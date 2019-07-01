@@ -30,131 +30,131 @@ sub _ReplaceStringByHashKey($$;$);
 
 our %compasspoints = (
     en => [
-        [ "North",           "N" ],
-        [ "North-Northeast", "NNE" ],
-        [ "North-East",      "NE" ],
-        [ "East-Northeast",  "ENE" ],
-        [ "East",            "E" ],
-        [ "East-Southeast",  "ESE" ],
-        [ "Southeast",       "SE" ],
-        [ "South-Southeast", "SSE" ],
-        [ "South",           "S" ],
-        [ "South-Southwest", "SSW" ],
-        [ "Southwest",       "SW" ],
-        [ "West-Southwest",  "WSW" ],
-        [ "West",            "W" ],
-        [ "West-Northwest",  "WNW" ],
-        [ "Northwest",       "NW" ],
-        [ "North-Northwest", "NNW" ],
+        [ "North",           "N",   '▲' ],
+        [ "North-Northeast", "NNE", '⬈' ],
+        [ "North-East",      "NE",  '⬈' ],
+        [ "East-Northeast",  "ENE", '⬈' ],
+        [ "East",            "E",   '▶' ],
+        [ "East-Southeast",  "ESE", '⬊' ],
+        [ "Southeast",       "SE",  '⬊' ],
+        [ "South-Southeast", "SSE", '⬊' ],
+        [ "South",           "S",   '▼' ],
+        [ "South-Southwest", "SSW", '⬋' ],
+        [ "Southwest",       "SW",  '⬋' ],
+        [ "West-Southwest",  "WSW", '⬋' ],
+        [ "West",            "W",   '◀' ],
+        [ "West-Northwest",  "WNW", '⬉' ],
+        [ "Northwest",       "NW",  '⬉' ],
+        [ "North-Northwest", "NNW", '⬉' ],
     ],
     de => [
-        [ "Norden",        "N" ],
-        [ "Nord-Nordost",  "NNO" ],
-        [ "Nord-Ost",      "NO" ],
-        [ "Ost-Nordost",   "ONO" ],
-        [ "Ost",           "O" ],
-        [ "Ost-Südost",   "OSO" ],
-        [ "Südost",       "SO" ],
-        [ "Süd-Südost",  "SSO" ],
-        [ "Süd",          "S" ],
-        [ "Süd-Südwest", "SSW" ],
-        [ "Südwest",      "SW" ],
-        [ "West-Südwest", "WSW" ],
-        [ "West",          "W" ],
-        [ "West-Nordwest", "WNW" ],
-        [ "Nordwest",      "NW" ],
-        [ "Nord-Nordwest", "NNW" ],
+        [ "Norden",        "N",   '▲' ],
+        [ "Nord-Nordost",  "NNO", '⬈' ],
+        [ "Nord-Ost",      "NO",  '⬈' ],
+        [ "Ost-Nordost",   "ONO", '⬈' ],
+        [ "Ost",           "O",   '▶' ],
+        [ "Ost-Südost",   "OSO", '⬊' ],
+        [ "Südost",       "SO",  '⬊' ],
+        [ "Süd-Südost",  "SSO", '⬊' ],
+        [ "Süd",          "S",   '▼' ],
+        [ "Süd-Südwest", "SSW", '⬋' ],
+        [ "Südwest",      "SW",  '⬋' ],
+        [ "West-Südwest", "WSW", '⬋' ],
+        [ "West",          "W",   '◀' ],
+        [ "West-Nordwest", "WNW", '⬉' ],
+        [ "Nordwest",      "NW",  '⬉' ],
+        [ "Nord-Nordwest", "NNW", '⬉' ],
     ],
     es => [
-        [ "Norte",          "N" ],
-        [ "Norte-Noreste",  "NNE" ],
-        [ "Noreste",        "NE" ],
-        [ "Este-Noreste",   "ENE" ],
-        [ "Este",           "E" ],
-        [ "Este-Sureste",   "ESE" ],
-        [ "Sureste",        "SE" ],
-        [ "Sur-Sureste",    "SSE" ],
-        [ "Sur",            "S" ],
-        [ "Sudoeste",       "SDO" ],
-        [ "Sur-Oeste",      "SO" ],
-        [ "Oeste-Suroeste", "OSO" ],
-        [ "Oeste",          "O" ],
-        [ "Oeste-Noroeste", "ONO" ],
-        [ "Noroeste",       "NO" ],
-        [ "Norte-Noroeste", "NNE" ],
+        [ "Norte",          "N",   '▲' ],
+        [ "Norte-Noreste",  "NNE", '⬈' ],
+        [ "Noreste",        "NE",  '⬈' ],
+        [ "Este-Noreste",   "ENE", '⬈' ],
+        [ "Este",           "E",   '▶' ],
+        [ "Este-Sureste",   "ESE", '⬊' ],
+        [ "Sureste",        "SE",  '⬊' ],
+        [ "Sur-Sureste",    "SSE", '⬊' ],
+        [ "Sur",            "S",   '▼' ],
+        [ "Sudoeste",       "SDO", '⬋' ],
+        [ "Sur-Oeste",      "SO",  '⬋' ],
+        [ "Oeste-Suroeste", "OSO", '⬋' ],
+        [ "Oeste",          "O",   '◀' ],
+        [ "Oeste-Noroeste", "ONO", '⬉' ],
+        [ "Noroeste",       "NO",  '⬉' ],
+        [ "Norte-Noroeste", "NNE", '⬉' ],
 
     ],
     it => [
-        [ "Nord",             "N" ],
-        [ "Nord-Nord-Est",    "NNE" ],
-        [ "Nord-Est",         "NE" ],
-        [ "Est-Nord-Est",     "ENE" ],
-        [ "Est",              "E" ],
-        [ "Est-Sud-Est",      "ESE" ],
-        [ "Sud-Est",          "SE" ],
-        [ "Sud-Sud-Est",      "SSE" ],
-        [ "Sud",              "S" ],
-        [ "Sud-Sud-Ovest",    "SSO" ],
-        [ "Sud-Ovest",        "SO" ],
-        [ "Ovest-Sud-Ovest",  "OSO" ],
-        [ "Ovest",            "O" ],
-        [ "Ovest-Nord-Ovest", "ONO" ],
-        [ "Nord-Ovest",       "NO" ],
-        [ "Nord-Nord-Ovest",  "NNO" ],
+        [ "Nord",             "N",   '▲' ],
+        [ "Nord-Nord-Est",    "NNE", '⬈' ],
+        [ "Nord-Est",         "NE",  '⬈' ],
+        [ "Est-Nord-Est",     "ENE", '⬈' ],
+        [ "Est",              "E",   '▶' ],
+        [ "Est-Sud-Est",      "ESE", '⬊' ],
+        [ "Sud-Est",          "SE",  '⬊' ],
+        [ "Sud-Sud-Est",      "SSE", '⬊' ],
+        [ "Sud",              "S",   '▼' ],
+        [ "Sud-Sud-Ovest",    "SSO", '⬋' ],
+        [ "Sud-Ovest",        "SO",  '⬋' ],
+        [ "Ovest-Sud-Ovest",  "OSO", '⬋' ],
+        [ "Ovest",            "O",   '◀' ],
+        [ "Ovest-Nord-Ovest", "ONO", '⬉' ],
+        [ "Nord-Ovest",       "NO",  '⬉' ],
+        [ "Nord-Nord-Ovest",  "NNO", '⬉' ],
     ],
     nl => [
-        [ "Noorden",           "N" ],
-        [ "Noord-Noordoosten", "NNO" ],
-        [ "Noordoosten",       "NO" ],
-        [ "Oost-Noordoost",    "ONO" ],
-        [ "Oosten",            "O" ],
-        [ "Oost-Zuidoost",     "OZO" ],
-        [ "Zuidoosten",        "ZO" ],
-        [ "Zuid-Zuidoost",     "ZZO" ],
-        [ "Zuiden",            "Z" ],
-        [ "Zuid-Zuidwest",     "ZZW" ],
-        [ "Zuidwest",          "ZW" ],
-        [ "West-Zuidwest",     "WZW" ],
-        [ "West",              "W" ],
-        [ "West-Noord-West",   "WNW" ],
-        [ "Noord-West",        "NW" ],
-        [ "Noord-Noord-West",  "NNW" ],
+        [ "Noorden",           "N",   '▲' ],
+        [ "Noord-Noordoosten", "NNO", '⬈' ],
+        [ "Noordoosten",       "NO",  '⬈' ],
+        [ "Oost-Noordoost",    "ONO", '⬈' ],
+        [ "Oosten",            "O",   '▶' ],
+        [ "Oost-Zuidoost",     "OZO", '⬊' ],
+        [ "Zuidoosten",        "ZO",  '⬊' ],
+        [ "Zuid-Zuidoost",     "ZZO", '⬊' ],
+        [ "Zuiden",            "Z",   '▼' ],
+        [ "Zuid-Zuidwest",     "ZZW", '⬋' ],
+        [ "Zuidwest",          "ZW",  '⬋' ],
+        [ "West-Zuidwest",     "WZW", '⬋' ],
+        [ "West",              "W",   '◀' ],
+        [ "West-Noord-West",   "WNW", '⬉' ],
+        [ "Noord-West",        "NW",  '⬉' ],
+        [ "Noord-Noord-West",  "NNW", '⬉' ],
     ],
     fr => [
-        [ "Nord",             "N" ],
-        [ "Nord-Nord-Est",    "NNE" ],
-        [ "Nord-Est",         "NE" ],
-        [ "Est-Nord-Est",     "ENE" ],
-        [ "Est",              "E" ],
-        [ "Est-Sud-Est",      "ESE" ],
-        [ "Sud-Est",          "SE" ],
-        [ "Sud-Sud-Est",      "SSE" ],
-        [ "Sud",              "S" ],
-        [ "Sud-Sud-Ouest",    "SSW" ],
-        [ "Sud-Ouest",        "SW" ],
-        [ "Ouest-Sud-Ouest",  "OSO" ],
-        [ "Ouest",            "O" ],
-        [ "Ouest-Nord-Ouest", "ONO" ],
-        [ "Nord-Ouest",       "NO" ],
-        [ "Nord-Nord-Ouest",  "NNO" ],
+        [ "Nord",             "N",   '▲' ],
+        [ "Nord-Nord-Est",    "NNE", '⬈' ],
+        [ "Nord-Est",         "NE",  '⬈' ],
+        [ "Est-Nord-Est",     "ENE", '⬈' ],
+        [ "Est",              "E",   '▶' ],
+        [ "Est-Sud-Est",      "ESE", '⬊' ],
+        [ "Sud-Est",          "SE",  '⬊' ],
+        [ "Sud-Sud-Est",      "SSE", '⬊' ],
+        [ "Sud",              "S",   '▼' ],
+        [ "Sud-Sud-Ouest",    "SSW", '⬋' ],
+        [ "Sud-Ouest",        "SW",  '⬋' ],
+        [ "Ouest-Sud-Ouest",  "OSO", '⬋' ],
+        [ "Ouest",            "O",   '◀' ],
+        [ "Ouest-Nord-Ouest", "ONO", '⬉' ],
+        [ "Nord-Ouest",       "NO",  '⬉' ],
+        [ "Nord-Nord-Ouest",  "NNO", '⬉' ],
     ],
     pl => [
-        [ "Północ",                        "N" ],
-        [ "Północny-Północny-Wschód",   "NNE" ],
-        [ "Północny-Wschód",              "NE" ],
-        [ "Wschód-Północny-Wschód",      "ENE" ],
-        [ "Wschód",                         "E" ],
-        [ "Wschód-Południowy-Wschód",     "ESE" ],
-        [ "Południowy-Południowy-Wschód", "SE" ],
-        [ "Południowy-Wschód",             "SSE" ],
-        [ "Południe",                       "S" ],
-        [ "Południowo-Południowy-Zachód", "SSW" ],
-        [ "Południowy-Zachód",             "SW" ],
-        [ "Zachód-Południowy-Zachód",     "WSW" ],
-        [ "Zachód",                         "W" ],
-        [ "Zachód-Północny-Zachód",      "WNW" ],
-        [ "Północny-Zachód",              "NW" ],
-        [ "Północno-Północny-Zachód",   "NNW" ],
+        [ "Północ",                        "N",   '▲' ],
+        [ "Północny-Północny-Wschód",   "NNE", '⬈' ],
+        [ "Północny-Wschód",              "NE",  '⬈' ],
+        [ "Wschód-Północny-Wschód",      "ENE", '⬈' ],
+        [ "Wschód",                         "E",   '▶' ],
+        [ "Wschód-Południowy-Wschód",     "ESE", '⬊' ],
+        [ "Południowy-Południowy-Wschód", "SE",  '⬊' ],
+        [ "Południowy-Wschód",             "SSE", '⬊' ],
+        [ "Południe",                       "S",   '▼' ],
+        [ "Południowo-Południowy-Zachód", "SSW", '⬋' ],
+        [ "Południowy-Zachód",             "SW",  '⬋' ],
+        [ "Zachód-Południowy-Zachód",     "WSW", '⬋' ],
+        [ "Zachód",                         "W",   '◀' ],
+        [ "Zachód-Północny-Zachód",      "WNW", '⬉' ],
+        [ "Północny-Zachód",              "NW",  '⬉' ],
+        [ "Północno-Północny-Zachód",   "NNW", '⬉' ],
     ],
 );
 
@@ -193,53 +193,31 @@ our %hr_formats = (
     ### lang ref ###
     #
 
-    en => {
-        ref => "std",
-    },
+    en => { ref => "std", },
 
-    de => {
-        ref => "std-fr",
-    },
+    de => { ref => "std-fr", },
 
     de_at => {
         ref => "std-fr",
         min => 4,
     },
 
-    de_ch => {
-        ref => "std",
-    },
+    de_ch => { ref => "std", },
 
-    nl => {
-        ref => "std-fr",
-    },
+    nl => { ref => "std-fr", },
 
-    fr => {
-        ref => "std-fr",
-    },
+    fr => { ref => "std-fr", },
 
-    pl => {
-        ref => "std-fr",
-    },
+    pl => { ref => "std-fr", },
 
     ### number ref ###
     #
 
-    0 => {
-        ref => "std",
-    },
-    1 => {
-        ref => "std-fr",
-    },
-    2 => {
-        ref => "old-english",
-    },
-    3 => {
-        ref => "old-european",
-    },
-    4 => {
-        ref => "ch",
-    },
+    0 => { ref => "std", },
+    1 => { ref => "std-fr", },
+    2 => { ref => "old-english", },
+    3 => { ref => "old-european", },
+    4 => { ref => "ch", },
     5 => {
         ref => "std-fr",
         min => 4,
@@ -807,7 +785,7 @@ sub mi2km($;$) {
 sub direction2compasspoint($;$$) {
     my ( $deg, $txt, $lang ) = @_;
     my $i = floor( ( ( $deg + 11.25 ) % 360 ) / 22.5 );
-    return $i if ( defined($txt) && $txt == 0. );
+    return $i if (!wantarray && defined($txt) && $txt == 0. );
 
     my $directions_txt_i18n;
     $lang = main::AttrVal( "global", "language", "EN" ) unless ($lang);
@@ -818,6 +796,13 @@ sub direction2compasspoint($;$$) {
     else {
         $directions_txt_i18n = $compasspoints{en};
     }
+
+    return (
+        $directions_txt_i18n->[$i][0],
+        $directions_txt_i18n->[$i][1],
+        $directions_txt_i18n->[$i][2]
+    ) if wantarray;
+    return $directions_txt_i18n->[$i][2] if ( $txt && $txt == 3. );
     return $directions_txt_i18n->[$i][0] if ( $txt && $txt == 2. );
     return $directions_txt_i18n->[$i][1];
 }
@@ -993,8 +978,11 @@ sub distance($$$$;$$) {
       if ( $lat1 eq $lat2 && $lng1 eq $lng2 );
 
     my $aearth = 6378.137;    # GRS80/WGS84 semi major axis of earth ellipsoid
-    my $km = great_circle_distance( deg2rad($lat1), pi/2. - deg2rad($lng1),
-        deg2rad($lat2), pi/2. - deg2rad($lng2), $aearth );
+    my $km = great_circle_distance(
+        deg2rad($lat1), pi / 2. - deg2rad($lng1),
+        deg2rad($lat2), pi / 2. - deg2rad($lng2),
+        $aearth
+    );
 
     return _round(
         (
@@ -1131,24 +1119,38 @@ sub humanReadable($;$) {
       );
     my $min =
       ref($h)
-      && defined( $h->{min} )
-      ? $h->{min}
-      : ( !ref($f) && $hr_formats{$f}{min} ? $hr_formats{$f}{min} : 5 );
+      && defined( $h->{min} ) ? $h->{min}
+      : (
+        !ref($f)
+          && $hr_formats{$f}{min} ? $hr_formats{$f}{min}
+        : 5
+      );
     my $group =
       ref($h)
-      && defined( $h->{group} )
-      ? $h->{group}
-      : ( !ref($f) && $hr_formats{$f}{group} ? $hr_formats{$f}{group} : 3 );
+      && defined( $h->{group} ) ? $h->{group}
+      : (
+        !ref($f)
+          && $hr_formats{$f}{group} ? $hr_formats{$f}{group}
+        : 3
+      );
     my $delim =
       ref($h)
-      && $h->{delim}
-      ? $h->{delim}
-      : $hr_formats{ ( $l =~ /^de|nl|fr|pl/i ? "std-fr" : "std" ) }{delim};
+      && $h->{delim} ? $h->{delim}
+      : $hr_formats{
+        (
+            $l =~ /^de|nl|fr|pl/i ? "std-fr"
+            : "std"
+        )
+      }{delim};
     my $sep =
       ref($h)
-      && $h->{sep}
-      ? $h->{sep}
-      : $hr_formats{ ( $l =~ /^de|nl|fr|pl/i ? "std-fr" : "std" ) }{sep};
+      && $h->{sep} ? $h->{sep}
+      : $hr_formats{
+        (
+            $l =~ /^de|nl|fr|pl/i ? "std-fr"
+            : "std"
+        )
+      }{sep};
     my $reverse = ref($h) && defined( $h->{rev} ) ? $h->{rev} : 1;
 
     my @p = split( /\./, $v, 2 );
@@ -1477,9 +1479,15 @@ sub DaysOfMonth (;$$) {
     my $m = shift;
 
     return undef
-      unless ( !$y
+      unless (
+          !$y
         || $y =~ /^\d{10}(?:\.\d+)?$/
-        || ( $y =~ /^[1-2]\d{3}$/ && ( !$m || $m =~ /^\d{1,2}$/ ) ) );
+        || (
+            $y =~ /^[1-2]\d{3}$/
+            && (  !$m
+                || $m =~ /^\d{1,2}$/ )
+        )
+      );
 
     my $t = ( $y =~ /^\d{10}(?:\.\d+)?$/ ? $y : gettimeofday() );
     $y = 1900. + ( localtime($t) )[5] unless ($y);
@@ -1599,12 +1607,11 @@ sub GetDaytime(;$$$$) {
 
     $ret->{daytimeRel_s} =
       hms2s("$ret->{hour}:$ret->{min}:$ret->{sec}") - $ret->{sunrise_s};
-    $ret->{daytimeRel} = s2hms( $ret->{daytimeRel_s} );
-    $ret->{daytimeT_s} = $ret->{sunset_s} - $ret->{sunrise_s};
-    $ret->{daytimeT}   = s2hms( $ret->{daytimeT_s} );
-    $ret->{daytimeStageLn_s} =
-      $ret->{daytimeT_s} / $ret->{daytimeStages};
-    $ret->{daytimeStageLn} = s2hms( $ret->{daytimeStageLn_s} );
+    $ret->{daytimeRel}       = s2hms( $ret->{daytimeRel_s} );
+    $ret->{daytimeT_s}       = $ret->{sunset_s} - $ret->{sunrise_s};
+    $ret->{daytimeT}         = s2hms( $ret->{daytimeT_s} );
+    $ret->{daytimeStageLn_s} = $ret->{daytimeT_s} / $ret->{daytimeStages};
+    $ret->{daytimeStageLn}   = s2hms( $ret->{daytimeStageLn_s} );
     $ret->{daytimeStage_float} =
       $ret->{daytimeRel_s} / $ret->{daytimeStageLn_s};
     $ret->{daytimeStage} =
@@ -1695,7 +1702,8 @@ sub GetDaytime(;$$$$) {
     $ret->{events}{ $ret->{midnight_t} }{DESC} =
       "Begin of night time and new calendar day";
     $ret->{events}{ $ret->{1}{midnight_t} }{TYPE} = "dayshift";
-    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} = $ret->{date} . " 24:00:00";
+    $ret->{events}{ $ret->{1}{midnight_t} }{TIME} =
+      $ret->{date} . " 24:00:00";
     $ret->{events}{ $ret->{1}{midnight_t} }{DESC} =
       "End of calendar day and begin night time";
 
@@ -1742,8 +1750,7 @@ sub GetDaytime(;$$$$) {
         if ( $i == $ret->{daytimeStages} + 1 ) {
             $ret->{events}{$t}{TYPE}  = "daytime";
             $ret->{events}{$t}{VALUE} = "midevening";
-            $ret->{events}{$t}{DESC} =
-              "End of daytime";
+            $ret->{events}{$t}{DESC}  = "End of daytime";
         }
         else {
             $ret->{events}{$t}{TYPE}  = "daytimeStage";
@@ -1846,13 +1853,15 @@ sub GetSeason (;$$$) {
         else {
             $ret->{'-1'}{$l}{seasonMeteo_long} =
               $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
-            $ret->{$l}{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
+            $ret->{$l}{seasonMeteo_long} =
+              $seasons{$l}[ $ret->{seasonMeteo} ];
             $ret->{1}{$l}{seasonMeteo_long} =
               $seasons{$l}[ $ret->{1}{seasonMeteo} ];
 
             $ret->{'-1'}{$l}{seasonAstro_long} =
               $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
-            $ret->{$l}{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
+            $ret->{$l}{seasonAstro_long} =
+              $seasons{$l}[ $ret->{seasonAstro} ];
             $ret->{1}{$l}{seasonAstro_long} =
               $seasons{$l}[ $ret->{1}{seasonAstro} ];
         }
@@ -2045,7 +2054,8 @@ sub _GetSeasonPheno ($$;$$) {
         if ( $l eq 'en' ) {
             $ret->{'-1'}{seasonPheno_long} =
               $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
-            $ret->{seasonPheno_long} = $seasonsPheno{$l}[ $ret->{seasonPheno} ];
+            $ret->{seasonPheno_long} =
+              $seasonsPheno{$l}[ $ret->{seasonPheno} ];
             $ret->{1}{seasonPheno_long} =
               $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
         }
@@ -2107,13 +2117,17 @@ sub decimal_mark ($;$) {
     $thousands_sep = chr(0x202F)
       unless ( defined($thousands_sep) && $thousands_sep ne "" );
     my @grouping =
-      $grouping && $grouping =~ /^\d+$/ ? unpack( "C*", $grouping ) : (3);
+      $grouping && $grouping =~ /^\d+$/
+      ? unpack( "C*", $grouping )
+      : (3);
 
     $i =~ s/(\d{$grouping[0]})(?=\d)/$1$thousands_sep/g;
     $f =~ s/(\d{$grouping[0]})(?=\d)/$1$thousands_sep/g
       if ( defined($f) && $f ne '' );
 
-    return ( $s ? $s : '' ) . ( reverse $i )
+    return
+        ( $s ? $s : '' )
+      . ( reverse $i )
       . ( defined($f) && $f ne '' ? $decimal_point . $f : '' );
 }
 
