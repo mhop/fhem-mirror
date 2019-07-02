@@ -71,6 +71,7 @@ my %models = (
     itswitch    => 'simple',
     itdimmer    => 'dimmer',
     ev1527      => 'ev1527',
+    itswitch_CHN => 'itswitch_CHN',
 );
 
 my %bintotristate=(
@@ -183,7 +184,7 @@ IT_Set($@)
   return "Dummydevice $hash->{NAME}: will not set data" if(IsDummy($hash->{NAME}));
 
   my $list = "";
-  $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
+  $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" && AttrVal($name, "model", "") ne "itswitch_CHN");
   
   if ($hash->{userV1setCodes}) {
      if ($hash->{READINGS}{protocol}{VAL} eq "EV1527" || $hash->{READINGS}{protocol}{VAL} eq "V1") {
@@ -1210,7 +1211,9 @@ IT_Parse($$)
         } else {
             readingsSingleUpdate($def->{$name},"dim",100,1);
         }
-      }
+      } elsif ( AttrVal($name, "model", "") eq "itswitch_CHN" ) {
+				$newstate="closed";
+			}
     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
       $newstate="off";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
@@ -1239,7 +1242,9 @@ IT_Parse($$)
       } elsif ($binVal == 0) {
         $newstate="off";
       } 
-    } else {
+		} elsif ( AttrVal($name, "model", "") eq "itswitch_CHN" ) {
+				$newstate="open";
+		} else {
       Log3 $def->{$name}{NAME},3,"$ioname IT: Code $onoffcode not supported by $def->{$name}{NAME}.";
       next;
     }
@@ -1508,6 +1513,8 @@ Examples:
 
           <b>Dimmer</b>: itdimmer<br>
 
+          <b>door/window contact (china)</b>: itswitch_CHN<br>
+					
           <b>Receiver/Actor</b>: itswitch<br>
 
           <b>EV1527</b>: ev1527
@@ -1795,6 +1802,8 @@ Beispiele:
 
         <b>Dimmer</b>: itdimmer<br>
 
+        <b>T&uuml;r/Fensterkontakt (China)</b>: itswitch_CHN<br>
+				
         <b>Empf&auml;nger/Actor</b>: itswitch<br>
 
         <b>EV1527</b>: ev1527
