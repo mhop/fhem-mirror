@@ -14,9 +14,27 @@
  *			</li>
 */
 
+/* Versionen:
+ *
+ *  1.0.0	02.07.2019	initial version
+*/
+
 /* global ftui:true, Modul_widget:true */
 
 "use strict";
+
+function depends_smaportalspg (){
+    var deps = [];
+
+	var userCSS = $('head').find("[href$='css/fhem-tablet-ui.css']");
+
+	if (userCSS.length)
+		userCSS.before('<link rel="stylesheet" href="'+ ftui.config.basedir + 'css/ftui_smaportalspg.css" type="text/css" />')
+	else
+		$('head').append('<link rel="stylesheet" href="'+ ftui.config.basedir + 'css/ftui_smaportalspg.css" type="text/css" />');
+			
+    return deps;
+};
 
 var Modul_smaportalspg = function () {
 
@@ -56,8 +74,6 @@ var Modul_smaportalspg = function () {
                         ftui.sendFhemCommand(cmd)
                             .done(function (data, dev) {
                             //console.log('received update for dynamic html : ', $(this) );
-							data = '<link rel="stylesheet" href="' + ftui.config.basedir + 'css/ftui_smaportalspg.css" type="text/css" />'
-									+ data;
                             elem.html(data);
                         });
                     }
