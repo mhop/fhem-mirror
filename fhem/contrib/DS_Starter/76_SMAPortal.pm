@@ -162,6 +162,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.2"  => "02.07.2019  change header design of portal graphics ",
   "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
   "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
@@ -1937,7 +1938,7 @@ sub PortalAsHtml ($$;$) {
   $colorw     =  AttrVal($wlname, 'weatherColor',       undef);
 
   $wlalias    =  AttrVal($wlname, 'alias',            $wlname);
-  $header     = (AttrNum($wlname, 'showHeader', 1)) ? 1 : undef; 
+  $header     =  AttrNum($wlname, 'showHeader', 1); 
 
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
@@ -1978,26 +1979,22 @@ sub PortalAsHtml ($$;$) {
   # Sonst sind schmale Ausgaben nicht von den Balken bzw. deren Anzahl abhängig, sondern allein durch die Breite des Headers bestimmt
 
   if ($header) {
-      my ($h1,$h2);
       if(AttrVal("global","language","EN") eq "DE") {
-          $h1 = "Prognose [pv] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$pv4h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$pvRe&nbsp;/ Morgen:&nbsp;$pvTo";
-          $h2 = "Prognose [co] - nächste&nbsp;4&nbsp;Stunden:&nbsp;$co4h&nbsp;/ Rest&nbsp;des&nbsp;Tages:&nbsp;$coRe&nbsp;/ Morgen:&nbsp;$coTo";
           my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
           $lup  = "$3.$2.$1 $4";
           $lupt = "letzte Aktualisierung:"; 
-      } else {
-          $h1 = "forecast&nbsp;data&nbsp;[pv]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$pv4h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$pvRe&nbsp;/ tomorrow:&nbsp;$pvTo";
-          $h2 = "forecast&nbsp;data&nbsp;[co]&nbsp;- next&nbsp;4&nbsp;hours:&nbsp;$co4h&nbsp;/ rest&nbsp;of&nbsp;day:&nbsp;$coRe&nbsp;/ tomorrow:&nbsp;$coTo";
       }
 
-      $lup = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;($lupt $lup)";
-      if ($type eq 'pv') { 
-          $header = $dlink.' '.$lup.' <br/>'.$h1; 
-      } elsif ($type eq 'co') { 
-          $header = $dlink.' '.$lup.' <br/>'.$h2; 
-      } else { 
-          $header = $dlink.' '.$lup.' <br/>'.$h1.'<br/>'.$h2;
-      }
+      $header  = "<table align=\"center\">";	
+      $header .= "<tr><td colspan=\"2\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
+	  if(AttrVal("global","language","EN") eq "DE") {
+		  $header .= "<tr> <td><b>PV > nächste 4h:</b></td> <td align=right>$pv4h</td> <td><b>Rest Heute:</b></td> <td align=right>$pvRe</td> <td><b>Morgen:</b></td> <td align=right>$pvTo</td> </tr>";
+		  $header .= "<tr> <td><b>CO > nächste 4h:</b></td> <td align=right>$co4h</td> <td><b>Rest Heute:</b></td> <td align=right>$coRe</td> <td><b>Morgen:</b></td> <td align=right>$coTo</td> </tr>";
+	  } else {
+		  $header .= "<tr> <td><b>PV > next 4h:</b></td> <td align=right>$pv4h</td> <td><b>rest today:</b></td> <td align=right>$pvRe</td> <td><b>tomorrow:</b></td> <td align=right>$pvTo</td> </tr>";
+		  $header .= "<tr> <td><b>CO > next 4h:</b></td> <td align=right>$co4h</td> <td><b>rest today:</b></td> <td align=right>$coRe</td> <td><b>tomorrow:</b></td> <td align=right>$coTo</td> </tr>";	
+	  }
+      $header .= "</table>";	 
   }
 
   # Werte aktuelle Stunde
