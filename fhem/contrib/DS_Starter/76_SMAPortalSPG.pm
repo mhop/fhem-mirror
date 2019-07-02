@@ -358,11 +358,16 @@ The module SMAPortalSPG is a device module attuned to the module SMAPortal for d
   
   <a name="SMAPortalSPGget"></a>
   <b>Get</b> 
-  
   <ul>
-  N/A
+    <br>
+    <ul>
+      <li><b> get &lt;name&gt; html </b> </li>  
+      The SMAPortal graphic is fetched as HTML-code and depicted. 
+    </ul>
+    <br>
+    
+    <br>
   </ul>
-  <br>
 
   <a name="SMAPortalSPGattr"></a>
   <b>Attribute</b>
@@ -596,11 +601,16 @@ Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Defin
   
   <a name="SMAPortalSPGget"></a>
   <b>Get</b> 
-  
   <ul>
-  N/A
+    <br>
+    <ul>
+      <li><b> get &lt;name&gt; html </b> </li>  
+      Die SMAPortal-Grafik wird als HTML-Code abgerufen und wiedergegeben. 
+    </ul>
+    <br>
+    
+    <br>
   </ul>
-  <br>
 
   <a name="SMAPortalSPGattr"></a>
   <b>Attribute</b>
