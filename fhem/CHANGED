@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 82_LGTV_WebOS: add wakeupCmd attribut to be executed when turning
+                  on an absent device. Can be an FHEM command or Perl command
  - bugfix:  32_withings: handle duplicate pwv values
  - change:  49_SSCam: increase get SID timeout to at least 60 s to avoid 
                       potential auth.cgi problem, set compatibility to SVS 
