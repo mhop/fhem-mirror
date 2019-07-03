@@ -30,66 +30,97 @@
 #$cmd = "qx(gatttool -i $hci -b $mac --char-read -a 0x38";   # Firmware und Batterie
 #  e8 00 00 58 0f 00 00 34 f1 02 02 3c 00 fb 34 9b
 
-package main;
-
-use strict;
-use warnings;
-
-my $version = "2.4.7";
-
-sub XiaomiBTLESens_Initialize($) {
-
-    my ($hash) = @_;
-
-    $hash->{SetFn}    = "XiaomiBTLESens::Set";
-    $hash->{GetFn}    = "XiaomiBTLESens::Get";
-    $hash->{DefFn}    = "XiaomiBTLESens::Define";
-    $hash->{NotifyFn} = "XiaomiBTLESens::Notify";
-    $hash->{UndefFn}  = "XiaomiBTLESens::Undef";
-    $hash->{AttrFn}   = "XiaomiBTLESens::Attr";
-    $hash->{AttrList} =
-        "interval "
-      . "disable:1 "
-      . "disabledForIntervals "
-      . "hciDevice:hci0,hci1,hci2 "
-      . "batteryFirmwareAge:8h,16h,24h,32h,40h,48h "
-      . "minFertility "
-      . "maxFertility "
-      . "minTemp "
-      . "maxTemp "
-      . "minMoisture "
-      . "maxMoisture "
-      . "minLux "
-      . "maxLux "
-      . "sshHost "
-      . "model:flowerSens,thermoHygroSens "
-      . "blockingCallLoglevel:2,3,4,5 "
-      . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{XiaomiBTLESens}{defptr} } ) {
-        my $hash = $modules{XiaomiBTLESens}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
-}
-
-package XiaomiBTLESens;
+package FHEM::XiaomiBTLESens;
 
 my $missingModul = "";
 
 use strict;
 use warnings;
 use POSIX;
+use FHEM::Meta;
 
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import GP_Export);
 
-eval "use JSON;1"     or $missingModul .= "JSON ";
+# try to use JSON::MaybeXS wrapper
+#   for chance of better performance + open code
+eval {
+    require JSON::MaybeXS;
+    import JSON::MaybeXS qw( decode_json encode_json );
+    1;
+};
+
+if ($@) {
+    $@ = undef;
+
+    # try to use JSON wrapper
+    #   for chance of better performance
+    eval {
+
+        # JSON preference order
+        local $ENV{PERL_JSON_BACKEND} =
+          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+
+        require JSON;
+        import JSON qw( decode_json encode_json );
+        1;
+    };
+
+    if ($@) {
+        $@ = undef;
+
+        # In rare cases, Cpanel::JSON::XS may
+        #   be installed but JSON|JSON::MaybeXS not ...
+        eval {
+            require Cpanel::JSON::XS;
+            import Cpanel::JSON::XS qw(decode_json encode_json);
+            1;
+        };
+
+        if ($@) {
+            $@ = undef;
+
+            # In rare cases, JSON::XS may
+            #   be installed but JSON not ...
+            eval {
+                require JSON::XS;
+                import JSON::XS qw(decode_json encode_json);
+                1;
+            };
+
+            if ($@) {
+                $@ = undef;
+
+                # Fallback to built-in JSON which SHOULD
+                #   be available since 5.014 ...
+                eval {
+                    require JSON::PP;
+                    import JSON::PP qw(decode_json encode_json);
+                    1;
+                };
+
+                if ($@) {
+                    $@ = undef;
+
+                    # Fallback to JSON::backportPP in really rare cases
+                    require JSON::backportPP;
+                    import JSON::backportPP qw(decode_json encode_json);
+                    1;
+                }
+            }
+        }
+    }
+}
+
 eval "use Blocking;1" or $missingModul .= "Blocking ";
 
 #use Data::Dumper;          only for Debugging
 
 ## Import der FHEM Funktionen
+#-- Run before package compilation
 BEGIN {
+
+    # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
           readingsBulkUpdate
@@ -112,9 +143,17 @@ BEGIN {
           BlockingKill
           BlockingCall
           FmtDateTime
+          readingFnAttributes
           makeDeviceName)
     );
 }
+
+#-- Export to main context with different name
+GP_Export(
+    qw(
+      Initialize
+      )
+);
 
 my %XiaomiModels = (
     flowerSens => {
@@ -144,6 +183,38 @@ my %CallBatteryAge = (
     '48h' => 172800
 );
 
+sub Initialize($) {
+
+    my ($hash) = @_;
+
+    $hash->{SetFn}    = "FHEM::XiaomiBTLESens::Set";
+    $hash->{GetFn}    = "FHEM::XiaomiBTLESens::Get";
+    $hash->{DefFn}    = "FHEM::XiaomiBTLESens::Define";
+    $hash->{NotifyFn} = "FHEM::XiaomiBTLESens::Notify";
+    $hash->{UndefFn}  = "FHEM::XiaomiBTLESens::Undef";
+    $hash->{AttrFn}   = "FHEM::XiaomiBTLESens::Attr";
+    $hash->{AttrList} =
+        "interval "
+      . "disable:1 "
+      . "disabledForIntervals "
+      . "hciDevice:hci0,hci1,hci2 "
+      . "batteryFirmwareAge:8h,16h,24h,32h,40h,48h "
+      . "minFertility "
+      . "maxFertility "
+      . "minTemp "
+      . "maxTemp "
+      . "minMoisture "
+      . "maxMoisture "
+      . "minLux "
+      . "maxLux "
+      . "sshHost "
+      . "model:flowerSens,thermoHygroSens "
+      . "blockingCallLoglevel:2,3,4,5 "
+      . $readingFnAttributes;
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
+}
+
 # declare prototype
 sub ExecGatttool_Run($);
 
@@ -151,6 +222,9 @@ sub Define($$) {
 
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t][ \t]*", $def );
+
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return "too few parameters: define <name> XiaomiBTLESens <BTMAC>"
       if ( @a != 3 );
@@ -162,7 +236,7 @@ sub Define($$) {
     my $mac  = $a[2];
 
     $hash->{BTMAC}                       = $mac;
-    $hash->{VERSION}                     = $version;
+    $hash->{VERSION}                     = version->parse($VERSION)->normal;
     $hash->{INTERVAL}                    = 300;
     $hash->{helper}{CallSensDataCounter} = 0;
     $hash->{helper}{CallBattery}         = 0;
@@ -394,7 +468,7 @@ sub stateRequestTimer($) {
     stateRequest($hash);
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL} + int( rand(300) ),
-        "XiaomiBTLESens::stateRequestTimer", $hash );
+        "FHEM::XiaomiBTLESens::stateRequestTimer", $hash );
 
     Log3 $name, 4,
       "XiaomiBTLESens ($name) - stateRequestTimer: Call Request Timer";
@@ -427,10 +501,12 @@ sub Set($$@) {
     }
     else {
         my $list = "";
-        $list .= "resetBatteryTimestamp:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
+        $list .= "resetBatteryTimestamp:noArg"
+          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+            and AttrVal( $name, 'model', 'none' ) ne 'none' );
 
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -470,10 +546,12 @@ sub Get($$@) {
     }
     else {
         my $list = "";
-        $list .= "sensorData:noArg firmware:noArg" unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
+        $list .= "sensorData:noArg firmware:noArg"
+          unless ( AttrVal( $name, 'model', 'none' ) eq 'none' );
         $list .= " devicename:noArg"
           if (
-            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens' and AttrVal( $name, 'model', 'none' ) ne 'none' );
+            AttrVal( $name, 'model', 'thermoHygroSens' ) eq 'thermoHygroSens'
+            and AttrVal( $name, 'model', 'none' ) ne 'none' );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -493,11 +571,11 @@ sub CreateParamGatttool($@) {
 
     if ( $mod eq 'read' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "XiaomiBTLESens::ExecGatttool_Run",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
             $name . "|" . $mac . "|" . $mod . "|" . $handle,
-            "XiaomiBTLESens::ExecGatttool_Done",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
             90,
-            "XiaomiBTLESens::ExecGatttool_Aborted",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
             $hash
         ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
 
@@ -509,16 +587,16 @@ sub CreateParamGatttool($@) {
     }
     elsif ( $mod eq 'write' ) {
         $hash->{helper}{RUNNING_PID} = BlockingCall(
-            "XiaomiBTLESens::ExecGatttool_Run",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Run",
             $name . "|"
               . $mac . "|"
               . $mod . "|"
               . $handle . "|"
               . $value . "|"
               . $XiaomiModels{ AttrVal( $name, 'model', '' ) }{wdatalisten},
-            "XiaomiBTLESens::ExecGatttool_Done",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Done",
             90,
-            "XiaomiBTLESens::ExecGatttool_Aborted",
+            "FHEM::XiaomiBTLESens::ExecGatttool_Aborted",
             $hash
         ) unless ( exists( $hash->{helper}{RUNNING_PID} ) );
 
@@ -891,7 +969,20 @@ sub ThermoHygroSensHandle0x10($$) {
     $notification =~ s/\s+//g;
 
     $readings{'temperature'} = pack( 'H*', substr( $notification, 4, 8 ) );
-    $readings{'humidity'} = pack( 'H*', substr( $notification, ( (scalar(@numberOfHex) == 14 or (scalar(@numberOfHex) == 13 and $readings{'temperature'} > 9)) ? 18 : 16 ), 8 ) );
+    $readings{'humidity'} = pack(
+        'H*',
+        substr(
+            $notification,
+            (
+                (
+                    scalar(@numberOfHex) == 14
+                      or ( scalar(@numberOfHex) == 13
+                        and $readings{'temperature'} > 9 )
+                ) ? 18 : 16
+            ),
+            8
+        )
+    );
 
     $hash->{helper}{CallBattery} = 0;
     return \%readings;
@@ -1291,5 +1382,55 @@ sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 74_XiaomiBTLESens.pm
+{
+  "abstract": "Modul to retrieves data from a Xiaomi BTLE Sensors",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul um Daten vom Xiaomi BTLE Sensoren aus zu lesen"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Flower",
+    "BTLE",
+    "Xiaomi",
+    "Sensor",
+    "Bluetooth LE"
+  ],
+  "release_status": "stable",
+  "license": "GPL_2",
+  "version": "v2.6.0",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 1,
+        "Blocking": 1,
+        "JSON": 1
+      },
+      "recommends": {
+        "JSON": 0
+      },
+      "suggests": {
+        "Cpanel::JSON::XS": 0,
+        "JSON::XS": 0
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 
 =cut
