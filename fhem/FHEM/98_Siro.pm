@@ -400,7 +400,8 @@ sub SendCommand($@) {
 
 	Log3( $name, 4,"Siro_sendCommand: args1 - $args[1]") if defined $args[1];
 
-   if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
+   #if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
+   if ( (defined($args[1]) and $args[1] eq "longstop" ))
 		{
 			$SignalRepeats = AttrVal( $name, 'SIRO_signalLongStopRepeats', '15' );
 		}
@@ -408,6 +409,8 @@ sub SendCommand($@) {
 		{
 			 $SignalRepeats = AttrVal( $name, 'SIRO_signalRepeats', '10' );
 		}
+		
+		
 	
 	Log3( $name, 5,"Siro_sendCommand: repeats  - $SignalRepeats");
 	
