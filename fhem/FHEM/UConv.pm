@@ -21,8 +21,6 @@ use Time::Local;
 
 #use Data::Dumper;
 
-sub GetSeason (;$$$);
-sub _GetSeasonPheno ($$;$$);
 sub _ReplaceStringByHashKey($$;$);
 
 ####################
@@ -785,7 +783,7 @@ sub mi2km($;$) {
 sub direction2compasspoint($;$$) {
     my ( $deg, $txt, $lang ) = @_;
     my $i = floor( ( ( $deg + 11.25 ) % 360 ) / 22.5 );
-    return $i if (!wantarray && defined($txt) && $txt == 0. );
+    return $i if ( !wantarray && defined($txt) && $txt == 0. );
 
     my $directions_txt_i18n;
     $lang = main::AttrVal( "global", "language", "EN" ) unless ($lang);
@@ -1561,24 +1559,6 @@ sub IsLeapYear (;$) {
     return 1;
 }
 
-sub IsDst(;$) {
-    my ($time) = @_;
-    my $ret = _time($time);
-    return $ret->{isdst};
-}
-
-sub IsWeekend(;$) {
-    my ($time) = @_;
-    my $ret = _time($time);
-    return $ret->{iswe};
-}
-
-sub IsHoliday(;$) {
-    my ($time) = @_;
-    my $ret = _time($time);
-    return $ret->{isholiday};
-}
-
 # Get current stage of the daytime based on temporal hours
 # https://de.wikipedia.org/wiki/Temporale_Stunden
 sub GetDaytime(;$$$$) {
@@ -1620,10 +1600,6 @@ sub GetDaytime(;$$$$) {
       if ( $ret->{daytimeStage} < 1
         || $ret->{daytimeStage} > $ret->{daytimeStages} );
 
-    # include season data
-    $ret = GetSeason( $ret, $lang );
-    $ret = _GetSeasonPheno( $ret, $lang );
-
     # change midnight event when season changes
     $ret->{events}{ $ret->{midnight_t} }{VALUE} = 1
       if ( $ret->{seasonMeteoChng} && $ret->{seasonMeteoChng} == 1 );
@@ -1647,12 +1623,12 @@ sub GetDaytime(;$$$$) {
 
         #TODO let user define %sdt2daytimes through attribute
         $ret->{daytime} =
-          $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }{$ds}
+          $sdt2daytimes{1}{ $ret->{isdst} }{$ds}
           if (
-               $sdt2daytimes{ $ret->{seasonMeteo} }
-            && $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }
+               $sdt2daytimes{1}
+            && $sdt2daytimes{1}{ $ret->{isdst} }
             && defined(
-                $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }{$ds}
+                $sdt2daytimes{1}{ $ret->{isdst} }{$ds}
             )
           );
         $ds--;
@@ -1735,12 +1711,12 @@ sub GetDaytime(;$$$$) {
 
         # find daytime
         my $daytime;
-        $daytime = $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }{$i}
+        $daytime = $sdt2daytimes{1}{ $ret->{isdst} }{$i}
           if (
-               $sdt2daytimes{ $ret->{seasonMeteo} }
-            && $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }
+               $sdt2daytimes{1}
+            && $sdt2daytimes{1}{ $ret->{isdst} }
             && defined(
-                $sdt2daytimes{ $ret->{seasonMeteo} }{ $ret->{isdst} }{$i}
+                $sdt2daytimes{1}{ $ret->{isdst} }{$i}
             )
           );
 
@@ -1766,320 +1742,6 @@ sub GetDaytime(;$$$$) {
         }
         $i++;
         $b += $ret->{daytimeStageLn_s};
-    }
-
-    return $ret;
-}
-
-sub GetSeason (;$$$) {
-    my ( $time, $lang, $meteo ) = @_;
-    $lang = (
-          $main::attr{global}{language}
-        ? $main::attr{global}{language}
-        : "EN"
-    ) unless ($lang);
-
-    my $ret;
-    my $wanthash = 0;
-
-    if ( !$time ) {
-        $time = time;
-    }
-    elsif ( ref($time) eq "HASH" ) {
-        $ret      = $time;
-        $wanthash = 1;
-    }
-    elsif ( $time =~ /^(?:0|1|2|3)$/ ) {
-        return $seasons{ lc($lang) }
-          ? $seasons{ lc($lang) }[$time]
-          : $seasons{en}[$time];
-    }
-    elsif ( $time =~ /[A-Za-z]/ ) {
-        my $index =
-          $seasons{ lc($lang) }
-          ? _GetIndexFromArray( $time, $seasons{ lc($lang) } )
-          : undef;
-        return $index;
-    }
-    elsif ( $time !~ /^\d{10}(?:\.\d+)?$/ ) {
-        return undef;
-    }
-    else {
-        $ret = _time($time);
-    }
-
-    my $index = 0;
-    $index = 3 if ( $ret->{mon} <= 1 );
-    $index++ if ( $ret->{mon} >= 5 );
-    $index++ if ( $ret->{mon} >= 8 );
-    $index++ if ( $ret->{mon} == 11 );
-    $ret->{seasonMeteo} = $index;
-
-    $index = 0;
-    $index = 3 if ( $ret->{yday} < ( 80 + $ret->{isly} ) );
-    $index++ if ( $ret->{yday} >= ( 173 + $ret->{isly} ) );
-    $index++ if ( $ret->{yday} >= ( 265 + $ret->{isly} ) );
-    $index++ if ( $ret->{yday} >= ( 356 + $ret->{isly} ) );
-    $ret->{seasonAstro} = $index;
-
-    return ( $ret->{seasonMeteo}, $ret->{seasonAstro} ) if (wantarray);
-
-    ( $ret->{'-1'}{seasonMeteo}, $ret->{'-1'}{seasonAstro} ) =
-      GetSeason( $ret->{'-1'}{time_t}, $lang );
-    ( $ret->{1}{seasonMeteo}, $ret->{1}{seasonAstro} ) =
-      GetSeason( $ret->{1}{time_t}, $lang );
-
-    # text strings
-    my @langs = ('EN');
-    push @langs, $lang unless ( $lang =~ /^EN/i );
-    foreach (@langs) {
-        my $l = lc($_);
-        $l =~ s/^([a-z]+).*/$1/g;
-        next unless ( $seasons{$l} );
-
-        if ( $l eq 'en' ) {
-            $ret->{'-1'}{seasonMeteo_long} =
-              $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
-            $ret->{seasonMeteo_long} = $seasons{$l}[ $ret->{seasonMeteo} ];
-            $ret->{1}{seasonMeteo_long} =
-              $seasons{$l}[ $ret->{1}{seasonMeteo} ];
-
-            $ret->{'-1'}{seasonAstro_long} =
-              $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
-            $ret->{seasonAstro_long} = $seasons{$l}[ $ret->{seasonAstro} ];
-            $ret->{1}{seasonAstro_long} =
-              $seasons{$l}[ $ret->{1}{seasonAstro} ];
-        }
-        else {
-            $ret->{'-1'}{$l}{seasonMeteo_long} =
-              $seasons{$l}[ $ret->{'-1'}{seasonMeteo} ];
-            $ret->{$l}{seasonMeteo_long} =
-              $seasons{$l}[ $ret->{seasonMeteo} ];
-            $ret->{1}{$l}{seasonMeteo_long} =
-              $seasons{$l}[ $ret->{1}{seasonMeteo} ];
-
-            $ret->{'-1'}{$l}{seasonAstro_long} =
-              $seasons{$l}[ $ret->{'-1'}{seasonAstro} ];
-            $ret->{$l}{seasonAstro_long} =
-              $seasons{$l}[ $ret->{seasonAstro} ];
-            $ret->{1}{$l}{seasonAstro_long} =
-              $seasons{$l}[ $ret->{1}{seasonAstro} ];
-        }
-    }
-
-    $ret->{'-1'}{seasonMeteoChng} = 0;
-    $ret->{seasonMeteoChng}       = 0;
-    $ret->{1}{seasonMeteoChng}    = 0;
-
-    if ( $ret->{seasonMeteo} ne $ret->{1}{seasonMeteo} ) {
-        $ret->{seasonMeteoChng} = 2;
-        $ret->{1}{seasonMeteoChng} = 1;
-    }
-    elsif ( $ret->{seasonMeteo} ne $ret->{'-1'}{seasonMeteo} ) {
-        $ret->{'-1'}{seasonMeteoChng} = 2;
-        $ret->{seasonMeteoChng} = 1;
-    }
-
-    $ret->{'-1'}{seasonAstroChng} = 0;
-    $ret->{seasonAstroChng}       = 0;
-    $ret->{1}{seasonAstroChng}    = 0;
-
-    if ( $ret->{seasonAstro} ne $ret->{1}{seasonAstro} ) {
-        $ret->{seasonAstroChng} = 2;
-        $ret->{1}{seasonAstroChng} = 1;
-    }
-    elsif ( $ret->{seasonAstro} ne $ret->{'-1'}{seasonAstro} ) {
-        $ret->{'-1'}{seasonAstroChng} = 2;
-        $ret->{seasonAstroChng} = 1;
-    }
-
-    return $ret if ($wanthash);
-    return $ret->{$lang}{seasonMeteo_long}
-      ? $ret->{$lang}{seasonMeteo_long}
-      : $ret->{seasonMeteo_long}
-      if ($meteo);
-    return $ret->{$lang}{seasonAstro_long}
-      ? $ret->{$lang}{seasonAstro_long}
-      : $ret->{seasonAstro_long};
-}
-
-# Estimate phenologic season from astro and meteo season
-# https://de.wikipedia.org/wiki/Ph%C3%A4nologie#Ph.C3.A4nologischer_Kalender
-sub _GetSeasonPheno ($$;$$) {
-    my ( $time, $lang, $seasonAstro, $seasonMeteo ) = @_;
-    $lang = (
-          $main::attr{global}{language}
-        ? $main::attr{global}{language}
-        : "EN"
-    ) unless ($lang);
-
-    my $ret;
-
-    if ( ref($time) eq "HASH" ) {
-        $ret = $time;
-    }
-    else {
-        $ret                = _time($time);
-        $ret->{seasonAstro} = $seasonAstro;
-        $ret->{seasonMeteo} = $seasonMeteo;
-    }
-
-    # stick to astro season first
-    my $index = $seasons{pheno}[ $ret->{seasonAstro} ];
-
-    # meteos say its spring time
-    if ( $ret->{seasonMeteo} == 0 ) {
-        $index = 0;
-    }
-
-    # meteos say its summer time
-    elsif ( $ret->{seasonMeteo} == 1 ) {
-        $index = 3;
-    }
-
-    # meteos say its fall time
-    elsif ( $ret->{seasonMeteo} == 2 ) {
-        $index = 6;
-    }
-
-    # meteos say its winter time
-    elsif ( $ret->{seasonMeteo} == 3 ) {
-        $index = 9;
-    }
-
-    # if we know our position and spring is ahead
-    if (   ( $index == 0 || $index == 1 || $index == 2 )
-        && $main::attr{global}{latitude}
-        && $main::attr{global}{longitude} )
-    {
-        # it starts in south-west Portugal
-        my $dist = distance(
-            $main::attr{global}{latitude},
-            $main::attr{global}{longitude},
-            37.136633, -8.817837
-        );
-
-        # TODO: let begin of early spring be set by user
-        my $earlySpringBegin =
-          main::time_str2num( $ret->{year} . '-02-28 00:00:00' );
-        my $days = ( $time - $earlySpringBegin ) / ( 60 * 60 * 24 );
-
-        # comes with 40km per day
-        my $currDist = $dist - ( $days * 40 );
-
-        # when season reached location
-        if ( $currDist <= 0 ) {
-            $index = 2;
-        }
-
-        # when season made 60% of it's way
-        elsif ( $currDist <= $dist * 0.4 ) {
-            $index = 1;
-        }
-    }
-
-    # assume spring progress from calendar
-    elsif ( ( $index == 0 || $index == 1 || $index == 2 ) ) {
-        $index = 1 if ( $ret->{monISO} == 4 );
-        $index = 2 if ( $ret->{monISO} == 5 );
-    }
-
-    # assume summer progress from calendar
-    elsif ( $index == 3 ) {
-        $index = 4 if ( $ret->{monISO} == 7 );
-        $index = 5 if ( $ret->{monISO} == 8 );
-    }
-
-    # if we know our position and autumn is ahead
-    elsif (( $index == 6 || $index == 7 || $index == 8 )
-        && $main::attr{global}{latitude}
-        && $main::attr{global}{longitude} )
-    {
-        # it starts in Helsinki
-        my $dist = distance(
-            $main::attr{global}{latitude},
-            $main::attr{global}{longitude},
-            60.161880, 24.937267
-        );
-
-        # TODO: let begin of early fall be set by user
-        my $earlySpringBegin =
-          main::time_str2num( $ret->{year} . '-09-01 00:00:00' );
-        my $days = ( $time - $earlySpringBegin ) / ( 60 * 60 * 24 );
-
-        # comes with 40km per day
-        my $currDist = $dist - ( $days * 40 );
-
-        # when season reached location
-        if ( $currDist <= 0 ) {
-            $index = 8;
-        }
-
-        # when season made 60% of it's way
-        elsif ( $currDist <= $dist * 0.4 ) {
-            $index = 7;
-        }
-    }
-
-    # assume autumn progress from calendar
-    elsif ( ( $index == 6 || $index == 7 || $index == 8 ) ) {
-        $index = 7 if ( $ret->{monISO} == 10 );
-        $index = 8 if ( $ret->{monISO} == 11 );
-    }
-
-    $ret->{seasonPheno} = $index;
-    return ( $ret->{seasonPheno} ) if (wantarray);
-
-    ( $ret->{'-1'}{seasonPheno} ) = _GetSeasonPheno(
-        $ret->{'-1'}{time_t},
-        $lang,
-        $ret->{'-1'}{seasonAstro},
-        $ret->{'-1'}{seasonMeteo}
-    );
-    ( $ret->{1}{seasonPheno} ) = _GetSeasonPheno(
-        $ret->{1}{time_t},
-        $lang,
-        $ret->{1}{seasonAstro},
-        $ret->{1}{seasonMeteo}
-    );
-
-    # text strings
-    my @langs = ('EN');
-    push @langs, $lang unless ( $lang =~ /^EN/i );
-    foreach (@langs) {
-        my $l = lc($_);
-        $l =~ s/^([a-z]+).*/$1/g;
-        next unless ( $seasonsPheno{$l} );
-
-        if ( $l eq 'en' ) {
-            $ret->{'-1'}{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
-            $ret->{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{seasonPheno} ];
-            $ret->{1}{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
-        }
-        else {
-            $ret->{'-1'}{$l}{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{'-1'}{seasonPheno} ];
-            $ret->{$l}{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{seasonPheno} ];
-            $ret->{1}{$l}{seasonPheno_long} =
-              $seasonsPheno{$l}[ $ret->{1}{seasonPheno} ];
-        }
-    }
-
-    $ret->{'-1'}{seasonPhenoChng} = 0;
-    $ret->{seasonPhenoChng}       = 0;
-    $ret->{1}{seasonPhenoChng}    = 0;
-
-    if ( $ret->{seasonPheno} ne $ret->{1}{seasonPheno} ) {
-        $ret->{seasonPhenoChng} = 2;
-        $ret->{1}{seasonPhenoChng} = 1;
-    }
-    elsif ( $ret->{seasonPheno} ne $ret->{'-1'}{seasonPheno} ) {
-        $ret->{'-1'}{seasonPhenoChng} = 2;
-        $ret->{seasonPhenoChng} = 1;
     }
 
     return $ret;
@@ -2237,24 +1899,15 @@ sub _time(;$$$$) {
     }
     $ret{isholiday} = 0;
 
-    my $holidayDev =
-      $main::attr{global}{holiday2we}
-      && main::IsDevice( $main::attr{global}{holiday2we}, "holiday" )
-      ? $main::attr{global}{holiday2we}
-      : undef;
-
     my $tod;
     my $ytd;
     my $tom;
-    if ($holidayDev) {
+    if ( main::AttrVal( 'global', 'holiday2we', undef ) ) {
         my $date = sprintf( "%02d-%02d", $ret{monISO}, $ret{mday} );
-        $tod = main::holiday_refresh( $holidayDev, $date );
+        $tod = main::IsWe($date);
         if ($dayOffset) {
-            $date =
-              sprintf( "%02d-%02d", $ret{'-1'}{monISO}, $ret{'-1'}{mday} );
-            $ytd = main::holiday_refresh( $holidayDev, $date );
-            $date = sprintf( "%02d-%02d", $ret{1}{monISO}, $ret{1}{mday} );
-            $tom = main::holiday_refresh( $holidayDev, $date );
+            $ytd  = main::IsWe('yesterday');
+            $tom  = main::IsWe('tomorrow');
         }
 
         if ( $tod ne "none" ) {
