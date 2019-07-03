@@ -9,6 +9,7 @@ use FHEM::Meta;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
 use Unit;
+
 #use Data::Dumper;
 
 our ( @RESIDENTStk_attr, %RESIDENTStk_types, %RESIDENTStk_subTypes );
@@ -71,7 +72,7 @@ our ( @RESIDENTStk_attr, %RESIDENTStk_types, %RESIDENTStk_subTypes );
         ],
         GUEST => [
             'scene_visit_guests@orange', 'scene_childs_room@orange',
-            'scene_cleaning@orange',   'scene_visit_guests@orange'
+            'scene_cleaning@orange',     'scene_visit_guests@orange'
         ],
         PET => [
             'dog_silhouette@green', 'dog_silhouette@green',
@@ -1996,10 +1997,9 @@ m/^((?:next[rR]un)?\s*(off|OFF|([\+\-])?(([0-9]{2}):([0-9]{2})|([1-9]+[0-9]*)))?
     my $wakeupEnforced =
       ReadingsVal( $NAME, "wakeupEnforced",
         AttrVal( $NAME, "wakeupEnforced", 0 ) );
-    my $wakeupResetSwitcher = AttrVal( $NAME,    "wakeupResetSwitcher", 0 );
-    my $holidayDevice       = AttrVal( "global", "holiday2we",          0 );
-    my $room                = AttrVal( $NAME,    "room",                0 );
-    my $userattr            = AttrVal( $NAME,    "userattr",            0 );
+    my $wakeupResetSwitcher = AttrVal( $NAME, "wakeupResetSwitcher", 0 );
+    my $room                = AttrVal( $NAME, "room",                0 );
+    my $userattr            = AttrVal( $NAME, "userattr",            0 );
     my $lastRun = ReadingsVal( $NAME, "lastRun", "07:00" );
     my $nextRun = ReadingsVal( $NAME, "nextRun", "07:00" );
     my $running = ReadingsVal( $NAME, "running", 0 );
@@ -2646,31 +2646,6 @@ return;;\
         fhem "attr $wakeupAtdevice computeAfterInit 1";
     }
 
-    # verify holiday2we attribute
-    if ( $wakeupHolidays ne "" ) {
-        if ( !$holidayDevice ) {
-            Log3 $NAME, 3,
-              "RESIDENTStk $NAME: "
-              . "ERROR - wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
-            return "ERROR: "
-              . "wakeupHolidays set in this alarm clock but global attribute holiday2we not set!";
-        }
-        elsif ( !IsDevice($holidayDevice) ) {
-            Log3 $NAME, 3,
-              "RESIDENTStk $NAME: "
-              . "ERROR - global attribute holiday2we has reference to non-existing device $holidayDevice";
-            return "ERROR: "
-              . "global attribute holiday2we has reference to non-existing device $holidayDevice";
-        }
-        elsif ( !IsDevice( $holidayDevice, "holiday" ) ) {
-            Log3 $NAME, 3,
-              "RESIDENTStk $NAME: "
-              . "ERROR - global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
-            return "ERROR: "
-              . "global attribute holiday2we seems to have invalid device reference - $holidayDevice is not of type 'holiday'";
-        }
-    }
-
     # start
     #
     if ( $cmd eq "start" ) {
@@ -2981,9 +2956,8 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $wakeupEnforced =
       ReadingsVal( $NAME, "wakeupEnforced",
         AttrVal( $NAME, "wakeupEnforced", 0 ) );
-    my $wakeupResetSwitcher = AttrVal( $NAME,    "wakeupResetSwitcher", 0 );
-    my $wakeupWaitPeriod    = AttrVal( $NAME,    "wakeupWaitPeriod",    360 );
-    my $holidayDevice       = AttrVal( "global", "holiday2we",          0 );
+    my $wakeupResetSwitcher = AttrVal( $NAME, "wakeupResetSwitcher", 0 );
+    my $wakeupWaitPeriod    = AttrVal( $NAME, "wakeupWaitPeriod",    360 );
     my $lastRun = ReadingsVal( $NAME, "lastRun", "06:00" );
     my $nextRun = ReadingsVal( $NAME, "nextRun", "06:00" );
     my $wakeupUserdeviceState  = ReadingsVal( $wakeupUserdevice, "state",  0 );
@@ -2993,14 +2967,9 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $preventRun   = 0;
     my $holidayToday = 0;
 
-    if ( $wakeupHolidays ne ""
-        && IsDevice( $holidayDevice, "holiday" ) )
-    {
-        $holidayToday = 1
-          unless ( ReadingsVal( $holidayDevice, "state", "none" ) eq "none" );
-    }
-    else {
-        $wakeupHolidays = "";
+    if ( $wakeupHolidays ne "" ) {
+        $holidayToday = IsWe();
+        $wakeupHolidays = "" unless ($holidayToday);
     }
 
     my ( $sec, $min, $hour, $mday, $mon, $year, $today, $yday, $isdst ) =
@@ -3320,8 +3289,6 @@ sub RESIDENTStk_wakeupGetNext($;$) {
     my $definitiveNextTodayDev;
     my $definitiveNextTomorrowDev;
 
-    my $holidayDevice = AttrVal( "global", "holiday2we", 0 );
-
     # check for each registered wake-up device
     for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
         if ( !IsDevice($wakeupDevice) ) {
@@ -3387,17 +3354,9 @@ sub RESIDENTStk_wakeupGetNext($;$) {
             Log3 $name, 4,
               "RESIDENTStk $wakeupDevice: 01 - Not considering any holidays";
         }
-        elsif ( IsDevice( $holidayDevice, "holiday" ) ) {
-            $holidayToday = 1
-              unless (
-                ReadingsVal( $holidayDevice, "state", "none" ) eq "none" );
-            $holidayTomorrow = 1
-              unless (
-                ReadingsVal( $holidayDevice, "tomorrow", "none" ) eq "none" );
-
-            Log3 $name, 4,
-              "RESIDENTStk $wakeupDevice: "
-              . "01 - Holidays to be considered ($wakeupHolidays) - holidayToday=$holidayToday holidayTomorrow=$holidayTomorrow";
+        else {
+            $holidayToday    = IsWe();
+            $holidayTomorrow = IsWe('tomorrow');
         }
 
         # set day scope for today
