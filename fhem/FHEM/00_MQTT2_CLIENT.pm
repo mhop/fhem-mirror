@@ -177,7 +177,8 @@ MQTT2_CLIENT_Disco($;$)
   RemoveInternalTimer($hash);
   $hash->{connecting} = 1 if(!$isUndef);
   my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
-  MQTT2_CLIENT_doPublish($hash, split(" ", $ond, 2), 0, 1) if($ond);
+  MQTT2_CLIENT_doPublish($hash, $2, $3, $1)
+        if($ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
   MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
 }
@@ -325,7 +326,8 @@ MQTT2_CLIENT_Read($@)
     if($hash->{connecting}) {
       delete($hash->{connecting});
       my $onc = AttrVal($name, "msgAfterConnect", "");
-      MQTT2_CLIENT_doPublish($hash, split(" ", $onc, 2)) if($onc);
+      MQTT2_CLIENT_doPublish($hash, $2, $3, $1)
+        if($onc =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
     }
 
   } elsif($cpt eq "PINGRESP") { # ignore it
@@ -569,13 +571,15 @@ MQTT2_CLIENT_getStr($$)
       </li></br>
 
     <a name="msgAfterConnect"></a>
-    <li>msgAfterConnect topic message<br>
-      publish the topic after each connect or reconnect.
+    <li>msgAfterConnect [-r] topic message<br>
+      publish the topic after each connect or reconnect.<br>
+      If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
     <a name="msgBeforeDisconnect"></a>
-    <li>msgBeforeDisconnect topic message<br>
-      publish the topic bofore each disconnect.
+    <li>msgBeforeDisconnect [-r] topic message<br>
+      publish the topic bofore each disconnect.<br>
+      If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
     <a name="rawEvents"></a>
