@@ -1,4 +1,4 @@
-Files with a maintainer. If you wish to change a file, please contact the
+﻿Files with a maintainer. If you wish to change a file, please contact the
 maintainer of the file to do the change.
 
 The third column specifies, where/how the maintainer should be contacted. If
@@ -80,6 +80,7 @@ FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF
 FHEM/10_WS980.pm             choenig              Unterstützende Dienste/Wettermodule
 FHEM/10_ZWave.pm             rudolfkoenig         ZWave
+FHEM/10_FS10.pm              sidey/elektron-bbs   SlowRF
 FHEM/11_FHT.pm               rudolfkoenig         SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         SlowRF
 FHEM/11_OWDevice.pm          neubert/mfr69bs      1Wire
