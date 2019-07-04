@@ -100,9 +100,9 @@ readingsGroup_updateDevices($;$)
       $hash->{DEF} =~ s/(\s*)\\$param((:\S+)?\s*)/ /g;
       $hash->{DEF} =~ s/^ //;
       $hash->{DEF} =~ s/ $//;
-    } elsif( $param =~ m/^{/) {
+    } elsif( $param =~ m/^\{/) {
       $attr{$hash->{NAME}}{mapping} = $param ." ". join( " ", @params );
-      $hash->{DEF} =~ s/\s*[{].*$//g;
+      $hash->{DEF} =~ s/\s*\{.*$//g;
       last;
     } else {
       my @device = split(":", $param, 2);               # 2 -> to allow : in calc expressions
@@ -191,7 +191,7 @@ readingsGroup_updateDevices($;$)
         next if( $regex && $regex =~ m/^\+(.*)/ );
         next if( $regex && $regex =~ m/^\?(.*)/ );
 
-        if( $name =~ m/^{(.*)}$/s ) {
+        if( $name =~ m/^\{(.*)\}$/s ) {
           my $DEVICE = $device->[0];
           $name = eval $name;
         }
@@ -282,7 +282,7 @@ lookup($$$$$$$$$)
   my($mapping,$name,$alias,$reading,$value,$room,$group,$row,$default) = @_;
 
   if( $mapping ) {
-    if( !ref($mapping) && $mapping =~ m/^{.*}$/s) {
+    if( !ref($mapping) && $mapping =~ m/^\{.*\}$/s) {
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
@@ -308,7 +308,7 @@ lookup($$$$$$$$$)
 
     return $default if( !defined($default) );
 
-    if( !ref($default) && $default =~ m/^{.*}$/s) {
+    if( !ref($default) && $default =~ m/^\{.*\}$/s) {
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
@@ -347,7 +347,7 @@ lookup2($$$$;$$)
 
   return "" if( !$lookup );
 
-  if( !ref($lookup) && $lookup =~ m/^{.*}$/s) {
+  if( !ref($lookup) && $lookup =~ m/^\{.*\}$/s) {
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
@@ -377,7 +377,7 @@ lookup2($$$$;$$)
 
   return undef if( !defined($lookup) );
 
-  if( !ref($lookup) && $lookup =~ m/^{.*}$/s) {
+  if( !ref($lookup) && $lookup =~ m/^\{.*\}$/s) {
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
@@ -723,7 +723,7 @@ readingsGroup_2html($;$)
   my $separator = AttrVal( $d, "separator", ":" );
 
   my $style = AttrVal( $d, "style", "" );
-  if( $style =~ m/^{.*}$/s ) {
+  if( $style =~ m/^\{.*\}$/s ) {
     my $s = eval $style;
     $style = $s if( $s );
   }
@@ -854,7 +854,7 @@ readingsGroup_2html($;$)
       if( $regex && $regex =~ m/^<(.*)>$/ ) {
         my $txt = $1;
         my $readings;
-        if( $txt =~ m/^{(.*)}(@[\w\-|.*]+)?$/ ) {
+        if( $txt =~ m/^\{(.*)\}(@[\w\-|.*]+)?$/ ) {
           $txt = "{$1}";
           $readings = $2;
 
@@ -1010,7 +1010,7 @@ readingsGroup_2html($;$)
           $regex = $1;
           my $force_device = $2;
           $name = $3;
-          if( $name =~ m/^{(.*)}$/s ) {
+          if( $name =~ m/^\{(.*)\}$/s ) {
             my $DEVICE = $device->[0];
             $name = eval $name;
           }
@@ -1349,7 +1349,7 @@ readingsGroup_Notify($$)
           if( $regex && $regex =~ m/^<(.*)>$/ ) {
             my $txt = $1;
             my $readings;
-            if( $txt =~ m/^{(.*)}(@([\w\-|.*]+))?$/ ) {
+            if( $txt =~ m/^\{(.*)\}(@([\w\-|.*]+))?$/ ) {
               $txt = "{$1}";
               $readings = $3;
 
@@ -1587,7 +1587,7 @@ readingsGroup_Set($@)
 
         my $v = join(" ", @a);
         my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
-        if( $set_fn =~ m/^{.*}$/s ) {
+        if( $set_fn =~ m/^\{.*\}$/s ) {
           my $CMD = $cmd;
           my $ARGS = $param ." ". join(" ", @a);
 
@@ -1659,7 +1659,7 @@ readingsGroup_Attr($$$;$)
       my $err = perlSyntaxCheck($attrVal, %specials);
       return $err if($err);
 
-      if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
+      if( $attrVal =~ m/^\{.*\}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
 
         my $av = eval $attrVal;
         if( $@ ) {
