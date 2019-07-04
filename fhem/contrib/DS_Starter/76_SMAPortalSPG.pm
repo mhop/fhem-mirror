@@ -337,6 +337,8 @@ return $ret;
 
 <br>
 The module SMAPortalSPG is a device module attuned to the module SMAPortal for definition of graphic devices. <br>
+Graphic data can also be integrated into FHEM Tablet UI with the 
+<a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SMAPortalSPG Widget"</a>. <br>
 
 <ul>
   <a name="SMAPortalSPGdefine"></a>
@@ -580,6 +582,8 @@ The module SMAPortalSPG is a device module attuned to the module SMAPortal for d
 
 <br>
 Das Modul SMAPortalSPG ist ein mit SMAPortal abgestimmtes Gerätemodul zur Definition von Grafik-Devices. <br>
+Die Portalgrafik kann ebenfalls in FHEM Tablet UI mit dem 
+<a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SMAPortalSPG Widget"</a> integriert werden. <br>
 
 <ul>
   <a name="SMAPortalSPGdefine"></a>

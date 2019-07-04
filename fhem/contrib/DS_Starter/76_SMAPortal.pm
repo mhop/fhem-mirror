@@ -2620,6 +2620,10 @@ return;
    </ul>
    <br>
    
+   Graphic data can also be integrated into FHEM Tablet UI with the 
+   <a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SMAPortalSPG Widget"</a>. <br>
+   <br>
+   
    <b>Preparation </b> <br><br>
     
    <ul>   
@@ -2821,6 +2825,10 @@ return;
      <li>die durch den Sunny Home Manager geplanten Schaltzeiten und aktuellen Status von Verbrauchern (sofern vorhanden) </li>
     </ul> 
    </ul>
+   <br>
+   
+   Die Portalgrafik kann ebenfalls in FHEM Tablet UI mit dem 
+   <a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SMAPortalSPG Widget"</a> integriert werden. <br>
    <br>
    
    <b>Vorbereitung </b> <br><br>
