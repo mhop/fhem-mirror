@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.9";
+my $version = "0.9.10";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -369,6 +369,7 @@ sub WUup_receive($) {
 # 2018-04-10 added attribute round
 # 2018-04-13 added AqPM2.5 and AqPM10
 # 2018-08-15 added attribute unit_solarradiation
+# 2019-07-04 replaced link to API documentation
 #
 ################################################################################
 
@@ -425,7 +426,7 @@ sub WUup_receive($) {
         <li><b>unit_solarradiation</b> - change the units of your solarradiation readings (lux or W/m&sup2;)</li>
         <li><b>round</b> - round values to this number of decimals for calculation (default 4)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">parameter name from api.</a> 
             Each of these attributes contains information about weather data to be sent 
             in format <code>sensorName:readingName</code><br/>
             Example: <code>attr WUup wutempf outside:temperature</code> will 
@@ -473,7 +474,7 @@ sub WUup_receive($) {
     <b>Notes</b><br/><br/>
     <ul>
         <li>Find complete api description 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">here</a></li>
         <li>Have fun!</li><br/>
     </ul>
 
@@ -529,7 +530,7 @@ sub WUup_receive($) {
         Sonneneinstrahlung an (lux oder W/m&sup2;)</li>
         <li><b>round</b> - Anzahl der Nachkommastellen zur Berechnung (Standard 4)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">Parameternamen aus der API.</a><br />
         Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
         im Format <code>sensorName:readingName</code>.<br/>
         Beispiel: <code>attr WUup wutempf outside:temperature</code> definiert
@@ -576,7 +577,7 @@ sub WUup_receive($) {
     <b>Notizen</b><br/><br/>
     <ul>
         <li>Die komplette API-Beschreibung findet sich 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">hier</a></li>
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">hier</a></li>
         <li>Viel Spa&szlig;!</li><br/>
     </ul>
 
