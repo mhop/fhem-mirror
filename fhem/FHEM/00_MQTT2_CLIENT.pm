@@ -177,8 +177,8 @@ MQTT2_CLIENT_Disco($;$)
   RemoveInternalTimer($hash);
   $hash->{connecting} = 1 if(!$isUndef);
   my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
-  MQTT2_CLIENT_doPublish($hash, $2, $3, $1)
-        if($ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
+  MQTT2_CLIENT_doPublish($hash, $2, $3, $1, 1)
+        if($ond && $ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
   MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
 }
@@ -326,8 +326,8 @@ MQTT2_CLIENT_Read($@)
     if($hash->{connecting}) {
       delete($hash->{connecting});
       my $onc = AttrVal($name, "msgAfterConnect", "");
-      MQTT2_CLIENT_doPublish($hash, $2, $3, $1)
-        if($onc =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
+      MQTT2_CLIENT_doPublish($hash, $2, $3, $1, 1)
+        if($onc && $onc =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
     }
 
   } elsif($cpt eq "PINGRESP") { # ignore it
