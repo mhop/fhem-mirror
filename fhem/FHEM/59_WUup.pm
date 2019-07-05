@@ -33,7 +33,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.10";
+my $version = "0.9.11";
 
 # Declare functions
 sub WUup_Initialize($);
