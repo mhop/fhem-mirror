@@ -788,7 +788,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
     </li>
     <li>active_low<br>
       Inverts logical value<br>
-      Default: off, valid values: on, off<br><br>
+      Default: no, valid values: no, yes<br><br>
     </li>    
     <li>interrupt<br>
       <b>can only be used with GPIO configured as input</b><br>
@@ -933,7 +933,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
     </li>
     <li>active_low<br>
       Invertieren des logischen Wertes<br>
-      Standard: off, g&uuml;ltige Werte: on, off<br><br>
+      Standard: no, g&uuml;ltige Werte: no, yes<br><br>
     </li>  
     <li>interrupt<br>
       <b>kann nur gew&auml;hlt werden, wenn der GPIO als Eingang konfiguriert ist</b><br>
