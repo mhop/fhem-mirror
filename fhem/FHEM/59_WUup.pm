@@ -31,6 +31,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
+use FHEM::Meta;
 
 my $version = "0.9.10";
 
@@ -70,10 +71,15 @@ sub WUup_Initialize($) {
       . "wuwindspdmph_avg2m wuwindspeedmph wuAqPM2.5 wuAqPM10 "
       . $readingFnAttributes;
     $hash->{VERSION} = $version;
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub WUup_Define($$$) {
     my ( $hash, $def ) = @_;
+
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
     my @a = split( "[ \t][ \t]*", $def );
 
     return "syntax: define <name> WUup <stationID> <password>"
@@ -370,20 +376,25 @@ sub WUup_receive($) {
 # 2018-04-13 added AqPM2.5 and AqPM10
 # 2018-08-15 added attribute unit_solarradiation
 # 2019-07-04 replaced link to API documentation
+# 2019-07-05 add Meta support
 #
 ################################################################################
 
 =pod
+
+=encoding utf8
+
 =item helper
 =item summary sends weather data to Weather Underground
 =item summary_DE sendet Wetterdaten zu Weather Underground
+
 =begin html
 
-<a name="WUup"></a>
+<a name="WUup" id="WUup"></a>
 <h3>WUup</h3>
 <ul>
 
-    <a name="WUupdefine"></a>
+    <a name="WUupdefine" id="WUupdefine"></a>
     <b>Define</b>
     <ul>
 
@@ -397,14 +408,14 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupset"></a>
+    <a name="WUupset" id="WUupset"></a>
     <b>Set-Commands</b><br/>
     <ul>
         <li><b>update</b> - send data to Weather Underground</li>
     </ul>
     <br/><br/>
 
-    <a name="WUupget"></a>
+    <a name="WUupget" id="WUupget"></a>
     <b>Get-Commands</b><br/>
     <ul>
         <br/>
@@ -412,7 +423,7 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupattr"></a>
+    <a name="WUupattr" id="WUupattr"></a>
     <b>Attributes</b><br/><br/>
     <ul>
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
@@ -481,13 +492,14 @@ sub WUup_receive($) {
 </ul>
 
 =end html
+
 =begin html_DE
 
-<a name="WUup"></a>
+<a name="WUup" id="WUup"></a>
 <h3>WUup</h3>
 <ul>
 
-    <a name="WUupdefine"></a>
+    <a name="WUupdefine" id="WUupdefine"></a>
     <b>Define</b>
     <ul>
 
@@ -500,14 +512,14 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupset"></a>
+    <a name="WUupset" id="WUupset"></a>
     <b>Set-Befehle</b><br/>
     <ul>
         <li><b>update</b> - sende Daten an Weather Underground</li>
     </ul>
     <br/><br/>
 
-    <a name="WUupget"></a>
+    <a name="WUupget" id="WUupget"></a>
     <b>Get-Befehle</b><br/>
     <ul>
         <br/>
@@ -515,7 +527,7 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupattr"></a>
+    <a name="WUupattr" id="WUupattr"></a>
     <b>Attribute</b><br/><br/>
     <ul>
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
@@ -584,4 +596,58 @@ sub WUup_receive($) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 59_WUup.pm
+{
+  "abstract": "sends weather data to Weather Underground",
+  "description": "This module provides connection to Weather Underground to send data from your own weather station.",
+  "x_lang": {
+    "de": {
+      "abstract": "sendet Wetterdaten zu Weather Underground",
+      "description": "Dieses Modul stellt eine Verbindung zu Weather Underground her, um Daten einer eigenen Wetterstation zu versenden"
+    }
+  },
+  "license": [
+    "gpl_2"
+  ],
+  "version": "v0.9.11",
+  "release_status": "stable",
+  "author": [
+    "Manfred Winter <mahowi@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "mahowi"
+  ],
+  "x_fhem_maintainer_github": [
+    "mahowi"
+  ],
+  "keywords": [
+    "fhem-mod",
+    "wunderground",
+    "pws",
+    "weather"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 0,
+        "FHEM::Meta": 0,
+        "HttpUtils": 0,
+        "UConv": 0,
+        "Time::HiRes": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki" : {
+     }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
