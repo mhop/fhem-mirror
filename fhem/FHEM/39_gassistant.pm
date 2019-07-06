@@ -572,6 +572,9 @@ gassistant_Set($$@)
     return undef;
   } elsif( $cmd eq 'start' || $cmd eq 'stop' || $cmd eq 'restart' ) {
     setKeyValue('gassistantFHEM.loginURL', '' );
+    if ($cmd eq 'start') {
+      readingsSingleUpdate($hash, 'gassistant-fhem-connection', 'starting...', 1 );
+    }
     readingsSingleUpdate($hash, 'gassistantFHEM.loginURL', 'Waiting for login url from gassistant-fhem', 1 );
   }
 
