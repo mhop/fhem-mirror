@@ -162,6 +162,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
   "2.4.2"  => "02.07.2019  change header design of portal graphics ",
   "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
   "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
@@ -1839,15 +1840,15 @@ sub PortalAsHtml ($$;$) {
   
   my ($i,$icon,$colorv,$colorc,$maxhours,$hourstyle,$header,$legend,$legend_txt,$legend_style);
   my ($val,$height,$fsize,$html_start,$html_end,$wlalias,$weather,$colorw,$maxVal,$show_night,$type,$kw);
-  my ($maxDif,$minDif,$maxCon,$v,$z2,$z3,$z4,$show_diff,$width,$w);
+  my ($maxDif,$minDif,$maxCon,$v,$z2,$z3,$z4,$show_diff,$width,$w,$hdrDetail,$hdrAlign);
   my $he;                                                                               # Balkenhöhe
   my (%pv,%is,%t,%we,%di,%co);
   my @pgCDev;
   
   # Kontext des aufrufenden SMAPortalSPG-Devices speichern für Refresh
-  $hash->{HELPER}{SPGDEV}    = $wlname;                    # Name des aufrufenden SMAPortalSPG-Devices
-  $hash->{HELPER}{SPGROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
-  $hash->{HELPER}{SPGDETAIL} = $FW_detail?$FW_detail:"";   # Name des SMAPortalSPG-Devices (wenn Detailansicht)
+  $hash->{HELPER}{SPGDEV}    = $wlname;                                                 # Name des aufrufenden SMAPortalSPG-Devices
+  $hash->{HELPER}{SPGROOM}   = $FW_room?$FW_room:"";                                    # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
+  $hash->{HELPER}{SPGDETAIL} = $FW_detail?$FW_detail:"";                                # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
   my $dl  = AttrVal($name, "detailLevel", 1);
   my $pv0 = ReadingsNum($name,"L2_ThisHour_PvMeanPower", undef);
@@ -1883,7 +1884,7 @@ sub PortalAsHtml ($$;$) {
   # Verbraucherlegende und Steuerung
   if ($legend) {
       foreach (@pgCDev) {
-          my($txt,$im) = split(':',$_);                                                            # $txt ist der Verbrauchername
+          my($txt,$im) = split(':',$_);                                                 # $txt ist der Verbrauchername
 		  my $cmdon   = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt on')\"";
           my $cmdoff  = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt off')\"";
           my $cmdauto = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt auto')\"";
@@ -1939,6 +1940,8 @@ sub PortalAsHtml ($$;$) {
 
   $wlalias    =  AttrVal($wlname, 'alias',            $wlname);
   $header     =  AttrNum($wlname, 'showHeader', 1); 
+  $hdrAlign   =  AttrVal($wlname, 'headerAlignment', 'center');  						# ermöglicht per attr die Ausrichtung der Tabelle zu setzen
+  $hdrDetail  =  AttrVal($wlname, 'headerDetail', 	    'all'); 						# ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
 
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
@@ -1969,31 +1972,45 @@ sub PortalAsHtml ($$;$) {
       $pvTo .= "&nbsp;Wh";
   }
 
-  # Headerzeile generieren
-  my $alias = AttrVal($name, "alias", "SMA Sunny Portal");                     # Linktext als Aliasname oder "SMA Sunny Portal"
-  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
-  my $lup   = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");        # letzte Updatezeit
-  my $lupt  = "last update:";  
-
-  # Da der Header relativ viele Zeichen hat, müssen Stellen erlaubt werden an denen automatisch umgebrochen werden kann. 
-  # Sonst sind schmale Ausgaben nicht von den Balken bzw. deren Anzahl abhängig, sondern allein durch die Breite des Headers bestimmt
-
+  
+  # Headerzeile generieren                                                                                                             
   if ($header) {
-      if(AttrVal("global","language","EN") eq "DE") {
-          my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
-          $lup  = "$3.$2.$1 $4";
-          $lupt = "letzte Aktualisierung:"; 
-      }
+	  my $lang    = AttrVal("global","language","EN");
+      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                   # Linktext als Aliasname oder "SMA Sunny Portal"
+      my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>"; 	  
+      my $lup     = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");      # letzte Updatezeit	
+	  
+	  my $lupt    = "last update:";  
+	  my $lblPv4h = "4h:";
+	  my $lblPvRe = "day:";
+	  my $lblPvTo = "tomorrow:";
+	 
+	  if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
+	    $lupt     = "Stand:"; 
+		$lblPv4h  = "4h:";
+		$lblPvRe  = "Tag:";
+		$lblPvTo  = "Morgen:";
+	  }	 
 
-      $header  = "<table align=\"center\">";	
-      $header .= "<tr><td colspan=\"2\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
-	  if(AttrVal("global","language","EN") eq "DE") {
-		  $header .= "<tr> <td><b>PV > nächste 4h:</b></td> <td align=right>$pv4h</td> <td><b>Rest Heute:</b></td> <td align=right>$pvRe</td> <td><b>Morgen:</b></td> <td align=right>$pvTo</td> </tr>";
-		  $header .= "<tr> <td><b>CO > nächste 4h:</b></td> <td align=right>$co4h</td> <td><b>Rest Heute:</b></td> <td align=right>$coRe</td> <td><b>Morgen:</b></td> <td align=right>$coTo</td> </tr>";
-	  } else {
-		  $header .= "<tr> <td><b>PV > next 4h:</b></td> <td align=right>$pv4h</td> <td><b>rest today:</b></td> <td align=right>$pvRe</td> <td><b>tomorrow:</b></td> <td align=right>$pvTo</td> </tr>";
-		  $header .= "<tr> <td><b>CO > next 4h:</b></td> <td align=right>$co4h</td> <td><b>rest today:</b></td> <td align=right>$coRe</td> <td><b>tomorrow:</b></td> <td align=right>$coTo</td> </tr>";	
+	  $header  = "<table align=\"$hdrAlign\">";	
+	  
+	  # Header Link + Status 
+	  if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
+		my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
+		$lup     = "$3.$2.$1 $4";
+		$header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
+      }
+	  
+	  # Header Information pv 
+	  if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {	
+		$header .= "<tr> <td><b>PV&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$pv4h</td> <td><b>$lblPvRe</b></td> <td align=right>$pvRe</td> <td><b>$lblPvTo</b></td> <td align=right>$pvTo</td> </tr>";
 	  }
+	  
+	  # Header Information co 
+	  if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
+		$header .= "<tr> <td><b>CO&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$co4h</td> <td><b>$lblPvRe</b></td> <td align=right>$coRe</td> <td><b>$lblPvTo</b></td> <td align=right>$coTo</td> </tr>";	
+	  }
+
       $header .= "</table>";	 
   }
 

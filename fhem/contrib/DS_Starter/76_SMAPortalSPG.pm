@@ -34,6 +34,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SMAPortalSPG_vNotesIntern = (
+  "1.5.0"  => "07.07.2019  new attributes headerAlignment, headerDetail ",
   "1.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "1.3.0"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
   "1.2.0"  => "21.06.2019  GetFn -> get <name> html ",
@@ -59,6 +60,8 @@ sub SMAPortalSPG_Initialize($) {
                                 "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 "disable:1,0 ".
                                 "forcePageRefresh:1,0 ".
+                                "headerAlignment:center,left,right ".										
+                                "headerDetail:all,co,pv,pvco,statusLink ".
                                 "hourCount:slider,4,1,24 ".
                                 "hourStyle ".
                                 "maxPV ".
@@ -455,6 +458,27 @@ Graphic data can also be integrated into FHEM Tablet UI with the
        </li>
        <br>
        
+       <a name="headerAlignment"></a>
+       <li><b>headerAlignment &lt;center | left | right&gt; </b><br>
+         Alignment of the header lines. (default: center)
+       </li>
+       <br>
+	   
+	   <a name="headerDetail"></a>
+       <li><b>headerDetail &lt;all | co | pv | pvco | statusLink&gt; </b><br>
+         Detail level of the header lines. (default: all)
+	     <ul>   
+	     <table>  
+	     <colgroup> <col width=15%> <col width=85%> </colgroup>
+		    <tr><td> <b>all</b>  </td>	<td>display production (PV), consumption (CO), link to SMAPortal device + update timestamp (default)</td></tr>
+	  	    <tr><td> <b>co</b>   </td>	<td>display consumption (CO) only</td></tr>
+		    <tr><td> <b>pv</b>   </td>	<td>display production (PV)</td></tr>
+		    <tr><td> <b>pvco</b> </td>	<td>display production (PV) and consumption (CO)</td></tr>			
+			<tr><td> <b>statusLink</b> 	</td><td>Link to SMAPortal device + update timestamp only</td></tr>
+	     </table>
+	     </ul> 		 
+       </li>
+       <br>	   
        <a name="hourCount"></a>
        <li><b>hourCount &lt;4...24&gt; </b><br>
          Amount of beams/hours to show. (default: 24)
@@ -700,6 +724,28 @@ Die Portalgrafik kann ebenfalls in FHEM Tablet UI mit dem
          Eltern-SMAPortal-Devices erzwungen.    
        </li>
        <br>
+       
+       <a name="headerAlignment"></a>
+       <li><b>headerAlignment &lt;center | left | right&gt; </b><br>
+         Ausrichtung der Kopfzeilen. (default: center)
+       </li>
+       <br>
+	   
+	   <a name="headerDetail"></a>
+       <li><b>headerDetail &lt;all | co | pv | pvco | statusLink&gt; </b><br>
+         Detailiierungsgrad der Kopfzeilen. (default: all)
+	     <ul>   
+	     <table>  
+	     <colgroup> <col width=15%> <col width=85%> </colgroup>
+		    <tr><td> <b>all</b>  </td>	<td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zum SMAPortal-Device + Aktualisierungszeit (default)</td></tr>
+	  	    <tr><td> <b>co</b>   </td>	<td>nur Verbrauch (CO)</td></tr>
+		    <tr><td> <b>pv</b>   </td>	<td>nur Erzeugung (PV)</td></tr>
+		    <tr><td> <b>pvco</b> </td>	<td>Erzeugung (PV) und Verbrauch (CO)</td></tr>			
+			<tr><td> <b>statusLink</b> 	</td><td>nur Link zum SMAPortal-Device + Aktualisierungszeit</td></tr>
+	     </table>
+	     </ul> 		 
+       </li>
+       <br>                                      
        
        <a name="hourCount"></a>
        <li><b>hourCount &lt;4...24&gt; </b><br>
