@@ -472,7 +472,7 @@ Graphic data can also be integrated into FHEM Tablet UI with the
 	     <colgroup> <col width=15%> <col width=85%> </colgroup>
 		    <tr><td> <b>all</b>  </td>	<td>display production (PV), consumption (CO), link to SMAPortal device + update timestamp (default)</td></tr>
 	  	    <tr><td> <b>co</b>   </td>	<td>display consumption (CO) only</td></tr>
-		    <tr><td> <b>pv</b>   </td>	<td>display production (PV)</td></tr>
+		    <tr><td> <b>pv</b>   </td>	<td>display production (PV) only</td></tr>
 		    <tr><td> <b>pvco</b> </td>	<td>display production (PV) and consumption (CO)</td></tr>			
 			<tr><td> <b>statusLink</b> 	</td><td>Link to SMAPortal device + update timestamp only</td></tr>
 	     </table>
