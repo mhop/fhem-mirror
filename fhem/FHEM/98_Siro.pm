@@ -839,7 +839,14 @@ sub Set($@) {
 	readingsSingleUpdate( $hash, "ActionTrigger", "fhem", 1 );
 	# name befehl befehlscode
 	$hash->{helper}{exexcmd}="on";
-	SendCommand( $hash, $sendCommands{$cmd} );
+	
+	
+	Log3( $name, 5, "Siro-def0: sende kommando ".$sendCommands{$cmd});
+	
+	if ($sendCommands{$cmd} eq 'fav'){
+	SendCommand( $hash, 'stop' , 'longstop' );}
+	else{
+	SendCommand( $hash, $sendCommands{$cmd} );}
 	return;
 	}
 
