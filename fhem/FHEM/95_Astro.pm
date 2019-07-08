@@ -41,7 +41,7 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 use Math::Trig;
 use Time::HiRes qw(gettimeofday);
-use Time::Local qw(timelocal_modern);
+use Time::Local;
 use UConv;
 #use Data::Dumper;
 
@@ -1071,6 +1071,31 @@ sub _LoadOptionalPackages {
       $json->shrink;
       $json->utf8;
     }
+
+    # only available for Perl versions after 2018-06-09
+    eval {
+        import Time::Local 'timelocal_modern';
+        1;
+    };
+    eval {
+        import Time::Local 'timegm_modern';
+        1;
+    };
+}
+
+########################################################################################################
+#
+# wrapper for Perl versions before 2018-06-09
+#
+########################################################################################################  
+
+sub _timelocal_modern {
+    return _timelocal_modern(@_)
+      if ( exists &{'timelocal_modern'} );
+
+    my @r = @_;
+    $r[5] -= 1900;
+    return timelocal(@r);
 }
 
 ########################################################################################################
@@ -2297,13 +2322,13 @@ sub Update($@) {
   {
     if ( $comp eq 'NewDay' ) {
         push @next,
-          timelocal_modern( 0, 0, 0, (localtime($now + 86400.))[3,4], (localtime($now + 86400.))[5]+1900. );
+          _timelocal_modern( 0, 0, 0, (localtime($now + 86400.))[3,4], (localtime($now + 86400.))[5]+1900. );
         next;
     }
     my $k = ".$comp";
     next unless ( defined( $Astro{$k} ) && $Astro{$k} =~ /^\d+(?:\.\d+)?$/ );
     my $t =
-      timelocal_modern( 0, 0, 0, (localtime($now))[3,4], (localtime($now))[5]+1900. ) + $Astro{$k} * 3600.;
+      _timelocal_modern( 0, 0, 0, (localtime($now))[3,4], (localtime($now))[5]+1900. ) + $Astro{$k} * 3600.;
     $t += 86400. if ( $t < $now );    # that is for tomorrow
     push @next, $t;
   }
@@ -2637,7 +2662,7 @@ sub Get($@) {
       return "[FHEM::Astro::Get] seconds can only be between 00 and 59" if (defined($9) && $9 > 59.);
 
       SetTime(
-          timelocal_modern(
+          _timelocal_modern(
               defined($3) ? $3 : (defined($9) ? $9 : 0),
               defined($2) ? $2 : (defined($8) ? $8 : 0),
               defined($1) ? $1 : (defined($7) ? $7 : 12),
