@@ -1090,7 +1090,7 @@ sub _LoadOptionalPackages {
 ########################################################################################################  
 
 sub _timelocal_modern {
-    return _timelocal_modern(@_)
+    return timelocal_modern(@_)
       if ( exists &{'timelocal_modern'} );
 
     my @r = @_;
