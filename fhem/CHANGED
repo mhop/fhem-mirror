@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  95_Astro: v2.0.3: improved Windows POSIX compatibility for
+                      timezone support
  - bugfix:  73_AutoShuttersControl: Fix for missing closed tag for strong
  - feature: 73_AutoShuttersControl: delayed self defense drive then absent,
                fix many of little bugs, change shading logic

@@ -41,7 +41,7 @@ use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
 use Math::Trig;
 use Time::HiRes qw(gettimeofday);
-use Time::Local;
+use Time::Local qw(timelocal_modern);
 use UConv;
 #use Data::Dumper;
 
@@ -785,6 +785,8 @@ sub Define ($@) {
 
 sub Undef ($$) {
   my ($hash,$arg) = @_;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
   
   RemoveInternalTimer($hash);
   
@@ -805,6 +807,8 @@ sub Notify ($$) {
   my $TYPE    = $hash->{TYPE};
   my $devName = $dev->{NAME};
   my $devType = GetType($devName);
+
+  return "" if ( IsDisabled($name) );
 
   if ( $devName eq "global" ) {
     my $events = deviceEvents( $dev, 1 );
@@ -1856,7 +1860,7 @@ sub SetTime (;$$$) {
 
     #-- readjust timezone
     local $ENV{TZ} = $tz if ($tz);
-    tzset();
+    tzset() if ( defined( *{'tzset'} ) );
 
     $time = gettimeofday() unless ( defined($time) );
 
@@ -1893,7 +1897,7 @@ sub SetTime (;$$$) {
     delete $Date{tz} if (!$Date{tz} || $Date{tz} eq "" || $Date{tz} eq " ");
 
     delete local $ENV{TZ};
-    tzset();
+    tzset() if ( defined( *{'tzset'} ) );
 
     setlocale(LC_TIME, "");
     setlocale(LC_TIME, $old_lctime);
@@ -1921,7 +1925,8 @@ sub Compute($;$){
   if( defined($params->{"language"}) &&
       exists($transtable{uc($params->{"language"})})
   ){
-    $tt = $transtable{uc($params->{"language"})};
+    $lang = uc($params->{"language"});
+    $tt = $transtable{$lang};
   }elsif( exists($transtable{uc($lang)}) ){
     $tt = $transtable{uc($lang)};
   }else{
@@ -1933,7 +1938,7 @@ sub Compute($;$){
   $tz = $params->{"timezone"}
     if ( defined( $params->{"timezone"} ) );
   local $ENV{TZ} = $tz if ($tz);
-  tzset();
+  tzset() if ( defined( *{'tzset'} ) );
 
   #-- geodetic latitude and longitude of observer on WGS84  
   if( defined($params->{"latitude"}) ){
@@ -2185,7 +2190,7 @@ sub Compute($;$){
   $Astro{ObsSeasonN} = $seasonn;
 
   delete local $ENV{TZ};
-  tzset();
+  tzset() if ( defined( *{'tzset'} ) );
 
   return( undef );
 };
@@ -2292,13 +2297,13 @@ sub Update($@) {
   {
     if ( $comp eq 'NewDay' ) {
         push @next,
-          timelocal( 0, 0, 0, ( localtime( $now + 86400. ) )[ 3, 4, 5 ] );
+          timelocal_modern( 0, 0, 0, (localtime($now + 86400.))[3,4], (localtime($now + 86400.))[5]+1900. );
         next;
     }
     my $k = ".$comp";
     next unless ( defined( $Astro{$k} ) && $Astro{$k} =~ /^\d+(?:\.\d+)?$/ );
     my $t =
-      timelocal( 0, 0, 0, ( localtime($now) )[ 3, 4, 5 ] ) + $Astro{$k} * 3600.;
+      timelocal_modern( 0, 0, 0, (localtime($now))[3,4], (localtime($now))[5]+1900. ) + $Astro{$k} * 3600.;
     $t += 86400. if ( $t < $now );    # that is for tomorrow
     push @next, $t;
   }
@@ -2560,6 +2565,7 @@ sub Get($@) {
 
   my $wantsreading = 0;
   my $dayOffset = 0;
+  my $now = gettimeofday();
   my $html = defined( $hash->{CL} ) && $hash->{CL}{TYPE} eq "FHEMWEB" ? 1 : undef;
   my $tz = AttrVal( $name, "timezone", AttrVal( "global", "timezone", undef ) );
   my $lang = AttrVal( $name, "language", AttrVal( "global", "language", undef ) );
@@ -2620,20 +2626,30 @@ sub Get($@) {
 
   if( int(@$a) > (1+$wantsreading) ) {
     my $str = (int(@$a) == (3+$wantsreading)) ? $a->[1+$wantsreading]." ".$a->[2+$wantsreading] : $a->[1+$wantsreading];
-    if( $str =~ /^(\d{2}):(\d{2})(?::(\d{2}))?|(?:(\d{4})-(\d{2})-(\d{2}))(?:\D+(\d{2}):(\d{2})(?::(\d{2}))?)?$/){
+    if( $str =~ /^(\d{2}):(\d{2})(?::(\d{2}))?$|^(?:(?:(\d{4})-)?(\d{2})-(\d{2}))(?:\D+(\d{2}):(\d{2})(?::(\d{2}))?)?$/){
+      return "[FHEM::Astro::Get] hours can only be between 00 and 23" if (defined($1) && $1 > 23.);
+      return "[FHEM::Astro::Get] minutes can only be between 00 and 59" if (defined($2) && $2 > 59.);
+      return "[FHEM::Astro::Get] seconds can only be between 00 and 59" if (defined($3) && $3 > 59.);
+      return "[FHEM::Astro::Get] month can only be between 01 and 12" if (defined($5) && ($5 > 12. || $5 < 1.));
+      return "[FHEM::Astro::Get] day can only be between 01 and 31" if (defined($6) && ($6 > 31. || $6 < 1.));
+      return "[FHEM::Astro::Get] hours can only be between 00 and 23" if (defined($7) && $7 > 23.);
+      return "[FHEM::Astro::Get] minutes can only be between 00 and 59" if (defined($8) && $8 > 59.);
+      return "[FHEM::Astro::Get] seconds can only be between 00 and 59" if (defined($9) && $9 > 59.);
+
       SetTime(
-          timelocal(
+          timelocal_modern(
               defined($3) ? $3 : (defined($9) ? $9 : 0),
               defined($2) ? $2 : (defined($8) ? $8 : 0),
               defined($1) ? $1 : (defined($7) ? $7 : 12),
-              (defined($4)? ($6,$5-1,$4) : (localtime(gettimeofday()))[3,4,5])
+              (defined($5)? ($6,$5-1.) : (localtime($now))[3,4]),
+              (defined($4)? $4 : (localtime($now))[5]+1900.),
           ) + ( $dayOffset * 86400. ), $tz, $lc_time
         )
     }else{
-      return "[FHEM::Astro::Get] $name has improper time specification $str, use YYYY-MM-DD [HH:MM:SS] [-1|yesterday|+1|tomorrow]";
+      return "[FHEM::Astro::Get] $name has improper time specification $str, use [YYYY-]MM-DD [HH:MM[:SS]] [-1|yesterday|+1|tomorrow]";
     }
   }else{
-    SetTime(gettimeofday() + ($dayOffset * 86400.), $tz, $lc_time);
+    SetTime($now + ($dayOffset * 86400.), $tz, $lc_time);
   }
 
   #-- disable automatic links to FHEM devices
@@ -2800,7 +2816,7 @@ sub Get($@) {
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; Astro</code>
-            <br />Defines the Astro device (only one is needed per FHEM installation). </p>
+            <br />Defines the Astro device (only one is needed per FHEM installation).</p>
         <p>
         Readings with prefix <i>Sun</i> refer to the sun, with prefix <i>Moon</i> refer to the moon.
         The suffixes for these readings are:
@@ -2875,6 +2891,7 @@ sub Get($@) {
         <ul>
             <li><a name="Astro_json"></a>
                 <code>get &lt;name&gt; json [&lt;reading&gt;,[&lt;reading&gt;]] [-1|yesterday|+1|tomorrow]</code><br/>
+                <code>get &lt;name&gt; json [&lt;reading&gt;,[&lt;reading&gt;]] MM-DD [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; json [&lt;reading&gt;,[&lt;reading&gt;]] YYYY-MM-DD [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; json [&lt;reading&gt;,[&lt;reading&gt;]] HH:MM[:SS] [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; json [&lt;reading&gt;,[&lt;reading&gt;]] YYYY-MM-DD HH:MM[:SS] [-1|yesterday|+1|tomorrow]</code>
@@ -2882,6 +2899,7 @@ sub Get($@) {
                 Formatted values as described below may be generated in a subtree <code>text</code> by adding <code>text=1</code> to the request.</li>
             <li><a name="Astro_text"></a>
                 <code>get &lt;name&gt; text [&lt;reading&gt;,[&lt;reading&gt;]] [-1|yesterday|+1|tomorrow]</code><br/>
+                <code>get &lt;name&gt; text [&lt;reading&gt;,[&lt;reading&gt;]] MM-DD [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; text [&lt;reading&gt;,[&lt;reading&gt;]] YYYY-MM-DD [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; text [&lt;reading&gt;,[&lt;reading&gt;]] HH:MM[:SS] [-1|yesterday|+1|tomorrow]</code><br/>
                 <code>get &lt;name&gt; text [&lt;reading&gt;,[&lt;reading&gt;]] YYYY-MM-DD HH:MM[:SS] [-1|yesterday|+1|tomorrow]</code>
@@ -2954,7 +2972,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.0.2",
+  "version": "v2.0.3",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",
