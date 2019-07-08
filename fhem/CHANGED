@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     76_SMAPortal: new module to integrate the SMA Sunny Portal
+                          (comes with 76_SMAPortalSPG graphic device and a 
+                          widget for FTUI), special thanks to Wzut and Xguide !
  - bugfix:  95_Astro: v2.0.3: improved Windows POSIX compatibility for
                       timezone support
  - bugfix:  73_AutoShuttersControl: Fix for missing closed tag for strong
