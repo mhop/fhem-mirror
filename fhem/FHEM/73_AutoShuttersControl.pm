@@ -5964,8 +5964,8 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Self_Defense_Mode - absent/gone</strong> - which Residents status Self Defense should become 
                 active without the window being open. (default: gone)
             </li>
-            <li><strong>ASC_Self_Defense_AbsentDelay - How many seconds should drive in Self Defense be delayed at 
-                Residents absent. (default: 300)
+            <li><strong>ASC_Self_Defense_AbsentDelay</strong> - um wie viele Sekunden soll das fahren in Selfdefense bei
+                Residents absent verz&ouml;gert werden. (default: 300)
             </li>
             <li><strong>ASC_ShuttersPlace window|terrace</strong> - If set to <em>terrace</em>, and the
                 residents device is set to <em>gone</em>, and <em>selfDefense</em> is activated, the shutter will
@@ -6516,7 +6516,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.20",
+  "version": "v0.6.21",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
