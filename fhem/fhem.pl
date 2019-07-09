@@ -183,7 +183,7 @@ sub CommandSet($$);
 sub CommandSetReading($$);
 sub CommandSetstate($$);
 sub CommandSetuuid($$);
-sub CommandShutdown($$;$$);
+sub CommandShutdown($$;$$$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
 
@@ -1754,9 +1754,9 @@ CancelDelayedShutdown($)
 }
 
 sub
-DelayedShutdown($$)
+DelayedShutdown($$$)
 {
-  my ($cl, $param) = @_;
+  my ($cl, $param, $exitValue) = @_;
 
   return 1 if(keys %delayedShutdowns);
   foreach my $d (sort keys %defs) {
@@ -1774,7 +1774,7 @@ DelayedShutdown($$)
 
   $checkList = sub()
   {
-     return CommandShutdown($cl, $param, undef, 1)
+     return CommandShutdown($cl, $param, undef, 1, $exitValue)
              if(!keys %delayedShutdowns || $waitingFor++ >= $maxShutdownDelay);
      InternalTimer(gettimeofday()+1, $checkList, undef, 0);
   };
@@ -1783,17 +1783,16 @@ DelayedShutdown($$)
 }
 
 sub
-CommandShutdown($$;$$)
+CommandShutdown($$;$$$)
 {
-  my ($cl, $param, $cmdName, $final) = @_;
-  my $exitValue = 0;
+  my ($cl, $param, $cmdName, $final, $exitValue) = @_;
   if($param && $param =~ m/^(\d+)$/) {
     $exitValue = $1;
     $param = "";
   }
   return "Usage: shutdown [restart|exitvalue]"
         if($param && $param ne "restart");
-  return if(!$final && DelayedShutdown($cl, $param));
+  return if(!$final && DelayedShutdown($cl, $param, $exitValue));
 
   DoTrigger("global", "SHUTDOWN", 1);
   Log 0, "Server shutdown";
@@ -1813,7 +1812,7 @@ CommandShutdown($$;$$)
       exec('cmd.exe /C net stop fhem & net start fhem');
     }
   }
-  exit($exitValue);
+  exit($exitValue ? $exitValue : 0);
 }
 
 
