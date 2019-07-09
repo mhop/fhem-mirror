@@ -210,9 +210,9 @@ sub YAMAHA_NP_Attr
   }
   elsif($attrName eq "timerRepeat")
   {
-    if ($cmd eq "set" && $attrVal !~ /^(once|every)$/)
+    if ($cmd eq "set" && lc($attrVal) !~ /^(once|every)$/)
     {
-      return "Use 'once' or 'every'";
+      return "'timerRepeat' must be 'once' or 'every'.";
     }
   }
   elsif($attrName eq "timerHour")
@@ -1553,7 +1553,7 @@ desiredListNloop:
         YAMAHA_NP_SendCmd($hash, "PUT:System,Misc,Timer,Param:"
                                 ."<Start_Time>".sprintf("%02d", $timerHour).":".sprintf("%02d", $timerMinute)."</Start_Time>"
                                 ."<Volume><Lvl>$timerVolume</Lvl></Volume>"
-                                ."<Repeat>$timerRepeat</Repeat>", $what, $a[2], 0);
+                                ."<Repeat>".ucfirst(lc($timerRepeat))."</Repeat>", $what, $a[2], 0);
       }
       else
       {
