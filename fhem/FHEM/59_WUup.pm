@@ -33,7 +33,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.11";
+my $version = "0.9.12";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -377,6 +377,7 @@ sub WUup_receive($) {
 # 2018-08-15 added attribute unit_solarradiation
 # 2019-07-04 replaced link to API documentation
 # 2019-07-05 add Meta support
+# 2019-07-09 add WIKI to Meta data
 #
 ################################################################################
 
@@ -610,7 +611,7 @@ sub WUup_receive($) {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.11",
+  "version": "v0.9.12",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
@@ -645,6 +646,8 @@ sub WUup_receive($) {
   },
   "resources": {
     "x_wiki" : {
+      "title" : "Wetter und Wettervorhersagen - Eigene Wetterdaten hochladen",
+      "web" : "https://wiki.fhem.de/wiki/Wetter_und_Wettervorhersagen#Eigene_Wetterdaten_hochladen"
      }
   }
 }
