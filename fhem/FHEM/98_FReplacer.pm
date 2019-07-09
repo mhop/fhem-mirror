@@ -47,7 +47,11 @@
 # attr SVG_FileLog_PM_1 plotsize 490,100  
 #
 
-
+#
+# ToDo:
+#	fhem blocks during SVG creation. Can we make this async?
+#	$FW_wname undef -> warning in SVG call at startup
+#
 
 package main;
 
