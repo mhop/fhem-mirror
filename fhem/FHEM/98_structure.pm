@@ -49,6 +49,7 @@ structure_Initialize($)
     disable
     disabledForIntervals
     evaluateSetResult:1,0
+    propagateAttr
     setStateIndirectly:1,0
     setStructType:0,1
   );
@@ -390,7 +391,8 @@ structure_Set($@)
   my %pars;
 
   # see Forum # 28623 for .cachedHelp
-  return $hash->{".cachedHelp"} if($list[1] eq "?" && $hash->{".cachedHelp"});
+  return $hash->{".cachedHelp"}
+        if(@list > 1 && $list[1] eq "?" && $hash->{".cachedHelp"});
 
   my @devList = @{$hash->{".memberList"}};
   if(@list > 1 && $list[$#list] eq "reverse") {
@@ -525,6 +527,7 @@ structure_Attr($@)
     group=>1,
     icon=>1,
     room=>1,
+    propagateAttr=>1,
     setStateIndirectly=>1,
     stateFormat=>1,
     webCmd=>1,
@@ -535,6 +538,8 @@ structure_Attr($@)
 
   my $me = $list[0];
   my $hash = $defs{$me};
+  my $pa = AttrVal($me, "propagateAttr", $featurelevel <= 5.9 ? '.*' : '^$');
+  return undef if($list[1] !~ m/$pa/);
 
   if($hash->{INATTR}) {
     Log3 $me, 1, "ERROR: endless loop detected in structure_Attr for $me";
@@ -732,6 +737,12 @@ structure_Attr($@)
       different from the set command (like set statusRequest), then you have to
       set this attribute to 1 in order to enable the structure instance to
       compute the new status.
+      </li>
+
+    <li>propagateAttr &lt;regexp&gt;<br>
+      if the regexp matches the name of the attribute, then this attribute will
+      be propagated to all the members. The default is .* (each attribute) for
+      featurelevel <= 5.9, else ^$ (no attribute).
       </li>
 
     <li>setStateIndirectly<br>
@@ -954,6 +965,13 @@ structure_Attr($@)
       unterschiedliches setzt (wie z.Bsp. beim set statusRequest), dann muss
       dieses Attribut auf 1 gesetzt werden, wenn die Struktur Instanz diesen
       neuen Status auswerten soll.
+      </li>
+
+    <li>propagateAttr &lt;regexp&gt;<br>
+      Falls der Regexp auf den Namen des Attributes zutrifft, dann wird dieses
+      Attribut an allen Mitglieder weitergegeben. F&uuml;r featurelevel <= 5.9
+      ist die Voreinstellung .* (d.h. alle Attribute), sonst ^$ (d.h. keine
+      Attribute).
       </li>
 
     <li>setStateIndirectly<br>
