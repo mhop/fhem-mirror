@@ -80,6 +80,7 @@
 #   2019-02-23  added maxHist attribute
 #   2019-02-24  added documentation and better return value when get history has no data, option to pass a pinName to get history
 #               query new running config after configuring device
+#   2019-06-17  fix log messages and expose logRetries attribute
 #
 # ideas / todo:
 #
@@ -103,7 +104,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.14 - 24.2.2019';
+my $ArduCounter_Version = '6.15 - 17.6.2019';
 
 
 my %ArduCounter_sets = (  
@@ -192,6 +193,7 @@ sub ArduCounter_Initialize($)
         'configDelay ' .                                # how many seconds to wait before sending config after reboot of board
         'keepAliveDelay ' .
         'keepAliveTimeout ' .
+        'keepAliveRetries ' .
         'nextOpenDelay ' .
         'silentReconnect:0,1 ' .
         'openTimeout ' .
@@ -538,14 +540,14 @@ sub ArduCounter_AliveTimeout($)
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
-    Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), setting to disconnected and try to reopen";
     delete $hash->{WaitForAlive};
-    
     $hash->{KeepAliveRetries} = 0 if (!$hash->{KeepAliveRetries});
             
     if (++$hash->{KeepAliveRetries} > AttrVal($name, "keepAliveRetries", 1)) {
-        Log3 $name, 3, "$name: no retries left, setting device to disconnected";
+        Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), no retries left, setting device to disconnected";
         ArduCounter_Disconnected($hash);        # set to Disconnected but let _Ready try to Reopen
+    } else {
+        Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), count=$hash->{KeepAliveRetries}";
     }
 }
 
@@ -2070,7 +2072,13 @@ sub ArduCounter_ReadAnswer($$)
             <code>
             attr myCounter keepAliveTimeout 3
             </code>            
-            
+        <li><b>keepAliveRetries</b></li> 
+            defines how often sending a keepalive is retried before the connection is closed and reopened.<br>
+            It defaults to 2.<br>
+            Example:
+            <code>
+            attr myCounter keepAliveRetries 3
+            </code>            
         <li><b>nextOpenDelay</b></li> 
             defines the time that the module waits before retrying to open a disconnected tcp connection. <br>
             This defaults to 60 seconds.<br>
