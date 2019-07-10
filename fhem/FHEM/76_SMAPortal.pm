@@ -162,6 +162,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.4"  => "11.07.2019  fix consinject to show multiple consumer icons if planned ",
   "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
   "2.4.2"  => "02.07.2019  change header design of portal graphics ",
   "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
@@ -2426,7 +2427,7 @@ sub consinject($$@) {
 		  my ($cons,$im,$start,$end) = split (':', $_);
 		  Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
 		  if ($im && ($i >= $start) && ($i <= $end)) {
-			  $ret = FW_makeImage($im);
+			  $ret .= FW_makeImage($im);
 		 }
 	  }
   }
@@ -2554,7 +2555,7 @@ return 'unknown';
 
 ######################################################################################################
 #      Refresh eines Raumes aus $hash->{HELPER}{SPGROOM}
-#      bzw. Longpoll von SSCam bzw. eines SMAPortalSPG Devices wenn $hash->{HELPER}{SPGDEV} gefüllt 
+#      bzw. Longpoll von SMAPortal bzw. eines SMAPortalSPG Devices wenn $hash->{HELPER}{SPGDEV} gefüllt 
 #      $hash, $pload (1=Page reload), SMAPortalSPG-Event (1=Event)
 ######################################################################################################
 sub SPGRefresh($$$) { 

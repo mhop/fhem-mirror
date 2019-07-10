@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  76_SMAPortal: show multiple consumer icons if planned
  - bugfix:  73_AutoShuttersControl: Fix for missing closed tag for strong
  - feature: 71_YAMAHA_NP: New commands 'checkForNewFirmware' and 'friendlyName'
  - feature: 95_Astro: v2.1.0: add alternative global functions
