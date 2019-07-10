@@ -6410,7 +6410,7 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Roommate_Reading</strong> - das Reading zum Roommate Device, welches den Status wieder gibt (default: state)</li>
             <li><strong>ASC_Self_Defense_Exclude - on/off</strong> - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. (default: off)</li>
             <li><strong>ASC_Self_Defense_Mode - absent/gone</strong> - ab welchen Residents Status soll Selfdefense aktiv werden ohne das Fenster auf sind. (default: gone)</li>
-            <li><strong>ASC_Self_Defense_AbsentDelay - um wie viele Sekunden soll das fahren in Selfdefense bei Residents absent verz&ouml;gert werden. (default: 300)</li>
+            <li><strong>ASC_Self_Defense_AbsentDelay</strong> - um wie viele Sekunden soll das fahren in Selfdefense bei Residents absent verz&ouml;gert werden. (default: 300)</li>
             <li><strong>ASC_Self_Defense_Exclude - on/off</strong> - bei on Wert wird dieser Rollladen bei aktiven Self Defense und offenen Fenster nicht runter gefahren, wenn Residents absent ist. (default: off)</li></p>
             <ul>
                 <strong><u>Beschreibung der Beschattungsfunktion</u></strong>
