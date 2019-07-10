@@ -32,6 +32,7 @@ sub PIFACE_Initialize($){
   $hash->{SetFn}	= "PIFACE_Set";
   $hash->{GetFn}	= "PIFACE_Get";
   $hash->{NotifyFn}     = "PIFACE_Notify";
+  $hash->{ShutdownFn}   = "PIFACE_Shutdown";
   $hash->{AttrFn}	= "PIFACE_Attr";
   $hash->{AttrList}	= $readingFnAttributes .
                           " defaultState:0,1,last,off pollInterval:0.5,0.75,1,1.5,2,3,4,5,6,7,8,9,10,off" .
@@ -44,6 +45,7 @@ sub PIFACE_Initialize($){
                           " portMode5:tri,up" .
                           " portMode6:tri,up" .
                           " portMode7:tri,up" .
+                          " shutdownClearIO:no,yes" .
                           " watchdog:on,off,silent watchdogInterval";
 }
 
@@ -99,35 +101,36 @@ sub PIFACE_Set($@) {
 }
 
 sub PIFACE_Get($@) {
-	my ($hash, @a)	= @_;
-	my $name = $hash->{NAME};
-	my $port = $a[1];
-	my ($adr, $cmd, $pin, $portMode, $val);
-	my $usage = "Unknown argument $port, choose one of all:noArg in:noArg out:noArg ".
-				"0:noArg 1:noArg  2:noArg  3:noArg  4:noArg ".
-				"5:noArg  6:noArg  7:noArg";
-	return $usage if $port eq "?";
-	if ($port eq "all") {
-	  PIFACE_Read_Inports(1, $hash);
-          PIFACE_Read_Outports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
-	} elsif ($port eq "in") {
-	  PIFACE_Read_Inports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
-	} elsif ($port eq "out") {
-          PIFACE_Read_Outports(1, $hash);
-	  Log3($name, 3, "PIFACE $name get port $port");
-	} else {
-	  # get state of in port
-	  $adr  = $base + 8 + $port;
-	  $cmd = "$gpioCmd -x mcp23s17:$base:0:0 read $adr";
-	  $val = `$cmd`;
-	  $val =~ s/\n//g;
-	  $val =~ s/\r//g;
-	  readingsSingleUpdate($hash, 'in' . $port, $val, 1);
-	  Log3($name, 3, "PIFACE $name get port in$port");
-	}
-	return;
+  my ($hash, @a)	= @_;
+  my $name = $hash->{NAME};
+  return undef if (IsDisabled($name));
+  my $port = $a[1];
+  my ($adr, $cmd, $pin, $portMode, $val);
+  my $usage = "Unknown argument $port, choose one of all:noArg in:noArg out:noArg ".
+		"0:noArg 1:noArg  2:noArg  3:noArg  4:noArg ".
+		"5:noArg  6:noArg  7:noArg";
+  return $usage if $port eq "?";
+  if ($port eq "all") {
+    PIFACE_Read_Inports(1, $hash);
+    PIFACE_Read_Outports(1, $hash);
+    Log3($name, 3, "PIFACE $name get port $port");
+  } elsif ($port eq "in") {
+    PIFACE_Read_Inports(1, $hash);
+    Log3($name, 3, "PIFACE $name get port $port");
+  } elsif ($port eq "out") {
+    PIFACE_Read_Outports(1, $hash);
+    Log3($name, 3, "PIFACE $name get port $port");
+  } else {
+    # get state of in port
+    $adr  = $base + 8 + $port;
+    $cmd = "$gpioCmd -x mcp23s17:$base:0:0 read $adr";
+    $val = `$cmd`;
+    $val =~ s/\n//g;
+    $val =~ s/\r//g;
+    readingsSingleUpdate($hash, 'in' . $port, $val, 1);
+    Log3($name, 3, "PIFACE $name get port in$port");
+  }
+  return;
 }
 
 sub PIFACE_Attr(@) {
@@ -173,6 +176,14 @@ sub PIFACE_Attr(@) {
     $val =~ s/\r//g;
     readingsSingleUpdate($hash, 'in' . $port, $val, 1);
 
+  } elsif ($attrName eq "shutdownClearIO") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^no|yes$/) {
+      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      CommandDeleteAttr(undef, "$name defaultState");
+    }
+
   } elsif ($attrName eq "watchdog") {
     if (!defined $attrVal) {
       $attrVal = "off" ;
@@ -200,16 +211,15 @@ sub PIFACE_Attr(@) {
 sub PIFACE_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME};
+  return undef if (IsDisabled($name));
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     PIFACE_Restore_Inports_Mode($hash);
     PIFACE_Restore_Outports_State($hash);
-    #PIFACE_Read_Inports(0, $hash);
-    #PIFACE_Read_Outports(0, $hash);
     PIFACE_GetUpdate($hash);
     PIFACE_Watchdog($hash);
     Log3($name, 3, "PIFACE $name initialized");
   }
-  return;
+  return undef;
 }
 
 sub PIFACE_Read_Outports($$) {
@@ -311,6 +321,7 @@ sub PIFACE_GetUpdate($) {
 sub PIFACE_Watchdog($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  return undef if (IsDisabled($name));
   my ($cmd, $port, $portMode, $valIn, $valOut0, $valOut1);
   my $watchdog = AttrVal($name, "watchdog", undef);
   my $watchdogInterval = AttrVal($name, "watchdogInterval", 60);
@@ -394,6 +405,22 @@ sub PIFACE_Watchdog($) {
   return;
 }
 
+sub PIFACE_Shutdown($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  return undef if (AttrVal($name, "shutdownClearIO", 'no') eq 'no');
+  my ($cmd, $port);
+  for (my $i = 0; $i <= 7; $i++) {
+    $port = $base + $i;
+    $cmd = "$gpioCmd -x mcp23s17:$base:0:0 write $port 0";
+    $cmd = `$cmd`;
+    $port = $base + $i + 8;
+    $cmd = "$gpioCmd -x mcp23s17:$base:0:0 mode $port tri";
+    $cmd = `$cmd`;
+  }
+  return undef;
+}
+
 1;
 
 =pod
@@ -444,7 +471,7 @@ sub PIFACE_Watchdog($) {
   </ul>
   <ul>
     <br>
-    Raspbian Jessie / Stretch<br>
+    Raspbian Jessie / Stretch / Buster<br>
     <li>Install it with<br>
       <code>sudo apt-get install wiringpi</code><br>
     </li>
@@ -562,6 +589,10 @@ sub PIFACE_Watchdog($) {
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+          <li><a name="PIFACE_shutdownClearIO">shutdownClearIO</a> no|yes,
+            [shutdownClearIO] = no is default.<br>
+            Clear IO ports during shutdown.
+          </li>
           <li><a name="PIFACE_watchdog">watchdog</a> off|on|silent,
             [watchdog] = off is default.<br>
             The function of the PiFace extension can be monitored periodically.
