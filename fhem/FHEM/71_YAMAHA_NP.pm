@@ -504,11 +504,12 @@ sub YAMAHA_NP_Set
     my $address = $hash->{helper}{ADDRESS};
     
     # Get model info in case not defined
-    if(not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
+    if(not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}) or not defined($hash->{FIRMWARE_STATUS}))
     {
       YAMAHA_NP_SendCmd($hash, "GET:System,Misc,Network,Info:GetParam", "statusRequest", "networkInfo" , 0);
       YAMAHA_NP_getModel($hash);
       YAMAHA_NP_SendCmd($hash, "GET:System,Config:GetParam"           , "statusRequest", "systemConfig", 0);
+      YAMAHA_NP_SendCmd($hash, "GET:System,Misc,Update,Yamaha_Network_Site,Status:GetParam" , "checkForNewFirmware", "noArg", 0);
     }
     
     # Setting default values. Update from device during existing communication.
@@ -553,8 +554,9 @@ sub YAMAHA_NP_Set
       # Context-sensitive command availability        
       if (ReadingsVal($name,"power","") !~ m/(off|absent)/)
       {
-        $usage .=" input:".$inputs_comma
-      
+        $usage .=" friendlyName"
+                ." checkForNewFirmware:noArg"
+                ." input:".$inputs_comma
                 ." volumeStraight:slider,".$volumeStraightMin.",1,".$volumeStraightMax
                 ." volume:slider,0,1,100"
                 ." volumeUp:noArg"
@@ -1535,6 +1537,23 @@ desiredListNloop:
         return "Please use straight device volume range :".$hash->{helper}{VOLUMESTRAIGHTMIN}."...".$hash->{helper}{VOLUMESTRAIGHTMAX}.".";
       }
     }
+    elsif($what eq "checkForNewFirmware")
+    {
+        YAMAHA_NP_SendCmd($hash, "GET:System,Misc,Update,Yamaha_Network_Site,Status:GetParam" , "checkForNewFirmware", "noArg", 0);
+    }
+    elsif($what eq "friendlyName")
+    {
+      # Accept 1 to 15 characters
+      if (length($a[2]) >= 1 and length($a[2]) <= 15)
+      {
+        $hash->{helper}{friendlyName} = $a[2];
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Misc,Network,Network_Name:".$a[2], $what, $a[2], 0);        
+      }
+      else
+      {
+        return "'friendlyName' must be between 1 and 15 characters."
+      }
+    }
     elsif($what eq "timerSet")
     {
       # TimerSet
@@ -2369,6 +2388,28 @@ sub YAMAHA_NP_ParseResponse
           return;
         }
       }
+      elsif($cmd eq "checkForNewFirmware")
+      {
+        if($data =~ /RC="0"/ and $data =~ /<Status>Unavailable<\/Status>/)
+        {
+            $hash->{FIRMWARE_STATUS} = "Most recent version installed";
+            $hash->{helper}{dInfo}{FIRMWARE_STATUS} = "Most recent version installed";
+        }
+        else
+        {
+            $hash->{FIRMWARE_STATUS} = "New Firmware available";
+            $hash->{helper}{dInfo}{FIRMWARE_STATUS} = "New Firmware available";
+        }
+      }
+      elsif($cmd eq "friendlyName")
+      {
+        if($data =~ /RC="0"/)
+        {
+          $hash->{FRIENDLY_NAME} = $hash->{helper}{friendlyName};
+          $hash->{helper}{dInfo}{FRIENDLY_NAME} = $hash->{helper}{friendlyName};
+          delete $hash->{helper}{friendlyName};
+        }
+      }
       elsif($cmd eq "mute")
       {
         if($data =~ /RC="0"/){readingsBulkUpdate($hash, "mute", $arg);}
@@ -2680,12 +2721,14 @@ sub YAMAHA_NP_html2txt
 	  <br>
       <u>Available commands:</u><br><br>
       <li><b>CDTray</b> &ndash; open/close the CD tray.</li>
+      <li><b>checkForNewFirmware</b> &ndash; Checks for firmware updates. The result is stored in 'Internals' und 'deviceInfo'.</li>
       <li><b>clockUpdate</b> &ndash; updates the system clock with current time. The local time information is taken from the FHEM server.</li>
       <li><b>dimmer</b> < 1..3 > &ndash; Sets the display brightness.</li>
       <li><b>directPlay</b> < input:Stream Level 1,Stream Level 2,... > &ndash; allows direct stream selection e.g. CD:1, DAB:1, netradio:Bookmarks,SWR3 (case&ndash;sensitive)</li>
       <li><b>favoriteDefine</b> < name:input[,Stream Level 1,Stream Level 2,...] > &ndash; defines and stores a favorite stream e.g. CoolSong:CD,1 (predefined favorites are the available inputs)</li>
       <li><b>favoriteDelete</b> < name > &ndash; deletes a favorite stream</li>
       <li><b>favoritePlay</b> < name > &ndash; plays a favorite stream</li>
+      <li><b>friendlyName</b> < name > &ndash; sets network player's friendly name (network name). String must be between 1 and 15 characters.</li>
       <li><b>input</b> [&lt;parameter&gt;] &ndash; selects the input channel. The inputs are read dynamically from the device. Available inputs can be set (e.g. cd, tuner, aux1, aux2, ...).</li>
       <li><b>mute</b> [on|off] &ndash; activates/deactivates muting</li>
       <li><b>off</b> &ndash; shuts down the device </li>
@@ -2882,12 +2925,14 @@ sub YAMAHA_NP_html2txt
 	  <br>
       <u>Verf&uuml;gbare Befehle:</u><br><br>
       <li><b>CDTray</b> &ndash; &Ouml;ffnen und Schlie&szlig;en des CD&ndash;Fachs.</li>
+      <li><b>checkForNewFirmware</b> &ndash; Pr&uuml;ft die Verf&uuml;gbarkeit neuer Firmware. Das Ergebnis wird in 'Internals' and 'deviceInfo' gespeichert.</li>
       <li><b>clockUpdate</b> &ndash; Aktualisierung der Systemzeit des Network Players. Die Zeitinformation wird von dem FHEM Server bezogen, auf dem das Modul ausgef&uuml;hrt wird.</li>
       <li><b>dimmer</b> [1..3] &ndash; Einstellung der Anzeigehelligkeit</li>
       <li><b>directPlay</b> < input:Stream Level 1,Stream Level 2,... > &ndash; erm&ouml;glicht direktes Abspielen eines Audiostreams/einer Audiodatei z.B. CD:1, DAB:1, netradio:Bookmarks,SWR3 </li>
       <li><b>favoriteDefine</b> < name:input[,Stream Level 1,Stream Level 2,...] > &ndash; Speichert einen Favoriten e.g. CoolSong:CD,1 (vordefinierte Favoriten sind die verf&uuml;gbaren Eing&auml;nge)</li>
       <li><b>favoriteDelete</b> < name > &ndash; L&ouml;scht einen Favoriten</li>
       <li><b>favoritePlay</b> < name > &ndash; Spielt einen Favoriten ab</li>
+	  <li><b>friendlyName</b> < name> &ndash; Setzt den Ger&auml;tenamen (friendly name / network name). String muss zwischen einem und 15 Zeichen sein.</li>
 	  <li><b>input</b> [&lt;parameter&gt;] &ndash; Auswahl des Eingangs des Network Players. (Nicht verf&uuml;gbar beim ausgeschaltetem Ger&auml;t)</li>
       <li><b>mute</b> [on|off] &ndash; Aktiviert/Deaktiviert die Stummschaltung</li>
       <li><b>off</b> &ndash; Network Player ausschalten</li>
