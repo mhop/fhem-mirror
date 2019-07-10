@@ -702,6 +702,19 @@ BEGIN {
           Initialize
           )
     );
+
+    # Export to main context with different name
+    no strict qw/refs/;
+    *{'main::asunrise_rel'} = *{ 'FHEM::Astro::SUNRISE_EL_sunrise_rel' };
+    *{'main::asunset_rel'}  = *{ 'FHEM::Astro::SUNRISE_EL_sunset_rel' };
+    *{'main::asunrise_abs'} = *{ 'FHEM::Astro::SUNRISE_EL_sunrise_abs' };
+    *{'main::asunset_abs'}  = *{ 'FHEM::Astro::SUNRISE_EL_sunset_abs' };
+    *{'main::asunrise'} = *{ 'FHEM::Astro::SUNRISE_EL_sunrise' };
+    *{'main::asunset'}  = *{ 'FHEM::Astro::SUNRISE_EL_sunset' };
+    *{'main::aisday'}   = *{ 'FHEM::Astro::SUNRISE_EL_isday' };
+    *{'main::asunrise_abs_dat'} = *{ 'FHEM::Astro::SUNRISE_EL_sunrise_abs_dat' };
+    *{'main::asunset_abs_dat'}  = *{ 'FHEM::Astro::SUNRISE_EL_sunset_abs_dat' };
+    use strict qw/refs/;
 }
 
 _LoadOptionalPackages();
@@ -736,10 +749,11 @@ sub Initialize ($) {
                          .$readingFnAttributes;
 
   $hash->{parseParams} = 1;
+  $hash->{NotifyOrderPrefix} = '45-';    # we are a data provider
 
   $data{FWEXT}{"/Astro_moonwidget"}{FUNC} = "FHEM::Astro::Moonwidget";
   $data{FWEXT}{"/Astro_moonwidget"}{FORKABLE} = 0;		
-	
+
   return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
@@ -755,9 +769,17 @@ sub Define ($@) {
  my ($hash,$a,$h) = @_;
  my $name = shift @$a;
  my $type = shift @$a;
+ my $global = shift @$a;
 
  return $@ unless ( FHEM::Meta::SetInternals($hash) );
  use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
+ if ($global) {
+   return "$type global device $modules{$type}{global}{NAME} is already defined"
+     if ( defined( $modules{$type}{global} ) );
+   $modules{$type}{global} = $hash;
+   $hash->{SCOPE} = 'global';
+ }
 
  $hash->{NOTIFYDEV} = "global";
  $hash->{INTERVAL} = 3600;
@@ -789,6 +811,15 @@ sub Undef ($$) {
   my $type = $hash->{TYPE};
   
   RemoveInternalTimer($hash);
+
+  delete $modules{$type}{defptr}{$name};
+
+  if ( defined( $modules{$type}{global} )
+      && $modules{$type}{global}{NAME} eq $name )
+  {
+      delete $modules{$type}{global};
+      Debug "Yes";
+  }
   
   return undef;
 }
@@ -1081,6 +1112,169 @@ sub _LoadOptionalPackages {
         import Time::Local 'timegm_modern';
         1;
     };
+}
+
+########################################################################################################
+#
+# subroutines for 99_SUNRISE_EL.pm compatibility layer
+#
+########################################################################################################
+
+sub SUNRISE_EL_sr($$$$$$) {
+    my ( $rise, $seconds, $isrel, $daycheck, $min, $max ) = @_;
+    SUNRISE_EL_sr_alt(
+        time(), $rise,         $isrel,   $daycheck,
+        1,      $main::defaultaltit, $seconds, $min,
+        $max
+    );
+}
+
+sub SUNRISE_EL_sr_alt($$$$$$$$$) {
+  my $nt=shift;
+  my $rise=shift;
+  my $isrel=shift;
+  my $daycheck=shift;
+  my $nextDay=shift;
+  my $altit = defined($_[0]) ? $_[0] : "";
+  my $hasalt = 0;
+  if(exists $main::alti{uc($altit)}) {
+      $hasalt = 1;
+      $altit=$main::alti{uc($altit)};
+      shift;
+  } elsif($altit =~ /HORIZON=([\-\+]*[0-9\.]+)/i) {
+      $hasalt = 1;
+      $altit=$1;
+      shift;
+  } else {
+      $altit=-6; #default
+  }
+  my($seconds, $min, $max)=@_;
+  my $needrise = ($rise || $daycheck) ? 1 : 0;
+  my $needset = (!$rise || $daycheck) ? 1 : 0;
+  $seconds = 0 if(!$seconds);
+
+  my $hash = defined( $modules{Astro}{global} ) ? $modules{Astro}{global} : ();
+  my $name = defined( $hash->{NAME} ) ? $hash->{NAME} : '';
+
+   ############################
+   # If set in global, use longitude/latitude
+   # from global, otherwise set Frankfurt/Germany as
+   # default
+   my $long = AttrVal( $name, "longitude", AttrVal( "global", "longitude", 10.0 ) );
+   my $lat  = AttrVal( $name, "latitude",  AttrVal( "global", "latitude",  50.0 ) );
+   $altit  = AttrVal( $name, "horizon",  AttrVal( "global", "horizon",  -6. ) ) unless($hasalt);
+   Log3 $name ne '' ? $name : undef, $name ne '' ? 4 : 5,
+        "[FHEM::Astro::SUNRISE_EL] "
+      . ( $name ne '' ? "$name: " : '' )
+      . "Compute sunrise/sunset for latitude $lat , longitude $long , horizon $altit at "
+      . FmtDateTime($nt);
+
+  #-- readjust timezone
+  my $tz =
+    AttrVal( $name, "timezone", AttrVal( "global", "timezone", undef ) );
+  local $ENV{TZ} = $tz if ($tz);
+  tzset() if ( exists &{'tzset'} );
+
+  #my $nt = time;
+  my @lt = localtime($nt);
+  my $gmtoff = main::_calctz($nt,@lt); # in hour
+
+  my ($rt,$st) = _SUNRISE_EL_sr_alt($lat,$long,$altit,$needrise,$needset,$nt,$gmtoff);
+  my $sst = ($rise ? $rt : $st) + ($seconds/3600);
+
+  my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;    # Current hour since midnight
+  if($daycheck) {
+    if(defined($min) && defined($max)) { #Forum #43742
+      $min = main::hms2h($min); $max = main::hms2h($max);
+      if($min < $max) {
+        $rt = $min if($rt < $min);
+        $st = $max if($st > $max);
+      } else {
+        $rt = $max if($rt > $max);
+        $st = $min if($st < $min);
+      }
+    }
+    return 1 if($rt <= $nh && $nh <= $st);
+    return 0;
+  }
+
+  $sst = main::hms2h($min) if(defined($min) && (main::hms2h($min) > $sst));
+  $sst = main::hms2h($max) if(defined($max) && (main::hms2h($max) < $sst));
+
+  my $diff = 0;
+  if (($data{AT_RECOMPUTE} ||                     # compute it for tommorow
+    int(($nh-$sst)*3600) >= 0) && $nextDay)  {    # if called a subsec earlier
+    $nt += 86400;
+    @lt = localtime($nt);
+    my $ngmtoff = main::_calctz($nt,@lt); # in hour
+    $diff = 24;
+
+    ($rt,$st) = _SUNRISE_EL_sr_alt($lat,$long,$altit,$needrise,$needset,$nt,$ngmtoff);
+    $sst = ($rise ? $rt : $st) + ($seconds/3600);
+
+    $sst = main::hms2h($min) if(defined($min) && (main::hms2h($min) > $sst));
+    $sst = main::hms2h($max) if(defined($max) && (main::hms2h($max) < $sst));
+  }
+
+  $sst += $diff if($isrel);
+  $sst -= $nh if($isrel == 1);
+
+  delete local $ENV{TZ};
+  tzset() if ( exists &{'tzset'} );
+
+  return main::h2hms_fmt($sst);
+}
+
+sub _SUNRISE_EL_sr_alt($$$$$$$) {
+    my ( $lat, $long, $altit, $needrise, $needset, $nt, $offset ) = @_;
+    my $hash =
+      defined( $modules{Astro}{global} ) ? $modules{Astro}{global} : ();
+    my $name = defined( $hash->{NAME} ) ? $hash->{NAME} : '';
+
+    my $horM = 0.0;
+    my $horE = 0.0;
+    if ( $altit =~ m/^([^:]+)(?::(.+))?$/ ) {
+        $horM = $1;
+        $horE = defined($2) ? $2 : $1;
+    }
+
+    my $tz =
+      AttrVal( $name, "timezone", AttrVal( "global", "timezone", undef ) );
+    SetTime( $nt, $tz );
+    my $JD0 = Date2JD( $Date{day}, $Date{month}, $Date{year} );
+
+    my (
+        $suntransit,            $sunrise,
+        $sunset,                $CivilTwilightMorning,
+        $CivilTwilightEvening,  $NauticTwilightMorning,
+        $NauticTwilightEvening, $AstroTwilightMorning,
+        $AstroTwilightEvening,  $CustomTwilightMorning,
+        $CustomTwilightEvening
+      )
+      = SunRise(
+        $JD0, $deltaT,
+        $long * $DEG,
+        $lat * $DEG,
+        $Date{zonedelta}, $horM, $horE, 0
+      );
+
+    return ( $needrise ? $CustomTwilightMorning : undef ),
+      ( $needset       ? $CustomTwilightEvening : undef );
+}
+
+sub SUNRISE_EL_sunrise_rel(@) { return SUNRISE_EL_sr_alt(time(),1,1,0,1,shift,shift,shift,shift); }
+sub SUNRISE_EL_sunset_rel (@) { return SUNRISE_EL_sr_alt(time(),0,1,0,1,shift,shift,shift,shift); }
+sub SUNRISE_EL_sunrise_abs(@) { return SUNRISE_EL_sr_alt(time(),1,0,0,0,shift,shift,shift,shift); }
+sub SUNRISE_EL_sunset_abs (@) { return SUNRISE_EL_sr_alt(time(),0,0,0,0,shift,shift,shift,shift); }
+sub SUNRISE_EL_sunrise    (@) { return SUNRISE_EL_sr_alt(time(),1,2,0,1,shift,shift,shift,shift); }
+sub SUNRISE_EL_sunset     (@) { return SUNRISE_EL_sr_alt(time(),0,2,0,1,shift,shift,shift,shift); }
+sub SUNRISE_EL_isday      (@) { return SUNRISE_EL_sr_alt(time(),1,0,1,1,shift,shift,shift,shift); }
+
+sub SUNRISE_EL_sunrise_abs_dat(@) {
+  return SUNRISE_EL_sr_alt(main::sr_noon(shift),1,0,0,0,shift,shift,shift,shift);
+}
+sub SUNRISE_EL_sunset_abs_dat (@) {
+  return SUNRISE_EL_sr_alt(main::sr_noon(shift),0,0,0,0,shift,shift,shift,shift);
 }
 
 ########################################################################################################
@@ -1885,7 +2079,7 @@ sub SetTime (;$$$) {
 
     #-- readjust timezone
     local $ENV{TZ} = $tz if ($tz);
-    tzset() if ( defined( *{'tzset'} ) );
+    tzset() if ( exists &{'tzset'} );
 
     $time = gettimeofday() unless ( defined($time) );
 
@@ -1922,7 +2116,7 @@ sub SetTime (;$$$) {
     delete $Date{tz} if (!$Date{tz} || $Date{tz} eq "" || $Date{tz} eq " ");
 
     delete local $ENV{TZ};
-    tzset() if ( defined( *{'tzset'} ) );
+    tzset() if ( exists &{'tzset'} );
 
     setlocale(LC_TIME, "");
     setlocale(LC_TIME, $old_lctime);
@@ -1963,7 +2157,7 @@ sub Compute($;$){
   $tz = $params->{"timezone"}
     if ( defined( $params->{"timezone"} ) );
   local $ENV{TZ} = $tz if ($tz);
-  tzset() if ( defined( *{'tzset'} ) );
+  tzset() if ( exists &{'tzset'} );
 
   #-- geodetic latitude and longitude of observer on WGS84  
   if( defined($params->{"latitude"}) ){
@@ -2215,7 +2409,7 @@ sub Compute($;$){
   $Astro{ObsSeasonN} = $seasonn;
 
   delete local $ENV{TZ};
-  tzset() if ( defined( *{'tzset'} ) );
+  tzset() if ( exists &{'tzset'} );
 
   return( undef );
 };
@@ -2840,8 +3034,10 @@ sub Get($@) {
         <a name="Astrodefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; Astro</code>
-            <br />Defines the Astro device (only one is needed per FHEM installation).</p>
+            <code>define &lt;name&gt; Astro [global]</code>
+            <br />Defines the Astro device (only one is needed per FHEM installation).
+            <br />
+            Optional parameter 'global' will mark this device for global configuration options, see SUNRISE_EL compatibility mode below for details.</p>
         <p>
         Readings with prefix <i>Sun</i> refer to the sun, with prefix <i>Moon</i> refer to the moon.
         The suffixes for these readings are:
@@ -2901,6 +3097,8 @@ sub Get($@) {
         You may also add parameters to customize your request:<br/>
         <ul><code>Astro_Get( SOME_HASH_REFERENCE, ["dummy","text"], {html=>1} );</code><br/>
         <code>Astro_Get( SOME_HASH_REFERENCE, ["dummy","text","SunRise,SunSet,SunAz,SunDistanceObserver"], {html=>1, long=>2} );</code></ul>
+        </li>
+        <li>Functions that can replace those from <a href="#SUNRISE_EL">SUNRISE_EL</a> are available under the same name and adding <i>a</i> as a prefix in front of it (for example, use <code>asunrise()</code> instead of <code>sunrise()</code>). A single Astro device can act as a global configuration device for such functions if it was created using the <i>global</i> define parameter. If you don't want to create any Astro device at all, you may put <code>LoadModule("Astro");</code> into your 99_myUtils.pm to only load the SUNRISE_EL replacement functions.
         </li>
         </ul>
         <a name="Astroset"></a>
@@ -2997,7 +3195,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.0.3",
+  "version": "v2.1.0",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",
