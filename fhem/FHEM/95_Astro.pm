@@ -776,7 +776,8 @@ sub Define ($@) {
 
  if ($global) {
    return "$type global device $modules{$type}{global}{NAME} is already defined"
-     if ( defined( $modules{$type}{global} ) );
+     if ( defined( $modules{$type}{global} )
+       && $modules{$type}{global}{NAME} ne $name );
    $modules{$type}{global} = $hash;
    $hash->{SCOPE} = 'global';
  }
@@ -1141,7 +1142,7 @@ sub SUNRISE_EL_sr_alt($$$$$$$$$) {
       $hasalt = 1;
       $altit=$main::alti{uc($altit)};
       shift;
-  } elsif($altit =~ /HORIZON=([\-\+]*[0-9\.]+)/i) {
+  } elsif($altit =~ /HORIZON=(([\-\+]*[0-9\.]+)(?::([\-\+]*[0-9\.]+))?)/i) {
       $hasalt = 1;
       $altit=$1;
       shift;
@@ -3195,7 +3196,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.1.0",
+  "version": "v2.1.1",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",
@@ -3216,16 +3217,24 @@ sub Get($@) {
     "astronomy",
     "constellation",
     "moon",
+    "moonrise",
+    "moonset",
     "sun",
+    "sunrise",
+    "sunset",
     "star sign",
     "twilight",
     "zodiac",
     "Astrologie",
     "Astronomie",
     "Mond",
+    "Mondaufgang",
+    "Monduntergang",
     "Sonne",
     "Sternbild",
     "Sternzeichen",
+    "Sonnenaufgang",
+    "Sonnenuntergang",
     "Tierkreiszeichen",
     "Zodiak"
   ],
