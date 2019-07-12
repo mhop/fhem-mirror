@@ -9765,10 +9765,16 @@ sub EnOcean_Parse($$)
 
       if ($st eq "lightTempOccupSensor.01") {
         # Light, Temperatur and Occupancy Sensor (EEP A5-08-01)
-        # [Eltako FABH63, FBH55, FBH63, FIBH63]
+        # [Eltako FABH63, FBH55, FBH63, FIBH63, TF-BHSB]
         if ($manufID eq "00D") {
-          $lux = sprintf "%d", $db[2] * 2048 / 255;
-          push @event, "3:state:M: $motion E: $lux";
+          if ( $model eq 'Eltako_TF') {
+            $lux = $db[2] << 1;
+            push @event, "3:state:M: $motion E: $lux U: $voltage";
+            push @event, "3:voltage:$voltage";
+          } else {
+            $lux = sprintf "%d", $db[2] * 2048 / 255;
+            push @event, "3:state:M: $motion E: $lux";
+          }
         } else {
           $lux = $db[2] << 1;
           $temp = sprintf "%0.1f", $db[1] * 0.2;
@@ -10648,6 +10654,11 @@ sub EnOcean_Parse($$)
         # Unknown Application
         push @event, "3:state:Manufacturer Specific Application unknown";
       }
+
+    } elsif ($st eq "contact" && $manufID eq "00D") {
+      # Eltako TF-FKB voltage telegram
+      push @event, "3:voltage:" . sprintf "%0.1f", $db[2] * 0.02;
+      push @event, "3:energyStorage:" . sprintf "%0.1f", $db[3] * 0.02;
 
     } elsif ($st eq "PM101") {
       # Light and Presence Sensor [Omnio Ratio eagle-PM101]
@@ -18115,7 +18126,8 @@ EnOcean_Delete($$)
        The attr subType must be contact. The attribute must be set manually.
        A monitoring period can be set for signOfLife telegrams of the sensor, see
        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
-       Default is "off" and an interval of 1980 sec.
+       Default is "off" and an interval of 1980 sec.<br>
+       Set the manufID to 00D for Eltako devices that send a periodic voltage telegram. (For example TF-FKB)
     </li><br><br>
 
     <li>Room Sensor and Control Unit (EEP A5-10-02)<br>
@@ -20432,17 +20444,19 @@ EnOcean_Delete($$)
 
      <li>Single Input Contact, Door/Window Contact<br>
          1BS Telegram (EEP D5-00-01)<br>
-         [EnOcean EMCS, STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU]
+         [EnOcean EMCS, STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU, Eltako TK-TKB]
      <ul>
          <li>closed</li>
          <li>open</li>
          <li>alarm: dead_sensor</li>
+         <li>battery: U/V (Range: U = 0 V ... 5 V</li>
+         <li>energyStorage: U/V (Range: U = 0 V ... 5 V</li>
          <li>teach: &lt;result of teach procedure&gt;</li>
          <li>state: open|closed</li>
      </ul></li>
         The device should be created by autocreate. A monitoring period can be set for signOfLife telegrams of the sensor, see
        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
-       Default is "off" and an interval of 1310 sec.
+       Default is "off" and an interval of 1980 sec.
      <br><br>
 
      <li>Temperature Sensors with with different ranges (EEP A5-02-01 ... A5-02-30)<br>
@@ -20642,7 +20656,7 @@ EnOcean_Delete($$)
         Eltako and PEHA devices only support Brightness and Motion.<br>
         The attr subType must be lightTempOccupSensor.<01|02|03> and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
-        created by autocreate.
+        created by autocreate. Set model to Eltako_TF manually for Eltako TF Devices.
      </li>
      <br><br>
 
