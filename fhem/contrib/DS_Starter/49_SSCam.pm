@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $
+# $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.15.1" => "11.07.2019  enhancement and bugfixes for refresh of SSCamSTRM devices (integrate FUUID) ",
+  "8.15.0" => "09.07.2019  support of SSCamSTRM get function and FTUI widget ",
   "8.14.2" => "28.06.2019  increase get SID timeout to at least 60 s, set compatibility to SVS 8.2.4, improve disable/enable behavior ",
   "8.14.1" => "23.06.2019  Presets and Patrols containing spaces in its names are replaced by \"_\", deletion of Presets corrected ".
                            "bugfix userattr when changing Prests ",
@@ -153,6 +155,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.15.0" => "09.07.2019 support of integrating Streaming-Devices in a SSCam FTUI widget ",
   "8.14.0" => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
@@ -326,7 +329,7 @@ our %SSCam_ttips_en = (
     ttcmdstop   => "Stopp playback of camera &quot;§NAME§&quot;",
     tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.<br>The camera is enforced to restart HLS transmission.",
     ttmjpegrun  => "Playback the MJPEG Livestream of camera &quot;§NAME§&quot;.",
-    tthlsrun    => "Playback the native HTTP Livestream of camera &quot;§NAME§&quot;.",
+    tthlsrun    => "Playback the native HTTP Livestream of camera &quot;§NAME§&quot;. The browser must have native support for HLS streaming.",
     ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.<br>Both MJPEG and H.264 recordings are rendered.",
     tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type H.264",
     ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type MJPEG",
@@ -344,7 +347,7 @@ our %SSCam_ttips_de = (
     ttcmdstop   => "Stopp Wiedergabe von Kamera &quot;§NAME§&quot;",
     tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
     ttmjpegrun  => "Wiedergabe des MJPEG Livestreams von Kamera &quot;§NAME§&quot;",
-    tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet.",
+    tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet. (der Browser muss HLS nativ unterstützen)",
     ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.<br>Es werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
     tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
     ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
@@ -882,11 +885,16 @@ sub SSCam_Set($@) {
       if (defined($prop) && $prop =~ /^\d+$/) {
           $hash->{HELPER}{RECTIME_TEMP} = $prop;
       }
+	  
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Aufnahme durch SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+      }	
       
       my $emtxt = AttrVal($name, "recEmailTxt", "");
-      my $at = join(" ",@a);
-      if($at =~ /recEmailTxt:/) {
-          $at =~ m/.*recEmailTxt:"(.*)".*/i;
+      if($spec =~ /recEmailTxt:/) {
+          $spec =~ m/.*recEmailTxt:"(.*)".*/i;
           $emtxt = $1;
       }
       
@@ -898,9 +906,8 @@ sub SSCam_Set($@) {
       }
       
       my $teletxt = AttrVal($name, "recTelegramTxt", "");
-      my $bt = join(" ",@a);
-      if($bt =~ /recTelegramTxt:/) {
-          $bt =~ m/.*recTelegramTxt:"(.*)".*/i;
+      if($spec =~ /recTelegramTxt:/) {
+          $spec =~ m/.*recTelegramTxt:"(.*)".*/i;
           $teletxt = $1;
       }
       
@@ -916,6 +923,13 @@ sub SSCam_Set($@) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
       my $teletxt = $hash->{HELPER}{TELERECMSG}?delete $hash->{HELPER}{TELERECMSG}:"";
+	  
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Aufnahmestop durch SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+      }
+	  
       SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
@@ -930,13 +944,18 @@ sub SSCam_Set($@) {
           $lag = $prop1;
       }
       
-      Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");      
-      $hash->{HELPER}{SNAPBYSTRMDEV} = 1 if ($prop2 && $prop2 =~ /STRM/);   # $prop wird mitgegeben durch Snap by SSCamSTRM-Device
+      Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");   
+	  
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Snap by SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+		  $hash->{HELPER}{SNAPBYSTRMDEV} = 1;
+      }	
        
       my $emtxt = AttrVal($name, "snapEmailTxt", "");
-      my $at = join(" ",@a);
-      if($at =~ /snapEmailTxt:/) {
-          $at =~ m/.*snapEmailTxt:"(.*)".*/i;
+      if($spec =~ /snapEmailTxt:/) {
+          $spec =~ m/.*snapEmailTxt:"(.*)".*/i;
           $emtxt = $1;
       }
       
@@ -948,9 +967,8 @@ sub SSCam_Set($@) {
       }
 	  
       my $teletxt = AttrVal($name, "snapTelegramTxt", "");
-      my $bt = join(" ",@a);
-      if($bt =~ /snapTelegramTxt:/) {
-          $bt =~ m/.*snapTelegramTxt:"(.*)".*/i;
+      if($spec =~ /snapTelegramTxt:/) {
+          $spec =~ m/.*snapTelegramTxt:"(.*)".*/i;
           $teletxt = $1;
       }
       
@@ -1086,7 +1104,7 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "createPTZcontrol" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
-      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','$ptzcdev','ptzcontrol')}");
+      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','','$ptzcdev','ptzcontrol')}");
 	  return $ret if($ret);
 	  my $room    = AttrVal($name,"room","SSCam");
       $attr{$ptzcdev}{room}  = $room;
@@ -1355,65 +1373,72 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "runView" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      if ($prop eq "live_open") {
+      
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Call by SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+      }	
+	  
+	  if ($prop eq "live_open") {
           if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
           $hash->{HELPER}{OPENWINDOW} = 1;
           $hash->{HELPER}{WLTYPE}     = "link";    
 		  $hash->{HELPER}{ALIAS}      = "LiveView";
 		  $hash->{HELPER}{RUNVIEW}    = "live_open";
-          $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
+          $hash->{HELPER}{ACTSTRM}    = "";		                # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_link") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "link"; 
 		  $hash->{HELPER}{ALIAS}      = "LiveView";
 		  $hash->{HELPER}{RUNVIEW}    = "live_link";
-		  $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
+		  $hash->{HELPER}{ACTSTRM}    = "";		                # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastrec_open") {
           if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
           $hash->{HELPER}{OPENWINDOW} = 1;
           $hash->{HELPER}{WLTYPE}     = "link"; 
 	      $hash->{HELPER}{ALIAS}      = "LastRecording";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
-		  $hash->{HELPER}{ACTSTRM}    = "";		             # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      }  elsif ($prop eq "lastrec_fw") {                     # Video in iFrame eingebettet
+		  $hash->{HELPER}{ACTSTRM}    = "";		                # sprechender Name des laufenden Streamtyps für SSCamSTRM
+      }  elsif ($prop eq "lastrec_fw") {                        # Video in iFrame eingebettet
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "iframe"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
-		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastrec_fw_MJPEG") {                # “video/avi” – MJPEG format event
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+      } elsif ($prop eq "lastrec_fw_MJPEG") {                   # “video/avi” – MJPEG format event
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "image"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
-		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {          # “video/mp4” – MPEG4/H.264 format event
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+      } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {             # “video/mp4” – MPEG4/H.264 format event
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "video"; 
 	      $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "lastrec";
-		  $hash->{HELPER}{ACTSTRM}    = "last Recording";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
+		  $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw") {
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "image"; 
 		  $hash->{HELPER}{ALIAS}      = " ";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
-		  $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";   # sprechender Name des laufenden Streamtyps für SSCamSTRM
+		  $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw_hls") {
           return "API \"SYNO.SurveillanceStation.VideoStream\" is not available or Reading \"CamStreamFormat\" is not \"HLS\". May be your API version is 2.8 or higher." if(!SSCam_IsHLSCap($hash));
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "hls"; 
 		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
-		  $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
+		  $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "lastsnap_fw") {
-          $hash->{HELPER}{LSNAPBYSTRMDEV}  = 1 if($prop1);   # Anzeige durch SSCamSTRM-Device ausgelöst
-          $hash->{HELPER}{LSNAPBYDEV}  = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
-          $hash->{HELPER}{OPENWINDOW}  = 0;
-          $hash->{HELPER}{WLTYPE}      = "base64img"; 
-		  $hash->{HELPER}{ALIAS}       = " ";
-		  $hash->{HELPER}{RUNVIEW}     = "lastsnap_fw";
-		  $hash->{HELPER}{ACTSTRM}     = "last Snapshot";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
+          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if($prop1);       # Anzeige durch SSCamSTRM-Device ausgelöst
+          $hash->{HELPER}{LSNAPBYDEV}     = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
+          $hash->{HELPER}{OPENWINDOW}     = 0;
+          $hash->{HELPER}{WLTYPE}         = "base64img"; 
+		  $hash->{HELPER}{ALIAS}          = " ";
+		  $hash->{HELPER}{RUNVIEW}        = "lastsnap_fw";
+		  $hash->{HELPER}{ACTSTRM}        = "last Snapshot";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } else {
           return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
       }
@@ -1427,13 +1452,21 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "hlsactivate" && SSCam_IsModelCam($hash)) {
       # ohne SET-Menüeintrag
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      SSCam_hlsactivate($hash);
+      
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Call by SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+      }
+	  SSCam_hlsactivate($hash);
         
   } elsif ($opt eq "refresh" && SSCam_IsModelCam($hash)) {
       # ohne SET-Menüeintrag
-      if($prop =~ /STRM/) {
-          # Event in allen SSCamSTRM-Devices erzeugen um Contentwiedergabe aufzufrischen
-          SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Refresh by SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+		  SSCam_refresh($hash,0,0,1);                                  # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
       }
       
   } elsif ($opt eq "extevent" && !SSCam_IsModelCam($hash)) {                                   
@@ -1443,6 +1476,12 @@ sub SSCam_Set($@) {
         
   } elsif ($opt eq "stopView" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+
+      my $spec = join(" ",@a);
+      if($spec =~ /STRM:/) {
+          $spec =~ m/.*STRM:(.*).*/i;                                  # Stop by SSCamSTRM-Device
+          $hash->{HELPER}{INFORM} = $1;
+      }	
       SSCam_stopliveview($hash);            
         
   } elsif ($opt eq "setPreset" && SSCam_IsModelCam($hash)) {
@@ -1906,8 +1945,7 @@ sub SSCam_FWdetailFn ($$$$) {
       $ret .= $hash->{".setup"};
   }
   
-  # return undef if(!AttrVal($d,"ptzPanel_use",1));
-  $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($d,'') if($hash->{".ptzhtml"} eq "");
 
   if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
@@ -5539,10 +5577,9 @@ sub SSCam_camop_parse ($) {
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
 
 				########  fallabhängige Eventgenerierung  ########
-                if ($hash->{HELPER}{SNAPBYSTRMDEV} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
+                if ($hash->{HELPER}{INFORM} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
                     # Snap durch SSCamSTRM-Device ausgelöst
                     SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                    delete $hash->{HELPER}{SNAPBYSTRMDEV};
                     delete $hash->{HELPER}{LSNAPBYSTRMDEV};
                 } elsif ($hash->{HELPER}{LSNAPBYDEV}) {
                     SSCam_refresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
@@ -5550,26 +5587,6 @@ sub SSCam_camop_parse ($) {
                 } else {
                     SSCam_refresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
-                # longpoll für alle Streamingdevices v. Typ "lastsnap"
-                my @lsnapstrms = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
-                if(scalar(@lsnapstrms) >= 1) {
-                    foreach (@lsnapstrms) {
-                        if($defs{$_}) {
-                            $hash->{HELPER}{STRMDEV} = $_;
-                            SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                        }
-                    }
-                }
-                # longpoll für alle Streamingdevices v. Typ "snapgallery"
-                @lsnapstrms = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=snapgallery");
-                if(scalar(@lsnapstrms) >= 1) {
-                    foreach (@lsnapstrms) {
-                        if($defs{$_}) {
-                            $hash->{HELPER}{STRMDEV} = $_;
-                            SSCam_refresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                        }
-                    }
-                }
             
 			} elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
                 # HLS Streaming wurde aktiviert
@@ -6653,13 +6670,11 @@ return($hash,$success,$myjson);
 
 ######################################################################################################
 #      Refresh eines Raumes aus $hash->{HELPER}{STRMROOM}
-#      bzw. Longpoll von SSCam bzw. eines SSCamSTRM Devices wenn
-#      $hash->{HELPER}{STRMDEV} gefüllt 
 #      $hash, $pload (1=Page reload), SSCam-state-Event(1=Event), SSCamSTRM-Event (1=Event)
 ######################################################################################################
 sub SSCam_refresh($$$$) { 
   my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
-  my $name;
+  my ($name,$st);
   if (ref $hash ne "HASH")
   {
     ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
@@ -6669,48 +6684,53 @@ sub SSCam_refresh($$$$) {
   }
   my $fpr  = 0;
   
-  # Kontext des SSCamSTRM-Devices speichern für Refresh
-  my $sd  = $hash->{HELPER}{STRMDEV}?$hash->{HELPER}{STRMDEV}:"\"n.a.\"";       # Name des aufrufenden SSCamSTRM-Devices
-  my $sr  = $hash->{HELPER}{STRMROOM}?$hash->{HELPER}{STRMROOM}:"\"n.a.\"";     # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
-  my $sl  = $hash->{HELPER}{STRMDETAIL}?$hash->{HELPER}{STRMDETAIL}:"\"n.a.\""; # Name des SSCamSTRM-Devices (wenn Detailansicht)
-  $fpr    = AttrVal($hash->{HELPER}{STRMDEV},"forcePageRefresh",0) if($hash->{HELPER}{STRMDEV});
-  Log3($name, 4, "$name - SSCam_refresh - caller: $sd, callerroom: $sr, detail: $sl, pload: $pload, forcePageRefresh: $fpr, event_STRMdev: $lpoll_strm");
-  
-  # Page-Reload
-  if($pload && $hash->{HELPER}{STRMROOM} && $hash->{HELPER}{STRMDETAIL}) {
-      if($hash->{HELPER}{STRMROOM} && !$hash->{HELPER}{STRMDETAIL} && !$fpr) {
-      Log3($name, 4, "$name - SSCam_refresh jetzt");
-          # trifft zu wenn in einer Raumansicht
-	      my @rooms = split(",",$hash->{HELPER}{STRMROOM});
-	      foreach (@rooms) {
-	          my $room = $_;
-              { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
-	      }
-      } elsif ( !$hash->{HELPER}{STRMROOM} || $hash->{HELPER}{STRMDETAIL} || $fpr ) {
-          # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
-          # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
-          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
-      } 
-  } elsif ($fpr) {
-      # Seitenrefresh durch SSCamSTRM-Attribut "forcePageRefresh" erzwungen
-      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+  # SSCamSTRM-Device mit hinterlegter FUUID ($hash->{HELPER}{INFORM}) selektieren
+  my @spgs = devspec2array("TYPE=SSCamSTRM");
+  my $room = "";
+  foreach(@spgs) {   
+      if($defs{$_}{PARENT} eq $name) {
+          next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
+		  $fpr  = AttrVal($defs{$_}{NAME},"forcePageRefresh",0);
+          $room = AttrVal($defs{$_}{NAME},"room","");
+		  Log3($name, 4, "$name - SSCam_refresh - pagerefresh: $defs{$_}{NAME}") if($fpr);
+      }
   }
   
+  # Page-Reload
+  if($pload && $room) {
+      if(!$fpr) {
+          # nur Räume mit dem SSCamSTRM-Device reloaden
+	      my @rooms = split(",",$room);
+	      foreach (@rooms) {
+	          my $r = $_;
+              { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
+	      }
+      }
+  } elsif ($pload || $fpr) {
+      # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
+      # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
+      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+  } 
+  
   # Aufnahmestatus/Disabledstatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
-  my $st = (ReadingsVal($name, "Availability", "enabled") eq "disabled")?"disabled":(ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
+  $st = (ReadingsVal($name, "Availability", "enabled") eq "disabled")?"disabled":(ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
   if($lpoll_scm) {
       readingsSingleUpdate($hash,"state", $st, 1);
   } else {
       readingsSingleUpdate($hash,"state", $st, 0);  
   }
   
-  # parentState des SSCamSTRM-Device mit Opmode updaten (mit/ohne Event)
-  if($hash->{HELPER}{STRMDEV}) {
-      my $strmhash = $defs{$hash->{HELPER}{STRMDEV}};  
-      if($lpoll_strm) {
-          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 1);
-      } else {
-          readingsSingleUpdate($strmhash,"parentState", $hash->{OPMODE}, 0);  
+  # parentState des SSCamSTRM-Device updaten
+  $st = ReadingsVal($name, "state", "initialized");  
+  foreach(@spgs) {   
+      if($defs{$_}{PARENT} eq $name) {
+          next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
+          readingsBeginUpdate($defs{$_});
+          readingsBulkUpdate($defs{$_},"parentState", $st);
+          readingsBulkUpdate($defs{$_},"state", "updated");
+          readingsEndUpdate($defs{$_}, 1);
+		  Log3($name, 4, "$name - SSCam_refresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
+		  delete $hash->{HELPER}{INFORM};
       }
   }
         
@@ -6887,8 +6907,8 @@ return ($ret);
 #     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
 #     das generierte Widget und das weblink-Device ptzpanel_$name
 ###############################################################################
-sub SSCam_ptzpanel($;$$) {
-  my ($name,$ptzcdev,$ptzcontrol)     = @_; 
+sub SSCam_ptzpanel($$;$$) {
+  my ($name,$ftui,$ptzcdev,$ptzcontrol)     = @_; 
   my $hash       = $defs{$name};
   my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
   my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
@@ -6916,21 +6936,22 @@ sub SSCam_ptzpanel($;$$) {
           if ($btn[$btnnr] ne "") {
               my $cmd;
               my $img;
-              if ($btn[$btnnr] =~ /(.*?):(.*)/) {    # enthält Komando -> <command>:<image>
+              if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                               # enthält Komando -> <command>:<image>
                   $cmd = $1;
                   $img = $2;
-              } else {                               # button has format <command> or is empty
+              } else {                                                                          # button has format <command> or is empty
                   $cmd = $btn[$btnnr];
                   $img = $btn[$btnnr];
               }
-		      if ($img =~ m/\.svg/) {                # Verwendung für SVG's
+		      if ($img =~ m/\.svg/) {                                                           # Verwendung für SVG's
 		          $img = FW_makeImage($img, $cmd, "rc-button");
 		      } else {
                   $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\">";                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
 		      }
               if ($cmd || $cmd eq "0") {
-                  $cmd = "cmd=set $name $cmd";
-                  $ptz_ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmd')\">$img</a>";  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+                  my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";            # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+                  $cmd1     = "ftui.setFhemStatus('set $name $cmd')" if($ftui); 
+                  $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
               } else {
                   $ptz_ret .= $img;
               }
@@ -6946,58 +6967,58 @@ sub SSCam_ptzpanel($;$$) {
   
   ########################
   # add Preset & Patrols
-  
-  my ($Presets,$Patrols,$fn);
-  my $cmdPreset = "goPreset";
-  my $cmdPatrol = "runPatrol";
-  
-  foreach $fn (sort keys %{$data{webCmdFn}}) {
-      no strict "refs";
-      $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
-      use strict "refs";
-      last if(defined($Presets));
-  }
-  if($Presets) {
-      $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,;
-      # Log3($name, 1, "$name - commandArgs: $Presets");
-  } else {
-      $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
-  }
+  if(!$ftui) {
+      my ($Presets,$Patrols,$fn);
+      my $cmdPreset = "goPreset";
+      my $cmdPatrol = "runPatrol";
+      
+      foreach $fn (sort keys %{$data{webCmdFn}}) {
+          no strict "refs";
+          $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
+          use strict "refs";
+          last if(defined($Presets));
+      }
+      if($Presets) {
+          $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,;
+          # Log3($name, 1, "$name - commandArgs: $Presets");
+      } else {
+          $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
+      }
 
-  foreach $fn (sort keys %{$data{webCmdFn}}) {
-      no strict "refs";
-      $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
-      use strict "refs";
-      last if(defined($Patrols));
-  }
-  
-  
-  # Rahmenklasse
-  $ptz_ret .= "<div class=\"ptzpanel\">";
-  $ptz_ret .= "<table class=\"rc_body\">";  
-  $ptz_ret .= "<tr>";
-  $ptz_ret .= '<td class="rc_button">';
-  
-  # Dropdown Klasse
-  $ptz_ret .= "<table class=\"webcmd\">";  
-  $ptz_ret .= "<tr>";
-  $ptz_ret .= "<td style=\"font-size:250%;\">Preset:  </td><td><div class='col3'>$Presets</div></td>";  
-  $ptz_ret .= "</tr>";
-  $ptz_ret .= "</table>";
-  
-  $ptz_ret .= "<table class=\"webcmd\">"; 
-  $ptz_ret .= "<tr>";
-  $ptz_ret .= "<td style=\"font-size:250%;\">Patrol:  </td><td><div class='col3'>$Patrols</div></td>";
-  $ptz_ret .= "</tr>";
-  $ptz_ret .= "</table>";
-  
-  # Rahmenklasse end
-  $ptz_ret .= "</td>";
-  $ptz_ret .= "</tr>";
-  $ptz_ret .= "</table>";
-  $ptz_ret .= "</div>";
-  
- #####################
+      foreach $fn (sort keys %{$data{webCmdFn}}) {
+          no strict "refs";
+          $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
+          use strict "refs";
+          last if(defined($Patrols));
+      }
+      
+      # Rahmenklasse
+      $ptz_ret .= "<div class=\"ptzpanel\">";
+      $ptz_ret .= "<table class=\"rc_body\">";  
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= '<td class="rc_button">';
+      
+      # Dropdown Klasse
+      $ptz_ret .= "<table class=\"webcmd\">";  
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style=\"font-size:250%;\">Preset:  </td><td><div class='col3'>$Presets</div></td>";  
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "</table>";
+      
+      $ptz_ret .= "<table class=\"webcmd\">"; 
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style=\"font-size:250%;\">Patrol:  </td><td><div class='col3'>$Patrols</div></td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "</table>";
+      
+      # Rahmenklasse end
+      $ptz_ret .= "</td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "</table>";
+      $ptz_ret .= "</div>";
+      
+      #####################
+ }
   
   if ($rowisset) {
       return $ptz_ret;
@@ -7088,8 +7109,8 @@ return;
 #      $fmt     = Streaming Format
 #
 ######################################################################################
-sub SSCam_StreamDev($$$) {
-  my ($camname,$strmdev,$fmt) = @_; 
+sub SSCam_StreamDev($$$;$) {
+  my ($camname,$strmdev,$fmt,$ftui) = @_; 
   my $hash               = $defs{$camname};
   my $wltype             = $hash->{HELPER}{WLTYPE}; 
   my $serveraddr         = $hash->{SERVERADDR};
@@ -7106,6 +7127,7 @@ sub SSCam_StreamDev($$$) {
   my $camid              = $hash->{CAMID};
   my $sid                = $hash->{HELPER}{SID};
   my $proto              = $hash->{PROTOCOL};
+  $ftui                  = ($ftui && $ftui eq "ftui")?1:0;
   my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
@@ -7113,35 +7135,52 @@ sub SSCam_StreamDev($$$) {
   $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";       # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
   $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";   # Name des SSCamSTRM-Devices (wenn Detailansicht)
   my $streamHash              = $defs{$strmdev};            # Hash des SSCamSTRM-Devices
+  my $uuid                    = $streamHash->{FUUID};       # eindeutige UUID des Streamingdevices
   delete $streamHash->{HELPER}{STREAM};
   delete $streamHash->{HELPER}{STREAMACTIVE};               # Statusbit ob ein Stream aktiviert ist
   
   # Definition Tasten
-  my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
-  my $cmdstop       = "cmd=set $camname stopView";                                                      # Stream deaktivieren
+  my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                                # nicht sichtbare Leertaste
+  my $cmdstop       = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname stopView STRM:$uuid')";                       # Stream deaktivieren
   my $imgstop       = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
-  my $cmdhlsreact   = "cmd=set $camname hlsreactivate";                                                 # HLS Stream reaktivieren
+  my $cmdhlsreact   = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname hlsreactivate')";                             # HLS Stream reaktivieren
   my $imghlsreact   = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_BACKDroid.png\">";
-  my $cmdmjpegrun   = "cmd=set $camname runView live_fw";                                               # MJPEG Stream aktivieren  
+  my $cmdmjpegrun   = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView live_fw STRM:$uuid')";                # MJPEG Stream aktivieren  
   my $imgmjpegrun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_MJPEG.png\">";
-  my $cmdhlsrun     = "cmd=set $camname runView live_fw_hls";                                           # HLS Stream aktivieren  
+  my $cmdhlsrun     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView live_fw_hls STRM:$uuid')";            # HLS Stream aktivieren  
   my $imghlsrun     = "<img src=\"$FW_ME/www/images/sscam/black_btn_HLS.png\">";
-  my $cmdlrirun     = "cmd=set $camname runView lastrec_fw";                                            # Last Record IFrame  
+  my $cmdlrirun     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView lastrec_fw STRM:$uuid')";             # Last Record IFrame  
   my $imglrirun     = "<img src=\"$FW_ME/www/images/sscam/black_btn_LASTRECIFRAME.png\">";
-  my $cmdlh264run   = "cmd=set $camname runView lastrec_fw_MPEG4/H.264";                                # Last Record H.264  
+  my $cmdlh264run   = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView lastrec_fw_MPEG4/H.264 STRM:$uuid')"; # Last Record H.264  
   my $imglh264run   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECH264.png\">";
-  my $cmdlmjpegrun  = "cmd=set $camname runView lastrec_fw_MJPEG";                                      # Last Record MJPEG  
+  my $cmdlmjpegrun  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView lastrec_fw_MJPEG STRM:$uuid')";       # Last Record MJPEG  
   my $imglmjpegrun  = "<img src=\"$FW_ME/www/images/sscam/black_btn_LRECMJPEG.png\">";
-  my $cmdlsnaprun   = "cmd=set $camname runView lastsnap_fw STRM";                                      # Last SNAP  
+  my $cmdlsnaprun   = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname runView lastsnap_fw STRM:$uuid')";            # Last SNAP  
   my $imglsnaprun   = "<img src=\"$FW_ME/www/images/sscam/black_btn_LSNAP.png\">";
-  my $cmdrecendless = "cmd=set $camname on 0";                                                          # Endlosaufnahme Start  
+  my $cmdrecendless = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname on 0 STRM:$uuid')";                           # Endlosaufnahme Start  
   my $imgrecendless = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTART.png\">";
-  my $cmdrecstop    = "cmd=set $camname off";                                                           # Aufnahme Stop  
+  my $cmdrecstop    = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname off STRM:$uuid')";                            # Aufnahme Stop  
   my $imgrecstop    = "<img src=\"$FW_ME/www/images/sscam/black_btn_RECSTOP.png\">";
-  my $cmddosnap     = "cmd=set $camname snap 1 2 STRM";                                                 # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  my $cmddosnap     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname snap 1 2 STRM:$uuid')";                       # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
-  my $cmdrefresh    = "cmd=set $camname refresh STRM";                                                  # Refresh in SSCamSTRM-Devices
+  my $cmdrefresh    = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $camname refresh STRM:$uuid')";                        # Refresh in SSCamSTRM-Devices
   my $imgrefresh    = "<img src=\"$FW_ME/www/images/default/Restart.png\">";
+  
+  # bei Aufruf durch FTUI Kommandosyntax anpassen
+  if ($ftui) {
+      $cmddosnap     = "ftui.setFhemStatus('set $camname snap 1 2 STRM:$uuid')";  
+      $cmdstop       = "ftui.setFhemStatus('set $camname stopView STRM:$uuid')";  
+      $cmdhlsreact   = "ftui.setFhemStatus('set $camname hlsreactivate STRM:$uuid')"; 
+      $cmdmjpegrun   = "ftui.setFhemStatus('set $camname runView live_fw STRM:$uuid')";   
+      $cmdhlsrun     = "ftui.setFhemStatus('set $camname runView live_fw_hls STRM:$uuid')"; 
+      $cmdlrirun     = "ftui.setFhemStatus('set $camname runView lastrec_fw STRM:$uuid')";
+      $cmdlh264run   = "ftui.setFhemStatus('set $camname runView lastrec_fw_MPEG4/H.264 STRM:$uuid')";
+      $cmdlmjpegrun  = "ftui.setFhemStatus('set $camname runView lastrec_fw_MJPEG STRM:$uuid')";     
+      $cmdlsnaprun   = "ftui.setFhemStatus('set $camname runView lastsnap_fw STRM STRM:$uuid')";
+      $cmdrecendless = "ftui.setFhemStatus('set $camname on 0 STRM:$uuid')";
+      $cmdrecstop    = "ftui.setFhemStatus('set $camname off STRM:$uuid')"; 
+      $cmdrefresh    = "ftui.setFhemStatus('set $camname refresh STRM:$uuid')";      
+  }
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
   $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
@@ -7182,7 +7221,7 @@ sub SSCam_StreamDev($$$) {
   }
   
   $ret  = "";
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
+  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
   $ret .= '<table class="block wide internals">';
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
@@ -7212,22 +7251,26 @@ sub SSCam_StreamDev($$$) {
           if($apiaudiostmmaxver) {                                   
               $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
           }
-          $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
-          $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-          $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist      
+          if(!$ftui) {
+              $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
+          } else {
+              $ret .= "<td><img src=$link $ha><br>";
+          }
+          $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+          $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);               # Statusbit wenn ein Stream aktiviert ist      
       }
             
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
           }	else {
              # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
           }	      
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname);
+          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7246,8 +7289,12 @@ sub SSCam_StreamDev($$$) {
       $link     = $hash->{HELPER}{".LASTSNAP"};
       my $gattr = (AttrVal($camname,"snapGallerySize","Icon") eq "Full")?$ha:""; 
       if($link) {
-          $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          if(!$ftui) {
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
+          } else {
+              $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
+          }
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
           $ret .= "</td>";
           $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
@@ -7289,19 +7336,19 @@ sub SSCam_StreamDev($$$) {
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
       $ret .= $imgblank;
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
           }	else {
              # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
           }	      
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname);
+          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7335,19 +7382,19 @@ sub SSCam_StreamDev($$$) {
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
       
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
       $ret .= $imgblank;
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
              # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
           }	else {
              # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
           }	      
-      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname);
+          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7362,25 +7409,29 @@ sub SSCam_StreamDev($$$) {
               if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
                   $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
               } else {
-                  $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
+                  if(!$ftui) {
+                      $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
+                  } else {
+                      $ret .= "<td><img src=$link $ha><br>" if($link);
+                  }
                   $streamHash->{HELPER}{STREAM} = "<img src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
                   $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               }    
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= $imgblank;              
               if($hash->{HELPER}{RUNVIEW} =~ /live_fw/) {              
                   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                       # Aufnahmebutton endlos Start
-                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+                      $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
                   }	else {
                       # Aufnahmebutton Stop
-                      $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+                      $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
                   }	      
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+                  $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
               }              
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
-                  my $ptz_ret = SSCam_ptzpanel($camname);
+                  my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
@@ -7396,15 +7447,21 @@ sub SSCam_StreamDev($$$) {
               }         
           
           } elsif ($wltype =~ /iframe/) {
-              $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
-                       Iframes disabled
-                       </iframe><br>" if($link);
+              if(!$ftui) {
+                  $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">
+                           Iframes disabled
+                           </iframe><br>" if($link);
+              } else {
+                  $ret .= "<td><iframe src=$link $ha controls autoplay>
+                           Iframes disabled
+                           </iframe><br>" if($link);              
+              }
               $streamHash->{HELPER}{STREAM} = "<iframe src=$link $pws controls autoplay>".
                                               "Iframes disabled".
                                               "</iframe>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);          # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
+              $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '</tr>';
@@ -7430,7 +7487,7 @@ sub SSCam_StreamDev($$$) {
                                               "Your browser does not support the video tag".
                                               "</video>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern              
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
+              $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
               $ret .= "</td>";
               if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
                   $ret .= '</tr>';
@@ -7442,16 +7499,24 @@ sub SSCam_StreamDev($$$) {
                   $ret .= "<td></td>" if(AttrVal($camname,"ptzPanel_use",0));
               }
           } elsif($wltype =~ /base64img/) {
-              $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
-              $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
-              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              if(!$ftui) {
+                  $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
+              } else {
+                  $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha><br>" if($link);
+              }
+              $streamHash->{HELPER}{STREAM}       = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
+              $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                      # Statusbit wenn ein Stream aktiviert ist
+              $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= $imgblank;
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+              $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
               $ret .= "</td>";
 		  
           } elsif($wltype =~ /embed/) {
-              $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
+              if(!$ftui) {
+                  $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
+              } else {
+                  $ret .= "<td><embed src=$link $ha></td>" if($link);
+              }
               $streamHash->{HELPER}{STREAM} = "<embed src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);           # Statusbit wenn ein Stream aktiviert ist
               
@@ -7467,21 +7532,21 @@ sub SSCam_StreamDev($$$) {
                                               "Your browser does not support the video tag".
                                               "</video>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrefresh')\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
+              $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+              $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+              $ret .= "<a onClick=\"$cmdhlsreact\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
               $ret .= $imgblank;
               if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                   # Aufnahmebutton endlos Start
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+                  $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
               }	else {
                   # Aufnahmebutton Stop
-                  $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+                  $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
               }		
-              $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
+              $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
-                  my $ptz_ret = SSCam_ptzpanel($camname);
+                  my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
@@ -7493,12 +7558,12 @@ sub SSCam_StreamDev($$$) {
           my $cam = AttrVal($camname, "alias", $camname);
           $cause = "Playback cam \"$cam\" switched off";
           $ret .= "<td> <br> <b> $cause </b> <br><br>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdmjpegrun')\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsrun')\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlrirun')\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlh264run')\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlmjpegrun')\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
-          $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdlsnaprun')\" onmouseover=\"Tip('$ttlsnaprun')\" onmouseout=\"UnTip()\">$imglsnaprun </a>";            
+          $ret .= "<a onClick=\"$cmdmjpegrun\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
+          $ret .= "<a onClick=\"$cmdhlsrun\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
+          $ret .= "<a onClick=\"$cmdlrirun\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
+          $ret .= "<a onClick=\"$cmdlh264run\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
+          $ret .= "<a onClick=\"$cmdlmjpegrun\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
+          $ret .= "<a onClick=\"$cmdlsnaprun\" onmouseover=\"Tip('$ttlsnaprun')\" onmouseout=\"UnTip()\">$imglsnaprun </a>";            
           $ret .= "</td>";    
       }
   } else {
@@ -7564,31 +7629,42 @@ return $ret;
 #                   Schnappschußgalerie zusammenstellen
 #                   Verwendung durch SSCamSTRM-Devices
 ###############################################################################
-sub SSCam_composegallery ($;$$) { 
-  my ($name,$strmdev,$model) = @_;
+sub SSCam_composegallery ($;$$$) { 
+  my ($name,$strmdev,$model,$ftui) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
-  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                   # = %allsnaps
-  my $sgc      = AttrVal($name,"snapGalleryColumns",3);          # Anzahl der Images in einer Tabellenzeile
-  my $lss      = ReadingsVal($name, "LastSnapTime", "");         # Zeitpunkt neueste Aufnahme
-  my $lang     = AttrVal("global","language","EN");              # Systemsprache       
-  my $limit    = $hash->{HELPER}{SNAPLIMIT};                     # abgerufene Anzahl Snaps
-  my $totalcnt = $hash->{HELPER}{TOTALCNT};                      # totale Anzahl Snaps
-  $limit       = $totalcnt if ($limit > $totalcnt);              # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
+  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                                                # = %allsnaps
+  my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
+  my $lss      = ReadingsVal($name, "LastSnapTime", "");                                      # Zeitpunkt neueste Aufnahme
+  my $lang     = AttrVal("global","language","EN");                                           # Systemsprache       
+  my $limit    = $hash->{HELPER}{SNAPLIMIT};                                                  # abgerufene Anzahl Snaps
+  my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale Anzahl Snaps
+  $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
+  $ftui        = ($ftui && $ftui eq "ftui")?1:0;
+  my $uuid     = "";
   my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
-  $hash->{HELPER}{STRMDEV}    = $strmdev;                        # Name des aufrufenden SSCamSTRM-Devices
-  $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";            # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
-  $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";        # Name des SSCamSTRM-Devices (wenn Detailansicht)
-  my $streamHash              = $defs{$strmdev} if($strmdev);    # Hash des SSCamSTRM-Devices
-  delete $streamHash->{HELPER}{STREAM};
+  $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
+  $hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";                                         # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
+  $hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";                                     # Name des SSCamSTRM-Devices (wenn Detailansicht)
   
-  my $cmddosnap     = "cmd=set $name snap 1 2 STRM";             # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  if($strmdev) {
+	  my $streamHash = $defs{$strmdev};                                                       # Hash des SSCamSTRM-Devices
+	  $uuid = $streamHash->{FUUID};                                                           # eindeutige UUID des Streamingdevices
+	  delete $streamHash->{HELPER}{STREAM};
+  }
+  
+  my $cmddosnap     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";   # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap     = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
+  
+  # bei Aufruf durch FTUI Kommandosyntax anpassen
+  if($ftui) {
+      $cmddosnap = "ftui.setFhemStatus('set $name snap 1 2 STRM:$uuid')";     
+  }
  
   my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
   
@@ -7611,11 +7687,10 @@ sub SSCam_composegallery ($;$$) {
   
   # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
   my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
-  my ($ttsnap);
-  if(AttrVal("global","language","EN") =~ /EN/) {
-      $ttsnap     = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
-  } else {
-      $ttsnap     = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
+  
+  my $ttsnap = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
+  if(AttrVal("global","language","EN") =~ /DE/) {
+      $ttsnap = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
   }
   
   my $header;
@@ -7644,8 +7719,10 @@ sub SSCam_composegallery ($;$$) {
   foreach my $key (@as) {
       $ct = $allsnaps->{$key}{createdTm};
       my $idata = "";
-      $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
-	  my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr $idata> </td>" );
+      if(!$ftui) {
+          $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
+	  }
+      my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr $idata> </td>" );
       $cell++;
 
       if ( $cell == $sgc+1 ) {
@@ -7666,7 +7743,7 @@ sub SSCam_composegallery ($;$$) {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  $htmlCode .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+  $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   $htmlCode .= "</html>";
 
 return $htmlCode;
@@ -8960,12 +9037,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19552 2019-06-04 21:13:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -9155,9 +9232,16 @@ return;
    For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
     
    If you like to discuss or help to improve this module please use FHEM-Forum with link: <br>
-   <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
+   <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.
+   <br><br>
+   
+   <b>Integration into FHEM TabletUI: </b> <br><br>
+   There is a widget provided for integration of SSCam-Streaming devices (Type SSCamSTRM) into FTUI. For further information please be informed by the
+   (german) FHEM Wiki article: <br>
+   <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_SSCam_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
+   <br><br><br>
   
-<b> Prerequisites </b> <br><br>
+  <b>Prerequisites </b> <br><br>
   <ul>
     This module uses the Perl-modules JSON and MIME::Lite which are usually have to be installed in addition. <br>
 	On Debian-Linux based systems these modules can be installed by: <br><br>
@@ -9202,7 +9286,7 @@ return;
 	command in a previously defined SVS device.
 	<br><br>
 	
-    A <b>camera</b> is defined by: <br><br>
+    A <b>camera device</b> is defined by: <br><br>
 	<ul>
       <b><code>define &lt;Name&gt; SSCAM &lt;camera name in SVS&gt; &lt;ServerAddr&gt; [Port] [Protocol]</code></b> <br><br>
     </ul>
@@ -9266,7 +9350,8 @@ return;
     panel can be affected by <a href="#SSCamattr">attributes</a> "ptzPanel_.*". <br>
     Please see also <a href="#SSCamset">command</a> <b>"set &lt;name&gt; createPTZcontrol"</b> in this context.
     <br><br><br>
-    </ul>
+	
+	</ul>
     
     <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
@@ -10910,7 +10995,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
 
     Weitere Infomationen zum Modul sind im FHEM-Wiki zu finden:<br>
-    <a href="http://www.fhemwiki.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station">SSCAM - Steuerung von Kameras in Synology Surveillance Station</a>.<br><br>
+    <a href="http://www.fhemwiki.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station">SSCAM - Steuerung von Kameras in Synology Surveillance Station</a>.
+	<br><br>
+	
+    <b>Integration in FHEM TabletUI: </b> <br><br>
+    Zur Integration von SSCam Streaming Devices (Typ SSCamSTRM) wird ein Widget bereitgestellt. 
+	Für weitere Information dazu bitte den Artikel im Wiki durchlesen: <br>
+    <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_SSCam_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
+    <br><br><br>
     
     
     <b>Vorbereitung </b> <br><br>
