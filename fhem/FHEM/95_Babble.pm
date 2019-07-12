@@ -55,7 +55,7 @@ if  (eval {require RiveScript;1;} ne 1) {
 my $babblelinkname   = "babbles";    # link text
 my $babblehiddenroom = "babbleRoom"; # hidden room
 my $babblepublicroom = "babble";     # public room
-my $babbleversion    = "1.35";
+my $babbleversion    = "1.42";
 my @babblerows;
 
 my %babble_transtable_EN = ( 
@@ -188,7 +188,9 @@ sub Babble_Initialize ($) {
   #$hash->{AttrFn}      = "Babble_Attr";
   my $attst            = "lockstate:locked,unlocked helpFunc confirmFunc noChatBot:0,1 dnuFile testParm0 testParm1 testParm2 testParm3 ".
                          "remoteFHEM0 remoteFHEM1 remoteFHEM2 remoteFHEM3 remoteFunc0 remoteFunc1 remoteFunc2 remoteFunc3 remoteToken0 remoteToken1 remoteToken2 remoteToken3 ".
-                         "babbleIds babblePreSubs babbleDevices babblePlaces babbleNotPlaces babbleVerbs babbleVerbParts babblePrepos babbleQuests babbleArticles babbleStatus babbleWrites babbleTimes";
+                         "babbleIds babblePreSubs:textField-long babbleDevices:textField-long babblePlaces:textField-long babbleNotPlaces:textField-long babbleVerbs:textField-long ".
+                         "babbleVerbParts:textField-long babblePrepos:textField-long babbleQuests:textField-long babbleArticles:textField-long babbleStatus:textField-long ".
+                         "babbleWrites:textField-long babbleTimes:textField-long";
   $hash->{AttrList}    = $attst;
   
   if( !defined($babble_tt) ){
@@ -372,7 +374,12 @@ sub Babble_CreateEntry($) {
 sub Babble_Set($@) {
    my ( $hash, $name, $cmd, @args ) = @_;
 
-   if ( $cmd =~ /^lock(ed)?$/ ) {
+    if ( $cmd =~ /^((talk)|(doit))/ ) {
+      #-- put args together, then split again at comma boundaries
+      my ($str,@newargs) = split(',',join(' ',@args));
+      return Babble_DoIt($name,$str,@newargs);
+   #-----------------------------------------------------------
+   }elsif ( $cmd =~ /^lock(ed)?$/ ) {
 	  readingsSingleUpdate( $hash, "lockstate", "locked", 0 ); 
 	  return;
    #-----------------------------------------------------------
@@ -396,7 +403,7 @@ sub Babble_Set($@) {
      return Babble_restore($hash,1);
    
    } else {
-     my $str = "[babble] Unknown argument " . $cmd . ", choose one of locked:noArg unlocked:noArg save:noArg restore:noArg test:noArg ";
+     my $str = "[babble] Unknown argument " . $cmd . ", choose one of talk doit locked:noArg unlocked:noArg save:noArg restore:noArg test:noArg ";
 	 $str .= "rivereload:noArg"
 	   if($rive == 1 && AttrVal($name,"noChatBot",0) != 1);
 	 return $str;
@@ -644,6 +651,9 @@ sub Babble_Normalize($$){
   }
   my @word = split(' ',$sentmod,15);
   my $len  = int(@word);
+   #-- emergency: only one word given
+  return ($word[0],"none","none","none","none","none","none","X.X.X")
+    if( $len==1 );
   
   ############################# POS tagging ###################
  
@@ -1096,6 +1106,7 @@ sub Babble_DoIt{
   my $star   = "";
   my $reply  = "";
   
+  readingsSingleUpdate( $hash, "text", $sentence, 0 );
   #-- semantic analysis
   my ($device,$verb,$reading,$value,$article,$reserve,$place,$cat) = Babble_Normalize($name,$sentence);
   $verb = "none" 
@@ -1120,6 +1131,7 @@ sub Babble_DoIt{
   
   #-- find command directly
   my $cmd = $hash->{DATA}{"command"}{$device}{$place}{$verb}{$reading}; 
+  #Log3 $name,5,"[Babble_DoIt] Result after first access of Cmd-Hash =".((defined $cmd)?$cmd:"none");
   
   #-- not directly - but maybe we have an alias device ?
   if( !defined($cmd) || $cmd eq "" ){
@@ -1138,6 +1150,7 @@ sub Babble_DoIt{
         last;
       }
     }
+    #Log3 $name,5,"[Babble_DoIt] Result after second access of Cmd-Hash =".((defined $cmd)?$cmd:"none");
   }   
   
   #-- not directly - but maybe we have a device which is an extension of an alias device
@@ -1158,6 +1171,7 @@ sub Babble_DoIt{
         }
       }
     }
+    #Log3 $name,5,"[Babble_DoIt] Result after third access of Cmd-Hash =".((defined $cmd)?$cmd:"none");
   }   
   
   #-- command found after all
@@ -1174,18 +1188,21 @@ sub Babble_DoIt{
       $cmd =~ s/\$PARM$i/$parms[$i]/g;
     }
     if( $testit==0 || ($testit==1 && $exflag==1 )){
-      Log3 $name,1,"[Babble_DoIt] Executing from hash: $device.$place.$verb.$reading/$value  ";
+      Log3 $name,5,"[Babble_DoIt] Executing from hash: $device.$place.$verb.$reading/$value  ";
       my $contact = $hash->{DATA}{"devcontacts"}{$device}[2];
       my $fhemdev = $hash->{DATA}{"devcontacts"}{$device}[1];
       if( $contact == 0 ){
         $res = fhem($cmd);
+        readingsSingleUpdate( $hash, "cmd", $cmd, 0 );
       }else{
         my $ip    = AttrVal($name,"remoteFHEM".$contact,undef);
         my $token = AttrVal($name,"remoteToken".$contact,undef);
         my $func  = AttrVal($name,"remoteFunc".$contact,undef);  
         if( $func && $func ne "" ){
-          $res = eval($func."(\"".$cmd."\")")
+          $res = eval($func."(\"".$cmd."\")");
+          readingsSingleUpdate( $hash, "cmd", $res, 0 );
         }else{
+          readingsSingleUpdate( $hash, "cmd", "remoteFHEM".$contact." ".$cmd, 0 );
           $cmd =~ s/\s/\%20/g;
           my $url    = "http://".$ip."/fhem?XHR=1&amp;fwcsrf=".$token."&amp;cmd.$fhemdev=$cmd";
           HttpUtils_NonblockingGet({
@@ -1212,13 +1229,12 @@ sub Babble_DoIt{
       }
     }
     #-- what to do in conclusion
-    if( $testit==0 ){
-      return undef;   
-    }else{
+    if( $testit==1 ){
       $str .= "==> $cmd";
       return $str;
     }
- 
+    return undef;
+     
   #-- no command found, acquire alternate text
   }else{
     #-- ChatBot available
@@ -1239,12 +1255,13 @@ sub Babble_DoIt{
           close $fh;
         }
       }
-        
+      readingsSingleUpdate( $hash, "cmd", "none => ChatBot text = $reply", 0 );
     #-- no chatbot, use help text directly
     }else{
       $reply = defined($hash->{DATA}{"help"}{$device}) ? $hash->{DATA}{"help"}{$device} : "";
+      readingsSingleUpdate( $hash, "cmd", "none => Help text = $reply", 0 );
     }  
-    #-- get help function
+   #-- get help function - embed reply of chatbot here
    my $func  = AttrVal($name,"helpFunc",undef);  
    if( $func && $func ne "" ){
       #-- substitution
@@ -1254,23 +1271,25 @@ sub Babble_DoIt{
       for(my $i=0;$i<int(@parms);$i++){
         $func =~ s/\$PARM$i/$parms[$i]/g;
       }    
-      if( $testit==0 ){
+      #-- parameter is missing
+      if( $func =~ /.*PARM\d.*/){
+        return $str." ".$reply;
+      #-- test
+      }elsif( $testit==1 ){
+        $res = eval($func)
+          if( $exflag==1 );
+        return $str." ".$func;
+      }else{
         $res = eval($func);
         return "";
-      }elsif($testit==1 && $exflag==1 ){
-        $res = eval($func);
-        return $str." ".$reply;
-      }else{
-        return $str." ".$func;
-      }    
+      }
     #-- no command, testing, no execution 
     }elsif( $testit==1 ){
       Log 1,"[Babble_DoIt] Command $device.$place.$verb.$reading/$value undefined, reply = $reply";
-      $str = $reply;
+      return $reply;
     }else{
-      $str = "";
+      return ""
     }
-    return $str;
   } 
 }
 
@@ -1470,14 +1489,14 @@ sub Babble_RemCmd($$$$$$){
      if( $target eq "");
    #-- trying to delete from data obtained via web
    if( defined($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target}) ){
-     Log3 $name, 1,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
+     Log3 $name, 5,"[Babble_RemCmd] Deleting from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
      delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
      return
    #-- try to figure out data from index (fallback strategy)
    }else{
      my $cmdstr = $babblerows[$fallback-1];
      ($bdev,$place,$verb,$target)=split('\+\|\+',$cmdstr);
-     Log3 $name, 1,"[Babble_RemCmd] Deleting in fallback strategy from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
+     Log3 $name, 5,"[Babble_RemCmd] Deleting in fallback strategy from hash: $bdev.$place.$verb.$target => ".$hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target};
      delete($hash->{DATA}{"command"}{$bdev}{$place}{$verb}{$target});
      return
    }
@@ -2157,21 +2176,23 @@ sub Babble_Html($)
         <br/>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; babble</code>
+            <code>define &lt;name&gt; Babble</code>
             <br />Defines the Babble device. </p>
         <a name="babbleset"></a>
         Notes: <ul>
-        <li>This module uses the global attribute <code>language</code> to determine its output data<br/>
+        <li>This module uses the global attribute <code>language</code> to determine its output data<br />
          (default: EN=english). For German output set <code>attr global language DE</code>.</li>
          <li>This module needs the JSON package.</li>
          <li>Only when the chatbot functionality of RiveScript is required, the RiveScript module must be installed as well, see https://github.com/aichaos/rivescript-perl</li>
          </ul>
          <h4>Usage</h4>
-          To use this module, call the Perl function <code>Babble_DoIt("&lt;name&gt;","&lt;sentence&gt;"[,&lt;parm0&gt;,&lt;parm1&gt;,...])</code>. 
-          &lt;name&gt; is the name of the Babble device,  &lt;parm0&gt; &lt;parm1&gt; are arbitrary parameters. 
-          
+          To use this module, 
+          <ol><li>call the Perl function <code>Babble_DoIt("&lt;name&gt;","&lt;sentence&gt;"[,&lt;parm0&gt;,&lt;parm1&gt;,...])</code>.</li>
+          <li>execute the FHEM command <code>set &lt;name&gt; talk|doit &lt;sentence&gt;[,&lt;parm0&gt;,&lt;parm1&gt;,...]</code>.</li>
+          </ol>
+          &lt;name&gt; is the name of the Babble device, &lt;parm0&gt; &lt;parm1&gt; are arbitrary parameters passed to the executed command.
           The module will analyze the sentence passed an isolate a device to be addressed, a place identifier, 
-          a verb, a target and its value from the sentence passed.
+          a verb, a target and its value from the sentence passed. <b>Attention: in case the FHEM command is used, &lt;sentence&gt must not contain commas.</b>
           
           If a proper command has been stored with device, place, verb and target, it will be subject to substitutions and then will be executed. 
           In these substitutions, a string $VALUE will be replaced by the value for the target reading, a string $DEV will be replaced by the device name identified by Babble, 
@@ -2185,7 +2206,11 @@ sub Babble_Html($)
           </ul>
         <h4>Set</h4>
         <ul>
-            <li><a name="babble_lock">
+            <li><a name="babble_talk">
+                    <code>set &lt;name&gt; talk|doit &lt;sentence&gt;[,&lt;parm0&gt;,&lt;parm1&gt;,...]</code><br />
+                </a>
+                <br />execute the command given in the sentence.</li>
+               <li><a name="babble_lock">
                     <code>set &lt;name&gt; locked</code><br />
                     <code>set &lt;name&gt; unlocked</code>
                 </a>
@@ -2296,7 +2321,7 @@ sub Babble_Html($)
 <a name="Babble"></a>
 <h3>Babble</h3>
 <ul>
-<a href="https://wiki.fhem.de/wiki/Modul_Babble">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#babble">babble</a> 
+<a href="https://wiki.fhem.de/wiki/Modul_Babble">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="commandref.html#Babble">Babble</a> 
 </ul>
 =end html_DE
 =cut

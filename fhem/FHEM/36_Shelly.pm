@@ -31,14 +31,15 @@ package main;
 use strict;
 use warnings;
 
-use JSON;      # imports encode_json, decode_json, to_json and from_json.
+use JSON;      
+use HttpUtils;
 
 use vars qw{%attr %defs};
 
 sub Log($$);
 
 #-- globals on start
-my $version = "2.03";
+my $version = "2.04";
 
 #-- these we may get on request
 my %gets = (
@@ -178,6 +179,9 @@ sub Shelly_Define($$) {
     readingsBulkUpdate($hash,"network","not connected");
   }
   readingsEndUpdate($hash,1); 
+  
+  #-- perform status update in a minute or so
+  InternalTimer(time()+60, "Shelly_status", $hash,0);
      
   $init_done = $oid;
   
@@ -993,7 +997,7 @@ sub Shelly_pwd($){
     my $green = $jhash->{'lights'}[0]{'green'};
     my $blue  = $jhash->{'lights'}[0]{'blue'};
     my $white = $jhash->{'lights'}[0]{'white'};
-    my $rgb   = sprintf("%X%X%X", $red,$green,$blue);
+    my $rgb   = sprintf("%02X%02X%02X", $red,$green,$blue);
      
     readingsBulkUpdateIfChanged($hash,"rgb",$rgb);
     readingsBulkUpdateIfChanged($hash,"L-red",$red);
@@ -1005,9 +1009,9 @@ sub Shelly_pwd($){
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
       $power = $jhash->{'meters'}[$i]{'power'};
-      $energy = int($jhash->{'meters'}[$i]{'total'}/6)/10;
+      $energy = (defined($jhash->{'meters'}[$i]{'total'}))?int($jhash->{'meters'}[$i]{'total'}/6)/10:"undefined";     
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
-      #readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy); 
+      readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy); 
     }  
   }
   #-- common to all Shelly models
