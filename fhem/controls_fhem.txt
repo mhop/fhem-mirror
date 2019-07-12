@@ -1,4 +1,4 @@
-REV 19815
+REV 19817
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -448,7 +448,7 @@ UPD 2019-02-19_07:45:03 70621 FHEM/93_PWMR.pm
 UPD 2017-09-13_07:45:02 7907 FHEM/93_RFHEM.pm
 UPD 2019-03-06_07:45:02 51996 FHEM/94_PWM.pm
 UPD 2018-09-15_07:45:02 68569 FHEM/95_Alarm.pm
-UPD 2019-07-11_07:45:02 125956 FHEM/95_Astro.pm
+UPD 2019-07-12_07:45:02 126174 FHEM/95_Astro.pm
 UPD 2018-04-28_07:45:03 91427 FHEM/95_Babble.pm
 UPD 2018-06-30_07:45:03 57430 FHEM/95_Dashboard.pm
 UPD 2017-03-20_07:45:03 62531 FHEM/95_FLOORPLAN.pm
@@ -729,8 +729,8 @@ UPD 2019-07-11_07:45:06 4087701 docs/commandref.html
 UPD 2019-07-11_07:45:08 2528401 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-07-11_07:45:09 217309 docs/commandref_modular.html
-UPD 2019-07-11_07:45:10 228249 docs/commandref_modular_DE.html
+UPD 2019-07-12_07:45:09 217309 docs/commandref_modular.html
+UPD 2019-07-12_07:45:10 228249 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
