@@ -371,6 +371,12 @@ sub YAMAHA_NP_GetStatus
     
     # Basic status request
     YAMAHA_NP_SendCmd($hash, "GET:System,Basic_Status:GetParam", "statusRequest", "basicStatus", 0);
+    
+    YAMAHA_NP_SendCmd($hash, "GET:System,Sound,Balance:GetParam", "statusRequest", "balance", 0);
+    YAMAHA_NP_SendCmd($hash, "GET:System,Sound,Equalizer,Low:GetParam", "statusRequest", "EQlow", 0);
+    YAMAHA_NP_SendCmd($hash, "GET:System,Sound,Equalizer,Mid:GetParam", "statusRequest", "EQmid", 0);
+    YAMAHA_NP_SendCmd($hash, "GET:System,Sound,Equalizer,High:GetParam", "statusRequest", "EQhigh", 0);
+    YAMAHA_NP_SendCmd($hash, "GET:System,Sound,Enhancer:GetParam", "statusRequest", "enhancer", 0);
   }
 
   # Reset Timer for the next loop.
@@ -555,6 +561,11 @@ sub YAMAHA_NP_Set
       if (ReadingsVal($name,"power","") !~ m/(off|absent)/)
       {
         $usage .=" friendlyName"
+                ." soundBalance:slider,-10,1,10"
+                ." soundEqLow:slider,-10,1,10"
+                ." soundEqMid:slider,-10,1,10"
+                ." soundEqHigh:slider,-10,1,10"
+                ." soundEnhancer:on,off"
                 ." checkForNewFirmware:noArg"
                 ." input:".$inputs_comma
                 ." volumeStraight:slider,".$volumeStraightMin.",1,".$volumeStraightMax
@@ -1327,6 +1338,17 @@ desiredListNloop:
       
       Log3 $name, 4, "YAMAHA_NP ($name) - new target volume: $hash->{helper}{targetVolume}";
     }
+    elsif($what eq "soundEnhancer")
+    {
+      if(lc($a[2]) =~ /^(on|off)$/)
+      {
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Sound,Enhancer:".ucfirst(lc($a[2])), $what, $a[2], 0);
+      }
+      else
+      {
+        return "'soundEnhancer must be [on|off]"
+      }
+    }
     elsif($what eq "sleep")
     {
       if($a[2] eq "off")
@@ -1453,6 +1475,50 @@ desiredListNloop:
     {
       # Toggle CD Tray
       YAMAHA_NP_SendCmd($hash, "PUT:System,Misc,Tray:Open/Close", $what, "Open/Close", 0);
+    }
+    elsif($what eq "soundBalance")
+    {
+      if($a[2] >= -10 and $a[2] <= 10)
+      {
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Sound,Balance:$a[2]", "soundBalance", $a[2], 0);
+      }
+      else
+      {
+        return "'soundBalance' must be between -10 and 10."
+      }
+    }
+    elsif($what eq "soundEqLow")
+    {
+      if($a[2] >= -10 and $a[2] <= 10)
+      {
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Sound,Equalizer,Low:$a[2]", "soundEqLow", $a[2], 0);
+      }
+      else
+      {
+        return "'soundEqLow' must be between -10 and 10."
+      }
+    }
+    elsif($what eq "soundEqMid")
+    {
+      if($a[2] >= -10 and $a[2] <= 10)
+      {
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Sound,Equalizer,Mid:$a[2]", "soundEqMid", $a[2], 0);
+      }
+      else
+      {
+        return "'soundEqMid' must be between -10 and 10."
+      }
+    }
+    elsif($what eq "soundEqHigh")
+    {
+      if($a[2] >= -10 and $a[2] <= 10)
+      {
+        YAMAHA_NP_SendCmd($hash, "PUT:System,Sound,Equalizer,High:$a[2]", "soundEqHigh", $a[2], 0);
+      }
+      else
+      {
+        return "'soundEqHigh' must be between -10 and 10."
+      }
     }
     elsif($what eq "clockUpdate")
     {  # Clock Update
@@ -1902,6 +1968,26 @@ sub YAMAHA_NP_ParseResponse
             $hash->{helper}{sleep} = $sl;
             readingsBulkUpdate($hash, "sleep", $sl);
           }
+        }
+        elsif($arg eq "enhancer")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Enhancer>(.*)<\/Enhancer>/){readingsBulkUpdate($hash, "soundEnhancer", lc($1));}        
+        }
+        elsif($arg eq "balance")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Balance>(.*)<\/Balance>/){readingsBulkUpdate($hash, "soundBalance", $1);}        
+        }        
+        elsif($arg eq "EQlow")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Low>(.*)<\/Low>/){readingsBulkUpdate($hash, "soundEqLow", $1);}           
+        }
+        elsif($arg eq "EQmid")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<Mid>(.*)<\/Mid>/){readingsBulkUpdate($hash, "soundEqMid", $1);}        
+        }
+        elsif($arg eq "EQhigh")
+        {
+            if($data =~ /RC="0"/ and $data =~ /<High>(.*)<\/High>/){readingsBulkUpdate($hash, "soundEqHigh", $1);}        
         }
         elsif($arg eq "playerStatus")
         {
@@ -2410,6 +2496,26 @@ sub YAMAHA_NP_ParseResponse
           delete $hash->{helper}{friendlyName};
         }
       }
+      elsif($cmd eq "soundEnhancer")
+      {
+        if($data =~ /RC="0"/){readingsBulkUpdate($hash, "soundEnhancer", lc($arg));} 
+      }
+      elsif($cmd eq "soundBalance")
+      {
+        if($data =~ /RC="0"/){readingsBulkUpdate($hash, "soundBalance", $arg);} 
+      }
+      elsif($cmd eq "soundEqLow")
+      {
+        if($data =~ /RC="0"/){readingsBulkUpdate($hash, "soundEqLow", $arg);} 
+      }
+      elsif($cmd eq "soundEqMid")
+      {
+        if($data =~ /RC="0"/){readingsBulkUpdate($hash, "soundEqMid", $arg);} 
+      }
+      elsif($cmd eq "soundEqHigh")
+      {
+        if($data =~ /RC="0"/){readingsBulkUpdate($hash, "soundEqHigh", $arg);} 
+      }
       elsif($cmd eq "mute")
       {
         if($data =~ /RC="0"/){readingsBulkUpdate($hash, "mute", $arg);}
@@ -2750,6 +2856,11 @@ sub YAMAHA_NP_html2txt
         <li><b>repeatAll</b> &ndash; Set repeat mode All</li>
       </ul>
       <li><b>selectStream</b> &ndash; direct context&ndash;sensitive stream selection depending on the input and available streams. Available streams are read out from device automatically. Depending on the number, this may take some time... (Limited to 999 list entries.) (see also 'maxPlayerLineItems' attribute</li>
+	  <li><b>soundBalance</b> <-10..10> &ndash; Set balance</li>
+	  <li><b>soundEnhancer</b> [on|off] &ndash; Music Enhancer on|off</li>
+	  <li><b>soundEqLow</b> <-10..10> &ndash; Set EQ Low band</li>
+	  <li><b>soundEqMid</b> <-10..10> &ndash; Set EQ Mid band</li>
+	  <li><b>soundEqHigh</b> <-10..10> &ndash; Set EQ High band</li>
 	  <li><b>sleep</b> [off|30min|60min|90min|120min] &ndash; activates the internal sleep timer</li>
       <li><b>standbyMode</b> [eco|normal] &ndash; set the standby mode</li>
       <li><b>statusRequest [&lt;parameter&gt;] </b> &ndash; requests the current status of the device</li>
@@ -2825,6 +2936,11 @@ sub YAMAHA_NP_html2txt
         <li>presence &ndash; presence status of the device (present|absent)</li>
         <li>selectStream &ndash; status of the selectStream command</li>
         <li>sleep &ndash; sleep timer value (off|30 min|60 min|90 min|120 min)</li>
+        <li><b>soundEqLow</b> &ndash; Balance value</li>
+        <li><b>soundEnhancer</b> &ndash; Music Enhancer on|off</li>
+        <li><b>soundEqLow</b> &ndash; Equalizer value Low band</li>
+        <li><b>soundEqMid</b> &ndash; Equalizer value Mid band</li>
+        <li><b>soundEqHigh</b> &ndash; Equalizer value High band</li>
         <li>standbyMode &ndash; status of the standby mode (normal|eco)</li>
         <li>state &ndash; current state information (on|off)</li>
         <li>volume &ndash; relative volume (0...100)</li>
@@ -2955,6 +3071,11 @@ sub YAMAHA_NP_html2txt
       </ul>
 	  <li><b>selectStream</b> &ndash; Direkte kontextsensitive Streamauswahl. Ver&uuml;gbare Men&uuml;eintr&auml;ge werden automatisch generiert. Bedingt durch das KOnzept des Yamaha&ndash;Protokolls kann dies etwas Zeit in Anspruch nehmen. (Defaultm&auml;ssig auf 999 Listeneint&auml;ge limitiert. s.a. maxPlayerLineItems Attribut.)</li>
 	  <li><b>sleep</b> [off|30min|60min|90min|120min] &ndash; Aktiviert/Deaktiviert den internen Sleep&ndash;Timer</li>
+      <li><b>soundBalance</b> <-10..10> &ndash; Setzt balance</li>
+	  <li><b>soundEnhancer</b> [on|off] &ndash; Music Enhancer on|off</li>
+	  <li><b>soundEqLow</b> <-10..10> &ndash; Setzt EQ Low band</li>
+	  <li><b>soundEqMid</b> <-10..10> &ndash; Setzt EQ Mid band</li>
+	  <li><b>soundEqHigh</b> <-10..10> &ndash; Setzt EQ High band</li>
       <li><b>standbyMode</b> [eco|normal] &ndash; Umschaltung des Standby Modus.</li>
       <li><b>statusRequest [&lt;parameter&gt;] </b> &ndash; Abfrage des aktuellen Status des Network Players.</li>
       <ul>
@@ -3027,6 +3148,11 @@ sub YAMAHA_NP_html2txt
         <li>power &ndash; Aktueller Devicestatus (on|off)</li>
         <li>presence &ndash; Ger&aumlteverf&uuml;gbarkeit im Netzwerk (present|absent)</li>
         <li>selectStream &ndash; Status des selectStream Befehls</li>
+        <li><b>soundEqLow</b> &ndash; Balance Wert</li>
+        <li><b>soundEnhancer</b> &ndash; Music Enhancer on|off</li>
+        <li><b>soundEqLow</b> &ndash; Equalizer Wert Low band</li>
+        <li><b>soundEqMid</b> &ndash; Equalizer Wert Mid band</li>
+        <li><b>soundEqHigh</b> &ndash; Equalizer Wert High band</li>        
         <li>sleep &ndash; Sleeptimer Wert (off|30 min|60 min|90 min|120 min)</li>
         <li>standbyMode &ndash; Standby Mode Status (normal|eco)</li>
         <li>state &ndash; Aktueller Ger&auml;tezusand (on|off)</li>
