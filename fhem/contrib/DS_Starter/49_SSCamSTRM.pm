@@ -35,6 +35,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.7.0"  => "14.07.2019  FTUI support, new attributes htmlattrFTUI, hideDisplayNameFTUI ",
   "2.6.0"  => "21.06.2019  GetFn -> get <name> html ",
   "2.5.0"  => "27.03.2019  add Meta.pm support ",
   "2.4.0"  => "24.02.2019  support for \"genericStrmHtmlTag\" in streaming device MODEL generic ",
@@ -81,7 +82,9 @@ sub SSCamSTRM_Initialize($) {
                                 "forcePageRefresh:1,0 ".
                                 "genericStrmHtmlTag ".
                                 "htmlattr ".
+                                "htmlattrFTUI ".
                                 "hideDisplayName:1,0 ".
+                                "hideDisplayNameFTUI:1,0 ".
                                 "popupWindowSize ".
                                 "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
@@ -267,15 +270,9 @@ sub SSCamSTRM_FwFn($;$$$) {
   RemoveInternalTimer($hash);
   $hash->{HELPER}{FW} = $FW_wname;
        
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
-  my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
-  $show = $show?"($show)":"";
-
-  my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s); 
   
   my $ret = "";
-  $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($d,"hideDisplayName",0));
   if(IsDisabled($d)) {
       if(AttrVal($d,"hideDisplayName",0)) {
           $ret .= "Stream-device <a href=\"/fhem?detail=$d\">$d</a> is disabled";
@@ -365,15 +362,9 @@ sub SSCamSTRM_AsHtml($;$) {
       $link = $s.",'$ftui')}";
   }
   
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
-  my $show = $defs{$hash->{PARENT}}->{HELPER}{ACTSTRM} if($hash->{MODEL} =~ /switched/);
-  $show = $show?"($show)":"";
-  
-  my $alias = AttrVal($name, "alias", $name);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s); 
   
   my $ret = "<html>";
-  $ret   .= "<span>$dlink $show</span><br>"  if(!AttrVal($name,"hideDisplayName",0));
   if(IsDisabled($name)) {  
       if(AttrVal($name,"hideDisplayName",0)) {
           $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
@@ -540,13 +531,30 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </li>
     <br>
     
+    <a name="hideDisplayNameFTUI"></a>
+    <li><b>hideDisplayNameFTUI</b><br>
+      Hide the device/alias name (link to detail view) in FHEM TabletUI.     
+    </li>
+    <br>
+    
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
       Additional HTML tags to manipulate the streaming device. 
       <br><br>
       <ul>
         <b>Example: </b><br>
-        attr &lt;name&gt; htmlattr width="480" height="560" <br>
+        attr &lt;name&gt; htmlattr width="580" height="460" <br>
+      </ul>
+    </li>
+    <br>
+    
+    <a name="htmlattrFTUI"></a>
+    <li><b>htmlattrFTUI</b><br>
+      Additional HTML tags to manipulate the streaming device in TabletUI. 
+      <br><br>
+      <ul>
+        <b>Example: </b><br>
+        attr &lt;name&gt; htmlattr width="580" height="460" <br>
       </ul>
     </li>
     <br>
@@ -736,13 +744,30 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </li>
     <br>
     
+    <a name="hideDisplayNameFTUI"></a>
+    <li><b>hideDisplayNameFTUI</b><br>
+      Verbirgt den Device/Alias-Namen (Link zur Detailansicht) im TabletUI.    
+    </li>
+    <br>
+    
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      Zusätzliche HTML Tags zur Darstellungsänderung im Streaming Device. 
+      Zusätzliche HTML Tags zur Darstellung im Streaming Device. 
       <br><br>
       <ul>
         <b>Beispiel: </b><br>
-        attr &lt;name&gt; htmlattr width="480" height="560"  <br>
+        attr &lt;name&gt; htmlattr width="580" height="460"  <br>
+      </ul>
+    </li>
+    <br>
+    
+    <a name="htmlattrFTUI"></a>
+    <li><b>htmlattrFTUI</b><br>
+      Zusätzliche HTML Tags zur Darstellung des Streaming Device im TabletUI. 
+      <br><br>
+      <ul>
+        <b>Beispiel: </b><br>
+        attr &lt;name&gt; htmlattr width="580" height="460"  <br>
       </ul>
     </li>
     <br>

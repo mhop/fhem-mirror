@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
   "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composegallery, ".
                            "align center of FTUI table, set compatibility to 8.2.5 ",
   "8.15.1" => "11.07.2019  enhancement and bugfixes for refresh of SSCamSTRM devices (integrate FUUID) ",
@@ -7223,9 +7224,20 @@ sub SSCam_StreamDev($$$;$) {
   }
   
   my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
-  $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmattr Streaming-Device übersteuern 
+  $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmlattr Streaming-Device übersteuern 
+  if($ftui) {
+      $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                         # wenn aus FTUI aufgerufen divers setzen 
+  }
+  
   my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
   $pws       =~ s/"//g if($pws);
+  
+  my $show = $defs{$streamHash->{PARENT}}->{HELPER}{ACTSTRM} if($streamHash->{MODEL} =~ /switched/);
+  $show = $show?"($show)":"";
+  
+  my $alias  = AttrVal($strmdev, "alias", $strmdev);                         # Linktext als Aliasname oder Devicename setzen
+  my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
+  
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
   # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
@@ -7263,19 +7275,24 @@ sub SSCam_StreamDev($$$;$) {
   $ret  = "";
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
   $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
+  if($ftui) {
+      $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+  } else {
+      $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+  }  
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
 
   if(!$StmKey || ReadingsVal($camname, "Availability", "") ne "enabled" || IsDisabled($camname)) {
       # Ausgabe bei Fehler
-      my $cam = AttrVal($camname, "alias", $camname);
-      $cause = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Cam \"$cam\" is disabled";
-      $cause = "Camera \"$cam\" is disabled" if(IsDisabled($camname));
-      $ret .= "<td> <br> <b> $cause </b> <br><br></td>";
-      $ret .= '</tr>';
-      $ret .= '</tbody>';
-      $ret .= '</table>';
-      $ret .= '</div>';
+      my $cam = AttrVal($camname, "alias", $camname);                         # Linktext als Aliasname oder Devicename setzen
+      $cause  = !$StmKey?"Camera $cam has no Reading \"StmKey\" set !":"Cam \"$cam\" is disabled";
+      $cause  = "Camera \"$cam\" is disabled" if(IsDisabled($camname));
+      $ret   .= "<td> <br> <b> $cause </b> <br><br></td>";
+      $ret   .= '</tr>';
+      $ret   .= '</tbody>';
+      $ret   .= '</table>';
+      $ret   .= '</div>';
       return $ret; 
   }
   
@@ -7706,16 +7723,21 @@ sub SSCam_composegallery ($;$$$) {
       $cmddosnap = "ftui.setFhemStatus('set $name snap 1 2 STRM:$uuid')";     
   }
  
-  my $ha  = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
+  my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
+  
+  my $alias  = AttrVal($strmdev, "alias", $strmdev);                                          # Linktext als Aliasname oder Devicename setzen
+  my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $devWlink = "";
   my $pws      = "";
   if ($strmdev) {
-      $pws     = AttrVal($strmdev, "popupWindowSize", "");       # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
-      $pws     =~ s/"//g if($pws);
-      my $wlha = AttrVal($strmdev, "htmlattr", undef); 
-      $ha      = (defined($wlha))?$wlha:$ha;                     # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt   
+      $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
+      $pws =~ s/"//g if($pws);
+      $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
+      if($ftui) {
+          $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
+      }
   }
   
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
@@ -7733,12 +7755,18 @@ sub SSCam_composegallery ($;$$$) {
       $ttsnap = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/g;
   }
   
+  # Header Generierung
   my $header;
+  if($ftui) {
+      $header .= "<span>$dlink </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+  } else {
+      $header .= "<span>$dlink </span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+  } 
   if ($lang eq "EN") {
-      $header  = "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
+      $header .= "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
 	  $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
   } else {
-      $header  = "Schnappschüsse ($limit/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
+      $header .= "Schnappschüsse ($limit/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
       $lupt    =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
 	  $lupt    = "$3.$2.$1 $4";
 	  $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
