@@ -182,7 +182,7 @@ function
 zw_drawline(ld, h, o, i1)
 {
   var n = h[o].neighbors[i1];
-  var ns = h[o].neighborstyles[i1];
+  var ns = (h[o].neighborstyles ? h[o].neighborstyles[i1] : "")
   if(!h[o] || !h[n])
     return "";
   var bidi = false;
