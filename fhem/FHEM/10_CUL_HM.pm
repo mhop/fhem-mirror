@@ -180,6 +180,7 @@ sub CUL_HM_Initialize($) {
                        ."hmKey hmKey2 hmKey3 "  
                        ."readingOnDead:multiple,noChange,state,periodValues,periodString,channels "
                        ."subType:"   .join(",",CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}))." "
+                       ."modelForce:".join(",", sort @modellist)." "
                        .".mId "
                        ;
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
@@ -190,7 +191,6 @@ sub CUL_HM_Initialize($) {
                        ."msgRepeat "                      
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesKey:5,4,3,2,1,0  "
-                       ."modelForce:".join(",", sort @modellist)." "
                        ;
   $hash->{Attr}{chn} =  "repPeers "            # -- channel only attributes
                        ."peerIDs "
@@ -293,7 +293,7 @@ sub CUL_HM_updateConfig($){##########################
       delete $attr{$name}{$_}
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
-      #$hash->{helper}{role}{vrt} = 1;
+      $hash->{helper}{role}{vrt} = 1;
       #$hash->{helper}{role}{dev} = 1;
       next;
     }
@@ -712,6 +712,7 @@ sub CUL_HM_Attr(@) {#################################
       else{
         return "attribut not allowed for channels"
                       if (!$hash->{helper}{role}{dev});
+        CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrVal);
       }
     }
     $updtReq = 1;
@@ -807,15 +808,20 @@ sub CUL_HM_Attr(@) {#################################
     return;
   }
   elsif($attrName eq "model" && $hash->{helper}{role}{dev}){
-    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
-    delete $hash->{helper}{rxType}; # needs new calculation
-    delete $hash->{helper}{mId};
-    if ($attrVal eq "CCU-FHEM"){
-      $attr{$name}{subType} = "virtual";
-      $updtReq = 1;
-      CUL_HM_UpdtCentral($name);
+    if (  $attrVal eq "CCU-FHEM" 
+      and $cmd eq "set"
+      and AttrVal($name,"model","VIRTUAL") eq "VIRTUAL"){
+        delete $hash->{helper}{rxType}; # needs new calculation
+        delete $hash->{helper}{mId};
+        $attr{$name}{subType} = "virtual";
+        $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attrVal);
+        $updtReq = 1;
+        CUL_HM_UpdtCentral($name);
     }
     else{
+      return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
+      delete $hash->{helper}{rxType}; # needs new calculation
+      delete $hash->{helper}{mId};
       CUL_HM_hmInitMsg($hash);# will update mId, rxType and others
     }
     $attr{$name}{$attrName} = $attrVal if ($cmd eq "set");
@@ -1746,7 +1752,7 @@ sub CUL_HM_Parse($$) {#########################################################
       if($mh{mTp} eq "10"){
         $chn = "04";#fixed
         my $bat  =(($err            ) & 0x1f)/10+1.5;
-        $actTemp =sprintf("%2.1f",((($setTemp        ) & 0x3ff)/10));
+        $actTemp = sprintf("%2.1f",((($setTemp        ) & 0x3ff)/10));
         $vp      = (hex($mI[4])     ) & 0x7f ;
         $setTemp = ($setTemp    >>10);
         $err     = ($err        >> 5);
@@ -1770,7 +1776,7 @@ sub CUL_HM_Parse($$) {#########################################################
       else{
         $chn        =  $mI[1];
         $setTemp    = ($setTemp        );
-        $lBat       = $err&0x80?"low":"ok"; # prior to changes of $err!
+        $lBat       = $err & 0x80 ? "low" : "ok"; # prior to changes of $err!
         $err        = ($err        >> 1);
         $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"} if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
         $actTemp   = ReadingsVal($mh{devN},"measured-temp","");
@@ -4448,7 +4454,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return $name." already defines as ".$attr{$name}{subType}
        if ($attr{$name}{subType} && $attr{$name}{subType} !~ m/^(virtual|no)$/);
     $attr{$name}{subType} = "virtual";
-    $attr{$name}{model}   = "VIRTUAL" if (!$attr{$name}{model});
+    if (!$attr{$name}{model}){
+      $attr{$name}{model}   = "VIRTUAL";
+      $attr{$name}{".mId"}  = CUL_HM_getmIdFromModel("VIRTUAL");
+    }
     my $devId = $hash->{DEF};
     for (my $btn=1;$btn <= $maxBtnNo;$btn++){
       my $chnName = $name."_Btn".$btn;
@@ -6700,7 +6709,6 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
   $attr{$name}{firmware}   = $fw;      # to be removed from attributes
 
   CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",$md));#model may be overwritten by modelForce
-  #General CUL_HM_configUpdate
   CUL_HM_complConfigTest($name) if(ReadingsVal($name,"D-firmware","") ne $fw     # force read register
                                  ||ReadingsVal($name,"D-serialNr","") ne $serial
                                  ||ReadingsVal($name,".D-devInfo","") ne $devInfo
@@ -6723,7 +6731,7 @@ sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite 
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
   
-  if ($attr{$name}{subType} eq "virtual"){# du not apply all possible channels for virtual
+  if ($attr{$name}{subType} eq "virtual"){# do not apply all possible channels for virtual
     $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
   }
   else{
@@ -6766,7 +6774,6 @@ sub CUL_HM_getConfig($){
   my $id = CUL_HM_IoId($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
-  #General CUL_HM_configUpdate($name);
   delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
   CUL_HM_complConfigTest($name);
   CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
@@ -7830,7 +7837,7 @@ sub CUL_HM_getMId($) {     #in: hash(chn or dev) out:model key (key for %culHmMo
  # Will store result in device helper
   my $hash = shift;
   $hash = CUL_HM_getDeviceHash($hash);
-  return "" if (!$hash->{NAME});
+  return "none" if (!$hash->{NAME});
   if (!defined $hash->{helper}{mId} || !$hash->{helper}{mId}){# need to search
     $hash->{helper}{mId}     = CUL_HM_getmIdFromModel(AttrVal($hash->{NAME}, "model", ""));
     $hash->{helper}{mId}     = CUL_HM_getmIdFromModel($culHmModel->{$hash->{helper}{mId}}{alias})    
@@ -8702,7 +8709,7 @@ sub CUL_HM_getChnList($){ # get reglist assotiated with a channel
   my $devHash = CUL_HM_getDeviceHash($hash);  
   my $chnN = hex(InternalVal($name,"chanNo","0"));
   $chnN = "-" if ($chnN == 0);
-  return if (!$devHash->{helper}{mId});
+  return undef if (!$devHash->{helper}{mId});
   my @chRl;
 
   if    ($hash->{helper}{role}{vrt}){
@@ -9759,7 +9766,6 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
 sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
   CUL_HM_complConfigTest($name);
-  #General CUL_HM_configUpdate($name);
   return if (!$defs{$name}
              ||$lvl >= (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
   CUL_HM_qEntity($name,"qReqConf");
