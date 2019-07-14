@@ -7276,9 +7276,9 @@ sub SSCam_StreamDev($$$;$) {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
   $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   if($ftui) {
-      $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+      $ret .= "<span align=\"center\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
   } else {
-      $ret .= "<span>$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+      $ret .= "<span align=\"center\">$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
   }  
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
