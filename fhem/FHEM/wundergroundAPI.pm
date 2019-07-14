@@ -127,7 +127,7 @@ sub new {
     $self->{units} = (
         defined( $apioptions->{units} )
         ? $apioptions->{units}
-        : 's'
+        : 'm'
     );
 
     $self->{stationId} = (
@@ -744,7 +744,7 @@ sub strftimeWrapper(@) {
       "abstract": "Wetter API für Weather Underground"
     }
   },
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
