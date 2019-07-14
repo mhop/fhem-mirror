@@ -52,25 +52,8 @@ sub Siro_Initialize($) {
 	  . " SIRO_no_IO_msg:0,1"
 	  . " SIRO_dbl_msg_block"
 	  . " SIRO_remote_correction:0,0.25,0.5,0.75,1,1.25,1.5,1.75,2,2.5,2.75,3"
-	  
-	  #oldversion entfernen mit kommender version 
-      # . " SIRO_channel:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15" 
-      . " SignalRepeats:1,2,3,4,5,6,7,8,9"
-      . " SignalLongStopRepeats:10,15,20,40,45,50"
-      . " channel_send_mode_1:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
-      . " $readingFnAttributes"
-      . " setList"
-      . " ignore:0,1"
-      . " dummy:1,0"
-      . " time_to_open"
-      . " time_to_close"
-      . " time_down_to_favorite" . " hash"
-      . " operation_mode:0,1"
-      . " debug_mode:0,1"
-      . " down_limit_mode_1:slider,0,1,100"
-      . " down_auto_stop:slider,0,1,100"
-      . " invers_position:0,1"
-      . " prog_fav_sequence";
+	  ;
+
 	  
     $hash->{AutoCreate} = {
         "Siro.*" => {
@@ -80,10 +63,7 @@ sub Siro_Initialize($) {
         }
     };
 
-    #$hash->{NOTIFYDEV} = "global";
 	$hash->{helper}{progmode} = "off";   #exexcmd    on
-	#$hash->{helper}{exexcmd} = "on"; 
-    #FHEM::Siro::LoadHelper($hash) if ($init_done);
 }
 
 
@@ -789,10 +769,7 @@ sub Set($@) {
 	# versionschange
 	#changeconfig
 	
-	if ( $cmd eq 'changeconfig'){
-		versionchange( $name );
-		return;
-		}	
+
 	
 	# pruefe auf unbekannte sets
 	 if ( $cmd =~ m/^exec.*/ )# empfangene sequenz aus programmiermode 
@@ -1521,64 +1498,7 @@ sub Restartset($) {
 	return;
 }
 #############################
-sub versionchange($) {
-    my ($input) = @_;
-    my ( $name, $arg ) = split( / /, $input );
-    my $hash = $defs{$name};
-    return "" if ( IsDisabled($name) );
-	Log3( $name, 0, "Siro - versionchange : aufruf");
-	my $attr;
 
-	$attr = AttrVal($name,'time_to_close','undef');
-	CommandAttr(undef,$name . ' SIRO_time_to_close ' . $attr) if ( AttrVal($name,'time_to_close','undef') ne 'undef' );
-	fhem("deleteattr $name time_to_close");
-	
-	$attr = AttrVal($name,'time_to_open','undef');
-	CommandAttr(undef,$name . ' SIRO_time_to_open ' . $attr) if ( AttrVal($name,'time_to_open','undef') ne 'undef' );
-	fhem("deleteattr $name time_to_open");
-	
-	$attr = AttrVal($name,'SignalLongStopRepeats','undef');
-	CommandAttr(undef,$name . ' SIRO_signalLongStopRepeats ' . $attr) if ( AttrVal($name,'SignalLongStopRepeats','undef') ne 'undef' );
-	fhem("deleteattr $name SignalLongStopRepeats");
-	
-	$attr = AttrVal($name,'SignalRepeats','undef');
-	CommandAttr(undef,$name . ' SIRO_signalRepeats ' . $attr) if ( AttrVal($name,'SignalRepeats','undef') ne 'undef' );
-	fhem("deleteattr $name SignalRepeats");
-	
-	$attr = AttrVal($name,'invers_position','undef');
-	CommandAttr(undef,$name . ' SIRO_inversPosition ' . $attr) if ( AttrVal($name,'invers_position','undef') ne 'undef' );
-	fhem("deleteattr $name invers_position");
-
-	CommandAttr( undef,$name . ' devStateIcon {return FHEM::Siro::Siro_icon($name)}' );
-    CommandAttr(undef,$name . ' webCmd stop:open:close:fav:pct');
-
-	$attr = AttrVal($name,'operation_mode','undef');
-	if ($attr eq "1"){
-	my $modch = AttrVal($name,'channel_send_mode_1','undef');
-	CommandAttr(undef,$name . ' SIRO_send_channel ' . $modch)
-	}
-	
-	fhem("deleteattr $name operation_mode");
-	fhem("deleteattr $name channel_send_mode_1");
-	fhem("deleteattr $name down_limit_mode_1");
-	fhem("deleteattr $name operation_mode");
-	fhem("deleteattr $name invers_position");
-	fhem("deleteattr $name down_auto_stop");
-	fhem("deleteattr $name prog_fav_sequence");
-	fhem("deleteattr $name time_down_to_favorite");
-	fhem("deleteattr $name time_down_to_favorite");
-	my $seconds = ReadingsVal( $name, 'operating_seconds', '0' );
-	fhem("deletereading $name .*");
-	readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "state", "0" );
-	readingsBulkUpdate( $hash, "pct", "0" ) ;
-	readingsBulkUpdate( $hash, "position", "0" ) ;
-	readingsBulkUpdate( $hash, "motor-term", $seconds ) ;
-    readingsEndUpdate( $hash, 1 );
-	SendCommand( $hash, 'off' );
-	return;
-}
-#############################
 sub fhemwebFn($$$$) {
 my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
     my $hash     = $defs{$d};
@@ -1622,21 +1542,7 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 	
 	}
 	
-#############################	versionsänderung
-# kann irgendwann entfernt werden	
-	if (ReadingsVal( $name, 'last_reset_os', 'undef' ) ne 'undef')
-		{
-		$msg.= "<table class='block wide' id='SiroWebTR'>
-			<tr class='even'>
-			<td><center>&nbsp;<br>ACHTUNG !<br>&nbsp;<br>Das Siromudul wurde komplett erneuert.<br>Die vorhandenen Attribute und Readings sind inkompatibel und das Device derzeit nur bedingt funktionsfaehig:<br>&nbsp;<br>Durch druecken des untenstehenden Buttons ist eine automatisch Neukonfiguration moeglich, dabei werden vorhandene Daten beruecksichtigt. Nach betaetigen des Buttons macht das Rollo eine Initialisierungsfahrt nach oben.<br>&nbsp;<br>Danach ist eine Funktion mit der alten Siroversion nicht mehr moeglich.<br>Fuer den Fall, das doch die alte Version wieder eingesetzt werden sollte ist die jetzt vorhandene Rawdefinition <u>vor einer Umstellung zu sichern</u>.<br>Wichtig: Bei einer automatischen Umstellung werden entgegen den Massgaben vorhandene Userattribute geaendert ! ";
-		$msg.= "<br>&nbsp;<br>";
-		$msg.= "<input type=\"button\" id=\"\" value=\"KONFIGURATION AUTOMATISCH ANPASSEN\" onClick=\"javascript:prog('changeconfig');\">";
-		$msg.= "&nbsp;";
-		$msg.= "<br>&nbsp;
-			</td></tr></table>
-			";
-		}
-#############################
+
 
 
 	if ( $progmode eq "on")
@@ -1714,10 +1620,6 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 	$msg.= "function prog(msg){
 		var  def = \"" . $name . "\"+\" \"+msg;
 		if (msg == 'prog_mode_off')
-		{
-		location = location.pathname+\"?detail=" . $name . "&cmd=set \"+addcsrf(def);
-		}
-		else if ( msg == 'changeconfig')
 		{
 		location = location.pathname+\"?detail=" . $name . "&cmd=set \"+addcsrf(def);
 		}
