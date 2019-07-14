@@ -7169,6 +7169,7 @@ sub SSCam_StreamDev($$$;$) {
   my $sid                = $hash->{HELPER}{SID};
   my $proto              = $hash->{PROTOCOL};
   $ftui                  = ($ftui && $ftui eq "ftui")?1:0;
+  my $hdrAlign           = "center";
   my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
@@ -7276,9 +7277,9 @@ sub SSCam_StreamDev($$$;$) {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
   $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   if($ftui) {
-      $ret .= "<span align=\"center\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+      $ret .= "<span align=\"$hdrAlign\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
   } else {
-      $ret .= "<span align=\"center\">$dlink $show</span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+      $ret .= "<span align=\"$hdrAlign\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
   }  
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
@@ -7699,6 +7700,7 @@ sub SSCam_composegallery ($;$$$) {
   $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
   $ftui        = ($ftui && $ftui eq "ftui")?1:0;
   my $uuid     = "";
+  my $hdrAlign = "center";
   my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
@@ -7729,7 +7731,6 @@ sub SSCam_composegallery ($;$$$) {
   my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
   
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
-  my $devWlink = "";
   my $pws      = "";
   if ($strmdev) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
@@ -7756,11 +7757,11 @@ sub SSCam_composegallery ($;$$$) {
   }
   
   # Header Generierung
-  my $header;
+  my $header;  
   if($ftui) {
-      $header .= "<span>$dlink </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+      $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
   } else {
-      $header .= "<span>$dlink </span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+      $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
   } 
   if ($lang eq "EN") {
       $header .= "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
@@ -7780,7 +7781,7 @@ sub SSCam_composegallery ($;$$$) {
   my ($htmlCode,$ct);
   $htmlCode  = "<html>";
   $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
-  $htmlCode .= sprintf("$devWlink <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
+  $htmlCode .= "<div class=\"makeTable wide\"; style=\"text-align:$hdrAlign\"> $header <br>";
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
