@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composegallery, ".
+                           "align center of FTUI table, set compatibility to 8.2.5 ",
   "8.15.1" => "11.07.2019  enhancement and bugfixes for refresh of SSCamSTRM devices (integrate FUUID) ",
   "8.15.0" => "09.07.2019  support of SSCamSTRM get function and FTUI widget ",
   "8.14.2" => "28.06.2019  increase get SID timeout to at least 60 s, set compatibility to SVS 8.2.4, improve disable/enable behavior ",
@@ -269,7 +271,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat = "8.2.4";
+my $compstat = "8.2.5";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -5127,7 +5129,7 @@ sub SSCam_camop_parse ($) {
                 $sendrecs{$sn}{createdTm}    = $createdTm;
 				$sendrecs{$sn}{fileName}     = $fileName;
 				$sendrecs{$sn}{".imageData"} = $myjson;
-				Log3($name,4, "$name - Snap '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+				Log3($name,4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
                 
                 # prüfen ob Recording als Email / Telegram versendet werden soll                
 				SSCam_prepareSendData ($hash, $OpMode, \%sendrecs);
@@ -5480,7 +5482,11 @@ sub SSCam_camop_parse ($) {
 						my $i = 0;
 						my $sn = 0;
                         my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
-						
+
+                        if($hash->{HELPER}{".SNAPHASH"}) {
+                            $hash->{HELPER}{".SNAPHASHOLD"} = delete($hash->{HELPER}{".SNAPHASH"});
+                        }
+                            
 						while ($data->{'data'}{'data'}[$i]) {
 							if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
 								$i += 1;
@@ -5505,18 +5511,31 @@ sub SSCam_camop_parse ($) {
 							$sendsnaps{$sn}{".imageData"} = $imageData;
 							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
                         
-                            # Snaphash um die neuen Snaps ergänzen wenn existent
-                            if($hash->{HELPER}{".SNAPHASH"}{$sn}) {
-                                $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
-                                $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
-                                $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
-                                $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
-                                Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        						
-                            }							
+                            # Snaphash erstellen 
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
+                            $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
+                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        													
                             
                             $sn += 1;
 							$i += 1;
 						}
+                        
+                        my $sgn = AttrVal($name,"snapGalleryNumber",3);
+                        my $ss  = $sn;
+                        $sn     = 0;
+                                               													
+                        if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
+                            for my $kn ($ss..($sgn-1)) {
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $sn += 1;                            
+                            }
+                            delete $hash->{HELPER}{".SNAPHASHOLD"};
+                        }
                         
 					    # prüfen ob Schnappschuß versendet werden soll
 				        SSCam_prepareSendData ($hash, $OpMode, \%sendsnaps);
@@ -5528,6 +5547,10 @@ sub SSCam_camop_parse ($) {
                         my $sn = 0;
                          
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
+                        
+                        if($hash->{HELPER}{".SNAPHASH"}) {
+                            $hash->{HELPER}{".SNAPHASHOLD"} = delete($hash->{HELPER}{".SNAPHASH"});
+                        }
                         
                         while ($data->{'data'}{'data'}[$i]) {
 							if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
@@ -5546,13 +5569,30 @@ sub SSCam_camop_parse ($) {
                             } else {
                                 $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
                             }
+                            
+                            # Snaphash erstellen
                             $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
                             $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
                             $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
                             $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
                             Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{snapid}, File => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{fileName}, Created => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{createdTm}");
+                            
                             $sn += 1;
                             $i += 1;
+                        }
+                        
+                        my $sgn = AttrVal($name,"snapGalleryNumber",3);
+                        my $ss  = $sn;
+                        $sn     = 0; 
+                        if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
+                            for my $kn ($ss..($sgn-1)) {
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $sn += 1;                            
+                            }
+                            delete $hash->{HELPER}{".SNAPHASHOLD"};
                         }
                         
                         # Direktausgabe Snaphash wenn nicht gepollt wird
@@ -7222,7 +7262,7 @@ sub SSCam_StreamDev($$$;$) {
   
   $ret  = "";
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
-  $ret .= '<table class="block wide internals">';
+  $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
 
@@ -7699,6 +7739,8 @@ sub SSCam_composegallery ($;$$$) {
 	  $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
   } else {
       $header  = "Schnappschüsse ($limit/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
+      $lupt    =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/;
+	  $lupt    = "$3.$2.$1 $4";
 	  $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
   }
   $header .= $sgbnote;
@@ -7711,7 +7753,7 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode  = "<html>";
   $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= sprintf("$devWlink <div class=\"makeTable wide\"; style=\"text-align:center\"> $header <br>");
-  $htmlCode .= "<table class=\"block wide internals\">";
+  $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
   my $cell   = 1;
