@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.4.8";
+my $HOMEMODE_version = "1.4.9";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -824,7 +824,7 @@ sub HOMEMODE_Get($@)
   }
   elsif ($cmd eq "publicIP")
   {
-    return HOMEMODE_checkIP($hash,1);
+    return HOMEMODE_checkIP($hash);
   }
   else
   {
@@ -1825,7 +1825,6 @@ sub HOMEMODE_Attr(@)
       return $trans if (!HOMEMODE_CheckIfIsValidDevspec("$attr_value:FILTER=TYPE=Weather"));
       if ($attr_value_old ne $attr_value)
       {
-        CommandDeleteReading(undef,"$name condition|wind_chill");
         CommandDeleteReading(undef,"$name pressure") if (!AttrVal($name,"HomeSensorAirpressure",undef));
         CommandDeleteReading(undef,"$name wind") if (!AttrVal($name,"HomeSensorWindspeed",undef));
         CommandDeleteReading(undef,"$name temperature") if (!AttrVal($name,"HomeSensorTemperatureOutside",undef));
@@ -2062,7 +2061,7 @@ sub HOMEMODE_Attr(@)
     {
       if ($attr_name eq "HomeWeatherDevice")
       {
-        CommandDeleteReading(undef,"$name pressure|condition|wind");
+        CommandDeleteReading(undef,"$name pressure|wind");
         CommandDeleteReading(undef,"$name temperature") if (!AttrVal($name,"HomeSensorTemperatureOutside",undef));
         CommandDeleteReading(undef,"$name humidity") if (!AttrVal($name,"HomeSensorHumidityOutside",undef));
       }
@@ -2145,7 +2144,6 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $ppdevice = ReadingsVal($name,"lastPresentByPresenceDevice","");
   my $paddress = InternalVal($pdevice,"ADDRESS","");
   my $pressure = ReadingsVal($name,"pressure","");
-  my $pressuretrend = ReadingsVal($sensor,"pressureTrend","");
   my $weatherlong = HOMEMODE_WeatherTXT($hash,AttrVal($name,"HomeTextWeatherLong",""));
   my $weathershort = HOMEMODE_WeatherTXT($hash,AttrVal($name,"HomeTextWeatherShort",""));
   my $forecast = HOMEMODE_ForecastTXT($hash);
@@ -2157,7 +2155,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $temp = ReadingsVal($name,"temperature",0);
   my $temptrend = ReadingsVal($name,"temperatureTrend","constant");
   my $wind = ReadingsVal($name,"wind",0);
-  my $windchill = ReadingsVal($sensor,"wind_chill",0);
+  my $windchill = ReadingsNum($sensor,"apparentTemperature",0);
   my $motion = ReadingsVal($name,"lastMotion","");
   my $pmotion = ReadingsVal($name,"prevMotion","");
   my $contact = ReadingsVal($name,"lastContact","");
@@ -2269,7 +2267,6 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%PRESENT%/$pres/g;
   $cmd =~ s/%PRESENTR%/$rpres/g;
   $cmd =~ s/%PRESSURE%/$pressure/g;
-  $cmd =~ s/%PRESSURETREND%/$pressuretrend/g;
   $cmd =~ s/%PREVAMODE%/$pamode/g;
   $cmd =~ s/%PREVCONTACT%/$pcontact/g;
   $cmd =~ s/%PREVMODE%/$pmode/g;
@@ -2359,16 +2356,14 @@ sub HOMEMODE_WeatherTXT($$)
   my $condition = ReadingsVal($weather,"condition","");
   my $conditionart = ReadingsVal($name,".be","");
   my $pressure = ReadingsVal($name,"pressure","");
-  my $pressuretrend = ReadingsVal($weather,"pressureTrend","");
   my $humi = ReadingsVal($name,"humidity",0);
   my $temp = ReadingsVal($name,"temperature",0);
-  my $windchill = ReadingsVal($weather,"wind_chill",0);
+  my $windchill = ReadingsNum($weather,"apparentTemperature",0);
   my $wind = ReadingsVal($name,"wind",0);
   $text =~ s/%CONDITION%/$condition/gm;
   $text =~ s/%TOBE%/$conditionart/gm;
   $text =~ s/%HUMIDITY%/$humi/gm;
   $text =~ s/%PRESSURE%/$pressure/gm;
-  $text =~ s/%PRESSURETREND%/$pressuretrend/gm;
   $text =~ s/%TEMPERATURE%/$temp/gm;
   $text =~ s/%WINDCHILL%/$windchill/gm;
   $text =~ s/%WIND%/$wind/gm;
@@ -2386,7 +2381,7 @@ sub HOMEMODE_ForecastTXT($;$)
   my $high = ReadingsVal($weather,"fc".$day."_high_c","");
   my $temp = ReadingsVal($name,"temperature","");
   my $hum = ReadingsVal($name,"humidity","");
-  my $chill = ReadingsVal($weather,"wind_chill","");
+  my $chill = ReadingsNum($weather,"apparentTemperature",0);
   my $wind = ReadingsVal($name,"wind","");
   my $text;
   if (defined $cond && defined $low && defined $high)
@@ -3402,31 +3397,51 @@ sub HOMEMODE_CalendarEvents($$)
   return \@events;
 }
 
-sub HOMEMODE_checkIP($;$)
+sub HOMEMODE_checkIP($)
 {
-  my ($hash,$r) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $url = "http://icanhazip.com/";
-  my $ip = GetFileFromURL($url);
-  if (!$ip || $ip =~ /[<>]/)
+  my $param = {
+    url        => "http://icanhazip.com/",
+    timeout    => 5,
+    hash       => $hash,
+    callback   => \&HOMEMODE_setIP
+  };
+  return HttpUtils_NonblockingGet($param);
+}
+
+sub HOMEMODE_setIP($)
+{
+  my ($param,$err,$data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  if ($err ne "")
   {
-    return $r ? "publicIP service check ($url) is temporary not available" : undef;
+    Log3 $name,3,"$name: Error while requesting ".$param->{url}." - $err";
   }
-  $ip =~ s/\s+//g;
-  chomp $ip;
-  if (ReadingsVal($name,"publicIP","") ne $ip)
+  if (!$data || $data =~ /[<>]/)
   {
-    my @commands;
-    readingsSingleUpdate($hash,"publicIP",$ip,1);
-    push @commands,AttrVal($name,"HomeCMDpublic-ip-change","") if (AttrVal($name,"HomeCMDpublic-ip-change",undef));
-    HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands);
+    $err = "Error - publicIP service check is temporary not available";
+    readingsSingleUpdate($hash,"publicIP",$err,1);
+    Log3 $name,3,"$name: $err";
   }
-  if (AttrNum($name,"HomePublicIpCheckInterval",0))
+  elsif ($data ne "")
   {
-    my $timer = gettimeofday() + 60 * AttrNum($name,"HomePublicIpCheckInterval",0);
-    $hash->{".IP_TRIGGERTIME_NEXT"} = $timer;
+    $data =~ s/\s+//g;
+    chomp $data;
+    if (ReadingsVal($name,"publicIP","") ne $data)
+    {
+      my @commands;
+      readingsSingleUpdate($hash,"publicIP",$data,1);
+      push @commands,AttrVal($name,"HomeCMDpublic-ip-change","") if (AttrVal($name,"HomeCMDpublic-ip-change",undef));
+      HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands);
+    }
+    if (AttrNum($name,"HomePublicIpCheckInterval",0))
+    {
+      my $timer = gettimeofday() + 60 * AttrNum($name,"HomePublicIpCheckInterval",0);
+      $hash->{".IP_TRIGGERTIME_NEXT"} = $timer;
+    }
   }
-  return $r ? $ip : undef;
 }
 
 sub HOMEMODE_ToggleDevice($$)
@@ -3573,7 +3588,7 @@ sub HOMEMODE_Details($$$)
   A lot of placeholders are available for usage within the HomeCMD or HomeText attributes (see Placeholders).<br>
   All your energy and power measuring sensors can be added and calculated total readings for energy and power will be created.<br>
   You can also add your local outside temperature and humidity sensors and you'll get ice warning e.g.<br>
-  If you also add your Yahoo weather device you'll also get short and long weather informations and weather forecast.<br>
+  If you also add your Weather device you'll also get short and long weather informations and weather forecast.<br>
   You can monitor added contact and motion sensors and execute CMDs depending on their state.<br>
   A simple alarm system is included, so your contact and motion sensors can trigger alarms depending on the current alarm mode.<br>
   A lot of customizations are possible, e.g. special event (holiday) calendars and locations.<br>
@@ -3592,7 +3607,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       There's a special function, which you may use, which is converting given minutes (up to 5999.99) to a timestamp that can be used for creating at devices.<br>
-      This function is called HOMEMODE_hourMaker and the only value you need to pass is the number in minutes with max. 2 digits after the dot.
+      This function is called HOMEMODE_hourMaker and the only value you need to pass is the number in minutes with max. two decimal places.
     </li>
     <li>
       Each set command and each updated reading of the HOMEMODE device will create an event within FHEM, so you're able to create additional notify or DOIF devices if needed.
@@ -4388,7 +4403,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>HomeWeatherDevice</i></b><br>
-      your local weather device<br>
+      your local Weather device<br>
       default:
     </li>
     <li>
@@ -4545,7 +4560,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>humidty</i></b><br>
-      current humidty of the Yahoo weather device or of your own sensor (if available)
+      current humidty of the Weather device or of your own sensor (if available)
     </li>
     <li>
       <b><i>humidtyTrend</i></b><br>
@@ -4700,7 +4715,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>pressure</i></b><br>
-      current air pressure of the Yahoo weather device
+      current air pressure of the Weather device
     </li>
     <li>
       <b><i>prevActivityByResident</i></b><br>
@@ -4760,7 +4775,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>temperature</i></b><br>
-      current temperature of the Yahoo weather device or of your own sensor (if available)
+      current temperature of the Weather device or of your own sensor (if available)
     </li>
     <li>
       <b><i>temperatureTrend</i></b><br>
@@ -4781,7 +4796,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>wind</i></b><br>
-      current wind speed of the Yahoo weather
+      current wind speed of the Weather device
     </li>
   </ul>
   <a name="HOMEMODE_placeholders"></a>
@@ -4833,7 +4848,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%BE%</i></b><br>
-      is or are of condition reading of monitored Yahoo weather device<br>
+      is or are of condition reading of monitored Weather device<br>
       can be used for weather (forecast) output
     </li>
     <li>
@@ -4850,7 +4865,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%CONDITION%</i></b><br>
-      value of the condition reading of monitored Yahoo weather device<br>
+      value of the condition reading of monitored Weather device<br>
       can be used for weather (forecast) output
     </li>
     <li>
@@ -5029,11 +5044,6 @@ sub HOMEMODE_Details($$$)
       can be used for weather info in HomeTextWeather attributes e.g.
     </li>
     <li>
-      <b><i>%PRESSURETREND%</i></b><br>
-      value of the pressureTrend reading of the Yahoo weather device<br>
-      can be used for weather info in HomeTextWeather attributes e.g.
-    </li>
-    <li>
       <b><i>%PREVAMODE%</i></b><br>
       previous alarm mode of the HOMEMODE device
     </li>
@@ -5161,7 +5171,7 @@ sub HOMEMODE_Details($$$)
     </li>
     <li>
       <b><i>%WINDCHILL%</i></b><br>
-      value of the wind_chill reading of the Yahoo weather device<br>
+      value of the apparentTemperature reading of the Weather device<br>
       can be used for weather info in HomeTextWeather attributes e.g.
     </li>
   </ul>
