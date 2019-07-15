@@ -708,7 +708,7 @@ upd_writeFile($$$$)
     <li>Falls man &lt;fileName&gt; spezifiziert, dann werden nur die Dateien
         heruntergeladen, die diesem Regexp entsprechen.</li>
   </ul>
-  Siehe also das restore Befehl.<br>
+  Siehe Befehl restore.<br>
   <br>
   Beispiele:<br>
   <ul>
