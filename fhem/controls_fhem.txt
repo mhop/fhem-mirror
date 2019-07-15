@@ -1,4 +1,4 @@
-REV 19823
+REV 19832
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -64,7 +64,7 @@ UPD 2018-06-04_07:45:02 52079 FHEM/02_RSS.pm
 UPD 2018-03-11_07:45:03 4860 FHEM/09_BS.pm
 UPD 2019-01-24_07:45:02 21854 FHEM/09_CUL_FHTTK.pm
 UPD 2018-03-11_07:45:03 6824 FHEM/09_USF1000.pm
-UPD 2019-05-31_07:45:02 612128 FHEM/10_CUL_HM.pm
+UPD 2019-07-15_07:45:02 612429 FHEM/10_CUL_HM.pm
 UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
@@ -497,7 +497,7 @@ UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2019-04-29_07:45:03 24261 FHEM/98_RandomTimer.pm
 UPD 2019-06-24_07:45:02 96236 FHEM/98_SVG.pm
-UPD 2019-07-07_07:45:02 75803 FHEM/98_Siro.pm
+UPD 2019-07-15_07:45:02 71079 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -707,7 +707,7 @@ UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-03-25_07:45:04 18178 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
-UPD 2019-06-08_12:09:27 34531 FHEM/wundergroundAPI.pm
+UPD 2019-07-15_07:45:02 34531 FHEM/wundergroundAPI.pm
 UPD 2019-06-04_07:45:11 6392 contrib/commandref_join.pl
 UPD 2019-06-08_12:09:35 4360 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
@@ -729,8 +729,8 @@ UPD 2019-07-13_07:45:06 4089196 docs/commandref.html
 UPD 2019-07-13_07:45:08 2529064 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-07-14_07:45:10 217321 docs/commandref_modular.html
-UPD 2019-07-14_07:45:11 228261 docs/commandref_modular_DE.html
+UPD 2019-07-15_07:45:10 217321 docs/commandref_modular.html
+UPD 2019-07-15_07:45:11 228261 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2234,4 +2234,4 @@ UPD 2019-06-20_10:05:58 5637 www/pgm2/svg_style.css
 UPD 2019-01-15_07:45:03 14976 www/pgm2/todoist.js
 UPD 2015-07-28_14:05:34 639 www/pgm2/touchpadstyle.css
 UPD 2019-03-01_07:45:02 18900 www/pgm2/yaahm.js
-UPD 2019-06-26_07:45:02 20778 www/pgm2/zwave_neighborlist.js
+UPD 2019-07-15_07:45:02 20806 www/pgm2/zwave_neighborlist.js
