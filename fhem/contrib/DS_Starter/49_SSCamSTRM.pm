@@ -63,7 +63,7 @@ our %SSCamSTRM_vNotesIntern = (
 );
 
 # Standardvariablen und Forward-Declaration
-sub SSCam_ptzpanel($;$$);
+sub SSCam_ptzpanel(@);
 sub SSCam_StreamDev($$$;$);
 sub SSCam_getclhash($;$$);
 

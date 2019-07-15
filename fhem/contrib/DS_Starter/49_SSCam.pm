@@ -1107,7 +1107,7 @@ sub SSCam_Set($@) {
   } elsif ($opt eq "createPTZcontrol" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 	  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
-      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','','$ptzcdev','ptzcontrol')}");
+      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','$ptzcdev','ptzcontrol')}");
 	  return $ret if($ret);
 	  my $room    = AttrVal($name,"room","SSCam");
       $attr{$ptzcdev}{room}  = $room;
@@ -1948,7 +1948,7 @@ sub SSCam_FWdetailFn ($$$$) {
       $ret .= $hash->{".setup"};
   }
   
-  $hash->{".ptzhtml"} = SSCam_ptzpanel($d,'') if($hash->{".ptzhtml"} eq "");
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
 
   if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
@@ -6948,8 +6948,8 @@ return ($ret);
 #     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
 #     das generierte Widget und das weblink-Device ptzpanel_$name
 ###############################################################################
-sub SSCam_ptzpanel($$;$$) {
-  my ($name,$ftui,$ptzcdev,$ptzcontrol)     = @_; 
+sub SSCam_ptzpanel(@) {
+  my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
   my $hash       = $defs{$name};
   my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
   my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
@@ -6960,7 +6960,7 @@ sub SSCam_ptzpanel($$;$$) {
   my $row;
   
   return "" if(SSCam_myVersion($hash) <= 71);
-  
+ 
   $ptz_ret = "<div class=\"ptzpanel\">";
   $ptz_ret.= '<table class="rc_body">';
 
@@ -7170,7 +7170,7 @@ sub SSCam_StreamDev($$$;$) {
   my $proto              = $hash->{PROTOCOL};
   $ftui                  = ($ftui && $ftui eq "ftui")?1:0;
   my $hdrAlign           = "center";
-  my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$alias,$wlalias);
+  my ($cause,$ret,$link,$audiolink,$devWlink,$wlhash,$wlalias);
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                   # Name des aufrufenden SSCamSTRM-Devices
@@ -7328,7 +7328,7 @@ sub SSCam_StreamDev($$$;$) {
       $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
+          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7406,7 +7406,7 @@ sub SSCam_StreamDev($$$;$) {
       $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
+          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7452,7 +7452,7 @@ sub SSCam_StreamDev($$$;$) {
       $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
+          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7489,7 +7489,7 @@ sub SSCam_StreamDev($$$;$) {
               }              
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
-                  my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
+                  my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
@@ -7604,7 +7604,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
-                  my $ptz_ret = SSCam_ptzpanel($camname,$ftui);
+                  my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
