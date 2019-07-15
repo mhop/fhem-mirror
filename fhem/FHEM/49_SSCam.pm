@@ -6964,7 +6964,7 @@ sub SSCam_ptzpanel(@) {
   return "" if(SSCam_myVersion($hash) <= 71);
  
   $ptz_ret  = "";
-  $ptz_ret .= "<style>TD.ptzcontrol {padding: 2px 2px;}</style>";
+  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 5px;}</style>";
   $ptz_ret .= '<table class="rc_body">';
 
   foreach my $rownr (0..9) {
