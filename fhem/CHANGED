@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  49_SSCam: fix warnings
  - feature: 49_SSCam: support of FTUI Widget with SSCamSTRM, new attributes
                       in SSCamSTRM, some fixes
  - feature: 71_YAMAHA_NP: Added undocumented reverse-engineered

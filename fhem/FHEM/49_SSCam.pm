@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.16.1" => "16.07.2019  fix warnings ",
   "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
   "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composegallery, ".
                            "align center of FTUI table, set compatibility to 8.2.5 ",
@@ -953,7 +954,6 @@ sub SSCam_Set($@) {
       if($spec =~ /STRM:/) {
           $spec =~ m/.*STRM:(.*).*/i;                                  # Snap by SSCamSTRM-Device
           $hash->{HELPER}{INFORM} = $1;
-		  $hash->{HELPER}{SNAPBYSTRMDEV} = 1;
       }	
        
       my $emtxt = AttrVal($name, "snapEmailTxt", "");
@@ -6950,18 +6950,19 @@ return ($ret);
 ###############################################################################
 sub SSCam_ptzpanel(@) {
   my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
-  my $hash       = $defs{$name};
-  my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
-  my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
-  my $pbs        = AttrVal("$ptzcdev","ptzButtonSize", 100);                     # Größe der Druckbuttons in %
-  my $pbsf       = AttrVal("$ptzcdev","ptzButtonSizeFTUI", 100);                 # Größe der Druckbuttons im FTUI in %
-  my $valPresets = ReadingsVal("$name","Presets","");
-  my $valPatrols = ReadingsVal("$name","Patrols","");
-  my $rowisset   = 0;
-  my $ptz_ret;
-  my $row;
+  my $hash        = $defs{$name};
+  my $iconpath    = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
+  my $iconprefix  = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
+  my $valPresets  = ReadingsVal("$name","Presets","");
+  my $valPatrols  = ReadingsVal("$name","Patrols","");
+  my $rowisset    = 0;
+  my ($pbs,$pbsf) = ("","");
+  my ($row,$ptz_ret);
   
   return "" if(SSCam_myVersion($hash) <= 71);
+  
+  $pbs      = AttrVal("$ptzcdev","ptzButtonSize", 100);                                                     # Größe der Druckbuttons in %
+  $pbsf     = AttrVal("$ptzcdev","ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
  
   $ptz_ret  = "";
   $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 5px;}</style>";
@@ -6973,7 +6974,7 @@ sub SSCam_ptzpanel(@) {
       next if (!$row);
       $rowisset = 1;
       $ptz_ret .= "<tr>";
-      my @btn = split (",",$row);                    # die Anzahl Buttons in einer Reihe
+      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
       
       foreach my $btnnr (0..$#btn) {                 
           $ptz_ret .= '<td class="ptzcontrol">';
@@ -7711,6 +7712,7 @@ sub SSCam_composegallery ($;$$$) {
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
+  my ($alias,$dlink) = ("","");
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7721,6 +7723,8 @@ sub SSCam_composegallery ($;$$$) {
 	  my $streamHash = $defs{$strmdev};                                                       # Hash des SSCamSTRM-Devices
 	  $uuid = $streamHash->{FUUID};                                                           # eindeutige UUID des Streamingdevices
 	  delete $streamHash->{HELPER}{STREAM};
+      $alias  = AttrVal($strmdev, "alias", $strmdev);                                         # Linktext als Aliasname oder Devicename setzen
+      $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";  
   }
   
   my $cmddosnap     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";   # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
@@ -7732,10 +7736,7 @@ sub SSCam_composegallery ($;$$$) {
   }
  
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
-  
-  my $alias  = AttrVal($strmdev, "alias", $strmdev);                                          # Linktext als Aliasname oder Devicename setzen
-  my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
-  
+    
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $pws      = "";
   if ($strmdev) {
@@ -7745,6 +7746,7 @@ sub SSCam_composegallery ($;$$$) {
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
+  
   }
   
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
