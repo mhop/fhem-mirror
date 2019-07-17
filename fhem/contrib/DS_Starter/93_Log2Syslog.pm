@@ -1,5 +1,5 @@
 ##########################################################################################################################
-# $Id: 93_Log2Syslog.pm 18981 2019-03-20 21:39:53Z DS_Starter $
+# $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
@@ -37,9 +37,12 @@ use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
 eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.6.2"  => "17.07.2019  Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
+  "5.6.1"  => "24.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "5.6.0"  => "23.03.2019  attribute exclErrCond to exclude events from rating as \"error\" ",
   "5.5.0"  => "18.03.2019  prepare for Meta.pm ",
   "5.4.0"  => "17.03.2019  new feature parseProfile = Automatic ",
@@ -271,7 +274,7 @@ sub Log2Syslog_Initialize($) {
                       $readingFnAttributes
                       ;
                       
-  FHEM::Meta::InitMod( __FILE__, $hash );           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };    # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;   
 }
@@ -321,17 +324,18 @@ sub Log2Syslog_Define($@) {
       # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
       notifyRegexpChanged($hash, $hash->{HELPER}{EVNTLOG}) if($hash->{HELPER}{EVNTLOG});
 		
-      $hash->{PEERHOST} = $a[2];                            # Destination Host (Syslog Server)
+      $hash->{PEERHOST} = $a[2];                              # Destination Host (Syslog Server)
   }
 
-  $hash->{SEQNO}            = 1;                            # PROCID in IETF, wird kontinuierlich hochgezählt
+  $hash->{SEQNO}                 = 1;                         # PROCID in IETF, wird kontinuierlich hochgezählt
   
-  $logInform{$hash->{NAME}} = "Log2Syslog_fhemlog";         # Funktion die in hash %loginform für $name eingetragen wird
-  $hash->{HELPER}{SSLVER}   = "n.a.";                       # Initialisierung
-  $hash->{HELPER}{SSLALGO}  = "n.a.";                       # Initialisierung
-  $hash->{HELPER}{LTIME}    = time();                       # Init Timestmp f. Ratenbestimmung
-  $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
-  $hash->{HELPER}{OLDSTATE} = "initialized";
+  $logInform{$hash->{NAME}}      = "Log2Syslog_fhemlog";      # Funktion die in hash %loginform für $name eingetragen wird
+  $hash->{HELPER}{SSLVER}        = "n.a.";                    # Initialisierung
+  $hash->{HELPER}{SSLALGO}       = "n.a.";                    # Initialisierung
+  $hash->{HELPER}{LTIME}         = time();                    # Init Timestmp f. Ratenbestimmung
+  $hash->{HELPER}{OLDSEQNO}      = $hash->{SEQNO};            # Init Sequenznummer f. Ratenbestimmung
+  $hash->{HELPER}{OLDSTATE}      = "initialized";
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);      # Modul Meta.pm nicht vorhanden
   
   # Versionsinformationen setzen
   Log2Syslog_setVersionInfo($hash);
@@ -343,7 +347,7 @@ sub Log2Syslog_Define($@) {
   readingsBulkUpdate($hash, "state", "initialized") if($hash->{MODEL}=~/Sender/);
   readingsEndUpdate($hash,1);
   
-  Log2Syslog_trate($hash);                                 # regelm. Berechnung Transfer Rate starten 
+  Log2Syslog_trate($hash);                                    # regelm. Berechnung Transfer Rate starten 
       
 return undef;
 }
@@ -483,7 +487,8 @@ sub Log2Syslog_Read($@) {
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
           }   
       } else {
-          @load = split("[\r\n]",$data);
+          chomp $data;
+          push @load, $data;
       }
  
       foreach my $line (@load) {          
@@ -2047,16 +2052,16 @@ sub Log2Syslog_setVersionInfo($) {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
-  if($modules{$type}{META}{x_prereqs_src}) {
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 18981 2019-03-20 21:39:53Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 18981 2019-03-20 21:39:53Z DS_Starter $ im Kopf komplett! vorhanden )
-	  if( __PACKAGE__ eq $type) {
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
@@ -3565,7 +3570,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         "Net::Domain": 0         
       },
       "recommends": {
-        "IO::Socket::SSL": 0 
+        "IO::Socket::SSL": 0,
+        "FHEM::Meta": 0        
       },
       "suggests": {
       }
