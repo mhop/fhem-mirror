@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.16.2" => "17.07.2019  change function SSCam_ptzpanel using css stylesheet ",
   "8.16.1" => "16.07.2019  fix warnings ",
   "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
   "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composegallery, ".
@@ -6965,8 +6966,9 @@ sub SSCam_ptzpanel(@) {
   $pbsf     = AttrVal("$ptzcdev","ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
  
   $ptz_ret  = "";
-  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 5px;}</style>";
-  $ptz_ret .= '<table class="rc_body">';
+  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
+  $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
+  $ptz_ret .= '<table class="rc_body defsize">';
 
   foreach my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
@@ -7010,7 +7012,6 @@ sub SSCam_ptzpanel(@) {
       }
       $ptz_ret .= "</tr>\n";
   }
-  
   $ptz_ret .= "</table>";
   
   ########################
@@ -7028,7 +7029,6 @@ sub SSCam_ptzpanel(@) {
       }
       if($Presets) {
           $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,;
-          # Log3($name, 1, "$name - commandArgs: $Presets");
       } else {
           $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
       }
@@ -7040,33 +7040,24 @@ sub SSCam_ptzpanel(@) {
           last if(defined($Patrols));
       }
       
-      # Rahmenklasse
-      $ptz_ret .= "<div class=\"ptzpanel\">";
-      $ptz_ret .= "<table class=\"rc_body\">";  
+      if($Patrols) {
+          $Patrols =~ s,^<td[^>]*>(.*)</td>$,$1,;
+      } else {
+          $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
+      }
+      
+      $ptz_ret .= '<table class="rc_body defsize">';
+      
       $ptz_ret .= "<tr>";
-      $ptz_ret .= '<td class="rc_button">';
+      $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
+      $ptz_ret .= "</tr>";
       
-      # Dropdown Klasse
-      $ptz_ret .= "<table class=\"webcmd\">";  
       $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td style=\"font-size:250%;\">Preset:  </td><td><div class='col3'>$Presets</div></td>";  
+      $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
       $ptz_ret .= "</tr>";
+
       $ptz_ret .= "</table>";
-      
-      $ptz_ret .= "<table class=\"webcmd\">"; 
-      $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td style=\"font-size:250%;\">Patrol:  </td><td><div class='col3'>$Patrols</div></td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "</table>";
-      
-      # Rahmenklasse end
-      $ptz_ret .= "</td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "</table>";
-      $ptz_ret .= "</div>";
-      
-      #####################
- }
+  }
   
   if ($rowisset) {
       return $ptz_ret;
@@ -7336,7 +7327,7 @@ sub SSCam_StreamDev($$$;$) {
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
-          if($ptz_ret) { 
+          if($ptz_ret) {         
               $ret .= "<td>$ptz_ret</td>";
           }
       }
