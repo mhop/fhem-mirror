@@ -41,6 +41,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.6.3"  => "18.07.2019  fix state reading if changed disabled attribute ",
   "5.6.2"  => "17.07.2019  Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
   "5.6.1"  => "24.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "5.6.0"  => "23.03.2019  attribute exclErrCond to exclude events from rating as \"error\" ",
@@ -1265,7 +1266,7 @@ sub Log2Syslog_Attr ($$$$) {
         }
         $do = 0 if($cmd eq "del");
         $st = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"initialized";
-		
+        
         $hash->{HELPER}{MEMLOCK} = 1;
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
 		
@@ -1277,7 +1278,8 @@ sub Log2Syslog_Attr ($$$$) {
 		} else {
 		    Log2Syslog_closesock($hash,1);          # Clientsocket schließen 
             Log2Syslog_downServer($hash);           # Serversocket schließen
-		}         
+		}
+		readingsSingleUpdate ($hash, 'state', $st, 1);        
     }
 	
     if ($aName eq "TLS") {
@@ -1404,8 +1406,8 @@ sub Log2Syslog_eventlog($$) {
   my ($prival,$data,$sock,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      $st = AttrVal($name, "disable", "0"); 
-	  $st = ($st =~ /maintenance/)?$st:"disabled";
+      # $st = AttrVal($name, "disable", "0"); 
+	  # $st = ($st =~ /maintenance/)?$st:"disabled";
 	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
 	  readingsSingleUpdate($hash, "state", $st, $evt);
 	  $hash->{HELPER}{OLDSTATE} = $st;
@@ -1480,8 +1482,8 @@ sub Log2Syslog_fhemlog($$) {
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      $st = AttrVal($name, "disable", "1"); 
-	  $st = ($st =~ /maintenance/)?$st:"disabled";
+      # $st = AttrVal($name, "disable", "1"); 
+	  # $st = ($st =~ /maintenance/)?$st:"disabled";
 	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
 	  readingsSingleUpdate($hash, "state", $st, $evt);
 	  $hash->{HELPER}{OLDSTATE} = $st;
@@ -1628,7 +1630,7 @@ sub Log2Syslog_opensock ($;$$) {
   my $host     = $hash->{PEERHOST};
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
-  my $st       = ReadingsVal($name,"state","active");
+  my $st       = "active";
   my $timeout  = AttrVal($name, "timeout", 0.5);
   my $ssldbg   = AttrVal($name, "ssldebug", 0);
   my ($sock,$lo,$lof,$sslver,$sslalgo);
