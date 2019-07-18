@@ -488,8 +488,7 @@ sub Log2Syslog_Read($@) {
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
           }   
       } else {
-          chomp $data;
-          push @load, $data;
+          @load = split("[\r\n]",$data);
       }
  
       foreach my $line (@load) {          
