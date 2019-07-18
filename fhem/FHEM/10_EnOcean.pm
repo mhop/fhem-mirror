@@ -638,7 +638,15 @@ my @EnO_resolution = (1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32);
 my @EnO_scaling = (0, 1, 10, 100, 1000, 10000, 100000, 1e6, 1e7, 0.1, 0.01, 0.001, 1e-6, 1e-9);
 
 my %EnO_gpValueEnum = (
-  1 => {name => "multipurpose"},
+  1 => {name => "multipurpose", "02D" => {"00000009" => {0 => {name => "volume",
+                                                               unit => "l"},
+                                                         1 => {name => "interval",
+                                                               unit => "h"},
+                                                         2 => {name => "battery",
+                                                               unit => "%"},
+                                                         4 => {name => "status",
+                                                               enum => {0 => "in_use", 1 => "not_used", 2 => "protection", 3 => "off"},
+                                                               enumInv => {"in_use" => 0, "not_used" => 1, "protection" => 2, "off" => 3}}}}},
   2 => {name => "buildingMode", enum => {0 => "in_use", 1 => "not_used", 2 => "protection"},
                                 enumInv => {"in_use" => 0, "not_used" => 1, "protection" => 2}},
   3 => {name => "occupanyMode", enum => {0 => "occupied", 1 => "standby", 2 => "not_occupied"},
@@ -6456,8 +6464,11 @@ sub EnOcean_Set($@)
         $destinationID = "FFFFFFFF";
 	my $productID = AttrVal($name, "productID", undef);
 	if (defined $productID) {
-	  # GP V1.1 definition
-	  $productID = '0000001000000100' . EnOcean_convHexToBit($productID);
+          # GP definition
+          # V1.0: teach-in signal type length 8 bit?
+          # V1.1: teach-in signal type length 6 bit?
+	  $productID = '000000001000000100' . EnOcean_convHexToBit($productID);
+	  #$productID = '0000001000000100' . EnOcean_convHexToBit($productID);
 	} else {
 	  $productID = '';
 	}
@@ -6525,10 +6536,11 @@ sub EnOcean_Set($@)
             # fill with trailing zeroes to x bytes
             $gpDefI .= 0 x (8 - length($gpDefI) % 8);
           }
-          # GP V1.0 definition
+          # GP definition
+          # V1.0: teach-in signal type length 8 bit?
+          # V1.1: teach-in signal type length 6 bit?
           #$teachInInfo = '0000000001' . unpack('B8', pack('C', length($gpDefI) / 4));
-          # GP V1.1 definition
-          $teachInInfo = '0000000100000000';
+          $teachInInfo = '000000000100000000';
         }
         #Log3 $name, 3, "EnOcean set $name header: $header O: $gpDefO Info: $teachInInfo I: $gpDefI";
         # DophinView GP profile error if Product ID sent
@@ -12181,8 +12193,13 @@ sub EnOcean_Parse($$)
         $channelType = unpack('C', pack('B8', '000000' . $1));
         $data = $2;
         if ($channelType == 0) {
-          $data =~ m/^(.{6})(.*)$/;
-          $signalType =  unpack('C', pack('B8', '00' . $1));
+          # GP definition
+          # V1.0: teach-in signal type length S1 = 8 bit?
+          # V1.1: teach-in signal type length S1 = 6 bit?
+          $data =~ m/^(.{8})(.*)$/;
+          $signalType =  unpack('C', pack('B8', $1));
+          #$data =~ m/^(.{6})(.*)$/;
+          #$signalType =  unpack('C', pack('B8', '00' . $1));
           $data = $2;
         } else {
           $data =~ m/^(.{8})(.*)$/;
