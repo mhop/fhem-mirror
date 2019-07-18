@@ -697,7 +697,7 @@ sub Log2Syslog_parsePayload($$) {
   }
   
   if($pp =~ /raw/) {
-      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - $data");
+      # Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - $data");
       $ts = TimeNow();
       $pl = $data;
   
