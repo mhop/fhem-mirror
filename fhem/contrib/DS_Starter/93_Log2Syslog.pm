@@ -456,7 +456,7 @@ sub Log2Syslog_Read($@) {
       
   } else {
       # raw oder User eigenes Format
-      $len = 8192;        
+      $len = 16384;        
   } 
   
   if($socket) {
