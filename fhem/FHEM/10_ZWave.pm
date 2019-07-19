@@ -2343,6 +2343,7 @@ sub
 ZWave_mfsParse($$$$$)
 {
   my ($hash, $mf, $prod, $id, $config) = @_;
+  sub getVal { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" }
 
   if($config == 2) {
     setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
@@ -2355,16 +2356,18 @@ ZWave_mfsParse($$$$$)
   if(open(FH, $xml)) {
     my ($lastMf, $mName, $ret) = ("","");
     while(my $l = <FH>) {
-      if($l =~ m/<Manufacturer.*id="([^"]*)".*name="([^"]*)"/) {
-        $lastMf = lc($1);
-        $mName = $2;
+      if($l =~ m/<Manufacturer/) {
+        $lastMf = lc(getVal($l, "id"));
+        $mName = getVal($l, "name");
         next;
       }
 
-      if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
-        if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
+      if($l =~ m/<Product/) {
+        my $lId = lc(getVal($l, "id"));
+        my $lProd = lc(getVal($l, "type"));
+        if($mf eq $lastMf && $prod eq $lProd && $id eq $lId) {
           if($config) {
-            $ret = (($l =~ m/config\s*=\s*"([^"]*)"/) ? $1 : "unknown");
+            $ret = getVal($l, "config");
             ZWave_mfsAddClasses($hash, $1);
             # execInits needs the modelId
             setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
