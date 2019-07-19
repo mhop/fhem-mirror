@@ -474,7 +474,10 @@ my %zwave_class = (
                location => '05' },
     parse => { '..770300(.*)' => '"name:".pack("H*", $1)',
                '..770600(.*)' => '"location:".pack("H*", $1)' } },
-  FIRMWARE_UPDATE_MD       => { id => '7a' },
+  FIRMWARE_UPDATE_MD       => { id => '7a',
+    get   => { fwMetaData  => 'ZWave_firmware($hash, "")'  },
+    set   => { fwUpdate    => 'ZWave_firmware($hash, "%s")'},
+    parse => { "..7a(..)(.*)" => 'ZWave_firmwareUpdateParse($hash, $1, $2)' } },
   GROUPING_NAME            => { id => '7b' },
   REMOTE_ASSOCIATION_ACTIVATE=>{id => '7c' },
   REMOTE_ASSOCIATION       => { id => '7d' },
@@ -5334,7 +5337,338 @@ s2Hex($)
   $p = hex($p);
   return ($p > 32767 ? -(65536-$p) : $p);
 }
+#####################################
+# OTA Firmware update 
+sub
+ZWave_firmware($$)
+{
+  my ($hash, $args) = @_;
+  if($args)
+  {
+    return("Firmware update in progress. Please try update again later", "EMPTY") if(defined $hash->{FW_UPDATE_DATA});
+    my $classVersion = $hash->{".vclasses"}{FIRMWARE_UPDATE_MD};
+    return("Firmware update with FIRMWARE_UPDATE_MD classversion > 4 not supported", "EMPTY") if($classVersion > 4);
+    my ($target, $fwFile) = split / /, $args;
+    my $usage = "wrong argumets, need: <FwTarget> <FwFileName>";
+    return ($usage, "EMPTY") if (!$target || !$fwFile);
+    
+    my $fName = "$attr{global}{modpath}/FHEM/firmware/$fwFile";
+    my $l = -s $fName;
+    return "$fName does not exists, or is empty" if(!$l);
+    open(IN, $fName) || return "Cant open $fName: $!";
+    binmode(IN);
+    my $buf;
+    while (1) 
+    {
+        my $part = $l - length($buf);
+        my $success = read(IN, $buf, 100, length($buf));
+        if( not defined $success)
+        {
+          return "Cant read $l bytes from $fName";
+        }
+        last if not $success;
+    }
+    close(IN);
+    my $strbuff = unpack('H*',$buf);
+    my $FwNewChkSum = ZWave_CRC16($strbuff);
+    $hash->{FW_UPDATE_DATA}->{CONTENT} = $strbuff;
+    $hash->{FW_UPDATE_DATA}->{CHK_SUM} = $FwNewChkSum;
+    $hash->{FW_UPDATE_DATA}->{TARGET} = $target;
+    $hash->{FW_UPDATE_DATA}->{FILE_LENGTH} = $l;
+    $hash->{FW_UPDATE_DATA}->{CL} = $hash->{CL};
+    $hash->{FW_UPDATE_DATA}->{STAGE} = "INTERVIEW";
+    
+    Log3 $hash, 3, "ZWave_firmware: Target: $target FILE: $fName LENGTH: $l CRC $FwNewChkSum Version $classVersion";
+    return("Firmware Update Version $classVersion does not support targets != 0", "EMPTY") if (int($target) != 0 && $classVersion < 3);
+  }
+  
+  
+  ZWave_firmwareSendCmd($hash, "01"); #send FIRMWARE_MD_GET
+  if(defined $hash->{FW_UPDATE_DATA})
+  {
+    $zwave_parseHook{"$hash->{nodeIdHex}:..7a.*"} = \&ZWave_firmwareUpdateParse;
+    return(ZWave_WibMsg($hash).", performing firmware update", "EMPTY");
+  }
+  else
+  {
+    return(ZWave_WibMsg($hash).", fetching firmware meta data", "EMPTY");
+  }
+}
 
+sub
+ZWave_firmwareSendCmd($$)
+{
+  my ($hash, $cmd) = @_;
+  my $name = $hash->{NAME};
+  my $id = $hash->{nodeIdHex};
+  my $len = sprintf("%02x", length($cmd)/2+1);
+  my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
+  my $data = "13$id${len}7a$cmd$cmdEf". ZWave_callbackId($hash);
+  ZWave_addToSendStack($hash, "set", $data);
+  #my $data = "0013$id${len}7a$cmd$cmdEf" . ZWave_callbackId($hash);
+  #ZWDongle_Write($hash->{IODev}, "", $data);
+  return;
+}
+
+sub
+ZWave_firmwareUpdateTimeOut($)
+{
+  my ($arg) = @_;
+  my $hash = $arg->{hash};
+  my $msg = "Time out in stage ".$hash->{FW_UPDATE_DATA}->{STAGE};
+  
+  Log3 $hash, 3, "ZWave_firmwareUpdateTimeOut: MSG: $msg";
+  ZWave_firmwareUpdateFinish($hash, $msg)
+}
+
+sub
+ZWave_firmwareUpdateFinish($$)
+{
+  my ($hash, $msg) = @_;
+  return if(!defined $hash->{FW_UPDATE_DATA});
+  
+  $msg = "Finished firmware update: ".$msg;
+  
+  Log3 $hash, 3, "ZWave_firmwareUpdateFinish: MSG: $msg";
+  foreach my $h (keys %zwave_parseHook) {
+    if( $h =~ m/$hash->{nodeIdHex}:..7a.*/) 
+    {
+      delete $zwave_parseHook{$h};
+    }
+  }
+  
+  RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
+  RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{REPORT_TIMER});
+  
+  my $cl = $hash->{FW_UPDATE_DATA}->{CL};
+  delete($hash->{FW_UPDATE_DATA});
+  
+  asyncOutput($cl, $msg);
+}
+
+sub
+ZWave_firmwareUpdateSendSingleReport($)
+{
+  my ($arg) = @_;
+  my $hash = $arg->{hash};
+  my $reportsToSend = $hash->{FW_UPDATE_DATA}->{REPORTS_TO_SEND};
+  if($reportsToSend > 0)
+  {
+    my $classVersion = $hash->{".vclasses"}{FIRMWARE_UPDATE_MD};
+    my $nextReport = $hash->{FW_UPDATE_DATA}->{NEXT_REPORT};
+    my $reportSize = $hash->{FW_UPDATE_DATA}->{FRAG_SIZE};
+    my $l = $hash->{FW_UPDATE_DATA}->{FILE_LENGTH};
+    my $off = ($nextReport - 1) * hex($reportSize);
+    my $dataLength = $l - $off > hex($reportSize) ? hex($reportSize) : $l - $off;
+    my $last = $l - $off <= hex($reportSize) ? 1 : 0;
+    my $dataToSend = substr($hash->{FW_UPDATE_DATA}->{CONTENT}, $off * 2, $dataLength * 2); #one byte -> two positions in string
+    my $nextReport = $nextReport | $last << 15;
+    my $reportCmd = "06".sprintf("%04x",$nextReport).sprintf("%s",$dataToSend);
+    Log3 $hash, 3, "ZWave_firmwareUpdateSendSingleReport: sending report: $nextReport";
+    if($classVersion >= 2)
+    {
+      $reportCmd .= ZWave_CRC16("7a".$reportCmd);
+    }
+    
+    ZWave_firmwareSendCmd($hash, $reportCmd); #send FIRMWARE_UPDATE_MD_REPORT
+    
+    $hash->{FW_UPDATE_DATA}->{REPORTS_TO_SEND} = $hash->{FW_UPDATE_DATA}->{REPORTS_TO_SEND} - 1;
+    $hash->{FW_UPDATE_DATA}->{NEXT_REPORT} = $nextReport + 1 if( $last == 0);
+    
+    if($hash->{FW_UPDATE_DATA}->{REPORTS_TO_SEND} > 0) #send back to back report 
+    {
+      $hash->{FW_UPDATE_DATA}->{REPORT_TIMER} = { hash => $hash };
+      InternalTimer(gettimeofday() + 0.035, "ZWave_firmwareUpdateSendSingleReport", $hash->{FW_UPDATE_DATA}->{REPORT_TIMER}, 0);
+    }
+    else
+    {
+      $hash->{FW_UPDATE_DATA}->{STAGE} = "GET";
+      $zwave_parseHook{"$hash->{nodeIdHex}:..7a0[4 5 7].*"} = \&ZWave_firmwareUpdateParse;
+      $hash->{FW_UPDATE_DATA}->{TIMER} = { hash => $hash };
+      InternalTimer(gettimeofday() + 50, "ZWave_firmwareUpdateTimeOut", $hash->{FW_UPDATE_DATA}->{TIMER}, 0);
+    }
+  }
+}
+
+sub
+ZWave_firmwareUpdateParse($$$)
+{
+  my ($hash, $cmd, $msg) = @_;
+  my $classVersion = $hash->{".vclasses"}{FIRMWARE_UPDATE_MD};
+  my $ret = "";
+  my $calledByHook = undef;
+  if(!$msg)# called by parse hook
+  {
+    $calledByHook = 1;
+    if($cmd =~ m/....(..)(.*)/)
+    {
+      $cmd = $1;
+      $msg = $2;
+    }
+  }
+  if($calledByHook && !defined $hash->{FW_UPDATE_DATA} && $cmd != '02')
+  {
+    return 0;
+  }
+  
+  if(!defined $calledByHook && $cmd != '02')
+  {
+    return;
+  }
+  
+  Log3 $hash, 3, "ZWave_firmwareUpdateParse: CMD: $cmd MSG: $msg Version: $classVersion";
+  if($cmd == '02') 
+  {
+    $ret  = "fwMd: ";
+    $hash->{FW_UPDATE_DATA}->{MAN_ID} = substr($msg,0, 4) if(defined $hash->{FW_UPDATE_DATA});
+    $ret .= " fwMdManId: ".substr($msg,0, 4); $msg = substr($msg, 4);
+    $hash->{FW_UPDATE_DATA}->{FwId_0} = substr($msg,0, 4) if(defined $hash->{FW_UPDATE_DATA});
+    $ret .= ", fwMdFwId_0: ".substr($msg,0, 4); $msg = substr($msg, 4);
+    $ret .= ", fwMdChkSum_0: ".substr($msg,0, 4); $msg = substr($msg, 4);
+    $hash->{FW_UPDATE_DATA}->{FRAG_SIZE} = "0010" if(defined $hash->{FW_UPDATE_DATA}); #for $classVersion < 3
+    
+    
+    if ($classVersion >= 3)
+    {
+      $ret .= ", fwMdUpgradeable: ".substr($msg,0, 2); $msg = substr($msg, 2);
+      my $NrTarget = substr($msg,0, 2); $msg = substr($msg, 2);
+      $ret .= ", fwMdNrTarg: ".$NrTarget;
+      $hash->{FW_UPDATE_DATA}->{FRAG_SIZE} = substr($msg,0, 4) if(defined $hash->{FW_UPDATE_DATA});
+      $ret .= ", fwMdFrqSize: ".substr($msg,0, 4); $msg = substr($msg, 4);
+      
+      for (my $targ = 1; $targ<=int($NrTarget); $targ++)
+      {
+        my $key = "FwId_".$targ;
+        $hash->{FW_UPDATE_DATA}->{$key} = substr($msg,0, 4) if(defined $hash->{FW_UPDATE_DATA});
+        $ret .= ", fwMdFwId_".$targ.": ".substr($msg,0, 4); $msg = substr($msg, 4);
+      }
+    }
+    if ($classVersion >= 5)
+    {
+      $ret .= ", fwMdHwId: ".substr($msg,0, 2); $msg = substr($msg, 2);
+    }
+    
+    if( defined $calledByHook)
+    {
+      #FIRMWARE_UPDATE_MD_REQUEST_GET
+      Log3 $hash, 3, "ZWave_firmwareUpdateParse: Seding FIRMWARE_UPDATE_MD_REQUEST_GET";
+      $hash->{FW_UPDATE_DATA}->{STAGE} = "REQUEST_GET";
+      my $target = $hash->{FW_UPDATE_DATA}->{TARGET};
+      my $FwIdKey = "FwId_".int($target);
+      ZWave_firmwareUpdateFinish($hash, "Device $hash->{NAME} does not support target $target") if (!$hash->{FW_UPDATE_DATA}->{$FwIdKey});
+      my $requestGetCmd = "03".$hash->{FW_UPDATE_DATA}->{MAN_ID}.$hash->{FW_UPDATE_DATA}->{$FwIdKey}.$hash->{FW_UPDATE_DATA}->{CHK_SUM};
+      if($classVersion >= 3)
+      {
+        $requestGetCmd .= sprintf("%02x", $target).$hash->{FW_UPDATE_DATA}->{FRAG_SIZE};
+      }
+      if($classVersion >= 4)
+      {
+        $requestGetCmd .= '0';   #No activation delay
+      }
+      $zwave_parseHook{"$hash->{nodeIdHex}:..7a04.*"} = \&ZWave_firmwareUpdateParse;
+      ZWave_firmwareSendCmd($hash, $requestGetCmd); #send FIRMWARE_UPDATE_MD_REQUEST_GET
+      $hash->{FW_UPDATE_DATA}->{TIMER} = { hash => $hash };
+      InternalTimer(gettimeofday() + 50, "ZWave_firmwareUpdateTimeOut", $hash->{FW_UPDATE_DATA}->{TIMER}, 0);
+      return 0; #no Veto generate readings
+    }
+    else
+    {
+      return $ret; # retun reading
+    }
+  }
+  elsif($cmd == '04')
+  {
+    #FIRMWARE_UPDATE_MD_REQUEST_GET
+    RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
+    delete($hash->{FW_UPDATE_DATA}->{TIMER});
+    if ($msg =~ m/^(..).*/)
+    {
+      my $status = $1;
+      if($status ne "ff")
+      {
+        ZWave_firmwareUpdateFinish($hash, "FIRMWARE_UPDATE_MD_REQUEST_GET returned with Status: $status" );
+        return 1; #Veto
+      }
+      $hash->{FW_UPDATE_DATA}->{STAGE} = "GET";
+      $zwave_parseHook{"$hash->{nodeIdHex}:..7a0[4 5].*"} = \&ZWave_firmwareUpdateParse;
+      $hash->{FW_UPDATE_DATA}->{TIMER} = { hash => $hash };
+      InternalTimer(gettimeofday() + 50, "ZWave_firmwareUpdateTimeOut", $hash->{FW_UPDATE_DATA}->{TIMER}, 0);
+      return 1; #Veto
+    }
+  }
+  elsif($cmd == '05')
+  {
+    #FIRMWARE_UPDATE_MD_GET
+    RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
+    delete($hash->{FW_UPDATE_DATA}->{TIMER});
+    if($msg =~ m/^(..)(....).*/)
+    {
+      my $reports = int($1);
+      my $reportNr = hex($2) & 0x7FFF;
+      Log3 $hash, 3, "ZWave_firmwareUpdateParse: GET reports: $reports reportNr: $reportNr";
+      $hash->{FW_UPDATE_DATA}->{STAGE} = "SEND_REPORT";
+      $hash->{FW_UPDATE_DATA}->{REPORTS_TO_SEND} = $reports;
+      $hash->{FW_UPDATE_DATA}->{NEXT_REPORT} = $reportNr;
+      $hash->{FW_UPDATE_DATA}->{REPORT_TIMER} = { hash => $hash };
+      ZWave_firmwareUpdateSendSingleReport($hash->{FW_UPDATE_DATA}->{REPORT_TIMER});
+      return 1; #Veto
+    }
+    else
+    {
+      ZWave_firmwareUpdateFinish($hash, "Can not parse FIRMWARE_UPDATE_MD_GET" );
+      return 1; #Veto
+    }
+  }
+  elsif($cmd == '07')
+  {
+    #FIRMWARE_UPDATE_MD_STATUS_REPORT
+    RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
+    delete($hash->{FW_UPDATE_DATA}->{TIMER});
+    if($msg =~ m/^(..)(.*)/)
+    {
+      my $status = $1;
+      my $waiteTimeSec = 0;
+      if($classVersion >= 3)
+      {
+        if($2 =~ m/^(....).*/)
+        {
+          $waiteTimeSec = hex($1);
+        }
+      }
+      if( ($status ne "ff") && ($status ne "fe")&& ($status ne "fd"))
+      {
+        ZWave_firmwareUpdateFinish($hash,"FIRMWARE_UPDATE_MD_STATUS_REPORT returned with Status: $status");
+        return 1; #Veto
+      }
+      if($classVersion >= 4 && ($status eq "fd"))
+      {
+        ZWave_firmwareUpdateFinish($hash,"FIRMWARE_UPDATE_MD_STATUS_REPORT returned with Status: $status"); #activation delay not supported
+        return 1; #Veto
+      }
+      if($status eq "fe")
+      {
+        ZWave_firmwareUpdateFinish($hash,"Firmware Update Done please restart the device");
+        return 1; #Veto
+      }
+
+      my $report = "Firmware Update succsessful.";
+      $report .= sprintf(" The device needs %d seconds to reconfigure. Please do not use it within this time span.",$waiteTimeSec) if( $waiteTimeSec > 0);
+      
+      ZWave_firmwareUpdateFinish($hash, $report);
+      return 1; #Veto
+    }
+    else
+    {
+      ZWave_firmwareUpdateFinish($hash, "Can not parse FIRMWARE_UPDATE_MD_GET" );
+      return 1; #Veto
+    }
+  }
+  else
+  {
+    ZWave_firmwareUpdateFinish($hash, "Can not parse FIRMWARE_UPDATE COMMAND");
+    return 1; #Veto
+  }
+}
 1;
 
 =pod
@@ -5547,6 +5881,12 @@ s2Hex($)
       = outside handles 3 and 2 are active, inside handle 1 is active<br>
     timeoutSeconds: time out for timed operation (in seconds) [1-15239].
     </li>
+
+  <br><br><b>Class FIRMWARE_UPDATE_META_DATA</b>
+  <li>fwUpdate  &lt;decimal Target&gt;  &lt;filename&gt;<br>
+  updates specified firmware target with firmware given in filename. The file is searched within 
+  the in the modpath/FHEM/firmware/ folder. The supported targets can be requested with the get fwMetaData command. 
+  FIRMWARE_UPDATE_MD class version &gt 3 untested, feedback welcome. FIRMWARE_UPDATE_MD class version &gt 4 not supported feedback welcome.</li>
 
   <br><br><b>Class INDICATOR</b>
   <li>indicatorOn<br>
@@ -6105,6 +6445,13 @@ s2Hex($)
   <li>doorLockOperation<br>
     Request the operconfiguration report from the door lock.
     </li>
+    
+    <br><br><b>Class FIRMWARE_UPDATE_META_DATA</b>
+  <li>fwMetaData<br>
+    Interviews the device about the firmware update capabilities. Generates the reading fwMd which holdes, 
+    dependent on the classversion the data about the manufacturer ids, the firmware ids and check sum of the 
+    upgradeable targets. More over it holdes the informationif the device is upgradeable und the maximum paylod of a data packed.
+  </li>
 
   <br><br><b>Class HRV_STATUS</b>
   <li>hrvStatus<br>

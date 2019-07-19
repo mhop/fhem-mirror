@@ -919,7 +919,7 @@ ZWDongle_ReadAnswer($$$)
 
       my $rin = '';
       vec($rin, $hash->{FD}, 1) = 1;
-      my $nfound = select($rin, undef, undef, $to);
+      my ($nfound, $timeleft) = select($rin, undef, undef, $to);
       if($nfound < 0) {
         my $err = $!;
         Log3 $hash, 5, "ZWDongle_ReadAnswer: nfound < 0 / err:$err";
@@ -928,7 +928,7 @@ ZWDongle_ReadAnswer($$$)
         return("ZWDongle_ReadAnswer $arg: $err", undef);
       }
 
-      if($nfound == 0){
+      if($nfound == 0 || $timeleft <= 0){
         Log3 $hash, 5, "ZWDongle_ReadAnswer: select timeout";
         if($hash->{GotCAN}) {
           ZWDongle_ProcessSendStack($hash);
@@ -942,6 +942,8 @@ ZWDongle_ReadAnswer($$$)
         Log3 $hash, 1,"ZWDongle_ReadAnswer: no data read";
         return ("No data", undef);
       }
+      
+      $to = $timeleft;      #set remaining time for select
     }
 
     my $ret = ZWDongle_Read($hash, $buf, $regexp);
