@@ -1,12 +1,14 @@
-###########################################
-# SIGNALduino RSL Modul. Modified version of FHEMduino Modul by Wzut
-#  
+#####################################################################
 # $Id$
+#
+# The file is part of the SIGNALduino project.
+# SIGNALduino RSL Modul. Modified version of FHEMduino Modul by Wzut
+#
+# 2019 - Ralf9 & Sidey79
+#
 # Supports following devices:
 # - Conrad RSL 
-# Ralf9 2019
-# Sidey89 2019
-#####################################
+#####################################################################
 
 package main;
 
@@ -53,8 +55,7 @@ my @RSLCodes;
     $RSLCodes[4][4][0] = 0xA3;  # IV   4 / off All
     $RSLCodes[4][4][1] = 0x93;  # IV   4 / on  All
 
-sub SD_RSL_Initialize($)
-{ 
+sub SD_RSL_Initialize($) { 
   my ($hash) = @_;
 
   $hash->{Match}     = "^P1#[A-Fa-f0-9]+";
@@ -71,21 +72,20 @@ sub SD_RSL_Initialize($)
 
 #####################################
 
-sub SD_RSL_Define($$)
-{ 
-
+sub SD_RSL_Define($$) { 
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> SD_RSL <code (00000-FFFFFF)_channel (1-4)_button (1-4)>"  if(int(@a) != 3);
+  return "wrong syntax: define <name> SD_RSL <code (00000-FFFFFF)_channel (1-4)_button (1-4)> <optional IODEV>"  if(int(@a) < 3 || int(@a) > 5);
 
   my $name = $a[0];
   my ($device,$channel,$button) = split("_",$a[2]);
   if ($channel eq "ALL") {
-	$channel = 4;
-	$button = 4;
+		$channel = 4;
+		$button = 4;
   }
+
   return "wrong syntax: use channel 1 - 4"  if(($channel > 4)); # || ($channel < 1 ));
   return "wrong syntax: use button 1 - 4"  if(($button > 4));   # || ($button < 1));
   return "wrong syntax: use code 000000 - FFFFFF" if (length($device) != 6);
@@ -102,24 +102,26 @@ sub SD_RSL_Define($$)
   $hash->{OnCode}  = sprintf('%02X', ($RSLCodes[$channel][$button][1]));
   $hash->{OffCode} = sprintf('%02X', ($RSLCodes[$channel][$button][0]));
   
-  AssignIoPort($hash);
+	my $iodevice;
+	$iodevice = $a[3] if($a[3]);
+	$iodevice = $modules{SD_RSL}{defptr}{ioname} if (exists $modules{SD_RSL}{defptr}{ioname} && not $iodevice);
+	
+  AssignIoPort($hash, $iodevice);
 
-   return undef;
+  return undef;
 }
 
 ##########################################################
-sub SD_RSL_Set($@)
-{ 
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
+sub SD_RSL_Set($@) { 
+  my ($hash,  $name, @a) = @_;
   my $ioHash = $hash->{IODev};
   my $ioName = $ioHash->{NAME};
-  my $cmd  = $a[1];
+  my $cmd  = $a[0];
   my $c;
   my $message;
   my $device = substr($hash->{DEF},0,6);
 
-  return join(" ", sort keys %sets) if((@a < 2) || ($cmd eq "?"));
+  return join(" ", sort keys %sets) if((@a < 1) || ($cmd eq "?"));
 
   $c = $hash->{OnCode}  if  ($cmd eq "on") ;
   $c = $hash->{OffCode} if  ($cmd eq "off");
@@ -128,7 +130,7 @@ sub SD_RSL_Set($@)
 
   ## Send Message to IODev using IOWrite
   $message = 'P1#0x' . $c . $device . '#R' . AttrVal($name, "RSLrepetition", 6);
-  Log3 $name, 4, "$ioName RSL_SET_sendCommand: $name -> message: $message";
+  Log3 $name, 3, "$ioName RSL_set: $name $cmd -> sendMsg: $message";
   IOWrite($hash, 'sendMsg', $message);
   #my $ret = IOWrite($hash, 'sendMsg', $c."_".AttrVal($name, "RSLrepetition", 6));
   #Log3 $hash, 5, "$name Set return : $ret";
@@ -143,11 +145,11 @@ sub SD_RSL_Set($@)
 }
 
 ###################################################################
-sub RSL_getButtonCode($$)
-{ 
+sub RSL_getButtonCode($$) { 
 
   my ($hash,$msg) = @_;
 
+  my $name = $hash->{NAME};
   my $DeviceCode         = "undef";
   my $receivedButtonCode = "undef";
   my $receivedActionCode = "undef";
@@ -159,35 +161,29 @@ sub RSL_getButtonCode($$)
   ## Groupcode
   $DeviceCode  = substr($msg,2,6);
   $receivedButtonCode  = substr($msg,0,2);
-  Log3 $hash, 4, "SD_RSL Message Devicecode: $DeviceCode Buttoncode: $receivedButtonCode";
+  Log3 $hash, 4, "$name: SD_RSL_getButtonCode Message Devicecode: $DeviceCode Buttoncode: $receivedButtonCode";
 
   if ((hex($receivedButtonCode) & 0xc0) != 0x80) {
-    Log3 $hash, 4, "SD_RSL Message Error: received Buttoncode $receivedButtonCode begins not with bin 10";
+    Log3 $hash, 4, "$name: SD_RSL_getButtonCode Message Error: received Buttoncode $receivedButtonCode begins not with bin 10";
     return "";
   }
   $parsedButtonCode  = hex($receivedButtonCode);  # & 63; # nur 6 Bit bitte
-  Log3 $hash, 5, "SD_RSL Message parsed Devicecode: $DeviceCode Buttoncode: $parsedButtonCode";
+  Log3 $hash, 5, "$name: SD_RSL_getButtonCode Message parsed Devicecode: $DeviceCode Buttoncode: $parsedButtonCode";
 
-  for (my $i=0; $i<5; $i++)
-  {
-    for (my $j=0; $j<5; $j++)
-    {
+  for (my $i=0; $i<5; $i++) {
+    for (my $j=0; $j<5; $j++) {
       next if ($i == 0 && $j != 0);
       next if ($i != 0 && $j == 0);
-      if ($RSLCodes[$i][$j][0] == $parsedButtonCode) 
-        {$action ="off"; $button = $j; $channel = $i;}
-      if ($RSLCodes[$i][$j][1] == $parsedButtonCode) 
-        {$action ="on";  $button = $j; $channel = $i;}
+      if ($RSLCodes[$i][$j][0] == $parsedButtonCode) {$action ="off"; $button = $j; $channel = $i;}
+      if ($RSLCodes[$i][$j][1] == $parsedButtonCode) {$action ="on";  $button = $j; $channel = $i;}
     }
   }
 
-  if (($button >-1) && ($channel > -1)) 
-  {
-    Log3 $hash, 4, "RSL button return/result: ID: $DeviceCode $receivedButtonCode DEVICE: $DeviceCode $channel $button ACTION: $action";
+  if (($button >-1) && ($channel > -1)) {
+    Log3 $hash, 4, "$name: SD_RSL_getButtonCode button return/result: ID: $DeviceCode $receivedButtonCode DEVICE: $DeviceCode $channel $button ACTION: $action";
     if ($channel == 4 && $button == 4) {
       return $DeviceCode."_ALL ".$action;
-    }
-    else {
+    } else {
       return $DeviceCode."_".$channel."_".$button." ".$action;
     }
   }
@@ -196,29 +192,27 @@ sub RSL_getButtonCode($$)
 }
 
 ########################################################
-sub SD_RSL_Parse($$)
-{ 
+sub SD_RSL_Parse($$) { 
 
   my ($hash,$msg) = @_;
   my $name = $hash->{NAME};
-  my (undef ,$rawData) = split("#",$msg);
+	my (undef ,$rawData) = split("#",$msg);
   
-  Log3 $hash, 4, "$name RSL_Parse Message: $rawData";
+  Log3 $hash, 4, "$name: SD_RSL_Parse - Message: $rawData";
 
   my $result = RSL_getButtonCode($hash,$rawData);
 
-  if ($result ne "") 
-  {
+  if ($result ne "") {
     my ($deviceCode,$action) = split m/ /, $result, 2;
 
-    Log3 $hash, 4, "$name Parse: Device: $deviceCode  Action: $action";
-
+    Log3 $hash, 4, "$name: SD_RSL_Parse - Device: $deviceCode  Action: $action";
+		
+		$modules{SD_RSL}{defptr}{ioname} = $name;
     my $def = $modules{SD_RSL}{defptr}{$hash->{NAME} . "." . $deviceCode};
     $def = $modules{SD_RSL}{defptr}{$deviceCode} if(!$def);
 
-    if(!$def) 
-    {
-      Log3 $hash, 3, "$name RSL_Parse UNDEFINED Remotebutton send to define: $deviceCode";
+    if(!$def) {
+      Log3 $hash, 3, "$name: SD_RSL_Parse UNDEFINED Remotebutton send to define: $deviceCode";
       return "UNDEFINED RSL_$deviceCode SD_RSL $deviceCode";
     }
 
@@ -227,13 +221,12 @@ sub SD_RSL_Parse($$)
     my $name = $hash->{NAME};
     return "" if(IsIgnored($name));
 
-    if(!$action) 
-    {
-      Log3 $name, 5, "$name SD_RSL_Parse: can't decode $msg";
+    if(!$action) {
+      Log3 $name, 5, "$name: SD_RSL_Parse - can't decode $msg";
       return "";
     }
 
-    Log3 $name, 5, "$name SD_RSL_Parse actioncode: $action";
+    Log3 $name, 5, "$name: SD_RSL_Parse - actioncode: $action";
 
     #if (($action eq "on")  && ($hash->{STATE} eq "off")){$action = "stop";}
     #if (($action eq "off") && ($hash->{STATE} eq "on")) {$action = "stop";}
@@ -248,15 +241,14 @@ sub SD_RSL_Parse($$)
 }
 
 ########################################################
-sub SD_RSL_Undef($$)
-{ 
+sub SD_RSL_Undef($$) { 
   my ($hash, $name) = @_;
-  delete($modules{SIGNALduino_RSL}{defptr}{$hash->{DEF}}) if($hash && $hash->{DEF});
+  delete($modules{SD_RSL}{defptr}{$hash->{DEF}}) if($hash && $hash->{DEF});
   return undef;
 }
 
-sub SD_RSL_Attr(@)
-{
+########################################################
+sub SD_RSL_Attr(@) {
   my @a = @_;
 
   # Make possible to use the same code for different logical devices when they
@@ -279,7 +271,7 @@ sub SD_RSL_Attr(@)
 =begin html
 
 <a name="SD_RSL"></a>
-<h3>RSL</h3>
+<h3>SD_RSL</h3>
 The SD_RSL module decrypts and creates Conrad RSL messages sent / received by a SIGNALduino device.<br>
 If autocreate is used, a device &quot;&lt;code&gt;_ALL&quot; like RSL_74A400_ALLis created instead of channel and button = 4.<br>
 
@@ -287,7 +279,7 @@ If autocreate is used, a device &quot;&lt;code&gt;_ALL&quot; like RSL_74A400_ALL
 <a name="SD_RSL_Define"></a>
 <b>Define</b>
 <ul>
-	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;]</code>
+	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code>
 	<br>
 	<br>
 	<code>&lt;name&gt;</code> is any name assigned to the device.
@@ -335,14 +327,14 @@ If autocreate is used, a device &quot;&lt;code&gt;_ALL&quot; like RSL_74A400_ALL
 =begin html_DE
 
 <a name="SD_RSL"></a>
-<h3>RSL</h3>
+<h3>SD_RSL</h3>
 Das SD_RSL-Modul decodiert und erstellt Conrad-RSL-Nachrichten, die vom SIGNALduino gesendet bzw. empfangen werden.<br>
 Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button = 4 &quot;&lt;code&gt;_ALL&quot; angelegt, z.B. RSL_74A400_ALL<br>
 <br>
 <a name="SD_RSL_Define"></a>
 <b>Define</b>
 <ul>
-	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;]</code>
+	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code>
 	<br>
 	<br>
 	<code>&lt;name&gt;</code> ist ein Name, der dem Ger&auml;t zugewiesen ist.
@@ -374,7 +366,7 @@ Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button
 <a name="SD_RSL_Attr"></a>
 <b>Attribute</b>
 <ul>
-    <li><a href="#IODev">IODev</a></li>
+	<li><a href="#IODev">IODev</a></li>
 	<li><a href="#do_not_notify">do_not_notify</a></li>
 	<li><a href="#eventMap">eventMap</a></li>
 	<li><a href="#ignore">ignore</a></li>
