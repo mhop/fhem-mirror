@@ -1,5 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  00_SIGNALduino.pm: v3.4.0
+            Option to reconstruct last bit of transmission in MU and MS signals
+            if there is enough data to detect it.
+            Moved protocol hash into a separate perl module instead of loading
+            a simple textfile into a variable. 
+            Added standard deviceOverview output in detail page #545
+            new internal (Protocol_ID), which will provide the protocolID in
+            logcial modules.
+            Drop-down list for set command config CC1101 (#589)
+            add drop-down list for cc1101_bWidth, cc1101_rAmpl and cc1101_sens
  - change:  49_SSCam: PTZ panel internal code changed 
  - bugfix:  49_SSCam: fix warnings
  - feature: 49_SSCam: support of FTUI Widget with SSCamSTRM, new attributes
