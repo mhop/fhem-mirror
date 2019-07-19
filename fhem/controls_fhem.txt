@@ -1,4 +1,4 @@
-REV 19846
+REV 19852
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -69,7 +69,7 @@ UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
 UPD 2019-01-23_07:45:02 30674 FHEM/10_EQ3BT.pm
-UPD 2019-07-13_07:45:02 977687 FHEM/10_EnOcean.pm
+UPD 2019-07-19_07:45:03 978979 FHEM/10_EnOcean.pm
 UPD 2019-02-03_07:45:02 20753 FHEM/10_FBDECT.pm
 UPD 2018-01-21_07:45:02 70159 FHEM/10_FRM.pm
 UPD 2019-07-05_07:45:02 14540 FHEM/10_FS10.pm
@@ -702,7 +702,7 @@ UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2019-07-18_07:45:03 28212 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2018-08-09_07:45:03 249740 FHEM/lib/openzwave_deviceconfig.xml.gz
 UPD 2019-07-18_07:45:03 104196 FHEM/lib/openzwave_manufacturer_specific.xml
-UPD 2018-07-23_07:45:03 26070 FHEM/lib/zwave_alliancelinks.csv.gz
+UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-03-25_07:45:04 18178 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
@@ -729,8 +729,8 @@ UPD 2019-07-16_07:45:07 4090813 docs/commandref.html
 UPD 2019-07-16_07:45:09 2530976 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-07-18_07:45:10 217386 docs/commandref_modular.html
-UPD 2019-07-18_07:45:11 228326 docs/commandref_modular_DE.html
+UPD 2019-07-19_07:45:10 217386 docs/commandref_modular.html
+UPD 2019-07-19_07:45:11 228326 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
