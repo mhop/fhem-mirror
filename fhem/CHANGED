@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_WS07.pm: new sensor / station Auriol AFW 2 A1, IAN: 297514
  - feature: 90_SIGNALduino_un.pm: support tracing geiger rohrmotor signals
  - change:  00_SIGNALduino.pm: v3.4.0
             Option to reconstruct last bit of transmission in MU and MS signals

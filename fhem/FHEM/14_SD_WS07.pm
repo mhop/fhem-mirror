@@ -21,7 +21,7 @@
 #  flags are 4 bits B 0 C C, where B is the battery status: 1=OK, 0=LOW 
 #  and CC is the channel: 0=CH1, 1=CH2, 2=CH3 
 #  temp is 12 bit signed scaled by 10 
-#  const is always 1111 (0x0F) 
+#  const is always 1111 (0xF) or 1010 (0xA)
 #  humiditiy is 8 bits 
 
 package main;
@@ -37,8 +37,7 @@ sub
 SD_WS07_Initialize($)
 {
   my ($hash) = @_;
-
-  $hash->{Match}     = "^P7#[A-Fa-f0-9]{6}F[A-Fa-f0-9]{2}";    ## pos 7 ist aktuell immer 0xF
+  $hash->{Match}     = "^P7#[A-Fa-f0-9]{6}[AFaf][A-Fa-f0-9]{2,3}";    ## pos 7 ist aktuell immer 0xF oder 0xA
   $hash->{DefFn}     = "SD_WS07_Define";
   $hash->{UndefFn}   = "SD_WS07_Undef";
   $hash->{ParseFn}   = "SD_WS07_Parse";
@@ -104,15 +103,18 @@ SD_WS07_Parse($$)
 
 	Log3 $iohash, 4, "$iohash->{NAME}: SD_WS07_Parse $model ($msg) length: $hlen";
   
-  # 0    4    8  9    12            24    28       36
-  # 0011 0110 1  010  000100000010  1111  00111000 0000  eas8007
-  # 0111 0010 1  010  000010111100  1111  00000000 0000  other device from anfichtn
-  # 1101 0010 0  000  000000010001  1111  00101000       other device from elektron-bbs
-  # 0110 0011 1  000  000011101010  1111  00001010       other device from HomeAuto_User SD_WS07_TH_631
-  # 1110 1011 1  000  000010111000  1111  00000000       other device from HomeAuto_User SD_WS07_T_EB1
-  # 1100 0100 1  000  000100100010  1111  00000000       other device from HomeAuto_User SD_WS07_T_C41
-  # 0110 0100 0  000  000100001110  1111  00101010       hama TS36E from HomeAuto_User - Bat bit identified
-  #     ID   Bat CHN       TMP       ??      HUM
+  # 0   4    8     12            24    28       36
+  # 00110110 1010  000100000010  1111  00111000 0000  eas8007
+  # 01110010 1010  000010111100  1111  00000000 0000  other device from anfichtn
+  # 11010010 0000  000000010001  1111  00101000       other device from elektron-bbs
+  # 01100011 1000  000011101010  1111  00001010       other device from HomeAuto_User SD_WS07_TH_631
+  # 11101011 1000  000010111000  1111  00000000       other device from HomeAuto_User SD_WS07_T_EB1
+  # 11000100 1000  000100100010  1111  00000000       other device from HomeAuto_User SD_WS07_T_C41
+  # 01100100 0000  000100001110  1111  00101010       hama TS36E from HomeAuto_User - Bat bit identified
+  # Long-ID  BCCC  TEMPERATURE    ??   HUMIDITY       B=Battery, C=Channel
+
+  # 10110001 1000  000100011010  1010  00101100       Auriol AFW 2 A1, IAN: 297514
+  # Long-ID  BSCC  TEMPERATURE    ??   HUMIDITY       B=Battery, S=Sendmode, C=Channel
   
 	# Modelliste
 	my %models = (
@@ -125,9 +127,13 @@ SD_WS07_Parse($$)
     
     my $id = substr($rawData,0,2);
     my $bat = substr($bitData,8,1) eq "1" ? "ok" : "low";	# 1 = ok | 0 = low --> identified on hama TS36E
+    my $sendmode;
     my $channel = oct("0b" . substr($bitData,9,3)) + 1;
+    if (substr($bitData,24,4) eq "1010") {
+      $sendmode = substr($bitData,9,1) eq "1" ? "manual" : "auto";	# 1 = manual | 0 = auto --> identified on Auriol AFW 2 A1
+      $channel = oct("0b" . substr($bitData,10,2)) + 1;
+    }
     my $temp = oct("0b" . substr($bitData,12,12));
-    my $bit24bis27 = oct("0b".substr($bitData,24,4));
     my $hum = oct("0b" . substr($bitData,28,8));
 	my $modelkey;
     
@@ -265,6 +271,7 @@ SD_WS07_Parse($$)
     readingsBulkUpdate($hash, "temperature", $temp)  if ($temp ne"");
     readingsBulkUpdate($hash, "humidity", $hum)  if ($models{$modelkey} eq "TH");
     readingsBulkUpdate($hash, "batteryState", $bat);
+    readingsBulkUpdate($hash, "sendmode", $sendmode, 0) if (defined($sendmode));
     readingsBulkUpdate($hash, "channel", $channel) if ($channel ne "");
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
 
@@ -306,6 +313,7 @@ sub SD_WS07_Attr(@)
   <br>
   <b>Known models:</b>
   <ul>
+    <li>Auriol AFW 2 A1, IAN: 297514</li>
     <li>Eurochon EAS800z</li>
     <li>Technoline WS6750/TX70DTH</li>
   </ul>
@@ -387,6 +395,7 @@ sub SD_WS07_Attr(@)
   <br>
   <b>Unterst&uumltzte Modelle:</b>
   <ul>
+    <li>Auriol AFW 2 A1, IAN: 297514</li>
     <li>Eurochon EAS800z</li>
     <li>Technoline WS6750/TX70DTH</li>
     <li>TFA 30320902</li>
