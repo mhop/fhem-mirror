@@ -114,7 +114,7 @@ HUEBridge_Read($)
             HUEDevice_Parse($chash,$obj);
             HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
           } else {
-            Log3 $name, 4, "$name: message for unknow device received: $code";
+            Log3 $name, 4, "$name: message for unknown device received: $code";
           }
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'scene-called' ) {
@@ -1758,7 +1758,7 @@ HUEBridge_dispatch($$$;$)
             if( defined($chash) ) {
               HUEDevice_Parse($chash,$sensors->{$id});
             } else {
-              Log3 $name, 4, "$name: message for unknow sensor received: $code";
+              Log3 $name, 4, "$name: message for unknown sensor received: $code";
             }
           }
         }
@@ -1772,7 +1772,7 @@ HUEBridge_dispatch($$$;$)
             if( defined($chash) ) {
               HUEDevice_Parse($chash,$groups->{$id});
             } else {
-              Log3 $name, 2, "$name: message for unknow group received: $code";
+              Log3 $name, 2, "$name: message for unknown group received: $code";
             }
           }
         }
@@ -1786,7 +1786,8 @@ HUEBridge_dispatch($$$;$)
         my $lights = $json;
         foreach my $id ( keys %{$lights} ) {
           my $code = $name ."-". $id;
-          my $chash = $modules{HUEDevice}{defptr}{$code};
+          my $chash;
+          $chash = $modules{HUEDevice}{defptr}{$code} if( defined($modules{HUEDevice}{defptr}{$code}) );
 
           if( defined($chash) ) {
             if( HUEDevice_Parse($chash,$lights->{$id}) ) {
@@ -1794,7 +1795,7 @@ HUEBridge_dispatch($$$;$)
               $changed .= $chash->{ID};
             }
           } else {
-            Log3 $name, 2, "$name: message for unknow device received: $code";
+            Log3 $name, 2, "$name: message for unknown device received: $code";
           }
         }
         HUEBridge_updateGroups($hash, $changed) if( $changed );
@@ -1803,7 +1804,7 @@ HUEBridge_dispatch($$$;$)
         HUEBridge_Parse($hash,$json);
 
       } else {
-        Log3 $name, 2, "$name: message for unknow type received: $type";
+        Log3 $name, 2, "$name: message for unknown type received: $type";
         Log3 $name, 4, Dumper $json;
 
       }
@@ -1842,7 +1843,7 @@ HUEBridge_dispatch($$$;$)
       }
 
     } else {
-      Log3 $name, 2, "$name: message for unknow type received: $type";
+      Log3 $name, 2, "$name: message for unknown type received: $type";
       Log3 $name, 4, Dumper $json;
 
     }
