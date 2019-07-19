@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_WS.pm: crc calculation fixes and
+            new protocol for Atech wireless weather station 
+            added new sensor TECVANCE TV-4848 
  - change:  14_SD_RSL.pm: changed loglevel from 4 to 3 and improved readability
  - feature: 14_SD_WS07.pm: new sensor / station Auriol AFW 2 A1, IAN: 297514
  - feature: 90_SIGNALduino_un.pm: support tracing geiger rohrmotor signals
