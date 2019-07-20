@@ -555,6 +555,7 @@ sub Log2Syslog_getifdata($$@) {
   my $name                = $hash->{NAME};
   my $socket              = $hash->{SERVERSOCKET};
   my $protocol            = lc(AttrVal($name, "protocol", "udp"));
+  my $eof = 0;
   
   if($hash->{TEMPORARY}) {
       # temporäre Instanz abgelegt durch TcpServer_Accept
@@ -593,16 +594,17 @@ sub Log2Syslog_getifdata($$@) {
 		  }
 		  return ($st,$data,$hash);
       }
-
+      
+      # Child, $hash ist Hash der temporären Instanz
       my $sname   = $hash->{SNAME};
       my $cname   = $hash->{NAME};
-      my $shash   = $defs{$sname};               # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+      my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
       my $waitEOF = AttrVal($sname, "waitForEOF", 0);
 
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF");
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF, SSL: ".$hash->{SSL} );
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
       
 	  $st = ReadingsVal($sname,"state","active");
@@ -622,20 +624,25 @@ sub Log2Syslog_getifdata($$@) {
                   return ($st,undef,$hash); 
 
               } elsif (!$ret) {
-			      # end of file
+			      # EOF or error
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
-                  if(defined($ret)) {
-                      $data = $hash->{BUF};
-                      chomp $data; 
-                      CommandDelete(undef, $cname);                       
-                      return ($st,$data,$hash);
+                  if(!defined($ret)) {
+                      # error
+                      CommandDelete(undef, $cname);
+                      $hash = $shash;
+                      return ($st,undef,$hash);
                   } else {
-                      CommandDelete(undef, $cname); 
-                      return ($st,undef,$hash); 
+                      # EOF
+                      $eof  = 1;
+                      $data = $hash->{BUF};
+                      CommandDelete(undef, $cname);     
                   }
-              
               }
-              $hash->{BUF} .= $buf;
+              
+              if(!$eof) {
+                  $hash->{BUF} .= $buf;
+                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - chars $ret length added to buffer:\n$buf") if($waitEOF && !$hash->{SSL});
+              }
               
               if($hash->{SSL} && $c->can('pending')) {
                   while($c->pending()) {
@@ -644,15 +651,21 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
-              Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$buf");
-              
-              if(!$waitEOF) {
+              if(!$waitEOF || $hash->{SSL}) {
                   $data = $hash->{BUF};
+                  chomp $data;
                   delete $hash->{BUF};
                   $hash = $shash;
-                  chomp $data;
+                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data") if($data);
                   return ($st,$data,$hash);
-              }              
+              } else {
+                  if($eof) {
+                      $hash = $shash;
+                      chomp $data;
+                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data") if($data);
+                      return ($st,$data,$hash);                      
+                  }
+              }             
           }
       }
       
