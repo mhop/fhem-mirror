@@ -610,7 +610,7 @@ sub Log2Syslog_getifdata($$@) {
               my $off = 0;
               $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
-              if(!defined($ret)){
+              if(!defined($ret) && $! == EWOULDBLOCK){
 			      # error
                   $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
                   $hash = $shash;
