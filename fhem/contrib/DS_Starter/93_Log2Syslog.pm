@@ -41,6 +41,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.8.0"  => "20.07.2019  attribute waitForEOF ",
   "5.7.0"  => "20.07.2019  change logging and chomp received data, use raw parse format if automatic mode don't detect a valid format, ".
                            "change getifdata tcp stack error handling (if sysread undef)",
   "5.6.5"  => "19.07.2019  bugfix parse BSD if ID (TAG) is used, function DbLog_splitFn -> Log2Syslog_DbLogSplit, new attribute useParsefilter ",
@@ -278,6 +279,7 @@ sub Log2Syslog_Initialize($) {
 					  "TLS:1,0 ".
 					  "timeout ".
                       "useParsefilter:0,1 ".
+                      "waitForEOF:1,0 ".
                       $readingFnAttributes
                       ;
                       
@@ -579,7 +581,7 @@ sub Log2Syslog_getifdata($$@) {
       }           
   
   } elsif ($protocol =~ /tcp/) {
-      if($hash->{SERVERSOCKET}) {   # Accept and create a child
+      if($hash->{SERVERSOCKET}) {                               # Accept and create a child
           my $nhash = TcpServer_Accept($hash, "Log2Syslog");
           return ($st,$data,$hash) if(!$nhash);
           $nhash->{CD}->blocking(0);
@@ -592,13 +594,15 @@ sub Log2Syslog_getifdata($$@) {
 		  return ($st,$data,$hash);
       }
 
-      my $sname = $hash->{SNAME};
-      my $cname = $hash->{NAME};
-      my $shash = $defs{$sname};               # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+      my $sname   = $hash->{SNAME};
+      my $cname   = $hash->{NAME};
+      my $shash   = $defs{$sname};               # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+      my $waitEOF = AttrVal($sname, "waitForEOF", 0);
 
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");   
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
       
 	  $st = ReadingsVal($sname,"state","active");
@@ -619,10 +623,17 @@ sub Log2Syslog_getifdata($$@) {
 
               } elsif (!$ret) {
 			      # end of file
-                  CommandDelete(undef, $cname); 
-                  $hash = $shash;
-                  Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
-                  return ($st,undef,$hash); 
+                  Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
+                  if(defined($ret)) {
+                      $data = $hash->{BUF};
+                      chomp $data;
+                      Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data"); 
+                      CommandDelete(undef, $cname);                       
+                      return ($st,$data,$hash);
+                  } else {
+                      CommandDelete(undef, $cname); 
+                      return ($st,undef,$hash); 
+                  }
               
               }
               $hash->{BUF} .= $buf;
@@ -634,11 +645,14 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
-              $data = $hash->{BUF};
-              delete $hash->{BUF};
-              $hash = $shash;
-              chomp $data;
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data");         
+              if(!$waitEOF) {
+                  $data = $hash->{BUF};
+                  delete $hash->{BUF};
+                  $hash = $shash;
+                  chomp $data;
+                  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data");
+                  return ($st,$data,$hash);
+              }              
           }
       }
       
@@ -647,7 +661,7 @@ sub Log2Syslog_getifdata($$@) {
       $data = '';
   }
 
-return ($st,$data,$hash); 
+return ($st,undef,$hash); 
 }
 
 ###############################################################################
