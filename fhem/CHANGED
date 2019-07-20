@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  77_UWZ: remove last InternalTimer Fn parameter
  - feature: 14_SD_WS.pm: crc calculation fixes and
             new protocol for Atech wireless weather station 
             added new sensor TECVANCE TV-4848 
