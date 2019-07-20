@@ -135,7 +135,7 @@ sub _fi2_Count() {
                 ($model =~ m/^<.*>$/) ||
                 ($model eq '?') || 
                 ($model eq '1') || 
-                (length($model) > 80) ||
+#                (length($model) > 80) ||
                 (defined($defs{$key}{'chanNo'})) ||
                 ($name =~ m/^unknown_/) );
 
