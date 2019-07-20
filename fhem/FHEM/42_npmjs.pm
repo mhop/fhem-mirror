@@ -1205,6 +1205,16 @@ m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/i
                     $h->{error}{detail}  = "<pre>$p</pre>";
                 }
             }
+            elsif ( $json =~
+                m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?not.found$/im
+                or $json =~
+m/(?:(\w+?): )?(?:(\w+? \d+): )?(\w+?): [^:]*?No.such.file.or.directory$/im
+              )
+            {
+                $h->{error}{code}    = "E404";
+                $h->{error}{summary} = "Not Found - $3 is not installed";
+                $h->{error}{detail}  = "<pre>$o</pre>";
+            }
             else {
                 $h->{error}{code}    = "E500";
                 $h->{error}{summary} = "Parsing error - " . $@;
@@ -1856,7 +1866,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.1.1",
+  "version": "v1.1.2",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
