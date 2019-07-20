@@ -269,12 +269,21 @@ sub _fi2_zwave($) {
       $mName = $2;
       next;
     }
-    if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
-      if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
+
+    if($l =~ m/<Product config\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)".*type\s*=\s*"([^"]*)"/) {
+      if($mf eq $lastMf && $prod eq lc($4) && $id eq lc($2)) {
         $ret = "$mName $3";
         last;
       }
     }
+
+#    if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
+#      if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
+#        $ret = "$mName $3";
+#        last;
+#      }
+#    }
+
   }
   return $ret if($ret);
   return $zwave;
