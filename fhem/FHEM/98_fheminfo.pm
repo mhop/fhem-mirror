@@ -254,6 +254,8 @@ sub _fi2_findRev() {
 sub _fi2_zwave($) {
   my ($zwave) = @_;
 
+  sub getVal { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" }
+
   my ($mf, $prod, $id) = split(/-/,$zwave);
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
 
@@ -264,25 +266,21 @@ sub _fi2_zwave($) {
 
   my ($lastMf, $mName, $ret) = ("","");
   foreach my $l (@data) {
-    if($l =~ m/<Manufacturer.*id="([^"]*)".*name="([^"]*)"/) {
-      $lastMf = lc($1);
-      $mName = $2;
+
+    if($l =~ m/<Manufacturer/) {
+      $lastMf = lc(getVal($l, "id"));
+      $mName = getVal($l, "name");
       next;
     }
 
-    if($l =~ m/<Product config\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)".*type\s*=\s*"([^"]*)"/) {
-      if($mf eq $lastMf && $prod eq lc($4) && $id eq lc($2)) {
+    if($l =~ m/<Product/) {
+      my $lId = lc(getVal($l, "id"));
+      my $lProd = lc(getVal($l, "type"));
+      if($mf eq $lastMf && $prod eq $lProd && $id eq $lId) {
         $ret = "$mName $3";
         last;
       }
     }
-
-#    if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
-#      if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
-#        $ret = "$mName $3";
-#        last;
-#      }
-#    }
 
   }
   return $ret if($ret);
