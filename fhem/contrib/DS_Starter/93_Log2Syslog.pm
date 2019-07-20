@@ -626,8 +626,7 @@ sub Log2Syslog_getifdata($$@) {
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
                   if(defined($ret)) {
                       $data = $hash->{BUF};
-                      chomp $data;
-                      Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data"); 
+                      chomp $data; 
                       CommandDelete(undef, $cname);                       
                       return ($st,$data,$hash);
                   } else {
@@ -645,12 +644,13 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
+              Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$buf");
+              
               if(!$waitEOF) {
                   $data = $hash->{BUF};
                   delete $hash->{BUF};
                   $hash = $shash;
                   chomp $data;
-                  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data");
                   return ($st,$data,$hash);
               }              
           }
