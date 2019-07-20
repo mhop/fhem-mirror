@@ -131,8 +131,11 @@ sub _fi2_Count() {
 # 7. skip for some special cases found in database
       next if ( ($model =~ /^unkno.*/i) || 
                 ($model =~ /virtual.*/i) || 
+                ($model =~ m/\berror\b/i) ||
+                ($model =~ m/^<.*>$/) ||
                 ($model eq '?') || 
                 ($model eq '1') || 
+                (length($model) > 80) ||
                 (defined($defs{$key}{'chanNo'})) ||
                 ($name =~ m/^unknown_/) );
 
