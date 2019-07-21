@@ -2377,7 +2377,8 @@ ZWave_mfsParse($$$$$)
             ZWave_execInits($hash, 50, $ret);
             return "modelConfig:$ret";
           } else {
-            $ret = "model:$mName $3";
+            my $pName = getVal($l, "name");
+            $ret = "model:$mName $pName";
           }
           last;
         }
