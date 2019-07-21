@@ -287,7 +287,9 @@ sub CUL_HM_updateConfig($){##########################
       $attr{$name}{"event-on-change-reading"} = 
                 AttrVal($name, "event-on-change-reading", ".*")
                 if(!$nAttr);
-      $attr{$name}{model} = "ActionDetector";
+      $attr{$name}{".mId"}  = CUL_HM_getmIdFromModel("0000");
+      $attr{$name}{model}   = $culHmModel->{"0000"}{name};
+      $attr{$name}{subType} = $culHmModel->{"0000"}{st};
       delete $hash->{IODev};
       delete $hash->{helper}{role};
       delete $attr{$name}{$_}
@@ -7856,6 +7858,7 @@ sub CUL_HM_getMId($) {     #in: hash(chn or dev) out:model key (key for %culHmMo
 }
 sub CUL_HM_getmIdFromModel($){ # enter model and receive the corresponding ID
   my $model = shift;
+  $model = ""        if(not defined $model);
   $model = "VIRTUAL" if($model =~ m/^virtual_/);
   return (defined $culHmModel2Id->{$model}     ? $culHmModel2Id->{$model}
         :(defined $culHmModel2Id->{uc($model)} ? $culHmModel2Id->{uc($model)}
