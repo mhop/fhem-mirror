@@ -370,15 +370,21 @@ FW_Read($$)
   }
 
   if($hash->{websocket}) { # 59713
+    # https://tools.ietf.org/html/rfc6455
     my $fin  = (ord(substr($hash->{BUF},0,1)) & 0x80)?1:0;
     my $op   = (ord(substr($hash->{BUF},0,1)) & 0x0F);
     my $mask = (ord(substr($hash->{BUF},1,1)) & 0x80)?1:0;
     my $len  = (ord(substr($hash->{BUF},1,1)) & 0x7F);
     my $i = 2;
 
+    # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
     if($op == 8) {
       TcpServer_Close($hash, 1);
       return;
+
+    } elsif($op == 9) {
+      return addToWritebuffer($hash, chr(0x8A).chr(0)); # Pong
+
     }
 
     if( $len == 126 ) {
@@ -389,17 +395,21 @@ FW_Read($$)
       $i += 8;
     }
 
-    if( $mask ) {
-      $mask = substr($hash->{BUF},$i,4);
+    my @m;
+    if($mask) {
+      @m = unpack("C*", substr($hash->{BUF},$i,4));
       $i += 4;
     }
+    return if(length($hash->{BUF}) < $i+$len);
 
-    #my $data = substr($hash->{BUF}, $i, $len);
-    #for( my $i = 0; $i < $len; $i++ ) {
-    #  substr( $data, $i, 1, substr( $data, $i, 1, ) ^ substr($mask, $i% , 1) );
-    #}
-    #Log 1, "Received via websocket: ".unpack("H*",$data);
+    my $data = substr($hash->{BUF}, $i, $len);
+    if($mask) {
+      my $idx = 0;
+      $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
+    }
     $hash->{BUF} = "";
+    my $ret = FW_fC($data);
+    FW_addToWritebuffer($hash, FW_longpollInfo("JSON", $ret)."\n") if($ret);
     return;
   }
 
