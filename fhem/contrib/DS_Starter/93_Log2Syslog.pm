@@ -41,13 +41,13 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
-  "5.8.0"  => "20.07.2019  attribute waitForEOF ",
+  "5.8.0"  => "20.07.2019  attribute waitForEOF, solution for Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
   "5.7.0"  => "20.07.2019  change logging and chomp received data, use raw parse format if automatic mode don't detect a valid format, ".
                            "change getifdata tcp stack error handling (if sysread undef)",
   "5.6.5"  => "19.07.2019  bugfix parse BSD if ID (TAG) is used, function DbLog_splitFn -> Log2Syslog_DbLogSplit, new attribute useParsefilter ",
   "5.6.4"  => "19.07.2019  minor changes and fixes (max. lenth read to 16384, code && logging) ",
   "5.6.3"  => "18.07.2019  fix state reading if changed disabled attribute ",
-  "5.6.2"  => "17.07.2019  Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
+  "5.6.2"  => "17.07.2019  Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 first try",
   "5.6.1"  => "24.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "5.6.0"  => "23.03.2019  attribute exclErrCond to exclude events from rating as \"error\" ",
   "5.5.0"  => "18.03.2019  prepare for Meta.pm ",
@@ -105,6 +105,9 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.8.0"  => "20.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
+                          "New attribute \"waitForEOF\" to parse not till the sender was sending an EOF signal. An bugfix in ".
+                          "parse BSD was implemented if the ID (TAG) is used. Minor other fixes and changes. ",
   "5.6.0"  => "23.03.2019 New attribute \"exclErrCond\" to exclude events from rating as \"Error\" even though the ".
                           "event contains the text \"Error\". ",
   "5.4.0"  => "17.03.2019 New feature parseProfile = Automatic. The module may detect the message format BSD or IETF automatically in server mode ",
@@ -463,7 +466,7 @@ sub Log2Syslog_Read($@) {
       # IETF-Format   
       $len = $RFC5425len{DL};     
       
-  }
+  } 
   
   if($socket) {
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$reread);
@@ -578,8 +581,9 @@ sub Log2Syslog_getifdata($$@) {
       } else {
           my $dl = length($data);
           chomp $data;
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars length:\n$data");
-      }           
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars ready to parse:\n$data");
+      } 
+      return ($st,$data,$hash);  
   
   } elsif ($protocol =~ /tcp/) {
       if($hash->{SERVERSOCKET}) {                               # Accept and create a child
@@ -600,11 +604,12 @@ sub Log2Syslog_getifdata($$@) {
       my $cname   = $hash->{NAME};
       my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
       my $waitEOF = AttrVal($sname, "waitForEOF", 0);
+      my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
 
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF, SSL: ".$hash->{SSL} );
+      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF, SSL: $tlsv");
       Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
       
 	  $st = ReadingsVal($sname,"state","active");
@@ -641,7 +646,7 @@ sub Log2Syslog_getifdata($$@) {
               
               if(!$eof) {
                   $hash->{BUF} .= $buf;
-                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - chars $ret length added to buffer:\n$buf") if($waitEOF && !$hash->{SSL});
+                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Add $ret chars to buffer:\n$buf") if($waitEOF && !$hash->{SSL});
               }
               
               if($hash->{SSL} && $c->can('pending')) {
@@ -653,16 +658,20 @@ sub Log2Syslog_getifdata($$@) {
               
               if(!$waitEOF || $hash->{SSL}) {
                   $data = $hash->{BUF};
-                  chomp $data;
                   delete $hash->{BUF};
                   $hash = $shash;
-                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data") if($data);
+                  if($data) {
+                      my $dl = length($data); 
+                      chomp $data;
+                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
+                  }
                   return ($st,$data,$hash);
               } else {
                   if($eof) {
                       $hash = $shash;
+                      my $dl = length($data); 
                       chomp $data;
-                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $ret chars length:\n$data") if($data);
+                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars after EOF ready to parse:\n$data") if($data);
                       return ($st,$data,$hash);                      
                   }
               }             
@@ -672,9 +681,10 @@ sub Log2Syslog_getifdata($$@) {
   } else {
       $st = "error - no socket opened";
       $data = '';
+      return ($st,$data,$hash); 
   }
 
-return ($st,undef,$hash); 
+return ($st,undef,$hash);  
 }
 
 ###############################################################################
@@ -2888,6 +2898,21 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </ul>
     <br>
     <br>
+    
+    <ul>
+	<a name="waitForEOF"></a>
+    <li><b>waitForEOF</b><br>
+        <br>
+        No parsing, until the sender has send an EOF signal. If TLS is used, this attribute has no effect. 
+        <br>
+        <br>
+        
+        <b>Note:</b><br>
+        Please use ist with care! It can cause a loop if the sender don't send an EOF at any time.
+    </li>
+    </ul>
+    <br>
+    <br>
 	
   </ul>
   <br>  
@@ -3608,6 +3633,22 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         Verbose-Level entsprechend dem globalen <a href="#attributes">Attribut</a> "verbose".
         Die Ausgaben der Verbose-Level von Log2Syslog-Devices werden ausschließlich im lokalen FHEM Logfile ausgegeben und
 		nicht weitergeleitet um Schleifen zu vermeiden.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="waitForEOF"></a>
+    <li><b>waitForEOF</b><br>
+        <br>
+        Es wird mit dem Parsing gewartet bis der Sender ein EOF Signal gesendet hat. Wird TLS verwendet, hat dieses Attribut 
+        keine Auswirkung. 
+        <br>
+        <br>
+        
+        <b>Hinweis:</b><br>
+        Bitte mit Vorsicht verwenden! Es kann zu einer Schleife führen wenn der Sender kein EOF verwendet.
     </li>
     </ul>
     <br>
