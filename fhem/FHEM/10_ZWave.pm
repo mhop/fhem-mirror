@@ -5463,7 +5463,7 @@ ZWave_firmwareUpdateSendSingleReport($)
     my $dataLength = $l - $off > hex($reportSize) ? hex($reportSize) : $l - $off;
     my $last = $l - $off <= hex($reportSize) ? 1 : 0;
     my $dataToSend = substr($hash->{FW_UPDATE_DATA}->{CONTENT}, $off * 2, $dataLength * 2); #one byte -> two positions in string
-    my $nextReport = $nextReport | $last << 15;
+    $nextReport = $nextReport | $last << 15;
     my $reportCmd = "06".sprintf("%04x",$nextReport).sprintf("%s",$dataToSend);
     Log3 $hash, 3, "ZWave_firmwareUpdateSendSingleReport: sending report: $nextReport";
     if($classVersion >= 2)
