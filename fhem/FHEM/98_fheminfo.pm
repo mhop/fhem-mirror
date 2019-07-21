@@ -277,7 +277,8 @@ sub _fi2_zwave($) {
       my $lId = lc(getVal($l, "id"));
       my $lProd = lc(getVal($l, "type"));
       if($mf eq $lastMf && $prod eq $lProd && $id eq $lId) {
-        $ret = "$mName $3";
+        my $pName = getVal($l, "name");
+        $ret = "$mName $pName";
         last;
       }
     }
