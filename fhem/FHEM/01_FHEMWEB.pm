@@ -409,7 +409,8 @@ FW_Read($$)
     }
     $hash->{BUF} = "";
     my $ret = FW_fC($data);
-    FW_addToWritebuffer($hash, FW_longpollInfo("JSON", $ret)."\n") if($ret);
+    FW_addToWritebuffer($hash,
+                       FW_longpollInfo("JSON", defined($ret) ? $ret : "")."\n");
     return;
   }
 
