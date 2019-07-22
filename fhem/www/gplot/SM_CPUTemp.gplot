@@ -14,7 +14,7 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics
-set yrange [450:1050]
+set yrange [450:1500]
 set y2tics
 set title '<L1>'
 set grid xtics y2tics
