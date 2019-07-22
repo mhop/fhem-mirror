@@ -3099,7 +3099,7 @@ ZWave_ALARM_05_Report($$$$)
     $rt0 = "alarm_type_$t:level $l";
     $rt1 = "alarm_$at:level $l";
   } elsif ($r =~ m/(..)(..)(..)(..)(..)(.*)/) {
-    my ($zid, $ns, $t2, $e, $prop, $opt) = ($1, $2, $3, $4, $5, $6);
+    my ($zid, $ns, $t2, $e, $prop, $opt) = ($1, $2, $3, $4, hex($5), $6);
       
     if ($e ne "00") {
       if (($t ne "00") && ($l eq "00")) {
