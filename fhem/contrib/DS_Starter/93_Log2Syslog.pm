@@ -439,17 +439,18 @@ return;
 sub Log2Syslog_Read($@) {
   my ($hash,$reread) = @_;
   my $socket         = $hash->{SERVERSOCKET};
-  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$evt,$pen);  
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen);  
   
   return if($init_done != 1);
   
   # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
   # vom Sender initiiert wird (Endlosschleife vermeiden)
-  $len = 16384;
+  $mlen = 16384;
+  $len  = 8192;
 
   if($hash->{TEMPORARY}) {
       # temporäre Instanz angelegt durch TcpServer_Accept
-      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$reread);
+      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
   my $name     = $hash->{NAME};
@@ -469,7 +470,7 @@ sub Log2Syslog_Read($@) {
   } 
   
   if($socket) {
-      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$reread);
+      ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
   if($data) {      
@@ -554,11 +555,11 @@ return;
 # 
 ###############################################################################
 sub Log2Syslog_getifdata($$@) {
-  my ($hash,$len,$reread) = @_;
-  my $name                = $hash->{NAME};
-  my $socket              = $hash->{SERVERSOCKET};
-  my $protocol            = lc(AttrVal($name, "protocol", "udp"));
-  my $eof = 0;
+  my ($hash,$len,$mlen,$reread) = @_;
+  my $name                      = $hash->{NAME};
+  my $socket                    = $hash->{SERVERSOCKET};
+  my $protocol                  = lc(AttrVal($name, "protocol", "udp"));
+  my ($eof,$buforun)            = (0,0);
   
   if($hash->{TEMPORARY}) {
       # temporäre Instanz abgelegt durch TcpServer_Accept
@@ -568,68 +569,68 @@ sub Log2Syslog_getifdata($$@) {
   my $st = ReadingsVal($name,"state","active");
   my ($data,$ret);
   
-  if($socket && $protocol =~ /udp/) { 
-      # UDP Datagramm empfangen    
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########        new Syslog UDP Receive       ######### ");
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");      
+  if(!$reread) {
+      if($socket && $protocol =~ /udp/) { 
+          # UDP Datagramm empfangen    
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########        new Syslog UDP Receive       ######### ");
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");      
 
-      unless($socket->recv($data, $len)) {
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
-          $data = '' if(length($data) == 0);
-          $st = "receive error - see logfile";
-      } else {
-          my $dl = length($data);
-          chomp $data;
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars ready to parse:\n$data");
-      } 
-      return ($st,$data,$hash);  
-  
-  } elsif ($protocol =~ /tcp/) {
-      if($hash->{SERVERSOCKET}) {                               # Accept and create a child
-          my $nhash = TcpServer_Accept($hash, "Log2Syslog");
-          return ($st,$data,$hash) if(!$nhash);
-          $nhash->{CD}->blocking(0);
-		  if($nhash->{SSL}) {
-		      my $sslver  = $nhash->{CD}->get_sslversion();
-		      my $sslalgo = $nhash->{CD}->get_fingerprint(); 
-			  readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
-			  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
-		  }
-		  return ($st,$data,$hash);
-      }
+          unless($socket->recv($data, $len)) {
+              Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
+              $data = '' if(length($data) == 0);
+              $st = "receive error - see logfile";
+          } else {
+              my $dl = length($data);
+              chomp $data;
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars ready to parse:\n$data");
+          } 
+          return ($st,$data,$hash);  
       
-      # Child, $hash ist Hash der temporären Instanz
-      my $sname   = $hash->{SNAME};
-      my $cname   = $hash->{NAME};
-      my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
-      my $waitEOF = AttrVal($sname, "waitForEOF", 0);
-      my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
+      } elsif ($protocol =~ /tcp/) {
+          if($hash->{SERVERSOCKET}) {                               # Accept and create a child
+              my $nhash = TcpServer_Accept($hash, "Log2Syslog");
+              return ($st,$data,$hash) if(!$nhash);
+              $nhash->{CD}->blocking(0);
+              if($nhash->{SSL}) {
+                  my $sslver  = $nhash->{CD}->get_sslversion();
+                  my $sslalgo = $nhash->{CD}->get_fingerprint(); 
+                  readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
+                  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
+              }
+              return ($st,$data,$hash);
+          }
+          
+          # Child, $hash ist Hash der temporären Instanz
+          my $sname   = $hash->{SNAME};
+          my $cname   = $hash->{NAME};
+          my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+          my $waitEOF = AttrVal($sname, "waitForEOF", 0);
+          my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
 
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - wait for EOF: $waitEOF, SSL: $tlsv");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
-      
-	  $st = ReadingsVal($sname,"state","active");
-      my $c = $hash->{CD};
-      if($c) {
-          $shash->{HELPER}{TCPPADDR} = $hash->{PEER};
-          if(!$reread) {
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $waitEOF, SSL: $tlsv");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
+          
+          $st = ReadingsVal($sname,"state","active");
+          my $c = $hash->{CD};
+          if($c) {
+              $shash->{HELPER}{TCPPADDR} = $hash->{PEER};             
               my $buf;  	  		  
               my $off = 0;
               $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
               if(!defined($ret) && $! == EWOULDBLOCK){
-			      # error
+                  # error
                   $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
                   $hash = $shash;
                   Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $sname - ERROR - TCP stack error:  $!");   
                   return ($st,undef,$hash); 
 
               } elsif (!$ret) {
-			      # EOF or error
+                  # EOF or error
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
                   if(!defined($ret)) {
                       # error
@@ -656,13 +657,16 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
-              if(!$waitEOF || $hash->{SSL}) {
+              $buforun = (length($hash->{BUF}) >= $mlen)?1:0;
+              
+              if(!$waitEOF || $hash->{SSL} || $buforun) {
                   $data = $hash->{BUF};
                   delete $hash->{BUF};
                   $hash = $shash;
                   if($data) {
                       my $dl = length($data); 
                       chomp $data;
+                      Log2Syslog_Log3slog ($shash, 2, "Log2Syslog $sname - WARNING - Buffer overrun ! Enforce parse data.") if($buforun);
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
                   }
                   return ($st,$data,$hash);
@@ -676,12 +680,12 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }             
           }
+          
+      } else {
+          $st = "error - no socket opened";
+          $data = '';
+          return ($st,$data,$hash); 
       }
-      
-  } else {
-      $st = "error - no socket opened";
-      $data = '';
-      return ($st,$data,$hash); 
   }
 
 return ($st,undef,$hash);  
@@ -754,8 +758,7 @@ sub Log2Syslog_parsePayload($$) {
 	      $hash->{PROFILE} = "Automatic - detected format: $pp";
 	      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Message format \"$pp\" detected. Try Parsing ... ");
       } else {
-          Log2Syslog_Log3slog($name, 2, "Log2Syslog $name - ERROR - no message format detected by automatic mode. Please specify the correct one by attribute \"parseProfile\" !");
-          Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Use raw profile ... ");
+          Log2Syslog_Log3slog($name, 2, "Log2Syslog $name - WARNING - no message format is detected, \"raw\" is used instead. You can specify the correct profile by attribute \"parseProfile\" !");
       }
   }
   
@@ -2685,7 +2688,9 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
 	<a name="parseProfile"></a>
     <li><b>parseProfile [ Automatic | BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
-        Selection of a parse profile. The attribute is only usable for device type "Collector".
+        Selection of a parse profile. The attribute is only usable for device type "Collector". <br>
+        In mode "Automatic" the module attempts to recognize, if the received data are from type "BSD" or "IEFT".
+        If the type is not recognized, the "raw" format is used instead and a warning is generated in the FHEM log.
         <br><br>
     
         <ul>  
@@ -2908,7 +2913,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         <br>
         
         <b>Note:</b><br>
-        Please use ist with care! It can cause a loop if the sender don't send an EOF at any time.
+        If the sender don't use EOF signal, the data parsing is enforced after exceeding a buffer use threshold
+        and the warning "Buffer overrun" is issued in the FHEM Logfile.
     </li>
     </ul>
     <br>
@@ -3423,7 +3429,9 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
 	<a name="parseProfile"></a>
     <li><b>parseProfile [ Automatic | BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
-        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-Model "Collector" verwendbar.
+        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-Model "Collector" verwendbar. <br>
+        Im Modus "Automatic" versucht das Modul zu erkennen, ob die empfangenen Daten vom Typ "BSD" oder "IEFT" sind.
+        Konnte der Typ nicht erkannt werden, wird das "raw" Format genutzt und im Log eine Warnung generiert.
         <br><br>
     
         <ul>  
@@ -3648,7 +3656,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         <br>
         
         <b>Hinweis:</b><br>
-        Bitte mit Vorsicht verwenden! Es kann zu einer Schleife führen wenn der Sender kein EOF verwendet.
+        Wenn der Sender kein EOF verwendet, wird nach Überschreiten eines Puffer-Schwellenwertes das Parsing der Daten erzwungen
+        und die Warnung "Buffer overrun" im FHEM Log ausgegeben.
     </li>
     </ul>
     <br>
