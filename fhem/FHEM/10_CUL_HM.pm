@@ -547,7 +547,6 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_complConfig($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -9163,7 +9162,7 @@ sub CUL_HM_dimLog($) {# dimmer readings - support virtual chan - unused so far
 # that period.
 # ActionDetector will use the fixed HMid 000000
 sub CUL_HM_ActGetCreateHash() {# get ActionDetector - create if necessary
-  if (!$modules{CUL_HM}{defptr}{"000000"}){
+  if (!$modules{CUL_HM}{defptr}{"000000"} && $init_done){
     CommandDefine(undef,"ActionDetector CUL_HM 000000");
     $attr{ActionDetector}{actCycle} = 600;
     $attr{ActionDetector}{"event-on-change-reading"} = ".*";
