@@ -107,8 +107,9 @@ our %Log2Syslog_vNotesIntern = (
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
   "5.8.1"  => "23.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
-                          "New attribute \"useEOF\" to parse not till the sender was sending an EOF signal. An bugfix in ".
-                          "parse BSD was implemented if the ID (TAG) is used. Minor other fixes and changes. ",
+                          "New attribute \"useEOF\" to parse not till the sender was sending an EOF signal (Collector), or in ".
+                          "case of model Sender, after transmission an EOF signal is send. A bugfix for ".
+                          "parsing BSD if the ID (TAG) is used was implemented. Minor other fixes and changes. ",
   "5.6.0"  => "23.03.2019 New attribute \"exclErrCond\" to exclude events from rating as \"Error\" even though the ".
                           "event contains the text \"Error\". ",
   "5.4.0"  => "17.03.2019 New feature parseProfile = Automatic. The module may detect the message format BSD or IETF automatically in server mode ",

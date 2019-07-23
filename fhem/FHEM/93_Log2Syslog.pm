@@ -41,6 +41,14 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.8.1"  => "23.07.2019  attribute waitForEOF rename to useEOF, useEOF also for type sender ",
+  "5.8.0"  => "20.07.2019  attribute waitForEOF, solution for Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
+  "5.7.0"  => "20.07.2019  change logging and chomp received data, use raw parse format if automatic mode don't detect a valid format, ".
+                           "change getifdata tcp stack error handling (if sysread undef)",
+  "5.6.5"  => "19.07.2019  bugfix parse BSD if ID (TAG) is used, function DbLog_splitFn -> Log2Syslog_DbLogSplit, new attribute useParsefilter ",
+  "5.6.4"  => "19.07.2019  minor changes and fixes (max. lenth read to 16384, code && logging) ",
+  "5.6.3"  => "18.07.2019  fix state reading if changed disabled attribute ",
+  "5.6.2"  => "17.07.2019  Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 first try",
   "5.6.1"  => "24.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "5.6.0"  => "23.03.2019  attribute exclErrCond to exclude events from rating as \"error\" ",
   "5.5.0"  => "18.03.2019  prepare for Meta.pm ",
@@ -98,6 +106,10 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.8.1"  => "23.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
+                          "New attribute \"useEOF\" to parse not till the sender was sending an EOF signal (Collector), or in ".
+                          "case of model Sender, after transmission an EOF signal is send. A bugfix for ".
+                          "parsing BSD if the ID (TAG) is used was implemented. Minor other fixes and changes. ",
   "5.6.0"  => "23.03.2019 New attribute \"exclErrCond\" to exclude events from rating as \"Error\" even though the ".
                           "event contains the text \"Error\". ",
   "5.4.0"  => "17.03.2019 New feature parseProfile = Automatic. The module may detect the message format BSD or IETF automatically in server mode ",
@@ -242,14 +254,15 @@ use vars qw(%Log2Syslog_vHintsExt_de);
 sub Log2Syslog_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}    = "Log2Syslog_Define";
-  $hash->{UndefFn}  = "Log2Syslog_Undef";
-  $hash->{DeleteFn} = "Log2Syslog_Delete";
-  $hash->{SetFn}    = "Log2Syslog_Set";
-  $hash->{GetFn}    = "Log2Syslog_Get";
-  $hash->{AttrFn}   = "Log2Syslog_Attr";
-  $hash->{NotifyFn} = "Log2Syslog_eventlog";
-  $hash->{ReadFn}   = "Log2Syslog_Read";
+  $hash->{DefFn}         = "Log2Syslog_Define";
+  $hash->{UndefFn}       = "Log2Syslog_Undef";
+  $hash->{DeleteFn}      = "Log2Syslog_Delete";
+  $hash->{SetFn}         = "Log2Syslog_Set";
+  $hash->{GetFn}         = "Log2Syslog_Get";
+  $hash->{AttrFn}        = "Log2Syslog_Attr";
+  $hash->{NotifyFn}      = "Log2Syslog_eventlog";
+  $hash->{DbLog_splitFn} = "Log2Syslog_DbLogSplit";
+  $hash->{ReadFn}        = "Log2Syslog_Read";
 
   $hash->{AttrList} = "addStateEvent:1,0 ".
                       "disable:1,0,maintenance ".
@@ -263,13 +276,15 @@ sub Log2Syslog_Initialize($) {
                       "parseFn:textField-long ".
                       "respectSeverity:multiple-strict,Emergency,Alert,Critical,Error,Warning,Notice,Informational,Debug ".
                       "octetCount:1,0 ".
+	                  "protocol:UDP,TCP ".
+	                  "port ".
+					  "rateCalcRerun ".
                       "ssldebug:0,1,2,3 ".
                       "sslCertPrefix ".
 					  "TLS:1,0 ".
 					  "timeout ".
-	                  "protocol:UDP,TCP ".
-	                  "port ".
-					  "rateCalcRerun ".
+                      "useParsefilter:0,1 ".
+                      "useEOF:1,0 ".
                       $readingFnAttributes
                       ;
                       
@@ -426,23 +441,25 @@ return;
 sub Log2Syslog_Read($@) {
   my ($hash,$reread) = @_;
   my $socket         = $hash->{SERVERSOCKET};
-  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$evt,$pen);  
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen);  
   
   return if($init_done != 1);
   
-  my $mlen = 8192;                                               # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
-                                                                 # vom Sender initiiert wird (Endlosschleife vermeiden)
+  # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
+  # vom Sender initiiert wird (Endlosschleife vermeiden)
+  $mlen = 16384;
+  $len  = 8192;
+
   if($hash->{TEMPORARY}) {
       # temporäre Instanz angelegt durch TcpServer_Accept
-      $len = 8192;
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
   my $name     = $hash->{NAME};
   return if(IsDisabled($name) || Log2Syslog_IsMemLock($hash));
   my $pp       = $hash->{PROFILE};
-  my $mevt     = AttrVal($name, "makeEvent", "intern");          # wie soll Reading/Event erstellt werden
-  my $sevevt   = AttrVal($name, "respectSeverity", "");          # welcher Schweregrad soll berücksichtigt werden (default: alle)
+  my $mevt     = AttrVal($name, "makeEvent", "intern");                   # wie soll Reading/Event erstellt werden
+  my $sevevt   = AttrVal($name, "respectSeverity", "");                   # welcher Schweregrad soll berücksichtigt werden (default: alle)
     
   if($pp =~ /BSD/) {
       # BSD-Format
@@ -452,16 +469,13 @@ sub Log2Syslog_Read($@) {
       # IETF-Format   
       $len = $RFC5425len{DL};     
       
-  } else {
-      # raw oder User eigenes Format
-      $len = 8192;        
   } 
   
   if($socket) {
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
-  if($data) {
+  if($data) {      
       # parse Payload 
       my (@load,$mlen,$msg,$tail);
       if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
@@ -488,8 +502,8 @@ sub Log2Syslog_Read($@) {
       } else {
           @load = split("[\r\n]",$data);
       }
- 
-      foreach my $line (@load) {          
+      
+      foreach my $line (@load) {       
           ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$line);       
           $hash->{SEQNO}++;
           if($err) {
@@ -500,7 +514,7 @@ sub Log2Syslog_Read($@) {
           } elsif ($ignore) {
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> dataset was ignored by parseFn");
           } else {
-              return if($sevevt && $sevevt !~ m/$sev/);            # Message nicht berücksichtigen
+              return if($sevevt && $sevevt !~ m/$sev/);                                 # Message nicht berücksichtigen
               $st = "active";
               if($mevt =~ /intern/) {
                   # kein Reading, nur Event
@@ -543,73 +557,100 @@ return;
 # 
 ###############################################################################
 sub Log2Syslog_getifdata($$@) {
-  my ($hash,$len,$mlen,$reread)   = @_;
-  my $name     = $hash->{NAME};
-  my $socket   = $hash->{SERVERSOCKET};
-  my $protocol = lc(AttrVal($name, "protocol", "udp"));
+  my ($hash,$len,$mlen,$reread) = @_;
+  my $name                      = $hash->{NAME};
+  my $socket                    = $hash->{SERVERSOCKET};
+  my $protocol                  = lc(AttrVal($name, "protocol", "udp"));
+  my ($eof,$buforun)            = (0,0);
+  
   if($hash->{TEMPORARY}) {
       # temporäre Instanz abgelegt durch TcpServer_Accept
       $protocol = "tcp";
   }
+  
   my $st = ReadingsVal($name,"state","active");
   my ($data,$ret);
   
-  if($socket && $protocol =~ /udp/) { 
-      # UDP Datagramm empfangen
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########        new Syslog UDP Parsing       ######### ");
-      Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");      
-      unless($socket->recv($data, $len)) {
-          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
-          $data = '' if(length($data) == 0);
-          $st = "receive error - see logfile";
-      }              
-  } elsif ($protocol =~ /tcp/) {
-      if($hash->{SERVERSOCKET}) {   # Accept and create a child
-          my $nhash = TcpServer_Accept($hash, "Log2Syslog");
-          return ($st,$data,$hash) if(!$nhash);
-          $nhash->{CD}->blocking(0);
-		  if($nhash->{SSL}) {
-		      my $sslver  = $nhash->{CD}->get_sslversion();
-		      my $sslalgo = $nhash->{CD}->get_fingerprint(); 
-			  readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
-			  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
-		  }
-		  return ($st,$data,$hash);
-      }
+  if(!$reread) {
+      if($socket && $protocol =~ /udp/) { 
+          # UDP Datagramm empfangen    
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########        new Syslog UDP Receive       ######### ");
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - ####################################################### ");      
 
-      my $sname = $hash->{SNAME};
-      my $cname = $hash->{NAME};
-      my $shash = $defs{$sname};    # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz
+          unless($socket->recv($data, $len)) {
+              Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
+              $data = '' if(length($data) == 0);
+              $st = "receive error - see logfile";
+          } else {
+              my $dl = length($data);
+              chomp $data;
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars ready to parse:\n$data");
+          } 
+          return ($st,$data,$hash);  
       
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Parsing       ######### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-      Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
-      $st       = ReadingsVal($sname,"state","active");
-      my $c = $hash->{CD};
-      if($c) {
-          $shash->{HELPER}{TCPPADDR} = $hash->{PEER};
-          if(!$reread) {
+      } elsif ($protocol =~ /tcp/) {
+          if($hash->{SERVERSOCKET}) {                               # Accept and create a child
+              my $nhash = TcpServer_Accept($hash, "Log2Syslog");
+              return ($st,$data,$hash) if(!$nhash);
+              $nhash->{CD}->blocking(0);
+              if($nhash->{SSL}) {
+                  my $sslver  = $nhash->{CD}->get_sslversion();
+                  my $sslalgo = $nhash->{CD}->get_fingerprint(); 
+                  readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
+                  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
+              }
+              return ($st,$data,$hash);
+          }
+          
+          # Child, $hash ist Hash der temporären Instanz
+          my $sname   = $hash->{SNAME};
+          my $cname   = $hash->{NAME};
+          my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+          my $uef     = AttrVal($sname, "useEOF", 0);
+          my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
+
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $uef, SSL: $tlsv");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
+          
+          $st = ReadingsVal($sname,"state","active");
+          my $c = $hash->{CD};
+          if($c) {
+              $shash->{HELPER}{TCPPADDR} = $hash->{PEER};             
               my $buf;  	  		  
               my $off = 0;
               $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
-              if(!defined($ret) && $! == EWOULDBLOCK ){
-			      # error
+              if(!defined($ret) && $! == EWOULDBLOCK){
+                  # error
                   $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
                   $hash = $shash;
+                  Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $sname - ERROR - TCP stack error:  $!");   
                   return ($st,undef,$hash); 
 
               } elsif (!$ret) {
-			      # end of file
-                  CommandDelete(undef, $cname); 
-                  $hash = $shash;
+                  # EOF or error
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
-                  return ($st,undef,$hash); 
-              
+                  if(!defined($ret)) {
+                      # error
+                      CommandDelete(undef, $cname);
+                      $hash = $shash;
+                      return ($st,undef,$hash);
+                  } else {
+                      # EOF
+                      $eof  = 1;
+                      $data = $hash->{BUF};
+                      CommandDelete(undef, $cname);     
+                  }
               }
-              $hash->{BUF} .= $buf;
+              
+              if(!$eof) {
+                  $hash->{BUF} .= $buf;
+                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Add $ret chars to buffer:\n$buf") if($uef && !$hash->{SSL});
+              }
               
               if($hash->{SSL} && $c->can('pending')) {
                   while($c->pending()) {
@@ -618,19 +659,38 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
-              $data = $hash->{BUF};
-              delete $hash->{BUF};
-              $hash = $shash;
-              Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer content:\n$data");         
+              $buforun = (length($hash->{BUF}) >= $mlen)?1:0;
+              
+              if(!$uef || $hash->{SSL} || $buforun) {
+                  $data = $hash->{BUF};
+                  delete $hash->{BUF};
+                  $hash = $shash;
+                  if($data) {
+                      my $dl = length($data); 
+                      chomp $data;
+                      Log2Syslog_Log3slog ($shash, 2, "Log2Syslog $sname - WARNING - Buffer overrun ! Enforce parse data.") if($buforun);
+                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
+                  }
+                  return ($st,$data,$hash);
+              } else {
+                  if($eof) {
+                      $hash = $shash;
+                      my $dl = length($data); 
+                      chomp $data;
+                      Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars after EOF ready to parse:\n$data") if($data);
+                      return ($st,$data,$hash);                      
+                  }
+              }             
           }
+          
+      } else {
+          $st = "error - no socket opened";
+          $data = '';
+          return ($st,$data,$hash); 
       }
-      
-  } else {
-      $st = "error - no socket opened";
-      $data = '';
   }
 
-return ($st,$data,$hash); 
+return ($st,undef,$hash);  
 }
 
 ###############################################################################
@@ -641,11 +701,17 @@ sub Log2Syslog_parsePayload($$) {
   my ($hash,$data) = @_;
   my $name         = $hash->{NAME};
   my $pp           = AttrVal($name, "parseProfile", $hash->{PROFILE});
+  my $pr           = (AttrVal($name, "protocol", "UDP"));
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
   my $ignore       = 0;
   my ($Mmm,$dd,$delimiter,$day,$ietf,$err,$pl,$tail);
+  
+  $data = Log2Syslog_parsefilter($data) if(AttrVal($name,"useParsefilter",0));       # Steuerzeichen werden entfernt (Achtung auch CR/LF)
+
+  Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - #########             Parse Message           ######### ");
+  Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parse profile: $pp");
   
   # Hash zur Umwandlung Felder in deren Variablen
   my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
@@ -675,7 +741,7 @@ sub Log2Syslog_parsePayload($$) {
   $year = $year+1900;
   
   if($pp =~ /^Automatic/) {
-      $pp = "unknown";
+      $pp = "raw";
       Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Analyze message format automatically ...");
       $data =~ /^<(?<prival>\d{1,3})>(?<tail>\w{3}).*$/;
       $tail = $+{tail};
@@ -690,12 +756,16 @@ sub Log2Syslog_parsePayload($$) {
           $time   = $+{time};        # must             
           $pp     = "IETF" if($prival && $date && $time);
 	  }
-	  $hash->{PROFILE} = "Automatic - detected format: $pp";
-	  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Message format \"$pp\" detected. Try Parsing ... ") if($pp ne "unknown");
+      if($pp ne "raw") {
+	      $hash->{PROFILE} = "Automatic - detected format: $pp";
+	      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Message format \"$pp\" detected. Try Parsing ... ");
+      } else {
+          Log2Syslog_Log3slog($name, 2, "Log2Syslog $name - WARNING - no message format is detected, \"raw\" is used instead. You can specify the correct profile by attribute \"parseProfile\" !");
+      }
   }
   
   if($pp =~ /raw/) {
-      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - $data");
+      # Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - $data");
       $ts = TimeNow();
       $pl = $data;
   
@@ -703,12 +773,12 @@ sub Log2Syslog_parsePayload($$) {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       # Beispiel data "<$prival>$month $day $time $myhost $id: $otp"
       $data =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/;
-      $prival = $+{prival};        # must
+      $prival = $+{prival};           # must
       $tail   = $+{tail}; 
       $tail =~ /^((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<tail>.*)$/;
-      $Mmm       = $+{month};         # should
-      $dd        = $+{day};           # should
-      $time      = $+{time};          # should
+      $Mmm       = $+{month};         # can
+      $dd        = $+{day};           # can
+      $time      = $+{time};          # can
       $tail      = $+{tail};  
       if( $Mmm && $dd && $time ) {
           my $month = $Log2Syslog_BSDMonth{$Mmm};
@@ -718,13 +788,14 @@ sub Log2Syslog_parsePayload($$) {
       if($ts) {
           # Annahme: wenn Timestamp gesetzt, wird der Rest der Message ebenfalls dem Standard entsprechen
           $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
-          $host = $+{host};          # should 
+          $host = $+{host};          # can 
           $tail = $+{tail};
-          $tail =~ /^(?<id>(\w*))?(?<cont>(\[\w*\]:|:\s).*)$/; 
-          $id   = $+{id};            # should
+		  # ein TAG-Feld (id) ist so aufgebaut->  sshd[27010]:
+          $tail =~ /^((?<id>(\w+\[\w+\])):)?\s(?<cont>(.*))$/; 
+          $id   = $+{id};            # can
           if($id) {
               $id   = substr($id,0, ($RFC3164len{TAG}-1));           # Länge TAG-Feld nach RFC begrenzen
-              $cont = $+{cont};      # should
+              $cont = $+{cont};      # can
           } else {
               $cont = $tail;
           }
@@ -1248,7 +1319,7 @@ sub Log2Syslog_Attr ($$$$) {
     # $name is device name
     # aName and aVal are Attribute name and value
 
-	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent/) {
+	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/) {
          return "\"$aName\" is only valid for model \"Collector\"";
 	}
     
@@ -1263,7 +1334,7 @@ sub Log2Syslog_Attr ($$$$) {
         }
         $do = 0 if($cmd eq "del");
         $st = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"initialized";
-		
+        
         $hash->{HELPER}{MEMLOCK} = 1;
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
 		
@@ -1275,7 +1346,8 @@ sub Log2Syslog_Attr ($$$$) {
 		} else {
 		    Log2Syslog_closesock($hash,1);          # Clientsocket schließen 
             Log2Syslog_downServer($hash);           # Serversocket schließen
-		}         
+		}
+		readingsSingleUpdate ($hash, 'state', $st, 1);        
     }
 	
     if ($aName eq "TLS") {
@@ -1389,6 +1461,21 @@ sub Log2Syslog_Attr ($$$$) {
 return;
 }
 
+###############################################################
+#               Log2Syslog DbLog_splitFn
+###############################################################
+sub Log2Syslog_DbLogSplit($$) {
+  my ($event, $device) = @_;
+  my $devhash = $defs{$device};
+  my ($reading, $value, $unit);
+
+  # sds1.myds.me: <14>Jul 19 21:16:58 SDS1 Connection: User [Heiko] from [SFHEIKO1(192.168.2.205)] via [CIFS(SMB3)] accessed shared folder [photo].
+  ($reading,$value) = split(/: /,$event,2);
+  $unit             = "";
+  
+return ($reading, $value, $unit);
+}
+
 #################################################################################
 #                               Eventlogging
 #################################################################################
@@ -1402,8 +1489,8 @@ sub Log2Syslog_eventlog($$) {
   my ($prival,$data,$sock,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      $st = AttrVal($name, "disable", "0"); 
-	  $st = ($st =~ /maintenance/)?$st:"disabled";
+      # $st = AttrVal($name, "disable", "0"); 
+	  # $st = ($st =~ /maintenance/)?$st:"disabled";
 	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
 	  readingsSingleUpdate($hash, "state", $st, $evt);
 	  $hash->{HELPER}{OLDSTATE} = $st;
@@ -1456,7 +1543,8 @@ sub Log2Syslog_eventlog($$) {
           }
       } 
    
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+      my $uef = AttrVal($name, "useEOF", 0);
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1478,8 +1566,8 @@ sub Log2Syslog_fhemlog($$) {
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      $st = AttrVal($name, "disable", "1"); 
-	  $st = ($st =~ /maintenance/)?$st:"disabled";
+      # $st = AttrVal($name, "disable", "1"); 
+	  # $st = ($st =~ /maintenance/)?$st:"disabled";
 	  my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
 	  readingsSingleUpdate($hash, "state", $st, $evt);
 	  $hash->{HELPER}{OLDSTATE} = $st;
@@ -1520,7 +1608,8 @@ sub Log2Syslog_fhemlog($$) {
               $st = "write error: $err";             
 	      }  
           
-          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+          my $uef = AttrVal($name, "useEOF", 0);
+          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
 	  }
   }
   
@@ -1573,7 +1662,8 @@ sub Log2Syslog_sendTestMsg($$) {
           $st = "write error: $err";              
 	  }  
       
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+      my $uef = AttrVal($name, "useEOF", 0);
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1626,7 +1716,7 @@ sub Log2Syslog_opensock ($;$$) {
   my $host     = $hash->{PEERHOST};
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
-  my $st       = ReadingsVal($name,"state","active");
+  my $st       = "active";
   my $timeout  = AttrVal($name, "timeout", 0.5);
   my $ssldbg   = AttrVal($name, "ssldebug", 0);
   my ($sock,$lo,$lof,$sslver,$sslalgo);
@@ -2079,6 +2169,17 @@ sub Log2Syslog_trim ($) {
  my $str = shift;
  $str =~ s/^\s+|\s+$//g;
 return ($str);
+}
+
+################################################################
+#               Payload for Parsen filtern 
+################################################################
+sub Log2Syslog_parsefilter ($) { 
+  my $s = shift;
+ 
+  $s =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~ßäöüÄÖÜ€°//cd;
+  
+return($s);
 }
 
 #############################################################################################
@@ -2592,7 +2693,9 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
 	<a name="parseProfile"></a>
     <li><b>parseProfile [ Automatic | BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
-        Selection of a parse profile. The attribute is only usable for device type "Collector".
+        Selection of a parse profile. The attribute is only usable for device type "Collector". <br>
+        In mode "Automatic" the module attempts to recognize, if the received data are from type "BSD" or "IEFT".
+        If the type is not recognized, the "raw" format is used instead and a warning is generated in the FHEM log.
         <br><br>
     
         <ul>  
@@ -2783,6 +2886,16 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </ul>
     <br>
     <br>
+    
+    <ul>
+	<a name="useParsefilter"></a>
+    <li><b>useParsefilter</b><br>
+        <br>
+        If activated, all non-ASCII characters are deleted before parsing the message.
+    </li>
+    </ul>
+    <br>
+    <br>
 	
     <ul>
 	<a name="verbose"></a>
@@ -2791,6 +2904,26 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         Please see global <a href="#attributes">attribute</a> "verbose".
         To avoid loops, the output of verbose level of the Log2Syslog-Devices will only be reported into the local FHEM 
         Logfile and not forwarded.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="useEOF"></a>
+    <li><b>useEOF</b><br>
+        <br>
+        <b>Model Sender (protocol TCP): </b><br>
+        After every transmission the TCP-connection will be terminated with signal EOF. <br><br>
+        
+        <b>Model Collector: </b><br>
+        No parsing until the sender has send an EOF signal. If TLS is used, this attribute has no effect. 
+        <br>
+        <br>
+        
+        <b>Note:</b><br>
+        If the sender don't use EOF signal, the data parsing is enforced after exceeding a buffer use threshold
+        and the warning "Buffer overrun" is issued in the FHEM Logfile.
     </li>
     </ul>
     <br>
@@ -3305,7 +3438,9 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
 	<a name="parseProfile"></a>
     <li><b>parseProfile [ Automatic | BSD | IETF | ... | ParseFn | raw ] </b><br>
         <br>
-        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-Model "Collector" verwendbar.
+        Auswahl eines Parsing-Profiles. Das Attribut ist nur für Device-Model "Collector" verwendbar. <br>
+        Im Modus "Automatic" versucht das Modul zu erkennen, ob die empfangenen Daten vom Typ "BSD" oder "IEFT" sind.
+        Konnte der Typ nicht erkannt werden, wird das "raw" Format genutzt und im Log eine Warnung generiert.
         <br><br>
     
         <ul>  
@@ -3497,6 +3632,16 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     </ul>
     <br>
     <br>
+    
+    <ul>
+	<a name="useParsefilter"></a>
+    <li><b>useParsefilter</b><br>
+        <br>
+        Wenn aktiviert, werden vor dem Parsing der Message nicht-ASCII Zeichen entfernt.
+    </li>
+    </ul>
+    <br>
+    <br>
 	
     <ul>
 	<a name="verbose"></a>
@@ -3505,6 +3650,27 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
         Verbose-Level entsprechend dem globalen <a href="#attributes">Attribut</a> "verbose".
         Die Ausgaben der Verbose-Level von Log2Syslog-Devices werden ausschließlich im lokalen FHEM Logfile ausgegeben und
 		nicht weitergeleitet um Schleifen zu vermeiden.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="useEOF"></a>
+    <li><b>useEOF</b><br>
+        <br>
+        <b>Model Sender (Protokoll TCP): </b><br> 
+        Nach jedem Sendevorgang wird eine TCP-Verbindung mit EOF beendet. <br><br>
+        
+        <b>Model Collector: </b><br>      
+        Es wird mit dem Parsing gewartet, bis der Sender ein EOF Signal gesendet hat. Wird TLS verwendet, hat dieses Attribut 
+        keine Auswirkung. 
+        <br>
+        <br>
+        
+        <b>Hinweis:</b><br>
+        Wenn der Sender kein EOF verwendet, wird nach Überschreiten eines Puffer-Schwellenwertes das Parsing der Daten erzwungen
+        und die Warnung "Buffer overrun" im FHEM Log ausgegeben.
     </li>
     </ul>
     <br>
