@@ -95,7 +95,6 @@ consFill()
     consConn.onclose = 
     consConn.onerror = 
     consConn.onmessage = consUpdate;
-    consConn.onopen = function(){FW_wsPing(consConn);};
 
   } else {
     if(consConn) {
