@@ -41,6 +41,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.8.1"  => "23.07.2019  attribute waitForEOF rename to useEOF, useEOF also for type sender ",
   "5.8.0"  => "20.07.2019  attribute waitForEOF, solution for Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
   "5.7.0"  => "20.07.2019  change logging and chomp received data, use raw parse format if automatic mode don't detect a valid format, ".
                            "change getifdata tcp stack error handling (if sysread undef)",
@@ -105,8 +106,8 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
-  "5.8.0"  => "20.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
-                          "New attribute \"waitForEOF\" to parse not till the sender was sending an EOF signal. An bugfix in ".
+  "5.8.1"  => "23.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
+                          "New attribute \"useEOF\" to parse not till the sender was sending an EOF signal. An bugfix in ".
                           "parse BSD was implemented if the ID (TAG) is used. Minor other fixes and changes. ",
   "5.6.0"  => "23.03.2019 New attribute \"exclErrCond\" to exclude events from rating as \"Error\" even though the ".
                           "event contains the text \"Error\". ",
@@ -282,7 +283,7 @@ sub Log2Syslog_Initialize($) {
 					  "TLS:1,0 ".
 					  "timeout ".
                       "useParsefilter:0,1 ".
-                      "waitForEOF:1,0 ".
+                      "useEOF:1,0 ".
                       $readingFnAttributes
                       ;
                       
@@ -605,13 +606,13 @@ sub Log2Syslog_getifdata($$@) {
           my $sname   = $hash->{SNAME};
           my $cname   = $hash->{NAME};
           my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
-          my $waitEOF = AttrVal($sname, "waitForEOF", 0);
+          my $uef     = AttrVal($sname, "useEOF", 0);
           my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
 
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
-          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $waitEOF, SSL: $tlsv");
+          Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $uef, SSL: $tlsv");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
           
           $st = ReadingsVal($sname,"state","active");
@@ -647,7 +648,7 @@ sub Log2Syslog_getifdata($$@) {
               
               if(!$eof) {
                   $hash->{BUF} .= $buf;
-                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Add $ret chars to buffer:\n$buf") if($waitEOF && !$hash->{SSL});
+                  Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Add $ret chars to buffer:\n$buf") if($uef && !$hash->{SSL});
               }
               
               if($hash->{SSL} && $c->can('pending')) {
@@ -659,7 +660,7 @@ sub Log2Syslog_getifdata($$@) {
               
               $buforun = (length($hash->{BUF}) >= $mlen)?1:0;
               
-              if(!$waitEOF || $hash->{SSL} || $buforun) {
+              if(!$uef || $hash->{SSL} || $buforun) {
                   $data = $hash->{BUF};
                   delete $hash->{BUF};
                   $hash = $shash;
@@ -1541,7 +1542,8 @@ sub Log2Syslog_eventlog($$) {
           }
       } 
    
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+      my $uef = AttrVal($name, "useEOF", 0);
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1605,7 +1607,8 @@ sub Log2Syslog_fhemlog($$) {
               $st = "write error: $err";             
 	      }  
           
-          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+          my $uef = AttrVal($name, "useEOF", 0);
+          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
 	  }
   }
   
@@ -1658,7 +1661,8 @@ sub Log2Syslog_sendTestMsg($$) {
           $st = "write error: $err";              
 	  }  
       
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/);
+      my $uef = AttrVal($name, "useEOF", 0);
+      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -2905,10 +2909,14 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
-	<a name="waitForEOF"></a>
-    <li><b>waitForEOF</b><br>
+	<a name="useEOF"></a>
+    <li><b>useEOF</b><br>
         <br>
-        No parsing, until the sender has send an EOF signal. If TLS is used, this attribute has no effect. 
+        <b>Model Sender (protocol TCP): </b><br>
+        After every transmission the TCP-connection will be terminated with signal EOF. <br><br>
+        
+        <b>Model Collector: </b><br>
+        No parsing until the sender has send an EOF signal. If TLS is used, this attribute has no effect. 
         <br>
         <br>
         
@@ -3647,10 +3655,14 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <br>
     
     <ul>
-	<a name="waitForEOF"></a>
-    <li><b>waitForEOF</b><br>
+	<a name="useEOF"></a>
+    <li><b>useEOF</b><br>
         <br>
-        Es wird mit dem Parsing gewartet bis der Sender ein EOF Signal gesendet hat. Wird TLS verwendet, hat dieses Attribut 
+        <b>Model Sender (Protokoll TCP): </b><br> 
+        Nach jedem Sendevorgang wird eine TCP-Verbindung mit EOF beendet. <br><br>
+        
+        <b>Model Collector: </b><br>      
+        Es wird mit dem Parsing gewartet, bis der Sender ein EOF Signal gesendet hat. Wird TLS verwendet, hat dieses Attribut 
         keine Auswirkung. 
         <br>
         <br>
