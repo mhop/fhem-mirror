@@ -414,7 +414,7 @@ Weitere Informationen zu diesem Modul im <a href="https://wiki.fhem.de/wiki/UVR1
   <b>Readings</b>
   <br><br>
   Readings werden entsprechend der Definition in den Attributen angelegt.
-=end html
+=end html_DE
 
 # Ende der Commandref
 =cut
