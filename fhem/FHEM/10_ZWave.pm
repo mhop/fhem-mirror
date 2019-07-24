@@ -2346,7 +2346,7 @@ sub
 ZWave_mfsParse($$$$$)
 {
   my ($hash, $mf, $prod, $id, $config) = @_;
-  sub getVal { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" }
+  my $getVal = sub { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown"};
 
   if($config == 2) {
     setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
@@ -2360,24 +2360,24 @@ ZWave_mfsParse($$$$$)
     my ($lastMf, $mName, $ret) = ("","");
     while(my $l = <FH>) {
       if($l =~ m/<Manufacturer/) {
-        $lastMf = lc(getVal($l, "id"));
-        $mName = getVal($l, "name");
+        $lastMf = lc($getVal->($l, "id"));
+        $mName = $getVal->($l, "name");
         next;
       }
 
       if($l =~ m/<Product/) {
-        my $lId = lc(getVal($l, "id"));
-        my $lProd = lc(getVal($l, "type"));
+        my $lId = lc($getVal->($l, "id"));
+        my $lProd = lc($getVal->($l, "type"));
         if($mf eq $lastMf && $prod eq $lProd && $id eq $lId) {
           if($config) {
-            $ret = getVal($l, "config");
+            $ret = $getVal->($l, "config");
             ZWave_mfsAddClasses($hash, $1);
             # execInits needs the modelId
             setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
             ZWave_execInits($hash, 50, $ret);
             return "modelConfig:$ret";
           } else {
-            my $pName = getVal($l, "name");
+            my $pName = $getVal->($l, "name");
             $ret = "model:$mName $pName";
           }
           last;
