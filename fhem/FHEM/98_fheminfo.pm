@@ -254,7 +254,7 @@ sub _fi2_findRev() {
 sub _fi2_zwave($) {
   my ($zwave) = @_;
 
-  sub getVal { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" }
+  local *getVal = sub { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" };
 
   my ($mf, $prod, $id) = split(/-/,$zwave);
   ($mf, $prod, $id) = (lc($mf), lc($prod), lc($id)); # Just to make it sure
