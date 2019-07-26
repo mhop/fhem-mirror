@@ -141,7 +141,7 @@ MQTT2_CLIENT_doinit($)
         join("", map { pack("n", length($_)).$_.pack("C",0) } # QOS:0
                  split(" ", $s));
     MQTT2_CLIENT_send($hash,
-      pack("C",0x80).
+      pack("C",0x81).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 0, 1);
     $hash->{connecting} = 3;
 
