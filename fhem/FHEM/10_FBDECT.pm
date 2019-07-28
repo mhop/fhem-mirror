@@ -109,7 +109,7 @@ FBDECT_SetHttp($@)
 
   if($cmd =~ m/^(on|off|toggle)$/) {
     IOWrite($hash, ReadingsVal($name,"AIN",0), "setswitch$cmd");
-    my $state = ($cmd eq "toggle" ? ($hash->{state} eq "on" ? "off":"on"):$cmd);
+    my $state = ($cmd eq "toggle" ? ($hash->{STATE} eq "on" ? "off":"on"):$cmd);
     readingsSingleUpdate($hash, "state", $state, 1);
     return undef;
   }
