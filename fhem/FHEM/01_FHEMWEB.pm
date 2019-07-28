@@ -1154,7 +1154,7 @@ FW_dataAttr()
     my ($p, $default) = @_;
     my $val = AttrVal($FW_wname,$p, $default);
     $val =~ s/&/&amp;/g;
-    $val =~ s/'/&quot;/g;
+    $val =~ s/'/&#39;/g;
     return "data-$p='$val' ";
   }
 
