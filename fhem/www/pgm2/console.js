@@ -2,13 +2,14 @@
 FW_version["console.js"] = "$Id$";
 
 var consConn;
+var debug;
 
 var consFilter, oldFilter, consFType="";
 var consLastIndex = 0;
 var withLog = 0;
 var mustScroll = 1;
 
-log("Event monitor is starting");
+log("Event monitor is starting!");
 
 function
 cons_closeConn()
@@ -59,8 +60,15 @@ consUpdate(evt)
   if(new_content == undefined || new_content.length == 0)
     return;
   log("Console Rcvd: "+new_content);
-  if(new_content.indexOf('<') != 0)
-    new_content = new_content.replace(/ /g, "&nbsp;");
+  var ma = new_content.match(/(.*)<br>[\r\n]+$/); // Strange stuff.
+  if(ma) {
+    new_content = ma[1];
+    if(new_content.indexOf('<') != 0) {
+      var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
+      new_content = new_content.replace(/[<> ]/g, function(a){return rTab[a]});
+    }
+    new_content += '<br>';
+  }
   
   $("#console").append(new_content);
     
