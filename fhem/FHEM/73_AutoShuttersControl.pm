@@ -207,7 +207,6 @@ my %userAttrList = (
     'ASC_Time_Down_Late'                         => '-',
     'ASC_PrivacyDownTime_beforNightClose'        => '-',
     'ASC_PrivacyDown_Pos'                        => '-',
-    'ASC_WindowRec'                              => '-',
     'ASC_TempSensor'                             => '-',
     'ASC_Ventilate_Window_Open:on,off'           => '-',
     'ASC_LockOut:soft,hard,off'                  => '-',
@@ -228,7 +227,9 @@ my %userAttrList = (
     'ASC_Shading_WaitingPeriod'                            => '-',
     'ASC_Drive_Offset'                                     => '-',
     'ASC_Drive_OffsetStart'                                => '-',
+    'ASC_WindowRec'                                        => '-',
     'ASC_WindowRec_subType:twostate,threestate'            => '-',
+    'ASC_WindowRec_PosAfterDayClosed:open,lastManual'      => '-',
     'ASC_ShuttersPlace:window,terrace'                     => '-',
     'ASC_Ventilate_Pos:10,20,30,40,50,60,70,80,90,100'     => [ '', 70, 30 ],
     'ASC_ComfortOpen_Pos:0,10,20,30,40,50,60,70,80,90,100' => [ '', 20, 80 ],
@@ -268,7 +269,7 @@ sub ascAPIget($@) {
     my ( $getCommand, $shutterDev, $value ) = @_;
 
     my $getter = 'get' . $getCommand;
-    
+
     if ( defined($value) and $value ) {
         $shutters->setShuttersDev($shutterDev);
         return $shutters->$getter($value);
@@ -1002,10 +1003,18 @@ sub EventProcessingWindowRec($@) {
                     $shutters->setNoOffset(1);
                     $shutters->setDriveCmd( $shutters->getShadingPos );
                 }
-                elsif ( $shutters->getStatus != $shutters->getOpenPos ) {
+                elsif ($shutters->getStatus != $shutters->getOpenPos
+                    or $shutters->getStatus != $shutters->getLastManPos )
+                {
                     $shutters->setLastDrive('window closed at day');
                     $shutters->setNoOffset(1);
-                    $shutters->setDriveCmd( $shutters->getOpenPos );
+                    $shutters->setDriveCmd(
+                        (
+                              $shutters->getVentilatePosAfterDayClosed eq 'open'
+                            ? $shutters->getOpenPos
+                            : $shutters->getLastManPos
+                        )
+                    );
                 }
             }
             elsif (
@@ -3977,7 +3986,7 @@ sub getFreezeStatus {
 sub getShuttersPosCmdValueNegate {
     my $self = shift;
 
-    return ( $shutters->getOpenPos < $shutters->getClosedPos ? 1 : 0 );
+    return ( $shutters->getOpenPos > $shutters->getClosedPos ? 1 : 0 );
 }
 
 sub getQueryShuttersPos
@@ -4654,6 +4663,13 @@ sub getVentilatePos {
     return AttrVal( $self->{shuttersDev}, 'ASC_Ventilate_Pos',
         $userAttrList{'ASC_Ventilate_Pos:10,20,30,40,50,60,70,80,90,100'}
           [ AttrVal( $self->{shuttersDev}, 'ASC', 2 ) ] );
+}
+
+sub getVentilatePosAfterDayClosed {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev}, 'ASC_WindowRec_PosAfterDayClosed',
+        'open' );
 }
 
 sub getClosedPos {
@@ -6445,6 +6461,7 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Up - astro/time/brightness</strong> - bei astro wird Sonnenaufgang berechnet, bei time wird der Wert aus ASC_Time_Up_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Up_Early und ASC_Time_Up_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Up_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Up_Early und ASC_Time_Up_Late geschaut, ob die als Attribut im Moduldevice hinterlegte Down Wert von ASC_brightnessDriveUpDown erreicht wurde. Wenn ja, wird der Rollladen hoch gefahren (default: astro)</li>
             <li><strong>ASC_Ventilate_Pos</strong> -  in 10 Schritten von 0 bis 100 (default: ist abh&auml;ngig vom Attribut <em>ASC</em>)</li>
             <li><strong>ASC_Ventilate_Window_Open</strong> - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist (default: on)</li>
+            <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <li><strong>ASC_WiggleValue</strong> - Wert um welchen sich die Position des Rollladens &auml;ndern soll (default: 5)</li>
             <li><strong>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION]</strong> / Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. (default: '50:20 ClosedPosition')</li>
             <li><strong>ASC_WindowRec</strong> - Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist (default: none)</li>
@@ -6532,7 +6549,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.23",
+  "version": "v0.6.24",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

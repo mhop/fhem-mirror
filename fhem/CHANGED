@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix bug in getShuttersPosCmdValueNegate
+                    add new Attribut ASC_WindowRec_PosAfterDayClosed for
+                    Shutter Pos at day after closed window
  - feature: 73_AutoShuttersControl: fix little commandref typo,
                    expand ascAPIget Fn
  - bugfix:  93_Log2Syslog: fix warning uninitialized value in numeric (>=)
