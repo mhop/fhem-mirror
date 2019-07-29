@@ -397,7 +397,8 @@ set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
-  toggle:noArg CMNDTOPIC/POWER1 2
+  toggle:noArg CMNDTOPIC/POWER1 2\
+  on-for-timer {my $duration = $EVTPART1*10; 'CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
@@ -954,6 +955,46 @@ attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE model A_11a_shelly2_split
+
+# shelly2.5 using original firmware.
+# Based on user 87insane contribution in https://forum.fhem.de/index.php/topic,94060.msg962167.html#msg962167
+# NOTE: a second device will be created for the second channel
+name:A_11a1_shelly25_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shelly2.5 using original firmware. <br>NOTE: a second device will be created for the second channel
+set DEVICE attrTemplate A_10a_shellyplug
+par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
+attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
+  shellies/DEVNAME/relay/0:.* relay_0\
+  shellies/DEVNAME/input/0:.* input_0\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/DEVNAME/relay/0/power:.* relay_0_power\
+  shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
+  shellies/DEVNAME/temperature:.* temperature\
+  shellies/DEVNAME/overtemperature:.* overtemperature\
+  shellies/DEVNAME/longpush/0:.* longpush_0
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
+  shellies/DEVNAME/relay/1:.* relay_1\
+  shellies/DEVNAME/input/1:.* input_1\
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/DEVNAME/relay/1/power:.* relay_1_power\
+  shellies/DEVNAME/relay/1/energy:.* relay_1_energy\
+  shellies/DEVNAME/temperature:.* temperature\
+  shellies/DEVNAME/overtemperature:.* overtemperature\
+  shellies/DEVNAME/longpush/1:.* longpush_1
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
+attr DEVICE_CH2 setList \
+  off:noArg shellies/DEVNAME/relay/1/command off\
+  on:noArg shellies/DEVNAME/relay/1/command on
+attr DEVICE model A_11a1_shelly25_split
 
 # shelly4pro using original firmware
 name:A_14a_shelly4pro_split
