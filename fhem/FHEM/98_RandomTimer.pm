@@ -65,7 +65,7 @@ sub RandomTimer_Initialize($) {
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}    = "RandomTimer_Attr";
   $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond ".
-                       "runonce:0,1 keepDeviceAlive forceStoptimeSameDay ".
+                       "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 ".
                        $readingFnAttributes;
 }
 
@@ -323,8 +323,10 @@ sub RandomTimer_schaltZeitenErmitteln ($$) {
   RandomTimer_stopZeitErmitteln ($hash, $now);
 
   readingsBeginUpdate($hash);
-  readingsBulkUpdate ($hash,  "Startzeit", FmtDateTime($hash->{helper}{startTime}));
-  readingsBulkUpdate ($hash,  "Stoppzeit", FmtDateTime($hash->{helper}{stopTime}));
+#  readingsBulkUpdate ($hash,  "Startzeit", FmtDateTime($hash->{helper}{startTime}));
+#  readingsBulkUpdate ($hash,  "Stoppzeit", FmtDateTime($hash->{helper}{stopTime}));
+  readingsBulkUpdate ($hash,  "StartTime", FmtDateTime($hash->{helper}{startTime}));
+  readingsBulkUpdate ($hash,  "StopTime", FmtDateTime($hash->{helper}{stopTime}));
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
 
 }
@@ -538,7 +540,7 @@ sub RandomTimer_GetHashIndirekt ($$) {
       Defines a device, that imitates the random switch functionality of a timer clock, like a <b>FS20 ZSU</b>. The idea to create it, came from the problem, that is was always a little bit tricky to install a timer clock before holiday: finding the manual, testing it the days before and three different timer clocks with three different manuals - a horror.<br>
       By using it in conjunction with a dummy and a disableCond, I'm able to switch the always defined timer on every weekend easily from all over the world.<br>
       <br>
-      <b>Descrition</b>
+      <b>Description</b>
       <ul>
         a RandomTimer device starts at timespec_start switching device. Every (timeToSwitch seconds +-10%) it trys to switch device on/off. The switching period stops when the next time to switch is greater than timespec_stop.
       </ul>
@@ -605,6 +607,11 @@ sub RandomTimer_GetHashIndirekt ($$) {
       </li>
       <br>
       <li>
+        <code>forceStoptimeSameDay</code><br>
+        When <b>timespec_start</b> is later then <b>timespec_stop</b>, it forces the <b>timespec_stop</b> to end on the current day instead of the next day. See <a href="https://forum.fhem.de/index.php/topic,72988.0.html" title="Random Timer in Verbindung mit Twilight, EIN-Schaltzeit nach AUS-Schaltzeit">forum post</a> for use case.<br>
+      </li>
+      <br>
+      <li>
         <code>keepDeviceAlive</code><br>
         The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached. The <b>keepDeviceAlive</b> attribute  changes the behavior. If set, the device status is not changed when the stoptime is reached.<br>
         <br>
@@ -633,7 +640,7 @@ sub RandomTimer_GetHashIndirekt ($$) {
             attr Timer offCmd set @ off 12
           </code></li>
         </ul>
-        the decision to switch on or off depends on the state of the device and is evaluated by the funktion Value(<device>). Value() must evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a stateFormat:<br>
+        The decision to switch on or off depends on the state of the device and is evaluated by the funktion Value(&lt;device&gt;). Value() must evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a stateFormat:<br>
         <code>
            attr stateFormat EDIPlug_01 {(ReadingsVal("EDIPlug_01","state","nF") =~ m/(ON|on)/i)  ? "on" : "off" }
         </code><br>
@@ -650,8 +657,14 @@ sub RandomTimer_GetHashIndirekt ($$) {
       </li>
       <br>
       <li>
+        <code>runonce</code><br>
+        Deletes the RandomTimer device after <b>timespec_stop</b> is reached.
+        <br>
+      </li>
+      <br>
+      <li>
         <code>switchmode</code><br>
-        Setting the switchmode you can influence the behavior of switching on/off. The parameter has the Format 999/999 and the default ist 800/200. The values are in "per mill". The first  parameter sets the value of the probability that the device will be switched on  when the device is off. The second parameter sets the value of the probability that the device will be switched off when the device is off.<br>
+        Setting the switchmode you can influence the behavior of switching on/off. The parameter has the Format 999/999 and the default ist 800/200. The values are in "per mill". The first parameter sets the value of the probability that the device will be switched on when the device is off. The second parameter sets the value of the probability that the device will be switched off when the device is on.<br>
         <br>
         <b>Examples</b>
         <ul>
