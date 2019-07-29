@@ -3986,7 +3986,7 @@ sub getFreezeStatus {
 sub getShuttersPosCmdValueNegate {
     my $self = shift;
 
-    return ( $shutters->getOpenPos > $shutters->getClosedPos ? 1 : 0 );
+    return ( $shutters->getOpenPos < $shutters->getClosedPos ? 1 : 0 );
 }
 
 sub getQueryShuttersPos
