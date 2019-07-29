@@ -265,7 +265,8 @@ sub cref_findInfo {
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
   foreach $l (@text) {
     @line = split("[ \t][ \t]*", $l,3);
-    $found = ($l =~ m/_$mod/i);
+    $found = ($l =~ m/.._$mod.pm/i);
+#    $found = ($l =~ m/_$mod/i);
     last if ($found);
   }
   if($found) {
