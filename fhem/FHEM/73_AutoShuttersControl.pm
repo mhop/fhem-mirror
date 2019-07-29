@@ -47,10 +47,10 @@ package main;
 use strict;
 use warnings;
 
-sub ascAPIget($;$) {
-    my ( $getCommand, $shutterDev ) = @_;
+sub ascAPIget($@) {
+    my ( $getCommand, $shutterDev, $value ) = @_;
 
-    return AutoShuttersControl_ascAPIget( $getCommand, $shutterDev );
+    return AutoShuttersControl_ascAPIget( $getCommand, $shutterDev, $value );
 }
 
 ## unserer packagename
@@ -160,7 +160,6 @@ BEGIN {
           readingFnAttributes
           AttrVal
           ReadingsVal
-          Value
           IsDisabled
           deviceEvents
           init_done
@@ -265,11 +264,16 @@ my %posSetCmds = (
 my $shutters = new ASC_Shutters();
 my $ascDev   = new ASC_Dev();
 
-sub ascAPIget($;$) {
-    my ( $getCommand, $shutterDev ) = @_;
+sub ascAPIget($@) {
+    my ( $getCommand, $shutterDev, $value ) = @_;
 
     my $getter = 'get' . $getCommand;
-    if ( defined($shutterDev) and $shutterDev ) {
+    
+    if ( defined($value) and $value ) {
+        $shutters->setShuttersDev($shutterDev);
+        return $shutters->$getter($value);
+    }
+    elsif ( defined($shutterDev) and $shutterDev ) {
         $shutters->setShuttersDev($shutterDev);
         return $shutters->$getter;
     }
@@ -1239,7 +1243,7 @@ sub EventProcessingRoommate($@) {
                 $shutters->setLastDrive('roommate absent');
             }
 
-            ShuttersCommandSet( $hash, $shuttersDev, $$posValue );
+            ShuttersCommandSet( $hash, $shuttersDev, $posValue );
         }
     }
 }
@@ -1718,6 +1722,9 @@ sub EventProcessingBrightness($@) {
                     and $ascDev->getSelfDefense eq 'off'
                     or ( $ascDev->getSelfDefense eq 'on'
                         and CheckIfShuttersWindowRecOpen($shuttersDev) == 0 )
+                    or (    $ascDev->getSelfDefense eq 'on'
+                        and CheckIfShuttersWindowRecOpen($shuttersDev) != 0
+                        and $ascDev->getResidentsStatus eq 'home' )
                   )
                 {
                     $shutters->setSunrise(1);
@@ -6017,7 +6024,7 @@ sub getblockAscDrivesAfterManual {
             </li>
             <li><strong>ASC_WindowRec_subType</strong> - Model type of the used <em>ASC_WindowRec</em>:
                 <ul>
-                    <li><strong>twostate</strong> - optical or magnetical sensors with two states: opened or closed</li>#
+                    <li><strong>twostate</strong> - optical or magnetical sensors with two states: opened or closed</li>
                     <li><strong>threestate</strong> - sensors with three states: opened, tilted, closed</li>
                 </ul>
                 Defaults to twostate.
@@ -6206,7 +6213,7 @@ sub getblockAscDrivesAfterManual {
                 <th>Description</th>
             </tr>
             <tr>
-                <td>outTemp</td>
+                <td>OutTemp</td>
                 <td>Current temperature of a configured temperature device, return -100 is no device configured</td>
             </tr>
             <tr>
@@ -6479,6 +6486,15 @@ sub getblockAscDrivesAfterManual {
         <tr><td>PrivacyDownStatus</td><td>Abfrage ob das Rollo aktuell im PrivacyDown Status steht</td></tr>
         <tr><td>OutTemp</td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
     <table/>
+    </p>
+    <u>&Uuml;bersicht f&uuml;r das Rollladen-Device mit Parameter&uuml;bergabe</u>
+    <ul>
+        <code>{ ascAPIget('Getter','ROLLODEVICENAME',VALUE) }</code><br>
+    </ul>
+    <table border="1">
+        <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
+        <tr><td>QueryShuttersPos</td><td>R&uuml;ckgabewert 1 bedeutet das die aktuelle Position des Rollos unterhalb der Valueposition ist. 0 oder nichts bedeutet oberhalb der Valueposition.</td></tr>
+    <table/>
         </p>
         <u>&Uuml;bersicht f&uuml;r das ASC Device</u>
         <ul>
@@ -6486,13 +6502,13 @@ sub getblockAscDrivesAfterManual {
         </ul>
         <table border="1">
             <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
-            <tr><td>outTemp </td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
+            <tr><td>OutTemp </td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
             <tr><td>ResidentsStatus</td><td>aktueller Status des Residents Devices</td></tr>
             <tr><td>ResidentsLastStatus</td><td>letzter Status des Residents Devices</td></tr>
             <tr><td>Azimuth</td><td>Azimut Wert</td></tr>
             <tr><td>Elevation</td><td>Elevation Wert</td></tr>
             <tr><td>ASCenable</td><td>ist die ASC Steuerung global aktiv?</td></tr>
-            <table/>
+        <table/>
 </ul>
 
 =end html_DE
@@ -6516,7 +6532,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.21",
+  "version": "v0.6.23",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

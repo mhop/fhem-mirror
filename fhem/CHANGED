@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 73_AutoShuttersControl: fix little commandref typo,
+                   expand ascAPIget Fn
  - bugfix:  93_Log2Syslog: fix warning uninitialized value in numeric (>=)
  - feature: 93_Log2Syslog: V5.8.1, new attributes and further developments 
             regarding to Forum: topic,75426.msg958836.html#msg958836,
