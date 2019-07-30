@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -6578,7 +6578,7 @@ return;
       attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
-      A new Attribute DbLogExclude will be propagated to all devices if DBLog is used. 
+      A new attribute DbLogExclude will be propagated to all devices if DBLog is used. 
 	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by 
       comma. 
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
@@ -6592,6 +6592,41 @@ return;
     </li>
   </ul>
   <br>
+  
+  <ul>
+     <a name="DbLogValueFn"></a>
+     <li><b>DbLogValueFn</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; DbLogValueFn {}
+	   </code><br>
+       
+       The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used. 
+	   This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of 
+       reading) and $UNIT (unit of reading value). That means the changed values are logged.
+       You also have readonly-access to $EVENT for evaluation in your expression. <br>
+	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
+	   be changed.
+	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
+
+       The device specific function in "DbLogValueFn" is applied to the dataset before the potential existing attribute 
+       "valueFn" in the DbLog device.
+       <br><br>
+	   
+	   <b>Example</b> <br>
+       <pre>
+attr SMA_Energymeter DbLogValueFn
+{ 
+  if ($READING eq "Bezug_WirkP_Kosten_Diff"){
+    $UNIT="Diff-W";
+  }
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
+    $IGNORE=1;
+}
+	   </pre>
+     </ul>
+     </li>
+  </ul>
   
   <ul>
     <a name="disable"></a>
@@ -6892,9 +6927,9 @@ return;
 	   attr &lt;device&gt; valueFn {}
 	   </code><br>
       
-	   Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (value of reading) and 
-	   $UNIT (unit of reading value).
-       It also has readonly-access to $EVENT for evaluation in your expression. <br>
+	   The attribute contains a Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, 
+       $VALUE (value of reading) and $UNIT (unit of reading value).
+       You also have readonly-access to $EVENT for evaluation in your expression. <br>
 	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
 	   be changed.
 	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
@@ -7897,7 +7932,7 @@ attr SMA_Energymeter DbLogValueFn
   if ($READING eq "Bezug_WirkP_Kosten_Diff"){
     $UNIT="Diff-W";
   }
-  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/){
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
     $IGNORE=1;
 }
 	   </pre>
