@@ -260,6 +260,8 @@ my %posSetCmds = (
     KLF200Node => 'pct',
     DUOFERN    => 'position',
     HM485      => 'level',
+    SELVECommeo => 'position',
+    SELVE       => 'position',
 );
 
 my $shutters = new ASC_Shutters();
@@ -285,18 +287,6 @@ sub ascAPIget($@) {
 
 sub Initialize($) {
     my ($hash) = @_;
-
-   #    ### alte Attribute welche entfernt werden
-   #     my $oldAttr =
-   #         'ASC_temperatureSensor '
-   #       . 'ASC_temperatureReading '
-   #       . 'ASC_residentsDevice '
-   #       . 'ASC_residentsDeviceReading '
-   #       . 'ASC_rainSensorDevice '
-   #       . 'ASC_rainSensorReading '
-   #       . 'ASC_rainSensorShuttersClosedPos:0,10,20,30,40,50,60,70,80,90,100 '
-   #       . 'ASC_brightnessMinVal '
-   #       . 'ASC_brightnessMaxVal ';
 
 ## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
     #  und davor mit :: getrennt der eigentliche package Name des Modules
@@ -325,8 +315,6 @@ sub Initialize($) {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
-
-      #       . $oldAttr
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
 
@@ -712,12 +700,6 @@ sub ShuttersDeviceScan($) {
         push( @{ $hash->{helper}{shuttersList} }, $_ )
           ; ## einem Hash wird ein Array zugewiesen welches die Liste der erkannten Rollos beinhaltet
 
-#         delFromDevAttrList( $_, 'ASC_Wind_SensorDevice' )
-#           ;    # temporär muss später gelöscht werden ab Version 0.4.0.10
-#         CommandDeleteReading( undef, $_ . ' ASC_Time_PrivacyDriveUp' )
-#           if ( ReadingsVal( $_, 'ASC_Time_PrivacyDriveUp', 'none' ) ne 'none' )
-#           ;    # temporär muss später gelöscht werden ab Version 0.6.3
-
         $shuttersList = $shuttersList . ',' . $_;
         $shutters->setShuttersDev($_);
         $shutters->setLastManPos( $shutters->getStatus );
@@ -735,17 +717,6 @@ sub ShuttersDeviceScan($) {
         readingsSingleUpdate( $defs{$_}, 'ASC_Enable', 'on', 0 )
           if ( ReadingsVal( $_, 'ASC_Enable', 'none' ) eq 'none' );
     }
-
-    #    ### Temporär und muss später entfernt werden
-    #     CommandAttr( undef,
-    #             $name
-    #           . ' ASC_brightnessDriveUpDown '
-    #           . AttrVal( $name, 'ASC_brightnessMinVal', 500 ) . ':'
-    #           . AttrVal( $name, 'ASC_brightnessMaxVal', 800 ) )
-    #       if ( AttrVal( $name, 'ASC_brightnessMinVal', 'none' ) ne 'none' );
-    #
-    #     CommandDeleteAttr( undef, $name . ' ASC_brightnessMaxVal' )
-    #       if ( AttrVal( $name, 'ASC_brightnessMaxVal', 'none' ) ne 'none' );
 
     $hash->{NOTIFYDEV} = "global," . $name . $shuttersList;
 
@@ -3655,8 +3626,6 @@ sub _setShuttersLastDriveDelayed($) {
 
     readingsSingleUpdate( $shuttersDevHash, 'ASC_ShuttersLastDrive',
         $lastDrive, 1 );
-
-#     print('Ausgabe Funktion wurde aufgerufen - LastDrive: ' . $lastDrive . ', DevHash and Name: ' . $shuttersDevHash . ':: ' . $shuttersDevHash->{NAME} . "\n");
 }
 
 sub ASC_Debug($) {
@@ -5822,29 +5791,6 @@ sub getblockAscDrivesAfterManual {
             </li>
         </ul>
         <br/>
-        <ul>
-            <u><strong>The following attributes are deprecated and should not used in the future:</strong></u>
-            <br /><br />
-            <a name="ASC_temperatureSensor"></a>
-            <li><del>ASC_temperatureSensor</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_temperatureReading"></a>
-            <li><del>ASC_temperatureReading</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_residentsDevice"></a>
-            <li><del>ASC_residentsDevice</del>- <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_residentsDeviceReading"></a>
-            <li><del>ASC_residentsDeviceReading</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_rainSensorDevice"></a>
-            <li><del>ASC_rainSensorDevice</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_rainSensorReading"></a>
-            <li><del>ASC_rainSensorReading</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_rainSensorShuttersClosedPos"></a>
-            <li><del>ASC_rainSensorShuttersClosedPos</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_brightnessMinVal"></a>
-            <li><del>ASC_brightnessMinVal</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-            <a name="ASC_brightnessMaxVal"></a>
-            <li><del>ASC_brightnessMaxVal</del> - <em>Warning! Deprecated! Don't use anymore!</em></li>
-        </ul>
-
         <p>At shutter devices, controlled by <abbr>ASC</abbr>:</p>
         <ul>
             <li><strong>ASC - 0|1|2</strong>
@@ -6045,6 +5991,7 @@ sub getblockAscDrivesAfterManual {
                 </ul>
                 Defaults to twostate.
             </li>
+            <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <blockquote>
                 <p>
                     <strong><u>Shading</u></strong>
@@ -6219,6 +6166,19 @@ sub getblockAscDrivesAfterManual {
         </tr>
     <table/>
     </p>
+    <u>&Uuml;bersicht f&uuml;r das Rollladen-Device mit Parameter&uuml;bergabe</u>
+    <ul>
+        <code>{ ascAPIget('Getter','ROLLODEVICENAME',VALUE) }</code><br>
+    </ul>
+    <table border="1">
+        <tr>
+            <th>Getter</th><th>Erl&auml;uterung</th>
+        </tr>
+        <tr>
+            <td>QueryShuttersPos</td><td>R&uuml;ckgabewert 1 bedeutet das die aktuelle Position des Rollos unterhalb der Valueposition ist. 0 oder nichts bedeutet oberhalb der Valueposition.</td>
+        </tr>
+    <table/>
+    </p>
     <u>Data points of the <abbr>ASC</abbr> device</u>
         <p>
             <code>{ ascAPIget('Getter') }</code><br>
@@ -6378,28 +6338,6 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_windSensor - DEVICE[:READING]</strong> - Sensor f&uuml;r die Windgeschwindigkeit. Kombination aus Device und Reading.</li>
         </ul>
         <br />
-        <ul>
-            <u>Folgende Attribute sind obsolet und sollten nicht mehr verwendet werden.</u>
-            <a name="ASC_temperatureSensor"></a>
-            <li>ASC_temperatureSensor - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_temperatureReading"></a>
-            <li>ASC_temperatureReading - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_residentsDevice"></a>
-            <li>ASC_residentsDevice - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_residentsDeviceReading"></a>
-            <li>ASC_residentsDeviceReading - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_rainSensorDevice"></a>
-            <li>ASC_rainSensorDevice - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_rainSensorReading"></a>
-            <li>ASC_rainSensorReading - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_rainSensorShuttersClosedPos"></a>
-            <li>ASC_rainSensorShuttersClosedPos - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_brightnessMinVal"></a>
-            <li>ASC_brightnessMinVal - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-            <a name="ASC_brightnessMaxVal"></a>
-            <li>ASC_brightnessMaxVal - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-        </ul>
-        <br />
         <u> In den Rolll&auml;den-Ger&auml;ten</u>
         <ul>
             <li><strong>ASC - 0/1/2</strong> 0 = "kein Anlegen der Attribute beim ersten Scan bzw. keine Beachtung eines Fahrbefehles",1 = "Inverse oder Rollo - Bsp.: Rollo oben 0, Rollo unten 100 und der Befehl zum prozentualen Fahren ist position",2 = "Homematic Style - Bsp.: Rollo oben 100, Rollo unten 0 und der Befehl zum prozentualen Fahren ist pct</li>
@@ -6461,9 +6399,9 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Up - astro/time/brightness</strong> - bei astro wird Sonnenaufgang berechnet, bei time wird der Wert aus ASC_Time_Up_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Up_Early und ASC_Time_Up_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Up_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Up_Early und ASC_Time_Up_Late geschaut, ob die als Attribut im Moduldevice hinterlegte Down Wert von ASC_brightnessDriveUpDown erreicht wurde. Wenn ja, wird der Rollladen hoch gefahren (default: astro)</li>
             <li><strong>ASC_Ventilate_Pos</strong> -  in 10 Schritten von 0 bis 100 (default: ist abh&auml;ngig vom Attribut <em>ASC</em>)</li>
             <li><strong>ASC_Ventilate_Window_Open</strong> - auf l&uuml;ften, wenn das Fenster gekippt/ge&ouml;ffnet wird und aktuelle Position unterhalb der L&uuml;ften-Position ist (default: on)</li>
-            <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <li><strong>ASC_WiggleValue</strong> - Wert um welchen sich die Position des Rollladens &auml;ndern soll (default: 5)</li>
             <li><strong>ASC_WindParameters - TRIGGERMAX[:HYSTERESE] [DRIVEPOSITION]</strong> / Angabe von Max Wert ab dem f&uuml;r Wind getriggert werden soll, Hytsrese Wert ab dem der Windschutz aufgehoben werden soll TRIGGERMAX - HYSTERESE / Ist es bei einigen Rolll&auml;den nicht gew&uuml;nscht das gefahren werden soll, so ist der TRIGGERMAX Wert mit -1 an zu geben. (default: '50:20 ClosedPosition')</li>
+            <li><strong>ASC_WindowRec_PosAfterDayClosed</strong> - open,lastManual / auf welche Position soll das Rollo nach dem schlie&szlig;en am Tag fahren. Open Position oder letzte gespeicherte manuelle Position (default: open)</li>
             <li><strong>ASC_WindowRec</strong> - Name des Fensterkontaktes, an dessen Fenster der Rollladen angebracht ist (default: none)</li>
             <li><strong>ASC_WindowRec_subType</strong> - Typ des verwendeten Fensterkontaktes: twostate (optisch oder magnetisch) oder threestate (Drehgriffkontakt) (default: twostate)</li>
         </ul>
@@ -6549,7 +6487,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.24",
+  "version": "v0.6.25",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
