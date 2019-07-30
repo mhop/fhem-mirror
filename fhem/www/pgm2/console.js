@@ -60,16 +60,10 @@ consUpdate(evt)
   if(new_content == undefined || new_content.length == 0)
     return;
   log("Console Rcvd: "+new_content);
-  var ma = new_content.match(/(.*)<br>[\r\n]+$/); // Strange stuff.
-  if(ma) {
-    new_content = ma[1];
-    if(new_content.indexOf('<') != 0) {
-      var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
-      new_content = new_content.replace(/[<> ]/g, function(a){return rTab[a]});
-    }
-    new_content += '<br>';
-  }
-  
+  var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
+  new_content = new_content.replace(/(.*)<br>[\r\n]/g, function(all,p1) {
+    return p1.replace(/[<> ]/g, function(a){return rTab[a]})+"<br>";
+  });
   $("#console").append(new_content);
     
   if(mustScroll)
