@@ -682,10 +682,10 @@ upd_writeFile($$$$)
   <br>
   <br>
   Erneuert die FHEM Installation. D.h. es wird (werden) zuerst die
-  Kontroll-Datei(en) heruntergeladen, und mit der lokalen Version dieser Datei
+  Kontroll-Datei(en) heruntergeladen und mit der lokalen Version dieser Datei
   in moddir/FHEM verglichen. Danach werden alle in der  Kontroll-Datei
   spezifizierten Dateien heruntergeladen, deren Gr&ouml;&szlig;e oder
-  Zeitstempel sich unterscheidet. Wenn dieser Ablauf abgeschlossen ist, wird
+  Zeitstempel sich unterscheiden. Wenn dieser Ablauf abgeschlossen ist, wird
   das globale UPDATE Ereignis ausgel&ouml;st.
   <br>
   Mit den Befehlen add/delete/list/reset kann man die Liste der Kontrolldateien 
@@ -696,16 +696,16 @@ upd_writeFile($$$$)
   <ul>
     <li>Das contrib Verzeichnis wird nicht heruntergeladen.</li>
     <li>Die Dateien werden auf der Webseite einmal am Tag um 07:45 MET/MEST aus
-        der Quell-Verwaltungssystem (SVN) bereitgestellt.</li>
+        dem Quell-Verwaltungssystem (SVN) bereitgestellt.</li>
     <li>Das all Argument ist die Voreinstellung.</li>
     <li>Das force Argument beachtet die lokale controls_fhem.txt Datei
         nicht.</li>
-    <li>Das check Argument zeigt die neueren Dateien an, und den letzten
+    <li>Das check Argument zeigt die neueren Dateien und den letzten
         Abschnitt aus der CHANGED Datei</li>
     <li>checktime zeigt zus&auml;tzlich zu check den update-Zeitstempel der
         neuen Datei, &uuml;blicherweise version Zeitstempel +1 Tag.
         </li>
-    <li>Falls man &lt;fileName&gt; spezifiziert, dann werden nur die Dateien
+    <li>Falls man &lt;fileName&gt; spezifiziert werden nur die Dateien
         heruntergeladen, die diesem Regexp entsprechen.</li>
   </ul>
   Siehe Befehl restore.<br>
@@ -724,10 +724,10 @@ upd_writeFile($$$$)
   <ul>
     <a name="updateInBackground"></a>
     <li>updateInBackground<br>
-        Wenn dieses Attribut gesetzt ist, wird das update Befehl in einem
-        separaten Prozess ausgef&uuml;hrt, und alle Meldungen werden per Event
+        Wenn dieses Attribut gesetzt ist, wird der update Befehl in einem
+        separaten Prozess ausgef&uuml;hrt und alle Meldungen werden per Event
         &uuml;bermittelt. In der telnet Sitzung wird inform, in FHEMWEB wird
-        das Event Monitor aktiviert. Die Voreinstellung ist an, zum
+        der Event Monitor aktiviert. Die Voreinstellung ist an, zum
         Deaktivieren bitte Attribut auf 0 setzen.
         </li><br>
 
@@ -735,7 +735,7 @@ upd_writeFile($$$$)
     <li>updateNoFileCheck<br>
         Wenn dieses Attribut gesetzt ist, wird die Gr&ouml;&szlig;e der bereits
         vorhandenen, lokalen Datei nicht mit der Sollgr&ouml;&szlig;e
-        verglichen. Dieses Attribut wurde nach nicht genau spezifizierten Wnsch
+        verglichen. Dieses Attribut wurde nach nicht genau spezifiziertem Wunsch
         erfahrener FHEM Benutzer eingefuehrt, die Voreinstellung ist 0.
         </li><br>
 
@@ -754,7 +754,7 @@ upd_writeFile($$$$)
     <a name="exclude_from_update"></a>
     <li>exclude_from_update<br>
         Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateinamen
-        (regexp), welche nicht im update ber&uuml;cksichtigt werden.<br>
+        (Regexp), welche nicht beim update ber&uuml;cksichtigt werden.<br>
         Falls der Wert commandref enth&auml;lt, dann wird commandref_join.pl
         nach dem update nicht aufgerufen, d.h. die Gesamtdokumentation ist
         nicht mehr aktuell. Die Moduldokumentation bleibt weiterhin aktuell.
