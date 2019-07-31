@@ -1650,7 +1650,7 @@ sub Unifi_SetAccesspointReadings($) {
         $essid = '';
         $utiliz = '';
         $apRef = $hash->{accespoints}->{$apID};
-        $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
+        $apName = ($apRef->{name}) ? makeReadingName($apRef->{name}) : $apRef->{ip};
 
         if (defined $apRef->{vap_table} && scalar @{$apRef->{vap_table}}) {
             for my $vap (@{$apRef->{vap_table}}) {
