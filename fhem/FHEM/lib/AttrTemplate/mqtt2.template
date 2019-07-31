@@ -600,6 +600,8 @@ name:A_02b_tasmota_2ch_shutter_invert_1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in ROLLO style with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_0, if you need a Homematic-style device pct 100% = open.
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
 set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; SetOption14 1; SetOption81 1; switchmode1 3; switchmode2 3; SaveData 1;
@@ -1250,7 +1252,7 @@ name:X_01_esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x....)/.*/([0-4])?.*:.* "milight_$1_$2"
+attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x....)/.*/([0-8])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
 attr DEVICE setStateList on off
 attr DEVICE stateFormat <a href="http://ip_address" target="_blank">\
