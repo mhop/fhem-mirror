@@ -5767,7 +5767,15 @@ return;
 	
   <b>Preparations</b> <br><br>
   
-  At first you need to setup the database. <br>
+  At first you need to install and setup the database.
+  The installation of database system itself is not described here, please refer to the installation instructions of your 
+  database. <br><br>
+  
+  <b>Note:</b> <br>
+  In case of fresh installed MySQL/MariaDB system don't forget deleting the anonymous "Everyone"-User with an admin-tool if 
+  existing ! 
+  <br><br>  
+  
   Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in 
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>. <br>
   (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts !!) 
@@ -7008,7 +7016,15 @@ attr SMA_Energymeter DbLogValueFn
 	
   <b>Vorbereitungen</b> <br><br>
   
-  Zunächst muss die Datenbank angelegt werden. <br>
+  Zunächst muss die Datenbank installiert und angelegt werden.
+  Die Installation des Datenbanksystems selbst wird hier nicht beschrieben. Dazu bitte nach den Installationsvorgaben des 
+  verwendeten Datenbanksystems verfahren. <br><br>
+  
+  <b>Hinweis:</b> <br>
+  Im Falle eines frisch installierten MySQL/MariaDB Systems bitte nicht vergessen die anonymen "Jeder"-Nutzer mit einem
+  Admin-Tool (z.B. phpMyAdmin) zu löschen falls sie existieren ! 
+  <br><br>
+  
   Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist im 
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>
   enthalten. <br>
