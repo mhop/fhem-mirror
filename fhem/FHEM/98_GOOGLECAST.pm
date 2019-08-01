@@ -164,21 +164,19 @@ sub GOOGLECAST_Initialize($) {
 sub GOOGLECAST_Define($$) {
     my ($hash, $def) = @_;
     my @a = split("[ \t]+", $def);
-    my $name = $a[0];
+    my $name = shift(@a);
+    my $type = shift(@a);
 
     $hash->{STATE} = "initialized";
 
-    if (int(@a) > 3) {
-        return 'GOOGLECAST: Wrong syntax, must be define <name> GOOGLECAST <device name>';
-    } elsif(int(@a) == 3) {
-        Log3 $hash, 3, "GOOGLECAST: $a[2] initializing...";
-        $hash->{CCNAME} = $a[2];
-        Log3 $hash, 5, "GOOGLECAST: $a[2] set readings offline";
-        GOOGLECAST_updateReading($hash, "presence", "offline");
-        GOOGLECAST_updateReading($hash, "state", "offline");
-        Log3 $hash, 5, "GOOGLECAST: $a[2] start initDevice";
-        GOOGLECAST_initDevice($hash);
-    }
+    my $ccname = join(" ", @a);
+    Log3 $hash, 3, "GOOGLECAST: $ccname initializing...";
+    $hash->{CCNAME} = $ccname;
+    Log3 $hash, 5, "GOOGLECAST: $ccname set readings offline";
+    GOOGLECAST_updateReading($hash, "presence", "offline");
+    GOOGLECAST_updateReading($hash, "state", "offline");
+    Log3 $hash, 5, "GOOGLECAST: $ccname start initDevice";
+    GOOGLECAST_initDevice($hash);
 
     return undef;
 }
