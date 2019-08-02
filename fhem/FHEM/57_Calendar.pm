@@ -1938,6 +1938,8 @@ sub Calendar_Get($@) {
     my @filters= ();
     my $next= undef;
     my $count= undef;
+    my $returnFormat= '$text';
+    my @includes= ();
 
     my ($paramerror, $arrayref)= Calendar_simpleParseWords(join(" ", @a));
     return "$name: Parameter parse error: $paramerror" if(defined($paramerror));
@@ -1965,7 +1967,7 @@ sub Calendar_Get($@) {
     } elsif($p =~ /^timeFormat:['"](.+)['"]$/) {
         $timeFormat= $1;
       ### filter
-      } elsif($p =~ /^filter:(.+)$/) {
+    } elsif($p =~ /^filter:(.+)$/) {
         my ($filtererror, $filterarrayref)= Calendar_simpleParseWords($1, ",");
         return "$name: Filter parse error: $filtererror" if(defined($filtererror));
         my @filterspecs= @{$filterarrayref};
@@ -2038,13 +2040,41 @@ sub Calendar_Get($@) {
           }
 
       }
-      } else {
+    } elsif($p =~ /^returnType:(.+)$/) {
+        $returnFormat= $1;
+        if( ($returnFormat eq '$text') ||
+            ($returnFormat eq '@events') ||
+            ($returnFormat eq '@texts')) {
+              # fine
+        } else {
+          return "$name: Illegal return format: $returnFormat";
+        }
+    } elsif($p =~ /^include:(.+)$/) {
+        @includes= split(",", $1);
+        # remove duplicates
+        @includes= keys %{{ map{ $_ => 1 } @includes }};
+        #my %seen = ();
+        #@includes = grep { ! $seen{ $_ }++ } @includes;
+    } else {
         return "$name: Illegal parameter: $p";
       }
     }
 
-    my @texts;
     my @events= Calendar_GetEvents($hash, $t, @filters);
+
+    if($#includes>= 0) {
+      foreach my $calname (@includes) {
+        next if($calname eq $name); # silently ignore inclusion of this calendar
+        my $dev= $defs{$calname};
+        if(defined($dev) && $dev->{TYPE} eq "Calendar") {
+          push @events, Calendar_GetEvents($dev, $t, @filters);
+        } else {
+          Log3 $hash, 2, "$name: device $calname does not exist or is not a Calendar";
+        }
+      }
+      @events= sort { $a->start() <=> $b->start() } @events;
+    }
+
     # special treatment for next
     if(defined($next)) {
         my %uids;  # remember the UIDs
@@ -2058,11 +2088,16 @@ sub Calendar_Get($@) {
         } @events;
     }
 
+    return @events if($returnFormat eq '@events');
+
     my $n= 0;
+    my @texts;
     foreach my $event (@events) {
         push @texts, $event->formatted($format, $timeFormat);
         last if(defined($count) && (++$n>= $count));
     }
+    return @texts  if($returnFormat eq '@texts');
+
     return "" if($#texts<0);
     return join("\n", @texts);
 
@@ -3248,15 +3283,15 @@ sub CalendarEventsAsHtml($;$) {
     </ul>
     <br/>
     - Wildcards in url will be evaluated on every calendar update.<br/>
-    - The evaluation of wildcards maybe disabled by adding literal 'noWildcards' to attribute 'quirks'. 
-    This may be useful in url containing % without marking a wildcard.<br/> 
+    - The evaluation of wildcards maybe disabled by adding literal 'noWildcards' to attribute 'quirks'.
+    This may be useful in url containing % without marking a wildcard.<br/>
     <br/>
-    Note for users of Google Calendar: 
+    Note for users of Google Calendar:
     <ul>
     <li>Wildcards must not be used in Google Calendar url!</li>
     <li>You can literally use the private ICal URL from your Google Calendar.</li>
-    <li>If your Google Calendar URL starts with <code>https://</code> and the perl module IO::Socket::SSL is 
-    not installed on your system, you can replace it by <code>http://</code> if and only if there is 
+    <li>If your Google Calendar URL starts with <code>https://</code> and the perl module IO::Socket::SSL is
+    not installed on your system, you can replace it by <code>http://</code> if and only if there is
     no redirection to the <code>https://</code> URL. Check with your browser first if unsure.</li>
     </ul>
     <br/>
@@ -3300,7 +3335,11 @@ sub CalendarEventsAsHtml($;$) {
     Same as  <code>set &lt;name&gt; update</code><br><br></li>
 
 
-    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]</code><br><br>
+    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;]
+    [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]
+    [include:&lt;names&gt;]
+    [returnType:&lt;returnTypeSpec&gt;]
+    </code><br><br>
     The swiss army knife for displaying calendar events.
     Returns, line by line, information on the calendar events in the calendar &lt;name&gt;
     according to formatting and filtering rules.
@@ -3449,6 +3488,28 @@ sub CalendarEventsAsHtml($;$) {
     <code>get MyCalendar events limit:count=10,from=0,to=+10d</code><br>
     <br><br>
 
+    The <u><code>include</code></u> parameter includes events from other calendars. This is useful for
+    displaying events from several calendars in one combined output. <code>&lt;names&gt;</code> is
+    a comma-separated list of names of calendar devices. The name of the device itself as well as
+    any duplicates are silently ignored. Names of non-existant devices or of devices that are not
+    Calendar devices are ignored and an error is written to the log.<br><br>
+    Example:<br>
+    <code>get MyCalendar events include:HolidayCalendar,GarbageCollection</code><br>
+    <br><br>
+
+
+    The <u><code>returnType</code></u> parameter is used to return the events in a particular type.
+    This is useful for Perl scripts.<br><br>
+
+    <table>
+    <tr><th align="left"><code>&lt;returnTypeSpec&gt;</code></th><th align="left">description</th></tr>
+    <tr><td><code>$text</code></td><td>a multiline string in human-readable format (default)</td></tr>
+    <tr><td><code>@texts</code></td><td>an array of strings in human-readable format</td></tr>
+    <tr><td><code>@event</code></td><td>an array of Calendar::Event hashes</td></tr>
+
+    </table>
+    <br><br>
+
     </li>
 
 
@@ -3546,9 +3607,9 @@ sub CalendarEventsAsHtml($;$) {
       the &lt;timeFormatSpec&gt; in quotes.</li></p>
 
     <li><code>synchronousUpdate 0|1</code><br>
-        If this attribute is not set or if it is set to 0, the processing is done 
+        If this attribute is not set or if it is set to 0, the processing is done
         in the background and FHEM will not block during updates. <br/>
-        If this attribute is set to 1, the processing of the calendar is done 
+        If this attribute is set to 1, the processing of the calendar is done
         in the foreground. Large calendars will block FHEM on slow systems. <br/>
         <br/>
         Attribute value will be ignored if FHEM is running on a Windows platform.<br/>
@@ -3917,9 +3978,9 @@ sub CalendarEventsAsHtml($;$) {
     -Die wildcards werden bei jedem Kalenderupdate ausgewertet.<br/>
     -Die Auswertung von wildcards kann bei Bedarf f&uuml; einen Kalender deaktiviert werden, indem das Schl&uuml;sselwort 'noWildcards'
      dem Attribut 'quirks' hinzugef&uuml;gt wird. Das ist n&uuml;tzlich bei url die bereits ein % enthalten, ohne damit ein wildcard
-     zu kennzeichnen.<br/>    
+     zu kennzeichnen.<br/>
     <br/>
-    Hinweise f&uuml;r Nutzer des Google-Kalenders: 
+    Hinweise f&uuml;r Nutzer des Google-Kalenders:
     <ul>
     <li>Wildcards d&uuml;rfen in Google Kalender URL nicht verwendet werden!</li>
     <li>Du kannst direkt die private iCal-URL des Google-Kalenders nutzen.</li>
@@ -3940,7 +4001,7 @@ sub CalendarEventsAsHtml($;$) {
       define IrgendeinKalender Calendar ical file /home/johndoe/calendar.ics
       </pre>
   </ul>
-  
+
   <a name="Calendarset"></a>
   <b>Set </b><br><br>
   <ul>
@@ -3964,19 +4025,23 @@ sub CalendarEventsAsHtml($;$) {
 
     <code>get &lt;name&gt; reload</code><br>
     Entspricht  <code>set &lt;name&gt; reload</code><br><br>
-    
-    
-    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;] [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]</code><br><br>    
+
+
+    <li><code>get &lt;name&gt; events [format:&lt;formatSpec&gt;] [timeFormat:&lt;timeFormatSpec&gt;] [filter:&lt;filterSpecs&gt;]
+    [series:next[=&lt;max&gt;]] [limit:&lt;limitSpecs&gt;]
+    [include:&lt;names&gt;]
+    [returnType:&lt;returnTypeSpec&gt;]
+    </code><br><br>
     Das Schweizer Taschenmesser f&uuml;r die Anzeige von Terminen.
     Die Termine des Kalenders &lt;name&gt; werden Zeile f&uuml;r Zeile entsprechend der Format- und Filterangaben ausgegeben.
     Keiner, einer oder mehrere der Parameter <code>format</code>,
     <code>timeFormat</code>, <code>filter</code>, <code>series</code> und <code>limit</code>
     k&ouml;nnen angegeben werden, weiterhin ist es sinnvoll, den Parameter <code>filter</code> mehrere Male anzugeben.
     <br><br>
-    
+
     Der Parameter <u><code>format</code></u> legt den zur&uuml;ckgegeben Inhalt fest.<br><br>
     Folgende Formatspezifikationen stehen zur Verf&uuml;gung:<br><br>
-    
+
     <table>
     <tr><th align="left">&lt;formatSpec&gt;</th><th align="left">Beschreibung</th></tr>
     <tr><td><code>default</code></td><td>Standardformat (siehe unten)</td></tr>
@@ -3985,13 +4050,13 @@ sub CalendarEventsAsHtml($;$) {
     <tr><td><code>custom="&lt;formatString&gt;"</code></td><td>ein spezifisches Format (siehe unten)</td></tr>
     <tr><td><code>custom="{ &lt;perl-code&gt; }"</code></td><td>ein spezifisches Format (siehe unten)</td></tr>
     </table><br>
-    Einzelne Anf&uuml;hrungszeichen (<code>'</code>) k&ouml;nnen anstelle von doppelten Anf&uuml;hrungszeichen (<code>"</code>) innerhalb 
+    Einzelne Anf&uuml;hrungszeichen (<code>'</code>) k&ouml;nnen anstelle von doppelten Anf&uuml;hrungszeichen (<code>"</code>) innerhalb
     eines spezifischen Formats benutzt werden.
-    
+
     Folgende Variablen k&ouml;nnen in <code>&lt;formatString&gt;</code> und in
     <code>&lt;perl-code&gt;</code> verwendet werden:
     <br><br>
-   
+
     <table>
     <tr><th align="left">variable</th><th align="left">Bedeutung</th></tr>
     <tr><td><code>$t1</code></td><td>Startzeit in Sekunden</td></tr>
@@ -4016,22 +4081,22 @@ sub CalendarEventsAsHtml($;$) {
     Wird der Parameter <code>format</code> ausgelassen, dann wird die Formatierung
     aus <code>defaultFormat</code> benutzt. Ist dieses Attribut nicht gesetzt,  wird <code>"$T1 $D $S"</code>
     als Formatierung benutzt.
-    
+
     Das letzte Auftreten von <code>format</code> gewinnt bei mehrfacher Angabe.
     <br><br>
-    
+
     Examples:<br>
     <code>get MyCalendar events format:full</code><br>
     <code>get MyCalendar events format:custom="$T1-$T2 $S \@ $L"</code><br>
     <code>get MyCalendar events format:custom={ sprintf("%20s %8s", $S, $D) }</code><br><br>
 
-    Der Parameter <u><code>timeFormat</code></u> legt das Format f&uuml;r die Start-, 
+    Der Parameter <u><code>timeFormat</code></u> legt das Format f&uuml;r die Start-,
     End- und Alarmzeiten fest.<br><br>
 
     In <code>&lt;timeFormatSpec&gt;</code> kann die POSIX-Spezifikation verwendet werden.
     Auf <a href="http://strftime.net">strftime.net</a> gibt es ein Tool zum Erstellen von
     <code>&lt;timeFormatSpec&gt;</code>.<br><br>
-        
+
     Wenn der Parameter <code>timeFormat</code> ausgelassen, dann wird die Formatierung
     aus <code>defaultTimeFormat</code> benutzt. Ist dieses Attribut nicht gesetzt, dann
     wird <code>"%d.%m.%Y %H:%M"</code> als Formatierung benutzt.
@@ -4039,7 +4104,7 @@ sub CalendarEventsAsHtml($;$) {
     doppelte (<code>"</code>) Anf&uuml;hrungszeichen verwendet werden.<br><br>
 
     Das letzte Auftreten von <code>timeFormat</code> gewinnt bei mehrfacher Angabe.
-    <br><br>    
+    <br><br>
 
     Example:<br>
     <code>get MyCalendar events timeFormat:"%e-%b-%Y" format:full</code><br><br>
@@ -4051,7 +4116,7 @@ sub CalendarEventsAsHtml($;$) {
     Alle Filterangaben m&uuml;ssen zutreffen, damit ein Termin angezeigt wird.
     Die Angabe ist kumulativ: jeder angegebene Filter wird zur Filterliste hinzugef&uum;gt
     und ber&uum;cksichtigt.<br><br>
-    
+
     <table>
     <tr><th align="left"><code>&lt;filterSpec&gt;</code></th><th align="left">Beschreibung</th></tr>
     <tr><td><code>uid=="&lt;uid&gt;"</code></td><td>UID ist <code>&lt;uid&gt;</code><br>
@@ -4074,7 +4139,7 @@ sub CalendarEventsAsHtml($;$) {
     Die doppelten Anf&uuml;hrungszeichen auf der rechten Seite von <code>&lt;filterSpec&gt;</code> sind nicht
     Teil des regul&auml;ren Ausdrucks. Es k&ouml;nnen stattdessen einfache Anf&uuml;hrungszeichen verwendet werden.
     <br><br>
-        
+
     Examples:<br>
     <code>get MyCalendar events filter:uid=="432dsafweq64yehdbwqhkd"</code><br>
     <code>get MyCalendar events filter:uid=~"^7"</code><br>
@@ -4086,7 +4151,7 @@ sub CalendarEventsAsHtml($;$) {
     <code>get MyCalendar events filter:field(summary)=~"Gelber Sack" filter:mode=~"upcoming|start"</code>
     <br><br>
 
-    Der Parameter <u><code>series</code></u> bestimmt die Anzeige von wiederkehrenden 
+    Der Parameter <u><code>series</code></u> bestimmt die Anzeige von wiederkehrenden
     Terminen. <code>series:next</code> begrenzt die Anzeige auf den n&auml;chsten Termin
     der noch nicht beendeten Termine innerhalb der Serie. <code>series:next=&lt;max&gt;</code>
     zeigt die n&auml;chsten <code>&lt;max&gt;</code> Termine der Serie. Dies gilt pro Serie.
@@ -4099,10 +4164,10 @@ sub CalendarEventsAsHtml($;$) {
     <table>
     <tr><th align="left"><code>&lt;limitSpec&gt;</code></th><th align="left">Beschreibung</th></tr>
     <tr><td><code>count=&lt;n&gt;</code></td><td>zeigt <code>&lt;n&gt;</code> Termine, wobei <code>&lt;n&gt;</code> eine positive Ganzzahl (integer) ist</td></tr>
-    <tr><td><code>from=[+|-]&lt;timespec&gt;</code></td><td>zeigt nur Termine die nach einer Zeitspanne &lt;timespec&gt; ab jetzt enden; 
+    <tr><td><code>from=[+|-]&lt;timespec&gt;</code></td><td>zeigt nur Termine die nach einer Zeitspanne &lt;timespec&gt; ab jetzt enden;
     Minuszeichen f&uuml;r Termine in der Vergangenheit benutzen; &lt;timespec&gt; wird weiter unten im Attribut-Abschnitt beschrieben.</td></tr>
     <tr><td><code>to=[+|-]&lt;timespec&gt;</code></td><td>
-    zeigt nur Termine die vor einer Zeitspanne &lt;timespec&gt; ab jetzt starten; 
+    zeigt nur Termine die vor einer Zeitspanne &lt;timespec&gt; ab jetzt starten;
     Minuszeichen f&uuml;r Termine in der Vergangenheit benutzen; &lt;timespec&gt; wird weiter unten im Attribut-Abschnitt beschrieben.</td></tr>
     <tr><td><code>when=today|tomorrow</code></td><td>zeigt anstehende Termin f&uuml;r heute oder morgen an</td></tr>
     </table><br>
@@ -4114,9 +4179,32 @@ sub CalendarEventsAsHtml($;$) {
     <code>get MyCalendar events limit:count=10,from=0,to=+10d</code><br>
     <br><br>
 
+    Der <u><code>include</code></u> Parameter schlie&szlig;t Termine aus anderen Kalendern ein. Das ist n&uuml;tzlich,
+    um Termine aus anderen Kalendern in einer kombimierten Ausgabe anzuzeigen.
+    <code>&lt;names&gt;</code> ist eine mit Kommas getrennte Liste der Namen von Calendar-Ger&auml;ten.
+    Der Name des Kalenders selbst sowie Duplikate werden stillschweigend ignoriert. Namen von Ger&auml;ten, die
+    es nicht gibt oder keine Calendar-Ger&auml;te sind, werden ignoriert und es wird eine Fehlermeldung ins Log
+    geschrieben.<br><br>
+    Example:<br>
+    <code>get MyCalendar events include:Feiertage,M&uuml;llabfuhr</code><br>
+    <br><br>
+
+
+    Der Parameter <u><code>returnType</code></u> wird verwendet, um die Termine als ein bestimmter Typ
+    zur&uuml;ckzugeben. Das ist n&uuml;tzlich f&uuml;r Perl-Skripte.<br><br>
+
+    <table>
+    <tr><th align="left"><code>&lt;returnTypeSpec&gt;</code></th><th align="left">Beschreibung</th></tr>
+    <tr><td><code>$text</code></td><td>ein mehrzeiliger String in menschenlesbarer Darstellung (Vorgabe)</td></tr>
+    <tr><td><code>@texts</code></td><td>ein Array von Strings in menschenlesbarer Darstellung</td></tr>
+    <tr><td><code>@event</code></td><td>ein Array von Calendar::Event-Hashs</td></tr>
+
+    </table>
+    <br><br>
+
     </li>
-    
-   
+
+
     <li><code>get &lt;name&gt; find &lt;regexp&gt;</code><br>
     Gibt zeilenweise die UID von allen Terminen aus, deren Zusammenfassung dem regul&auml;ren Ausdruck &lt;regexp&gt; entspricht.<br><br></li>
 
@@ -4145,23 +4233,23 @@ sub CalendarEventsAsHtml($;$) {
     <li><code>defaultTimeFormat &lt;timeFormatSpec&gt;</code><br>
         Setzt das Standardzeitformat f&uuml;r <code>get &lt;name&gt; events</code>.
         Der Aufbau wird dort erkl&auml;t. &lt;timeFormatSpec&gt; <b>nicht</b> in Anf&uuml;hrungszeichen setzten. </li></p>
-  
+
     <li><code>synchronousUpdate 0|1</code><br>
-        Wenn dieses Attribut nicht oder auf 0 gesetzt ist, findet die Verarbeitung im Hintergrund statt 
+        Wenn dieses Attribut nicht oder auf 0 gesetzt ist, findet die Verarbeitung im Hintergrund statt
         und FHEM wird w&auml;hrend der Verarbeitung nicht blockieren.<br/>
-        Wird dieses Attribut auf 1 gesetzt, findet die Verarbeitung des Kalenders im Vordergrund statt. 
-        Umfangreiche Kalender werden FHEM auf langsamen Systemen blockieren.<br/> 
+        Wird dieses Attribut auf 1 gesetzt, findet die Verarbeitung des Kalenders im Vordergrund statt.
+        Umfangreiche Kalender werden FHEM auf langsamen Systemen blockieren.<br/>
         <br/>
-        Das Attribut wird ignoriert, falls FHEM unter Windows betrieben wird. 
+        Das Attribut wird ignoriert, falls FHEM unter Windows betrieben wird.
         In diesem Fall erfolgt die Verarbeitung immer synchron.<br/>
        </li><p>
 
     <li><code>update none|onUrlChanged</code><br>
         Wird dieses Attribut auf <code>none</code> gesetzt ist, wird der Kalender &uuml;berhaupt nicht aktualisiert.<br/>
-        Wird dieses Attribut auf <code>onUrlChanged</code> gesetzt ist, wird der Kalender nur dann aktualisiert, wenn sich die 
+        Wird dieses Attribut auf <code>onUrlChanged</code> gesetzt ist, wird der Kalender nur dann aktualisiert, wenn sich die
         URL seit dem letzten Aufruf ver&auml;ndert hat, insbesondere nach der Auswertung von wildcards im define.<br/>
         </li><p>
-  
+
     <li><code>removevcalendar 0|1</code><br>
 		Wenn dieses Attribut auf 1 gesetzt ist, wird der vCalendar nach der Verarbeitung verworfen,
 		gleichzeitig reduziert sich der Speicherverbrauch des Moduls.
