@@ -474,6 +474,18 @@ my %zwave_class = (
                location => '05' },
     parse => { '..770300(.*)' => '"name:".pack("H*", $1)',
                '..770600(.*)' => '"location:".pack("H*", $1)' } },
+  SOUND_SWITCH             => { id => '79',
+    set   => { toneConfiguration  => "05%02x%02x",
+               tonePlay           => "08%02x",
+               tonePlayDefault    => "08FF" },
+               toneStop           => "0800",
+    get   => { toneNumbers        => "01",
+               tonePlay           => "09",
+               toneConfiguration  => "06"},
+    parse => { "037902(..)"       => '"toneNumbers:".hex($1)',
+               "047907(..)(..)"   => '"toneConfiguration:Volume ".hex($1).'.
+                                     '" Default ".hex($2)',
+               "03790a(..)"       => '"tonePlay:".hex($1)' } },
   FIRMWARE_UPDATE_MD       => { id => '7a',
     get   => { fwMetaData  => 'ZWave_firmware($hash, "")'  },
     set   => { fwUpdate    => 'ZWave_firmware($hash, "%s")'},
@@ -5982,6 +5994,18 @@ ZWave_firmwareUpdateParse($$$)
   <li>location LOCATION<br>
     Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
 
+  <br><br><b>Class SOUND_SWITCH</b>
+  <li>toneConfiguration VOLUME DEFAULTNR<br>
+     Configure the volume and the default tone. Volume 0 is off, 1..100 is
+     interpreted as 1% to 100%, and 255 restores last volume, if the current is
+     0. If DEFAULTNR is 0, set only the volume.</li>
+  <li>tonePlay TONENUMBER<br>
+     Play tone Number TONENUMBER.</li>
+  <li>tonePlayDefault<br>
+     Play the default tone.</li>
+  <li>toneStop<br>
+     Stop playing.</li>
+
   <br><br><b>Class POWERLEVEL</b>
   <li>Class is only used in an installation or test situation</li>
   <li>powerlevel level timeout/s<br>
@@ -6545,6 +6569,14 @@ ZWave_firmwareUpdateParse($$$)
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
 
+  <br><br><b>Class SOUND_SWITCH</b>
+  <li>toneConfiguration<br>
+     Request the current configuration.</li>
+  <li>toneNumbers<br>
+     Request the number of tones supported.</li>
+  <li>tonePlay<br>
+     Request the tone number being played.</li>
+
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
@@ -7037,6 +7069,11 @@ ZWave_firmwareUpdateParse($$$)
   <br><br><b>Class NODE_NAMING</b>
   <li>name:NAME</li>
   <li>location:LOCATION</li>
+
+  <br><br><b>Class SOUND_SWITCH</b>
+  <li>toneConfiguration:Volume VOLUME Default DEFAULT</li>
+  <li>toneNumbers:NUMBER</li>
+  <li>tonePlay:NUMBER</li>
 
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlvl:current x remain y<br>
