@@ -1,4 +1,4 @@
-REV 19929
+REV 19931
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -473,7 +473,7 @@ UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
 UPD 2019-03-22_07:45:02 41238 FHEM/98_GAEBUS.pm
 UPD 2019-03-23_07:45:03 33178 FHEM/98_GEOFANCY.pm
-UPD 2019-04-04_07:45:03 30334 FHEM/98_GOOGLECAST.pm
+UPD 2019-08-02_07:45:02 30228 FHEM/98_GOOGLECAST.pm
 UPD 2017-01-21_07:45:02 11576 FHEM/98_GoogleAuth.pm
 UPD 2019-05-31_07:45:02 174130 FHEM/98_HMinfo.pm
 UPD 2019-04-01_07:45:02 31631 FHEM/98_HMtemplate.pm
@@ -731,8 +731,8 @@ UPD 2019-08-01_07:45:07 4096422 docs/commandref.html
 UPD 2019-07-31_07:45:08 2534579 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-01_07:45:10 217347 docs/commandref_modular.html
-UPD 2019-08-01_07:45:11 228290 docs/commandref_modular_DE.html
+UPD 2019-08-02_07:45:10 217347 docs/commandref_modular.html
+UPD 2019-08-02_07:45:11 228290 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
