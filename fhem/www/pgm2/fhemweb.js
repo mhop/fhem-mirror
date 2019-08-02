@@ -982,7 +982,7 @@ FW_treeMenu()
       $(el).find("div>div").css("background-image", "url('"+FW_arrowDown+"')");
     } else {
       $(el).closest("table").find("tr[data-mTree^="+tgt+"]")
-        .hide().addClass("closed");
+        .hide().filter('[data-nxt]').addClass("closed").removeClass("open");
       $(el).find("div>div").css("background-image", "url('"+FW_arrowRight+"')");
     }
     $(el).toggleClass("closed");
