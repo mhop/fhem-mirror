@@ -173,6 +173,7 @@ sub RandomTimer_device_switch ($) {
    }
    $command =~ s/@/$hash->{DEVICE}/g;
    $command = SemicolonEscape($command);
+   readingsSingleUpdate($hash, 'LastCommand', $command, 1);
    Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
 
    my $ret  = AnalyzeCommandChain(undef, $command);
