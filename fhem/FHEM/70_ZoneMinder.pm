@@ -255,7 +255,8 @@ sub ZoneMinder_API_ReadHostInfo_Callback {
     $hash->{ZM_VERSION} = 'error';
     $hash->{ZM_API_VERSION} = 'error';
   } elsif($data ne "") {
-      
+      $data =~ s/\R//g;
+
       my $zmVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'version');
       if (not $zmVersion) {
         $zmVersion = 'unknown';
@@ -281,6 +282,8 @@ sub ZoneMinder_API_ReadHostLoad_Callback {
     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
     readingsSingleUpdate($hash, 'CPU_Load', 'error', 0);
   } elsif($data ne "") {
+    $data =~ s/\R//g;
+
     my $load = ZoneMinder_GetConfigArrayByKey($hash, $data, 'load');
     readingsSingleUpdate($hash, 'CPU_Load', $load, 1);
 
@@ -299,6 +302,8 @@ sub ZoneMinder_API_ReadConfig_Callback {
   if($err ne "") {
     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
   } elsif($data ne "") {
+      $data =~ s/\R//g;
+
       my $zmPathZms = ZoneMinder_GetConfigValueByName($hash, $data, 'ZM_PATH_ZMS');
       if ($zmPathZms) {
         $zmPathZms =~ s/\\//g;
@@ -356,6 +361,7 @@ sub ZoneMinder_API_UpdateMonitors_Callback {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
+  $data =~ s/\R//g;
   my @monitors = split(/\{"Monitor"\:\{/, $data);
 
   foreach my $monitorData (@monitors) {
@@ -388,6 +394,7 @@ sub ZoneMinder_API_CreateMonitors_Callback {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
+  $data =~ s/\R//g;
   my @monitors = split(/\{"Monitor"\:\{/, $data);
 
   foreach my $monitorData (@monitors) {
@@ -502,6 +509,8 @@ sub ZoneMinder_API_ChangeMonitorState_Callback {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   if ($data) {
+    $data =~ s/\R//g;
+
     my $monitorId = $param->{zmMonitorId};
     my $logDevHash = $modules{ZM_Monitor}{defptr}{$name.'_'.$monitorId};
     my $function = $param->{zmFunction};
@@ -525,6 +534,8 @@ sub ZoneMinder_API_QueryEventDetails_Callback {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
+
+  $data =~ s/\R//g;
 
   my $zmMonitorId = ZoneMinder_GetConfigValueByKey($hash, $data, 'MonitorId');
   my $zmEventId = ZoneMinder_GetConfigValueByKey($hash, $data, 'Id');
