@@ -1,4 +1,4 @@
-REV 19931
+REV 19938
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-07-31_07:45:02 302323 ./CHANGED
+UPD 2019-08-03_07:45:03 302395 ./CHANGED
 UPD 2019-07-09_07:45:03 41601 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -91,7 +91,7 @@ UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
 UPD 2018-01-07_07:45:03 61206 FHEM/10_SOMFY.pm
 UPD 2016-12-19_07:45:02 18301 FHEM/10_UNIRoll.pm
 UPD 2019-04-08_07:45:03 53682 FHEM/10_WS980.pm
-UPD 2019-07-25_07:45:03 247896 FHEM/10_ZWave.pm
+UPD 2019-08-03_07:45:03 249386 FHEM/10_ZWave.pm
 UPD 2018-01-29_07:45:02 33552 FHEM/10_pilight_ctrl.pm
 UPD 2018-12-28_07:45:06 46715 FHEM/11_FHT.pm
 UPD 2017-08-14_07:45:02 8037 FHEM/11_FHT8V.pm
@@ -257,7 +257,7 @@ UPD 2017-12-02_07:45:02 14583 FHEM/44_S7_DRead.pm
 UPD 2017-12-02_07:45:02 17913 FHEM/44_S7_DWrite.pm
 UPD 2017-11-29_07:45:02 20344 FHEM/44_S7_S5Client.pm
 UPD 2017-11-28_07:45:03 34206 FHEM/44_S7_S7Client.pm
-UPD 2018-11-01_07:45:03 7670 FHEM/44_TEK603.pm
+UPD 2019-08-03_07:45:03 8098 FHEM/44_TEK603.pm
 UPD 2018-09-11_07:45:03 54773 FHEM/45_Plugwise.pm
 UPD 2019-02-26_07:45:02 27311 FHEM/45_TRX.pm
 UPD 2018-11-08_07:45:05 30506 FHEM/46_Aqicn.pm
@@ -310,7 +310,7 @@ UPD 2019-05-31_07:45:02 65886 FHEM/55_InfoPanel.pm
 UPD 2019-07-10_07:45:02 22166 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
-UPD 2019-02-25_07:45:03 162594 FHEM/57_Calendar.pm
+UPD 2019-08-03_07:45:03 166298 FHEM/57_Calendar.pm
 UPD 2018-12-05_07:45:02 33985 FHEM/59_HCS.pm
 UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
@@ -495,7 +495,7 @@ UPD 2017-11-04_07:45:02 25677 FHEM/98_ModbusTrovis5576.pm
 UPD 2018-11-13_07:45:04 47530 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
-UPD 2019-07-30_07:45:03 25018 FHEM/98_RandomTimer.pm
+UPD 2019-08-03_07:45:03 25078 FHEM/98_RandomTimer.pm
 UPD 2019-06-24_07:45:02 96236 FHEM/98_SVG.pm
 UPD 2019-07-15_07:45:02 71079 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
@@ -701,9 +701,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2019-07-18_07:45:03 28212 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2019-08-03_07:45:03 31052 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2018-08-09_07:45:03 249740 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2019-07-22_07:45:03 106552 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2019-08-03_07:45:03 106900 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-03-25_07:45:04 18178 FHEM/msgSchema.pm
@@ -727,12 +727,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-08-01_07:45:07 4096422 docs/commandref.html
-UPD 2019-07-31_07:45:08 2534579 docs/commandref_DE.html
+UPD 2019-08-03_07:45:07 4098817 docs/commandref.html
+UPD 2019-08-03_07:45:10 2535860 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-02_07:45:10 217347 docs/commandref_modular.html
-UPD 2019-08-02_07:45:11 228290 docs/commandref_modular_DE.html
+UPD 2019-08-03_07:45:11 217347 docs/commandref_modular.html
+UPD 2019-08-03_07:45:12 228290 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2157,7 +2157,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2019-04-30_07:45:03 30708 www/pgm2/f18.js
 UPD 2019-06-26_07:45:02 9996 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2019-07-24_07:45:03 58944 www/pgm2/fhemweb.js
+UPD 2019-08-03_07:45:03 58985 www/pgm2/fhemweb.js
 UPD 2019-01-26_07:45:02 13786 www/pgm2/fhemweb_colorpicker.js
 UPD 2019-01-09_07:45:02 4402 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
