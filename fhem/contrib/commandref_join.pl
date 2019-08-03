@@ -204,7 +204,8 @@ generateModuleCommandref($$;$$)
         if($dosMode);
 # TODO: add doc to each $jsfile
     print "*** $lang $fPath: No document text found\n"
-       if(!$jsFile && !$suffix && !$docCount && !$dosMode && $fPath !~ m,/99_,);
+       if(!$jsFile && !$suffix && !$docCount && !$dosMode &&
+          $fPath !~ m,/99_, && !$noWarnings);
     if(!$jsFile && $suffix && !$docCount && !$dosMode) {
       if($lang eq "DE" && $fh) {
         print $fh <<EOF;
@@ -227,5 +228,5 @@ EOF
     }
 
     print "*** $lang $fPath: =end html$suffix: ".($nrEnd>0 ? "missing":"there are too many")."\n"
-        if($nrEnd);
+        if($nrEnd && !$noWarnings);
 }
