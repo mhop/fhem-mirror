@@ -5790,10 +5790,10 @@ computeAlignTime($$@)
   return ("timeSpec: $tmErr", undef) if($alErr);
 
   my $now = int(gettimeofday());
-  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);
+  my $alTime = ($alHr*60+$alMin)*60+$alSec;
   my $step = ($hr*60+$min)*60+$sec;
   my $ttime = ($triggertime ? int($triggertime) : $now);
-  my $off = ($ttime % 86400) - 86400;
+  my $off = (($ttime+fhemTzOffset($now)) % 86400) - 86400;
   while($off < $alTime) {
     $off += $step;
   }
