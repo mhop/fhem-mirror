@@ -64,7 +64,7 @@ consUpdate(evt)
   var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
   var isTa = $("#console").is("textarea"); // 102773
   new_content = new_content.replace(/(.*)<br>[\r\n]/g, function(all,p1) {
-    return p1.replace(/[<> ]/g, function(a){return rTab[a]})+(isTa ? "\n" : "<br>");
+    return p1.replace(/[<> ]/g, function(a){return rTab[a]})+(isTa?"\n":"<br>");
   });
   $("#console").append(new_content);
     

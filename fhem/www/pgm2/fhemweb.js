@@ -36,7 +36,7 @@ var FW_widgets = {
   textField:         { createFn:FW_createTextField },
   textFieldNL:       { createFn:FW_createTextField, second:true },
   "textField-long":  { createFn:FW_createTextField, second:true },
-  "textFieldNL-long":{ createFn:FW_createTextField, second:true }
+  bitfield:          { createFn:FW_createBitfield },
 };
 
 window.onbeforeunload = function(e)
@@ -1828,6 +1828,49 @@ FW_createMultiple(elName, devName, vArr, currVal, set, params, cmd)
   return newEl;
 }
 
+function
+FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
+{
+  if(vArr[0] != "bitfield")
+    return undef;
+  elName = elName.replace(/[^A-Z0-9_]/ig, '_');
+  var fieldSize = (vArr.length == 1 ? 8 : parseInt(vArr[1]));
+  var html = '<div style="display:inline-block" tabindex="0">'+
+             '<input type="hidden" name="'+elName+'">'+
+             '<table id="'+elName+'_bitfield">';
+  for(var fs=fieldSize; fs>0; ) {
+    html += '<tr><td>Bit '+fs+'</td><td>';
+    for(var i1=0; i1<8 && fs>0; i1++, fs--)
+      html += '<input type="checkbox" value="'+fs+'" title="'+fs+'">';
+    html += '</td></tr>\n';
+  }
+  html += '</table></div>';
+  var newEl = $(html).get(0);
+
+  newEl.activateFn = function() {
+    $("#"+elName+"_bitfield input").change(function(){
+      var total = 0;
+      $("#"+elName+"_bitfield input").each(function(){
+        if($(this).is(":checked")) {
+          var sv = parseInt($(this).attr("value"))-1, thisVal=1;
+          while(sv) { thisVal *= 2; sv--; } // << works on signed 32bit values
+          total += thisVal;
+        }
+      });
+      $("[name="+elName+"]").val(total);
+    });
+  }
+
+  newEl.setValueFn = function(arg) {
+    var total = parseInt(arg);
+    for(var i1=1; i1<=fieldSize; i1++) {
+      $('#'+elName+'_bitfield input[value='+i1+']')
+        .prop("checked", (total%2 == 1));
+      total = parseInt(total/2);
+    }
+  };
+  return newEl;
+}
 /*************** WIDGETS END **************/
 
 
@@ -1982,6 +2025,8 @@ FW_getSVG(emb)
       exponent, e.g. 0.0625.</li>
   <li>select,&lt;val1&gt;,&lt;val2&gt;,... - show a dropdown with all values.
       <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
+  <li>bitfield,&lt;size&gt; - show a table of checkboxes (8 per line)
+      to set single bits. Default for size is 8.</li>
 
 =end html
 
@@ -2012,6 +2057,9 @@ FW_getSVG(emb)
   <li>select,&lt;val1&gt;,&lt;val2&gt;,... - zeigt ein HTML select mit allen
       Werten. <b>Achtung</b>: so ein Widget wird auch dann angezeigt, falls
       kein passender Modifier gefunden wurde.</li>
+  <li>bitfield,&lt;size&gt; - zeigt eine Tabelle von Kontrollk&auml;stchen (8
+      pro Zeile), um einzelne Bits setzen zu koennen. Die Voreinstellung fuer
+      size ist 8.</li>
 
 =end html_DE
 

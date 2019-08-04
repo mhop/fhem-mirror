@@ -2689,6 +2689,7 @@ ZWave_configParseModel($;$)
   }
 
   my $partial="";
+  my $bsHelp="";
   while($gz->gzreadline($line)) {
     last if($line =~ m+^\s*</Product>+);
     if($line =~ m/^\s*<CommandClass.*id="([^"]*)"(.*)$/) {
@@ -2720,23 +2721,32 @@ ZWave_configParseModel($;$)
       $h{Help} .= "Full text for $cmdName is: $h{label}<br>"
         if($shortened || $origName ne $cmdName);
       $hash{$cmdName} = \%h;
+      $bsHelp = ""; $partial = "";
     }
 
+    if($line =~ m,<BitSet\sid="(.*)">,) {
+      $bsHelp = "Bit $1: ";
+      next;
+    }
     if($line =~ m,<Help>, && $line !~ m,</Help>,) { # Multiline Help
       $partial = $line;
       next;
     }
     if($partial) {
       if($line =~ m,</Help>,) {
-        $line = $partial.$line;
+        $line = $bsHelp.$partial.$line;
         $line =~ s/[\r\n]//gs;
         $partial = "";
+        $bsHelp="";
       } else {
         $partial .= $line;
         next;
       }
     }
-    $hash{$cmdName}{Help} .= "$1<br>" if($line =~ m+<Help>(.*)</Help>+s);
+    if($line =~ m+<Help>(.*)</Help>+s) {
+      $hash{$cmdName}{Help} .= "$bsHelp$1<br>";
+      $bsHelp="";
+    }
 
     if($line =~ m/^\s*<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
@@ -2760,6 +2770,8 @@ ZWave_configParseModel($;$)
     my $caName = "$cfg$cmd";
     $zwave_cmdArgs{set}{$caName} = join(",", keys %{$h->{Item}}) if($h->{Item});
     $zwave_cmdArgs{set}{$caName} = "noArg" if($h->{type} eq "button");
+    $zwave_cmdArgs{set}{$caName} = "bitfield,".$h->{size}*8
+                                        if($h->{type} eq "bitset");
     $zwave_cmdArgs{get}{$caName} = "noArg";
   }
 
