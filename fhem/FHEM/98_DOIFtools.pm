@@ -224,9 +224,6 @@ function doiftoolsOptChanged() {
       inpt.setSelectionRange(7,17+N);
     }
 }
-function doiftoolsReplaceBR() {
-        $("textarea#console").html($("textarea#console").html().replace(/<br(.*)?>/g,""));
-}
 
 function delbutton() {
     if ($('#doiftoolstype').attr('embefore') == 1) {
@@ -245,7 +242,6 @@ function delbutton() {
   //execute
   $( window ).on( "load", delbutton );
   $('#console').on('select', doiftoolsCopyToClipboard);
-  $('#console').on('mouseover',doiftoolsReplaceBR);
 </script>
 EOF
 my $DOIFtoolsJSfuncStart = <<'EOF';

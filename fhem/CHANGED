@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_DOIFtools: remove unessesary code due to changes in console.js
  - bugfix:  70_ZoneMinder: fixed JSON-parsing bug
  - feature: 57_Calendar: get ...events include:... returnType:...
  - feature: 44_TEK603: ser2net support
