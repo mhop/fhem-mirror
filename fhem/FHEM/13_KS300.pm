@@ -214,7 +214,10 @@ KS300_Parse($$)
     my $std = AttrVal($name, "strangeTempDiff", 0);
     if($std) {
       my $ov = ReadingsVal($name, 'temperature', 0);
-      return "" if($ov && abs($ov-$v[4]) > $std);
+      if($ov && abs($ov-$v[4]) > $std) {
+        readingsBulkUpdate($def, 'strangeTemp', $v[4], 0);
+        $v[4] = $ov;
+      }
     }
     
     # Negative temp
