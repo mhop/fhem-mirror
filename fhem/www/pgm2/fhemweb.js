@@ -1834,7 +1834,8 @@ FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
   if(vArr[0] != "bitfield")
     return undef;
   elName = elName.replace(/[^A-Z0-9_]/ig, '_');
-  var fieldSize = (vArr.length == 1 ? 8 : parseInt(vArr[1]));
+  var fieldSize = (vArr.length > 1 ? parseInt(vArr[1]) : 8);
+  var bitMask   = (vArr.length > 2 ? parseInt(vArr[2]) : 4294967295);
   var html = '<div style="display:inline-block" tabindex="0">'+
              '<input type="hidden" name="'+elName+'">'+
              '<table id="'+elName+'_bitfield">';
@@ -1848,6 +1849,13 @@ FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
   var newEl = $(html).get(0);
 
   newEl.activateFn = function() {
+    var bm = bitMask;
+    for(var i1=1; i1<=fieldSize; i1++) {
+      $('#'+elName+'_bitfield input[value='+i1+']')
+        .prop("disabled", (bm%2 == 0));
+      bm = parseInt(bm/2);
+    }
+
     $("#"+elName+"_bitfield input").change(function(){
       var total = 0;
       $("#"+elName+"_bitfield input").each(function(){
@@ -2025,8 +2033,8 @@ FW_getSVG(emb)
       exponent, e.g. 0.0625.</li>
   <li>select,&lt;val1&gt;,&lt;val2&gt;,... - show a dropdown with all values.
       <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
-  <li>bitfield,&lt;size&gt; - show a table of checkboxes (8 per line)
-      to set single bits. Default for size is 8.</li>
+  <li>bitfield,&lt;size&gt;&lt;mask&gt; - show a table of checkboxes (8 per
+      line) to set single bits. Default for size is 8 and for mask 2^32-1</li>
 
 =end html
 
@@ -2057,9 +2065,10 @@ FW_getSVG(emb)
   <li>select,&lt;val1&gt;,&lt;val2&gt;,... - zeigt ein HTML select mit allen
       Werten. <b>Achtung</b>: so ein Widget wird auch dann angezeigt, falls
       kein passender Modifier gefunden wurde.</li>
-  <li>bitfield,&lt;size&gt; - zeigt eine Tabelle von Kontrollk&auml;stchen (8
-      pro Zeile), um einzelne Bits setzen zu koennen. Die Voreinstellung fuer
-      size ist 8.</li>
+  <li>bitfield,&lt;size&gt;,&lt;mask&gt; - zeigt eine Tabelle von
+      Kontrollk&auml;stchen (8 pro Zeile), um einzelne Bits setzen zu koennen.
+      Die Voreinstellung fuer size ist 8 und fuer mask 2^32-1.</li>
+
 
 =end html_DE
 

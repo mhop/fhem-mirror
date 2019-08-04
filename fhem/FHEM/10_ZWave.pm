@@ -2707,6 +2707,7 @@ ZWave_configParseModel($;$)
       $h{min}   = $1 if($line =~ m/min="([^"]*)"/i);
       $h{max}   = $1 if($line =~ m/max="([^"]*)"/i);
       $h{value} = $1 if($line =~ m/value="([^"]*)"/i);
+      $h{bitmask}= $1 if($line =~ m/bitmask="([^"]*)"/i);
       $h{index} = $1 if($line =~ m/index="([^"]*)"/i); # 1, 2, etc
       $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
       $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
@@ -2724,7 +2725,7 @@ ZWave_configParseModel($;$)
       $bsHelp = ""; $partial = "";
     }
 
-    if($line =~ m,<BitSet\sid="(.*)">,) {
+    if($line =~ m,<BitSet\s+id="(.*)">,) {
       $bsHelp = "Bit $1: ";
       next;
     }
@@ -2734,15 +2735,15 @@ ZWave_configParseModel($;$)
     }
     if($partial) {
       if($line =~ m,</Help>,) {
-        $line = $bsHelp.$partial.$line;
+        $line = $partial.$line;
         $line =~ s/[\r\n]//gs;
         $partial = "";
-        $bsHelp="";
       } else {
         $partial .= $line;
         next;
       }
     }
+
     if($line =~ m+<Help>(.*)</Help>+s) {
       $hash{$cmdName}{Help} .= "$bsHelp$1<br>";
       $bsHelp="";
@@ -2770,8 +2771,10 @@ ZWave_configParseModel($;$)
     my $caName = "$cfg$cmd";
     $zwave_cmdArgs{set}{$caName} = join(",", keys %{$h->{Item}}) if($h->{Item});
     $zwave_cmdArgs{set}{$caName} = "noArg" if($h->{type} eq "button");
-    $zwave_cmdArgs{set}{$caName} = "bitfield,".$h->{size}*8
-                                        if($h->{type} eq "bitset");
+    if($h->{type} eq "bitset") {
+      $zwave_cmdArgs{set}{$caName} = 
+          "bitfield,".($h->{size}*8).($h->{bitmask} ? ",$h->{bitmask}":"");
+    }
     $zwave_cmdArgs{get}{$caName} = "noArg";
   }
 
