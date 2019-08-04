@@ -1,4 +1,4 @@
-REV 19938
+REV 19943
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-08-03_07:45:03 302395 ./CHANGED
+UPD 2019-08-04_07:45:03 302445 ./CHANGED
 UPD 2019-07-09_07:45:03 41601 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2019-07-10_07:45:11 159138 ./fhem.pl
+UPD 2019-08-04_07:45:12 159140 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-10-19_07:45:03 57590 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -356,7 +356,7 @@ UPD 2016-01-12_07:45:11 36886 FHEM/70_VIERA.pm
 UPD 2016-08-21_07:45:14 20340 FHEM/70_VolumeLink.pm
 UPD 2018-03-14_07:45:03 44782 FHEM/70_WINCONNECT.pm
 UPD 2017-03-01_07:45:02 22279 FHEM/70_WS3600.pm
-UPD 2019-03-05_07:45:02 24793 FHEM/70_ZoneMinder.pm
+UPD 2019-08-04_07:45:03 24943 FHEM/70_ZoneMinder.pm
 UPD 2017-05-29_07:45:02 63897 FHEM/71_ONKYO_AVR_ZONE.pm
 UPD 2019-02-26_07:45:02 96052 FHEM/71_PHILIPS_AUDIO.pm
 UPD 2017-06-27_07:45:02 24467 FHEM/71_PIONEERAVRZONE.pm
@@ -484,7 +484,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2019-05-20_07:45:03 334714 FHEM/98_MSwitch.pm
+UPD 2019-08-04_07:45:03 384925 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-05-13_07:45:02 34555 FHEM/98_MediaList.pm
 UPD 2019-05-02_07:45:02 231297 FHEM/98_Modbus.pm
@@ -710,7 +710,7 @@ UPD 2019-03-25_07:45:04 18178 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2019-07-15_07:45:02 34531 FHEM/wundergroundAPI.pm
-UPD 2019-06-04_07:45:11 6392 contrib/commandref_join.pl
+UPD 2019-08-04_07:45:12 6434 contrib/commandref_join.pl
 UPD 2019-06-08_12:09:35 4360 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
 UPD 2019-03-15_07:45:03 390 demolog/LightScenes.save
@@ -731,8 +731,8 @@ UPD 2019-08-03_07:45:07 4098817 docs/commandref.html
 UPD 2019-08-03_07:45:10 2535860 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-03_07:45:11 217347 docs/commandref_modular.html
-UPD 2019-08-03_07:45:12 228290 docs/commandref_modular_DE.html
+UPD 2019-08-04_07:45:10 217347 docs/commandref_modular.html
+UPD 2019-08-04_07:45:11 228290 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
