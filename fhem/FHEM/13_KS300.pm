@@ -28,9 +28,18 @@ KS300_Initialize($)
   $hash->{DefFn}     = "KS300_Define";
   $hash->{UndefFn}   = "KS300_Undef";
   $hash->{ParseFn}   = "KS300_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:ks300 ".
-                        "rainadjustment:0,1 ignore:0,1 ".
-                        $readingFnAttributes;
+  no warnings 'qw';
+  my @attrList = qw(
+    IODev
+    do_not_notify:0,1
+    ignore:0,1 
+    model:ks300 
+    rainadjustment:0,1
+    strangeTempDiff
+    showtime:0,1
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
   $hash->{AutoCreate}=
     { "KS300.*" => {
          GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
@@ -202,6 +211,12 @@ KS300_Parse($$)
     $v[8] = $a[17];
     $v[9] = KS300_windIndex($v[2]);
 
+    my $std = AttrVal($name, "strangeTempDiff", 0);
+    if($std) {
+      my $ov = ReadingsVal($name, 'temperature', 0);
+      return "" if($ov && abs($ov-$v[4]) > $std);
+    }
+    
     # Negative temp
     $v[4] = -$v[4] if(hex($v[8]) & 8);
 
@@ -375,6 +390,10 @@ KS300_windIndex($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a> (ks300)</li>
+    <li>strangeTempDiff DIFFVAL<br>
+        If set, the module will only accept data where the difference between
+        the reported temperature and tha last recorded value is less than
+        DIFFVAL.</li>
     <li>rainadjustment<br>
         If this attribute is set, fhem automatically considers rain counter
         resets after a battery change and random counter switches as
@@ -444,6 +463,10 @@ KS300_windIndex($)
         ber&uuml;cksichtigt.  Resets treten beim Wechsel der Batterie und nach
         Beobachtung einiger Benutzer auch nach zuf&auml;lligen Schaltzyklen
         auf. Die Voreinstellung ist 0 (aus).</li>
+    <li>strangeTempDiff DIFFVAL<br>
+        Falls gesetzt, werden nur solche Telegramme akzeptiert, wo der
+        Unterschied bei der gemeldeten Temperatur zum letzten Wert weniger als
+        DIFFVAL ist. </li>
   </ul>
   <br>
 
