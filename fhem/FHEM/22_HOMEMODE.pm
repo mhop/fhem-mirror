@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.4.9";
+my $HOMEMODE_version = "1.4.10";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -82,8 +82,8 @@ sub HOMEMODE_Define($$)
     else
     {
       $trans = $HOMEMODE_de?
-        "Kein RESIDENTS Gerät gefunden! Bitte erst ein RESIDENTS Gerät anlegen und ein paar ROOMMATE/GUEST und ihre korrespondierenden PRESENCE Geräte hinzufügen um Spaß mit diesem Modul zu haben!":
-        "No RESIDENTS device found! Please define a RESIDENTS device first and add some ROOMMATE/GUEST and their PRESENCE device(s) to have fun with this module!";
+        "Kein RESIDENTS Gerät gefunden! Bitte erst ein RESIDENTS Gerät anlegen und ein paar ROOMMATE/GUEST/PET und ihre korrespondierenden PRESENCE Geräte hinzufügen um Spaß mit diesem Modul zu haben!":
+        "No RESIDENTS device found! Please define a RESIDENTS device first and add some ROOMMATE/GUEST/PET and their PRESENCE device(s) to have fun with this module!";
       return $trans;
     }
   }
@@ -182,7 +182,7 @@ sub HOMEMODE_Notify($$)
   }
   else
   {
-    if ($devtype =~ /^(RESIDENTS|ROOMMATE|GUEST)$/ && grep /^(state|wayhome|presence):\s/,@{$events})
+    if ($devtype =~ /^(RESIDENTS|ROOMMATE|GUEST|PET)$/ && grep /^(state|wayhome|presence):\s/,@{$events})
     {
       HOMEMODE_RESIDENTS($hash,$devname);
     }
@@ -375,7 +375,7 @@ sub HOMEMODE_Notify($$)
         foreach (split /,/,$hash->{RESIDENTS})
         {
           my $regex = lc($_);
-          $regex =~ s/^(rr_|rg_)//;
+          $regex =~ s/^(rr_|rg_|rp_)//;
           next unless (lc($devname) =~ /$regex/);
           $resident = $_;
           $residentregex = $regex;
@@ -517,11 +517,12 @@ sub HOMEMODE_updateInternals($;$$)
     my @residents;
     push @residents,$defs{$resdev}->{ROOMMATES} if ($defs{$resdev}->{ROOMMATES});
     push @residents,$defs{$resdev}->{GUESTS} if ($defs{$resdev}->{GUESTS});
+    push @residents,$defs{$resdev}->{PETS} if ($defs{$resdev}->{PETS});
     if (@residents < 1)
     {
       $trans = $HOMEMODE_de?
-        "Keine verfügbaren ROOMMATE/GUEST im RESIDENTS Gerät $resdev":
-        "No available ROOMMATE/GUEST in RESIDENTS device $resdev";
+        "Keine verfügbaren ROOMMATE/GUEST/PET im RESIDENTS Gerät $resdev":
+        "No available ROOMMATE/GUEST/PET in RESIDENTS device $resdev";
       Log3 $name,2,$trans;
       readingsSingleUpdate($hash,"HomeInfo",$trans,1);
       return;
@@ -542,7 +543,7 @@ sub HOMEMODE_updateInternals($;$$)
     {
       push @allMonitoredDevices,$resident;
       my $short = lc($resident);
-      $short =~ s/^(rr_|rg_)//;
+      $short =~ s/^(rr_|rg_|rp_)//;
       push @residentsshort,$short;
       if ($autopresence)
       {
@@ -1196,7 +1197,7 @@ sub HOMEMODE_RESIDENTS($;$)
     $mode = $mode eq "home" && AttrNum($name,"HomeAutoDaytime",1) ? HOMEMODE_DayTime($hash) : $mode;
     CommandSet(undef,"$name:FILTER=mode!=$mode mode $mode");
   }
-  elsif ($devtype =~ /^ROOMMATE|GUEST$/)
+  elsif ($devtype =~ /^ROOMMATE|GUEST|PET$/)
   {
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged($hash,"lastActivityByResident",$dev);
@@ -1492,12 +1493,12 @@ sub HOMEMODE_userattr($)
   }
   foreach my $resident (split /,/,$hash->{RESIDENTS})
   {
-    my $devtype = HOMEMODE_ID($resident,"ROOMMATE|GUEST") ? $defs{$resident}->{TYPE} : "";
+    my $devtype = HOMEMODE_ID($resident,"ROOMMATE|GUEST|PET") ? $defs{$resident}->{TYPE} : "";
     next unless ($devtype);
     if ($adv)
     {
       my $states = "absent";
-      $states .= ",$HOMEMODE_UserModesAll" if ($devtype eq "ROOMMATE");
+      $states .= ",$HOMEMODE_UserModesAll" if ($devtype =~ /^ROOMMATE|PET$/);
       $states .= ",home,$HOMEMODE_UserModes" if ($devtype eq "GUEST");
       foreach (split /,/,$states)
       {
@@ -3570,8 +3571,8 @@ sub HOMEMODE_Details($$$)
 
 =pod
 =item helper
-=item summary    home device with ROOMMATE/GUEST integration
-=item summary_DE Zuhause Ger&auml;t mit ROOMMATE/GUEST Integration
+=item summary    home device with ROOMMATE/GUEST/PET integration
+=item summary_DE Zuhause Ger&auml;t mit ROOMMATE/GUEST/PET Integration
 =begin html
 
 <a name="HOMEMODE"></a>
@@ -3582,7 +3583,7 @@ sub HOMEMODE_Details($$$)
   It has been optimized for usage with homebridge as GUI.<br>
   You can also configure CMDs to be executed on specific events.<br>
   There is no need to create notify(s) or DOIF(s) to achieve common tasks depending on the home state(s).<br>
-  It's also possible to control ROOMMATE/GUEST devices states depending on their associated presence device.<br>
+  It's also possible to control ROOMMATE/GUEST/PET devices states depending on their associated presence device.<br>
   If the RESIDENTS device is on state home, the HOMEMODE device can automatically change its mode depending on the local time (morning,day,afternoon,evening,night)<br>
   There is also a daytime reading and associated HomeCMD attributes that will execute the HOMEMODE state CMDs independend of the presence of any RESIDENT.<br>
   A lot of placeholders are available for usage within the HomeCMD or HomeText attributes (see Placeholders).<br>
@@ -4065,12 +4066,12 @@ sub HOMEMODE_Details($$$)
       default:
     </li>
     <li>
-      <b><i>HomePresenceDeviceAbsentCount-&lt;ROOMMATE/GUEST&gt;</i></b><br>
+      <b><i>HomePresenceDeviceAbsentCount-&lt;ROOMMATE/GUEST/PET&gt;</i></b><br>
       number of resident associated presence device to turn resident to absent<br>
       default: maximum number of available presence device for each resident
     </li>
     <li>
-      <b><i>HomePresenceDevicePresentCount-&lt;ROOMMATE/GUEST&gt;</i></b><br>
+      <b><i>HomePresenceDevicePresentCount-&lt;ROOMMATE/GUEST/PET&gt;</i></b><br>
       number of resident associated presence device to turn resident to home<br>
       default: 1
     </li>
