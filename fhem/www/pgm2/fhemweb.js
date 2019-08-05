@@ -1832,7 +1832,7 @@ function
 FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
 {
   if(vArr[0] != "bitfield")
-    return undef;
+    return undefined;
   elName = elName.replace(/[^A-Z0-9_]/ig, '_');
   var fieldSize = (vArr.length > 1 ? parseInt(vArr[1]) : 8);
   var bitMask   = (vArr.length > 2 ? parseInt(vArr[2]) : 4294967295);
