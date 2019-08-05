@@ -1,4 +1,4 @@
-REV 19951
+REV 19953
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -731,8 +731,8 @@ UPD 2019-08-05_07:45:06 4099182 docs/commandref.html
 UPD 2019-08-05_07:45:08 2536287 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-05_07:45:10 217347 docs/commandref_modular.html
-UPD 2019-08-05_07:45:11 228290 docs/commandref_modular_DE.html
+UPD 2019-08-05_08:57:55 217347 docs/commandref_modular.html
+UPD 2019-08-05_08:57:56 228290 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2157,7 +2157,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2019-04-30_07:45:03 30708 www/pgm2/f18.js
 UPD 2019-06-26_07:45:02 9996 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2019-08-05_07:45:02 60999 www/pgm2/fhemweb.js
+UPD 2019-08-05_08:57:48 61003 www/pgm2/fhemweb.js
 UPD 2019-01-26_07:45:02 13786 www/pgm2/fhemweb_colorpicker.js
 UPD 2019-01-09_07:45:02 4402 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
