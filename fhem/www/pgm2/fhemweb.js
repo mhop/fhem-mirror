@@ -1833,12 +1833,14 @@ FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
 {
   if(vArr[0] != "bitfield")
     return undefined;
-  elName = elName.replace(/[^A-Z0-9_]/ig, '_');
+  if(elName)
+    elName = elName.replace(/[^A-Z0-9_]/ig, '_');
+  var lName = Math.random().toString(36).substr(2);
   var fieldSize = (vArr.length > 1 ? parseInt(vArr[1]) : 8);
   var bitMask   = (vArr.length > 2 ? parseInt(vArr[2]) : 4294967295);
   var html = '<div style="display:inline-block" tabindex="0">'+
-             '<input type="hidden" name="'+elName+'">'+
-             '<table id="'+elName+'_bitfield">';
+             (elName ? '<input type="hidden" name="'+elName+'">' : '')+
+             '<table id="'+lName+'_bitfield">';
   for(var fs=fieldSize; fs>0; ) {
     html += '<tr><td>Bit '+fs+'</td><td>';
     for(var i1=0; i1<8 && fs>0; i1++, fs--)
@@ -1851,28 +1853,31 @@ FW_createBitfield(elName, devName, vArr, currVal, set, params, cmd)
   newEl.activateFn = function() {
     var bm = bitMask;
     for(var i1=1; i1<=fieldSize; i1++) {
-      $('#'+elName+'_bitfield input[value='+i1+']')
+      $('#'+lName+'_bitfield input[value='+i1+']')
         .prop("disabled", (bm%2 == 0));
       bm = parseInt(bm/2);
     }
 
-    $("#"+elName+"_bitfield input").change(function(){
+    $("#"+lName+"_bitfield input").change(function(){
       var total = 0;
-      $("#"+elName+"_bitfield input").each(function(){
+      $("#"+lName+"_bitfield input").each(function(){
         if($(this).is(":checked")) {
           var sv = parseInt($(this).attr("value"))-1, thisVal=1;
           while(sv) { thisVal *= 2; sv--; } // << works on signed 32bit values
           total += thisVal;
         }
       });
-      $("[name="+elName+"]").val(total);
+      if(cmd)
+        cmd(total);
+      if(elName)
+        $("[name="+elName+"]").val(total);
     });
   }
 
   newEl.setValueFn = function(arg) {
     var total = parseInt(arg);
     for(var i1=1; i1<=fieldSize; i1++) {
-      $('#'+elName+'_bitfield input[value='+i1+']')
+      $('#'+lName+'_bitfield input[value='+i1+']')
         .prop("checked", (total%2 == 1));
       total = parseInt(total/2);
     }
