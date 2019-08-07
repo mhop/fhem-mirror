@@ -1204,7 +1204,8 @@ HUEDevice_Parse($$)
 
   if( ref($result) ne "HASH" ) {
     if( ref($result) && $HUEDevice_hasDataDumper) {
-      Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
+       #Log3 $name, 2, "$name: got wrong status message for $name: ". Dumper $result;
+      Log3 $name, 2, "$name: got wrong status message for $name: $result";
     } else {
       Log3 $name, 2, "$name: got wrong status message for $name: $result";
     }
@@ -1212,7 +1213,7 @@ HUEDevice_Parse($$)
   }
 
   Log3 $name, 4, "parse status message for $name";
-  Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
+  #Log3 $name, 5, Dumper $result if($HUEDevice_hasDataDumper);
 
   $hash->{name} = $result->{name} if( defined($result->{name}) );
   $hash->{type} = $result->{type} if( defined($result->{type}) );
@@ -1427,7 +1428,7 @@ HUEDevice_Parse($$)
                      && (!$readings{state} || $readings{state} eq ReadingsVal( $name, 'state', '' ))  );
 
     Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
-    Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
+    #Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
       
     $hash->{lastupdated} = $lastupdated;
     $hash->{lastupdated_local} = $lastupdated_local;
