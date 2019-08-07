@@ -12262,7 +12262,7 @@ sub EnOcean_Parse($$)
             $attr{$name}{productID} = EnOcean_convBitToHex($1);
             $data = $2;
           } elsif ($signalType == 3) {
-######
+#####
             # Connected GSI Sensor IDs
             my $gsiIdDataLen =  $teachInDataLen - 16;
             $data =~ m/^(.{8})(.{8})(.{$gsiIdDataLen})(.*)$/;
@@ -17207,9 +17207,11 @@ sub EnOcean_sec_convertToNonsecure($$$) {
     $rlc = $2;
     $mac = $3;
   } elsif ($expect_rlc == 0 && $expect_mac == 1) {
+    $rlc = ReadingsVal($name, ".rlcRcv", $attr{$name}{rlcRcv});
+    $rlc = $attr{$name}{rlcRcv} if (hex($rlc) < hex($attr{$name}{rlcRcv}));
     $mac = $2;
   }
-
+  my $old_rlc = $rlc;
   Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RORG: $rorg DATA_ENC: $data_enc";
   if ($expect_rlc == 1) {
     Log3 $name, 5, "EnOcean $name EnOcean_sec_convertToNonsecure RLC: $rlc";
@@ -17263,6 +17265,9 @@ sub EnOcean_sec_convertToNonsecure($$$) {
   }
   # Couldn't verify or decrypt message in RLC window
   #####
+  # restore old rlc
+  readingsSingleUpdate($hash, ".rlcRcv", $old_rlc, 0);
+  $attr{$name}{rlcRcv} = $old_rlc;
   return ("Can't verify or decrypt telegram", undef, undef);
 }
 
