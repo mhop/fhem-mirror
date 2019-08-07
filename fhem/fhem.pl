@@ -847,7 +847,7 @@ IsDummy($)
 {
   my $devname = shift;
 
-  return 1 if(defined($attr{$devname}) && defined($attr{$devname}{dummy}));
+  return 1 if(defined($attr{$devname}) && $attr{$devname}{dummy});
   return 0;
 }
 
