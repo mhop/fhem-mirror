@@ -402,6 +402,7 @@ my %EnO_eepConfig = (
   "D2.11.07" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.11.08" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.14.30" => {attr => {subType => "multiFuncSensor.30"}, GPLOT => "EnO_temp4humi4:Temp/Humi,"},
+  "D2.15.00" => {attr => {subType => "multiFuncSensor.00"}},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}, GPLOT => "EnO_D2-32-xx:Current,"},
@@ -11540,6 +11541,45 @@ sub EnOcean_Parse($$)
       }
       CommandDeleteReading(undef, "$name waitingCmds");
 
+    } elsif ($st eq "multiFuncSensor.00") {
+      # people activity counter
+      # (D2-15-00)
+      my @energyStorage = ('ok', 'medium', 'low', 'critical');
+      my @presence = ('present', 'absent', 'not_detectable', 'error');
+      my $alarm = 'off';
+      my $battery = $energyStorage[($db[2] & 0x30) >> 4];
+      if (!exists($hash->{helper}{lastAlarm}) || $hash->{helper}{lastAlarm} ne $alarm || ReadingsVal($name, 'alarm', '') eq 'dead_sensor') {
+        push @event, "3:alarm:" . $alarm;
+      }
+      push @event, "3:presence:" . $presence[($db[2] & 0xC0) >> 6];
+      if (!exists($hash->{helper}{lastBattery}) || $hash->{helper}{lastBattery} ne $battery) {
+        push @event, "3:battery:" . $battery;
+      }
+      my $activity;
+      my $pirCounterCurrentTel = hex(substr($data, 2, 4));
+      my $pirCounter;
+      if (!exists($hash->{helper}{pirCounterLastTel}) || !exists($hash->{helper}{arrivalPreviousTelegram})) {
+        $activity = 0;
+      } else {
+        if ($hash->{helper}{pirCounterLastTel} > $pirCounterCurrentTel) {
+          # roll-over
+          $pirCounter = 0xFFFF - $hash->{helper}{pirCounterLastTel} + $pirCounterCurrentTel;
+        } else {
+           $pirCounter = $pirCounterCurrentTel - $hash->{helper}{pirCounterLastTel};
+        }
+        $activity = $pirCounter / (gettimeofday() - $hash->{helper}{arrivalPreviousTelegram}) / ($db[2] & 0x0F);
+      }
+      push @event, "3:activity:" . $activity;
+      push @event, "3:state:" . $activity;
+      $hash->{helper}{arrivalPreviousTelegram} = gettimeofday();
+      $hash->{helper}{lastAlarm} = $alarm;
+      $hash->{helper}{lastBattery} = $battery;
+      $hash->{helper}{pirCounterLastTel} = $pirCounterCurrentTel;
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if (exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+      InternalTimer(gettimeofday() + 4320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+#####
+
     } elsif ($st eq "multiFuncSensor.30") {
       # Sensor for Smoke, Air quality, Hygrothermal comfort, Temperature and Humidity
       # (D2-14-30)
@@ -17222,6 +17262,7 @@ sub EnOcean_sec_convertToNonsecure($$$) {
     }
   }
   # Couldn't verify or decrypt message in RLC window
+  #####
   return ("Can't verify or decrypt telegram", undef, undef);
 }
 
@@ -22019,6 +22060,22 @@ EnOcean_Delete($$)
        <li>state: off|smoke-alarm</li>
      </ul><br>
        The attr subType must be multiFuncSensor.30. This is done if the device was
+       created by autocreate.
+     </li>
+     <br><br>
+
+     <li>People Activity Counter (D2-15-00)<br>
+        [EOcean EASYFIT EPAC untested]<br>
+     <ul>
+       <li>0 ... 100/%</li>
+       <li>activity: 0 ... 100/%</li>
+       <li>alarm: off|dead_sensor</li>
+       <li>battery: ok|medium|low|critical</li>
+       <li>present: present|absent|not_detectable|error</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>state: 0 ... 100/%</li>
+     </ul><br>
+       The attr subType must be multiFuncSensor.00. This is done if the device was
        created by autocreate.
      </li>
      <br><br>
