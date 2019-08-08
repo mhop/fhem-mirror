@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.2
+#  89_FULLY.pm 1.3
 #
 #  $Id$
 #
@@ -410,7 +410,7 @@ sub FULLY_Get ($@)
 			Log3 $name, 2, "FULLY: [$name] Command failed";
 			return "FULLY: Command failed";
 		}
-		elsif ($response =~ /Wrong password/) {
+		elsif ($result =~ /Wrong password/) {
 			Log3 $name, 2, "FULLY: [$name] Wrong password";
 			return "FULLY: Wrong password";
 		}
@@ -539,6 +539,7 @@ sub FULLY_ExecuteCB ($$$)
 		if ($param->{cmdno} == $param->{cmdcnt}) {
 			# Last request, update readings
 			Log3 $name, 4, "FULLY: [$name] Last command executed. Processing results";
+			Log3 $name, 5, "FULLY: [$name] $data";
 			my $result = FULLY_ProcessDeviceInfo ($name, $data);
 			if (!FULLY_UpdateReadings ($hash, $result)) {
 				Log3 $name, 2, "FULLY: [$name] Command failed";
@@ -656,8 +657,11 @@ sub FULLY_ProcessDeviceInfo ($$)
 	return "$name|0|state=failed" if (!defined ($result) || $result eq '');
 	return "$name|0|state=wrong password" if ($result =~ /Wrong password/);
 	
+	# HTML code format
+	# <td class='table-cell'>Kiosk mode</td><td class='table-cell'>off</td>
+	
 	my $parameters = "$name|1";
-	while ($result =~ /table-cell\">([^<]+)<\/td><td class="table-cell">([^<]+)</g) {
+	while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>([^<]+)</g) {
 		my $rn = lc($1);
 		my $rv = $2;
 		$rv =~ s/\s+$//;

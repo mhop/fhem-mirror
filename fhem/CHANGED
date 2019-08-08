@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  89_FULLY: Support for Fully version 1.33
  - feature: 22_HOMEMODE: v1.4.10 add support for PET
  - change:  98_DOIFtools: remove unessesary code due to changes in console.js
  - bugfix:  70_ZoneMinder: fixed JSON-parsing bug
