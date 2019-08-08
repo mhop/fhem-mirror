@@ -4683,8 +4683,10 @@ readingsEndUpdate($$)
         Log 1, $value;
         $result= $value;
       } elsif(!defined($value)) {
-        $cmdFromAnalyze = $perlCode; # For the __WARN__ sub
-        warn("$name userReadings $reading evaluated to undef");
+        if(AttrVal("global", "verbose", 3) >= 5) { #102868
+          $cmdFromAnalyze = $perlCode; # For the __WARN__ sub
+          warn("$name userReadings $reading evaluated to undef");
+        }
         next;
       } elsif($modifier eq "none") {
         $result= $value;
