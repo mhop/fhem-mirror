@@ -37,7 +37,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.2";
+my $FULLY_VERSION = "1.3";
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
