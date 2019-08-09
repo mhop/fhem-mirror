@@ -1,4 +1,4 @@
-REV 19962
+REV 19967
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-08-06_07:45:03 302576 ./CHANGED
+UPD 2019-08-09_07:45:02 302629 ./CHANGED
 UPD 2019-07-09_07:45:03 41601 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2019-08-08_07:45:11 159131 ./fhem.pl
+UPD 2019-08-09_07:45:12 159204 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2018-10-19_07:45:03 57590 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -428,7 +428,7 @@ UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2019-07-31_07:45:02 4293 FHEM/88_WEBCOUNT.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
-UPD 2019-02-14_07:45:03 27089 FHEM/89_FULLY.pm
+UPD 2019-08-09_07:45:02 27223 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -731,8 +731,8 @@ UPD 2019-08-07_07:45:07 4099755 docs/commandref.html
 UPD 2019-08-05_07:45:08 2536287 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-08_07:45:10 217351 docs/commandref_modular.html
-UPD 2019-08-08_07:45:11 228294 docs/commandref_modular_DE.html
+UPD 2019-08-09_07:45:10 217351 docs/commandref_modular.html
+UPD 2019-08-09_07:45:11 228294 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1252,6 +1252,7 @@ UPD 2015-07-28_14:05:34 9428 www/images/default/ws_S_kl.png
 UPD 2015-07-28_14:05:34 9539 www/images/default/ws_WNW_kl.png
 UPD 2015-07-28_14:05:34 9522 www/images/default/ws_WSW_kl.png
 UPD 2015-07-28_14:05:34 9478 www/images/default/ws_W_kl.png
+UPD 2019-08-09_07:45:02 21769 www/images/fhemSVG/3d_printer.svg
 UPD 2019-02-09_07:45:03 59586 www/images/fhemSVG/Botvac_VR200.svg
 UPD 2017-11-26_07:45:02 58372 www/images/fhemSVG/DIN_rail_housing.svg
 UPD 2017-11-14_07:45:02 14088 www/images/fhemSVG/HutschIcon3.svg
@@ -1264,6 +1265,7 @@ UPD 2017-10-04_07:45:02 7800 www/images/fhemSVG/Ventilator_wind.svg
 UPD 2017-10-29_07:45:02 4511 www/images/fhemSVG/Wunderlist.svg
 UPD 2017-11-14_07:45:02 2918 www/images/fhemSVG/access_keypad_1.svg
 UPD 2017-11-14_07:45:02 22160 www/images/fhemSVG/access_keypad_2.svg
+UPD 2019-08-09_07:45:02 59117 www/images/fhemSVG/air_compressor.svg
 UPD 2017-11-14_07:45:02 2149 www/images/fhemSVG/alarm_system_password.svg
 UPD 2017-01-31_07:45:03 6055 www/images/fhemSVG/alexa.svg
 UPD 2017-01-31_07:45:03 2924 www/images/fhemSVG/alexa2.svg
@@ -1793,6 +1795,9 @@ UPD 2015-07-28_14:05:33 1571 www/images/openautomation/fts_garage_door_60.svg
 UPD 2015-07-28_14:05:33 1586 www/images/openautomation/fts_garage_door_70.svg
 UPD 2015-07-28_14:05:33 1764 www/images/openautomation/fts_garage_door_80.svg
 UPD 2015-07-28_14:05:33 1749 www/images/openautomation/fts_garage_door_90.svg
+UPD 2019-08-09_07:45:02 2824 www/images/openautomation/fts_garage_door_down.svg
+UPD 2019-08-09_07:45:02 3966 www/images/openautomation/fts_garage_door_manual.svg
+UPD 2019-08-09_07:45:02 2834 www/images/openautomation/fts_garage_door_up.svg
 UPD 2015-07-28_14:05:33 1498 www/images/openautomation/fts_light_dome.svg
 UPD 2015-07-28_14:05:33 1686 www/images/openautomation/fts_light_dome_open.svg
 UPD 2015-07-28_14:05:33 2357 www/images/openautomation/fts_shutter.svg
