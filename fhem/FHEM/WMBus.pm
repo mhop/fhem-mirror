@@ -1846,7 +1846,7 @@ sub decodeApplicationLayer($) {
     $offset += 14;
   }
   
-  if (exists($self->{ell})) {
+  if (exists($self->{ell}{session_number})) {
     $self->{ell}{session_number_enc} = $self->{ell}{session_number} >> 29;
     $self->{ell}{session_number_time} = ($self->{ell}{session_number} & 0b0001111111111111111111111111111) >> 4;
     $self->{ell}{session_number_session} = $self->{ell}{session_number} & 0b1111;
