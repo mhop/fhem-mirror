@@ -11567,7 +11567,7 @@ sub EnOcean_Parse($$)
         } else {
            $pirCounter = $pirCounterCurrentTel - $hash->{helper}{pirCounterLastTel};
         }
-        $activity = $pirCounter / (gettimeofday() - $hash->{helper}{arrivalPreviousTelegram}) / ($db[2] & 0x0F);
+        $activity = $pirCounter / (gettimeofday() - $hash->{helper}{arrivalPreviousTelegram}) / (($db[2] & 0x0F) + 1);
       }
       push @event, "3:activity:" . $activity;
       push @event, "3:state:" . $activity;
