@@ -2690,8 +2690,31 @@ ZWave_configParseModel($;$)
 
   my $partial="";
   my $bsHelp="";
+  my %OZW;
   while($gz->gzreadline($line)) {
     last if($line =~ m+^\s*</Product>+);
+
+    if($line =~ m,<(Help|MetaDataItem)>, && 
+       $line !~ m,</(Help|MetaDataItem)>,) { # Multiline Help
+      $partial = $line;
+      next;
+    }
+
+    if($partial) {
+      if($line =~ m,</(Help|MetaDataItem)>,) {
+        $line = $partial.$line;
+        $line =~ s/[\r\n]//gs;
+        $partial = "";
+      } else {
+        $partial .= $line;
+        next;
+      }
+    }
+
+    if($line =~ m+<MetaDataItem.*name="(.*?)".*>(.*)</MetaDataItem>+s) {
+      $OZW{$1} = $2;
+    }
+
     if($line =~ m/^\s*<CommandClass.*id="([^"]*)"(.*)$/) {
       $class = $1;
       $classInfo{$class} = $2;
@@ -2729,20 +2752,6 @@ ZWave_configParseModel($;$)
       $bsHelp = "Bit $1: ";
       next;
     }
-    if($line =~ m,<Help>, && $line !~ m,</Help>,) { # Multiline Help
-      $partial = $line;
-      next;
-    }
-    if($partial) {
-      if($line =~ m,</Help>,) {
-        $line = $partial.$line;
-        $line =~ s/[\r\n]//gs;
-        $partial = "";
-      } else {
-        $partial .= $line;
-        next;
-      }
-    }
 
     if($line =~ m+<Help>(.*)</Help>+s) {
       $hash{$cmdName}{Help} .= "$bsHelp$1<br>";
@@ -2776,6 +2785,16 @@ ZWave_configParseModel($;$)
           "bitfield,".($h->{size}*8).($h->{bitmask} ? ",$h->{bitmask}":"");
     }
     $zwave_cmdArgs{get}{$caName} = "noArg";
+  }
+
+  if(%OZW) {
+    my $OZW="";
+    foreach my $k (sort keys %OZW) {
+      my $v = $OZW{$k};
+      $v = "<a target='_blank' href='$v'>$v</a>" if($v =~ m+http.*://+);
+      $OZW .= "<h4>$k</h4><ul>$v</ul>";
+    }
+    $mc{OZW} = $OZW;
   }
 
   $zwave_modelConfig{$cfg} = \%mc;
@@ -5266,6 +5285,7 @@ ZWave_helpFn($$)
   my ($d,$cmd) = @_;
   my $mc = ZWave_configGetHash($defs{$d});
   return "" if(!$mc);
+  return $mc->{OZW} if($cmd eq "OZW" && $mc->{OZW});
   my $h = $mc->{config}{$cmd};
   return "" if(!$h || !$h->{Help});
   $cmd .= " (numeric code $h->{index})" if(defined($h->{index}));
@@ -5323,8 +5343,17 @@ ZWave_fhemwebFn($$$$)
     my $url = ($n eq "alliance" ?
               "http://products.z-wavealliance.org/products/" :
               "http://devel.pepper1.net/zwavedb/device/");
-    $pl .= "<a target='_blank' href='$url/$link'>Details in $n DB</a>";
+    $pl .= "<a target='_blank' href='$url/$link'>Details:$n</a>";
     $pl .= "</div>";
+  }
+
+  if(ReadingsVal($d, "modelConfig", undef)) {
+    my $mc = ZWave_configGetHash($defs{$d});
+    if($mc && $mc->{OZW}) {
+      $pl .= "<div class='detLink ZWPepper'>";
+      $pl .= "<a id='details_ozw' href='#'>Details:OZW</a>";
+      $pl .= "</div>";
+    }
   }
 
   my $img = ZWave_getPic($iodev, lc($model));
@@ -5337,19 +5366,28 @@ ZWave_fhemwebFn($$$$)
   return
   "<div id='ZWHelp' class='makeTable help'></div>$pl".
   '<script type="text/javascript">'.
-   "var zwaveDevice='$d', FW_tp='$FW_tp';" . <<'JSEND'
+   "var zwd='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
       $("div#ZWHelp").insertBefore("div.makeTable.internals"); // Move
       $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
       if(FW_tp) $("div.img.ZWPepper").appendTo("div#menu");
       $("select.set,select.get").each(function(){
-        $(this).get(0).setValueFn = function(val) {
-          $("div#ZWHelp").html(val);
-        }
+        var ss = $(this).get(0);
+        ss.setValueFn = function(val) { $("div#ZWHelp").html(val); }
         $(this).change(function(){
-          FW_queryValue('{ZWave_helpFn("'+zwaveDevice+'","'+$(this).val()+'")}',
-                        $(this).get(0));
+          FW_queryValue('{ZWave_helpFn("'+zwd+'","'+$(this).val()+'")}', ss);
         });
+      });
+
+      $("a#details_ozw").click(function(){
+        if($("#devSpecHelp").length) {
+          $("#devSpecHelp").remove();
+          return;
+        }
+        $("#content").append('<div id="devSpecHelp"></div>');
+        var dsh = $("#devSpecHelp").get(0);
+        dsh.setValueFn = function(val) { $("#devSpecHelp").html(val); }
+        FW_queryValue('{ZWave_helpFn("'+zwd+'","OZW")}', dsh);
       });
     });
   </script>
