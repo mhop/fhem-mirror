@@ -43,7 +43,8 @@ foreach my $file (`find $ARGV[0] -name \*.xml`) {
   while(my $l = <FH>) {
     next if($l =~ m/^<\?xml/);
     chomp($l);
-    $l =~ s/^<Product.*xmlns.*/<Product sourceFile="$name">/;
+    $l =~ s/<!--.*-->//g;
+    $l =~ s/^(.*)<Product.*xmlns.*/$1<Product sourceFile="$name">/;
     $l =~ s/\r//g;
     $l =~ s/\t/  /g;
     #$l =~ s/^ *//g;
@@ -52,6 +53,14 @@ foreach my $file (`find $ARGV[0] -name \*.xml`) {
     if($l !~ m/>$/ || $l =~ m/^\s*<Help>\s*$/) { $buffer .= " ".$l; next; }
     if($buffer && $l =~ m/>$/) { $l = "$buffer $l"; $buffer=""; }
     $l =~ s/<!--.*-->//g;
+    # $l =~ s/<MetaData.*<\/MetaData>//g;
+    # $l =~ s/<MetaDataItem.*<\/MetaDataItem>//g;
+    # $l =~ s/<Entry.author.*<\/Entry>//g;
+    # $l =~ s/<ChangeLog.*<\/ChangeLog>//g;
+    # $l =~ s/<MetaData>//g;
+    # $l =~ s/<\/MetaData>//g;
+    # $l =~ s/<ChangeLog>//g;
+    # $l =~ s/<\/ChangeLog>//g;
     $l =~ s/ *$//g;
     print $l,"\n" if($l);
   }
