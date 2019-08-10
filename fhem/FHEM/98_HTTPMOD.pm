@@ -161,6 +161,7 @@
 #   2019-01-12  special handling when extractAllJSON is set to 2
 #   2019-01-13  check for featurelevl > 5.9
 #   2019-02-13  remove Warning when checking for extractAllJSON == 2, new attribute extractAllJSONPrefix as regex filter
+#   2019-03-06  enhanced documentation
 #
 #
 
@@ -2790,8 +2791,7 @@ sub HTTPMOD_Read($$$)
 #######################################
 # Aufruf aus InternalTimer mit "queue:$name" 
 # oder direkt mit $direct:$name
-sub
-HTTPMOD_HandleSendQueue($)
+sub HTTPMOD_HandleSendQueue($)
 {
   my (undef,$name) = split(':', $_[0]);
   my $hash  = $defs{$name};
@@ -2955,8 +2955,7 @@ HTTPMOD_HandleSendQueue($)
 
 
 #####################################
-sub
-HTTPMOD_AddToQueue($$$$$;$$$$){
+sub HTTPMOD_AddToQueue($$$$$;$$$$){
     my ($hash, $url, $header, $data, $type, $value, $count, $ignoreredirects, $prio) = @_;
     my $name = $hash->{NAME};
 
@@ -3055,7 +3054,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         to define how values are parsed from the HTTP response and in which readings they are stored. <br>
         (The old syntax <code>attr readingsNameX</code> and <code>attr readingsRegexX</code> is still supported 
         but it can go away in a future version of HTTPMOD so the new one with <code>attr readingXName</code> 
-        and <code>attr readingXRegex</code> should be preferred.
+        and <code>attr readingXRegex</code> should be preferred)
         <br><br>
         Example for a PoolManager 5:<br><br>
         <ul><code>
@@ -3082,9 +3081,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             attr PM stateFormat {sprintf("%.1f Grad, PH %.1f, %.1f mg/l Chlor", ReadingsVal($name,"TEMP",0), ReadingsVal($name,"PH",0), ReadingsVal($name,"CL",0))}<br>
         </code></ul>
         <br>
-        The regular expressions used will take the value that matches a capture group. This is the part of the regular expression inside ().
-        In the above example "([\d\.]+)" refers to numerical digits or points between double quotation marks. Only the string consiting of digits and points 
-        will match inside (). This piece is assigned to the reading.
+        This example uses regular expressions to parse the HTTP response. A regular expression describes what text is around the value that is supposed to be assigned to a reading. The value itself has to match the so called capture group of the regular expression. That is the part of the regular expression inside ().
+        In the above example "([\d\.]+)" refers to numerical digits or points between double quotation marks. Only the string consisting of digits and points will match inside (). This piece is assigned to the reading.
         
         You can also use regular expressions that have several capture groups which might be helpful when parsing tables. In this case an attribute like 
         <code><ul>
@@ -3624,10 +3622,21 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <br>
         
         <li><b>reading[0-9]+Name</b></li>
-            the name of a reading to extract with the corresponding readingRegex, readingJSON, readingXPath or readingXPath-Strict<br>
+            specifies the name of a reading to extract with the corresponding readingRegex, readingJSON, readingXPath or readingXPath-Strict<br>
+            Example:
+            <code>
+            attr myWebDevice reading01Name temperature
+            attr myWebDevice reading02Name humidity
+            </code>
             Please note that the old syntax <b>readingsName.*</b> does not work with all features of HTTPMOD and should be avoided. It might go away in a future version of HTTPMOD.
+            
         <li><b>(get|set)[0-9]+Name</b></li>
-            Name of a get or set command to be defined. If the HTTP response that is received after the command is parsed with an individual parse option then this name is also used as a reading name. Please note that no individual parsing needs to be defined for a get or set. If no regex, XPath or JSON is specified for the command, then HTTPMOD will try to parse the response using all the defined readingRegex, reading XPath or readingJSON attributes.
+            Name of a get or set command to be defined. If the HTTP response that is received after the command is parsed with an individual parse option then this name is also used as a reading name. Please note that no individual parsing needs to be defined for a get or set. If no regex, XPath or JSON is specified for the command, then HTTPMOD will try to parse the response using all the defined readingRegex, readingXPath or readingJSON attributes.
+            Example:
+            <code>
+            attr myWebDevice get01Name temperature
+            attr myWebDevice set01Name tempSoll
+            </code>
             
         <li><b>(get|set|reading)[0-9]+Regex</b></li>
             If this attribute is specified, the Regex defined here is used to extract the value from the HTTP Response 
@@ -3638,11 +3647,23 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             Using this attribute for a set command (setXXRegex) only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
             Please note that the old syntax <b>readingsRegex.*</b> does not work with all features of HTTPMOD and should be avoided. It might go away in a future version of HTTPMOD.
             If for get or set commands neither a generic Regex attribute without numbers nor a specific (get|set)[0-9]+Regex attribute is specified and also no XPath or JSON parsing specification is given for the get or set command, then HTTPMOD tries to use the parsing definitions for general readings defined in reading[0-9]+Name, reading[0-9]+Regex or XPath or JSON attributes and assigns the Readings that match here.
+            Example:
+            <code>
+            attr myWebDevice get01Regex temperature:.([0-9]+)
+            attr myWebDevice reading102Regex 34.4001.value":[ \t]+"([\d\.]+)"
+            </code>
+            
         <li><b>(get|set|reading)[0-9]+RegOpt</b></li>
             Lets the user specify regular expression modifiers. For example if the same regular expression should be matched as often as possible in the HTTP response, 
             then you can specify RegOpt g which will case the matching to be done as /regex/g<br>
             The results will be trated the same way as multiple capture groups so the reading name will be extended with -number. 
             For other possible regular expression modifiers see http://perldoc.perl.org/perlre.html#Modifiers
+            Example:
+            <code>
+            attr myWebDevice reading0088Regex temperature:.([0-9]+)
+            attr myWebDevice reading0088RegOpt g
+            </code>
+            
         <li><b>(get|set|reading)[0-9]+XPath</b></li>
             defines an xpath to one or more values when parsing HTML data (see examples above)<br>
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>          
