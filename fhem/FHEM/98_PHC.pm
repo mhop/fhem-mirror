@@ -23,6 +23,7 @@
 #   2017-02-11  started initial PoC version
 #   2017-08-08  optimized logging, silentReconnect, singleLastCommand
 #   2017-08-18  ping command, reset / config, sendRaw
+#   2019-06-02  don't do event / lastcommmand reading for CLK
 #
 #
 # Todo / Ideas:
@@ -78,7 +79,7 @@ sub PHC_ParseFrames($);
 sub PHC_HandleSendQueue($);
 sub PHC_TimeoutSend($);
 
-my $PHC_Version = '0.42 - 31.8.2018';
+my $PHC_Version = '0.43 - 2.6.2019';
     
 
 my %PHC_AdrType = (
@@ -664,11 +665,13 @@ sub PHC_ParseCommands($$)
     return if (!PHC_ParseCode($hash, $command));
     PHC_ParseOptions($hash, $command);
     PHC_LogCommand($hash, $command, "", ($command->{MTYPE} eq "CLK" ? 5:4));
-
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, 'LastCommand', PHC_CmdText($hash, $command));
     
-    DoTrigger($name, PHC_ChannelText($hash, $command, $command->{CHANNEL}) . ": " . $command->{FNAME});
+    readingsBeginUpdate($hash);
+    
+    if ($command->{MTYPE} ne "CLK") {
+        readingsBulkUpdate($hash, 'LastCommand', PHC_CmdText($hash, $command));    
+        DoTrigger($name, PHC_ChannelText($hash, $command, $command->{CHANNEL}) . ": " . $command->{FNAME});
+    }
 
     # channel bits aus Feedback / Ack verarbeiten
     if ($command->{PARSEOPTS}{'cbm'} || $command->{PARSEOPTS}{'cba'}) {
@@ -750,7 +753,7 @@ sub PHC_ParseFrames($)
         
         ($pld, $crc, $rest) = unpack ("a[$len]va*", $rest);     # v = little endian unsigned short, n would be big endian
         @data  = unpack ('C*', $pld);
-		$crc   = 0 if (!$crc);
+        $crc   = 0 if (!$crc);
         $crc1  = crc($frame, 16, 0xffff, 0xffff, 1, 0x1021, 1, 0);
         my $fcrc  = unpack ("H*", pack ("v", $crc));
         my $fcrc1 = unpack ("H*", pack ("v", $crc1));
@@ -950,10 +953,10 @@ sub PHC_ReadAnswer($$$)
 sub PHC_Ready($)
 {
     my ($hash) = @_;
-	if ($hash->{STATE} eq "disconnected") {
-		$hash->{devioLoglevel} = (AttrVal($hash->{NAME}, "silentReconnect", 0) ? 4 : 3);
-		return DevIo_OpenDev($hash, 1, undef);
-	}
+    if ($hash->{STATE} eq "disconnected") {
+        $hash->{devioLoglevel} = (AttrVal($hash->{NAME}, "silentReconnect", 0) ? 4 : 3);
+        return DevIo_OpenDev($hash, 1, undef);
+    }
 
     # This is relevant for windows/USB only
     my $po = $hash->{USBDev};
@@ -1209,7 +1212,7 @@ sub PHC_Caller()
             They also define the names of readings that are automatically created when the module listens to the PHC bus.
         <br>
     </ul>
-	<br>
+    <br>
 </ul>
 
 =end html
