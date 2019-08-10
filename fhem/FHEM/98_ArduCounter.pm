@@ -81,10 +81,14 @@
 #   2019-02-24  added documentation and better return value when get history has no data, option to pass a pinName to get history
 #               query new running config after configuring device
 #   2019-06-17  fix log messages and expose logRetries attribute
+#   2019-07-20  add clearLevels, parese more verbose level output at 25v
+#   2019-08-10  fix parsing of levels at devVerbose >= 25
+#
 #
 # ideas / todo:
 #
 #   - max time for interpolation as attribute
+#   - detect level threasholds automatically for analog input, track drift
 #
 #   - convert module to package
 #
@@ -104,7 +108,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.15 - 17.6.2019';
+my $ArduCounter_Version = '6.17 - 10.8.2019';
 
 
 my %ArduCounter_sets = (  
@@ -113,7 +117,8 @@ my %ArduCounter_sets = (
     "raw"           =>  "",
     "reset"         =>  "",
     "flash"         =>  "",
-    "saveConfig"    => "",
+    "saveConfig"    =>  "",
+    "clearLevels"   =>  "",
     "reconnect"     =>  ""  
 );
 
@@ -1001,6 +1006,10 @@ sub ArduCounter_Set($@)
         ArduCounter_Open($hash);
         return;
 
+    } elsif ($attr eq "clearLevels") {
+        delete $hash->{analogLevels};
+        return;
+
     } elsif ($attr eq "flash") {
         return ArduCounter_Flash($hash, @a);        
     }
@@ -1021,7 +1030,7 @@ sub ArduCounter_Set($@)
     } elsif ($attr eq "saveConfig") {
         Log3 $name, 4, "$name: set saveConfig called";
         ArduCounter_Write($hash, "e");
-        
+                
     } elsif ($attr eq "reset") {
         Log3 $name, 4, "$name: set reset called";
         DevIo_CloseDev($hash); 
@@ -1050,6 +1059,14 @@ sub ArduCounter_Get($@)
         return "Unknown argument $attr, choose one of " . join(" ", @cList);
     } 
 
+    if ($attr eq "levels") {
+        my $msg = "";
+        foreach my $level (sort {$a <=> $b} keys %{$hash->{analogLevels}}) {
+            $msg .= "$level: $hash->{analogLevels}{$level}\n";
+        }
+        return "observed levels from analog input:\n$msg\n";
+    }
+    
     if(!$hash->{FD}) {
         Log3 $name, 4, "$name: Get called but device is disconnected";
         return ("Get called but device is disconnected", undef);
@@ -1089,13 +1106,6 @@ sub ArduCounter_Get($@)
                     $ret;
         }
         return ($ret ? $ret : "no history data so far");
-        
-    } elsif ($attr eq "levels") {
-        my $msg = "";
-        foreach my $level (sort {$a <=> $b} keys %{$hash->{analogLevels}}) {
-            $msg .= "$level: $hash->{analogLevels}{$level}\n";
-        }
-        return "observed levels from analog input:\n$msg\n";
     }
         
     return undef;
@@ -1600,7 +1610,13 @@ sub ArduCounter_Parse($)
             $retStr .= ($retStr ? "\n" : "") . $line;
             Log3 $name, 4, "$name: device: $1";
             
-        } elsif ($line =~ /^L([\d]+)/) {                # analog level difference reported
+        } elsif ($line =~ /^L *([\d]+) ?, ?([\d]+) ?, ?-> *([\d]+)/) { # analog level difference reported with details
+            if ($hash->{analogLevels}{$3}) {
+                $hash->{analogLevels}{$3}++;
+            } else {
+                $hash->{analogLevels}{$3} = 1;
+            }
+        } elsif ($line =~ /^L *([\d]+)/) {                # analog level difference reported
             if ($hash->{analogLevels}{$1}) {
                 $hash->{analogLevels}{$1}++;
             } else {
