@@ -113,7 +113,7 @@ sub KODI_Initialize($$)
   $hash->{ReadyFn}  = "KODI_Ready";
   $hash->{UndefFn}  = "KODI_Undefine";
   $hash->{AttrFn}   = "KODI_Attr";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:0,1 jsonResponseReading:0,1 " . $readingFnAttributes;
+  $hash->{AttrList} = "compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:0,1 jsonResponseReading:0,1 " . $readingFnAttributes;
 
   $data{RC_makenotify}{XBMC} = "KODI_RCmakenotify";
   $data{RC_layout}{KODI_RClayout}  = "KODI_RClayout";
@@ -157,7 +157,7 @@ sub KODI_Define($$)
   
   $attr{$hash->{NAME}}{"updateInterval"} = 60;
   
-  return undef;
+  return KODI_Connect( $hash, 0 );
 }
 
 sub KODI_Attr($$$$)
@@ -192,12 +192,12 @@ sub KODI_CreateId($)
 
 # Force a connection attempt to KODI as soon as possible 
 # (e.g. you know you just started it and want to connect immediately without waiting up to 60 s)
-sub KODI_Connect($)
+sub KODI_ForceConnect($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
-  Log3($name, 4, "$name: KODI_Connect");
+  Log3($name, 4, "$name: KODI_ForceConnect");
 
   if($hash->{Protocol} ne 'tcp') {
     # we dont have a persistent connection anyway
@@ -205,85 +205,55 @@ sub KODI_Connect($)
     return undef;
   }
   
-  if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
-    return undef unless $hash->{CHILDPID}; # nothing to do
-    # well, the fork process does not respond to SIGTERM
-    # so lets use SIGKILL to make things clear to it
-    if ((kill SIGKILL, $hash->{CHILDPID}) != 1) { 
-      Log3 3, $name, "$name: KODI_Connect: ERROR: Unable to kill fork process!";
-      return undef;
-    }
-    $hash->{CHILDPID} = undef; # undefg childpid so the Ready-func will fork again
-  } else {
-    $hash->{NEXT_OPEN} = 0; # force NEXT_OPEN used in DevIO
-  }
+  $hash->{NEXT_OPEN} = 0; # force NEXT_OPEN used in DevIO
 
   return undef;
 }
 
-# kills child process trying to connect (if existing)
-sub KODI_KillConnectionChild($)
-{
-  my ($hash) = @_;
-
-  return if !$hash->{CHILDPID};
-
-  my $name = $hash->{NAME};
-  Log3($name, 4, "$name: KODI_KillConnectionChild: Killing child process.");
-    
-  kill 'KILL', $hash->{CHILDPID};
-  undef $hash->{CHILDPID};
+sub KODI_Connect($$) {
+  my ( $hash, $reopen ) = @_;
+  return DevIo_OpenDev( $hash, $reopen, "KODI_OnConnect", "KODI_OnConnectError" );
 }
 
 sub KODI_Ready($)
 {
   my ($hash) = @_;
   
-  my $name = $hash->{NAME};
-  if (AttrVal($hash->{NAME}, 'disable', 0)) {
-    Log3($name, 4, "$name: KODI_Ready: Cancel - is disabled");
-    return;
+  if($hash->{Protocol} eq 'tcp') {
+      return undef if IsDisabled( $hash->{NAME} );
+
+      return KODI_Connect( $hash, 1 ) if ( $hash->{STATE} eq "disconnected" );
   }
   
-  if($hash->{Protocol} eq 'tcp') {
-    if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
-      if($hash->{CHILDPID} && !(kill 0, $hash->{CHILDPID})) {
-        $hash->{CHILDPID} = undef;
-        return DevIo_OpenDev($hash, 1, "KODI_Init");
-      }
-      elsif(!$hash->{CHILDPID}) {
-        return if($hash->{CHILDPID} = fork);
-        my $ppid = getppid();
-    
-        ### Copied from Blocking.pm
-        foreach my $d (sort keys %defs) {   # Close all kind of FD
-          my $h = $defs{$d};
-          #the following line was added by vbs to not close parent's DbLog DB handle
-          $h->{DBH}->{InactiveDestroy} = 1 if ($h->{TYPE} eq 'DbLog');
-          TcpServer_Close($h) if($h->{SERVERSOCKET});
-          if($h->{DeviceName}) {
-            require "$attr{global}{modpath}/FHEM/DevIo.pm";
-            DevIo_CloseDev($h,1);
-          }
-        }
-        ### End of copied from Blocking.pm
-    
-        while(kill 0, $ppid) {
-          DevIo_OpenDev($hash, 1, "KODI_ChildExit");
-          sleep(5);
-        }
-        exit(0);
-      }
-    } else {
-      return DevIo_OpenDev($hash, 1, "KODI_Init");
-    }
-  }
   return undef;
 }
 
-sub KODI_ChildExit($) 
+sub KODI_OnConnect($) 
 {
-   exit(0);
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  Log3($name, 4, "$name: Connection established");
+  
+  KODI_ResetPlayerReadings($hash);
+        
+  #since we just successfully connected to KODI I guess its safe to assume the device is awake
+  readingsSingleUpdate($hash,"system","wake",1);
+  $hash->{LAST_RECV} = time();
+  
+  KODI_Update($hash);
+  
+  KODI_QueueIntervalUpdate($hash);
+  
+  return undef;
+}
+
+sub KODI_OnConnectError($$) {
+  my ( $hash, $err ) = @_;
+
+  if ($err) {
+    Log3 $hash, 4, "$hash->{NAME}: unable to connect to KODI device: $err";
+  }
 }
 
 sub KODI_Undefine($$) 
@@ -306,25 +276,6 @@ sub KODI_Disconnect($)
   if($hash->{Protocol} eq 'tcp') {
     DevIo_CloseDev($hash); 
   }
-  
-  KODI_KillConnectionChild($hash);
-}
-
-sub KODI_Init($) 
-{
-  my ($hash) = @_;
-
-  KODI_ResetPlayerReadings($hash);
-        
-  #since we just successfully connected to KODI I guess its safe to assume the device is awake
-  readingsSingleUpdate($hash,"system","wake",1);
-  $hash->{LAST_RECV} = time();
-  
-  KODI_Update($hash);
-  
-  KODI_QueueIntervalUpdate($hash);
-  
-  return undef;
 }
 
 sub KODI_QueueIntervalUpdate($;$) {
@@ -1151,7 +1102,7 @@ sub KODI_Set($@)
     }
   }
   elsif($cmd eq 'connect') {
-    return KODI_Connect($hash);
+    return KODI_ForceConnect($hash);
   }
   elsif($cmd eq 'activatewindow') {
     my $name = $args[0];
@@ -1877,10 +1828,6 @@ sub KODI_HTTP_Request($$@)
     <li>offMode<br/>
       Declares what should be down if the off command is executed. Possible values are <i>quit</i> (closes Kodi), <i>hibernate</i> (puts system into hibernation), 
     <i>suspend</i> (puts system into stand by), and <i>shutdown</i> (shuts down the system). Default value is <i>quit</i></li>
-  <li>fork<br/>
-      If Kodi does not run all the time it used to be the case that FHEM blocks because it cannot reach Kodi (only happened 
-    if TCP was used). If you encounter problems like FHEM not responding for a few seconds then you should set <code>attr &lt;KODI_device&gt; fork enable</code>
-    which will move the search for Kodi into a separate process.</li>
   <li>updateInterval<br/>
       The interval which is used to check if Kodi is still alive (by sending a JSON ping) and also it is used to update current player item.</li>
   <li>disable<br/>
