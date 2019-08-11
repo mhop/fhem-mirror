@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.05";
+my $version = "2.06";
 
 #-- these we may get on request
 my %gets = (
@@ -1395,7 +1395,7 @@ sub Shelly_updown2($){
            </ul>
            Attention: Of course, a csrfToken must be included as well - or a proper <i>allowed</i> device declared.</li>
          </ul>
-        <a name="Shellyset" id="Shellyset></a>
+        <a name="Shellyset" id="Shellyset"></a>
         <h4>Set</h4>  
         For all Shelly devices
         <ul>
