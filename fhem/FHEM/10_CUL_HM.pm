@@ -694,7 +694,6 @@ sub CUL_HM_Attr(@) {#################################
   return $chk if ($chk);
   
   my $updtReq = 0;
-
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
     CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
@@ -713,6 +712,7 @@ sub CUL_HM_Attr(@) {#################################
       else{
         return "attribut not allowed for channels"
                       if (!$hash->{helper}{role}{dev});
+        return if (!$init_done); # will do at updateConfig
         CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrVal);
       }
     }
@@ -9162,7 +9162,8 @@ sub CUL_HM_dimLog($) {# dimmer readings - support virtual chan - unused so far
 # that period.
 # ActionDetector will use the fixed HMid 000000
 sub CUL_HM_ActGetCreateHash() {# get ActionDetector - create if necessary
-  if (!$modules{CUL_HM}{defptr}{"000000"} && $init_done){
+  return if (!$init_done);
+  if (!$modules{CUL_HM}{defptr}{"000000"}){
     CommandDefine(undef,"ActionDetector CUL_HM 000000");
     $attr{ActionDetector}{actCycle} = 600;
     $attr{ActionDetector}{"event-on-change-reading"} = ".*";
@@ -9196,7 +9197,6 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   my ($cycleString,undef)=CUL_HM_time2sec($timeout);
   my $devName = CUL_HM_id2Name($devId);
   my $devHash = $defs{$devName};
-
   $attr{$devName}{actCycle} = $cycleString;
   $attr{$devName}{actStatus}=""; # force trigger
   my $actHash = CUL_HM_ActGetCreateHash();
