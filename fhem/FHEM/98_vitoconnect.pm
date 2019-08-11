@@ -112,8 +112,25 @@
 #                    HKx-Urlaub_Start das Datum für _Ende auf den Folgetag gesetzt
 #                    Dafür werden die Perl Module DateTime, Time:Piece und Time::Seconds
 #                    benötigt (installieren mit apt install libdatetime-perl!)
-#          
-#	
+# 
+# 2019-08-11		Dokumentation aktualisiert
+#						Das Reading 'stat' zeigt jetzt den "aggregatedStatus" an, der von der API geliefert wird
+#									Bsp: "Offline", "WorksProperly"
+#                 Readings werden nur noch aktualisiert (und ein entsprechendes Event erzeugt),
+#                          wenn sich ihr Wert geändert hat. "state" wird immer aktualisiert.         
+#						Reading für Solarunterstützung hinzugefügt:
+#                          "heating.solar.active" 											=> "Solar_aktiv",	
+#                          "heating.solar.pumps.circuit.status" 						=> "Solar_Pumpe_Status",	
+#                          "heating.solar.rechargeSuppression.status" 				=> "Solar_Aufladeunterdrueckung_Status",	
+#                          "heating.solar.sensors.power.status" 						=> "Solar_Sensor_Power_Status",	
+#                          "heating.solar.sensors.power.value" 						=> "Solar_Sensor_Power",	
+#                          "heating.solar.sensors.temperature.collector.status" 	=> "Solar_Sensor_Temperatur_Kollektor_Status",	
+#                          "heating.solar.sensors.temperature.collector.value" 	=> "Solar_Sensor_Temperatur_Kollektor",	
+#                          "heating.solar.sensors.temperature.dhw.status" 			=> "Solar_Sensor_Temperatur_WW_Status",
+#                          "heating.solar.sensors.temperature.dhw.value" 			=> "Solar_Sensor_Temperatur_WW",	
+#                          "heating.solar.statistics.hours" 						   => "Solar_Sensor_Statistik_Stunden"	
+#						ErrorListChanges (Fehlereintraege_Historie und Fehlereintraege_aktive) werden jetzt im JSON
+#                          JSON Format ausgegeben (z.B.: "{"new":[],"current":[],"gone":[]}")
 #
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
@@ -121,7 +138,6 @@
 #                 Fehlerbehandlung verbessern
 #						Attribute implementieren und dokumentieren 
 #						"sinnvolle" Readings statt 1:1 aus der API übernommene
-#		  				ErrorListChanges implementieren
 #                 mapping der Readings optional machen
 #						Mehrsprachigkeit
 #                 Auswerten der Reading in getCode usw.
@@ -356,6 +372,17 @@ my $RequestList = {
     "heating.service.burnerBased.serviceIntervalBurnerHours" 			=> "Service_Intervall_Betriebsstunden",
     "heating.service.burnerBased.activeBurnerHoursSinceLastService" 	=> "Service_Betriebsstunden_seit_letzten",
     "heating.service.burnerBased.lastService" 								=> "Service_Letzter_brennerbasiert",
+    
+    "heating.solar.active" 														=> "Solar_aktiv",	
+    "heating.solar.pumps.circuit.status" 										=> "Solar_Pumpe_Status",	
+    "heating.solar.rechargeSuppression.status" 								=> "Solar_Aufladeunterdrueckung_Status",	
+    "heating.solar.sensors.power.status" 										=> "Solar_Sensor_Power_Status",	
+    "heating.solar.sensors.power.value" 										=> "Solar_Sensor_Power",	
+    "heating.solar.sensors.temperature.collector.status" 				=> "Solar_Sensor_Temperatur_Kollektor_Status",	
+    "heating.solar.sensors.temperature.collector.value" 					=> "Solar_Sensor_Temperatur_Kollektor",	
+    "heating.solar.sensors.temperature.dhw.status" 						=> "Solar_Sensor_Temperatur_WW_Status",
+    "heating.solar.sensors.temperature.dhw.value" 							=> "Solar_Sensor_Temperatur_WW",	
+    "heating.solar.statistics.hours" 						   				=> "Solar_Sensor_Statistik_Stunden",	
     
     "heating.solar.power.production.month"									=> "Solarproduktion/Monat",	
     "heating.solar.power.production.day"										=> "Solarproduktion/Tag",
@@ -1261,6 +1288,10 @@ sub vitoconnect_getGwCallback($) {
 			$file_handle->print(Dumper($decode_json));
 		}
       
+      my $aggregatedStatus = $decode_json->{entities}[0]->{properties}->{aggregatedStatus};
+      Log3 $name, 5, "$name: aggregatedStatus: $aggregatedStatus";
+      readingsSingleUpdate($hash, "state", $aggregatedStatus, 1);             
+      
       my $installation = $decode_json->{entities}[0]->{properties}->{id};
       Log3 $name, 5, "$name: installation: $installation";
       $hash->{".installation"} = $installation;
@@ -1334,17 +1365,17 @@ sub vitoconnect_getResourceCallback($) {
 				my $Type = $Properties{$Key}{type};
 				my $Value = $Properties{$Key}{value};
 				if ( $Type eq "string" ) {
-					readingsBulkUpdate($hash, $Reading, $Value);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "number" ) {
-					readingsBulkUpdate($hash, $Reading, $Value);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "array" ) {
 					my $Array = join(",", @$Value);
-					readingsBulkUpdate($hash, $Reading, $Array);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Array);
 					Log3 $name, 5, "$FieldName".".$Key: $Array ($Type)";
 				} elsif ( $Type eq "boolean" ) {
-					readingsBulkUpdate($hash, $Reading, $Value);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "Schedule" ) {
 					# my %Entries = %$Value;
@@ -1359,14 +1390,19 @@ sub vitoconnect_getResourceCallback($) {
 					#	}
 					#}
 					my $Result = encode_json($Value);
-					readingsBulkUpdate($hash, $Reading, $Result);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Result);
 					Log3 $name, 5, "$FieldName".".$Key: $Result ($Type)";
 				} elsif ( $Type eq "ErrorListChanges" ) {
 					# not implemented yet
-					readingsBulkUpdate($hash, $Reading, "ErrorListChanges");
-					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
+					#readingsBulkUpdateIfChanged($hash, $Reading, "ErrorListChanges");
+					#Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
+					
+					my $Result = encode_json($Value);
+					readingsBulkUpdateIfChanged($hash, $Reading, $Result);
+					Log3 $name, 5, "$FieldName".".$Key: $Result ($Type)";					
+					
  				} else {
-					readingsBulkUpdate($hash, $Reading, "Unknown: $Type");
+					readingsBulkUpdateIfChanged($hash, $Reading, "Unknown: $Type");
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				}	
 			}
@@ -1379,18 +1415,15 @@ sub vitoconnect_getResourceCallback($) {
 						my @fields = @{$action->{fields}};
 						my $Result = "action: ";
 						for my $field (@fields) { $Result .= $field->{name}." ";	}
-						readingsBulkUpdate($hash, $FieldName.".".$action->{"name"}, $Result);
+						readingsBulkUpdateIfChanged($hash, $FieldName.".".$action->{"name"}, $Result);
 					}	
 				}
 			}
 			###########################################
 		};
 		
-				
-		#readingsBulkUpdate($hash, "xxx", $RequestList2->{"heating.boiler.serial.value"});
-		
 		$hash->{counter} = $hash->{counter} + 1;
-		readingsBulkUpdate($hash, "state", "ok");             
+		#readingsBulkUpdate($hash, "state", "ok");             
    } else {
 		readingsBulkUpdate($hash, "state", "An error occured: $err");
       Log3 $name, 1, "$name - An error occured: $err";
@@ -1472,10 +1505,11 @@ sub vitoconnect_action($) {
 	return undef;
 }
 
+
+sub vitoconnect_StoreKeyValue($$$) {
 ###################################################
 # checks and stores obfuscated keys like passwords 
 # based on / copied from FRITZBOX_storePassword
-sub vitoconnect_StoreKeyValue($$$) {
     my ($hash, $kName, $value) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
     my $key   = getUniqueId().$index;    
@@ -1494,10 +1528,10 @@ sub vitoconnect_StoreKeyValue($$$) {
     return "error while saving the value - $err" if(defined($err));
     return undef;
 } 
-    
+sub vitoconnect_ReadKeyValue($$) {
 #####################################################
 # reads obfuscated value 
-sub vitoconnect_ReadKeyValue($$) {
+
    my ($hash, $kName) = @_;
    my $name = $hash->{NAME};
 
@@ -1544,19 +1578,24 @@ sub vitoconnect_ReadKeyValue($$) {
 <a name="vitoconnect"></a>
 <h3>vitoconnect</h3>
 <ul>
-    <i>vitoconnect</i> implements a device for Vissmann API <a href="https://www.vissmann.de/de/vissmann-apps/vitoconnect.html">Vitoconnect100</a>.
-    Based on investigation of <a href="https://github.com/thetrueavatar/Viessmann-Api">thetrueavatar</a>
+    <i>vitoconnect</i> implements a device for the Vissmann API <a href="https://www.vissmann.de/de/vissmann-apps/vitoconnect.html">Vitoconnect100</a>
+    based on investigation of <a href="https://github.com/thetrueavatar/Viessmann-Api">thetrueavatar</a><br>
     
-	 You need the user and password from the ViCare App account.  
+	 You need the user and password from the ViCare App account.<br>
 	 
-	 For details see: <a href="https://wiki.fhem.de/wiki/Vitoconnect">FHEM Wiki (german)</a>
+	 For details see: <a href="https://wiki.fhem.de/wiki/Vitoconnect">FHEM Wiki (german)</a><br><br>
 	 
-	 viconnect needs the following libraries: libtypes-path-tiny-perl<br>	 
-	 Use sudo apt install libtypes-path-tiny-perl or install path::tiny via cpan
+	 vitoconnect needs the following libraries:
+	 <ul>
+	 <li>Path::Tiny</li>
+	 <li>JSON</li>
+	 <li>DateTime</li>
+	 </ul>	 
+	 	 
+	 Use <code>sudo apt install libtypes-path-tiny-perl libjson-perl libdatetime-perl</code> or install the libraries via cpan. 
+	 Otherwise you will get an error message "cannot load module vitoconnect".
 	 
-	 sudo apt-get install
-
-    <br><br>
+	 <br><br>
     <a name="vitoconnectdefine"></a>
     <b>Define</b>
     <ul>
