@@ -23,12 +23,14 @@
 # - bugfix:  74_UnififSwitch: fixed poe restart
 # V 0.0.94
 # - feature: 74_UnififSwitch: supports new module UnifiClient
+# V 0.0.95
+# - feature: 74_UnififSwitch: supports disablePort
 # 
 # TODOs:
 # - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
-my $version="0.0.94";
+my $version="0.0.95";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;

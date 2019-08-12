@@ -71,10 +71,14 @@
 #  - fixed:   74_Unifi: fixed restore clients at fhem restart
 # V 3.3.3
 #  - fixed:   74_Unifi: fixed (un)blockClient for UC Version 5.10.24
+# V 3.3.4
+#  - fixed:   74_Unifi: fixed AP-Readingnames (use makeReadingName())
+# V 3.4.0
+#  - feature: 74_Unifi: new setter to start RF-Scan
 
 
 package main;
-my $version="3.3.3";
+my $version="3.4.0";
 # Default für clientReadings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -347,14 +351,26 @@ sub Unifi_Set($@) {
 	$disconnectedClientNames =~ s/.$//;
 		
     #my $clientNames = Unifi_ClientNames($hash);
-    my $apNames = Unifi_ApNames($hash);
+    my $apNames = Unifi_ApNames($hash); # TODO: $apNames in $deviceNames umbenennen
     my $SSIDs = Unifi_SSIDs($hash);
-    
-    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|updateClient|clear|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher|removeClientReadings|refreshUsergroups/) {
+	
+	my $aps = '';
+	for my $apID (keys %{$hash->{accespoints}}) {
+		my $apName=Unifi_ApNames($hash,$apID,'makeName');
+		my $essid_Reading=ReadingsVal($name, '-AP_'.$apName.'_essid', undef);
+		my $has_essid=0;
+		$has_essid=1 if(defined $essid_Reading && $essid_Reading ne 'none');
+		if ($has_essid){
+			$aps .= $apName.',';
+		}
+	}
+	$aps =~ s/.$//;
+	
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|startRFScan|disconnectClient|update|updateClient|clear|blockClient|unblockClient|enableWLAN|disableWLAN|switchSiteLEDs|createVoucher|removeClientReadings|refreshUsergroups/) {
         return "Unknown argument $setName, choose one of update:noArg "
                ."clear:all,readings,clientData,allData,voucherCache "
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
-               .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
+               .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames startRFScan:$aps " : "")
                .(($connectedClientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$connectedClientNames " : "")
                .(($disconnectedClientNames && Unifi_CONNECTED($hash)) ? "removeClientReadings:$disconnectedClientNames " : "")
                .(($unblockedClientNames && Unifi_CONNECTED($hash)) ? "blockClient:$unblockedClientNames " : "")
@@ -489,6 +505,15 @@ sub Unifi_Set($@) {
                 elsif (!$setVal || $setVal eq 'all') {
                     Unifi_ApCmd_Send($hash,'unset-locate',keys(%{$hash->{accespoints}}));
                 }
+            }
+            elsif ($setName eq 'startRFScan') {
+				$setVal = Unifi_ApNames($hash,$setVal,'makeID');
+				if (defined $hash->{accespoints}->{$setVal}) {
+					Unifi_ApCmd_Send($hash,'spectrum-scan',$setVal);
+				}
+				else {
+					return "$hash->{NAME}: Unknown accesspoint '$setVal' in command '$setName', choose one of: $aps";
+				}
             }
             elsif ($setName eq 'removeClientReadings') {
 				if($setVal && $setVal ne ""){
@@ -1381,7 +1406,8 @@ sub Unifi_GetEvents_Receive($) {
     return undef;
 }
 ###############################################################################
-sub Unifi_GetAccesspoints_Send($) {
+sub Unifi_GetAccesspoints_Send($) { # TODO Umbenennen in Unifi_GetDevices_Send. Dann muss man auch an Get_ApNames() ran, da dort nicht nur APs sondern auch usg und switch drin sind.
+									# Waren wohl früher in Version 1 des Moduls nur APs unter devices
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
@@ -1394,7 +1420,7 @@ sub Unifi_GetAccesspoints_Send($) {
     } );
     return undef;
 }
-sub Unifi_GetAccesspoints_Receive($) {
+sub Unifi_GetAccesspoints_Receive($) {# TODO Umbenennen in Unifi_GetDevices_Receive
     my ($param, $err, $data) = @_;
     my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
     Log3 $name, 5, "$name ($self) - executed.";
@@ -2038,7 +2064,7 @@ sub Unifi_CreateVoucher_Receive($) {
 }
 ###############################################################################
 
-sub Unifi_ApCmd_Send($$@) {     #cmd: 'set-locate', 'unset-locate', 'restart'
+sub Unifi_ApCmd_Send($$@) {     #cmd: 'set-locate', 'unset-locate', 'restart', 'startRFScan'
     my ($hash,$cmd,@aps) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed with cmd:'".$cmd."', count:'".scalar(@aps)."', ID:'".$aps[0]."'";
@@ -2663,10 +2689,13 @@ Or you can use the other readings or set and get features to control your unifi-
     Restart one ore all accesspoints. </li>
     <br>
     <li><code>set &lt;name&gt; setLocateAP &lt;all|_id|name|ip&gt;</code><br>
-    Start 'locate' on one or all accesspoints. </li>
+    Start 'locate' on one or all accesspoints.</li>
     <br>
     <li><code>set &lt;name&gt; unsetLocateAP &lt;all|_id|name|ip&gt;</code><br>
     Stop 'locate' on one or all accesspoints. </li>
+    <br>
+    <li><code>set &lt;name&gt; startRFScan &lt;all|_id|name|ip&gt;</code><br>
+    Start 'RF-Scan' on one or all accesspoints. Does not work with 1. Gen APs. </li>
     <br>
     <li><code>set &lt;name&gt; blockClient &lt;clientname&gt;</code><br>
     Block the &lt;clientname&gt;. Can also be called with the mac-address of the client.</li>

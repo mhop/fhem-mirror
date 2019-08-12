@@ -264,8 +264,8 @@ sub UnifiClient_Parse($$) {
 		$hash->{MODEL}=$clientRef->{oui};
         
         my $old_tx=ReadingsVal($hash->{NAME},"tx_bytes",undef);
-        my $seconds=ReadingsAge($hash->{NAME},"tx_bytes",1);
-		$seconds=0.1 if ($seconds eq 0 || ! defined $seconds);  
+        my $seconds=ReadingsAge($hash->{NAME},"tx_bytes",0);
+		$seconds=0.1 if (! defined $seconds || $seconds < 0.1);  
         my $tx_used=0;
         if (defined $old_tx && defined $clientRef->{tx_bytes}){
             $tx_used=($clientRef->{tx_bytes})-($old_tx);
