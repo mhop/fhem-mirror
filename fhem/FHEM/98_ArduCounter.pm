@@ -83,6 +83,8 @@
 #   2019-06-17  fix log messages and expose logRetries attribute
 #   2019-07-20  add clearLevels, parese more verbose level output at 25v
 #   2019-08-10  fix parsing of levels at devVerbose >= 25
+#   2019-08-12  fix documentation of keepalive attributes, add parsing of RSSI, 
+#               add missing attributes if they don't match the running device config
 #
 #
 # ideas / todo:
@@ -108,7 +110,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.17 - 10.8.2019';
+my $ArduCounter_Version = '6.18 - 12.8.2019';
 
 
 my %ArduCounter_sets = (  
@@ -530,10 +532,12 @@ sub ArduCounter_KeepAlive($)
     RemoveInternalTimer ("alive:$name");
     InternalTimer($now+$kto, "ArduCounter_AliveTimeout", "alive:$name", 0);
     $hash->{WaitForAlive} = 1;
+    #Log3 $name, 5, "$name: keepAlive timeout timer set  $kto";
     
     if ($hash->{TCP}) {        
         RemoveInternalTimer ("keepAlive:$name");
         InternalTimer($now+$kdl, "ArduCounter_KeepAlive", "keepAlive:$name", 0);    # next keepalive
+        #Log3 $name, 5, "$name: keepAlive timer for next message set in $kdl";
     }
 }
 
@@ -545,10 +549,11 @@ sub ArduCounter_AliveTimeout($)
     my $param = shift;
     my (undef,$name) = split(/:/,$param);
     my $hash = $defs{$name};
+    #Log3 $name, 5, "$name: AliveTimeout called";
     delete $hash->{WaitForAlive};
     $hash->{KeepAliveRetries} = 0 if (!$hash->{KeepAliveRetries});
             
-    if (++$hash->{KeepAliveRetries} > AttrVal($name, "keepAliveRetries", 1)) {
+    if (++$hash->{KeepAliveRetries} > AttrVal($name, "keepAliveRetries", 2)) {
         Log3 $name, 3, "$name: device didn't reply to k(eeepAlive), no retries left, setting device to disconnected";
         ArduCounter_Disconnected($hash);        # set to Disconnected but let _Ready try to Reopen
     } else {
@@ -593,6 +598,9 @@ sub ArduCounter_ConfigureDevice($)
             Log3 $name, 5, "$name: ConfigureDevice: comparing intervals (>$iRCfg< vs >$iACfg< from attr)";
             if (!$iRCfg || $iRCfg ne $iACfg) {
                 Log3 $name, 5, "$name: ConfigureDevice: intervals don't match (>$iRCfg< vs >$iACfg< from attr)";
+                if (AttrVal($name, "interval", "none") eq "none") {     # set attr if no attr is set and running config doesn't match
+                    CommandAttr(undef, "$name interval 30 600 2 2")
+                }
                 last CHECKS;
             }
         } else {
@@ -602,12 +610,15 @@ sub ArduCounter_ConfigureDevice($)
         my $vAttr = AttrVal($name, "devVerbose", "");     
         if (!$vAttr) {
             $vAttr = 0;
-            Log3 $name, 5, "$name: ConfigureDevice: devVerbose attr not set - take default $iAttr";
+            Log3 $name, 5, "$name: ConfigureDevice: devVerbose attr not set - take default $vAttr";
         }
         my $vRCfg = ($hash->{runningCfg}{V} ? $hash->{runningCfg}{V} : 0);
         Log3 $name, 5, "$name: ConfigureDevice: comparing devVerbose $vRCfg vs $vAttr from attr)";
         if ($vRCfg != $vAttr) {
             Log3 $name, 5, "$name: ConfigureDevice: devVerbose don't match ($vRCfg vs $vAttr from attr)";
+            if (!AttrVal($name, "devVerbose", "none" eq "none")) {  # set attr if no attr is set and running config doesn't match
+                CommandAttr(undef, "$name devVerbose 0")
+            }   
             last CHECKS;
         }
         
@@ -625,8 +636,7 @@ sub ArduCounter_ConfigureDevice($)
                 }
             } else {
                 Log3 $name, 3, "$name: ConfigureDevice: can not compare against analogThreshold attr - wrong format";         
-            }
-            
+            }            
         }
         
         Log3 $name, 5, "$name: ConfigureDevice: matches so far - now compare pins";
@@ -666,7 +676,7 @@ sub ArduCounter_ConfigureDevice($)
         return;
     }
     # todo: check for additional pins also when rest matches (return above is too early)
-    
+        
     Log3 $name, 5, "$name: ConfigureDevice: now check for pins without attr in @runningPins";
     my %cPins;      # get all pins from running config in a hash to find out if one is not defined on fhem side
     for (my $i = 0; $i < @runningPins; $i++) {
@@ -1586,10 +1596,16 @@ sub ArduCounter_Parse($)
             $retStr .= ($retStr ? "\n" : "") . $line;     
             Log3 $name, 4, "$name: device sent config for pin $1: $2 $p min $4";
             
-        } elsif ($line =~ /^alive/) {                       # alive response
+        } elsif ($line =~ /^alive( ?RSSI ([\-\d]+))?/) {    # alive response
+            Log3 $name, 5, "$name: device sent alive response: $line";
             RemoveInternalTimer ("alive:$name");
             $hash->{WaitForAlive} = 0;
             delete $hash->{KeepAliveRetries};
+            if ($2) {
+                readingsBeginUpdate($hash);         
+                readingsBulkUpdate($hash, "RSSI", $2);
+                readingsEndUpdate($hash, 1);
+            }
             
         } elsif ($line =~ /^ArduCounter V([\d\.]+).*(Started|Hello)/) {  # setup message
             ArduCounter_ParseHello($hash, $line, $now);       
@@ -2074,7 +2090,7 @@ sub ArduCounter_ReadAnswer($$)
             defines an interval in which the module sends keepalive messages to a counter device that is conected via tcp.<br>
             This attribute is ignored if the device is connected via serial port.<br>
             If the device doesn't reply within a defined timeout then the module closes and tries to reopen the connection.<br>
-            The module tells the device when to expect the next keepalive message and the device will also close the tcp connection if it doesn't see a keepalive message within the delay multiplied by 2.5<br>
+            The module tells the device when to expect the next keepalive message and the device will also close the tcp connection if it doesn't see a keepalive message within the delay multiplied by 3<br>
             The delay defaults to 10 seconds.<br>
             Example:
             <code>

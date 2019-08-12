@@ -93,6 +93,7 @@
         21.7.19 - V3.30 replace delay during analog read with millis() logic, optimize waiting times for analog read
         10.8.19 - V3.32 add ICACHE_RAM_ATTR for ISRs and remove remaining long casts (bug) when handling time
         12.8.19 - V3.33 fix handling of keepalive timeouts when millis wraps
+                  V3.34 add RSSI output when devVerbose >= 5 in kealive responses
 
     ToDo / Ideas:
         make analogInterval available in Fhem
@@ -103,7 +104,7 @@
 */ 
 
 /* Remove this before compiling */
-/* #define TestConfig */
+#define TestConfig // include my SSID / secret
 
 
 /* allow printing of every pin change to Serial */
@@ -121,7 +122,7 @@
 #include "pins_arduino.h"
 #include <EEPROM.h>
 
-const char versionStr[] PROGMEM = "ArduCounter V3.33";
+const char versionStr[] PROGMEM = "ArduCounter V3.34";
 
 #define SERIAL_SPEED 38400
 #define MAX_INPUT_NUM 8
@@ -157,7 +158,6 @@ WiFiClient Client1;                 // active TCP connection
 WiFiClient Client2;                 // secound TCP connection to send reject message
 boolean Client1Connected;           // remember state of TCP connection
 boolean Client2Connected;           // remember state of TCP connection
-long rssi;                          // WiFi connection strength
 
 boolean tcpMode = false;
 uint8_t delayedTcpReports = 0;      // how often did we already delay reporting because tcp disconnected
@@ -340,7 +340,7 @@ uint16_t countMin    =     2;       // continue counting if count is less than t
 
 uint32_t lastReportCall;
 #ifdef ESP8266
-uint16_t keepAliveTimeout;
+uint16_t keepAliveTimeout = 200;
 uint32_t lastKeepAlive;
 #endif
 
@@ -1199,19 +1199,28 @@ void devVerboseCmd(uint16_t *values, uint8_t size) {
             
             
 void keepAliveCmd(uint16_t *values, uint8_t size) {
+    uint32_t now = millis();
+
     if (values[0] == 1 && size > 0) {
-        Output->println(F("alive"));
-    }
+        Output->print(F("alive"));
 #ifdef ESP8266
-    if (values[0] == 1 && size > 0 && size < 3 && Client1.connected()) {
-        tcpMode = true;
-        if (size == 2) {
-            keepAliveTimeout = values[1];   // timeout in seconds (on ESP side we use it times 3)
-        } else {
-            keepAliveTimeout = 200;         // *3*1000 gives 10 minutes if nothing sent (should not happen)
+        if (devVerbose >=5) {
+            Output->print(F(" RSSI "));
+            Output->print(WiFi.RSSI());
         }
-    }  
+    
+        if (values[0] == 1 && size > 0 && size < 3 && Client1.connected()) {
+            tcpMode = true;
+            if (size == 2) {
+                keepAliveTimeout = values[1];   // timeout in seconds (on ESP side we use it times 3)
+            } else {
+                keepAliveTimeout = 200;         // *3*1000 gives 10 minutes if nothing sent (should not happen)
+            }
+        }  
+        lastKeepAlive = now;
 #endif
+        Output->println();
+    }
 }
 
 
@@ -1571,7 +1580,7 @@ void handleConnections() {
     uint32_t now = millis();
     
     if (Client1Connected) {
-        if((now - lastKeepAlive) > (keepAliveTimeout *3000)) {
+        if((now - lastKeepAlive) > (keepAliveTimeout * 3000)) {
             Serial.println(F("M no keepalive from Client - disconnecting"));
             Client1.stop();
         }
