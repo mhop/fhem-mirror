@@ -92,6 +92,7 @@
         20.7.19 -       nicer debug output for analog leves
         21.7.19 - V3.30 replace delay during analog read with millis() logic, optimize waiting times for analog read
         10.8.19 - V3.32 add ICACHE_RAM_ATTR for ISRs and remove remaining long casts (bug) when handling time
+        12.8.19 - V3.33 fix handling of keepalive timeouts when millis wraps
 
     ToDo / Ideas:
         make analogInterval available in Fhem
@@ -120,7 +121,7 @@
 #include "pins_arduino.h"
 #include <EEPROM.h>
 
-const char versionStr[] PROGMEM = "ArduCounter V3.32";
+const char versionStr[] PROGMEM = "ArduCounter V3.33";
 
 #define SERIAL_SPEED 38400
 #define MAX_INPUT_NUM 8
@@ -156,6 +157,7 @@ WiFiClient Client1;                 // active TCP connection
 WiFiClient Client2;                 // secound TCP connection to send reject message
 boolean Client1Connected;           // remember state of TCP connection
 boolean Client2Connected;           // remember state of TCP connection
+long rssi;                          // WiFi connection strength
 
 boolean tcpMode = false;
 uint8_t delayedTcpReports = 0;      // how often did we already delay reporting because tcp disconnected
@@ -338,7 +340,8 @@ uint16_t countMin    =     2;       // continue counting if count is less than t
 
 uint32_t lastReportCall;
 #ifdef ESP8266
-uint32_t expectK;
+uint16_t keepAliveTimeout;
+uint32_t lastKeepAlive;
 #endif
 
 /* index to the following arrays is the internal pin index number  */
@@ -433,7 +436,7 @@ void initialize() {
 #endif
     restoreFromEEPROM();
 #ifdef ESP8266  
-    expectK   = now + 600000;   // max 10 Minutes (to be checked on Fhem module side as well
+    lastKeepAlive = now;
 #endif      
 }
 
@@ -448,8 +451,7 @@ void initialize() {
 */
 static void inline doCount(uint8_t pinIndex, uint8_t level, uint32_t now) {
     uint32_t len = now - lastChange[pinIndex];
-  char     act = ' ';
-
+    char act = ' ';
 #ifdef pulseHistory 
     histIndex++;
     if (histIndex >= MAX_HIST) histIndex = 0;
@@ -780,7 +782,7 @@ void showPinCounter(short pinIndex, boolean showOnly, uint32_t now) {
     rejDiff   = rejCount - lastRejCount[pinIndex];
     
     if (!showOnly) {                                // real reporting sets the interval borders new
-        if((now - lastReport[pinIndex]) >= intervalMax) { 
+        if((now - lastReport[pinIndex]) > intervalMax) { 
             // intervalMax is over
             if ((countDiff >= countMin) && (timeDiff > intervalSml) && (intervalMin != intervalMax)) {
                 // normal procedure
@@ -795,7 +797,7 @@ void showPinCounter(short pinIndex, boolean showOnly, uint32_t now) {
                 interrupts();
                 timeDiff  = now - startT;           // special handling - calculation ends now
             }        
-        } else if (((now - lastReport[pinIndex]) >= intervalMin)   
+        } else if (((now - lastReport[pinIndex]) > intervalMin)   
             && (countDiff >= countMin) && (timeDiff > intervalSml)) {
             // minInterval has elapsed and other conditions are ok
             noInterrupts();                         // vars could be modified in ISR as well
@@ -862,12 +864,12 @@ void showPinCounter(short pinIndex, boolean showOnly, uint32_t now) {
 boolean reportDue() {
     uint32_t now = millis();
     boolean doReport  = false;                          // check if report needs to be called
-    if((now - lastReportCall) >= intervalMin)           // works fine when millis wraps.
+    if((now - lastReportCall) > intervalMin)            // works fine when millis wraps.
         doReport = true;                                // intervalMin is over 
     else 
         for (uint8_t pinIndex=0; pinIndex < MAX_PIN; pinIndex++)  
             if (activePin[pinIndex] >= 0)
-                if((now - lastReport[pinIndex]) >= intervalMax)
+                if((now - lastReport[pinIndex]) > intervalMax)
                     doReport = true;                    // active pin has not been reported for langer than intervalMax
     return doReport;
 }
@@ -878,7 +880,7 @@ void report() {
     uint32_t now = millis();    
 #ifdef ESP8266
     if (tcpMode && !Client1Connected && (delayedTcpReports < 3)) {
-        if(delayedTcpReports == 0 || ((long)(now - (lastDelayedTcpReports + (1 * 30 * 1000))) > 0)) {
+        if(delayedTcpReports == 0 || ((now - lastDelayedTcpReports) > 30000)) {
             Serial.print(F("D report called but tcp is disconnected - delaying ("));
             Serial.print(delayedTcpReports);
             Serial.print(F(")"));
@@ -1104,19 +1106,19 @@ void intervalCmd(uint16_t *values, uint8_t size) {
         PrintErrorMsg(); Output->println(values[0]);
         return;
     }
-    intervalMin = (long)values[0] * 1000;
+    intervalMin = (uint32_t)values[0] * 1000;
 
     if (values[1] < 1 || values[1] > 3600) {
         PrintErrorMsg(); Output->println(values[1]);
         return;
     }
-    intervalMax = (long)values[1]* 1000;
+    intervalMax = (uint32_t)values[1]* 1000;
 
     if (values[2] > 3600) {
         PrintErrorMsg(); Output->println(values[2]);
         return;
     }
-    intervalSml = (long)values[2] * 1000;
+    intervalSml = (uint32_t)values[2] * 1000;
 
     if (values[3] > 100) {
         PrintErrorMsg(); Output->println(values[3]);
@@ -1204,9 +1206,9 @@ void keepAliveCmd(uint16_t *values, uint8_t size) {
     if (values[0] == 1 && size > 0 && size < 3 && Client1.connected()) {
         tcpMode = true;
         if (size == 2) {
-            expectK = millis() + values[1] * 2500;
+            keepAliveTimeout = values[1];   // timeout in seconds (on ESP side we use it times 3)
         } else {
-            expectK = millis() + 600000;    // 10 Minutes if nothing sent (should not happen)
+            keepAliveTimeout = 200;         // *3*1000 gives 10 minutes if nothing sent (should not happen)
         }
     }  
 #endif
@@ -1569,7 +1571,7 @@ void handleConnections() {
     uint32_t now = millis();
     
     if (Client1Connected) {
-        if((long)(now - expectK) >= 0) {
+        if((now - lastKeepAlive) > (keepAliveTimeout *3000)) {
             Serial.println(F("M no keepalive from Client - disconnecting"));
             Client1.stop();
         }
@@ -1602,7 +1604,7 @@ void handleConnections() {
             Serial.println(F(" accepted"));
             Client1Connected = true;
             Output = &Client1;
-            expectK = now + 600000;   // max 10 Minutes (to be checked on Fhem module side as well
+            lastKeepAlive = now;
             helloCmd();                                         // say hello to client
         }
     }
@@ -1664,14 +1666,16 @@ void readAnalog() {
     short AIndex = allowedPins[analogInPin];
     if (AIndex >= 0 && activePin[AIndex] >= 0) {                // analog Pin active?
         uint32_t now = millis();
-        if (now - lastAnalogRead > analogReadInterval) {        // time for next analog read?
+        uint16_t interval2 = analogReadInterval + 2;
+        uint16_t interval3 = analogReadInterval + 4;
+        if ((now - lastAnalogRead) > analogReadInterval) {      // time for next analog read?
             switch (analogReadState) {
                 case 0:                                         // initial state
                     digitalWrite(irOutPin, LOW);                // switch IR LED is off
                     analogReadState = 1;
                     break;
                 case 1:                                         // wait before measuring
-                    if (now - lastAnalogRead < analogReadInterval + 2)
+                    if ((now - lastAnalogRead) < interval2)
                         return;
                     analogReadState = 2;
                     break;
@@ -1684,7 +1688,7 @@ void readAnalog() {
                     analogReadState = 4;
                     break;
                 case 4:                                         // wait again before measuring
-                    if (now - lastAnalogRead < analogReadInterval + 4)
+                    if ((now - lastAnalogRead) < interval3)
                         return;
                     analogReadState = 5;
                     break;
