@@ -5,12 +5,13 @@
 # written by Dr. Boris Neubert 2007-12-30
 # e-mail: omega at online dot de
 #
-# modified and maintained by Tobias Faust since 2012-06-26
+# modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# reduceLog() created by Claudiu Schuster (rapster)
+# redesigned and maintained 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
+# e-mail: heiko dot maaz at t-online dot de
 #
-# redesigned 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
+# reduceLog() created by Claudiu Schuster (rapster)
 #
 ############################################################################################################################################
 
@@ -28,7 +29,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\", Forum: #100344",
+  "4.2.0"   => "25.07.2019 DbLogValueFn as device specific function propagated in devices if dblog is used ",
+  "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\", Forum: #100344 ",
   "4.1.0"   => "17.04.2019 DbLog_Get: change reconnect for MySQL (Forum: #99719), change index suggestion in DbLog_configcheck ",
   "4.0.0"   => "14.04.2019 rewrite DbLog_PushAsync / DbLog_Push / DbLog_Connectxx, new attribute \"bulkInsert\" ",
   "3.14.1"  => "12.04.2019 DbLog_Get: change select of MySQL Forum: https://forum.fhem.de/index.php/topic,99280.0.html ",
@@ -260,6 +262,7 @@ sub DbLog_Initialize($)
 
   addToAttrList("DbLogInclude");
   addToAttrList("DbLogExclude");
+  addToAttrList("DbLogValueFn:textField-long");
 
   $hash->{FW_detailFn}      = "DbLog_fhemwebFn";
   $hash->{SVG_sampleDataFn} = "DbLog_sampleDataFn";
@@ -1229,7 +1232,6 @@ sub DbLog_Log($$) {
 			  last;
 		  }
 	  }
-	  # Log3 $name, 5, "DbLog $name -> verbose 4 output of device $dev_name skipped due to attribute \"verbose4Devs\" restrictions" if(!$vb4show);
   }
   
   if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
@@ -1246,8 +1248,16 @@ sub DbLog_Log($$) {
   my $now                = gettimeofday();                               # get timestamp in seconds since epoch
   my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
   my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
+  my $DbLogValueFn       = AttrVal($dev_name, "DbLogValueFn","");
   my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");
   my $value_fn           = AttrVal( $name, "valueFn", "" );  
+  
+  # Funktion aus Device spezifischer DbLogValueFn validieren
+  if( $DbLogValueFn =~ m/^\s*(\{.*\})\s*$/s ) {
+      $DbLogValueFn = $1;
+  } else {
+      $DbLogValueFn = '';
+  }
   
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
@@ -1375,8 +1385,34 @@ sub DbLog_Log($$) {
 	    	  if ($DoIt) {
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
+                  
+			      # Device spezifische DbLogValueFn-Funktion anwenden
+ 		  	      if($DbLogValueFn ne '') {
+ 				      my $TIMESTAMP  = $timestamp;
+ 				      my $EVENT      = $event;
+ 				      my $READING    = $reading;
+ 		  	          my $VALUE 	 = $value;
+ 				      my $UNIT   	 = $unit;
+					  my $IGNORE     = 0;
+                      my $CN         = " ";
+
+ 				      eval $DbLogValueFn;
+					  Log3 $name, 2, "DbLog $name -> error device \"$dev_name\" specific DbLogValueFn: ".$@ if($@);
+                      
+					  if($IGNORE) {
+					      # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $DbLogValueFn
+						  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
+						                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
+					      next;  
+					  }
+					  
+					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+ 				      $reading   = $READING    if($READING ne '');
+ 		  	          $value     = $VALUE      if(defined $VALUE);
+ 				      $unit      = $UNIT       if(defined $UNIT);
+                  }
 				  
-			      # Anwender kann Feldwerte mit Funktion aus Attr valueFn verändern oder Datensatz-Log überspringen
+			      # zentrale valueFn im DbLog-Device abarbeiten
  		  	      if($value_fn ne '') {
  				      my $TIMESTAMP  = $timestamp;
  				      my $DEVICE     = $dev_name;
@@ -1390,6 +1426,7 @@ sub DbLog_Log($$) {
 
  				      eval $value_fn;
 					  Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
+                      
 					  if($IGNORE) {
 					      # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
 						  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
@@ -5730,7 +5767,15 @@ return;
 	
   <b>Preparations</b> <br><br>
   
-  At first you need to setup the database. <br>
+  At first you need to install and setup the database.
+  The installation of database system itself is not described here, please refer to the installation instructions of your 
+  database. <br><br>
+  
+  <b>Note:</b> <br>
+  In case of fresh installed MySQL/MariaDB system don't forget deleting the anonymous "Everyone"-User with an admin-tool if 
+  existing ! 
+  <br><br>  
+  
   Sample code and Scripts to prepare a MySQL/PostgreSQL/SQLite database you can find in 
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>. <br>
   (<b>Caution:</b> The local FHEM-Installation subdirectory ./contrib/dblog doesn't contain the freshest scripts !!) 
@@ -6541,7 +6586,7 @@ return;
       attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
       </code><br>
 	  
-      A new Attribute DbLogExclude will be propagated to all devices if DBLog is used. 
+      A new attribute DbLogExclude will be propagated to all devices if DBLog is used. 
 	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by 
       comma. 
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
@@ -6555,6 +6600,41 @@ return;
     </li>
   </ul>
   <br>
+  
+  <ul>
+     <a name="DbLogValueFn"></a>
+     <li><b>DbLogValueFn</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; DbLogValueFn {}
+	   </code><br>
+       
+       The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used. 
+	   This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of 
+       reading) and $UNIT (unit of reading value). That means the changed values are logged.
+       You also have readonly-access to $EVENT for evaluation in your expression. <br>
+	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
+	   be changed.
+	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
+
+       The device specific function in "DbLogValueFn" is applied to the dataset before the potential existing attribute 
+       "valueFn" in the DbLog device.
+       <br><br>
+	   
+	   <b>Example</b> <br>
+       <pre>
+attr SMA_Energymeter DbLogValueFn
+{ 
+  if ($READING eq "Bezug_WirkP_Kosten_Diff"){
+    $UNIT="Diff-W";
+  }
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
+    $IGNORE=1;
+}
+	   </pre>
+     </ul>
+     </li>
+  </ul>
   
   <ul>
     <a name="disable"></a>
@@ -6855,9 +6935,9 @@ return;
 	   attr &lt;device&gt; valueFn {}
 	   </code><br>
       
-	   Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (value of reading) and 
-	   $UNIT (unit of reading value).
-       It also has readonly-access to $EVENT for evaluation in your expression. <br>
+	   The attribute contains a Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, 
+       $VALUE (value of reading) and $UNIT (unit of reading value).
+       You also have readonly-access to $EVENT for evaluation in your expression. <br>
 	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
 	   be changed.
 	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
@@ -6936,7 +7016,15 @@ return;
 	
   <b>Vorbereitungen</b> <br><br>
   
-  Zunächst muss die Datenbank angelegt werden. <br>
+  Zunächst muss die Datenbank installiert und angelegt werden.
+  Die Installation des Datenbanksystems selbst wird hier nicht beschrieben. Dazu bitte nach den Installationsvorgaben des 
+  verwendeten Datenbanksystems verfahren. <br><br>
+  
+  <b>Hinweis:</b> <br>
+  Im Falle eines frisch installierten MySQL/MariaDB Systems bitte nicht vergessen die anonymen "Jeder"-Nutzer mit einem
+  Admin-Tool (z.B. phpMyAdmin) zu löschen falls sie existieren ! 
+  <br><br>
+  
   Beispielcode bzw. Scripts zum Erstellen einer MySQL/PostgreSQL/SQLite Datenbank ist im 
   <a href="https://svn.fhem.de/trac/browser/trunk/fhem/contrib/dblog">SVN -&gt; contrib/dblog/db_create_&lt;DBType&gt;.sql</a>
   enthalten. <br>
@@ -7832,6 +7920,41 @@ return;
     </li>
   </ul>
   <br>
+  
+  <ul>
+     <a name="DbLogValueFn"></a>
+     <li><b>DbLogValueFn</b>
+     <ul>
+	   <code>
+	   attr &lt;device&gt; DbLogValueFn {}
+	   </code><br>
+       
+       Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
+	   Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und 
+	   $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
+       Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
+	   $EVENT kann nicht verändert werden. <br>
+	   Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
+	   geänderte $timestamp nicht übernommen.
+	   Zusätzlich kann durch Setzen der Variable "$IGNORE=1" der Datensatz vom Logging ausgeschlossen werden. <br> 
+       Die devicespezifische Funktion in "DbLogValueFn" wird vor der eventuell im DbLog-Device vorhandenen Funktion im Attribut 
+       "valueFn" auf den Datensatz angewendet.
+       <br><br>
+	   
+	   <b>Beispiel</b> <br>
+       <pre>
+attr SMA_Energymeter DbLogValueFn
+{ 
+  if ($READING eq "Bezug_WirkP_Kosten_Diff"){
+    $UNIT="Diff-W";
+  }
+  if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
+    $IGNORE=1;
+}
+	   </pre>
+     </ul>
+     </li>
+  </ul>
   
   <ul>
     <a name="disable"></a>
