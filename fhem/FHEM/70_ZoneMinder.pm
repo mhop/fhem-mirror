@@ -262,6 +262,7 @@ sub ZoneMinder_API_ReadHostInfo_Callback {
         $zmVersion = 'unknown';
       }
       $hash->{ZM_VERSION} = $zmVersion;
+      $hash->{model} = $zmVersion;
 
       my $zmApiVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'apiversion');
       if (not $zmApiVersion) {
@@ -322,19 +323,21 @@ sub ZoneMinder_API_ReadConfig_Callback {
 
 sub ZoneMinder_GetConfigValueByKey {
   my ($hash, $config, $key) = @_;
-  my $searchString = '"'.$key.'":"';
+  my $searchString = qr/"$key":\s*"/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, '"');
 }
 
 sub ZoneMinder_GetConfigArrayByKey {
   my ($hash, $config, $key) = @_;
-  my $searchString = '"'.$key.'":[';
+#  my $searchString = '"'.$key.'":[';
+my $searchString = qr/"$key":\s*\[/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, ']');
 }
 
 sub ZoneMinder_GetConfigValueByName {
   my ($hash, $config, $key) = @_;
-  my $searchString = '"Name":"'.$key.'","Value":"';
+#  my $searchString = '"Name":"'.$key.'","Value":"';
+my $searchString = qr/"Name":"$key","Value":"/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, '"');
 }
 
@@ -343,15 +346,30 @@ sub ZoneMinder_GetFromJson {
   my $name = $hash->{NAME};
 
 #  Log3 $name, 5, "json: $config";
-  my $searchLength = length($searchString);
-  my $startIdx = index($config, $searchString);
-  Log3 $name, 5, "ZoneMinder ($name) - $searchString found at $startIdx";
-  $startIdx += $searchLength;
-  my $endIdx = index($config, $endChar, $startIdx);
-  my $frame = $endIdx - $startIdx;
-  my $searchResult = substr $config, $startIdx, $frame;
+#  my $searchLength = length($searchString);
+  my $searchLength;
+  my $prema;
 
-  Log3 $name, 5, "ZoneMinder ($name) - looking for $searchString - length: $searchLength. start: $startIdx. end: $endIdx. result: $searchResult";
+#  my $startIdx = index($config, $searchString);
+  my $startIdx;
+  if (my ($match) = $config =~ $searchString) {
+    $prema = $';
+    my $ma = $&;
+    my $poma = $`;
+#    Log3 $name, 1, "ZM_TEST prematch: $prema match: $ma postmatch: $poma startIdx: $startIdx";
+    $searchLength = length($ma);
+  } else {
+    Log3 $name, 1, "ZoneMinder ($name) - $searchString NOT found. Please report, this is a problem.";
+    return;
+  }
+
+  Log3 $name, 5, "ZoneMinder ($name) - $searchString found.";
+
+  my $searchResult = substr $prema, 0;
+  my $endIdx = index($searchResult, $endChar);
+  $searchResult = substr $searchResult, 0, $endIdx;
+
+#  Log3 $name, 5, "ZoneMinder ($name) - looking for $searchString - length: $searchLength. start: $startIdx. end: $endIdx. result: $searchResult";
   
   return $searchResult;
 }
