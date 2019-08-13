@@ -1142,8 +1142,11 @@ sub LGTV_WebOS_WriteReadings($$) {
 
     elsif ( defined( $decode_json->{payload}{appId} ) ) {
 
-        if (   $decode_json->{payload}{appId} =~ /com.webos.app.externalinput/
-            or $decode_json->{payload}{appId} =~ /com.webos.app.hdmi/ )
+        if (  (   $decode_json->{payload}{appId} =~ /com.webos.app.externalinput/
+               or $decode_json->{payload}{appId} =~ /com.webos.app.hdmi/ )
+             and defined ($hash->{helper}{device}{inputapps}{ $decode_json->{payload}{appId} } )
+             and $hash->{helper}{device}{inputapps}{ $decode_json->{payload}{appId} }
+          )
         {
 
             readingsBulkUpdateIfChanged( $hash, 'input',
@@ -1152,12 +1155,16 @@ sub LGTV_WebOS_WriteReadings($$) {
             readingsBulkUpdateIfChanged( $hash, 'launchApp', '-' );
 
         }
-        else {
+        elsif ( defined ( $openAppsPackageName{ $decode_json->{payload}{appId} } )
+            and $openAppsPackageName{ $decode_json->{payload}{appId} } )
+        {
 
             readingsBulkUpdateIfChanged( $hash, 'launchApp',
                 $openAppsPackageName{ $decode_json->{payload}{appId} } );
             readingsBulkUpdateIfChanged( $hash, 'input', '-' );
         }
+        
+        
     }
 
     if ( defined( $decode_json->{type} ) ) {
@@ -1999,7 +2006,7 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.0",
+  "version": "v3.2.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
