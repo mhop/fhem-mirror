@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.16.3" => "13.08.2019  commandref revised ",
   "8.16.2" => "17.07.2019  change function SSCam_ptzpanel using css stylesheet ",
   "8.16.1" => "16.07.2019  fix warnings ",
   "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
@@ -10690,14 +10691,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   
   <a name="recTelegramTxt"></a>
-  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
     The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
 	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the following placeholders in "subject". <br><br>
+	If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+    
+	You can use the following placeholders within "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10711,14 +10713,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Examples:</b><br>
-        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
-      </ul>
-      <br>
+	<b>Examples:</b><br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
+    <br>
   </li><br>	 
   
   <a name="rectime"></a>
@@ -10822,8 +10824,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the following placeholders in "subject". <br><br>
+	If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+    
+	You can use the following placeholders within "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10836,15 +10839,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</table>
 		</ul>     
 		<br>	
-    
-       <ul>
-		<b>Examples:</b><br>
-        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
-      </ul>
-      <br>
+
+	<b>Examples:</b><br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
+    <br>
   </li><br>	  
     
   <a name="snapGalleryBoost"></a>
@@ -12511,7 +12514,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	anzugeben, welches für den Versand der Daten verwendet werden soll. 
 	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
-	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Device verwendet. <br><br>
+    
 	Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
@@ -12526,13 +12530,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Beispiele:</b><br>
-        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
-      </ul>
+	<b>Beispiele:</b><br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
       <br>
   </li><br>
   
@@ -12640,8 +12644,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	anzugeben, welches für den Versand der Daten verwendet werden soll. 
 	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
-	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
-	Es können die Platzhalter im subject verwendet werden. <br><br>
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Devices verwendet. <br><br>
+	
+    Es können folgende Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12655,14 +12660,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Beispiele:</b><br>
-        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
-      </ul>
-      <br>
+	<b>Beispiele:</b><br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
+    <br>
   </li><br>
     
   <a name="snapGalleryBoost"></a>
