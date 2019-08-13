@@ -1149,7 +1149,8 @@ sub EventProcessingRoommate($@) {
                 {
                     if (    $shutters->getIfInShading
                         and not $shutters->getShadingManualDriveStatus
-                        and $shutters->getStatus == $shutters->getOpenPos )
+                        and $shutters->getStatus == $shutters->getOpenPos
+                        and $shutters->getShadingMode 'home')
                     {
                         $shutters->setLastDrive('shading in');
                         $posValue = $shutters->getShadingPos;
@@ -1157,7 +1158,8 @@ sub EventProcessingRoommate($@) {
                         ShuttersCommandSet( $hash, $shuttersDev, $posValue );
                     }
                     elsif (
-                        not $shutters->getIfInShading
+                        ( not $shutters->getIfInShading
+                          or  $shutters->getShadingMode eq 'absent' )
                         and (  $shutters->getStatus == $shutters->getClosedPos
                             or $shutters->getStatus ==
                             $shutters->getShadingPos )
@@ -1217,13 +1219,13 @@ sub EventProcessingRoommate($@) {
             {
                 $posValue = $shutters->getShadingPos;
                 $shutters->setLastDrive('shading in');
+                ShuttersCommandSet( $hash, $shuttersDev, $posValue );
             }
-            else {
+            elsif ( not $shutters->getIsDay ) {
                 $posValue = $shutters->getClosedPos;
                 $shutters->setLastDrive('roommate absent');
+                ShuttersCommandSet( $hash, $shuttersDev, $posValue );
             }
-
-            ShuttersCommandSet( $hash, $shuttersDev, $posValue );
         }
     }
 }
@@ -1553,8 +1555,8 @@ sub EventProcessingBrightness($@) {
     return EventProcessingShadingBrightness( $hash, $shuttersDev, $events )
       unless (
         (
-               $shutters->getModeDown eq 'brightness'
-            or $shutters->getModeUp eq 'brightness'
+               $shutters->getDown eq 'brightness'
+            or $shutters->getUp eq 'brightness'
         )
         or (
             (
@@ -1682,7 +1684,6 @@ sub EventProcessingBrightness($@) {
             my $homemode = $shutters->getRoommatesStatus;
             $homemode = $ascDev->getResidentsStatus
               if ( $homemode eq 'none' );
-            $shutters->setLastDrive('maximum brightness threshold exceeded');
 
             if (
                 $shutters->getModeUp eq $homemode
@@ -1707,6 +1708,7 @@ sub EventProcessingBrightness($@) {
                         and $ascDev->getResidentsStatus eq 'home' )
                   )
                 {
+                    $shutters->setLastDrive('maximum brightness threshold exceeded');
                     $shutters->setSunrise(1);
                     $shutters->setSunset(0);
                     ShuttersCommandSet( $hash, $shuttersDev,
@@ -1749,24 +1751,9 @@ sub EventProcessingBrightness($@) {
                   . ' - Verarbeitungszeit für Sunset wurd erkannt. Prüfe Status der Roommates'
             );
 
-            my $posValue;
-            if (    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-                and $shutters->getSubTyp eq 'threestate'
-                and $ascDev->getAutoShuttersControlComfort eq 'on' )
-            {
-                $posValue = $shutters->getComfortOpenPos;
-            }
-            elsif ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
-                or $shutters->getVentilateOpen eq 'off' )
-            {
-                $posValue = $shutters->getClosedPos;
-            }
-            else { $posValue = $shutters->getVentilatePos; }
-
             my $homemode = $shutters->getRoommatesStatus;
             $homemode = $ascDev->getResidentsStatus
               if ( $homemode eq 'none' );
-            $shutters->setLastDrive('minimum brightness threshold fell below');
 
             if (
                 $shutters->getModeDown eq $homemode
@@ -1775,6 +1762,21 @@ sub EventProcessingBrightness($@) {
                 or $shutters->getModeDown eq 'always'
               )
             {
+                my $posValue;
+                if (    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                    and $shutters->getSubTyp eq 'threestate'
+                    and $ascDev->getAutoShuttersControlComfort eq 'on' )
+                {
+                    $posValue = $shutters->getComfortOpenPos;
+                }
+                elsif ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
+                    or $shutters->getVentilateOpen eq 'off' )
+                {
+                    $posValue = $shutters->getClosedPos;
+                }
+                else { $posValue = $shutters->getVentilatePos; }
+
+                $shutters->setLastDrive('minimum brightness threshold fell below');
                 $shutters->setSunrise(0);
                 $shutters->setSunset(1);
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
@@ -3413,9 +3415,11 @@ sub IsAfterShuttersTimeBlocking($) {
         ( int( gettimeofday() ) - $shutters->getLastManPosTimestamp ) <
         $shutters->getBlockingTimeAfterManual
         or ( not $shutters->getIsDay
+            and defined( $shutters->getSunriseUnixTime )
             and $shutters->getSunriseUnixTime - ( int( gettimeofday() ) ) <
             $shutters->getBlockingTimeBeforDayOpen )
         or (    $shutters->getIsDay
+            and defined( $shutters->getSunriseUnixTime )
             and $shutters->getSunsetUnixTime - ( int( gettimeofday() ) ) <
             $shutters->getBlockingTimeBeforNightClose )
       )
@@ -3535,18 +3539,18 @@ sub CheckIfShuttersWindowRecOpen($) {
 sub makeReadingName($) {
     my ($rname) = @_;
     my %charHash = (
-        "ä" => "ae",
-        "Ä" => "Ae",
-        "ü" => "ue",
-        "Ü" => "Ue",
-        "ö" => "oe",
-        "Ö" => "Oe",
-        "ß" => "ss"
+        chr(0xe4) => "ae",      # ä
+        chr(0xc4) => "Ae",      # Ä
+        chr(0xfc) => "ue",      # ü
+        chr(0xdc) => "Ue",      # Ü
+        chr(0xf6) => "oe",      # ö
+        chr(0xd6) => "Oe",      # Ö
+        chr(0xdf) => "ss"       # ß
     );
-    my $charHashkeys = join( "|", keys(%charHash) );
+    my $charHashkeys = join( "", keys(%charHash) );
 
     return $rname if ( $rname =~ m/^\./ );
-    $rname =~ s/($charHashkeys)/$charHash{$1}/gi;
+    $rname =~ s/([$charHashkeys])/$charHash{$1}/gi;
     $rname =~ s/[^a-z0-9._\-\/]/_/gi;
     return $rname;
 }
@@ -5768,7 +5772,7 @@ sub getblockAscDrivesAfterManual {
             <a name="ASC_residentsDev"></a>
             <li><strong>ASC_residentsDev DEVICENAME[:READINGNAME]</strong> - <em>DEVICENAME</em> points to a device
                 for presence, e.g. of type <em>RESIDENTS</em>. <em>READINGNAME</em> points to a reading at
-                <em>DEVICENAME</em> which contains a presence state, e.g. <em>rgr_Residents:presence</em>. The target
+                <em>DEVICENAME</em> which contains a presence state, e.g. <em>rgr_Residents:state</em>. The target
                 should contain values alike the <em>RESIDENTS</em> family.
             </li>
             <a name="ASC_shuttersDriveOffset"></a>
@@ -6327,7 +6331,7 @@ sub getblockAscDrivesAfterManual {
             <a name="ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor - DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS]</strong> - der Inhalt ist eine Kombination aus Devicename, Readingname, Wert ab dem getriggert werden soll, Hysterese Wert ab dem der Status Regenschutz aufgehoben werden soll und der "wegen Regen geschlossen Position".</li>
             <a name="ASC_residentsDev"></a>
-            <li><strong>ASC_residentsDev - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Devicenamen und Readingnamen des Residents-Device der obersten Ebene (z.B. rgr_Residents:presence)</li>
+            <li><strong>ASC_residentsDev - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Devicenamen und Readingnamen des Residents-Device der obersten Ebene (z.B. rgr_Residents:state)</li>
             <a name="ASC_shuttersDriveOffset"></a>
             <li><strong>ASC_shuttersDriveOffset</strong> - maximale Zufallsverz&ouml;gerung in Sekunden bei der Berechnung der Fahrzeiten. 0 bedeutet keine Verz&ouml;gerung</li>
             <a name="ASC_tempSensor"></a>
@@ -6487,7 +6491,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.25",
+  "version": "v0.6.26",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix UTF8 Problem und Initialisierungfehler,
+               fix brightness morning and evening drive, add more condition
+               for roommate and shading
  - bugfix:  82_LGTV_WebOS: fix Forum #966380
  - feature: 93_DbLog: new attr DbLogValueFn propagated as device specific 
                       attribute if DbLog is used
