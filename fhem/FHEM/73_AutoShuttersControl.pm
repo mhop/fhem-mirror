@@ -251,15 +251,15 @@ my %userAttrList = (
 );
 
 my %posSetCmds = (
-    ZWave      => 'dim',
-    Siro       => 'pct',
-    CUL_HM     => 'pct',
-    ROLLO      => 'pct',
-    SOMFY      => 'position',
-    tahoma     => 'dim',
-    KLF200Node => 'pct',
-    DUOFERN    => 'position',
-    HM485      => 'level',
+    ZWave       => 'dim',
+    Siro        => 'pct',
+    CUL_HM      => 'pct',
+    ROLLO       => 'pct',
+    SOMFY       => 'position',
+    tahoma      => 'dim',
+    KLF200Node  => 'pct',
+    DUOFERN     => 'position',
+    HM485       => 'level',
     SELVECommeo => 'position',
     SELVE       => 'position',
 );
@@ -1150,7 +1150,7 @@ sub EventProcessingRoommate($@) {
                     if (    $shutters->getIfInShading
                         and not $shutters->getShadingManualDriveStatus
                         and $shutters->getStatus == $shutters->getOpenPos
-                        and $shutters->getShadingMode 'home')
+                        and $shutters->getShadingMode eq 'home' )
                     {
                         $shutters->setLastDrive('shading in');
                         $posValue = $shutters->getShadingPos;
@@ -1158,8 +1158,10 @@ sub EventProcessingRoommate($@) {
                         ShuttersCommandSet( $hash, $shuttersDev, $posValue );
                     }
                     elsif (
-                        ( not $shutters->getIfInShading
-                          or  $shutters->getShadingMode eq 'absent' )
+                        (
+                            not $shutters->getIfInShading
+                            or $shutters->getShadingMode eq 'absent'
+                        )
                         and (  $shutters->getStatus == $shutters->getClosedPos
                             or $shutters->getStatus ==
                             $shutters->getShadingPos )
@@ -1708,7 +1710,8 @@ sub EventProcessingBrightness($@) {
                         and $ascDev->getResidentsStatus eq 'home' )
                   )
                 {
-                    $shutters->setLastDrive('maximum brightness threshold exceeded');
+                    $shutters->setLastDrive(
+                        'maximum brightness threshold exceeded');
                     $shutters->setSunrise(1);
                     $shutters->setSunset(0);
                     ShuttersCommandSet( $hash, $shuttersDev,
@@ -1776,7 +1779,8 @@ sub EventProcessingBrightness($@) {
                 }
                 else { $posValue = $shutters->getVentilatePos; }
 
-                $shutters->setLastDrive('minimum brightness threshold fell below');
+                $shutters->setLastDrive(
+                    'minimum brightness threshold fell below');
                 $shutters->setSunrise(0);
                 $shutters->setSunset(1);
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
@@ -3414,7 +3418,7 @@ sub IsAfterShuttersTimeBlocking($) {
     if (
         ( int( gettimeofday() ) - $shutters->getLastManPosTimestamp ) <
         $shutters->getBlockingTimeAfterManual
-        or ( not $shutters->getIsDay
+        or (    not $shutters->getIsDay
             and defined( $shutters->getSunriseUnixTime )
             and $shutters->getSunriseUnixTime - ( int( gettimeofday() ) ) <
             $shutters->getBlockingTimeBeforDayOpen )
@@ -3539,13 +3543,13 @@ sub CheckIfShuttersWindowRecOpen($) {
 sub makeReadingName($) {
     my ($rname) = @_;
     my %charHash = (
-        chr(0xe4) => "ae",      # ä
-        chr(0xc4) => "Ae",      # Ä
-        chr(0xfc) => "ue",      # ü
-        chr(0xdc) => "Ue",      # Ü
-        chr(0xf6) => "oe",      # ö
-        chr(0xd6) => "Oe",      # Ö
-        chr(0xdf) => "ss"       # ß
+        chr(0xe4) => "ae",                            # ä
+        chr(0xc4) => "Ae",                            # Ä
+        chr(0xfc) => "ue",                            # ü
+        chr(0xdc) => "Ue",                            # Ü
+        chr(0xf6) => "oe",                            # ö
+        chr(0xd6) => "Oe",                            # Ö
+        chr(0xdf) => "ss"                             # ß
     );
     my $charHashkeys = join( "", keys(%charHash) );
 
@@ -6491,7 +6495,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.26",
+  "version": "v0.6.27",
   "x_developmentversion": "v0.6.19.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
