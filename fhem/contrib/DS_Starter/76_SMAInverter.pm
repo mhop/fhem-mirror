@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 16934 2018-07-02 20:11:29Z DS_Starter $
+# $Id: 76_SMAInverter.pm 19290 2019-04-29 19:17:44Z DS_Starter $
 #################################################################################################################
 # 
 #
@@ -28,6 +28,7 @@
 #################################################################################################################
 # Versions History by DS_Starter
 #
+# 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
 # 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
 # 2.10.0   29.06.2018      Internal MODEL added
 # 2.9.2    08.10.2017      adapted to use extended abortArg (Forum:77472)
@@ -83,7 +84,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.10.0";
+my $SMAInverterVersion = "2.10.2";
 
 # Inverter Data fields and supported commands flags.
 # $inv_SPOT_ETODAY                # Today yield
@@ -229,6 +230,8 @@ my %SMAInverter_devtypes = (
 9305 => "SB6.0-1SP-US-40",
 9306 => "SB8.0-1SP-US-40",
 9307 => "Energy Meter",
+9403 => "Sunny Boy 4.0 (SB4.0-1AV-41)",
+9358 => "SBS5.0-10 (SBS5.0-10)",
 );
 
 # Wechselrichter Class-Hash DE
