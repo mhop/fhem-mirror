@@ -68,6 +68,7 @@ my %vacuum_states = ( '0' => "Unknown",
                      '15' => "Docking" ,
                      '16' => "Goto" ,
                      '17' => "Zoned Clean" ,
+                     '17' => "Targeted Clean" ,
                     '100' => "Fully Charged" , );
 
 
@@ -1707,7 +1708,7 @@ sub XiaomiDevice_GetUpdate($)
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier")
   {
     $hash->{helper}{packet}{$packetid} = "hum_data";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","temp_dec","humidity","button_pressed"]}' );
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","temp_dec","humidity","trans_level","speed","depth","dry","temperature","button_pressed"]}' );
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
   {
@@ -1775,7 +1776,7 @@ sub XiaomiDevice_GetSettings($)
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "hum_settings";
-    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["buzzer","led_b","child_lock","limit_hum"]}' );
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["buzzer","led_b","child_lock","limit_hum","use_time"]}' );
   }
 
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
@@ -2144,7 +2145,13 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "mode", ($json->{result}[0] eq "off") ? "idle" : $json->{result}[1], 1 ) if(defined($json->{result}[1]));
     readingsBulkUpdate( $hash, "temperature", ($json->{result}[2]/10), 1 ) if(defined($json->{result}[2]));
     readingsBulkUpdate( $hash, "humidity", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
-    readingsBulkUpdate( $hash, "button_pressed", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "trans_level", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "speed", $json->{result}[5], 1 ) if(defined($json->{result}[5]));
+    readingsBulkUpdate( $hash, "depth", $json->{result}[6], 1 ) if(defined($json->{result}[6]));
+    readingsBulkUpdate( $hash, "dry", $json->{result}[7], 1 ) if(defined($json->{result}[7]));
+    readingsBulkUpdate( $hash, "temperature", $json->{result}[8], 1 ) if(defined($json->{result}[8]) && !defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "button_pressed", $json->{result}[9], 1 ) if(defined($json->{result}[9]));
+
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2157,6 +2164,7 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "led", ($json->{result}[1] eq "0" ? 'bright' : $json->{result}[1] eq "1" ? 'dim' : 'off' ), 1 ) if(defined($json->{result}[1]));
     readingsBulkUpdate( $hash, "child_lock", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
     readingsBulkUpdate( $hash, "limit_hum", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
+    readingsBulkUpdate( $hash, "use_time", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2381,7 +2389,7 @@ sub XiaomiDevice_ParseJSON($$)
       readingsBulkUpdate( $hash, "usb_power", $json->{result}[0]{usb_power}, 1 ) if(defined($json->{result}[0]{usb_power}));
       readingsBulkUpdate( $hash, "load_power", $json->{result}[0]{load_power}, 1 ) if(defined($json->{result}[0]{load_power}));
       readingsBulkUpdate( $hash, "usb_power", ($json->{result}[0]{usb_on} eq "0" ? 'off' : 'on' ), 1 ) if(defined($json->{result}[0]{usb_on}));
-    #readingsBulkUpdate( $hash, "setting", (($json->{result}[0]{setting} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{setting}));
+      #readingsBulkUpdate( $hash, "setting", (($json->{result}[0]{setting} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{setting}));
     readingsEndUpdate($hash,1);
     } else {
       readingsBeginUpdate($hash);
@@ -2449,13 +2457,13 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "last_clean_time", sprintf( "%.2f" ,int($json->{result}[0]{clean_time})/3600), 1) if(defined($json->{result}[0]{clean_time}));#sprintf( "%.1f", int($json->{result}[0]{clean_time})/3600), 1 );
     readingsBulkUpdate( $hash, "last_clean_area", sprintf( "%.2f" ,int($json->{result}[0]{clean_area})/1000000), 1 ) if(defined($json->{result}[0]{clean_area}));
     readingsBulkUpdate( $hash, "error_code", $vacuum_errors{$json->{result}[0]{error_code}}, 1 ) if(defined($json->{result}[0]{error_code}));
-    readingsBulkUpdate( $hash, "map_present", (($json->{result}[0]{map_present} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{map_present}));
-    readingsBulkUpdate( $hash, "in_cleaning", (($json->{result}[0]{in_cleaning} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_cleaning})); #not working or used for something else
-    readingsBulkUpdate( $hash, "in_returning", (($json->{result}[0]{in_returning} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_returning}));
-    readingsBulkUpdate( $hash, "in_fresh_state", (($json->{result}[0]{in_fresh_state} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_fresh_state}));
-    readingsBulkUpdate( $hash, "lab_status", (($json->{result}[0]{lab_status} eq "1")?"yes":"no"), 1 ) if(defined($json->{result}[0]{lab_status}));
+    readingsBulkUpdate( $hash, "map_present", (($json->{result}[0]{map_present} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{map_present}));
+    readingsBulkUpdate( $hash, "in_cleaning", (($json->{result}[0]{in_cleaning} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_cleaning})); #not working or used for something else
+    readingsBulkUpdate( $hash, "in_returning", (($json->{result}[0]{in_returning} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_returning}));
+    readingsBulkUpdate( $hash, "in_fresh_state", (($json->{result}[0]{in_fresh_state} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{in_fresh_state}));
+    readingsBulkUpdate( $hash, "lab_status", (($json->{result}[0]{lab_status} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{lab_status}));
     readingsBulkUpdate( $hash, "fan_power", $json->{result}[0]{fan_power}, 1 ) if(defined($json->{result}[0]{fan_power}));
-    readingsBulkUpdate( $hash, "dnd", (($json->{result}[0]{dnd_enabled} eq "1")?"on":"off"), 1 ) if(defined($json->{result}[0]{dnd_enabled}));
+    readingsBulkUpdate( $hash, "dnd", (($json->{result}[0]{dnd_enabled} ne "0")?"on":"off"), 1 ) if(defined($json->{result}[0]{dnd_enabled}));
     if(defined($json->{result}[0]{fan_power}) && int($json->{result}[0]{fan_power}) > 100) {
       my $cleaning_int = int($json->{result}[0]{fan_power});
       my $cleaningmode = ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : "unknown";
@@ -2712,7 +2720,7 @@ sub XiaomiDevice_ParseJSON($$)
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "dnd_enabled", (($json->{result}[0]{enabled} eq "1")?"on":"off"), 1 ) if(defined($json->{result}[0]{enabled}));
+    readingsBulkUpdate( $hash, "dnd_enabled", (($json->{result}[0]{enabled} ne "0")?"on":"off"), 1 ) if(defined($json->{result}[0]{enabled}));
     readingsBulkUpdate( $hash, "dnd_start", sprintf("%02d",$json->{result}[0]{start_hour}).":".sprintf("%02d",$json->{result}[0]{start_minute}), 1 ) if(defined($json->{result}[0]{start_hour}) && defined($json->{result}[0]{start_minute}));
     readingsBulkUpdate( $hash, "dnd_end", sprintf("%02d",$json->{result}[0]{end_hour}).":".sprintf("%02d",$json->{result}[0]{end_minute}), 1 ) if(defined($json->{result}[0]{end_hour}) && defined($json->{result}[0]{end_minute}));
     readingsEndUpdate($hash,1);
