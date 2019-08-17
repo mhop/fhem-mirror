@@ -1,4 +1,4 @@
-REV 20003
+REV 20005
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -486,7 +486,7 @@ UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
 UPD 2019-08-04_07:45:03 384925 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
-UPD 2019-05-13_07:45:02 34555 FHEM/98_MediaList.pm
+UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
 UPD 2019-08-11_07:45:03 232341 FHEM/98_Modbus.pm
 UPD 2019-04-07_07:45:02 51318 FHEM/98_ModbusAttr.pm
 UPD 2019-06-15_07:45:09 38613 FHEM/98_ModbusElsnerWS.pm
@@ -727,12 +727,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-08-14_07:45:07 4102774 docs/commandref.html
+UPD 2019-08-17_07:45:07 4102742 docs/commandref.html
 UPD 2019-08-14_07:45:10 2538601 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-16_07:45:11 217364 docs/commandref_modular.html
-UPD 2019-08-16_07:45:12 228307 docs/commandref_modular_DE.html
+UPD 2019-08-17_07:45:11 217364 docs/commandref_modular.html
+UPD 2019-08-17_07:45:12 228307 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
