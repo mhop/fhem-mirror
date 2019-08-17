@@ -28,6 +28,7 @@
 #################################################################################################################
 # Versions History by DS_Starter
 #
+# 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined
 # 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
 # 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
 # 2.10.0   29.06.2018      Internal MODEL added
@@ -1398,15 +1399,33 @@ sub SMA_logon($$$) {
  my $inv_serial = unpack("V*", substr $data, 30, 4);
  $socket->close();
  
-  if (AttrVal($name, "target-serial", undef)) {
+ if (AttrVal($name, "target-serial", undef)) {
      return 0 unless($inv_serial eq $target_serial);
+ } else {
+     BlockingInformParent("SMAInverter_setFromBlocking", [$name, "target-serial", $inv_serial], 0);   # Serial automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448          
  }
+ 
  if (AttrVal($name, "target-susyid", undef)) {
      return 0 unless($inv_susyid eq $target_susyid);
+ } else {
+     BlockingInformParent("SMAInverter_setFromBlocking", [$name, "target-susyid", $inv_susyid], 0);   # SuSyId automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448
  }
  
  Log3 $name, 4, "$name - logged in to inverter serial: $inv_serial, susyid: $inv_susyid";
- return 1;
+ 
+return 1;
+}
+
+################################################################
+#            Attributwert aus BlockingCall setzen
+################################################################
+sub SMAInverter_setFromBlocking($$$) {
+  my ($name,$attr,$val) = @_;
+  my $hash             = $defs{$name};
+
+  CommandAttr(undef,"$name $attr $val");
+
+return;
 }
 
 ##########################################################################
@@ -1438,10 +1457,10 @@ sub SMA_logout($$) {
  $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;	
  $spkt_ID = ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
  
- #Logout command
+ # Logout command
  $cmd_ID = "0E01FDFF" . "FFFFFFFF";  # Logout command
 
- #build final command to send
+ # build final command to send
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0003" . $myID . "0003" . "00000000" . $spkt_ID . $cmd_ID . "00000000";
 
  # flush after every write
@@ -1467,7 +1486,8 @@ sub SMA_logout($$) {
  Log3 $name, 4, "$name - logged out now from inverter serial: $target_serial, susyid: $target_susyid";
  
  $socket->close();	
- return 1;	
+ 
+return 1;	
 }
 
 ##########################################################################
@@ -1479,7 +1499,8 @@ sub ByteOrderShort($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 2, 2) . substr($input, 0, 2);
- return $output;
+ 
+return $output;
 }
 
 ##########################
@@ -1487,12 +1508,12 @@ sub ByteOrderLong($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 6, 2) . substr($input, 4, 2) . substr($input, 2, 2) . substr($input, 0, 2);
- return $output;
+ 
+return $output;
 }
 
 ##########################
-sub StatusText($)
-{
+sub StatusText($) {
  # Parameter is the code, return value is the Text or if not known then the code as string
  my $code = $_[0];
 
@@ -1505,7 +1526,7 @@ sub StatusText($)
  if($code eq 307)      { return "Ok"; }
  if($code eq 455)      { return (AttrVal("global", "language", "EN") eq "DE") ? "Warnung" : "Warning"; }
 
- return sprintf("%d", $code);
+return sprintf("%d", $code);
 }
 
 ##########################
@@ -1516,7 +1537,8 @@ sub devtype ($) {
   
   unless (exists($SMAInverter_devtypes{$code})) { return $code;}
   my $dev = $SMAInverter_devtypes{$code};
-  return ($dev);
+  
+return ($dev);
 }
 
 ##########################
