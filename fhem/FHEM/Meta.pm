@@ -1136,7 +1136,7 @@ sub __GetMetadata {
 
     # Static meta information
     $modMeta->{dynamic_config} = 1;
-    $modMeta->{'meta-spec'} = {
+    $modMeta->{'meta-spec'}    = {
         "version" => 2,
         "url"     => "https://metacpan.org/pod/CPAN::Meta::Spec"
     };
@@ -1161,8 +1161,8 @@ sub __GetMetadata {
         #   $file[8] - plain extracted version number, may be undefined
 
         $modMeta->{x_file} = \@file;
-        $modName = $file[4];
-        $modType = $file[3] || $file[2] eq 'fhem.pl' ? 'mod' : 'pkg';
+        $modName           = $file[4];
+        $modType           = $file[3] || $file[2] eq 'fhem.pl' ? 'mod' : 'pkg';
     }
 
     # grep info from file content
@@ -2001,7 +2001,7 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
     $@ .=
       $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
       if ( defined( $modMeta->{version} )
-        && $modMeta->{version} !~ m/^\d+\.\d+$/ );
+        && $modMeta->{version} !~ m/^\d+\.\d+(?:_\d+)?$/ );
 
     # meta name
     unless ( defined( $modMeta->{name} ) ) {
@@ -3190,12 +3190,12 @@ m/^((\S+) ((([0-9]+)-([0-9]+)-([0-9]+))_(([0-9]+):([0-9]+):([0-9]+))) (\d+) (?:\
                     }
                 }
 
-                else {
-                    Log 5,
-                        __PACKAGE__
-                      . "::__GetUpdatedata: $file: Ignoring line\n  "
-                      . $l;
-                }
+                # else {
+                #     Log 5,
+                #         __PACKAGE__
+                #       . "::__GetUpdatedata: $file: Ignoring line\n  "
+                #       . $l;
+                # }
             }
             close($fh);
         }
@@ -3243,23 +3243,18 @@ sub __SetXVersion {
           );
     }
 
-    # from META.json only
-    elsif ( $modMeta->{x_file}[7] eq 'META.json' )
-    {
-        $modMeta->{x_version} =
-            $modMeta->{x_file}[2] . ':'
-          . version->parse( $modMeta->{version} )->normal;
-    }
-
     # Generate generic version to fill the gap
-    elsif ( $modMeta->{x_file}[7] eq 'generated/blank' ) {
+    elsif (defined( $modMeta->{x_file} )
+        && defined( $modMeta->{x_file}[7] )
+        && $modMeta->{x_file}[7] eq 'generated/blank' )
+    {
         $modMeta->{x_version} = $modMeta->{x_file}[2] . ':?';
     }
 
     if ( defined( $modMeta->{x_version} ) ) {
 
         # Add modified date to extended version
-        if ( defined( $modMeta->{x_vcs} ) ) {
+        if ( defined( $modMeta->{x_vcs} ) && defined( $modMeta->{x_vcs}[7] ) ) {
             $modMeta->{x_version} .= '/' . $modMeta->{x_vcs}[7];
 
             # #FIXME can't use modified time because FHEM Update currently
@@ -3271,7 +3266,11 @@ sub __SetXVersion {
             #   if ( defined( $modMeta->{x_vcs} )
             #     && $modMeta->{x_vcs}[16] ne $modMeta->{x_file}[6][9][0] );
         }
-        else {
+        elsif (defined( $modMeta->{x_file} )
+            && defined( $modMeta->{x_file}[6] )
+            && defined( $modMeta->{x_file}[6][9] )
+            && defined( $modMeta->{x_file}[6][9][2] ) )
+        {
             $modMeta->{x_version} .= '/' . $modMeta->{x_file}[6][9][2];
         }
 
@@ -3302,7 +3301,7 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.6.4",
+  "version": "v0.6.5",
   "release_status": "testing",
   "x_changelog": {
     "2019-04-18": {
