@@ -394,9 +394,9 @@ KS300_windIndex($)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a> (ks300)</li>
     <li>strangeTempDiff DIFFVAL<br>
-        If set, the module will only accept data where the difference between
-        the reported temperature and tha last recorded value is less than
-        DIFFVAL.</li>
+        If set, the module will only accept temperature values when the
+        difference between the reported temperature and the last recorded value
+        is less than DIFFVAL.</li>
     <li>rainadjustment<br>
         If this attribute is set, fhem automatically considers rain counter
         resets after a battery change and random counter switches as
@@ -467,7 +467,7 @@ KS300_windIndex($)
         Beobachtung einiger Benutzer auch nach zuf&auml;lligen Schaltzyklen
         auf. Die Voreinstellung ist 0 (aus).</li>
     <li>strangeTempDiff DIFFVAL<br>
-        Falls gesetzt, werden nur solche Telegramme akzeptiert, wo der
+        Falls gesetzt, werden nur solche Temperaturen akzeptiert, wo der
         Unterschied bei der gemeldeten Temperatur zum letzten Wert weniger als
         DIFFVAL ist. </li>
   </ul>

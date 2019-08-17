@@ -25,9 +25,18 @@ CUL_WS_Initialize($)
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ".
-                       "model:S300TH,KS300,ASH2200 ignore:0,1 ".
-                       $readingFnAttributes;
+  no warnings 'qw';
+  my @attrList = qw(
+    IODev
+    do_not_notify:0,1
+    ignore:0,1
+    model:S300TH,KS300,ASH2200
+    showtime:0,1
+    strangeTempDiff
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+
   $hash->{AutoCreate}=
     { "CUL_WS.*" => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER=>"%NAME:T:.*" } };
 }
@@ -137,11 +146,25 @@ CUL_WS_Parse($$)
   my $family  = "unknown";
   my ($sgn, $tmp, $rain, $hum, $prs, $wnd);
 
+  my $std = sub($) {
+    my ($t) = @_;
+    my $std = AttrVal($name, "strangeTempDiff", 0);
+    if($std) {
+      my $ot = ReadingsVal($name, 'temperature', 0);
+      if($ot && abs($ot-$t) > $std) {
+        readingsBulkUpdate($def, 'strangeTemp', $t, 0);
+        $t = $ot;
+      }
+    }
+    return $t;
+  };
+    
+
   if($sfirstbyte == 7) {
   
     if($typbyte == 0 && int(@a) > 6) {           # temp
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $tmp = $std->($sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
       $val = "T: $tmp";
       $devtype = "Temp";
       $NotifyType="T";
@@ -150,7 +173,7 @@ CUL_WS_Parse($$)
 
     if($typbyte == 1 && int(@a) > 8) {           # temp/hum
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $tmp = $std->($sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
       $devtype = "PS50";
@@ -187,7 +210,7 @@ CUL_WS_Parse($$)
 
     if($typbyte == 4 && int(@a) > 10) {          # temp/hum/press
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $tmp = $std->($sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $prs = ($a[9].$a[10])+ 900 + $hash->{corr3};
       if($prs < 930) {
@@ -224,7 +247,7 @@ CUL_WS_Parse($$)
 
     if($typbyte == 7 && int(@a) > 8) {           # Temp/hum
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $tmp = $std->($sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
       $devtype = "Temp/Hum";
@@ -245,7 +268,8 @@ CUL_WS_Parse($$)
       }
 
       $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = sprintf("%0.1f", $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
+      $tmp = $std->(sprintf("%0.1f",
+                            $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1}));
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
       $devtype = "S300TH";
@@ -276,7 +300,7 @@ CUL_WS_Parse($$)
    } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
       if(join("", @a[3..8]) =~ m/^\d*$/) {      # Forum 49125
         $sgn = ($firstbyte&8) ? -1 : 1;
-        $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+        $tmp = $std->($sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1});
         $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
         $val = "T: $tmp  H: $hum";
         $devtype = "TH".$sfirstbyte;
@@ -422,6 +446,10 @@ CUL_WS_Attr(@)
     <li><a href="#model">model</a> (S300,KS300,ASH2200)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>strangeTempDiff DIFFVAL<br>
+        If set, the module will only accept temperature values when the
+        difference between the reported temperature and the last recorded value
+        is less than DIFFVAL.</li>
   </ul>
   <br>
 </ul>
@@ -473,6 +501,10 @@ CUL_WS_Attr(@)
     <li><a href="#model">model</a> (S300,KS300,ASH2200)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>strangeTempDiff DIFFVAL<br>
+        Falls gesetzt, werden nur solche Temperaturen akzeptiert, wo der
+        Unterschied bei der gemeldeten Temperatur zum letzten Wert weniger als
+        DIFFVAL ist. </li>
   </ul>
   <br>
 </ul>
