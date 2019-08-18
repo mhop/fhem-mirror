@@ -12,25 +12,27 @@
 #                             Model als Internal
 #                             port-state als reading hinzugefügt
 # V 0.90
-# - feature: 74_UnififSwitch: setter for poe-Mode
+# - feature: 74_UnifiSwitch: setter for poe-Mode
 #                             added commandref
 # V 0.91
-# - fixed:   74_UnififSwitch: fixed wording in commandref
+# - fixed:   74_Unififwitch: fixed wording in commandref
 #                             added new state-mappings
 # V 0.92
-# - fixed:   74_UnififSwitch: fixed possible log-error in eq in line 135
+# - fixed:   74_UnifiSwitch: fixed possible log-error in eq in line 135
 # V 0.93
-# - bugfix:  74_UnififSwitch: fixed poe restart
+# - bugfix:  74_UnifiSwitch: fixed poe restart
 # V 0.0.94
-# - feature: 74_UnififSwitch: supports new module UnifiClient
+# - feature: 74_UnifiSwitch: supports new module UnifiClient
 # V 0.0.95
-# - feature: 74_UnififSwitch: supports disablePort
+# - feature: 74_UnifiSwitch: supports disablePort
+# V 0.0.96
+# - fixed:   74_UnifiSwitch: Log-Messages
 # 
 # TODOs:
 # - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
-my $version="0.0.95";
+my $version="0.0.96";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;
@@ -126,7 +128,7 @@ sub UnifiSwitch_Set($@){
   #  return undef;
   #}
 	my $portProfileDisableID=AttrVal($name,"portProfileDisableID",undef);
-	my $isPortprofileID = undef;
+	my $isPortprofileID = "";
 	$isPortprofileID ="disablePort" if (defined $portProfileDisableID);
     if($setName !~ /clear|poeMode|disablePort/) {
 		return "Unknown argument $setName, choose one of "
