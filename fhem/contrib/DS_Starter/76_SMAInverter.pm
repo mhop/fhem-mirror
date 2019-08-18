@@ -1119,17 +1119,21 @@ sub SMAInverter_SMAcommand($$$$$) {
  Log3 $name, 5, "$name - Data identifier $data_ID";
 	
  if($data_ID eq 0x2601)	{
-     eval { $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4)); };
-     if ($@) {
+     if (length($data) >= 66){
+		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
+	 } else {
          Log3 $name, 3, "$name - WARNING - SPOT_ETOTAL wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETOTAL = 0;
-     }
-	 eval { $inv_SPOT_ETODAY = unpack("V*", substr $data, 78, 4); };
-     if ($@) {
+	 }
+
+     if (length($data) >= 82){
+		 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
+	 } else {
          Log3 $name, 3, "$name - WARNING - SPOT_ETODAY wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETODAY = 0;
-     }
-	 Log3 $name, 5, "$name - Found Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
+	 }
+
+	 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
 	 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
  }
 			
