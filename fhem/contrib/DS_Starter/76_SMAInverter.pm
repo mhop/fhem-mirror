@@ -28,7 +28,9 @@
 #################################################################################################################
 # Versions History by DS_Starter
 #
-# 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined
+#
+# 2.12.0   18.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered (SMA_command), Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
+# 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined, commandref revised
 # 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
 # 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
 # 2.10.0   29.06.2018      Internal MODEL added
@@ -85,7 +87,7 @@ use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
 
-my $SMAInverterVersion = "2.10.2";
+my $SMAInverterVersion = "2.12.0";
 
 # Inverter Data fields and supported commands flags.
 # $inv_SPOT_ETODAY                # Today yield
@@ -1117,8 +1119,16 @@ sub SMA_command($$$$$) {
  Log3 $name, 5, "$name - Data identifier $data_ID";
 	
  if($data_ID eq 0x2601)	{
-     $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
-	 $inv_SPOT_ETODAY = unpack("V*", substr $data, 78, 4);
+     eval { $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4)); };
+     if ($@) {
+         Log3 $name, 3, "$name - WARNING - SPOT_ETOTAL wasn't deliverd ... set it to \"0\" !";
+         $inv_SPOT_ETOTAL = 0;
+     }
+	 eval { $inv_SPOT_ETODAY = unpack("V*", substr $data, 78, 4); };
+     if ($@) {
+         Log3 $name, 3, "$name - WARNING - SPOT_ETODAY wasn't deliverd ... set it to \"0\" !";
+         $inv_SPOT_ETODAY = 0;
+     }
 	 Log3 $name, 5, "$name - Found Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
 	 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
  }
@@ -1629,31 +1639,113 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <b>Get</b> 
 <br>
 <ul>
-<code>get &lt;name&gt; data</code>
-<br><br>
 
-The request of the inverter will be executed. Those possibility is especifically created for the "manual" operation mode (see attribute "mode").
+  <li><b> get &lt;name&gt; data </b>
+  <br><br>
 
+  The request of the inverter will be executed. Those possibility is especifically created for the "manual" operation 
+  mode (see attribute "mode").
+  <br>
+  </li>
+  
+<br>
 </ul>
 
 <b>Attributes</b>
 <ul>
-  <li><b>interval</b>       : Queryintreval in seconds </li>
-  <li><b>detail-level</b>   : "0" - Only Power and Energy / "1" - Including Voltage and Current / "2" - All values </li>
-  <li><b>disable</b>        : 1 = the module is disabled </li>
-  <li><b>mode</b>           : automatic = the inverter will be polled by preset interval, manual = query only by command "get &lt;name&gt; data" </li>
-  <li><b>offset</b>         : time in seconds to prefer the sunrise respectively defer the sunset virtualy (0 ... 7200).  You will be able to extend the working
-                              period of the module. </li>
-  <li><b>SBFSpotComp</b>    : 1 = the readings are created like SBFSpot-style </li>
-  <li><b>suppressSleep</b>  : the sleep mode (after sunset, before sunrise) is deactivated and the inverter will be polled continuously.  </li>
-  <li><b>showproctime</b>   : shows processing time in background and wasted time to retrieve inverter data  </li>
-  <li><b>target-susyid</b>  : In case of a Multigate the target SUSyID can be defined. If more than one inverter is installed you have to
-                              set the inverter-SUSyID to assign the inverter to the device definition.
-                              Default is 0xFFFF, means any SUSyID</li>
-  <li><b>target-serial</b>  : In case of a Multigate the target Serialnumber can be defined. If more than one inverter is installed you have to
-                              set the inverter-Serialnumber to assign the inverter to the device definition.
-							  Default is 0xFFFFFFFF, means any Serialnumber</li>
-  <li><b>timeout</b>        : setup timeout of inverter data request (default 60s) </li>  
+  
+  <a name="detail-level"></a>
+  <li><b>detail-level [0|1|2] </b><br>
+    Defines the complexity of the generated readings. <br><br>
+    
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> 0  </td><td>- only Power and Energy </td></tr>
+		  <tr><td> 1  </td><td>- as 0, additional voltage and current </td></tr>
+		  <tr><td> 2  </td><td>- all values </td></tr>
+		</table>
+		</ul>     
+   
+  </li>
+  <br>
+  
+  <a name="disable"></a>
+  <li><b>disable [1|0]</b><br>
+    Deactivate/activate the module.
+  </li>
+  <br>
+  
+  <a name="interval"></a>
+  <li><b>interval </b><br>
+    Request cycle in seconds. (default: 60)
+  </li>
+  <br>
+
+  <a name="mode"></a>
+  <li><b>mode [automatic|manual] </b><br>
+    The request mode of the inverter. (default: automatic) <br><br>
+    
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> automatic  </td><td>- the inverter will be polled regularly as defined by attribute "interval" </td></tr>
+		  <tr><td> manual     </td><td>- query only by command "get &lt;name&gt; data" </td></tr>
+		</table>
+		</ul>        
+
+  </li>
+  <br>
+  
+  <a name="offset"></a>
+  <li><b>offset &lt;0 - 7200&gt; </b><br>
+    Time in seconds to forward the real sunrise respectively defer the real sunset.  
+    You will be able to extend the working period of the module.
+  </li>
+  <br>
+  
+  <a name="SBFSpotComp"></a>
+  <li><b>SBFSpotComp [1|0]</b><br>
+    The reading names are created like the SBFSpot-style. (default: 0)
+  </li>
+  <br>
+  
+  <a name="showproctime"></a>
+  <li><b>showproctime [1|0]</b><br>
+    Shows the processing time in background and the wasted time to retrieve inverter data. (default: 0)
+  </li>
+  <br>
+  
+  <a name="suppressSleep"></a>
+  <li><b>suppressSleep [1|0]</b><br>
+    The sleep mode (after sunset and before sunrise) is deactivated and the inverter will be polled continuously. (default: 0)
+  </li>
+  <br>
+
+  <a name="target-serial"></a>
+  <li><b>target-serial </b><br>
+    In case of a Multigate the target serial number has to be defined. If more than one inverter is installed, 
+    you have to set the inverter serial number to assign the inverter to the device definition.
+    If only one inverter available, the attribut is set automatically once the serial number of the inverter was detected.
+    (default: 0xFFFFFFFF = means any serial number)
+  </li>
+  <br>
+  
+  <a name="target-susyid"></a>
+  <li><b>target-susyid </b><br>
+    In case of a Multigate the target SUSyID has to be defined. If more than one inverter is installed, 
+    you have to set the inverter-SUSyID to assign the inverter to the device definition.
+    If only one inverter available, the attribut is set automatically once the SUSyID of the inverter was detected.
+    (default: 0xFFFF = means any SUSyID)
+  </li>
+  <br>
+
+  <a name="timeout"></a>
+  <li><b>timeout </b><br>
+    Setup timeout of inverter data request in seconds. (default 60)
+  </li>
+  <br>
+ 
 </ul>
 
 <b>Readings</b>
@@ -1778,31 +1870,115 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <b>Get</b> 
 <br>
 <ul>
-<code>get &lt;name&gt; data</code>
-<br><br>
+  
+  <li><b> get &lt;name&gt; data </b>
+  <br><br>
 
-Die Datenabfrage des Wechselrichters wird ausgeführt. Diese Möglichkeit ist speziell für den Betriebsmodus "manual" vorgesehen (siehe Attribut "mode").
-
+  Die Datenabfrage des Wechselrichters wird ausgeführt. Diese Möglichkeit ist speziell für den Betriebsmodus "manual" 
+  vorgesehen (siehe Attribut "mode").
+  <br>
+  </li>
+<br>
 </ul>
 
 <b>Attribute</b>
+<br<br>
 <ul>
-  <li><b>interval</b>         : Abfrageinterval in Sekunden </li>
-  <li><b>detail-level</b>     : "0" - Nur Leistung und Energie / "1" - zusätzlich Strom und Spannung / "2" - Alle Werte </li>
-  <li><b>disable</b>          : 1 = das Modul ist disabled </li>
-  <li><b>mode</b>             : automatic = die Wechselrichterwerte werden im eingestellten Interval abgefragt, manual = Abfrage nur mit "get &lt;name&gt; data" </li>
-  <li><b>offset</b>           : Zeit in Sekunden um die der Sonnenaufgang vorgezogen bzw. Sonnenuntergang verzögert wird (0 ... 7200). Dadurch wird die 
-                                effektive Aktivzeit des Moduls erweitert.  </li>
-  <li><b>suppressSleep</b>    : der Schlafmodus (nach Sonnenuntergang, vor Sonnenaufgang) wird ausgeschaltet und der WR abgefragt.  </li>
-  <li><b>showproctime</b>     : zeigt die für den Hintergrundprozess und die Abfrage des Wechselrichter verbrauchte Zeit.  </li>
-  <li><b>SBFSpotComp</b>      : 1 = die Readings werden kompatibel zu SBFSpot-Ausgaben erzeugt </li>
-  <li><b>target-susyid</b>    : Im Falle eines Multigate kann die Ziel-SUSyID definiert werden. Ist mehr als ein Wechselrichter installiert,
-                                muß die Wechselreichter-SUSyID gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
-							    Default ist 0xFFFF (=keine Einschränkung)</li>
-  <li><b>target-serial</b>    : Im Falle eines Multigate kann die Ziel-Seriennummer definiert werden. Ist mehr als ein Wechselrichter installiert,
-                                muß die Wechselreichter-Seriennummer gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
-								Default ist 0xFFFFFFFF (=keine Einschränkung)</li>
-  <li><b>timeout</b>          : Einstellung des timeout für die Wechselrichterabfrage (default 60s) </li>  
+  
+  <a name="detail-level"></a>
+  <li><b>detail-level [0|1|2] </b><br>
+    Legt den Umfang der ausgegebenen Readings fest. <br><br>
+    
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> 0  </td><td>- nur Leistung und Energie </td></tr>
+		  <tr><td> 1  </td><td>- wie 0, zusätzlich Strom und Spannung </td></tr>
+		  <tr><td> 2  </td><td>- alle Werte </td></tr>
+		</table>
+		</ul>     
+   
+  </li>
+  <br>
+  
+  <a name="disable"></a>
+  <li><b>disable [1|0]</b><br>
+    Deaktiviert/aktiviert das Modul.
+  </li>
+  <br>
+  
+  <a name="interval"></a>
+  <li><b>interval </b><br>
+    Abfrageinterval in Sekunden. (default: 60)
+  </li>
+  <br>
+
+  <a name="mode"></a>
+  <li><b>mode [automatic|manual] </b><br>
+    Abfragemodus des Wechselrichters. (default: automatic) <br><br>
+    
+		<ul>   
+		<table>  
+		<colgroup> <col width=10%> <col width=90%> </colgroup>
+		  <tr><td> automatic  </td><td>- die Wechselrichterwerte werden im eingestellten Interval abgefragt (Attribut "interval") </td></tr>
+		  <tr><td> manual     </td><td>- Abfrage nur mit "get &lt;name&gt; data" </td></tr>
+		</table>
+		</ul>        
+
+  </li>
+  <br>
+  
+  <a name="offset"></a>
+  <li><b>offset &lt;0 - 7200&gt; </b><br>
+    Zeit in Sekunden, um die der reale Sonnenaufgang vorgezogen bzw. reale Sonnenuntergang verzögert wird. 
+    Dadurch wird die effektive Aktivzeit des Moduls erweitert.
+  </li>
+  <br>
+  
+  <a name="SBFSpotComp"></a>
+  <li><b>SBFSpotComp [1|0]</b><br>
+    Die Readingnamen werden kompatibel zu SBFSpot-Ausgaben erzeugt. (default: 0)
+  </li>
+  <br>
+
+  <a name="showproctime"></a>
+  <li><b>showproctime [1|0]</b><br>
+    Zeigt die für den Hintergrundprozess und die Abfrage des Wechselrichter verbrauchte Zeit. (default: 0)
+  </li>
+  <br>
+  
+  <a name="suppressSleep"></a>
+  <li><b>suppressSleep [1|0]</b><br>
+    Der Schlafmodus (nach Sonnenuntergang und vor Sonnenaufgang) wird ausgeschaltet und der WR abgefragt. (default: 0)
+  </li>
+  <br>
+
+  <a name="target-serial"></a>
+  <li><b>target-serial </b><br>
+    Im Falle eines Multigate muss die Ziel-Seriennummer definiert werden. Ist mehr als ein Wechselrichter installiert,
+    muß die Wechselreichter-Seriennummer gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
+    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die 
+    Seriennummer des Wechselrichters erkannt wurde.
+    (default: 0xFFFFFFFF = keine Einschränkung)
+  </li>
+  <br>
+  
+  <a name="target-susyid"></a>
+  <li><b>target-susyid </b><br>
+    Im Falle eines Multigate muss die Ziel-SUSyID definiert werden. Ist mehr als ein Wechselrichter installiert,
+    muß die Wechselreichter-SUSyID gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
+    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die 
+    SUSyID des Wechselrichters erkannt wurde.
+    (default: 0xFFFF = keine Einschränkung)
+  </li>
+  <br>
+
+  <a name="timeout"></a>
+  <li><b>timeout </b><br>
+    Einstellung des timeout für die Wechselrichterabfrage in Sekunden. (default 60)
+  </li>
+  <br>
+
 </ul>
 
 <b>Readings</b>
