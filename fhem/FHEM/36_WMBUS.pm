@@ -480,37 +480,37 @@ WMBUS_Attr(@)
   every minute.
   <br>
   WMBus messages can be optionally encrypted. In that case the matching AESkey must be specified with attr AESkey. Otherwise the decryption
-  will fail and no relevant data will be available.
+  will fail and no relevant data will be available. The module can decrypt messages encrypted according to security profile A or B (mode 5 and 7).
   <br><br>
   <b>Prerequisites</b><br>
-  This module requires the perl modules Digest::CRC, Crypt::Mode::CBC and Crypt::Mode::CTR (Crypt modules only if encrypted messages should be processed).<br>
+  This module requires the perl modules Digest::CRC, Crypt::Mode::CBC, Crypt::Mode::CTR and Digest::CMAC (last three only if encrypted messages should be processed).<br>
   On a debian based system these can be installed with<br>
   <code>
   sudo apt-get install libdigest-crc-perl<br>
-  sudo cpan -i Crypt::Mode::CBC Crypt::Mode:CTR
+  sudo cpan -i Crypt::Mode::CBC Crypt::Mode:CTR Digest::CMAC
   </code>
   <br><br>
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;b[&lt;MessageEncoding&gt;]HexCode&gt;</code> <br>
     <br>
     Normally a WMBus device isn't defined manually but automatically through the <a href="#autocreate">autocreate</a> mechanism upon the first reception of a message.
     <br>
     For a manual definition there are two ways.
     <ul>
 			<li>
-			By specifying a raw WMBus message as received by a CUL. Such a message starts with a lower case 'b' and contains at least 24 hexadecimal digits.
+      By specifying a raw WMBus message as received by an IODev. Such a message starts with a lower case 'b' and contains at least 24 hexadecimal digits.
 			The WMBUS module extracts all relevant information from such a message.
 			</li>
 			<li>
       Explictly specify the information that uniquely identifies a WMBus device. <br>
       The manufacturer code, which is is a three letter shortcut of the manufacturer name. See 
-      <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a> for a list of registered ids.<br>
+      <a href="https://www.dlms.com/flag-id/flag-id-list">dlms.com</a> for a list of registered ids.<br>
       The identification number is the serial no of the meter.<br>
       version is the version code of the meter<br>
       type is the type of the meter, e.g. water or electricity encoded as a number.<br>
-      MessageEncoding is either CUL or AMB, depending on which kind of IODev is used.
+      MessageEncoding is either CUL or AMB, depending on which kind of IODev is used. The default encoding is CUL.
       </li>
       <br>
     </ul>
@@ -525,25 +525,31 @@ WMBUS_Attr(@)
   <a name="WMBUSattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="IODev"></a>
     <li><a href="#IODev">IODev</a><br>
         Set the IO or physical device which should be used for receiving signals
         for this "logical" device. An example for the physical device is a CUL.
 	 </li><br>
-	 <li>AESKey<br>
+   <a name="AESkey"></a>
+   <li>AESkey<br>
 			A 16 byte AES-Key in hexadecimal digits. Used to decrypt messages from meters which have encryption enabled.
 	</li><br>
   <li>
+    <a name="ignore"></a>  
     <a href="#ignore">ignore</a>
   </li><br>
+  <a name="rawmsg_as_reading"></a>  
   <li>rawmsg_as_reading<br>
      If set to 1, received raw messages will be stored in the reading rawmsg. This can be used to log raw messages to help with debugging.
-  </li>
+  </li><br>
+  <a name="ignoreUnknownDataBlocks"></a>
   <li>ignoreUnknownDataBlocks<br>
      If set to 1, datablocks containing unknown/manufacturer specific data will be ignored. This is useful if a meter sends data in different
      formats of which some can be interpreted and some not. This prevents the unknown data overwriting the readings of the data that can be
      interpreted.
-  </li>
-  <li>ignoreMasterMessages
+  </li><br>
+  <a name="ignoreMasterMessages"></a>
+  <li>ignoreMasterMessages<br>
      Some devices (e.g. Letrika solar inverters) only send data if they have received a special message from a master device.
      The messages sent by the master are ignored unless explictly enabled by this attribute.
   </li>
@@ -596,20 +602,20 @@ WMBUS_Attr(@)
   Minutentakt gesendet werden.
   <br>
   WMBus Nachrichten k&ouml;nnen optional verschl&uuml;sselt werden. Bei verschl&uuml;sselten Nachrichten muss der passende Schl&uuml;ssel mit dem Attribut AESkey angegeben werden. 
-  Andernfalls wird die Entschl&uuml;sselung fehlschlagen und es k&ouml;nnen keine relevanten Daten ausgelesen werden.
+  Andernfalls wird die Entschl&uuml;sselung fehlschlagen und es k&ouml;nnen keine relevanten Daten ausgelesen werden. Das Modul kann mit Security Profile A oder B (Mode 5 und 7) verschl&uuml;sselte Nachrichten entschl&uuml;sseln.
   <br><br>
   <b>Voraussetzungen</b><br>
-  Dieses Modul ben&ouml;tigt die perl Module Digest::CRC, Crypt::Mode::CBC und Crypt::ModeL::CTR (die Crypt Module werden nur ben&ouml;tigt wenn verschl&uuml;sselte Nachrichten verarbeitet werden sollen).<br>
+  Dieses Modul ben&ouml;tigt die perl Module Digest::CRC, Crypt::Mode::CBC, Crypt::ModeL::CTR und Digest::CMAC (die letzten drei Module werden nur ben&ouml;tigt wenn verschl&uuml;sselte Nachrichten verarbeitet werden sollen).<br>
   Bei einem Debian basierten System k&ouml;nnen diese so installiert werden<br>
   <code>
   sudo apt-get install libdigest-crc-perl<br>
-  sudo cpan -i Crypt::Mode::CBC Crypt::Mode::CTR
+  sudo cpan -i Crypt::Mode::CBC Crypt::Mode::CTR Digest::CMAC
   </code>
   <br><br>
   <a name="WMBUSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;bHexCode&gt;</code> <br>
+    <code>define &lt;name&gt; WMBUS [&lt;manufacturer id&gt; &lt;identification number&gt; &lt;version&gt; &lt;type&gt; [&lt;MessageEncoding&gt;]]|&lt;b[<MessageEncoding>]HexCode&gt;</code> <br>
     <br>
     Normalerweise wird ein WMBus Device nicht manuell angelegt. Dies geschieht automatisch bem Empfang der ersten Nachrichten eines Ger&auml;tes &uuml;ber den 
     fhem <a href="#autocreate">autocreate</a> Mechanismus.
@@ -624,11 +630,11 @@ WMBUS_Attr(@)
 			<li>
 			Durch explizite Angabe der Informationen die ein WMBus Ger&auml;t eindeutig identfizieren.<br>
 			Der Hersteller Code, besteht aus drei Buchstaben als Abk&uuml;rzung des Herstellernamens. Eine Liste der Abk&uuml;rzungen findet sich unter
-      <a href="http://dlms.com/organization/flagmanufacturesids/index.html">dlms.com</a><br>
+      <a href="https://www.dlms.com/flag-id/flag-id-list">dlms.com</a><br>
       Die Idenitfikationsnummer ist die Seriennummer des Z&auml;hlers.<br>
       Version ist ein Versionscode des Z&auml;hlers.<br>
       Typ ist die Art des Z&auml;hlers, z. B. Wasser oder Elektrizit&auml;t, kodiert als Zahl.<br>
-      MessageEncoding ist entweder CUL oder AMB, je nachdem welche Art von IODev verwendet wird
+      MessageEncoding ist entweder CUL oder AMB, je nachdem welche Art von IODev verwendet wird. Wird kein Encoding angegeben so wird CUL verwendet.
       </li>
       <br>
     </ul>
@@ -643,24 +649,29 @@ WMBUS_Attr(@)
   <a name="WMBUSattr"></a>
   <b>Attributes</b>
   <ul>
+   <a name="IODev"></a>
     <li><a href="#IODev">IODev</a><br>
 				Setzt den IO oder physisches Ger&auml;t welches f&uuml;r den Empfang der Signale f&uuml;r dieses 'logische' Ger&auml;t verwendet werden soll.
 				Ein Beispiel f&uuml;r ein solches Ger&auml;t ist ein CUL.
 	 </li><br>
+   <a name="AESkey"></a>
 	 <li>AESKey<br>
 			Ein 16 Bytes langer AES-Schl&uuml;ssel in hexadezimaler Schreibweise. Wird verwendet um Nachrichten von Z&auml;hlern zu entschl&uuml;sseln bei denen
 			die Verschl&uuml;sselung aktiviert ist.
 	</li><br>
   <li>
+    <a name="ignore"></a>
     <a href="#ignore">ignore</a>
   </li><br>
   <li>rawmsg_as_reading<br>
      Wenn auf 1 gesetzt so werden empfangene Nachrichten im Reading rawmsg gespeichert. Das kann verwendet werden um Rohnachrichten zu loggen und beim Debugging zu helfen.
-  </li>
+  </li><br>
+  <a name="rawmsg_as_reading"></a> 
   <li>ignoreUnknownDataBlocks<br>
      Wenn auf 1 gesetzt so werden Datenblocks die unbekannte/herstellerspezifische Daten enthalten ignoriert. Das ist hilfreich wenn ein Z&auml;hler Daten in unterschiedlichen
      Formaten sendet von denen einige nicht interpretiert werden k&ouml;nnen. Es verhindert, dass die unbekannten Daten die Readings der interpretierbaren Daten &uuml;berschreiben.
-  </li>  
+  </li><br> 
+  <a name="ignoreUnknownDataBlocks"></a>
   <li>ignoreMasterMessages
      Einige Geräte (z. B. Letrika Wechselrichter) senden nur dann Daten wenn sie eine spezielle Nachricht von einem Mastergerät erhalten haben.
      Die Nachrichten von dem Master werden ignoriert es sei denn es wird explizit mit diesem Attribut eingeschaltet.
