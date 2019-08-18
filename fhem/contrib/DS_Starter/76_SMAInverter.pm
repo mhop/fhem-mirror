@@ -1443,14 +1443,14 @@ return;
 ##########################################################################
 sub SMAInverter_SMAlogout($$) {
  # Parameters: host
- my ($hash,$host) = @_;
- my $name = $hash->{NAME};
- my $cmdheader = "534D4100000402A00000000100";
- my $pktlength = "22";		# length = 34 for logout command
- my $esignature = "0010606508A0";
- my $mysusyid = $hash->{HELPER}{MYSUSYID};
+ my ($hash,$host)   = @_;
+ my $name           = $hash->{NAME};
+ my $cmdheader      = "534D4100000402A00000000100";
+ my $pktlength      = "22";		# length = 34 for logout command
+ my $esignature     = "0010606508A0";
+ my $mysusyid       = $hash->{HELPER}{MYSUSYID};
  my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
- my $pkt_ID = $hash->{HELPER}{PKT_ID};
+ my $pkt_ID         = $hash->{HELPER}{PKT_ID};
  my ($cmd, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size);
  
