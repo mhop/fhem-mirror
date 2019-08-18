@@ -29,7 +29,7 @@
 # Versions History by DS_Starter
 #
 #
-# 2.12.0   18.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered (SMA_command), Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
+# 2.12.0   18.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered (SMAInverter_SMAcommand), Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
 # 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined, commandref revised
 # 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
 # 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
@@ -38,7 +38,7 @@
 # 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
 # 2.9.0    23.04.2017      fixed issue #22: wrong logon command for SunnyBoy systems
 # 2.8.3    19.04.2017      enhanced inverter Type-Hash
-# 2.8.2    23.03.2017      changed SMA_logon sub
+# 2.8.2    23.03.2017      changed SMAInverter_SMAlogon sub
 # 2.8.1    06.12.2016      SMAInverter version as internal 
 # 2.8      05.12.2016      changed commandsections to make sure getting only data from inverters with preset
 #                          $inv_susyid and $inv_serial
@@ -47,7 +47,7 @@
 # 2.7.2    03.12.2016      use Time::HiRes qw(gettimeofday tv_interval)
 # 2.7.1    02.12.2016      showproctime improved
 # 2.7      02.12.2016      showproctime added
-# 2.6.1    29.11.2016      getstatus_DoParse changed due to inititialized issues
+# 2.6.1    29.11.2016      SMAInverter_getstatusDoParse changed due to inititialized issues
 # 2.6      28.11.2016      bugfix warnings ParseDone redefine at startup, uninitialized value $avg if FHEM was 
 #                          restarted in sleeptime, switched avg_energy to avg_power, commandref updated
 # 2.5.2    27.11.2016      bugfix average calc, bugfix warnings at startup
@@ -477,7 +477,7 @@ sub SMAInverter_GetData($) {
 	 InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);	 
  } 
 
-$hash->{HELPER}{RUNNING_PID} = BlockingCall("getstatus_DoParse", "$name", "getstatus_ParseDone", $timeout, "getstatus_ParseAborted", $hash);
+$hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAInverter_getstatusDoParse", "$name", "SMAInverter_getstatusParseDone", $timeout, "SMAInverter_getstatusParseAborted", $hash);
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 4;
 
 return;
@@ -486,7 +486,7 @@ return;
 ###############################################################
 #          non-blocking Inverter Datenabruf
 ###############################################################
-sub getstatus_DoParse($) {
+sub SMAInverter_getstatusDoParse($) {
  my ($name) = @_;
  my $hash = $defs{$name};
  my $interval = AttrVal($name, "interval", 60);
@@ -531,7 +531,7 @@ sub getstatus_DoParse($) {
  # Background-Startzeit
  $bst = [gettimeofday];
         
- Log3 ($name, 4, "$name -> Start BlockingCall getstatus_DoParse");
+ Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusDoParse");
  
  # set dependency from surise/sunset used for inverter operation time 
  my $offset = AttrVal($name,"offset",0);
@@ -583,62 +583,62 @@ sub getstatus_DoParse($) {
           push(@commands, "sup_DeviceStatus");	       # Check DeviceStatus 
      }
 
-     if(SMA_logon($hash->{HOST}, $hash->{PASS}, $hash)) {
+     if(SMAInverter_SMAlogon($hash->{HOST}, $hash->{PASS}, $hash)) {
          Log3 $name, 5, "$name - Logged in now";
 	 
 	     foreach my $i(@commands) {
              if ($i eq "sup_TypeLabel") {
-		         ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
+		         ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
 		     } 
 			 elsif ($i eq "sup_EnergyProduction") {
-		         ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
+		         ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
 		     } 
 		     elsif ($i eq "sup_SpotDCPower") {
-		         ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
+		         ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
 		     } 
 		     elsif ($i eq "sup_SpotACPower") {
-		         ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
+		         ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
 	         } 
 		     elsif ($i eq "sup_SpotACTotalPower") {
-		         ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
+		         ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
 		     }    
 		     elsif ($i eq "sup_ChargeStatus") {
-		         ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
+		         ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
 		     } 
 		     elsif ($i eq "sup_SpotDCVoltage") {
-		         ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
+		         ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
 		     } 
 		     elsif ($i eq "sup_SpotACVoltage") {
-		         ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
+		         ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
 		     } 
 		     elsif ($i eq "sup_BatteryInfo") {
-		         ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
+		         ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
 		     } 
 		     elsif ($i eq "sup_SpotGridFrequency") {
-		         ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
+		         ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
 		     } 
 		     elsif ($i eq "sup_OperationTime") {
-		         ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
+		         ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
 		     } 
 		     elsif ($i eq "sup_InverterTemperature") {
-		         ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
+		         ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
 		     } 
 		     elsif ($i eq "sup_MaxACPower") {
-		         ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
+		         ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
 		     } 
 		     elsif ($i eq "sup_MaxACPower2") {
-		         ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
+		         ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
 		     }   
 		     elsif ($i eq "sup_GridRelayStatus") {
-		         ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
+		         ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
 		     } 
 		     elsif ($i eq "sup_DeviceStatus") {
-		         ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMA_command($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
+		         ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
 		     } 
          }	 
 	 
          # nothing more to do, just log out
-         SMA_logout($hash,$hash->{HOST});
+         SMAInverter_SMAlogout($hash,$hash->{HOST});
  
          # Inverter Laufzeit ermitteln
          $irt = tv_interval($ist);
@@ -772,8 +772,8 @@ sub getstatus_DoParse($) {
 	                 push(@row_array, "grid_freq. ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
                  if($sup_TypeLabel) {
-	                 push(@row_array, "device_type ".devtype($inv_TYPE)."\n");
-	                 push(@row_array, "device_class ".classtype($inv_CLASS)."\n");
+	                 push(@row_array, "device_type ".SMAInverter_devtype($inv_TYPE)."\n");
+	                 push(@row_array, "device_class ".SMAInverter_classtype($inv_CLASS)."\n");
 					 push(@row_array, "susyid ".$inv_susyid." - SN: ".$inv_serial."\n") if($inv_susyid && $inv_serial);
 	                 push(@row_array, "device_name "."SN: ".$inv_serial."\n") if($inv_serial);
 	                 push(@row_array, "serial_number ".$inv_serial."\n") if($inv_serial);
@@ -794,10 +794,10 @@ sub getstatus_DoParse($) {
 	                 push(@row_array, "operation_time ".$inv_SPOT_OPERTM."\n");
                  }
                  if($sup_GridRelayStatus) {
-	                 push(@row_array, "gridrelay_status ".StatusText($inv_GRIDRELAY)."\n");
+	                 push(@row_array, "gridrelay_status ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
                  }
                  if($sup_DeviceStatus) {
-	                 push(@row_array, "device_status ".StatusText($inv_STATUS)."\n");
+	                 push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
              } 
          } else {     # kein SBFSpot Compatibility Mode
@@ -862,8 +862,8 @@ sub getstatus_DoParse($) {
 	                 push(@row_array, "SPOT_FREQ ".$inv_SPOT_FREQ."\n");
                  }
                  if($sup_TypeLabel) {
-	                 push(@row_array, "INV_TYPE ".devtype($inv_TYPE)."\n");
-	                 push(@row_array, "INV_CLASS ".classtype($inv_CLASS)."\n");
+	                 push(@row_array, "INV_TYPE ".SMAInverter_devtype($inv_TYPE)."\n");
+	                 push(@row_array, "INV_CLASS ".SMAInverter_classtype($inv_CLASS)."\n");
 				     push(@row_array, "SUSyID ".$inv_susyid."\n") if($inv_susyid);
 	                 push(@row_array, "Serialnumber ".$inv_serial."\n") if($inv_serial);
                  }
@@ -883,10 +883,10 @@ sub getstatus_DoParse($) {
 	                 push(@row_array, "SPOT_OPERTM ".$inv_SPOT_OPERTM."\n");
                  }
                  if($sup_GridRelayStatus) {
-	                 push(@row_array, "INV_GRIDRELAY ".StatusText($inv_GRIDRELAY)."\n");
+	                 push(@row_array, "INV_GRIDRELAY ".SMAInverter_StatusText($inv_GRIDRELAY)."\n");
                  }
                  if($sup_DeviceStatus) {
-	                 push(@row_array, "INV_STATUS ".StatusText($inv_STATUS)."\n");
+	                 push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
              } 
          }
@@ -918,7 +918,7 @@ sub getstatus_DoParse($) {
 
  $rt = ($irt?$irt:'').",".$brt;
  
- Log3 ($name, 4, "$name -> BlockingCall getstatus_DoParse finished");
+ Log3 ($name, 4, "$name -> BlockingCall SMAInverter_getstatusDoParse finished");
  
 return "$name|$rowlist|$avg|$rt"; 
 }
@@ -926,7 +926,7 @@ return "$name|$rowlist|$avg|$rt";
 ###############################################################
 #         Auswertung non-blocking Inverter Datenabruf
 ###############################################################
-sub getstatus_ParseDone ($) {
+sub SMAInverter_getstatusParseDone ($) {
  my ($string)                = @_;
  my @a                       = split("\\|",$string);
  my $name                    = $a[0];
@@ -936,7 +936,7 @@ sub getstatus_ParseDone ($) {
  my $rt                      = $a[3]; 
  my ($irt,$brt)              = split(",", $rt);
  
- Log3 ($name, 4, "$name -> Start BlockingCall getstatus_ParseDone");
+ Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusParseDone");
   
  # proctime Readings löschen
  if(!AttrVal($name, "showproctime", undef)) {
@@ -970,7 +970,7 @@ sub getstatus_ParseDone ($) {
  readingsEndUpdate($hash, 1);
  
  delete($hash->{HELPER}{RUNNING_PID});
- Log3 ($name, 4, "$name -> BlockingCall getstatus_ParseDone finished");
+ Log3 ($name, 4, "$name -> BlockingCall SMAInverter_getstatusParseDone finished");
  
 return;
 }
@@ -978,7 +978,7 @@ return;
 ###############################################################
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
-sub getstatus_ParseAborted(@) {
+sub SMAInverter_getstatusParseAborted(@) {
   my ($hash,$cause) = @_;
   my $name      = $hash->{NAME};
   my $discycles = $hash->{HELPER}{FAULTEDCYCLES};
@@ -999,7 +999,7 @@ return;
 ##########################################################################
 #                     SMA Command Execution
 ##########################################################################
-sub SMA_command($$$$$) {
+sub SMAInverter_SMAcommand($$$$$) {
  # Parameters: $hash - host - command - first - last
  my ($hash,$host,$command,$first,$last) = @_;
  my $name = $hash->{NAME};
@@ -1035,14 +1035,14 @@ sub SMA_command($$$$$) {
  my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
 
  # Define own ID and target ID and packet ID
- $myID      = ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . ByteOrderLong(sprintf("%08X",$myserialnumber));
- $target_ID = ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . ByteOrderLong(sprintf("%08X",$target_serial));
+ $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
+ $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
  
  # Increasing Packet ID
  $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;	
- $spkt_ID = ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
+ $spkt_ID = SMAInverter_ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
 
- $cmd_ID = ByteOrderLong(sprintf("%08X",$command)) . ByteOrderLong(sprintf("%08X",$first)) . ByteOrderLong(sprintf("%08X",$last));
+ $cmd_ID = SMAInverter_ByteOrderLong(sprintf("%08X",$command)) . SMAInverter_ByteOrderLong(sprintf("%08X",$first)) . SMAInverter_ByteOrderLong(sprintf("%08X",$last));
 
  #build final command to send
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0000" . $myID . "0000" . "00000000" . $spkt_ID . $cmd_ID . "00000000";
@@ -1294,16 +1294,16 @@ return 0;
 ##########################################################################
 #                                Login
 ##########################################################################
-sub SMA_logon($$$) {
+sub SMAInverter_SMAlogon($$$) {
  # Parameters: host - passcode
  my ($host,$pass,$hash)  = @_;
- my $cmdheader = "534D4100000402A00000000100";
- my $pktlength = "3A";                             # length = 58 for logon command
- my $esignature = "001060650EA0";
- my $name = $hash->{NAME};
- my $mysusyid = $hash->{HELPER}{MYSUSYID};
- my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
- my $pkt_ID = $hash->{HELPER}{PKT_ID};
+ my $cmdheader           = "534D4100000402A00000000100";
+ my $pktlength           = "3A";                             # length = 58 for logon command
+ my $esignature          = "001060650EA0";
+ my $name                = $hash->{NAME};
+ my $mysusyid            = $hash->{HELPER}{MYSUSYID};
+ my $myserialnumber      = $hash->{HELPER}{MYSERIALNUMBER};
+ my $pkt_ID              = $hash->{HELPER}{PKT_ID};
  my ($cmd, $timestmp, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size);
  
@@ -1325,13 +1325,13 @@ sub SMA_logon($$$) {
  }
 
  # Get current timestamp in epoch format (unix format)
- $timestmp = ByteOrderLong(sprintf("%08X",int(time())));
+ $timestmp = SMAInverter_ByteOrderLong(sprintf("%08X",int(time())));
 
  # Define own ID and target ID and packet ID
- $myID      = ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . ByteOrderLong(sprintf("%08X",$myserialnumber));
- $target_ID = ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . ByteOrderLong(sprintf("%08X",$target_serial));
+ $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
+ $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
  $pkt_ID    = 0x8001;	# Reset to 0x8001
- $spkt_ID   = ByteOrderShort(sprintf("%04X",$pkt_ID));
+ $spkt_ID   = SMAInverter_ByteOrderShort(sprintf("%04X",$pkt_ID));
 
  #Logon command
  $cmd_ID = "0C04FDFF" . "07000000" . "84030000";  # Logon command + User group "User" + (maybe) Timeout
@@ -1374,7 +1374,7 @@ sub SMA_logon($$$) {
      Log3 $name, 1, "$name - Nothing received...";
      # send: cmd_logout
      $socket->close();
-     SMA_logout($hash,$host);
+     SMAInverter_SMAlogout($hash,$host);
      return 0;
  } else {
     # We have received something!
@@ -1392,14 +1392,14 @@ sub SMA_logon($$$) {
             Log3 $name, 5, "$name - Request/Response: SusyID $mysusyid/$r_susyid, Serial $myserialnumber/$r_serial, Packet ID $hash->{HELPER}{PKT_ID}/$r_pkt_ID, Command 0xFFFD040D/$r_cmd_ID, Error $r_error";
             # send: cmd_logout
             $socket->close();
-            SMA_logout($hash,$host);
+            SMAInverter_SMAlogout($hash,$host);
             return 0;
         }
     } else {
         Log3 $name, 1, "$name - Format of inverter response does not fit.";
         # send: cmd_logout
         $socket->close();
-        SMA_logout($hash,$host);
+        SMAInverter_SMAlogout($hash,$host);
         return 0;
     }
  }
@@ -1441,7 +1441,7 @@ return;
 ##########################################################################
 #                               Logout
 ##########################################################################
-sub SMA_logout($$) {
+sub SMAInverter_SMAlogout($$) {
  # Parameters: host
  my ($hash,$host) = @_;
  my $name = $hash->{NAME};
@@ -1461,11 +1461,11 @@ sub SMA_logout($$) {
  my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
 
  # Define own ID and target ID and packet ID
- $myID      = ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . ByteOrderLong(sprintf("%08X",$myserialnumber));
- $target_ID = ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . ByteOrderLong(sprintf("%08X",$target_serial));
+ $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
+ $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
  # Increasing Packet ID
  $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;	
- $spkt_ID = ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
+ $spkt_ID = SMAInverter_ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
  
  # Logout command
  $cmd_ID = "0E01FDFF" . "FFFFFFFF";  # Logout command
@@ -1505,7 +1505,7 @@ return 1;
 ##########################################################################
 
 ##########################
-sub ByteOrderShort($) {
+sub SMAInverter_ByteOrderShort($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 2, 2) . substr($input, 0, 2);
@@ -1514,7 +1514,7 @@ return $output;
 }
 
 ##########################
-sub ByteOrderLong($) {
+sub SMAInverter_ByteOrderLong($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 6, 2) . substr($input, 4, 2) . substr($input, 2, 2) . substr($input, 0, 2);
@@ -1523,7 +1523,7 @@ return $output;
 }
 
 ##########################
-sub StatusText($) {
+sub SMAInverter_StatusText($) {
  # Parameter is the code, return value is the Text or if not known then the code as string
  my $code = $_[0];
 
@@ -1542,7 +1542,7 @@ return sprintf("%d", $code);
 ##########################
 #  identify device type
 
-sub devtype ($) {
+sub SMAInverter_devtype ($) {
   my ($code) = @_;
   
   unless (exists($SMAInverter_devtypes{$code})) { return $code;}
@@ -1554,7 +1554,7 @@ return ($dev);
 ##########################
 #  identify device class
 
-sub classtype ($) {
+sub SMAInverter_classtype ($) {
   my ($code) = @_;
   my $class;
   
