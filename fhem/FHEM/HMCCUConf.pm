@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.6
+#  Version 4.6.002
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -168,6 +168,17 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:on:off",
 	widgetOverride   => "control:slider,0,10,100"	
 	},
+	"HmIP-FCI6" => {
+	_description     => "IP Kontaktschnittstelle Unterputz 6-fach",
+	_channels        => "1,2,3,4,5,6",
+	ccureadingfilter => "STATE",
+	controldatapoint => "STATE",
+	statedatapoint   => "STATE",
+	statevals        => "on:true,off:false",
+	substitute       => "STATE!(0|false):off,(1|true):on",
+	webCmd           => "devstate",
+	widgetOverride   => "devstate:uzsuToggle,off,on"
+	},
 	"HM-PB-2-FM" => {
 	_description     => "Funk-Wandtaster 2-fach",
 	_channels        => "1,2",
@@ -297,7 +308,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
 	},
-	"HmIP-BROLL" => {
+	"HmIP-BROLL|HmIP-FROLL" => {
 	_description     => "Rollladenaktor",
 	_channels        => "4",
 	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|LEVEL|ACTIVITY_STATE)",
@@ -336,7 +347,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	stripnumber      => 1,
 	substitute       => "RAINING,RAIN_COUNTER_OVERFLOW,SUNSHINEDURATION_OVERFLOW,SUNSHINE_THRESHOLD_OVERRUN,WIND_THRESHOLD_OVERRUN!(0|false):no,(1|true):yes"
 	},
-	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3" => {
+	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3|Hm-Sen-MDIR-O-3" => {
 	_description     => "Bewegungsmelder",
 	_channels        => "1",
 	ccureadingfilter => "(BRIGHTNESS|MOTION)",
@@ -348,9 +359,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	_description     => "Bewegungsmelder",
 	_channels        => "1",
 	ccureadingfilter => "(ILLUMINATION|MOTION)",
-	eventMap         => "/datapoint MOTION_DETECTION_ACTIVE 1:detection-on/datapoint MOTION_DETECTION_ACTIVE 0:detection-off/",
+	controldatapoint => "MOTION_DETECTION_ACTIVE",
+	eventMap         => "/datapoint RESET_MOTION 1:reset/datapoint MOTION_DETECTION_ACTIVE 1:detection-on/datapoint MOTION_DETECTION_ACTIVE 0:detection-off/",
+   hmstatevals      => "SABOTAGE!(1|true):sabotage",
 	statedatapoint   => "MOTION",
-	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	substitute       => "MOTION!(0|false):no,(1|true):yes;MOTION_DETECTION_ACTIVE!(0|false):off,(1|true):on",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"
 	},
 	"HmIP-SPI" => {
 	_description     => "Anwesenheitssensor",
@@ -712,16 +727,16 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:up:stop:down",
 	widgetOverride   => "control:slider,0,10,100"
 	},
-	"HmIP-BROLL" => {
+	"HmIP-BROLL|HmIP-FROLL" => {
 	_description     => "Rollladenaktor",
-	ccureadingfilter => "(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|LEVEL|ACTIVITY_STATE|SELF_CALIBRATION_RESULT)",
-	ccureadingname   => "LEVEL:+pct",
+	ccureadingfilter => "3.LEVEL;(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|ACTIVITY_STATE|SELF_CALIBRATION_RESULT)",
+	ccureadingname   => "3.LEVEL$:+control,+pct",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
 	controldatapoint => "4.LEVEL",
 	hmstatevals      => "ACTUAL_TEMPERATURE_STATUS!2:tempOverflow,3:tempUnderflow;ERROR_OVERHEAT!(1|true):overheat",
 	eventMap         => "/datapoint 4.STOP true:stop/datapoint 4.LEVEL 0:down/datapoint 4.LEVEL 100:up/datapoint 3.SELF_CALIBRATION 0:stopCalibration/datapoint 3.SELF_CALIBRATION 1:startCalibration/",
-	statedatapoint   => "4.LEVEL",
+	statedatapoint   => "3.LEVEL",
 	stripnumber      => 1,
 	substexcl        => "control|pct",
 	substitute       => "LEVEL!#0-0:closed,#100-100:open;ACTIVITY_STATE!0:unknown,1:up,2:down,3:stop;ERROR_OVERHEAT!(0|false):no,(1|true):yes;ACTUAL_TEMPERATURE_STATUS!0:normal,1:unknown,2:overflow,3:underflow;SELF_CALIBRATION_RESULT!(0|false):failed,(1|true):ok",
@@ -763,7 +778,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	ccureadingname   => "1.LEVEL:valve_position",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	controldatapoint => "1.SET_POINT_TEMPERATURE",
-	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.SET_POINT_TEMPERATURE 30.5:on/",
+	eventMap         => "/datapoint 1.BOOST_MODE true:Boost/datapoint 1.CONTROL_MODE 0:Auto/datapoint 1.CONTROL_MODE 1:Manual/datapoint 1.CONTROL_MODE 2:Holiday/datapoint 1.CONTROL_MODE 1 1.SET_POINT_TEMPERATURE 4.5:off/datapoint 1.CONTROL_MODE 0 1.SET_POINT_TEMPERATURE 30.5:on/",
 	genericDeviceType => "thermostat",
 	statedatapoint   => "1.SET_POINT_TEMPERATURE",
 	stripnumber      => 1,
@@ -833,7 +848,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	webCmd           => "control:Auto:Manu:Boost:on:off",
 	widgetOverride   => "control:slider,4.5,0.5,30.5,1"
 	},
-	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3" => {
+	"HM-Sec-MD|HM-Sec-MDIR|HM-Sec-MDIR-2|HM-Sec-MDIR-3|Hm-Sen-MDIR-O-3" => {
 	_description     => "Bewegungsmelder",
 	ccureadingfilter => "(BRIGHTNESS|MOTION)",
 	hmstatevals      => "ERROR!1:sabotage",
@@ -843,9 +858,13 @@ use vars qw(%HMCCU_SCRIPTS);
 	"HmIP-SMI" => {
 	_description     => "Bewegungsmelder",
 	ccureadingfilter => "(ILLUMINATION|MOTION)",
-	eventMap         => "/datapoint 1.MOTION_DETECTION_ACTIVE 1:detection-on/datapoint 1.MOTION_DETECTION_ACTIVE 0:detection-off/",
+	controldatapoint => "1.MOTION_DETECTION_ACTIVE",
+	eventMap         => "/datapoint 1.RESET_MOTION 1:reset/datapoint 1.MOTION_DETECTION_ACTIVE 1:detection-on/datapoint 1.MOTION_DETECTION_ACTIVE 0:detection-off/",
+   hmstatevals      => "SABOTAGE!(1|true):sabotage",
 	statedatapoint   => "1.MOTION",
-	substitute       => "MOTION!(0|false):no,(1|true):yes"
+	substitute       => "MOTION!(0|false):no,(1|true):yes;MOTION_DETECTION_ACTIVE!(0|false):off,(1|true):on",
+	webCmd           => "control",
+	widgetOverride   => "control:uzsuToggle,off,on"
 	},
 	"HmIP-SMI55" => {
 	_description     => "Bewegungsmelder",

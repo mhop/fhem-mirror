@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.008
+#  Version 4.3.009
 #
 #  (c) 2019 zap (zap01 <at> t-online <dot> de)
 #
@@ -340,6 +340,8 @@ sub HMCCUDEV_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 
+	return "No set command specified" if (!defined ($opt));
+
 	# Valid commands for read only devices
 	my $rocmds = "clear config defaults:noArg";
 
@@ -593,9 +595,34 @@ sub HMCCUDEV_Set ($@)
 			$objname .= ':'.$1;
 		}
 
-		my $rc = HMCCU_RPCSetConfig ($hash, $objname, $h);
+		my ($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $objname, "MASTER", $h);
+#		my $rc = HMCCU_RPCSetConfig ($hash, $objname, $h);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
+		return HMCCU_SetState ($hash, "OK");
+	}
+	elsif ($opt eq 'rpcParameter') {
+		return HMCCU_SetError ($hash, "Usage: set $name rpcParameter [channel] [MASTER|VALUES] {parameter}={value} [...]")
+			if ((scalar keys %{$h}) < 1);	
+			
+		my $key;
+		my $addr;
+		
+		while (my $p = shift @$a) {
+			if ($p =~ /^(MASTER|VALUES)$/ && !defined ($key)) {
+				$key = $p;
+			}
+			elsif ($p =~ /^([0-9]+)$/ && !defined ($addr)) {
+				HMCCU_SetError ($hash, -7) if ($p >= $hash->{channels});
+				$addr = $p;
+			}
+		}
+		
+		$key = 'VALUES' if (!defined ($key));
+		$addr = defined ($addr) ? "$ccuaddr:$addr" : $ccuaddr;
+		
+		my ($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $addr, $key, $h);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'defaults') {
@@ -640,6 +667,8 @@ sub HMCCUDEV_Get ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 
+	return "No get command specified" if (!defined ($opt));
+	
 	# Get I/O device
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
@@ -739,7 +768,6 @@ sub HMCCUDEV_Get ($@)
 		return HMCCU_FormatDeviceInfo ($result);
 	}
 	elsif ($opt eq 'config') {
-		my $channel = undef;
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
 		if (defined ($par)) {
@@ -751,13 +779,13 @@ sub HMCCUDEV_Get ($@)
 		}
 		$par = '.*' if (!defined ($par));
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
+		my ($rc, $res) = HMCCU_RPCRequest ($hash, "getParamset", $ccuobj, "MASTER", undef, $par);
+#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
 		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);		
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $res;
 	}
 	elsif ($opt eq 'configlist') {
-		my $channel = undef;
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
 		if (defined ($par)) {
@@ -769,13 +797,13 @@ sub HMCCUDEV_Get ($@)
 		}
 		$par = '.*' if (!defined ($par));
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
+		my ($rc, $res) = HMCCU_RPCRequest ($hash, "listParamset", $ccuobj, "MASTER", undef, $par);
+#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
 		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;
 	}
 	elsif ($opt eq 'configdesc') {
-		my $channel = undef;
 		my $ccuobj = $ccuaddr;
 		my $par = shift @$a;
 		if (defined ($par)) {
@@ -788,7 +816,8 @@ sub HMCCUDEV_Get ($@)
 			}
 		}
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
+		my ($rc, $res) = HMCCU_RPCRequest ($hash, "getParamsetDescription", $ccuobj, "MASTER", undef);
+#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
 		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;

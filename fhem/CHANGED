@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  88_HMCCU: New features and bug fixes
  - feature: 36_WMBUS: initial support for mode 7 encryption (mostly untested)
             Digest::CMAC must be installed
  - feature: 72_XiaomiDevice: added S1 vacuum states
