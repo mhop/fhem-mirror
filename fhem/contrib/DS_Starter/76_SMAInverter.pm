@@ -552,8 +552,8 @@ sub SMAInverter_getstatusDoParse($) {
  my $opertime_start = $oper_start->dmy('.')." ".$oper_start->hms;
  my $opertime_stop  = $oper_stop->dmy('.')." ".$oper_stop->hms;
  
- # ETOTAL Yesterday speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
- if ($dt_now >= $oper_stop && $dt_now <= $oper_start) {
+ # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
+ if ($dt_now >= $oper_stop) {
      my $val;
      $val = ReadingsVal($name, "etotal", 0)      if (exists $defs{$name}{READINGS}{etotal});
      $val = ReadingsVal($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
