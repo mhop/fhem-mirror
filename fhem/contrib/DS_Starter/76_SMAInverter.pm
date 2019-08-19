@@ -555,8 +555,8 @@ sub SMAInverter_getstatusDoParse($) {
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
  if ($dt_now >= $oper_stop) {
      my $val;
-     $val = ReadingsVal($name, "etotal", 0)      if (exists $defs{$name}{READINGS}{etotal});
-     $val = ReadingsVal($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
+     $val = ReadingsNum($name, "etotal", 0)      if (exists $defs{$name}{READINGS}{etotal});
+     $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
  }
  
