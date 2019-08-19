@@ -29,7 +29,8 @@
 # Versions History by DS_Starter
 #
 #
-# 2.12.0   18.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered (SMAInverter_SMAcommand), Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
+# 2.12.0   19.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully 
+#                          calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
 # 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined, commandref revised
 # 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
 # 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
@@ -487,10 +488,10 @@ return;
 #          non-blocking Inverter Datenabruf
 ###############################################################
 sub SMAInverter_getstatusDoParse($) {
- my ($name) = @_;
- my $hash = $defs{$name};
+ my ($name)   = @_;
+ my $hash     = $defs{$name};
  my $interval = AttrVal($name, "interval", 60);
- my $sc = AttrVal($name, "SBFSpotComp", 0);
+ my $sc       = AttrVal($name, "SBFSpotComp", 0);
  my ($sup_EnergyProduction,       
      $sup_SpotDCPower, 
      $sup_SpotACPower,            
@@ -536,16 +537,28 @@ sub SMAInverter_getstatusDoParse($) {
  # set dependency from surise/sunset used for inverter operation time 
  my $offset = AttrVal($name,"offset",0);
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+ 
  my ($sunrise_h,$sunrise_m,$sunrise_s) = split(":",sunrise_abs('-'.$offset));
  my ($sunset_h,$sunset_m,$sunset_s)    = split(":",sunset_abs('+'.$offset));
+ 
  my $oper_start = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunrise_h,minute=>$sunrise_m,second=>$sunrise_s,time_zone=>'local');
  my $oper_stop  = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunset_h,minute=>$sunset_m,second=>$sunset_s,time_zone=>'local');
- my $dt_now = DateTime->now(time_zone=>'local');
+ my $dt_now     = DateTime->now(time_zone=>'local');
+ 
  Log3 $name, 4, "$name - current time: ".$dt_now->dmy('.')." ".$dt_now->hms;
  Log3 $name, 4, "$name - operation time begin: ".$oper_start->dmy('.')." ".$oper_start->hms;
  Log3 $name, 4, "$name - operation time end: ".$oper_stop->dmy('.')." ".$oper_stop->hms;
+ 
  my $opertime_start = $oper_start->dmy('.')." ".$oper_start->hms;
  my $opertime_stop  = $oper_stop->dmy('.')." ".$oper_stop->hms;
+ 
+ # ETOTAL Yesterday speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
+ if ($dt_now >= $oper_stop && $dt_now <= $oper_start) {
+     my $val;
+     $val = ReadingsVal($name, "etotal", 0)      if (exists $defs{$name}{READINGS}{etotal});
+     $val = ReadingsVal($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
+     BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
+ }
  
  if (($oper_start <= $dt_now && $dt_now <= $oper_stop) || AttrVal($name,"suppressSleep",0)) {
      # normal operation or suppressed sleepmode
@@ -1122,15 +1135,24 @@ sub SMAInverter_SMAcommand($$$$$) {
      if (length($data) >= 66){
 		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
 	 } else {
-         Log3 $name, 3, "$name - WARNING - SPOT_ETOTAL wasn't deliverd ... set it to \"0\" !";
+         Log3 $name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETOTAL = 0;
 	 }
 
      if (length($data) >= 82){
 		 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
 	 } else {
-         Log3 $name, 3, "$name - WARNING - SPOT_ETODAY wasn't deliverd ... set it to \"0\" !";
-         $inv_SPOT_ETODAY = 0;
+         # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+         Log3 $name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...";
+         my $etotold = ReadingsVal($name, ".etotal_yesterday", undef);
+         if(defined $etotold && $inv_SPOT_ETOTAL >= $etotold) {
+             $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
+             Log3 $name, 3, "$name - ETODAY calculated successfully !";
+         } else {
+             Log3 $name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !";
+             $inv_SPOT_ETODAY = 0;         
+         }        
+
 	 }
 
 	 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
@@ -1416,13 +1438,13 @@ sub SMAInverter_SMAlogon($$$) {
  if (AttrVal($name, "target-serial", undef)) {
      return 0 unless($inv_serial eq $target_serial);
  } else {
-     BlockingInformParent("SMAInverter_setFromBlocking", [$name, "target-serial", $inv_serial], 0);   # Serial automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448          
+     BlockingInformParent("SMAInverter_setAttrFromBlocking", [$name, "target-serial", $inv_serial], 0);   # Serial automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448          
  }
  
  if (AttrVal($name, "target-susyid", undef)) {
      return 0 unless($inv_susyid eq $target_susyid);
  } else {
-     BlockingInformParent("SMAInverter_setFromBlocking", [$name, "target-susyid", $inv_susyid], 0);   # SuSyId automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448
+     BlockingInformParent("SMAInverter_setAttrFromBlocking", [$name, "target-susyid", $inv_susyid], 0);   # SuSyId automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448
  }
  
  Log3 $name, 4, "$name - logged in to inverter serial: $inv_serial, susyid: $inv_susyid";
@@ -1433,11 +1455,23 @@ return 1;
 ################################################################
 #            Attributwert aus BlockingCall setzen
 ################################################################
-sub SMAInverter_setFromBlocking($$$) {
+sub SMAInverter_setAttrFromBlocking($$$) {
   my ($name,$attr,$val) = @_;
   my $hash             = $defs{$name};
 
   CommandAttr(undef,"$name $attr $val");
+
+return;
+}
+
+################################################################
+#            Readingwert aus BlockingCall setzen
+################################################################
+sub SMAInverter_setReadingFromBlocking($$$) {
+  my ($name,$reading,$val) = @_;
+  my $hash                 = $defs{$name};
+
+  readingsSingleUpdate($hash, $reading, $val, 0);
 
 return;
 }
