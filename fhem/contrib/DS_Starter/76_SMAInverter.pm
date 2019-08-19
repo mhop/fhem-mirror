@@ -234,13 +234,33 @@ my %SMAInverter_devtypes = (
 9305 => "SB6.0-1SP-US-40",
 9306 => "SB8.0-1SP-US-40",
 9307 => "Energy Meter",
+9313 => "SB50.0-3SP-40",
+9319 => "SB3.0-1AV-40",
+9320 => "SB3.6-1AV-40",
+9321 => "SB4.0-1AV-40",
+9322 => "SB5.0-1AV-40",
+9324 => "SBS1.5-1VL-10",
+9325 => "SBS2.0-1VL-10",
+9326 => "SBS2.5-1VL-10",
+9327 => "SMA Energy Meter",
+9331 => "SI 3.0M-12",
+9332 => "SI 4.4M-12",
+9333 => "SI 6.0H-12",
+9334 => "SI 8.0H-12",
+9335 => "SMA Com Gateway",
 9336 => "STP 15000TL-30",
 9337 => "STP 17000TL-30",
 9344 => "STP4.0-3AV-40",
 9346 => "STP6.0-3AV-40",
+9347 => "STP8.0-3AV-40",
 9356 => "SBS3.7-1VL-10",
-9403 => "Sunny Boy 4.0 (SB4.0-1AV-41)",
 9358 => "SBS5.0-10 (SBS5.0-10)",
+9366 => "STP3.0-3AV-40",
+9401 => "SB3.0-1AV-41",
+9402 => "SB3.6-1AV-41",
+9403 => "SB4.0-1AV-41",
+9404 => "SB5.0-1AV-41",
+9405 => "SB6.0-1AV-41",
 );
 
 # Wechselrichter Class-Hash DE
@@ -1145,7 +1165,7 @@ sub SMAInverter_SMAcommand($$$$$) {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...";
          my $etotold = ReadingsVal($name, ".etotal_yesterday", undef);
-         if(defined $etotold && $inv_SPOT_ETOTAL >= $etotold) {
+         if(defined $etotold && $inv_SPOT_ETOTAL > $etotold) {
              $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
              Log3 $name, 3, "$name - ETODAY calculated successfully !";
          } else {
