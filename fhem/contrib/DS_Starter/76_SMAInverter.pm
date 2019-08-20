@@ -82,8 +82,6 @@ our %SMAInverter_vNotesIntern = (
   "1.0.0"  => "06.11.2016  Attr disable added, \$globalName replaced by \$name in all expressions (due to module redesign to non-blocking later) "
 );
 
-my $SMAInverterVersion = "2.12.0";
-
 # Inverter Data fields and supported commands flags.
 # $inv_SPOT_ETODAY                # Today yield
 # $inv_SPOT_ETOTAL                # Total yield
@@ -327,7 +325,6 @@ sub SMAInverter_Define($$) {
  my $name                       = $hash->{NAME};
  $hash->{LASTUPDATE}            = 0;
  $hash->{INTERVAL}              = $hash->{HELPER}{INTERVAL} = AttrVal($name, "interval", 60);
- $hash->{VERSION}               = $SMAInverterVersion;
  $hash->{HELPER}{FAULTEDCYCLES} = 0;
  delete($hash->{HELPER}{AVERAGEBUF}) if($hash->{HELPER}{AVERAGEBUF});
  
