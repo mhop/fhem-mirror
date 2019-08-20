@@ -2,7 +2,6 @@
 # $Id: 76_SMAInverter.pm 19290 2019-04-29 19:17:44Z DS_Starter $
 #################################################################################################################
 # 
-#
 #  Copyright notice
 #
 #  Published according Creative Commons : Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)
@@ -17,66 +16,10 @@
 # 
 #  Description:
 #  This is an FHEM-Module for SMA Inverters.
-#  Tested on Sunny Tripower 6000TL-20 and Sunny Island 4.4
 #
-#  Requirements:
-#  This module requires:
-#  - Perl Module: IO::Socket::INET
-#  - Perl Module: DateTime
 #
 #
 #################################################################################################################
-# Versions History by DS_Starter
-#
-#
-# 2.12.0   20.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully 
-#                          calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
-# 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined, commandref revised
-# 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
-# 2.10.1   28.04.2019      fix perl warnings, Forum:#56080.msg933276.html#msg933276
-# 2.10.0   29.06.2018      Internal MODEL added
-# 2.9.2    08.10.2017      adapted to use extended abortArg (Forum:77472)
-# 2.9.1    24.04.2017      fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40)
-# 2.9.0    23.04.2017      fixed issue #22: wrong logon command for SunnyBoy systems
-# 2.8.3    19.04.2017      enhanced inverter Type-Hash
-# 2.8.2    23.03.2017      changed SMAInverter_SMAlogon sub
-# 2.8.1    06.12.2016      SMAInverter version as internal 
-# 2.8      05.12.2016      changed commandsections to make sure getting only data from inverters with preset
-#                          $inv_susyid and $inv_serial
-# 2.7.4    04.12.2016      change loading of IO::Socket::INET, DateTime
-# 2.7.3    04.12.2016      commandref adapted
-# 2.7.2    03.12.2016      use Time::HiRes qw(gettimeofday tv_interval)
-# 2.7.1    02.12.2016      showproctime improved
-# 2.7      02.12.2016      showproctime added
-# 2.6.1    29.11.2016      SMAInverter_getstatusDoParse changed due to inititialized issues
-# 2.6      28.11.2016      bugfix warnings ParseDone redefine at startup, uninitialized value $avg if FHEM was 
-#                          restarted in sleeptime, switched avg_energy to avg_power, commandref updated
-# 2.5.2    27.11.2016      bugfix average calc, bugfix warnings at startup
-# 2.5.1    26.11.2016      calc of averagebuf changed to 5, 10, 15 minutes
-# 2.5      26.11.2016      averagebuf changed, Attr timeout added
-# 2.4      26.11.2016      create ringbuffer for calculating average energy last 5, 10, 15 cycles
-# 2.3      25.11.2016      bugfixing
-# 2.2      24.11.2016      further optimize of non-blocking operation
-# 2.1      24.11.2016      avg_energy_lastcycles added 
-# 2.0      24.11.2016      switched module to non-blocking operation
-# 1.8.4    23.11.2016      prepare non-blocking operation 
-# 1.8.3    23.11.2016      readings opertime_start, opertime_stop
-# 1.8.2    22.11.2016      eliminate global vars, prepare non-blocking operation 
-# 1.8.1    22.11.2016      eliminate global vars, create command array
-# 1.8      21.11.2016      eliminate $r_OK, $r_FAIL, create command-array
-# 1.7      21.11.2016      devtypes completed, minor bugfixes, commandref completed
-# 1.6.1    19.11.2016      bugfix perl warning during fhem start
-# 1.6      09.11.2016      added operation control by sunrise,sunset, Attr offset, suppressSleep added
-# 1.5      08.11.2016      added device classes hash
-# 1.4      07.11.2016      compatibility to SBFSpot improved, bilingual dependend on attr "language" of global-device,
-#                          added hash of SMA device types
-# 1.3      07.11.2016      Attr SBFSpotComp added to get compatibility mode with SBFSpot
-# 1.2      06.11.2016      function get data added, log output level changed to 4 in sub SMAInverter_Attr,
-#                          some code changes
-# 1.1      06.11.2016      Attr mode manual, automatic added
-# 1.0      06.11.2016      Attr disable added, 
-#                          $globalName replaced by $name in all expressions (due to module redesign to non-blocking later)
-
 
 package main;
 
@@ -87,6 +30,55 @@ eval "use DateTime;1" or my $MissModulDateTime = "DateTime";
 use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
+
+# Versions History by DS_Starter
+our %SMAInverter_vNotesIntern = (
+  "2.12.0" => "20.08.2019  set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully ".
+                           "calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823 ",
+  "2.11.0" => "17.08.2019  attr target-serial, target-susyid are set automatically if not defined, commandref revised ",
+  "2.10.2" => "14.08.2019  new types to %SMAInverter_devtypes ",
+  "2.10.1" => "28.04.2019  fix perl warnings, Forum:#56080.msg933276.html#msg933276 ",
+  "2.10.0" => "29.06.2018  Internal MODEL added ",
+  "2.9.2"  => "08.10.2017  adapted to use extended abortArg (Forum:77472) ",
+  "2.9.1"  => "24.04.2017  fix for issue #24 (Wrong INV_TYPE for STP10000TL-20) and fix for issue #25 (unpack out of range for SB1.5-1VL-40) ",
+  "2.9.0"  => "23.04.2017  fixed issue #22: wrong logon command for SunnyBoy systems ",
+  "2.8.3"  => "19.04.2017  enhanced inverter Type-Hash ",
+  "2.8.2"  => "23.03.2017  changed SMAInverter_SMAlogon sub ",
+  "2.8.1"  => "06.12.2016  SMAInverter version as internal ",
+  "2.8.0"  => "05.12.2016  changed commandsections to make sure getting only data from inverters with preset ".
+                           "\$inv_susyid and \$inv_serial ",
+  "2.7.4"  => "04.12.2016  change loading of IO::Socket::INET, DateTime ",
+  "2.7.3"  => "04.12.2016  commandref adapted ",
+  "2.7.2"  => "03.12.2016  use Time::HiRes qw(gettimeofday tv_interval ",
+  "2.7.1"  => "02.12.2016  showproctime improved ",
+  "2.7.0"  => "02.12.2016  showproctime added ",
+  "2.6.1"  => "29.11.2016  SMAInverter_getstatusDoParse changed due to inititialized issues ",
+  "2.6.0"  => "28.11.2016  bugfix warnings ParseDone redefine at startup, uninitialized value \$avg if FHEM was ".
+                           "restarted in sleeptime, switched avg_energy to avg_power, commandref updated ",
+  "2.5.2"  => "27.11.2016  bugfix average calc, bugfix warnings at startup ",
+  "2.5.1"  => "26.11.2016  calc of averagebuf changed to 5, 10, 15 minutes ",
+  "2.5.0"  => "26.11.2016  averagebuf changed, Attr timeout added ",
+  "2.4.0"  => "26.11.2016  create ringbuffer for calculating average energy last 5, 10, 15 cycles ",
+  "2.3.0"  => "25.11.2016  bugfixing ",
+  "2.2.0"  => "24.11.2016  further optimize of non-blocking operation ",
+  "2.1.0"  => "24.11.2016  avg_energy_lastcycles added ",
+  "2.0.0"  => "24.11.2016  switched module to non-blocking operation ",
+  "1.8.4"  => "23.11.2016  prepare non-blocking operation ",
+  "1.8.3"  => "23.11.2016  readings opertime_start, opertime_stop ",
+  "1.8.2"  => "22.11.2016  eliminate global vars, prepare non-blocking operation ",
+  "1.8.1"  => "22.11.2016  eliminate global vars, create command array ",
+  "1.8.0"  => "21.11.2016  eliminate \$r_OK, \$r_FAIL, create command-array ",
+  "1.7.0"  => "21.11.2016  devtypes completed, minor bugfixes, commandref completed ",
+  "1.6.1"  => "19.11.2016  bugfix perl warning during fhem start ",
+  "1.6.0"  => "09.11.2016  added operation control by sunrise,sunset, Attr offset, suppressSleep added ",
+  "1.5.0"  => "08.11.2016  added device classes hash ",
+  "1.4.0"  => "07.11.2016  compatibility to SBFSpot improved, bilingual dependend on attr \"language\" of global-device ".
+                           "added hash of SMA device types ",
+  "1.3.0"  => "07.11.2016  Attr SBFSpotComp added to get compatibility mode with SBFSpot ",
+  "1.2.0"  => "06.11.2016  function get data added, log output level changed to 4 in sub SMAInverter_Attr, some code changes ",
+  "1.1.0"  => "06.11.2016  Attr mode manual, automatic added ",
+  "1.0.0"  => "06.11.2016  Attr disable added, \$globalName replaced by \$name in all expressions (due to module redesign to non-blocking later) "
+);
 
 my $SMAInverterVersion = "2.12.0";
 
