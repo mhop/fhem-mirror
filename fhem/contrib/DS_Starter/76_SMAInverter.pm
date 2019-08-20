@@ -29,7 +29,7 @@
 # Versions History by DS_Starter
 #
 #
-# 2.12.0   19.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully 
+# 2.12.0   20.08.2019      set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully 
 #                          calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823
 # 2.11.0   17.08.2019      attr target-serial, target-susyid are set automatically if not defined, commandref revised
 # 2.10.2   14.08.2019      new types to %SMAInverter_devtypes
@@ -575,7 +575,7 @@ sub SMAInverter_getstatusDoParse($) {
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
  if ($dt_now >= $oper_stop) {
      my $val;
-     $val = ReadingsNum($name, "etotal", 0)      if (exists $defs{$name}{READINGS}{etotal});
+     $val = ReadingsNum($name, "etotal", 0)*1000 if (exists $defs{$name}{READINGS}{etotal});
      $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
  }
@@ -1152,19 +1152,19 @@ sub SMAInverter_SMAcommand($$$$$) {
  Log3 $name, 5, "$name - Data identifier $data_ID";
 	
  if($data_ID eq 0x2601)	{
-     if (length($data) >= 66){
+     if (length($data) >= 66) {
 		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
 	 } else {
          Log3 $name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETOTAL = 0;
 	 }
 
-     if (length($data) >= 82){
+     if (length($data) >= 82) {
 		 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
 	 } else {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
          Log3 $name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...";
-         my $etotold = ReadingsVal($name, ".etotal_yesterday", undef);
+         my $etotold = ReadingsNum($name, ".etotal_yesterday", undef);
          if(defined $etotold && $inv_SPOT_ETOTAL > $etotold) {
              $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
              Log3 $name, 3, "$name - ETODAY calculated successfully !";
@@ -1172,7 +1172,6 @@ sub SMAInverter_SMAcommand($$$$$) {
              Log3 $name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !";
              $inv_SPOT_ETODAY = 0;         
          }        
-
 	 }
 
 	 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
