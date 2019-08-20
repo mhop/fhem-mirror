@@ -1,4 +1,4 @@
-REV 20019
+REV 20025
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -484,7 +484,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2019-08-19_07:45:02 374514 FHEM/98_MSwitch.pm
+UPD 2019-08-20_07:45:02 374592 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
 UPD 2019-08-11_07:45:03 232341 FHEM/98_Modbus.pm
@@ -731,8 +731,8 @@ UPD 2019-08-19_07:45:06 4104095 docs/commandref.html
 UPD 2019-08-19_07:45:09 2539177 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-19_07:45:10 217447 docs/commandref_modular.html
-UPD 2019-08-19_07:45:11 228390 docs/commandref_modular_DE.html
+UPD 2019-08-20_07:45:10 217447 docs/commandref_modular.html
+UPD 2019-08-20_07:45:11 228390 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
