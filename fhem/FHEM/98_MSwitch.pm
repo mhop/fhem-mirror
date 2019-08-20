@@ -2394,7 +2394,7 @@ sub MSwitch_Cmd(@) {
                 MSwitch_LOG( $Name, 6,
                              "$Name:     execute als fhemcode -> " . $cmds );
                 my $errors = AnalyzeCommandChain( undef, $cmds );
-                if ( defined($errors) ) {
+                if ( defined($errors) and $errors ne "OK" ) {
                     MSwitch_LOG( $Name, 1,
                         "$Name MSwitch_Set: ERROR $cmds: $errors " . __LINE__ );
 
@@ -7145,7 +7145,7 @@ sub MSwitch_Exec_Notif($$$$$) {
 
                         if ( $cs =~ m/{.*}/ ) {
                             eval($cs);
-                            if ($@) {
+                            if ($@ and  $@ ne "OK" ) {
                                 MSwitch_LOG( $name, 1,
                                              "$name MSwitch_Set: ERROR $cs: $@ "
                                                . __LINE__ );
@@ -7165,7 +7165,7 @@ sub MSwitch_Exec_Notif($$$$$) {
                         else {
 
                             my $errors = AnalyzeCommandChain( undef, $cs );
-                            if ( defined($errors) ) {
+                            if ( defined($errors) and $errors ne "OK" ) {
                                 MSwitch_LOG( $name, 1,
 "$name Absent_Exec_Notif $comand: ERROR $device: $errors -> Comand: $cs"
                                 );
@@ -7507,7 +7507,7 @@ sub MSwitch_Restartcmd($) {
                 MSwitch_LOG( $name, 5,
                              "$name:     execute als fhemcode -> " . $cs );
                 my $errors = AnalyzeCommandChain( undef, $cs );
-                if ( defined($errors) ) {
+                if ( defined($errors) and $errors ne "OK"  ) {
                     MSwitch_LOG( $name, 1,
 "$name MSwitch_Restartcmd :Fehler bei Befehlsausfuehrung  ERROR $errors "
                           . __LINE__ );
