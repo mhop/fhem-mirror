@@ -46,7 +46,7 @@ use JSON;
 
 use HttpUtils;
 
-my $version     = "0.6.3";
+my $version     = "0.6.4";
 my $bridgeapi   = "1.6";
 
 
@@ -681,6 +681,8 @@ sub NUKIBridge_getCallbackList($) {
 
     
     my $decode_json = NUKIBridge_CallBlocking($hash,"callback/list",undef);
+    return
+      unless ( ref($decode_json) eq 'HASH' );
     
     Log3 $name, 4, "NUKIBridge ($name) - Callback data is collected and processed";
     

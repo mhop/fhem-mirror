@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_NUKIBridge: fix "Can't use stringas a HASH ref while strict
+                           refs in use"
  - change:  88_HMCCU: New features and bug fixes
  - feature: 36_WMBUS: initial support for mode 7 encryption (mostly untested)
             Digest::CMAC must be installed

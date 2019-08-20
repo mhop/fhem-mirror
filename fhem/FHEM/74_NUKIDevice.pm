@@ -33,7 +33,7 @@ use warnings;
 use JSON;
 
 
-my $version = "0.6.3";
+my $version = "0.6.4";
 
 
 
