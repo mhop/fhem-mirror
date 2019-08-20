@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SMAInverter: V2.13.0, attr target-serial/target-susyid are set 
+                            automatically if not defined, new inverter types
+                            added, support of Meta/Installer, ETOTAL is 
+                            calculated if inverter doesn't provide it 
  - feature: 14_SD_UT: added new model OR28V & fixed RC_10
  - feature: 70_ZoneMinder: added cause and notes to alerts. Credits to Obi
  - bugfix:  73_NUKIBridge: fix "Can't use stringas a HASH ref while strict
