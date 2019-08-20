@@ -30,9 +30,11 @@ eval "use DateTime;1" or my $MissModulDateTime = "DateTime";
 use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.13.0" => "20.08.2019  support of Meta.pm ",
   "2.12.0" => "20.08.2019  set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully ".
                            "calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823 ",
   "2.11.0" => "17.08.2019  attr target-serial, target-susyid are set automatically if not defined, commandref revised ",
@@ -302,7 +304,10 @@ sub SMAInverter_Initialize($) {
                       "target-serial " .
                       $readingFnAttributes;
  $hash->{AttrFn}    = "SMAInverter_Attr";
-
+ 
+ eval { FHEM::Meta::InitMod( __FILE__, $hash ) };    # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+ 
+return;
 }
 
 ###############################################################
@@ -327,12 +332,16 @@ sub SMAInverter_Define($$) {
  delete($hash->{HELPER}{AVERAGEBUF}) if($hash->{HELPER}{AVERAGEBUF});
  
  # protocol related defaults
- $hash->{HELPER}{MYSUSYID}              = 233;        # random number, has to be different from any device in local network
- $hash->{HELPER}{MYSERIALNUMBER}        = 123321123;  # random number, has to be different from any device in local network
- $hash->{HELPER}{DEFAULT_TARGET_SUSYID} = 0xFFFF;     # 0xFFFF is any susyid
- $hash->{HELPER}{DEFAULT_TARGET_SERIAL} = 0xFFFFFFFF; # 0xFFFFFFFF is any serialnumber
- $hash->{HELPER}{PKT_ID}                = 0x8001;     # Packet ID
- $hash->{HELPER}{MAXBYTES}              = 300;        # constant MAXBYTES scalar 300
+ $hash->{HELPER}{MYSUSYID}              = 233;                   # random number, has to be different from any device in local network
+ $hash->{HELPER}{MYSERIALNUMBER}        = 123321123;             # random number, has to be different from any device in local network
+ $hash->{HELPER}{DEFAULT_TARGET_SUSYID} = 0xFFFF;                # 0xFFFF is any susyid
+ $hash->{HELPER}{DEFAULT_TARGET_SERIAL} = 0xFFFFFFFF;            # 0xFFFFFFFF is any serialnumber
+ $hash->{HELPER}{PKT_ID}                = 0x8001;                # Packet ID
+ $hash->{HELPER}{MAXBYTES}              = 300;                   # constant MAXBYTES scalar 300
+ $hash->{HELPER}{MODMETAABSENT}         = 1 if($modMetaAbsent);  # Modul Meta.pm nicht vorhanden
+  
+ # Versionsinformationen setzen
+ SMAInverter_setVersionInfo($hash);
 
  my ($IP,$Host,$Caps);
 
@@ -1551,10 +1560,43 @@ return 1;
 }
 
 ##########################################################################
-#                           Hilfsroutinen
+#               Versionierungen des Moduls setzen
+#  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 ##########################################################################
+sub SMAInverter_setVersionInfo($) {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
 
-##########################
+  my $v                    = (sortTopicNum("desc",keys %SMAInverter_vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+	  # META-Daten sind vorhanden
+	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  } else {
+		  $modules{$type}{META}{x_version} = $v; 
+	  }
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+      }
+  } else {
+	  # herkömmliche Modulstruktur
+	  $hash->{VERSION} = $v;
+  }
+  
+return;
+}
+
+##########################################################################
+#                             Sortierung
+##########################################################################
 sub SMAInverter_ByteOrderShort($) {
  my $input = $_[0];
  my $output = "";
@@ -1563,7 +1605,9 @@ sub SMAInverter_ByteOrderShort($) {
 return $output;
 }
 
-##########################
+##########################################################################
+#                             Sortierung
+##########################################################################
 sub SMAInverter_ByteOrderLong($) {
  my $input = $_[0];
  my $output = "";
@@ -1572,9 +1616,12 @@ sub SMAInverter_ByteOrderLong($) {
 return $output;
 }
 
-##########################
+##########################################################################
+#                        Texte for State
+# Parameter is the code, return value is the Text or if not known then 
+# the code as string
+##########################################################################
 sub SMAInverter_StatusText($) {
- # Parameter is the code, return value is the Text or if not known then the code as string
  my $code = $_[0];
 
  if($code eq 51)       { return (AttrVal("global", "language", "EN") eq "DE") ? "geschlossen" : "Closed"; }
@@ -1589,9 +1636,9 @@ sub SMAInverter_StatusText($) {
 return sprintf("%d", $code);
 }
 
-##########################
-#  identify device type
-
+##########################################################################
+#                 identify inverter type
+##########################################################################
 sub SMAInverter_devtype ($) {
   my ($code) = @_;
   
@@ -1601,9 +1648,9 @@ sub SMAInverter_devtype ($) {
 return ($dev);
 }
 
-##########################
-#  identify device class
-
+##########################################################################
+#                          identify device class
+##########################################################################
 sub SMAInverter_classtype ($) {
   my ($code) = @_;
   my $class;
@@ -2087,5 +2134,52 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <br><br>
 
 =end html_DE
+
+=for :application/json;q=META.json 76_SMAInverter.pm
+{
+  "abstract": "Integration of SMA Inverters over it's Speedwire (=Ethernet) Interface",
+  "x_lang": {
+    "de": {
+      "abstract": "Integration von SMA Wechselrichtern ueber Speedwire (=Ethernet) Interface"
+    }
+  },
+  "keywords": [
+    "SMA",
+    "photovoltaics",
+    "PV",
+    "inverter"
+  ],
+  "version": "v1.1.1",
+  "release_status": "stable",
+  "author": [
+    "Thomas Schoedl (sct14675)",
+    "Heiko Maaz <heiko.maaz@t-online.de>",
+    null
+  ],
+  "x_fhem_maintainer": [
+    "sct14675",
+    "DS_Starter",
+    null
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "IO::Socket::INET": 0,
+        "DateTime": 0,
+        "Time::HiRes": 0,   
+        "Blocking": 0, 
+        "Time::Local": 0         
+      },
+      "recommends": {
+        "FHEM::Meta": 0        
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 
 =cut
