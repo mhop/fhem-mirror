@@ -82,7 +82,7 @@ MQTT2_SERVER_keepaliveChecker($)
 {
   my ($hash) = @_;
   my $now = gettimeofday();
-  my $multiplier = AttrVal($hash, "keepaliveFactor", 1.5);
+  my $multiplier = AttrVal($hash->{NAME}, "keepaliveFactor", 1.5);
   if($multiplier) {
     foreach my $clName (keys %{$hash->{clients}}) {
       my $cHash = $defs{$clName};
