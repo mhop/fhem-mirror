@@ -329,15 +329,13 @@ sub ZoneMinder_GetConfigValueByKey {
 
 sub ZoneMinder_GetConfigArrayByKey {
   my ($hash, $config, $key) = @_;
-#  my $searchString = '"'.$key.'":[';
-my $searchString = qr/"$key":\s*\[/;
+  my $searchString = qr/"$key":\s*\[/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, ']');
 }
 
 sub ZoneMinder_GetConfigValueByName {
   my ($hash, $config, $key) = @_;
-#  my $searchString = '"Name":"'.$key.'","Value":"';
-my $searchString = qr/"Name":"$key","Value":"/;
+  my $searchString = qr/"Name":"$key","Value":"/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, '"');
 }
 
@@ -345,18 +343,14 @@ sub ZoneMinder_GetFromJson {
   my ($hash, $config, $searchString, $endChar) = @_;
   my $name = $hash->{NAME};
 
-#  Log3 $name, 5, "json: $config";
-#  my $searchLength = length($searchString);
   my $searchLength;
   my $prema;
 
-#  my $startIdx = index($config, $searchString);
   my $startIdx;
-  if (my ($match) = $config =~ $searchString) {
+  if ( my ($match) = $config =~ $searchString ) {
     $prema = $';
     my $ma = $&;
     my $poma = $`;
-#    Log3 $name, 1, "ZM_TEST prematch: $prema match: $ma postmatch: $poma startIdx: $startIdx";
     $searchLength = length($ma);
   } else {
     Log3 $name, 1, "ZoneMinder ($name) - $searchString NOT found. Please report, this is a problem.";
@@ -368,8 +362,6 @@ sub ZoneMinder_GetFromJson {
   my $searchResult = substr $prema, 0;
   my $endIdx = index($searchResult, $endChar);
   $searchResult = substr $searchResult, 0, $endIdx;
-
-#  Log3 $name, 5, "ZoneMinder ($name) - looking for $searchString - length: $searchLength. start: $startIdx. end: $endIdx. result: $searchResult";
   
   return $searchResult;
 }
@@ -463,8 +455,11 @@ sub ZoneMinder_Write {
 
     my $zmMonitorId = $arguments->{zmMonitorId};
     my $zmAlarm = $arguments->{zmAlarm};
-    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Alarm:$zmAlarm";
-    return ZoneMinder_Trigger_ChangeAlarmState($hash, $zmMonitorId, $zmAlarm);
+    my $zmCause = $arguments->{zmCause};
+    my $zmNotes = $arguments->{zmNotes};
+
+    Log3 $name, 4, "ZoneMinder ($name) method: $method, monitorId:$zmMonitorId, Alarm:$zmAlarm , Cause:$zmCause, Notes:$zmNotes";
+    return ZoneMinder_Trigger_ChangeAlarmState($hash, $zmMonitorId, $zmAlarm, $zmCause, $zmNotes);
 
   } elsif ($method eq 'changeMonitorText') {
 
@@ -580,17 +575,17 @@ sub ZoneMinder_API_QueryEventDetails_Callback {
 
 
 sub ZoneMinder_Trigger_ChangeAlarmState {
-  my ( $hash, $zmMonitorId, $zmAlarm ) = @_;
+  my ( $hash, $zmMonitorId, $zmAlarm, $zmCause, $zmNotes ) = @_;
   my $name = $hash->{NAME};
 
   my $msg = "$zmMonitorId|";
   if ( 'on' eq $zmAlarm ) {
-    DevIo_SimpleWrite( $hash, $msg.'on|1|fhem', 2 );
+    DevIo_SimpleWrite( $hash, $msg.'on|1|'.$zmCause.'|'.$zmNotes, 2 );
   } elsif ( 'off' eq $zmAlarm ) {
-    DevIo_SimpleWrite( $hash, $msg.'off|1|fhem', 2);
+    DevIo_SimpleWrite( $hash, $msg.'off|1|'.$zmCause.'|'.$zmNotes, 2);
   } elsif ( $zmAlarm =~ /^on\-for\-timer/ ) {
     my $duration = $zmAlarm =~ s/on\-for\-timer\ /on\ /r;
-    DevIo_SimpleWrite( $hash, $msg.$duration.'|1|fhem', 2);
+    DevIo_SimpleWrite( $hash, $msg.$duration.'|1|'.$zmCause.'|'.$zmNotes, 2);
   }
 
   return undef;
