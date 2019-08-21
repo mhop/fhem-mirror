@@ -176,7 +176,7 @@ sub KeyValueProtocol_Parse($$) {
           $key = $newKey if ($newKey);
         }
 
-        readingsBulkUpdate($rhash, $key, $value);
+        readingsBulkUpdate($rhash, $key, $value) if ($value);
       }
 
       readingsEndUpdate($rhash, 1);
@@ -241,7 +241,7 @@ sub KeyValueProtocol_Parse($$) {
     </li>
   </ul>
   <br>
-
+  
   <a name="KeyValueProtocol_Readings"></a>
   <b>Readings</b><br>
   <ul>
