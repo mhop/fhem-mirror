@@ -555,29 +555,30 @@ HttpUtils_Connect2($)
   my $path = $hash->{path};
   $path = "$hash->{protocol}://$hash->{host}$hash->{hu_portSfx}$path"
         if($hash->{hu_proxy});
-  my $hdr = "$method $path HTTP/$httpVersion\r\n";
-  $hdr .= "Host: $hash->{host}$hash->{hu_portSfx}\r\n";
-  $hdr .= "User-Agent: fhem\r\n"
-        if(!$hash->{header} || $hash->{header} !~ "User-Agent:");
-  $hdr .= "Accept-Encoding: gzip,deflate\r\n" if($hash->{compress});
-  $hdr .= "Connection: keep-alive\r\n" if($hash->{keepalive});
-  $hdr .= "Connection: Close\r\n"
-                              if($httpVersion ne "1.0" && !$hash->{keepalive});
 
-  $hdr .= "Authorization: Basic ".
-                      encode_base64($hash->{user}.":".$hash->{pwd}, "")."\r\n"
-              if($hash->{auth} && !$hash->{digest} &&
-                 !($hash->{header} &&
-                   $hash->{header} =~ /^Authorization:\s*Digest/mi));
+  my $hdr = "$method $path HTTP/$httpVersion\r\n";
+  my $ha = sub($$) {
+    my ($n,$v)=@_;
+    return if($hash->{header} && $hash->{header} =~ /^$n:/mi);
+    $hdr .= "$n: $v\r\n";
+  };
+
+  $ha->("Host", "$hash->{host}$hash->{hu_portSfx}");
+  $ha->("User-Agent", "fhem");
+  $ha->("Accept-Encoding", "gzip,deflate") if($hash->{compress});
+  $ha->("Connection", "keep-alive") if($hash->{keepalive});
+  $ha->("Connection", "Close") if($httpVersion ne "1.0" && !$hash->{keepalive});
+  $ha->("Authorization",
+        "Basic ".encode_base64($hash->{user}.":".$hash->{pwd},""))
+              if($hash->{auth});
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
   if(defined($data) && length($data) > 0) {
-    $hdr .= "Content-Length: ".length($data)."\r\n";
-    $hdr .= "Content-Type: application/x-www-form-urlencoded\r\n"
-                if ($hdr !~ "Content-Type:");
+    $ha->("Content-Length", length($data));
+    $ha->("Content-Type", "application/x-www-form-urlencoded");
   }
   if(!$usingSSL) {
     my $pw = AttrVal("global", "proxyAuth", "");
-    $hdr .= "Proxy-Authorization: Basic $pw\r\n" if($pw);
+    $ha->("Proxy-Authorization","Basic $pw") if($pw);
   }
   Log3 $hash, $hash->{loglevel}+1, "HttpUtils request header:\n$hdr";
   $hdr .= "\r\n";
