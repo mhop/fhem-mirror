@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbLog: new attribute dbSchema to add database schema to tables
+                      Forum: #102679 
  - feature: 76_SMAInverter: V2.13.0, attr target-serial/target-susyid are set 
                             automatically if not defined, new inverter types
                             added, support of Meta/Installer, ETOTAL is 
