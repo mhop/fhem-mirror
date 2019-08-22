@@ -442,9 +442,11 @@ sub DbLog_split($$) {
   }
   if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Energy|Hour:|Hour(\d\d):/) {
       $event   =~ /^L(.*):\s(.*)\s(.*)/;
-      $reading = "L".$1;
-	  $value   = $2;
-	  $unit    = $3;
+      if($1) {
+          $reading = "L".$1;
+          $value   = $2;
+          $unit    = $3;
+      }
   }   
   if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption|Battery/) {
       $event =~ /^L(.*):\s(.*)\s(.*)/;
