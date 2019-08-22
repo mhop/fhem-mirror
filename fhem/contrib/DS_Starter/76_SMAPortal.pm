@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 00000 2019-03-14 20:21:11Z DS_Starter $
+# $Id: 76_SMAPortal.pm 19815 2019-07-10 22:15:43Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -162,6 +162,8 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.4.5"  => "22.08.2019  fix some warnings, Forum: https://forum.fhem.de/index.php/topic,102112.msg968829.html#msg968829 ",
+  "2.4.4"  => "11.07.2019  fix consinject to show multiple consumer icons if planned ",
   "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
   "2.4.2"  => "02.07.2019  change header design of portal graphics ",
   "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
@@ -431,10 +433,12 @@ sub DbLog_split($$) {
   my ($reading, $value, $unit);
 
   if($event =~ m/[_\-fd]Consumption|Quote/) {
-      $event   =~ /^L(.*):\s(.*)\s(.*)/;
-      $reading = "L".$1;
-	  $value   = $2;
-	  $unit    = $3;
+      $event =~ /^L(.*):\s(.*)\s(.*)/;
+      if($1) {
+          $reading = "L".$1;
+          $value   = $2;
+          $unit    = $3;
+      }
   }
   if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Energy|Hour:|Hour(\d\d):/) {
       $event   =~ /^L(.*):\s(.*)\s(.*)/;
@@ -443,10 +447,12 @@ sub DbLog_split($$) {
 	  $unit    = $3;
   }   
   if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption|Battery/) {
-      $event   =~ /^L(.*):\s(.*)\s(.*)/;
-      $reading = "L".$1;
-	  $value   = $2;
-	  $unit    = $3;
+      $event =~ /^L(.*):\s(.*)\s(.*)/;
+      if($1) {
+          $reading = "L".$1;
+          $value   = $2;
+          $unit    = $3;
+      }
   }   
   if($event =~ m/summary/) {
       $event   =~ /(.*):\s(.*)\s(.*)/;
@@ -1439,6 +1445,7 @@ sub extractConsumerData($$) {
                $key    =~ /^(\d+)_.*$/;
                my $lfn = $1; 
                my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
+               next if(!$cn);
                $cn     = replaceJunkSigns($cn);                        # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
                my $pos = $consumers{"${lfn}_PlannedOpTimeStart"};      # geplanter Start
                my $poe = $consumers{"${lfn}_PlannedOpTimeEnd"};        # geplantes Ende
@@ -1647,12 +1654,12 @@ sub setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 19815 2019-07-10 22:15:43Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: ... $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 19815 2019-07-10 22:15:43Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1982,14 +1989,13 @@ sub PortalAsHtml ($$;$) {
 	  
 	  my $lupt    = "last update:";  
 	  my $lblPv4h = "4h:";
-	  my $lblPvRe = "day:";
+	  my $lblPvRe = "today:";
 	  my $lblPvTo = "tomorrow:";
 	 
 	  if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
 	    $lupt     = "Stand:"; 
-		$lblPv4h  = "4h:";
-		$lblPvRe  = "Tag:";
-		$lblPvTo  = "Morgen:";
+		$lblPvRe  = "heute:";
+		$lblPvTo  = "morgen:";
 	  }	 
 
 	  $header  = "<table align=\"$hdrAlign\">";	
@@ -2427,7 +2433,7 @@ sub consinject($$@) {
 		  my ($cons,$im,$start,$end) = split (':', $_);
 		  Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
 		  if ($im && ($i >= $start) && ($i <= $end)) {
-			  $ret = FW_makeImage($im);
+			  $ret .= FW_makeImage($im);
 		 }
 	  }
   }
@@ -2555,7 +2561,7 @@ return 'unknown';
 
 ######################################################################################################
 #      Refresh eines Raumes aus $hash->{HELPER}{SPGROOM}
-#      bzw. Longpoll von SSCam bzw. eines SMAPortalSPG Devices wenn $hash->{HELPER}{SPGDEV} gefüllt 
+#      bzw. Longpoll von SMAPortal bzw. eines SMAPortalSPG Devices wenn $hash->{HELPER}{SPGDEV} gefüllt 
 #      $hash, $pload (1=Page reload), SMAPortalSPG-Event (1=Event)
 ######################################################################################################
 sub SPGRefresh($$$) { 
