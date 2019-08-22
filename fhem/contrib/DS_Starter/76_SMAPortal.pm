@@ -1501,6 +1501,7 @@ sub extractConsumerLiveData($$) {
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
 	  my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+      next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
       
       $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
@@ -1525,6 +1526,7 @@ sub extractConsumerLiveData($$) {
           my $OperationAutoEna = $c->{'Parameters'}[2]{'Value'};                                           # Automatic Betrieb erlaubt ?
 		  my $ltchange         = TimeAdjust($hash,$c->{'Parameters'}[0]{'Timestamp'}{'DateTime'},$tkind);  # letzter Schaltzeitpunkt der Bluetooth-Steckdose (Verbraucher)
           my $cn  = $consumers{"${i}_ConsumerName"};                                                       # Verbrauchername
+          next if(!$cn);
           $cn     = replaceJunkSigns($cn);                                                                 # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
           
           if(!$GriSwStt && $GriSwAuto) {
@@ -1579,6 +1581,7 @@ sub extractConsumerHistData($$$) {
       $consumers{"${i}_ConsumerLfd"}  = $i;
 	  my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh                                         
 	  my $cn                          = $consumers{"${i}_ConsumerName"};       # Verbrauchername
+      next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
       
       if($tf =~ /month|year/) {
