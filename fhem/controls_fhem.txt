@@ -1,4 +1,4 @@
-REV 20040
+REV 20045
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -397,7 +397,7 @@ UPD 2019-04-19_07:45:03 113063 FHEM/75_MSG.pm
 UPD 2019-03-23_07:45:03 31840 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
-UPD 2019-08-21_07:45:02 95820 FHEM/76_SMAInverter.pm
+UPD 2019-08-23_07:45:03 96252 FHEM/76_SMAInverter.pm
 UPD 2019-07-11_07:45:02 139060 FHEM/76_SMAPortal.pm
 UPD 2019-07-09_07:45:03 32710 FHEM/76_SMAPortalSPG.pm
 UPD 2018-06-04_07:45:02 37197 FHEM/76_msgDialog.pm
@@ -727,12 +727,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-08-22_07:45:07 4106028 docs/commandref.html
-UPD 2019-08-22_07:45:09 2541126 docs/commandref_DE.html
+UPD 2019-08-23_07:45:07 4106241 docs/commandref.html
+UPD 2019-08-23_07:45:09 2541300 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-22_07:45:11 217573 docs/commandref_modular.html
-UPD 2019-08-22_07:45:12 228516 docs/commandref_modular_DE.html
+UPD 2019-08-23_07:45:10 217573 docs/commandref_modular.html
+UPD 2019-08-23_07:45:12 228516 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
