@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
+  "8.21.2" => "14.08.2019  commandRef revised ",
   "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
   "8.21.0" => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
   "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
@@ -153,6 +155,8 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.22.0" => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
+                          "the value displayed from the VALUE database field before create the appropriate reading. ",
   "8.21.0" => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
   "8.20.0" => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
               "needed for DbLog and/or DbRep operation.",
@@ -340,6 +344,7 @@ sub DbRep_Initialize($) {
                        "fastStart:1,0 ".
 					   "fetchRoute:ascent,descent ".
                        "fetchMarkDuplicates:red,blue,brown,green,orange ".
+                       "fetchValueFn:textField-long ".
 					   "ftpDebug:1,0 ".
 					   "ftpDir ".
                        "ftpDumpFilesKeep:1,2,3,4,5,6,7,8,9,10 ".
@@ -1140,6 +1145,21 @@ sub DbRep_Attr($$$$) {
             $hash->{HELPER}{RDPFDEL} = $aVal;
         } else {
             delete $hash->{HELPER}{RDPFDEL} if($hash->{HELPER}{RDPFDEL});
+        }
+    }
+    
+    if ($aName eq "fetchValueFn") {
+        if($cmd eq "set") {
+            my $VALUE = "Hello";
+            # Funktion aus Attr validieren
+            if( $aVal =~ m/^\s*(\{.*\})\s*$/s ) {
+                $aVal = $1;
+            } else {
+                $aVal = "";
+            }  
+            return "Your function does not match the form \"{<function>}\"" if(!$aVal);
+            eval $aVal;
+            return "Bad function: $@" if($@);
         }
     }
     
@@ -4874,6 +4894,7 @@ sub fetchrows_ParseDone($) {
   my $name       = $hash->{NAME};
   my $reading    = AttrVal($name, "reading", undef);
   my $limit      = AttrVal($name, "limit", 1000);
+  my $fvfn       = AttrVal($name, "fetchValueFn", undef);
   my $color      = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
   $color =~ s/#// if($color =~ /red|blue|brown|green|orange/);
   my $ecolor     = "</span></html>";                                                                       # Ende Highlighting
@@ -4944,6 +4965,19 @@ sub fetchrows_ParseDone($) {
           } else {
               $reading_runtime_string = $ts."__".$dz."__".$dev."__".$rea.$zs;
           }
+      }
+      
+      if($fvfn) {
+          my $VALUE = $val;
+          if( $fvfn =~ m/^\s*(\{.*\})\s*$/s ) {
+              $fvfn = $1;
+          } else {
+              $fvfn = "";
+          }
+          if ($fvfn) {
+              eval $fvfn;
+              $val = $VALUE if(!$@); 
+          }          
       }
      
 	  ReadingsBulkUpdateValue($hash, $reading_runtime_string, $val);
@@ -9543,13 +9577,11 @@ sub DbRep_delread($;$$) {
          # Highlighted Readings löschen und save statefile wegen Inkompatibilitär beim Restart
          if($key =~ /<html><span/) {
              $do = 1;
-             # delete($defs{$name}{READINGS}{$key});
              readingsDelete($hash,$key);
          }
          # Reading löschen wenn Featuelevel > 5.9 und zu lang nach der neuen Festlegung
          if($do == 0 && $featurelevel > 5.9 && !goodReadingName($key)) {
              $do = 1;
-             # delete($defs{$name}{READINGS}{$key});
              readingsDelete($hash,$key);
          }         
      }
@@ -11624,7 +11656,8 @@ return;
                                  Every reading of result is composed of the dataset timestring , an index, the device name
                                  and the reading name.
                                  The function has the capability to reconize multiple occuring datasets (doublets).
-                                 Such doublets are marked by an index > 1. <br>
+                                 Such doublets are marked by an index > 1. Optional a Unique-Index is appended if 
+                                 datasets with identical timestamp, device and reading but different value are existing. <br>
                                  Doublets can be highlighted in terms of color by setting attribut e"fetchMarkDuplicates". <br><br>
                                  
                                  <b>Note:</b> <br>
@@ -11644,8 +11677,8 @@ return;
                                  
                                  <ul>
                                  <b>Example:</b> <br>
-                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff <br>
-                                 # &lt;date&gt;_&lt;time&gt;__&lt;index&gt;__&lt;device&gt;__&lt;reading&gt;
+                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff__[1] <br>
+                                 # &lt;date&gt;_&lt;time&gt;__&lt;index&gt;__&lt;device&gt;__&lt;reading&gt;__[Unique-Index]
                                  </ul>                                 
                                  <br>
 
@@ -11654,10 +11687,11 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>                             </td><td>: direction of selection read in database </td></tr>
-                                      <tr><td> <b>limit</b>                                  </td><td>: limits the number of datasets to select and display </td></tr>
-                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Highlighting of found doublets </td></tr>
                                       <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>fetchRoute</b>                             </td><td>: direction of selection read in database </td></tr>                                      
+                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Highlighting of found doublets </td></tr>
+                                      <tr><td> <b>fetchValueFn</b>                           </td><td>: the displayed value of the VALUE database field can be changed by a function before the reading is created </td></tr>
+                                      <tr><td> <b>limit</b>                                  </td><td>: limits the number of datasets to select and display </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: A number of attributes to limit selection by time </td></tr>
                                       <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
@@ -11674,7 +11708,7 @@ return;
 								 </li> <br> 
                                  
     <li><b> index &lt;Option&gt; </b>          
-	                           - Reports the existing indexes in the database or creates the needed indexes. 
+	                           - Reports the existing indexes in the database or creates the index which is needed. 
                                If the index is already created, it will be renewed (dropped and new created) <br><br> 
 
                                The possible options are:	<br><br>									 
@@ -11690,6 +11724,9 @@ return;
                                  </table>              
 	                           </ul>
 	                           <br>
+                               
+                               <b>Note:</b> <br>
+                               The used database user needs the ALTER and INDEX privilege. <br>
                                    
                                </li> <br>
                                  
@@ -12679,6 +12716,21 @@ sub bdump {
 														  </ul>
 														  
 														</li> <br><br>
+                                                        
+  <a name="fetchValueFn"></a>
+  <li><b>fetchValueFn </b>      - When fetching the database content, you are able to manipulate the value fetched from the 
+                                VALUE database field before create the appropriate reading. You have to insert a Perl 
+                                function which is enclosed in {} .<br>
+                                The value of the database field VALUE is provided in variable $VALUE. <br><br>
+
+                                <ul>
+							    <b>Example:</b> <br>
+								attr &lt;name&gt; fetchValueFn { $VALUE =~ s/^.*Used:\s(.*)\sMB,.*/$1." MB"/e } <br>
+								
+								# From a long line a specific pattern is extracted and will be displayed als VALUE instead 
+                                the whole line 
+                                </ul>
+                                </li> <br><br>
  
   <a name="ftpUse"></a> 
   <li><b>ftpUse </b>          - FTP Transfer after dump will be switched on (without SSL encoding). The created 
@@ -14037,10 +14089,12 @@ sub bdump {
 								 Die Leserichtung in der Datenbank kann durch das <a href="#DbRepattr">Attribut</a> 
 								 "fetchRoute" bestimmt werden. <br><br>
                                  
-                                 Jedes Ergebnisreading setzt sich aus dem Timestring des Datensatzes, einem Index, dem Device
-                                 und dem Reading zusammen.
+                                 Jedes Ergebnisreading setzt sich aus dem Timestring des Datensatzes, einem Dubletten-Index, 
+                                 dem Device und dem Reading zusammen.
                                  Die Funktion fetchrows ist in der Lage, mehrfach vorkommende Datensätze (Dubletten) zu erkennen.
-                                 Solche Dubletten sind mit einem Index > 1 gekennzeichnet. <br>
+                                 Solche Dubletten sind mit einem Dubletten-Index > 1 gekennzeichnet. Optional wird noch ein
+                                 Unique-Index angehängt, wenn Datensätze mit identischem Timestamp, Device und Reading aber 
+                                 unterschiedlichem Value vorhanden sind. <br>
                                  Dubletten können mit dem Attribut "fetchMarkDuplicates" farblich hervorgehoben werden. <br><br>
                                  
                                  <b>Hinweis:</b> <br>
@@ -14062,8 +14116,8 @@ sub bdump {
                                  
                                  <ul>
                                  <b>Beispiel:</b> <br>
-                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff <br>
-                                 # &lt;Datum&gt;_&lt;Zeit&gt;__&lt;Index&gt;__&lt;Device&gt;__&lt;Reading&gt;
+                                 2017-10-22_03-04-43__1__SMA_Energymeter__Bezug_WirkP_Kosten_Diff__[1] <br>
+                                 # &lt;Datum&gt;_&lt;Zeit&gt;__&lt;Dubletten-Index&gt;__&lt;Device&gt;__&lt;Reading&gt;__[Unique-Index]
                                  </ul>                                 
                                  <br>
 
@@ -14073,10 +14127,11 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>fetchRoute</b>                             </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
-                                      <tr><td> <b>limit</b>                                  </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
-                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
                                       <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
+                                      <tr><td> <b>fetchRoute</b>                             </td><td>: Leserichtung der Selektion innerhalb der Datenbank </td></tr>
+                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Hervorhebung von gefundenen Dubletten </td></tr>
+                                      <tr><td> <b>fetchValueFn</b>                           </td><td>: der angezeigte Wert des VALUE Datenbankfeldes kann mit einer Funktion vor der Readingerstellung geändert werden </td></tr>
+                                      <tr><td> <b>limit</b>                                  </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                       <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck (Datenbank spezifischer REGEXP). Der REGEXP wird auf Werte des Datenbankfeldes 'VALUE' angewendet. </td></tr>
@@ -14098,7 +14153,7 @@ sub bdump {
 	                           - Listet die in der Datenbank vorhandenen Indexe auf bzw. legt die benötigten Indexe
                                an. Ist ein Index bereits angelegt, wird er erneuert (gelöscht und erneut angelegt) <br><br> 
 
-                               Die möglichen Optionen sind:	<br><br>									 
+                               Die möglichen Optionen sind:	<br><br>								 
 
 	                           <ul>
                                  <table>  
@@ -14111,6 +14166,9 @@ sub bdump {
                                  </table>              
 	                           </ul>
 	                           <br>
+                               
+                               <b>Hinweis:</b> <br>
+                               Der verwendete Datenbank-Nutzer benötigt das ALTER und INDEX Privileg. <br>
                                    
                                </li> <br>								 
        
@@ -15117,6 +15175,21 @@ sub bdump {
 														  </ul>
 														  
 														</li> <br><br>
+                                                        
+  <a name="fetchValueFn"></a>
+  <li><b>fetchValueFn </b>      - Der angezeigte Wert des Datenbankfeldes VALUE kann vor der Erstellung des entsprechenden 
+                                Readings geändert werden. Das Attribut muss eine Perl Funktion eingeschlossen in {} 
+                                enthalten. <br>
+                                Der Wert des Datenbankfeldes VALUE wird in der Variable $VALUE zur Verfügung gestellt. <br><br>
+
+                                <ul>
+							    <b>Beispiel:</b> <br>
+								attr &lt;name&gt; fetchValueFn { $VALUE =~ s/^.*Used:\s(.*)\sMB,.*/$1." MB"/e } <br>
+								
+								# Von einer langen Ausgabe wird ein spezifisches Zeichenmuster extrahiert und als VALUE 
+                                anstatt der gesamten Zeile im Reading angezeigt. 
+                                </ul>
+                                </li> <br><br>
  
   <a name="ftpUse"></a> 
   <li><b>ftpUse </b>          - FTP Transfer nach einem Dump wird eingeschaltet (ohne SSL Verschlüsselung). Das erzeugte 
