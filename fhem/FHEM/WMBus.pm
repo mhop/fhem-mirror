@@ -11,6 +11,8 @@ eval "use Crypt::Mode::CBC"; # cpan -i Crypt::Mode::CBC
 my $hasCBC = ($@)?0:1;
 eval "use Crypt::Mode::CTR"; # cpan -i Crypt::Mode::CTR
 my $hasCTR = ($@)?0:1;
+eval "use Digest::CMAC"; # cpan -i Digest::CMAC
+my $hasCMAC = ($@)?0:1;
 
 require Exporter;
 my @ISA = qw(Exporter);
@@ -1197,6 +1199,7 @@ sub getCRCsize {
 
 sub decodeConfigword($) {
   my $self = shift;
+
   
   #printf("cw: %01x %01x\n", $self->{cw_1}, $self->{cw_2});
   $self->{cw_parts}{mode}             = ($self->{cw_2} & 0b00011111);
@@ -1209,10 +1212,13 @@ sub decodeConfigword($) {
     $self->{cw_parts}{content}          = ($self->{cw_1} & 0b00001100) >> 2;
     $self->{cw_parts}{repeated_access}  = ($self->{cw_1} & 0b00000010) >> 1;
     $self->{cw_parts}{hops}             = ($self->{cw_1} & 0b00000001);
-  } #elsif ($self->{cw_parts}{mode} == 7) {
-    # ToDo: wo kommt das dritte Byte her?
-  #  $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
-  #}
+  } elsif ($self->{cw_parts}{mode} == 7) {
+    # configword ist 3 Bytes lang
+    $self->{cw_parts}{key_id}           = ($self->{cw_3} & 0b00001111);
+    $self->{cw_parts}{dynamic_key}      = ($self->{cw_3} & 0b01110000) >> 4;
+    $self->{cw_parts}{content}          = ($self->{cw_2} & 0b11000000) >> 6;
+    $self->{cw_parts}{encrypted_blocks} = ($self->{cw_1} & 0b11110000) >> 4;
+  }
 }
 
 sub decodeBCD($$$) {
@@ -1622,7 +1628,7 @@ sub decodePayload($$) {
   return 1;
 }
 
-sub decrypt($) {
+sub decrypt_mode5($) {
   my $self = shift;
   my $encrypted = shift;
   my $padding = 2;
@@ -1647,105 +1653,49 @@ sub decrypt($) {
 sub decrypt_mode7($) {
   my $self = shift;
   my $encrypted = shift;
+  my $padding = 2;
   
-  # see 9.2.4, page 59      
+  # generate dynamic key
+  my $cmac = Digest::CMAC->new($self->{aeskey});
+  #my $cmac = Digest::CMAC->new(pack("H*",'000102030405060708090A0B0C0D0E0F'));
+  
+  # The calculation of Kenc and Kmac for the meter:
+  # Kenc = CMAC(MK, 0x00 ||C[7..0] ||C[15..8] ||C[23..16] ||C[31..24] ||ID_0||ID_1||ID_2||ID_3||0x07||0x07||0x07||0x07||0x07||0x07||0x07)
+  # Where C[7..0] is the LSB and C[31..24] is the MSB (Big Endian) of the counter AFL.MCR.C from meter to other (gateway).
+  
+  $cmac->add(pack("H*", "00"));
+  
+  #$self->{afl}{mcr} = pack("H*", "b30a0000");
+  $cmac->add($self->{afl}{mcr});
+  #print "MCR " . unpack("H*", $self->{afl}{mcr}) . "\n";
+  #print "identno " . unpack("H*", $self->{afield_identno}) . "\n";
+  $cmac->add($self->{afield_identno});
+  $cmac->add(pack("H*", "07070707070707"));
+  #$cmac->add(pack("H*",'7856341207070707070707'));
+  
+  
+  
+  my $key = $cmac->digest;
+  
+  #printf("Dynamic key %s\n", $cmac->hexdigest);
+  
+  # see 9.2.3, page 52      
   my $initVector = '';
   for (1..16) {
     $initVector .= pack('C',0x00);
   }
-  my $cipher = Crypt::Mode::CBC->new('AES', 2);
-  return $cipher->decrypt($encrypted, $self->{aeskey}, $initVector);
+  if (length($encrypted)%16 == 0) {
+    # no padding if data length is multiple of blocksize
+    $padding = 0;
+  } else {
+    $padding = 2;
+  }  
+  
+  #$encrypted = pack("H*","9058475F4BC91DF878B80A1B0F98B629024AAC727942BFC549233C0140829B93");
+  #print unpack("H*", $encrypted) . "\n";
+  my $cipher = Crypt::Mode::CBC->new('AES', $padding);
+  return $cipher->decrypt($encrypted, $key, $initVector);
 }
-
-# Generate MAC of data
-#
-# Parameter 1: private key as byte string, 16bytes
-# Parameter 2: data fro which mac should be calculated in hexadecimal format, len variable
-# Parameter 3: length of MAC to be generated in bytes
-#
-# Returns: MAC in hexadecimal format
-#
-# This function currently supports data with lentgh of less then 16bytes,
-# MAC for longer data is untested but specified
-#
-# copied from 10_EnOcean.pm
-sub generateMAC($$$$) {
-  my $self = shift;
-	my $private_key = $_[0];
-	my $data = $_[1];
-	my $cmac_len = $_[2];
-
-	#print "Calculating MAC for data $data\n";
-
-	# Pack data to 16byte byte string, padd with 10..0 binary
-	my $data_expanded = pack('H32', $data.'80');
-
-	#print "Exp. data  ".unpack('H32', $data_expanded)."\n";
-
-	# Constants according to specification
-	my $const_zero = pack('H32','00');
-	my $const_rb = pack('H32', '00000000000000000000000000000087');
-
-	# Encrypt zero data with private key to get L
-	my $cipher = Crypt::Rijndael->new($private_key);
-  my $l = $cipher->encrypt($const_zero);
-	#print "L          ".unpack('H32', $l)."\n";
-	#print "L          ".unpack('B128', $l)."\n";
-
-	# Expand L to 128bit string
-	my $l_bit = unpack('B128', $l);
-
-	# K1 and K2 stored as 128bit string
-	my $k1_bit;
-	my $k2_bit;
-
-	# K1 and K2 as binary
-	my $k1;
-	my $k2;
-
-	# Store L << 1 in K1
-	$l_bit =~ /^.(.{127})/;
-	$k1_bit = $1.'0';
-	$k1 = pack('B128', $k1_bit);
-
-	# If MSB of L == 1, K1 = K1 XOR const_Rb
-	if($l_bit =~ m/^1/) {
-		#print "MSB of L is set\n";
-		$k1 = $k1 ^ $const_rb;
-		$k1_bit = unpack('B128', $k1);
-	} else {
-		#print "MSB of L is unset\n";
-	}
-
-	# Store K1 << 1 in K2
-	$k1_bit =~ /^.(.{127})/;
-	$k2_bit = $1.'0';
-	$k2 = pack('B128', $k2_bit);
-
-	# If MSB of K1 == 1, K2 = K2 XOR const_Rb
-	if($k1_bit =~ m/^1/) {
-		#print "MSB of K1 is set\n";
-		$k2 = $k2 ^ $const_rb;
-	} else {
-		#print "MSB of K1 is unset\n";
-	}
-
-	# XOR data with K2
-	$data_expanded ^= $k2;
-
-	# Encrypt data
-	my $cmac = $cipher->encrypt($data_expanded);
-
-	#print "CMAC ".unpack('H32', $cmac)."\n";
-
-	# Extract specified len of MAC
-	my $cmac_pattern = '^(.{'.($cmac_len * 2).'})';
-	unpack('H32', $cmac) =~ /$cmac_pattern/;
-
-	# Return MAC in hexadecimal format
-	return uc($1);
-}
-
 
 sub decodeAFL($$) {
   my $self = shift;
@@ -1766,16 +1716,18 @@ sub decodeAFL($$) {
   if ($self->{afl}{fcl_mclp}) {
     # AFL Message Control Field (AFL.MCL)
     $self->{afl}{mcl} = unpack('C', substr($afl, $offset, 1));
+    #printf "AFL MCL %01x\n", $self->{afl}{mcl};
     $offset += 1;
     $self->{afl}{mcl_mlmp} = ($self->{afl}{mcl} & 0b01000000) != 0; 
     $self->{afl}{mcl_mcmp} = ($self->{afl}{mcl} & 0b00100000) != 0; 
     $self->{afl}{mcl_kimp} = ($self->{afl}{mcl} & 0b00010000) != 0; 
-    $self->{afl}{mcl_at}   = ($self->{afl}{mcl} & 0b00001111); 
+    $self->{afl}{mcl_at}   = ($self->{afl}{mcl} & 0b00001100) >> 2; 
+    $self->{afl}{mcl_ato}  = ($self->{afl}{mcl} & 0b00000011); 
   }
   if ($self->{afl}{fcl_mcrp}) {
     # AFL Message Counter Field (AFL.MCR)
-    $self->{afl}{mcr} = unpack('V', substr($afl, $offset));
-    #printf "AFL MC %08x\n", $self->{afl}{mcr};
+    #$self->{afl}{mcr} = unpack('N', substr($afl, $offset));
+    $self->{afl}{mcr} = substr($afl, $offset, 4);
     $offset += 4;
   }
   if ($self->{afl}{fcl_mlp}) {
@@ -1783,23 +1735,16 @@ sub decodeAFL($$) {
     $self->{afl}{ml} = unpack('v', substr($afl, $offset));
     $offset += 2;
   }
-  if ($self->{afl}{fcl_macp}) {
-    # AFL MAC Field (AFL.MCL)
-    # The length of the MAC field depends on the selected option AFL.MCL.AT indicated by the
-    # AFL.MCL field.
+  if ($self->{afl}{mcl_at} == 1) {
+    # CMAC-AES128 (see 9.3.1)
     my $mac_len = 0;
-    if ($self->{afl}{mcl_at} == 4) {
-      $mac_len = 4;
-      $self->{afl}{mac} = unpack('N', substr($afl, $offset, $mac_len));
-    } elsif ($self->{afl}{mcl_at} == 5) { 
+    if ($self->{afl}{mcl_ato} == 1) {
       $mac_len = 8;
       $self->{afl}{mac} = (unpack('N', substr($afl, $offset, 4))) << 32 | ((unpack('N', substr($afl, $offset+4, 4))));
-    } elsif ($self->{afl}{mcl_at} == 6) { 
-      $mac_len = 12;
-    } elsif ($self->{afl}{mcl_at} == 7) { 
-      $mac_len = 16;
+      #printf "AFL MAC %8x\n", $self->{afl}{mac};
+    } else {
+      # reserved
     }
-    #printf "AFL MAC %16x\n", $self->{afl}{mac};
     $offset += $mac_len;
   }
   if ($self->{afl}{fcl_kip}) {
@@ -1827,6 +1772,7 @@ sub decodeApplicationLayer($) {
   $self->{cifield} = unpack('C', $applicationlayer);
 
   my $offset = 1;
+  my $has_ell = 1;
 
   if ($self->{cifield} == CI_ELL_2) {
     # Extended Link Layer
@@ -1844,6 +1790,8 @@ sub decodeApplicationLayer($) {
     # Extended Link Layer
     ($self->{ell}{cc}, $self->{ell}{access_no}, $self->{ell}{m2}, $self->{ell}{a2}, $self->{ell}{session_number}) = unpack('CCvC6V', substr($applicationlayer,$offset));
     $offset += 14;
+  } else {
+    $has_ell = 0;
   }
   
   if (exists($self->{ell}{session_number})) {
@@ -1920,6 +1868,7 @@ sub decodeApplicationLayer($) {
   # initialize some fields
   $self->{cw_1} = 0;
   $self->{cw_2} = 0;
+  $self->{cw_3} = 0;
   $self->{status} = 0;
   $self->{statusstring} = "";
   $self->{access_no} = 0;
@@ -1928,15 +1877,18 @@ sub decodeApplicationLayer($) {
   
   #printf("CI Field %02x\n", $self->{cifield});
   
+  # Config Word ist normalerweise 2 Bytes lang, nur bei encryption mode 7 drei Bytes
+  # erstmal drei Bytes auslesen, aber den Offset nur um 2 Bytes erhöhen
+  
   if ($self->{cifield} == CI_RESP_4 || $self->{cifield} == CI_RESP_SML_4) {
     # Short header
-    ($self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) = unpack('CCCC', substr($applicationlayer,$offset));
+    ($self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}, $self->{cw_3}) = unpack('CCCCC', substr($applicationlayer,$offset));
     #printf("Short header access_no %x\n", $self->{access_no});
     $offset += 4;
   } elsif ($self->{cifield} == CI_RESP_12 || $self->{cifield} == CI_RESP_SML_12) {
     # Long header
-    ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}) 
-      = unpack('VvCCCCCC', substr($applicationlayer,$offset)); 
+    ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}, $self->{cw_3}) 
+      = unpack('VvCCCCCCC', substr($applicationlayer,$offset)); 
     $self->{meter_id} = sprintf("%08d", $self->{meter_id});  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
@@ -2012,7 +1964,7 @@ sub decodeApplicationLayer($) {
       $self->{decrypted} = 1;
     }
     $payload = substr($applicationlayer, $offset);
-  } elsif ($self->{cw_parts}{mode} == 5) {
+  } elsif ($self->{cw_parts}{mode} == 5 || $self->{cw_parts}{mode} == 7) {
     # data is encrypted with AES 128, dynamic init vector
     # decrypt data before further processing
     $self->{isEncrypted} = 1;
@@ -2020,24 +1972,41 @@ sub decodeApplicationLayer($) {
 
     if ($self->{aeskey}) { 
       if ($hasCBC) {
+        # payload can be only partially encrypted.
+        # decrypt only the encrypted part
         my $encrypted_length = $self->{cw_parts}{encrypted_blocks} * 16;
         #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset, $encrypted_length)));
-        eval {
-          $payload = $self->decrypt(substr($applicationlayer, $offset, $encrypted_length)) 
-            . substr($applicationlayer, $offset+$encrypted_length);
-        };
+        if ($self->{cw_parts}{mode} == 5) {
+          eval {
+            $payload = $self->decrypt_mode5(substr($applicationlayer, $offset, $encrypted_length)); 
+          };
+        } else {
+          # mode 7
+          if ($hasCMAC) {
+            $offset++; # account for codeword byte 3
+            eval {
+              $payload = $self->decrypt_mode7(substr($applicationlayer, $offset, $encrypted_length)); 
+            }
+          } else {
+            $self->{errormsg} = 'Digest::CMAC is not installed, please install it (sudo cpan -i Digest::CMAC)';
+            $self->{errorcode} = ERR_CIPHER_NOT_INSTALLED;
+            return 0;          
+          }
+        }
         if ($@) {
           #fatal decryption error occurred
-          $self->{errormsg} = "fatal decryption error: $@";
+          $self->{errormsg} = "fatal decryption error for mode " . $self->{cw_parts}{mode} . ": $@";
           $self->{errorcode} = ERR_DECRYPTION_FAILED;
           return 0;
         }
+        # add unencrypted payload 
+        $payload .= substr($applicationlayer, $offset+$encrypted_length);
         #printf("decrypted payload %s\n", unpack("H*", $payload));
         if (unpack('n', $payload) == 0x2f2f) {
           $self->{decrypted} = 1;
         } else {
           # Decryption verification failed
-          $self->{errormsg} = 'Decryption failed, wrong key?';
+          $self->{errormsg} = sprintf('Decryption mode %d failed, wrong key?', $self->{cw_parts}{mode});
           $self->{errorcode} = ERR_DECRYPTION_FAILED;
           #printf("%x\n", unpack('n', $payload));
           return 0;
@@ -2052,7 +2021,6 @@ sub decodeApplicationLayer($) {
       $self->{errorcode} = ERR_NO_AESKEY;
       return 0;
     }
-
   } else {
     # error, encryption mode not implemented
     $self->{errormsg} = sprintf('Encryption mode %x not implemented', $self->{cw_parts}{mode});
@@ -2085,6 +2053,7 @@ sub decodeLinkLayer($$)
   }
   ($self->{lfield}, $self->{cfield}, $self->{mfield}) = unpack('CCv', $linklayer);
   $self->{afield} = substr($linklayer,4,6);
+  $self->{afield_identno} = substr($self->{afield}, 0, 4);
   $self->{afield_id} = sprintf("%08d", $self->decodeBCD(8,substr($linklayer,4,4)));
   ($self->{afield_ver}, $self->{afield_type}) = unpack('CC', substr($linklayer,8,2));
   
