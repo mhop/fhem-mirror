@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 19507 2019-05-31 09:03:18Z DS_Starter $
+# $Id: 93_DbRep.pm 20048 2019-08-23 20:08:48Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.23.0" => "24.08.2019  devices marked as \"Associated With\" if possible ",
   "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
   "8.21.2" => "14.08.2019  commandRef revised ",
   "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
@@ -1211,6 +1212,11 @@ sub DbRep_Attr($$$$) {
         $hash->{MODEL} = $hash->{ROLE};
         delete($attr{$name}{icon}) if($do eq "Client");
     }
+    
+    if($aName eq "device") {
+        my $awdev = $aVal;
+        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
+    }
                          
     if ($cmd eq "set") {
 		if ($aName =~ /valueFilter/) {
@@ -1345,9 +1351,10 @@ sub DbRep_Notify($$) {
      $event = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
-#    if ($devName = $myName && $evl[0] =~ /done/) {
-#      InternalTimer(time+1, "browser_refresh", $own_hash, 0);
-#    }
+     if($event =~ /DELETED/) {
+         my $awdev = AttrVal($own_hash->{NAME}, "device", "");
+         DbRep_modAssociatedWith ($own_hash,"set",$awdev);
+     }
      
      if ($own_hash->{ROLE} eq "Agent") {
 	     # wenn Rolle "Agent" Verbeitung von RENAMED Events
@@ -10555,12 +10562,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 19507 2019-05-31 09:03:18Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20048 2019-08-23 20:08:48Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 19507 2019-05-31 09:03:18Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20048 2019-08-23 20:08:48Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10779,6 +10786,43 @@ sub browser_refresh($) {
   RemoveInternalTimer($hash, "browser_refresh");
   {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
   #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
+return;
+}
+
+###################################################################################
+#                     Associated Devices im DEF setzen
+###################################################################################
+sub DbRep_modAssociatedWith ($$$) {
+  my ($hash,$cmd,$awdev) = @_;
+  my @naw;
+  
+  my @def = split("{",$hash->{DEF}); 
+  
+  if($cmd eq "del") {
+      $hash->{DEF} = $def[0];
+      return;
+  }
+
+  my @nadev = split("[, ]", $awdev);
+  
+  foreach my $d (@nadev) {
+      if($defs{$d}) {
+          push(@naw, $d);
+          next;
+      }
+      my @a = devspec2array($d);
+      foreach(@a) {
+          next if(!$defs{$_});
+          push(@naw, $_) if( !( "EXCLUDE=".$_ ~~ @nadev) );
+      }
+  }
+  
+  if(@naw) {
+      $hash->{DEF} = $def[0]." {".join(" ",@naw)."}";
+  } else {
+      $hash->{DEF} = $def[0];
+  }
+  
 return;
 }
 
