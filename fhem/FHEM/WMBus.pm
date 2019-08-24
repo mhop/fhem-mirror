@@ -47,7 +47,7 @@ use constant {
   CI_TL_4 => 0x8a,    # Transport layer from device, 4 Bytes
   CI_TL_12 => 0x8b,   # Transport layer from device, 12 Bytes
   CI_ELL_2 => 0x8c,   # Extended Link Layer, 2 Bytes
-  CI_ELL_6 => 0x8e,   # Extended Link Layer, 6 Bytes
+  CI_ELL_10 => 0x8e,  # Extended Link Layer, 10 Bytes
   CI_ELL_8 => 0x8d,   # Extended Link Layer, 8 Bytes (see https://www.telit.com/wp-content/uploads/2017/09/Telit_Wireless_M-bus_2013_Part4_User_Guide_r14.pdf, 2.3.4)
   CI_ELL_16 => 0x8f,  # Extended Link Layer, 16 Bytes (see https://www.telit.com/wp-content/uploads/2017/09/Telit_Wireless_M-bus_2013_Part4_User_Guide_r14.pdf, 2.3.4)
   CI_AFL => 0x90,     # Authentification and Fragmentation Layer, variable size
@@ -1654,6 +1654,7 @@ sub decrypt_mode7($) {
   my $self = shift;
   my $encrypted = shift;
   my $padding = 2;
+  my $identno;
   
   # generate dynamic key
   my $cmac = Digest::CMAC->new($self->{aeskey});
@@ -1668,8 +1669,13 @@ sub decrypt_mode7($) {
   #$self->{afl}{mcr} = pack("H*", "b30a0000");
   $cmac->add($self->{afl}{mcr});
   #print "MCR " . unpack("H*", $self->{afl}{mcr}) . "\n";
-  #print "identno " . unpack("H*", $self->{afield_identno}) . "\n";
-  $cmac->add($self->{afield_identno});
+  if (exists($self->{meter_id_raw})) {
+    $identno =  $self->{meter_id_raw};
+  } else {
+    $identno = $self->{afield_identno};  
+  }
+  #print "identno " . unpack("H*", $identno) . "\n";
+  $cmac->add($identno);
   $cmac->add(pack("H*", "07070707070707"));
   #$cmac->add(pack("H*",'7856341207070707070707'));
   
@@ -1679,7 +1685,7 @@ sub decrypt_mode7($) {
   
   #printf("Dynamic key %s\n", $cmac->hexdigest);
   
-  # see 9.2.3, page 52      
+  # see 9.2.4, page 59      
   my $initVector = '';
   for (1..16) {
     $initVector .= pack('C',0x00);
@@ -1778,10 +1784,16 @@ sub decodeApplicationLayer($) {
     # Extended Link Layer
     ($self->{ell}{cc}, $self->{ell}{access_no}) = unpack('CC', substr($applicationlayer,$offset));
     $offset += 2;
-  } elsif ($self->{cifield} == CI_ELL_6) {
-    # Extended Link Layer
+  } elsif ($self->{cifield} == CI_ELL_10) {
+    # Extended Link Layer (long)
     ($self->{ell}{cc}, $self->{ell}{access_no}) = unpack('CC', substr($applicationlayer,$offset));
-    $offset += 6;
+    $offset += 2;
+    $self->{ell}{manufacturer} = substr($applicationlayer,$offset, 2);
+    $offset += 2;
+    $self->{ell}{identno} = substr($applicationlayer,$offset, 4);
+    $offset += 4;
+    ($self->{ell}{version},$self->{ell}{device}) = unpack('CC', substr($applicationlayer,$offset));
+    $offset += 2;
   } elsif ($self->{cifield} == CI_ELL_8) {
     # Extended Link Layer, payload CRC is part of (encrypted) payload
     ($self->{ell}{cc}, $self->{ell}{access_no}, $self->{ell}{session_number}) = unpack('CCV', substr($applicationlayer, $offset));
@@ -1887,9 +1899,10 @@ sub decodeApplicationLayer($) {
     $offset += 4;
   } elsif ($self->{cifield} == CI_RESP_12 || $self->{cifield} == CI_RESP_SML_12) {
     # Long header
-    ($self->{meter_id}, $self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}, $self->{cw_3}) 
-      = unpack('VvCCCCCCC', substr($applicationlayer,$offset)); 
-    $self->{meter_id} = sprintf("%08d", $self->{meter_id});  
+    $self->{meter_id_raw} = substr($applicationlayer,$offset,4);
+    ($self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}, $self->{cw_3}) 
+      = unpack('vCCCCCCC', substr($applicationlayer,$offset+4)); 
+    $self->{meter_id} = sprintf("%08d", unpack('V', $self->{meter_id}));  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
     #printf("Long header access_no %x\n", $self->{access_no});
@@ -1975,8 +1988,8 @@ sub decodeApplicationLayer($) {
         # payload can be only partially encrypted.
         # decrypt only the encrypted part
         my $encrypted_length = $self->{cw_parts}{encrypted_blocks} * 16;
-        #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset, $encrypted_length)));
         if ($self->{cw_parts}{mode} == 5) {
+          #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset, $encrypted_length)));
           eval {
             $payload = $self->decrypt_mode5(substr($applicationlayer, $offset, $encrypted_length)); 
           };
@@ -1984,6 +1997,7 @@ sub decodeApplicationLayer($) {
           # mode 7
           if ($hasCMAC) {
             $offset++; # account for codeword byte 3
+            #printf("encrypted payload %s\n", unpack("H*", substr($applicationlayer,$offset, $encrypted_length)));
             eval {
               $payload = $self->decrypt_mode7(substr($applicationlayer, $offset, $encrypted_length)); 
             }
