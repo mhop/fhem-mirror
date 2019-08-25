@@ -162,6 +162,7 @@ use vars qw($FW_ME);                                    # webname (default is fh
 
 # Versions History intern
 our %vNotesIntern = (
+  "2.5.0"  => "25.08.2019  change switch consumer to on<->automatic only in graphic overwiev, Forum: https://forum.fhem.de/index.php/topic,102112.msg969002.html#msg969002",
   "2.4.5"  => "22.08.2019  fix some warnings, Forum: https://forum.fhem.de/index.php/topic,102112.msg968829.html#msg968829 ",
   "2.4.4"  => "11.07.2019  fix consinject to show multiple consumer icons if planned ",
   "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
@@ -1914,7 +1915,7 @@ sub PortalAsHtml ($$;$) {
 		  } elsif ($swstate eq "on") {
 		      $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
 		  } elsif ($swstate =~ /off.*automatic.*/i) {
-		      $swicon = "<a onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+		      $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
 		  }
 		  
           if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
