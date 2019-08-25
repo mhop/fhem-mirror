@@ -1351,7 +1351,7 @@ sub DbRep_Notify($$) {
      $event = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
-     if($event =~ /DELETED|INITIALIZED/) {
+     if($event =~ /DELETED/) {
          my $awdev = AttrVal($own_hash->{NAME}, "device", "");
          DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
@@ -9601,7 +9601,7 @@ sub DbRep_delread($;$$) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          my $dodel = 1;
          foreach my $rdpfdel(@rdpfdel) {
-             if($key =~ /$rdpfdel/ || $key eq "state") {
+             if($key =~ /$rdpfdel/ || $key =~ /\bstate\b|\bassociatedWith\b/) {
                  $dodel = 0;
              }
          }
@@ -9612,9 +9612,9 @@ sub DbRep_delread($;$$) {
      }
  } else {
      foreach my $key(@allrds) {
-         # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
-         readingsDelete($hash,$key) if($key ne "state");
+         next if($key =~ /\bstate\b|\bassociatedWith\b/);
+         readingsDelete($hash,$key);
      }
  }
 return undef;
@@ -10800,7 +10800,7 @@ sub DbRep_modAssociatedWith ($$$) {
   # $hash->{DEF} = $def[0];
   
   if($cmd eq "del") {
-      delete $hash->{HELPER}{PAW};
+      readingsDelete($hash,".associatedWith");
       return;
   }
 
@@ -10819,7 +10819,7 @@ sub DbRep_modAssociatedWith ($$$) {
   }
   
   if(@naw) {
-      $hash->{HELPER}{PAW} = join(" ",@naw);
+      ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
   }
   
 return;
