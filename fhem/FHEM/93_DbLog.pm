@@ -3587,7 +3587,7 @@ sub DbLog_configcheck($) {
   }
   if($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
-	  $check .= "<b>Recommendation:</b> You should update FHEM to get the new DbLog version ! <br><br>";
+	  $check .= "<b>Recommendation:</b> You should update FHEM to get the freshest DbLog version ! <br><br>";
   } else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
 	  $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
