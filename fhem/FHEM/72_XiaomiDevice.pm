@@ -68,7 +68,7 @@ my %vacuum_states = ( '0' => "Unknown",
                      '15' => "Docking" ,
                      '16' => "Goto" ,
                      '17' => "Zoned Clean" ,
-                     '17' => "Targeted Clean" ,
+                     '18' => "Targeted Clean" ,
                     '100' => "Fully Charged" , );
 
 
@@ -609,6 +609,9 @@ sub XiaomiDevice_Set($$@) {
         $list  .=  ' lab_status:yes,no';
       }
     }
+    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.m1s" || $hash->{model} ne "test") {
+      $list  .=  ' clean_segment';
+    }
 
     if (defined($hash->{helper}{timers})&&($hash->{helper}{timers}>0))
     {
@@ -1015,6 +1018,13 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "lab_status";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_lab_status","params":['.(($arg[0] eq "yes")?'1':'0').']}' );
+  }
+  elsif ($cmd eq 'clean_segment')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "clean_segment";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_segment_clean","params":['.$arg[0].']}' );
   }
   elsif ($cmd eq 'timezone')
   {
