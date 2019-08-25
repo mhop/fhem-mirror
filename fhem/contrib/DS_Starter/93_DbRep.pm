@@ -1351,7 +1351,7 @@ sub DbRep_Notify($$) {
      $event = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
-     if($event =~ /DELETED/) {
+     if($event =~ /DELETED|INITIALIZED/) {
          my $awdev = AttrVal($own_hash->{NAME}, "device", "");
          DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
@@ -10796,10 +10796,11 @@ sub DbRep_modAssociatedWith ($$$) {
   my ($hash,$cmd,$awdev) = @_;
   my @naw;
   
-  my @def = split("{",$hash->{DEF}); 
+  # my @def = split("{",$hash->{DEF}); 
+  # $hash->{DEF} = $def[0];
   
   if($cmd eq "del") {
-      $hash->{DEF} = $def[0];
+      delete $hash->{HELPER}{PAW};
       return;
   }
 
@@ -10818,9 +10819,7 @@ sub DbRep_modAssociatedWith ($$$) {
   }
   
   if(@naw) {
-      $hash->{DEF} = $def[0]." {".join(" ",@naw)."}";
-  } else {
-      $hash->{DEF} = $def[0];
+      $hash->{HELPER}{PAW} = join(" ",@naw);
   }
   
 return;
