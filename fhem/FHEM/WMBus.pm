@@ -1505,6 +1505,8 @@ sub decodePayload($$) {
     $offset += $self->decodeDataRecordHeader(substr($payload,$offset), $dataBlock);
     #printf("No. %d, type %x at offset %d\n", $dataBlockNo, $dataBlock->{dataField}, $offset-1);
     
+    # DIF_INT are _signed_ values
+    
     if ($dataBlock->{dataField} == DIF_NONE or $dataBlock->{dataField} == DIF_READOUT) {
       $dataBlockNo--;
       $offset++;
@@ -1524,24 +1526,28 @@ sub decodePayload($$) {
       $value = $self->decodeBCD(12, substr($payload,$offset,6));
       $offset += 6;
     } elsif ($dataBlock->{dataField} == DIF_INT8) {
-      $value = unpack('C', substr($payload, $offset, 1));
+      $value = unpack('c', substr($payload, $offset, 1));
       $offset += 1;
     } elsif ($dataBlock->{dataField} == DIF_INT16) {
-      $value = unpack('v', substr($payload, $offset, 2));
+      $value = unpack('s<', substr($payload, $offset, 2));
       $offset += 2;
     } elsif ($dataBlock->{dataField} == DIF_INT24) {
       my @bytes = unpack('CCC', substr($payload, $offset, 3));
       $offset += 3;
       $value = $bytes[0] + $bytes[1] << 8 + $bytes[2] << 16;
+      # two's complement
+      $value = ~$value + 1;
     } elsif ($dataBlock->{dataField} == DIF_INT32) {
-      $value = unpack('V', substr($payload, $offset, 4));
+      $value = unpack('l<', substr($payload, $offset, 4));
       $offset += 4;
     } elsif ($dataBlock->{dataField} == DIF_INT48) {
       my @words = unpack('vvv', substr($payload, $offset, 6));
       $value = $words[0] + ($words[1] << 16) + ($words[2] << 32);
+      # two's complement
+      $value = ~$value + 1;
       $offset += 6;
     } elsif ($dataBlock->{dataField} == DIF_INT64) {
-      $value = unpack('Q<', substr($payload, $offset, 8));
+      $value = unpack('q<', substr($payload, $offset, 8));
       $offset += 8;
     } elsif ($dataBlock->{dataField} == DIF_FLOAT32) {
       #not allowed according to wmbus standard, Qundis seems to use it nevertheless
@@ -1560,17 +1566,12 @@ sub decodePayload($$) {
           #  ASCII string with LVAR characters
           $value = unpack('a*',substr($payload, $offset, $lvar));
           
-          # check if value only contains printable chars 
-          if(($value =~ tr/\x20-\x7d//c) == 0) {
+          # replace non printable chars 
+          $value =~ s/[\x00-\x1f\x7f]/?/g;
           
-            if ($self->{manufacturer} eq 'ESY') {
-              # Easymeter stores the string backwards!
-              $value = reverse($value);
-            }
-          } else {
-            $self->{errormsg} = "Non printable ASCII in LVAR";
-            $self->{errorcode} = ERR_UNKNOWN_DATAFIELD;
-            return 0;
+          if ($self->{manufacturer} eq 'ESY') {
+            # Easymeter stores the string backwards!
+            $value = reverse($value);
           }
         }
         $offset += $lvar;
@@ -1902,7 +1903,7 @@ sub decodeApplicationLayer($) {
     $self->{meter_id_raw} = substr($applicationlayer,$offset,4);
     ($self->{meter_man}, $self->{meter_vers}, $self->{meter_dev}, $self->{access_no}, $self->{status}, $self->{cw_1}, $self->{cw_2}, $self->{cw_3}) 
       = unpack('vCCCCCCC', substr($applicationlayer,$offset+4)); 
-    $self->{meter_id} = sprintf("%08d", unpack('V', $self->{meter_id}));  
+    $self->{meter_id} = sprintf("%08d", unpack('V', $self->{meter_id_raw}));  
     $self->{meter_devtypestring} =  $validDeviceTypes{$self->{meter_dev}} || 'unknown'; 
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
     #printf("Long header access_no %x\n", $self->{access_no});
