@@ -25,10 +25,12 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Time::Local;
 use Encode qw(encode_utf8);
+use HttpUtils;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
   "4.3.0"   => "14.08.2019 new attribute dbSchema, add database schema to subroutines ",
   "4.2.0"   => "25.07.2019 DbLogValueFn as device specific function propagated in devices if dblog is used ",
   "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\", Forum: #100344 ",
@@ -3576,10 +3578,20 @@ sub DbLog_configcheck($) {
   
   ### Start
   ####################################################################### 
+  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);
+  
   $check  = "<html>";
   $check .= "<u><b>Result of DbLog version check</u></b><br><br>";
-  $check .= "Used DbLog version: $hash->{HELPER}{VERSION} <br>";
-  $check .= "<b>Recommendation:</b> Please check for updates of DbLog periodically. <br><br>";
+  if($errcm) {
+      $check .= "<b>Recommendation:</b> ERROR - $errcm <br><br>";
+  }
+  if($supd) {
+      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+	  $check .= "<b>Recommendation:</b> You should update FHEM to get the new DbLog version ! <br><br>";
+  } else {
+      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+	  $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
+  }
   
   ### Configuration read check
   #######################################################################
@@ -4055,6 +4067,102 @@ sub DbLog_configcheck($) {
 return $check;
 }
 
+#########################################################################################
+#                  check Modul Aktualität fhem.de <-> local
+#########################################################################################
+sub DbLog_checkModVer($) {
+  my ($name) = @_;
+  my $src    = "http://fhem.de/fhemupdate/controls_fhem.txt";
+
+  if($src !~ m,^(.*)/([^/]*)$,) {
+    Log3 $name, 1, "DbLog $name -> configCheck: Cannot parse $src, probably not a valid http control file";
+    return ("check of new DbLog version not possible, see logfile.");
+  }
+  
+  my $basePath     = $1;
+  my $ctrlFileName = $2;
+
+  my ($remCtrlFile, $err) = DbLog_updGetUrl($name,$src);
+  return ("check of new DbLog version not possible: $err") if($err);
+  
+  if(!$remCtrlFile) {
+      Log3 $name, 1, "DbLog $name -> configCheck: No valid remote control file";
+      return ("check of new DbLog version not possible, see logfile.");
+  }
+  
+  my @remList = split(/\R/, $remCtrlFile);
+  Log3 $name, 4, "DbLog $name -> configCheck: Got remote $ctrlFileName with ".int(@remList)." entries.";
+
+  my $root = $attr{global}{modpath};
+
+  my @locList;
+  if(open(FD, "$root/FHEM/$ctrlFileName")) {
+      @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+      close(FD);
+      Log3 $name, 4, "DbLog $name -> configCheck: Got local $ctrlFileName with ".int(@locList)." entries.";
+  } else {
+      Log3 $name, 1, "DbLog $name -> configCheck: can't open $root/FHEM/$ctrlFileName: $!";
+      return ("check of new DbLog version not possible, see logfile.");  
+  }
+  
+  my %lh;
+  foreach my $l (@locList) {
+      my @l = split(" ", $l, 4);
+      next if($l[0] ne "UPD" || $l[3] !~ /93_DbLog/);
+      $lh{$l[3]}{TS} = $l[1];
+      $lh{$l[3]}{LEN} = $l[2];
+      Log3 $name, 4, "DbLog $name -> configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN};
+  }
+  
+  my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
+  foreach my $rem (@remList) {
+      my @r = split(" ", $rem, 4);
+      next if($r[0] ne "UPD" || $r[3] !~ /93_DbLog/);
+      my $fName  = $r[3];
+      my $fPath  = "$root/$fName";
+      my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+      if(!$fileOk) {
+          Log3 $name, 4, "DbLog $name -> configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2];
+          return ("",1,"A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)");
+      }
+      if(!$noSzCheck) {
+          my $sz = -s $fPath;
+          if($fileOk && defined($sz) && $sz ne $r[2]) {
+              Log3 $name, 4, "DbLog $name -> configCheck: remote version of $fName (creation time: $r[1], bytes: $r[2]) differs from local one (bytes: $sz)";
+              return ("",1,"Your local DbLog module is modified.");
+          }
+      }
+      last;
+  }
+  
+return ("",0,"Your local DbLog module is up to date.");
+}
+
+###################################
+sub DbLog_updGetUrl($$) {
+  my ($name,$url) = @_;
+  my %upd_connecthash;
+  $url =~ s/%/%25/g;
+  $upd_connecthash{url} = $url;
+  $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
+  
+  my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
+  if($err) {
+      Log3 $name, 1, "DbLog $name -> configCheck: ERROR while connecting to fhem.de:  $err";
+      return ("",$err);
+  }
+  if(!$data) {
+      Log3 $name, 1, "DbLog $name -> configCheck: ERROR $url: empty file received";
+      $err = 1;
+      return ("",$err);
+  }
+  
+return ($data,"");
+}
+
+#########################################################################################
+#                  Einen (einfachen) Datensatz aus DB lesen
+#########################################################################################
 sub DbLog_sqlget($$) {
   my ($hash,$sql)= @_;
   my $name = $hash->{NAME};
@@ -8393,6 +8501,7 @@ attr SMA_Energymeter DbLogValueFn
         "Blocking": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
+        "HttpUtils": 0,
         "Encode": 0        
       },
       "recommends": {
