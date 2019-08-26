@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
+  "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
   "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
   "8.21.2" => "14.08.2019  commandRef revised ",
   "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
@@ -1211,6 +1213,11 @@ sub DbRep_Attr($$$$) {
         $hash->{MODEL} = $hash->{ROLE};
         delete($attr{$name}{icon}) if($do eq "Client");
     }
+    
+    if($aName eq "device") {
+        my $awdev = $aVal;
+        # DbRep_modAssociatedWith ($hash,$cmd,$awdev);
+    }
                          
     if ($cmd eq "set") {
 		if ($aName =~ /valueFilter/) {
@@ -1345,9 +1352,10 @@ sub DbRep_Notify($$) {
      $event = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
-#    if ($devName = $myName && $evl[0] =~ /done/) {
-#      InternalTimer(time+1, "browser_refresh", $own_hash, 0);
-#    }
+     if($event =~ /DELETED/) {
+         my $awdev = AttrVal($own_hash->{NAME}, "device", "");
+         # DbRep_modAssociatedWith ($own_hash,"set",$awdev);
+     }
      
      if ($own_hash->{ROLE} eq "Agent") {
 	     # wenn Rolle "Agent" Verbeitung von RENAMED Events
@@ -9594,7 +9602,7 @@ sub DbRep_delread($;$$) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          my $dodel = 1;
          foreach my $rdpfdel(@rdpfdel) {
-             if($key =~ /$rdpfdel/ || $key eq "state") {
+             if($key =~ /$rdpfdel/ || $key =~ /\bstate\b|\bassociatedWith\b/) {
                  $dodel = 0;
              }
          }
@@ -9605,9 +9613,9 @@ sub DbRep_delread($;$$) {
      }
  } else {
      foreach my $key(@allrds) {
-         # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
          # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
-         readingsDelete($hash,$key) if($key ne "state");
+         next if($key =~ /\bstate\b|\bassociatedWith\b/);
+         readingsDelete($hash,$key);
      }
  }
 return undef;
@@ -10652,8 +10660,8 @@ sub DbRep_dbValue($$) {
   if($sql =~ m/^\s*(select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
+      $ret .= "\n" if($nrows);              # Forum: #103295
       $ret .= join("$srs", @line);
-      $ret .= "\n";
       # Anzahl der Datensätze
       $nrows++;
     }
@@ -10744,20 +10752,20 @@ sub DbReadingsVal($$$$) {
   } elsif ($dbmodel eq "SQLITE") {
       $sql = "select value from (
                 select value, (julianday(timestamp) - julianday('$ts')) * 86400.0 as diff from history 
-                where device='MyWetter' and reading='temperature' and timestamp >= '$ts' 
+                where device='$dev' and reading='$reading' and timestamp >= '$ts' 
                 union
                 select value, (julianday('$ts') - julianday(timestamp)) * 86400.0 as diff from history 
-                where device='MyWetter' and reading='temperature' and timestamp < '$ts'
+                where device='$dev' and reading='$reading' and timestamp < '$ts'
               )
               x order by diff limit 1;";    
   
   } elsif ($dbmodel eq "POSTGRESQL") {
       $sql = "select value from (
                 select value, EXTRACT(EPOCH FROM (timestamp - '$ts')) as diff from history 
-                where device='MyWetter' and reading='temperature' and timestamp >= '$ts' 
+                where device='$dev' and reading='$reading' and timestamp >= '$ts' 
                 union
                 select value, EXTRACT(EPOCH FROM ('$ts' - timestamp)) as diff from history 
-                where device='MyWetter' and reading='temperature' and timestamp < '$ts'
+                where device='$dev' and reading='$reading' and timestamp < '$ts'
               )
               x order by diff limit 1;";     
   } else {
@@ -10779,6 +10787,42 @@ sub browser_refresh($) {
   RemoveInternalTimer($hash, "browser_refresh");
   {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
   #  map { FW_directNotify("#FHEMWEB:$_", "location.reload(true)", "") } devspec2array("WEB.*");
+return;
+}
+
+###################################################################################
+#                     Associated Devices setzen
+###################################################################################
+sub DbRep_modAssociatedWith ($$$) {
+  my ($hash,$cmd,$awdev) = @_;
+  my @naw;
+  
+  # my @def = split("{",$hash->{DEF}); 
+  # $hash->{DEF} = $def[0];
+  
+  if($cmd eq "del") {
+      readingsDelete($hash,".associatedWith");
+      return;
+  }
+
+  my @nadev = split("[, ]", $awdev);
+  
+  foreach my $d (@nadev) {
+      if($defs{$d}) {
+          push(@naw, $d);
+          next;
+      }
+      my @a = devspec2array($d);
+      foreach(@a) {
+          next if(!$defs{$_});
+          push(@naw, $_) if( !( "EXCLUDE=".$_ ~~ @nadev) );
+      }
+  }
+  
+  if(@naw) {
+      ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
+  }
+  
 return;
 }
 
