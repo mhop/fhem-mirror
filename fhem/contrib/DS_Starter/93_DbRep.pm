@@ -58,7 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.23.0" => "24.08.2019  devices marked as \"Associated With\" if possible ",
+  "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
+  "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
   "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
   "8.21.2" => "14.08.2019  commandRef revised ",
   "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
@@ -1215,7 +1216,7 @@ sub DbRep_Attr($$$$) {
     
     if($aName eq "device") {
         my $awdev = $aVal;
-        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
+        # DbRep_modAssociatedWith ($hash,$cmd,$awdev);
     }
                          
     if ($cmd eq "set") {
@@ -1353,7 +1354,7 @@ sub DbRep_Notify($$) {
      
      if($event =~ /DELETED/) {
          my $awdev = AttrVal($own_hash->{NAME}, "device", "");
-         DbRep_modAssociatedWith ($own_hash,"set",$awdev);
+         # DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
      
      if ($own_hash->{ROLE} eq "Agent") {
@@ -10659,8 +10660,8 @@ sub DbRep_dbValue($$) {
   if($sql =~ m/^\s*(select|pragma|show)/is) {
     while (my @line = $sth->fetchrow_array()) {
       Log3 ($name, 4, "DbRep $name - SQL result: @line");
+      $ret .= "\n" if($nrows);              # Forum: #103295
       $ret .= join("$srs", @line);
-      $ret .= "\n";
       # Anzahl der Datensätze
       $nrows++;
     }
@@ -10790,7 +10791,7 @@ return;
 }
 
 ###################################################################################
-#                     Associated Devices im DEF setzen
+#                     Associated Devices etzen
 ###################################################################################
 sub DbRep_modAssociatedWith ($$$) {
   my ($hash,$cmd,$awdev) = @_;
