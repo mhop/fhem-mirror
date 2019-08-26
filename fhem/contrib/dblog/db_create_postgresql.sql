@@ -69,7 +69,7 @@ ALTER TABLE fhem.history OWNER TO fhem;
 -- Name: reading; Type: INDEX; Schema: fhem; Owner: fhem; Tablespace: 
 --
 
-CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp")
+CREATE INDEX "Search_Idx" ON history USING btree (device, reading, "timestamp");
 
 --
 -- PostgreSQL database dump complete
