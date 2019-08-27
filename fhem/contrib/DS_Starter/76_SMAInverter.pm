@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 19290 2019-04-29 19:17:44Z DS_Starter $
+# $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $
 #################################################################################################################
 # 
 #  Copyright notice
@@ -17,8 +17,6 @@
 #  Description:
 #  This is an FHEM-Module for SMA Inverters.
 #
-#
-#
 #################################################################################################################
 
 package main;
@@ -34,6 +32,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.13.2" => "27.08.2019   ",
+  "2.13.1" => "22.08.2019  commandref revised ",
   "2.13.0" => "20.08.2019  support of Meta.pm ",
   "2.12.0" => "20.08.2019  set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully ".
                            "calculated in SMAInverter_SMAcommand, Forum: https://forum.fhem.de/index.php/topic,56080.msg967823.html#msg967823 ",
@@ -573,7 +573,7 @@ sub SMAInverter_getstatusDoParse($) {
  
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
  if ($dt_now >= $oper_stop) {
-     my $val;
+     my $val = 0;
      $val = ReadingsNum($name, "etotal", 0)*1000 if (exists $defs{$name}{READINGS}{etotal});
      $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
@@ -1572,12 +1572,12 @@ sub SMAInverter_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1696,13 +1696,15 @@ This module requires:
 <br>
 
 
-<b>Define</b>
+<b>Definition</b>
 <ul>
 <code>define &lt;name&gt; SMAInverter &lt;pin&gt; &lt;hostname/ip&gt; </code><br>
 <br>
-<li>pin: User-Password of the SMA Inverter. Default is 0000. Can be changed by "Sunny Explorer" Windows Software</li>
+<li>pin: password of the inverter. Default is 0000. <br>
+         <b>inverter without webinterface:</b> The password for the inverter can be changed by "Sunny Explorer" Client Software <br>
+		 <b>inverter with webinterface:</b> The password changed by the webinterface is also valid for the device definition. </li>
 <li>hostname/ip: Hostname or IP-Adress of the inverter (or it's speedwire piggyback module).</li>
-<li>Port of the inverter is 9522 by default. Firewall has to allow connection on this port !</li>
+<li>The Speedwire port is 9522 by default. A Firewall has to allow connection on this port if present !</li>
 </ul>
 
 
@@ -1925,16 +1927,16 @@ Dieses Modul benötigt:
 <br>
 <br>
 
-
-<b>Define</b>
+<b>Definition</b>
 <ul>
 <code>define &lt;name&gt; SMAInverter &lt;pin&gt; &lt;hostname/ip&gt;</code><br>
 <br>
-<li>pin: Benutzer-Passwort des SMA STP Wechselrichters. Default ist 0000. Kann über die Windows-Software "Sunny Explorer" geändert werden </li>
+<li>pin: Passwort des Wechselrichters. Default ist 0000. <br>
+         <b>Wechselrichter ohne Webinterface:</b> Das Passwort kann über die Client Software "Sunny Explorer" geändert werden. <br>
+         <b>Wechselrichter mit Webinterface:</b> Das im Webinterface geänderte Passwort gilt auch für die Devicedefinition. </li>
 <li>hostname/ip: Hostname oder IP-Adresse des Wechselrichters (bzw. dessen Speedwire Moduls mit Ethernetanschluss) </li>
-<li>Der Port des Wechselrichters ist 9522. Dieser Port muss in der Firewall freigeschaltet sein !</li>
+<li>Der Speedwire-Port ist 9522. Dieser Port muss in der Firewall freigeschaltet sein !</li>
 </ul>
-
 
 <b>Arbeitsweise</b>
 <ul>
