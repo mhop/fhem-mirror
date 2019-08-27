@@ -5731,11 +5731,14 @@ getPawList($)
   my ($d) = @_;
   my $h = $defs{$d};
   my @dob;
+  my $daw = ReadingsVal($d, ".associatedWith", ""); # 103095
   foreach my $dn (sort keys %defs) {
     next if(!$dn || $dn eq $d);
     my $dh = $defs{$dn};
     if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
-       ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/)) {
+       (ReadingsVal($dn, ".associatedWith", "") =~ m/\b$d\b/) ||
+       ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/) ||
+       $daw =~ m/\b$dn\b/) {
       push(@dob, $dn);
     }
   }
