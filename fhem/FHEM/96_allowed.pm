@@ -81,9 +81,9 @@ allowed_Undef($$)
 #####################################
 # Return 0 for don't care, 1 for Allowed, 2 for forbidden.
 sub
-allowed_Authorize($$$$)
+allowed_Authorize($$$$;$)
 {
-  my ($me, $cl, $type, $arg) = @_;
+  my ($me, $cl, $type, $arg, $silent) = @_;
 
   return 0 if($me->{disabled});
   if( $cl->{SNAME} ) {
@@ -111,8 +111,10 @@ allowed_Authorize($$$$)
                 $me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
     return 1 if($me->{allowedDevicesRegexp} &&
                 $arg =~ m/^$me->{allowedDevicesRegexp}$/);
-    Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
-    stacktrace() if(AttrVal($me, "verbose", 5));
+    if(!$silent) {
+      Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
+      stacktrace() if(AttrVal($me, "verbose", 5));
+    }
     return 2;
   }
   return 0;

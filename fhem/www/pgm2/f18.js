@@ -366,6 +366,7 @@ f18_special()
     addHider("hideLogo", true, "Hide logo", f18_menu);
     addHider("hideInput", true, "Hide input", f18_menu);
     addHider("hideTextInput", true, "Hide text input", f18_menu);
+    addHider("hideMenu", true, "Hide menu", f18_menu);
     addHider("hidePin", true, "Hide pin", function(c){
       $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
@@ -416,7 +417,8 @@ f18_resize()
   log("f18.js resize W:"+w+" S:"+screen.width);
   var hl = f18_getAttr("hideLogo"),
       hi = f18_getAttr("hideInput"),
-      pm = f18_getAttr("Pinned.menu"),
+      hm = f18_getAttr("hideMenu"),
+      pm = f18_getAttr("Pinned.menu") || hm,
       rm = (f18_getAttr("rightMenu") && f18_small),
       hti = f18_getAttr("hideTextInput");
 
@@ -436,6 +438,7 @@ f18_resize()
   $("#menuBtn").toggle(!pm || f18_small);
   $("#menuBtn").css({ left:(rm ? "auto":"10px"), right:(rm ? "10px":"auto") });
   $("#logo")   .css({ left:(rm ? "auto":lleft ), right:(rm ? "48px":"auto") });
+  $("#menu").css({ display: (hm ? "none":"block") });
   if(FW_isiOS)
     $("#logo,#menuBtn").css({ top:'12px'});
 }

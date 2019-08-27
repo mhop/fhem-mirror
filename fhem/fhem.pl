@@ -51,6 +51,8 @@ sub AnalyzePerlCommand($$;$);
 sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub AttrNum($$$;$);
+sub Authorized($$$;$);
+sub Authenticate($$);
 sub CallFn(@);
 sub CallInstanceFn(@);
 sub CheckDuplicate($$@);
@@ -1246,10 +1248,7 @@ devspec2array($;$$)
 
   return "" if(!defined($name));
   if(defined($defs{$name})) {
-    if($cl && !Authorized($cl, "devicename", $name)) {
-      Log 4, "Forbidden device $name";
-      return "";
-    }
+    return "" if($cl && !Authorized($cl, "devicename", $name));
 
     # FHEM2FHEM LOG mode fake device, avoid local set/attr/etc operations on it
     return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
@@ -1335,7 +1334,7 @@ devspec2array($;$$)
     push @ret,@res;
   }
   return $name if(!@ret && !$isAttr);
-  @ret = grep { Authorized($cl, "devicename", $_) } @ret if($cl);
+  @ret = grep { Authorized($cl, "devicename", $_, 1) } @ret if($cl);
   return @ret;
 }
 
@@ -2496,7 +2495,7 @@ CommandList($$)
     for my $d (sort { my $x=$modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
                             $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
                          $x=($a cmp $b) if($x == 0); $x; } keys %defs) {
-      next if(IsIgnored($d) || ($cl && !Authorized($cl,"devicename",$d)));
+      next if(IsIgnored($d) || ($cl && !Authorized($cl, "devicename", $d, 1)));
       my $t = $defs{$d}{TYPE};
       $str .= "\n$t:\n" if($t ne $lt);
       $str .= sprintf("  %-20s (%s)\n", $d, $defs{$d}{STATE});
@@ -5558,9 +5557,9 @@ Each($$;$)      # can be used e.g. in at, Forum #40022
 # Return 1 if Authorized, else 0
 # Note: AuthorizeFn's returning 1 are not stackable.
 sub
-Authorized($$$)
+Authorized($$$;$)
 {
-  my ($cl, $type, $arg) = @_;
+  my ($cl, $type, $arg, $silent) = @_;
 
   return 1 if(!$init_done || !$cl || !$cl->{SNAME}); # Safeguarding
   RefreshAuthList() if($auth_refresh);
@@ -5568,8 +5567,8 @@ Authorized($$$)
   my $verbose = AttrVal($sname, "verbose", 1); # Speedup?
 
   foreach my $a (@authorize) {
-    my $r = CallFn($a, "AuthorizeFn", $defs{$a}, $cl, $type, $arg);
-    if($verbose >= 4) {
+    my $r = CallFn($a, "AuthorizeFn", $defs{$a}, $cl, $type, $arg, $silent);
+    if($verbose >= 4 && !$silent) {
       Log3 $sname, 4, "authorize $sname/$type/$arg: $a returned ".
           ($r == 0 ? "dont care" : $r == 1 ? "allowed" : "prohibited");
     }

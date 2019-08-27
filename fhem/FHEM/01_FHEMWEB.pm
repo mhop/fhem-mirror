@@ -1252,7 +1252,7 @@ FW_updateHashes()
   %FW_types = ();  # Needed for type sorting
 
   my $hre = AttrVal($FW_wname, "hiddenroomRegexp", "");
-  foreach my $d (keys %defs ) {
+  foreach my $d (devspec2array(".*", $FW_chash)) {
     next if(IsIgnored($d));
 
     foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
