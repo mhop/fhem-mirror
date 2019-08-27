@@ -503,10 +503,10 @@ MQTT2_DEVICE_addReading($$)
   MQTT2_DEVICE_delReading($name);
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
+    return "Bad line >$line< for $name" if(!defined($re) || !$defined($code);
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
-    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = $code
-        if($re && $code);
+    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = $code;
   }
   return undef;
 }
