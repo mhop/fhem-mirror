@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.13.2" => "27.08.2019  fix WARNING: Use of uninitialized value \$_ in substitution (s///) at /opt/fhem//FHEM/Blocking.pm line 238 ",
   "2.13.1" => "22.08.2019  commandref revised ",
   "2.13.0" => "20.08.2019  support of Meta.pm ",
   "2.12.0" => "20.08.2019  set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully ".
@@ -572,7 +573,7 @@ sub SMAInverter_getstatusDoParse($) {
  
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
  if ($dt_now >= $oper_stop) {
-     my $val;
+     my $val = 0;
      $val = ReadingsNum($name, "etotal", 0)*1000 if (exists $defs{$name}{READINGS}{etotal});
      $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
