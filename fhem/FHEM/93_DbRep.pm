@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.24.0" => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
   "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
   "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
   "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
@@ -1216,7 +1217,7 @@ sub DbRep_Attr($$$$) {
     
     if($aName eq "device") {
         my $awdev = $aVal;
-        # DbRep_modAssociatedWith ($hash,$cmd,$awdev);
+        DbRep_modAssociatedWith ($hash,$cmd,$awdev);
     }
                          
     if ($cmd eq "set") {
@@ -1354,7 +1355,7 @@ sub DbRep_Notify($$) {
      
      if($event =~ /DELETED/) {
          my $awdev = AttrVal($own_hash->{NAME}, "device", "");
-         # DbRep_modAssociatedWith ($own_hash,"set",$awdev);
+         DbRep_modAssociatedWith ($own_hash,"set",$awdev);
      }
      
      if ($own_hash->{ROLE} eq "Agent") {

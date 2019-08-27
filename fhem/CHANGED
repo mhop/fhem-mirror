@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: devices contained in the selection definition are marked
+                      as "Probably associated with" if possible
  - bugfix:  76_SMAInverter: fix Perl warnings
  - bugfix:  93_DbRep: fix add newline at the end of DbReadingsVal result, 
                       Forum: #103295
