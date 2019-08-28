@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.13.3" => "28.08.2019  commandref revised ",
   "2.13.2" => "27.08.2019  fix WARNING: Use of uninitialized value \$_ in substitution (s///) at /opt/fhem//FHEM/Blocking.pm line 238 ",
   "2.13.1" => "22.08.2019  commandref revised ",
   "2.13.0" => "20.08.2019  support of Meta.pm ",
@@ -1711,8 +1712,7 @@ This module requires:
 <b>Operation method</b>
 <ul>
 The module sends commands to the inverter and checks if they are supported by the inverter.<br>
-In case of a positive answer the data is collected and displayed in the readings according to the detail-level. <br>
-If more than one inverter is installed, set attributes "target-susyid" and "target-serial" with an appropriate value. <br><br>
+In case of a positive answer the data is collected and displayed in the readings according to the detail-level. <br><br>
 
 The normal operation time of the inverter is supposed from sunrise to sunset. In that time period the inverter will be polled.
 The time of sunrise and sunset will be calculated by functions of FHEM module 99_SUNRISE_EL.pm which is loaded automatically by default. 
@@ -1941,9 +1941,7 @@ Dieses Modul benötigt:
 <b>Arbeitsweise</b>
 <ul>
 Das Modul schickt Befehle an den Wechselrichter und überprüft, ob diese unterstützt werden.<br>
-Bei einer positiven Antwort werden die Daten gesammelt und je nach Detail-Level in den Readings dargestellt. <br>
-Sind mehr als ein Wechselrichter installiert, sind die Attribute "target-susyid" und "target-serial" entsprechend zu setzen um die korrekte
-Funktion zu gewährleisten. <br><br>
+Bei einer positiven Antwort werden die Daten gesammelt und je nach Detail-Level in den Readings dargestellt. <br><br>
 
 Die normale Betriebszeit des Wechselrichters wird in der Zeit vom Sonnenaufgang bis Sonnenuntergang angenommen. In dieser Periode werden die Wechselrichterdaten
 abgefragt. Die Ermittlung von Sonnenaufgang / Sonnenuntergang wird über die Funktionen des FHEM-Moduls 99_SUNRISE_EL.pm vorgenommen. Zu diesem Zweck sollten die globalen
