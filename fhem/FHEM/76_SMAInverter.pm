@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
   "2.13.3" => "28.08.2019  commandref revised ",
   "2.13.2" => "27.08.2019  fix WARNING: Use of uninitialized value \$_ in substitution (s///) at /opt/fhem//FHEM/Blocking.pm line 238 ",
   "2.13.1" => "22.08.2019  commandref revised ",
@@ -247,6 +248,7 @@ my %SMAInverter_devtypes = (
 9345 => "STP5.0-3AV-40 (Sunny Tripower 5.0)",
 9346 => "STP6.0-3AV-40 (Sunny Tripower 6.0)",
 9347 => "STP8.0-3AV-40 (Sunny Tripower 8.0)",
+9348 => "STP10.0-3AV-40 (Sunny Tripower 10.0)",
 9356 => "SBS3.7-1VL-10 (Sunny Boy Storage 3.7)",
 9358 => "SBS5.0-10 (Sunny Boy Storage 5.0)",
 9366 => "STP3.0-3AV-40 (Sunny Tripower 3.0)",
