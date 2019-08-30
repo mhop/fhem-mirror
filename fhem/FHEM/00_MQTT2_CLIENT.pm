@@ -154,11 +154,17 @@ MQTT2_CLIENT_keepalive($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  if($hash->{waitingForPingRespSince}) {
+    Log3 $name, 2, "$hash->{NAME}: No PINGRESP for last PINGREQ (".
+            "at $hash->{waitingForPingRespSince}), disconnecting";
+    delete $hash->{waitingForPingRespSince};
+    return  MQTT2_CLIENT_Disco($hash);
+  }
   my $keepalive = AttrVal($name, "keepaliveTimeout", 30);
   $keepalive = 30 if($keepalive !~ m/^[0-9]+$/);
   return if(ReadingsVal($name, "state", "") ne "opened" || $hash->{connecting});
-  Log3 $name, 5, "$name: keepalive $keepalive";
   MQTT2_CLIENT_send($hash, pack("C",0xC0).pack("C",0)); # PINGREQ
+  $hash->{waitingForPingRespSince} = TimeNow();
   InternalTimer(gettimeofday()+$keepalive, "MQTT2_CLIENT_keepalive", $hash, 0);
 }
 
@@ -330,7 +336,9 @@ MQTT2_CLIENT_Read($@)
         if($onc && $onc =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
     }
 
-  } elsif($cpt eq "PINGRESP") { # ignore it
+  } elsif($cpt eq "PINGRESP") {
+    delete($hash->{waitingForPingRespSince});
+    
   } elsif($cpt eq "PUBLISH")  {
     my $cf = ord(substr($fb,0,1)) & 0xf;
     my $qos = ($cf & 0x06) >> 1;
