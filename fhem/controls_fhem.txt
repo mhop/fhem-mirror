@@ -1,4 +1,4 @@
-REV 20078
+REV 20081
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-08-29_07:45:03 304803 ./CHANGED
+UPD 2019-08-31_07:45:03 304864 ./CHANGED
 UPD 2019-07-09_07:45:03 41601 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -40,7 +40,7 @@ UPD 2017-02-04_07:45:02 51672 FHEM/00_KM271.pm
 UPD 2019-01-06_07:45:02 3796 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2019-02-25_07:45:03 31183 FHEM/00_MQTT.pm
-UPD 2019-07-28_07:45:03 17065 FHEM/00_MQTT2_CLIENT.pm
+UPD 2019-08-31_07:45:03 17368 FHEM/00_MQTT2_CLIENT.pm
 UPD 2019-08-21_07:45:02 19008 FHEM/00_MQTT2_SERVER.pm
 UPD 2019-05-03_07:45:03 21773 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
@@ -397,7 +397,7 @@ UPD 2019-04-19_07:45:03 113063 FHEM/75_MSG.pm
 UPD 2019-03-23_07:45:03 31840 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
-UPD 2019-08-29_07:45:03 96146 FHEM/76_SMAInverter.pm
+UPD 2019-08-31_07:45:03 96279 FHEM/76_SMAInverter.pm
 UPD 2019-08-27_07:45:03 139574 FHEM/76_SMAPortal.pm
 UPD 2019-07-09_07:45:03 32710 FHEM/76_SMAPortalSPG.pm
 UPD 2018-06-04_07:45:02 37197 FHEM/76_msgDialog.pm
@@ -731,8 +731,8 @@ UPD 2019-08-29_07:45:07 4107673 docs/commandref.html
 UPD 2019-08-29_07:45:09 2542764 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-08-30_07:45:10 217586 docs/commandref_modular.html
-UPD 2019-08-30_07:45:11 228529 docs/commandref_modular_DE.html
+UPD 2019-08-31_07:45:11 217586 docs/commandref_modular.html
+UPD 2019-08-31_07:45:12 228529 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
