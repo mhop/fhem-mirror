@@ -109,6 +109,13 @@ use constant {
   FRAME_TYPE_A => 'A',
   FRAME_TYPE_B => 'B',
   
+  # content type (CC bits of configuration field)
+  # stored in $self->{cw_parts}{content}
+  CONTENT_STANDARD => 0b00, #  Standard data message with unsigned variable meter data
+  CONTENT_STATIC   => 0b10, #  Static message (consists of parameter, OBIS definitions and other data points
+                            #  which are not frequently changed – see also 4.3.2.4).
+
+  
 };
 
 sub valueCalcNumeric($$) {
@@ -193,7 +200,19 @@ sub valueCalcHex($$) {
   my $value = shift;
   my $dataBlock = shift;
 
-  return sprintf("%x", $value);
+  return unpack("H*", $value);
+}
+
+sub valueCalcAscii($$) {
+  my $value = shift;
+  my $dataBlock = shift;
+
+  my $result = unpack('a*',$value);
+  
+  # replace non printable chars 
+  $result =~ s/[\x00-\x1f\x7f-\xff]/?/g;
+  
+  return $result;
 }
 
 sub valueCalcu($$) {
@@ -453,7 +472,7 @@ my %VIFInfo = (
     type         => 0b01111000,
     bias         => 0,
     unit         => '',
-    calcFunc     => \&valueCalcNumeric,
+    calcFunc     => \&valueCalcAscii,
   },
   VIF_OWNER_NO =>  {                          # Eigentumsnummer (used by Easymeter even though the standard allows this only for writing to a slave)
     typeMask     => 0b01111111,
@@ -556,7 +575,7 @@ my %VIFInfo_FD = (
     type         => 0b00001001,
     bias         => 0,
     unit         => '',
-    calcFunc     => \&valueCalcNumeric,
+    calcFunc     => \&valueCalcAscii,
   },
   VIF_MANUFACTURER  => {                  #  Manufacturer (as in fixed header)
     typeMask     => 0b01111111,
@@ -606,6 +625,57 @@ my %VIFInfo_FD = (
     unit         => '',
     calcFunc     => \&valueCalcNumeric,
   },
+  
+
+  VIF_CUSTOMER_LOCATION => {                    #  Customer location
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010000,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+  VIF_CUSTOMER_CUSTOMER => {                    #  Customer
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010001,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+  VIF_ACCESS_CODE_USER => {                    #  Access code user
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010010,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+  VIF_ACCESS_CODE_OPERATOR => {                #  Access code operator
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010011,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+  VIF_ACCESS_CODE_SYSTEM_OPERATOR => {        #  Access code system operator
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010100,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+  VIF_PASSWORD => {                           #  Password
+    typeMask     => 0b01111111,
+    expMask      => 0b00000000,
+    type         => 0b00010110,
+    bias         => 0,
+    unit         => '',
+    calcFunc     => \&valueCalcHex
+  },
+ 
   VIF_ERROR_FLAGS => {                    #  Error flags (binary)
     typeMask     => 0b01111111,
     expMask      => 0b00000000,
@@ -960,6 +1030,9 @@ my %VIFInfo_ESY = (
     unit         => 'W',
     calcFunc     => \&valueCalcNumeric,
   },
+);
+
+my %VIFInfo_ESY2 = (
   VIF_ELECTRIC_POWER_PHASE_NO => {
     typeMask     => 0b01111110,
     expMask      => 0b00000000,
@@ -1346,8 +1419,10 @@ sub decodeValueInformationBlock($$$) {
       if ($self->{manufacturer} eq 'ESY') {
         # Easymeter
         $vif = unpack('C', substr($vib,$offset++,1));
+        #printf("ESY VIF %x\n", $vif);
         $vifInfoRef = \%VIFInfo_ESY;
       } elsif ($self->{manufacturer} eq 'KAM') {
+        # Kamstrup
         $vif = unpack('C', substr($vib,$offset++,1));
         $vifInfoRef = \%VIFInfo_KAM;       
       } else {
@@ -1363,7 +1438,8 @@ sub decodeValueInformationBlock($$$) {
       #print "other extension\n";
       $dataBlockExt = {};
       if ($self->{manufacturer} eq 'ESY') {
-        $vifInfoRef = \%VIFInfo_ESY;
+        #print "ESY\n";
+        $vifInfoRef = \%VIFInfo_ESY2;
         $dataBlockExt->{value} = unpack('C',substr($vib,2,1)) * 100;
       } else {
         $dataBlockExt->{value} = $vif;
@@ -1386,7 +1462,7 @@ sub decodeValueInformationBlock($$$) {
       # Plaintext VIF
       $offset = $self->decodePlaintext($vib, $dataBlockRef, $offset);
     } elsif (findVIF($vif, $vifInfoRef, $dataBlockRef) == 0) {
-      $dataBlockRef->{errormsg} = "unknown VIF " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
+      $dataBlockRef->{errormsg} = "unknown VIFE " . sprintf("%x", $vifExtension) . " at offset " . ($offset-1);
       $dataBlockRef->{errorcode} = ERR_UNKNOWN_VIFE;    
     }
   }
@@ -1564,10 +1640,7 @@ sub decodePayload($$) {
           #print "VALUE: " . $value . "\n";
         } else {
           #  ASCII string with LVAR characters
-          $value = unpack('a*',substr($payload, $offset, $lvar));
-          
-          # replace non printable chars 
-          $value =~ s/[\x00-\x1f\x7f]/?/g;
+          $value = valueCalcAscii(substr($payload, $offset, $lvar), $dataBlock);
           
           if ($self->{manufacturer} eq 'ESY') {
             # Easymeter stores the string backwards!
@@ -1610,12 +1683,13 @@ sub decodePayload($$) {
     
     my $VIFExtensions = $dataBlock->{VIFExtensions};
     for my $VIFExtension (@$VIFExtensions) {
-      $dataBlock->{extension} = $VIFExtension->{unit};
+      $dataBlock->{extension_unit} = $VIFExtension->{unit};
+      #printf("extension unit %s\n", $dataBlock->{extension_unit});
       if (defined $VIFExtension->{calcFunc}) {
         #printf("Extension value %d, valueFactor %d\n", $VIFExtension->{value}, $VIFExtension->{valueFactor});
-        $dataBlock->{extension} .= ", " . $VIFExtension->{calcFunc}->($VIFExtension->{value}, $dataBlock); 
+        $dataBlock->{extension_value} = $VIFExtension->{calcFunc}->($VIFExtension->{value}, $dataBlock); 
       } elsif (defined $VIFExtension->{value}) {
-        $dataBlock->{extension} .= ", " . sprintf("%x",$VIFExtension->{value});
+        $dataBlock->{extension_value} = sprintf("%x",$VIFExtension->{value});
       } else {
         #$dataBlock->{extension} = "";
       }
@@ -2310,6 +2384,64 @@ sub parseApplicationLayer($)
   $self->{errormsg} = '';
   $self->{errorcode} = ERR_NO_ERROR;
   return $self->decodeApplicationLayer();
+}
+
+sub dumpResult($)
+{
+  my $self = shift;
+
+  if ($self->{linkLayerOk}) {
+      printf("Manufacturer %x %s\n", $self->{mfield}, $self->{manufacturer});
+      printf("IdentNumber %s\n", $self->{afield_id});
+      printf("Version %d\n", $self->{afield_ver});
+      printf("Type %x %s\n", $self->{afield_type}, $self->{typestring});
+      printf("IsEncrypted %d\n", $self->{isEncrypted});
+      
+      printf("Status: %x %s\n", $self->{status}, $self->{statusstring});
+      if ($self->{cw_parts}{mode} == 5) {
+        print "Codeword:\n";
+        print "bidirectional: ". $self->{cw_parts}{bidirectional} . "\n";
+        print "accessability: ". $self->{cw_parts}{accessability} . "\n";
+        print "synchronous: $self->{cw_parts}{synchronous}\n";
+        print "mode: $self->{cw_parts}{mode}\n";
+        print "encrypted_blocks: $self->{cw_parts}{encrypted_blocks}\n";
+        print "content: $self->{cw_parts}{content}\n";
+        print "hops: $self->{cw_parts}{hops}\n";
+      }
+  }  
+  
+  if ($self->{errorcode} == ERR_NO_ERROR) {
+    if ($self->{cifield} == CI_RESP_12) { 
+      printf("Meter Id %d\n", $self->{meter_id});
+      printf("Meter Manufacturer %x %s\n", $self->{meter_man}, $self->manId2ascii($self->{meter_man}));
+      printf("Meter Version %d\n", $self->{meter_vers});
+      printf("Meter Dev %x %s\n", $self->{meter_dev}, $self->type2string($self->{meter_dev}));
+      printf("Access No %d\n", $self->{access_no});
+      printf("Status %x\n", $self->{status});
+    }
+    
+    my $dataBlocks = $self->{datablocks};
+    my $dataBlock;
+    
+    for $dataBlock ( @$dataBlocks ) {
+      #if ( $dataBlock->{type} eq "MANUFACTURER SPECIFIC") {
+      #  print $dataBlock->{number} . " " . $dataBlock->{type} . "\n";
+      #} else {
+        print $dataBlock->{number} . ". StorageNo " . $dataBlock->{storageNo} . " " ;
+        print $dataBlock->{functionFieldText} . " ";
+        print $dataBlock->{type} . " " . $dataBlock->{value} . " " . $dataBlock->{unit};
+        if ($dataBlock->{errormsg}) {
+          print "(" . $dataBlock->{errormsg} . ")";
+        }
+        if (defined($dataBlock->{extension_unit})) {
+          print " [" . $dataBlock->{extension_unit} . ", " . $dataBlock->{extension_value} . "]";
+        }
+        print "\n";
+      #}
+    }  
+  } else {
+    printf("Error %d: %s\n", $self->{errorcode}, $self->{errormsg});
+  }
 }
 
 1;
