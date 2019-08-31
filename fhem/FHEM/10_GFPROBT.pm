@@ -330,8 +330,8 @@ sub GFPROBT_execGatttool($) {
           $json{"timer".$i."-Weekdays"} = "-";
         }
         my %timers;
-        my @timerHnd = ("0x0017", "0x0019", "0x001b", "0x001d", "0x001f", "0x0021", "0x0023", "0x0025", "0x0027", "0x0029",
-                        "0x002b", "0x002d", "0x002f", "0x0031");
+        my @timerHnd = ("0x0017", "0x0019", "0x001b", "0x001d", "0x001f", "0x0021", "0x0023", "0x0031", "0x0025", "0x0027", "0x0029",
+                        "0x002b", "0x002d", "0x002f");
         my $stop = 0;
         foreach my $hnd (@timerHnd) {
           if ($stop == 1) {
@@ -419,10 +419,12 @@ sub GFPROBT_execGatttool($) {
             $json{'watering'} = GFPROBT_convertHexToInt($hash, $hash->{gattProc}->exp_after());
         }
         
-        if ($json{'watering'} == 1) {
-          $json{'state'} = 'on';
-        } else {
-          $json{'state'} = 'off';
+        if (defined($json{'watering'})) {
+          if ($json{'watering'} == 1) {
+            $json{'state'} = 'on';
+          } else {
+            $json{'state'} = 'off';
+          }
         }
         
         $hash->{gattProc}->send("disconnect");
@@ -465,6 +467,7 @@ sub GFPROBT_convertHexToTimer($$) {
     my $weekday = $day[int($seconds/(3600*24))];
     my $hour = int(($seconds%(3600*24))/3600);
     my $minutes = int(($seconds%(3600*24) - $hour*3600) / 60);
+    Log3 $hash, 3, "Seconds from Monday: ".$seconds.", ".$weekday."\n";
     $seconds = $seconds%60;
     my $duration = unpack "I", pack "H*", join("", @hexarr[4,5])."0000";
     return ($weekday, $hour, $minutes, $duration);
