@@ -12706,8 +12706,8 @@ return $ret;
   <a name="device"></a>
   <li><b>device </b>          - Selection of particular or several devices. <br>
                                 You can specify a list of devices separated by "," or use device specifications (devspec). <br>
-								The device names are derived from device specification and the active devices in FHEM before 
-                                SQL selection will be carried out. <br>
+								In that case the device names are derived from the device specification and the existing 
+                                devices in FHEM before carry out the SQL selection. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=", 
                                 the devices are excluded from database selection.                                
                                 <br><br>
@@ -15181,8 +15181,8 @@ return $ret;
  <a name="device"></a>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
-								Die Devicenamen werden vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
-								vorhandenen Devices abgeleitet. <br>
+								In diesem Fall werden die Devicenamen vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
+								vorhandenen Devices aufgelöst. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt, 
                                 werden diese Devices von der Selektion ausgeschlossen.                                
                                 <br><br>
