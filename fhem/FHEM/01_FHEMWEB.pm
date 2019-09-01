@@ -70,7 +70,7 @@ use vars qw($FW_sp);      # stylesheetPrefix
 # global variables, also used by 97_GROUP/95_VIEW/95_FLOORPLAN
 use vars qw(%FW_types);   # device types,
 use vars qw($FW_RET);     # Returned data (html)
-use vars qw($FW_RETTYPE); # image/png or the like
+use vars qw($FW_RETTYPE); # image/png or the like. Note: also as my below!
 use vars qw($FW_wname);   # Web instance
 use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
 use vars qw(%FW_pos);     # scroll position
@@ -106,7 +106,7 @@ my %FW_id2inform;
 my $FW_data;       # Filecontent from browser when editing a file
 my %FW_icons;      # List of icons
 my @FW_iconDirs;   # Directory search order for icons
-my $FW_RETTYPE;    # image/png or the like
+my $FW_RETTYPE;    # image/png or the like: Note: also as use vars above!
 my %FW_rooms;      # hash of all rooms
 my %FW_extraRooms; # hash of extra rooms
 my @FW_roomsArr;   # ordered list of rooms
@@ -319,6 +319,7 @@ FW_Undef($$)
     %FW_visibleDeviceHash = FW_visibleDevices();
     delete($logInform{$hash->{NAME}});
   }
+  delete $FW_svgData{$hash->{NAME}};
   return $ret;
 }
 
@@ -623,6 +624,7 @@ FW_finishRead($$$)
     FW_closeConn($hash);
     TcpServer_Close($hash, 1);
   } 
+  $FW_RET="";
 }
 
 sub
@@ -1996,6 +1998,7 @@ FW_showRoom()
   my ($idx,$svgIdx) = (1,1);
   @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
   $FW_svgData{$FW_cname} = { FW_RET=>$FW_RET, RES=>\%res, ATENDS=>\@atEnds };
+  my $svgDataUsed = 1;
   foreach my $d (@atEnds) {
     no strict "refs";
     my $fn = $modules{$defs{$d}{TYPE}}{FW_summaryFn};
@@ -2007,11 +2010,13 @@ FW_showRoom()
         return "$FW_cname,$d,".
                encode_base64(&{$fn}($FW_wname,$d,$FW_room,\%extPage),'');
       }, undef, "FW_svgCollect");
+      $svgDataUsed++;
     } else {
       $res{$d} = &{$fn}($FW_wname,$d,$FW_room,\%extPage);
     }
     use strict "refs";
   }
+  delete($FW_svgData{$FW_cname}) if(!$svgDataUsed);
   return FW_svgDone(\%res, \@atEnds, undef);
 }
 
