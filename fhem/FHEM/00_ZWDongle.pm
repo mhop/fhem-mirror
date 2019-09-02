@@ -355,6 +355,8 @@ ZWDongle_Set($@)
      $type =~ m/^createNode/ ||
      $type eq "sendNIF") {
 
+    return "Usage: $type <NODENAME_or_Number>" if(!defined($a[0]));
+
     $a[0] =~ s/^UNKNOWN_//;
 
     $a[0] = hex($defs{$a[0]}{nodeIdHex})
