@@ -2843,7 +2843,7 @@ sub count_DoParse($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$device|$reading|''|$err|$table";
+     return "$name|''|$device|''|$err|$table";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -2898,7 +2898,7 @@ sub count_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         return "$name|''|$device|$reading|''|$err|$table";
+         return "$name|''|$device|''|$err|$table";
      }
      
      if($ced) {
@@ -9169,16 +9169,15 @@ sub DbRep_createDeleteSql($$$$$$$) {
  # add valueFilter
  $sql .= $vf if(defined $vf);
  # Timestamp Filter
- if (($tf && $tn)) {
-     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
+ if ($tf && $tn) {
+     $sql .= "TIMESTAMP >= '$tf' AND TIMESTAMP ".($tnfull?"<=":"<")." '$tn' $addon;";
  } else {
      if ($dbmodel eq "POSTGRESQL") {
-	     $sql .= "true ";
+	     $sql .= "true;";
 	 } else {
-	     $sql .= "1 ";
+	      $sql .= "1;";
 	 }
  }
- $sql .= "$addon;";
 
 return $sql;
 }
