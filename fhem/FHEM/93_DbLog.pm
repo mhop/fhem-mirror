@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
   "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
   "4.3.0"   => "14.08.2019 new attribute dbSchema, add database schema to subroutines ",
   "4.2.0"   => "25.07.2019 DbLogValueFn as device specific function propagated in devices if dblog is used ",
@@ -512,11 +513,9 @@ sub DbLog_Set($@) {
     my $current = $hash->{HELPER}{TC};
 	my (@logs,$dir);
 	
-	if (!AttrVal($name,"expimpdir",undef)) {
-	    $dir = $attr{global}{modpath}."/log/";
-	} else {
-	    $dir = AttrVal($name,"expimpdir",undef);
-	}
+    my $dirdef = AttrVal("global", "logdir", $attr{global}{modpath}."/log/");
+    $dir       = AttrVal($name, "expimpdir", $dirdef);
+    $dir       = $dir."/" if($dir !~ /.*\/$/);
 	
 	opendir(DIR,$dir);
 	my $sd = "cache_".$name."_";
