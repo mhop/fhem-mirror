@@ -5452,9 +5452,10 @@ ZWave_firmware($$)
     return("Firmware update with FIRMWARE_UPDATE_MD classversion > 4 ".
                 "not supported", "EMPTY") if($classVersion > 4);
     my ($target, $fwFile) = split / /, $args;
-    my $usage = "wrong argumets, need: <FwTarget> <FwFileName>";
-    return ($usage, "EMPTY") if (!$target || !$fwFile);
-    
+    my $usage = "wrong argumets, need: <FwTargetAsNumber> <FwFileName>";
+    return ($usage, "EMPTY")
+        if(!defined($target) || $target !~ m/^\d+$/ || !$fwFile);
+
     my $fName = "$attr{global}{modpath}/FHEM/firmware/$fwFile";
     my $l = -s $fName;
     return "$fName does not exists, or is empty" if(!$l);
