@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 19992 2019-08-12 19:30:46Z DS_Starter $
+# $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -25,10 +25,14 @@ use Blocking;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Time::Local;
 use Encode qw(encode_utf8);
+use HttpUtils;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
+  "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
+  "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
   "4.3.0"   => "14.08.2019 new attribute dbSchema, add database schema to subroutines ",
   "4.2.0"   => "25.07.2019 DbLogValueFn as device specific function propagated in devices if dblog is used ",
   "4.1.1"   => "25.05.2019 fix ignore MinInterval if value is \"0\", Forum: #100344 ",
@@ -510,11 +514,9 @@ sub DbLog_Set($@) {
     my $current = $hash->{HELPER}{TC};
 	my (@logs,$dir);
 	
-	if (!AttrVal($name,"expimpdir",undef)) {
-	    $dir = $attr{global}{modpath}."/log/";
-	} else {
-	    $dir = AttrVal($name,"expimpdir",undef);
-	}
+    my $dirdef = AttrVal("global", "logdir", $attr{global}{modpath}."/log/");
+    $dir       = AttrVal($name, "expimpdir", $dirdef);
+    $dir       = $dir."/" if($dir !~ /.*\/$/);
 	
 	opendir(DIR,$dir);
 	my $sd = "cache_".$name."_";
@@ -1227,7 +1229,7 @@ sub DbLog_Log($$) {
   my $async    = AttrVal($name, "asyncMode", undef);
   my $clim     = AttrVal($name, "cacheLimit", 500);
   my $ce       = AttrVal($name, "cacheEvents", 0);
-  my $net;
+  my ($net,$force);
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
@@ -1361,11 +1363,11 @@ sub DbLog_Log($$) {
                           #Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                           my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-                          $lt = 0 if(!$lt);
-                          # $lv = "" if(!$lv);         
-                          $lv = "" if(!defined $lv);              # Forum: #100344
+                          $lt    = 0  if(!$lt);         
+                          $lv    = "" if(!defined $lv);                   # Forum: #100344
+                          $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
 
-                          if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                          if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
                               # innerhalb MinIntervall und LastValue=Value
                               $DoIt = 0;
                           }
@@ -1387,11 +1389,11 @@ sub DbLog_Log($$) {
                               #Regexp matcht und MinIntervall ist angegeben
                               my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                               my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-                              $lt = 0 if(!$lt);
-                              # $lv = "" if(!$lv);
-                              $lv = "" if(!defined $lv);              # Forum: #100344
+                              $lt    = 0  if(!$lt);
+                              $lv    = "" if(!defined $lv);                   # Forum: #100344
+                              $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
        
-                              if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                              if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
                                   # innerhalb MinIntervall und LastValue=Value
                                   $DoIt = 0;
                               }
@@ -2130,8 +2132,6 @@ sub DbLog_execmemcache ($) {
           Log3 ($name, 2, "DbLog $name - no data for last database write cycle") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
       }
   }
-  
-  # $memcount = scalar(keys%{$hash->{cache}{".memcache"}});
   
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime($nextsync);
@@ -3576,10 +3576,20 @@ sub DbLog_configcheck($) {
   
   ### Start
   ####################################################################### 
+  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);
+  
   $check  = "<html>";
   $check .= "<u><b>Result of DbLog version check</u></b><br><br>";
-  $check .= "Used DbLog version: $hash->{HELPER}{VERSION} <br>";
-  $check .= "<b>Recommendation:</b> Please check for updates of DbLog periodically. <br><br>";
+  if($errcm) {
+      $check .= "<b>Recommendation:</b> ERROR - $errcm <br><br>";
+  }
+  if($supd) {
+      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+	  $check .= "<b>Recommendation:</b> You should update FHEM to get the freshest DbLog version ! <br><br>";
+  } else {
+      $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
+	  $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
+  }
   
   ### Configuration read check
   #######################################################################
@@ -4055,6 +4065,102 @@ sub DbLog_configcheck($) {
 return $check;
 }
 
+#########################################################################################
+#                  check Modul Aktualität fhem.de <-> local
+#########################################################################################
+sub DbLog_checkModVer($) {
+  my ($name) = @_;
+  my $src    = "http://fhem.de/fhemupdate/controls_fhem.txt";
+
+  if($src !~ m,^(.*)/([^/]*)$,) {
+    Log3 $name, 1, "DbLog $name -> configCheck: Cannot parse $src, probably not a valid http control file";
+    return ("check of new DbLog version not possible, see logfile.");
+  }
+  
+  my $basePath     = $1;
+  my $ctrlFileName = $2;
+
+  my ($remCtrlFile, $err) = DbLog_updGetUrl($name,$src);
+  return ("check of new DbLog version not possible: $err") if($err);
+  
+  if(!$remCtrlFile) {
+      Log3 $name, 1, "DbLog $name -> configCheck: No valid remote control file";
+      return ("check of new DbLog version not possible, see logfile.");
+  }
+  
+  my @remList = split(/\R/, $remCtrlFile);
+  Log3 $name, 4, "DbLog $name -> configCheck: Got remote $ctrlFileName with ".int(@remList)." entries.";
+
+  my $root = $attr{global}{modpath};
+
+  my @locList;
+  if(open(FD, "$root/FHEM/$ctrlFileName")) {
+      @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+      close(FD);
+      Log3 $name, 4, "DbLog $name -> configCheck: Got local $ctrlFileName with ".int(@locList)." entries.";
+  } else {
+      Log3 $name, 1, "DbLog $name -> configCheck: can't open $root/FHEM/$ctrlFileName: $!";
+      return ("check of new DbLog version not possible, see logfile.");  
+  }
+  
+  my %lh;
+  foreach my $l (@locList) {
+      my @l = split(" ", $l, 4);
+      next if($l[0] ne "UPD" || $l[3] !~ /93_DbLog/);
+      $lh{$l[3]}{TS} = $l[1];
+      $lh{$l[3]}{LEN} = $l[2];
+      Log3 $name, 4, "DbLog $name -> configCheck: local version from last update - creation time: ".$lh{$l[3]}{TS}." - bytes: ".$lh{$l[3]}{LEN};
+  }
+  
+  my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
+  foreach my $rem (@remList) {
+      my @r = split(" ", $rem, 4);
+      next if($r[0] ne "UPD" || $r[3] !~ /93_DbLog/);
+      my $fName  = $r[3];
+      my $fPath  = "$root/$fName";
+      my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+      if(!$fileOk) {
+          Log3 $name, 4, "DbLog $name -> configCheck: New remote version of $fName found - creation time: ".$r[1]." - bytes: ".$r[2];
+          return ("",1,"A new DbLog version is available (creation time: $r[1], size: $r[2] bytes)");
+      }
+      if(!$noSzCheck) {
+          my $sz = -s $fPath;
+          if($fileOk && defined($sz) && $sz ne $r[2]) {
+              Log3 $name, 4, "DbLog $name -> configCheck: remote version of $fName (creation time: $r[1], bytes: $r[2]) differs from local one (bytes: $sz)";
+              return ("",1,"Your local DbLog module is modified.");
+          }
+      }
+      last;
+  }
+  
+return ("",0,"Your local DbLog module is up to date.");
+}
+
+###################################
+sub DbLog_updGetUrl($$) {
+  my ($name,$url) = @_;
+  my %upd_connecthash;
+  $url =~ s/%/%25/g;
+  $upd_connecthash{url} = $url;
+  $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
+  
+  my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
+  if($err) {
+      Log3 $name, 1, "DbLog $name -> configCheck: ERROR while connecting to fhem.de:  $err";
+      return ("",$err);
+  }
+  if(!$data) {
+      Log3 $name, 1, "DbLog $name -> configCheck: ERROR $url: empty file received";
+      $err = 1;
+      return ("",$err);
+  }
+  
+return ($data,"");
+}
+
+#########################################################################################
+#                  Einen (einfachen) Datensatz aus DB lesen
+#########################################################################################
 sub DbLog_sqlget($$) {
   my ($hash,$sql)= @_;
   my $name = $hash->{NAME};
@@ -5728,12 +5834,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 19992 2019-08-12 19:30:46Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 19992 2019-08-12 19:30:46Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -6576,19 +6682,22 @@ return;
     <li><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
 	  
       A new Attribute DbLogInclude will be propagated to all Devices if DBLog is used. 
       DbLogInclude works just like DbLogExclude but to include matching readings.
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
-      lastvalue is equal.
+      last value is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
+      equal the last one and the defined interval is not reached.
+      is not reached and the 
       See also DbLogSelectionMode-Attribute of DbLog device which takes influence on how DbLogExclude and DbLogInclude 
       are handled. <br><br>
 	
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
-      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -6599,19 +6708,21 @@ return;
     <li><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
 	  
       A new attribute DbLogExclude will be propagated to all devices if DBLog is used. 
 	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by 
       comma. 
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
-      lastvalue is equal. 
+      lastvalue is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
+      equal the last one and the defined interval is not reached.
       <br><br>
     
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
-      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -7912,20 +8023,23 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
       
 	  Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
 	  DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass Readings mit diesen RegExp 
-	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. Ist MinIntervall angegeben, so wird der Logeintrag 
-      nur dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
-      hat. <br>
-      Siehe auch das DbLog Attribut DbLogSelectionMode. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
+	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. <br>
+      Ist MinIntervall angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert 
+      des Readings sich nicht verändert hat. 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht nicht geloggt, wenn sich der 
+      Wert des Readings verändert hat. <br>
+      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
       werden. <br><br>
 
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
-      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -7936,18 +8050,23 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
     
       Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogExclude</i> propagiert. 
 	  Der Wert des Attributes wird als Regexp ausgewertet und schliesst die damit matchenden Readings von einem Logging aus. 
-	  Einzelne Regexp werden durch Komma getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
-      dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
-      hat. <br><br>
+	  Einzelne Regexp werden durch Komma getrennt. <br>
+      Ist MinIntervall angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der 
+      Wert des Readings sich nicht verändert hat. 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
+      Wert des Readings verändert hat. <br>
+      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
+      werden. <br><br>
     
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
-      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -8393,6 +8512,7 @@ attr SMA_Energymeter DbLogValueFn
         "Blocking": 0,
         "Time::HiRes": 0,
         "Time::Local": 0,
+        "HttpUtils": 0,
         "Encode": 0        
       },
       "recommends": {
