@@ -3196,7 +3196,7 @@ FW_devState($$@)
     $cmdList = "desiredTemperature" if(!$cmdList);
 
   } else {
-    my $html;
+    my $html = "";
     foreach my $state (split("\n", $state)) {
       $txt = $state;
       my ($icon, $isHtml);
