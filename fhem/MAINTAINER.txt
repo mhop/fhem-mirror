@@ -508,6 +508,7 @@ FHEM/98_powerMap             igami                Unterstützende Dienste
 FHEM/98_QRCode.pm            Benni                Unterstützende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
 FHEM/98_RandomTimer.pm       igami/Beta-User      Unterstützende Dienste/Kalendermodule
+FHEM/98_readingsWatcher	     Wzut		  Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
