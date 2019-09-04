@@ -2577,27 +2577,33 @@ sub MSwitch_Attr(@) {
     if ( $cmd eq 'set' && $aName eq 'disable' && $aVal == 0 ) {
         delete( $hash->{helper}{savemodeblock} );
         delete( $hash->{READINGS}{Safemode} );
+		
+		my $notedef = ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+		if ($notedef  eq "MSwitch_Self" ) {$notedef = $name}
+		$hash->{NOTIFYDEV} = $notedef;
+
         MSwitch_Createtimer($hash);
     }
 
-    if (    $cmd eq 'set'
-         && $aName eq 'disable'
-         && $aVal == 0
-         && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
-         'no_trigger' )
-    {
-        $hash->{NOTIFYDEV} =
-          ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-    }
+    # if (    $cmd eq 'set'
+         # && $aName eq 'disable'
+         # && $aVal == 0
+         # && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
+         # 'no_trigger' )
+    # {
+        # $hash->{NOTIFYDEV} =
+          # ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+    # }
 
-    if (    $cmd eq 'del'
-         && $aName eq 'disable'
-         && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
-         'no_trigger' )
-    {
-        $hash->{NOTIFYDEV} =
-          ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-    }
+    # if (    $cmd eq 'del' && $aName eq 'disable' && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
+         # 'no_trigger' )
+    # {
+	
+		# my $notedef = ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+		# if ($notedef  eq "MSwitch_Self" ) {$notedef = $name}
+		# $hash->{NOTIFYDEV} = $notedef;
+	
+    # }
 
     if ( $aName eq 'MSwitch_Activate_MSwitchcmds' && $aVal == 1 ) {
         addToAttrList('MSwitchcmd');
@@ -2646,7 +2652,6 @@ sub MSwitch_Attr(@) {
                   . __LINE__ );
 
         }
-
     }
 
 #############
@@ -2667,6 +2672,12 @@ sub MSwitch_Attr(@) {
             MSwitch_Clear_timer($hash);
             delete( $hash->{helper}{savemodeblock} );
             delete( $hash->{READINGS}{Safemode} );
+			
+			
+		my $notedef = ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+		if ($notedef  eq "MSwitch_Self" ) {$notedef = $name}
+		$hash->{NOTIFYDEV} = $notedef;
+		
         }
 
         if ( $testarg eq 'MSwitch_Reset_EVT_CMD1_COUNT' ) {
