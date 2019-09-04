@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.7.0"   => "04.09.2019 traceHandles ",
   "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
   "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
   "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
@@ -220,6 +221,7 @@ my %columns = ("DEVICE"  => 64,
               );
 					 
 sub DbLog_dbReadings($@);
+sub DbLog_showChildHandles($$$$);
 
 ################################################################
 sub DbLog_Initialize($)
@@ -253,6 +255,7 @@ sub DbLog_Initialize($)
 							   "suppressAddLogV3:1,0 ".
                                "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
                                "traceLevel:0,1,2,3,4,5,6,7 ".
+                               "traceHandles ".
 							   "asyncMode:1,0 ".
 							   "cacheEvents:2,1,0 ".
 							   "cacheLimit ".
@@ -478,6 +481,18 @@ sub DbLog_Attr(@) {
       if ($do == 0) {
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
           InternalTimer(gettimeofday()+2, "DbLog_ConnectPush", $hash, 0) if(!$async);
+      }
+  }
+  
+  if ($aName eq "traceHandles") {
+      unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+      RemoveInternalTimer($hash, "DbLog_startShowChildhandles");
+      if($cmd eq "set") {
+          $do = ($aVal) ? 1 : 0;
+      }
+      $do = 0 if($cmd eq "del");
+      if($do) { 
+          InternalTimer(gettimeofday()+5, "DbLog_startShowChildhandles", "$name:Main", 0);
       }
   }
   
@@ -2901,8 +2916,8 @@ sub DbLog_ConnectPush($;$$) {
 
 sub DbLog_ConnectNewDBH($) {
   # new dbh for common use (except DbLog_Push and get-function)
-  my ($hash)= @_;
-  my $name = $hash->{NAME};
+  my ($hash)     = @_;
+  my $name       = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
@@ -2920,7 +2935,7 @@ sub DbLog_ConnectNewDBH($) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });
       } 
   };
- 
+      
   if($@) {
     Log3($name, 2, "DbLog $name - $@");
     my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
@@ -5853,6 +5868,39 @@ sub DbLog_setVersionInfo($) {
 return;
 }
 
+#########################################################################
+#               Trace of Childhandles
+# dbh    Database handle object
+# sth    Statement handle object
+# drh    Driver handle object (rarely seen or used in applications)
+# h      Any of the handle types above ($dbh, $sth, or $drh)
+#########################################################################
+sub DbLog_startShowChildhandles ($) {
+    my ($str)       = @_;
+    my ($name,$sub) = split(":",$str);
+    my $hash        = $defs{$name};
+    
+    RemoveInternalTimer($hash, "DbLog_startShowChildhandles"); 
+    my $iv = AttrVal($name, "traceHandles", 0);
+    return if(!$iv);
+    
+    my %drivers = DBI->installed_drivers();    
+    DbLog_showChildHandles($name,$drivers{$_}, 0, $_) for (keys %drivers);
+    
+    InternalTimer(gettimeofday()+$iv, "DbLog_startShowChildhandles", "$name:$sub", 0) if($iv);
+return;
+}
+      
+sub DbLog_showChildHandles ($$$$) {
+    my ($name,$h, $level, $key) = @_;
+    
+    my $t = $h->{Type}."h";
+    $t = ($t=~/drh/)?"DriverHandle   ":($t=~/dbh/)?"DatabaseHandle ":($t=~/sth/)?"StatementHandle":"Undefined";
+    Log3($name, 1, "DbLog - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
+    DbLog_showChildHandles($name, $_, $level + 1, $key)
+        for (grep { defined } @{$h->{ChildHandles}});
+}
+
 1;
 
 =pod
@@ -7019,6 +7067,21 @@ attr SMA_Energymeter DbLogValueFn
 	   </ul>
 	   <br>
        
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="traceHandles"></a>
+    <li><b>traceHandles</b>
+    <ul>
+	  <code>attr &lt;device&gt; traceHandles &lt;n&gt;
+	  </code><br>
+	  
+      If set, every &lt;n&gt; seconds the system wide existing database handles are printed out into the logfile.
+      This attribute is only relevant for support cases. (default: 0 = switch off) <br>
+	  
     </ul>
     </li>
   </ul>
@@ -8363,6 +8426,21 @@ attr SMA_Energymeter DbLogValueFn
 	   </ul>
 	   <br>
        
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="traceHandles"></a>
+    <li><b>traceHandles</b>
+    <ul>
+	  <code>attr &lt;device&gt; traceHandles &lt;n&gt;
+	  </code><br>
+	  
+      Wenn gesetzt, werden alle &lt;n&gt; Sekunden die systemweit vorhandenen Datenbank-Handles im Logfile ausgegeben.
+      Dieses Attribut ist nur für Supportzwecke relevant. (Default: 0 = ausgeschaltet) <br>
+	  
     </ul>
     </li>
   </ul>
