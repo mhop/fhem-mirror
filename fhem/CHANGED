@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     98_readinsWatcher: new modul
  - change:  72_TA_CMI_JSON: adding model attribute
  - feature: 93_DbLog: attr global logdir is considered by set exportCache
  - change:  76_SMAInverter: STP10.0-3AV-40 298 type included
