@@ -30,7 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.7.0"   => "04.09.2019 traceHandles ",
+  "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
   "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
   "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
   "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
@@ -3589,12 +3589,28 @@ sub DbLog_configcheck($) {
   my $current = $hash->{HELPER}{TC};
   my ($check, $rec,%dbconfig);
   
-  ### Start
+  ### Version check
   ####################################################################### 
-  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);
+  my $pv      = sprintf("%vd",$^V);                                              # Perl Version
+  my $dbi     = $DBI::VERSION;                                                   # DBI Version
+  my %drivers = DBI->installed_drivers();
+  my $dv      = "";
+  if($dbmodel =~ /MYSQL/i) {
+      for (keys %drivers) {
+          $dv = $_ if($_ =~ /mysql|mariadb/);
+      }
+  }
+  my $dbd = ($dbmodel =~ /POSTGRESQL/i)?"Pg: ".$DBD::Pg::VERSION:                # DBD Version
+            ($dbmodel =~ /MYSQL/i && $dv)?"$dv: ".$DBD::mysql::VERSION:
+            ($dbmodel =~ /SQLITE/i)?"SQLite: ".$DBD::SQLite::VERSION:"Undefined";
+            
+  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);                            # DbLog Version
   
   $check  = "<html>";
-  $check .= "<u><b>Result of DbLog version check</u></b><br><br>";
+  $check .= "<u><b>Result of version check</u></b><br><br>";
+  $check .= "Used Perl version: $pv <br>";
+  $check .= "Used DBI (Database independent interface) version: $dbi <br>";
+  $check .= "Used DBD (Database driver) version $dbd <br>";
   if($errcm) {
       $check .= "<b>Recommendation:</b> ERROR - $errcm <br><br>";
   }
