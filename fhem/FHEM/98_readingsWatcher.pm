@@ -133,7 +133,7 @@ sub Define($$)
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "FHEM::readingsWatcher::OnTimer", $hash, 0);
-  return $@ unless ( FHEM::Meta::SetInternals($hash) ) if(!$modMetaAbsent);
+  #return $@ unless ( FHEM::Meta::SetInternals($hash) ) if(!$modMetaAbsent);
   return undef;
 }
 
