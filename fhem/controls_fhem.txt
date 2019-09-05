@@ -1,4 +1,4 @@
-REV 20098
+REV 20107
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-04_07:45:03 304989 ./CHANGED
-UPD 2019-07-09_07:45:03 41601 ./MAINTAINER.txt
+UPD 2019-09-05_07:45:02 305030 ./CHANGED
+UPD 2019-09-05_07:45:02 41648 ./MAINTAINER.txt
 UPD 2019-06-02_07:45:03 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2019-08-28_07:45:12 159391 ./fhem.pl
@@ -56,7 +56,7 @@ UPD 2019-03-25_07:45:04 143325 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2019-09-03_07:45:03 45287 FHEM/00_ZWDongle.pm
-UPD 2019-09-02_07:45:02 159841 FHEM/01_FHEMWEB.pm
+UPD 2019-09-05_07:45:02 159846 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2018-06-16_07:45:03 7921 FHEM/02_HTTPSRV.pm
@@ -485,7 +485,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2019-08-20_07:45:02 374592 FHEM/98_MSwitch.pm
+UPD 2019-09-05_07:45:02 374592 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
 UPD 2019-08-11_07:45:03 232341 FHEM/98_Modbus.pm
@@ -537,6 +537,7 @@ UPD 2015-08-13_07:45:10 8668 FHEM/98_pilight.pm
 UPD 2016-02-26_07:45:12 6994 FHEM/98_ping.pm
 UPD 2018-01-27_07:45:02 57667 FHEM/98_powerMap.pm
 UPD 2015-07-28_14:05:31 23311 FHEM/98_rain.pm
+UPD 2019-09-05_07:45:02 20828 FHEM/98_readingsWatcher.pm
 UPD 2018-03-18_07:45:02 4017 FHEM/98_restore.pm
 UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
@@ -728,12 +729,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-01_07:45:06 4110411 docs/commandref.html
-UPD 2019-09-01_07:45:09 2544129 docs/commandref_DE.html
+UPD 2019-09-05_07:45:06 4113486 docs/commandref.html
+UPD 2019-09-05_07:45:09 2547664 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-04_07:45:11 217738 docs/commandref_modular.html
-UPD 2019-09-04_07:45:12 228704 docs/commandref_modular_DE.html
+UPD 2019-09-05_07:45:10 218032 docs/commandref_modular.html
+UPD 2019-09-05_07:45:12 229012 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1425,6 +1426,7 @@ UPD 2016-06-19_07:45:12 953 www/images/fhemSVG/hue_room_recreation.svg
 UPD 2017-11-14_07:45:02 692 www/images/fhemSVG/hue_room_terrace.svg
 UPD 2016-06-19_07:45:12 641 www/images/fhemSVG/hue_room_toilet.svg
 UPD 2015-07-28_14:05:32 4224 www/images/fhemSVG/humidity.svg
+UPD 2019-09-05_07:45:02 1678 www/images/fhemSVG/inverter.svg
 UPD 2017-09-07_07:45:02 3979 www/images/fhemSVG/ios_off_fill.svg
 UPD 2017-09-07_07:45:02 4302 www/images/fhemSVG/ios_off_fortimer_fill.svg
 UPD 2017-09-07_07:45:02 8001 www/images/fhemSVG/ios_off_till_fill.svg
