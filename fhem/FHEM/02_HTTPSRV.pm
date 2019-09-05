@@ -64,7 +64,7 @@ HTTPSRV_Initialize($) {
     $hash->{UndefFn}   = "HTTPSRV_Undef";
     #$hash->{AttrFn}    = "HTTPSRV_Attr";
     $hash->{AttrList}  = "directoryindex " .
-                        "readings";
+                         "readings " . $readingFnAttributes;
     $hash->{AttrFn}    = "HTTPSRV_Attr";
     #$hash->{SetFn}     = "HTTPSRV_Set";
 
