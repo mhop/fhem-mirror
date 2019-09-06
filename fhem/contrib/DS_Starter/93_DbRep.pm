@@ -4274,7 +4274,7 @@ sub currentfillup_Push($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my ($err,$sth,$sql,$devs,$danz,$ranz);
+ my ($err,$sth,$sql,$selspec,$addon,@dwc,@rwc);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -4294,8 +4294,6 @@ sub currentfillup_Push($) {
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
- 
- ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
   
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -4303,82 +4301,34 @@ sub currentfillup_Push($) {
  # insert history mit/ohne primary key
  # SQL zusammenstellen für DB-Operation
  if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
-     $sql  = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
-         $sql .= "1 ";
-     }
-	 $sql .= "group by timestamp,device,reading ;";
+     $selspec = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	 $addon   = "group by timestamp,device,reading";
 	 
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
-     $sql  = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
-         $sql .= "1 ";
-     }
-	 $sql .= "group by timestamp,device,reading ;";
+     $selspec = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	 $addon   = "group by timestamp,device,reading";
  
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "true ";
-         }
-	 $sql .= "group by device,reading ON CONFLICT ($pkc) DO NOTHING; ";
+     $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+	 $addon   = "group by device,reading ON CONFLICT ($pkc) DO NOTHING";
  
  } else {
      if($dbloghash->{MODEL} ne 'POSTGRESQL') {
 	     # MySQL und SQLite
-         $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "1 ";
-         }
-	     $sql .= "group by device,reading ;";
+         $selspec = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	     $addon   = "group by device,reading";
 	 } else {
 	     # PostgreSQL
-         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "true ";
-         }
-	     $sql .= "group by device,reading;";
+         $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+	     $addon   = "group by device,reading";
 	 }
+ }
+ 
+ # SQL-Statement zusammenstellen
+ if ($IsTimeSet || $IsAggrSet) {
+	 $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+ } else {
+	 $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,$addon); 
  }
  
  # Log SQL Statement
@@ -8339,16 +8289,15 @@ sub DbRep_reduceLog($) {
         $filter = 1;
     }
    
-    my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$d,$r);
+    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
     
     # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
     my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
     
     my $sql;
-    my $table = "history";
-    my $selspec = "TIMESTAMP,DEVICE,'',READING,VALUE";
-    my $addon = "ORDER BY TIMESTAMP ASC";
+    my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
+    my $addon   = "ORDER BY TIMESTAMP ASC";
     
     if($filter) {
         # Option EX/INCLUDE wurde angegeben
@@ -8356,9 +8305,9 @@ sub DbRep_reduceLog($) {
                     .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                     ."TIMESTAMP <= '$ots'".($nts?" AND TIMESTAMP >= '$nts' ":" ")."ORDER BY TIMESTAMP ASC";
     } elsif ($IsTimeSet || $IsAggrSet) {
-        $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
+        $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
 	} else {
-	    $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,undef,undef,$addon); 
+	    $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,undef,undef,$addon); 
 	}
     
     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
@@ -8371,7 +8320,10 @@ sub DbRep_reduceLog($) {
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
         .(($average) ? "$average" : '')
         .($filter ? ((($average && $filter) ? ", " : '').(uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1])) :
-        ((($idanz || $iranz) ? " INCLUDE -> " : '').($idanz ? "Devs: ".$idevs : '').($iranz ? " Readings: ".$ireading : '').(($edanz || $eranz) ? " EXCLUDE -> " : '').($edanz ? "Devs: ".$edevs : '').($eranz ? " Readings: ".$ereading : '')) ));
+        ((($idanz || $idevswc || $iranz || $irdswc) ? " INCLUDE -> " : '').
+           (($idanz || $idevswc)? "Devs: ".($idevs?$idevs:'').($idevswc?$idevswc:'') : '').(($iranz || $irdswc) ? " Readings: ".($ireading?$ireading:'').($irdswc?$irdswc:'') : '').
+           (($edanz || $edevswc || $eranz || $erdswc) ? " EXCLUDE -> " : '').
+           (($edanz || $edevswc)? "Devs: ".($edevs?$edevs:'').($edevswc?$edevswc:'') : '').(($eranz || $erdswc) ? " Readings: ".($ereading?$ereading:'').($erdswc?$erdswc:'') : '')) ));
         
     if ($ots) {
 	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
@@ -8864,7 +8816,112 @@ return;
 }
 
 ####################################################################################################
-#  SQL-Statement zusammenstellen für DB-Abfrage
+#               SQL-Statement zusammenstellen Common
+####################################################################################################
+sub DbRep_createCommonSql ($$$$$$$) {
+ my ($hash,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
+ my $name      = $hash->{NAME};
+ my $dbmodel   = $hash->{dbloghash}{MODEL};
+ my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
+ my $tnfull    = 0;
+ my ($sql,$vf,@dwc,@rwc);
+ 
+ my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
+ 
+ if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+     $tnfull = 1;
+ }
+ 
+ if(defined $valfilter) {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $vf = "VALUE ~ '$valfilter' AND ";
+	 } else {
+	     $vf = "VALUE REGEXP '$valfilter' AND ";
+	 }
+ }
+ 
+ $sql = $selspec." ";
+ # included devices
+ $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ if($idevswc && $idevs !~ m(^%$)) {
+     @dwc    = split(",",$idevswc);
+	 my $i   = 1;
+	 my $len = scalar(@dwc);
+	 foreach(@dwc) {
+	     if($i<$len) {
+	         $sql .= "DEVICE LIKE '$_' OR ";
+		 } else {
+		     $sql .= "DEVICE LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($idanz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+ $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+ $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ # excluded devices
+ if($edevswc) {
+     @dwc = split(",",$edevswc);
+	 foreach(@dwc) {
+	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+ $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+ $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
+ # included readings
+ $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ if($irdswc && $ireading !~ m(^%$)) {
+     @rwc    = split(",",$irdswc);
+	 my $i   = 1;
+	 my $len = scalar(@rwc);
+	 foreach(@rwc) {
+	     if($i<$len) {
+	         $sql .= "READING LIKE '$_' OR ";
+		 } else {
+		     $sql .= "READING LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($iranz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) "            if($iranz > 1);
+ $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ # excluded readings
+ if($erdswc) {
+     @dwc = split(",",$erdswc);
+	 foreach(@dwc) {
+	     $sql .= "READING NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+ $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
+ # add valueFilter
+ $sql .= $vf if(defined $vf);
+ # Timestamp Filter
+ if (($tf && $tn)) {
+     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
+ } else {
+     if ($dbmodel eq "POSTGRESQL") {
+	     $sql .= "true ";
+	 } else {
+	     $sql .= "1 ";
+	 }
+ }
+ $sql .= "$addon;";
+
+return $sql;
+}
+
+####################################################################################################
+#               SQL-Statement zusammenstellen für DB-Abfrage Select
 ####################################################################################################
 sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
@@ -8945,7 +9002,7 @@ sub DbRep_createSelectSql($$$$$$$$) {
  if($erdswc) {
      @dwc = split(",",$erdswc);
 	 foreach(@dwc) {
-	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	     $sql .= "READING NOT LIKE '$_' AND ";
 	 }
  }
  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
@@ -9050,7 +9107,7 @@ sub DbRep_createUpdateSql($$$$$$$$) {
  if($erdswc) {
      @dwc = split(",",$erdswc);
 	 foreach(@dwc) {
-	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	     $sql .= "READING NOT LIKE '$_' AND ";
 	 }
  }
  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
@@ -9160,7 +9217,7 @@ sub DbRep_createDeleteSql($$$$$$$) {
  if($erdswc) {
      @dwc = split(",",$erdswc);
 	 foreach(@dwc) {
-	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	     $sql .= "READING NOT LIKE '$_' AND ";
 	 }
  }
  $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
@@ -11041,7 +11098,8 @@ return;
 sub DbRep_modAssociatedWith ($$$) {
   my ($hash,$cmd,$awdev) = @_;
   my $name = $hash->{NAME};
-  my (@naw,@edvs,@edvspcs,$edevswc,$edevs);
+  my (@naw,@edvs,@edvspcs,$edevswc);
+  my $edevs = '';
   
   if($cmd eq "del") {
       readingsDelete($hash,".associatedWith");
