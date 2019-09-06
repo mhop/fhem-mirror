@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbLog: add-on parameter "force" for MinInterval- Forum: #97148,
+                      new attribute traceHandles, show DB driver versions in 
+                      configCheck
  - new:     98_readinsWatcher: new modul
  - change:  72_TA_CMI_JSON: adding model attribute
  - feature: 93_DbLog: attr global logdir is considered by set exportCache

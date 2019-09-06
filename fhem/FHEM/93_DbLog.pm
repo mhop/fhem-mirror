@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
+  "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
   "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
   "4.4.0"   => "21.08.2019 configCheck changed: check if new DbLog version is available or the local one is modified ",
   "4.3.0"   => "14.08.2019 new attribute dbSchema, add database schema to subroutines ",
@@ -219,6 +221,7 @@ my %columns = ("DEVICE"  => 64,
               );
 					 
 sub DbLog_dbReadings($@);
+sub DbLog_showChildHandles($$$$);
 
 ################################################################
 sub DbLog_Initialize($)
@@ -252,6 +255,7 @@ sub DbLog_Initialize($)
 							   "suppressAddLogV3:1,0 ".
                                "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
                                "traceLevel:0,1,2,3,4,5,6,7 ".
+                               "traceHandles ".
 							   "asyncMode:1,0 ".
 							   "cacheEvents:2,1,0 ".
 							   "cacheLimit ".
@@ -477,6 +481,20 @@ sub DbLog_Attr(@) {
       if ($do == 0) {
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
           InternalTimer(gettimeofday()+2, "DbLog_ConnectPush", $hash, 0) if(!$async);
+      }
+  }
+  
+  if ($aName eq "traceHandles") {
+      if($cmd eq "set") {
+          unless ($aVal =~ /^[0-9]+$/) {return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+	  }
+      RemoveInternalTimer($hash, "DbLog_startShowChildhandles");
+      if($cmd eq "set") {
+          $do = ($aVal) ? 1 : 0;
+      }
+      $do = 0 if($cmd eq "del");
+      if($do) { 
+          InternalTimer(gettimeofday()+5, "DbLog_startShowChildhandles", "$name:Main", 0);
       }
   }
   
@@ -1228,7 +1246,7 @@ sub DbLog_Log($$) {
   my $async    = AttrVal($name, "asyncMode", undef);
   my $clim     = AttrVal($name, "cacheLimit", 500);
   my $ce       = AttrVal($name, "cacheEvents", 0);
-  my $net;
+  my ($net,$force);
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
 
@@ -1362,11 +1380,11 @@ sub DbLog_Log($$) {
                           #Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                           my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-                          $lt = 0 if(!$lt);
-                          # $lv = "" if(!$lv);         
-                          $lv = "" if(!defined $lv);              # Forum: #100344
+                          $lt    = 0  if(!$lt);         
+                          $lv    = "" if(!defined $lv);                   # Forum: #100344
+                          $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
 
-                          if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                          if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
                               # innerhalb MinIntervall und LastValue=Value
                               $DoIt = 0;
                           }
@@ -1388,11 +1406,11 @@ sub DbLog_Log($$) {
                               #Regexp matcht und MinIntervall ist angegeben
                               my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                               my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
-                              $lt = 0 if(!$lt);
-                              # $lv = "" if(!$lv);
-                              $lv = "" if(!defined $lv);              # Forum: #100344
+                              $lt    = 0  if(!$lt);
+                              $lv    = "" if(!defined $lv);                   # Forum: #100344
+                              $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
        
-                              if(($now-$lt < $v2[1]) && ($lv eq $value)) {
+                              if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
                                   # innerhalb MinIntervall und LastValue=Value
                                   $DoIt = 0;
                               }
@@ -2131,8 +2149,6 @@ sub DbLog_execmemcache ($) {
           Log3 ($name, 2, "DbLog $name - no data for last database write cycle") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
       }
   }
-  
-  # $memcount = scalar(keys%{$hash->{cache}{".memcache"}});
   
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime($nextsync);
@@ -2902,8 +2918,8 @@ sub DbLog_ConnectPush($;$$) {
 
 sub DbLog_ConnectNewDBH($) {
   # new dbh for common use (except DbLog_Push and get-function)
-  my ($hash)= @_;
-  my $name = $hash->{NAME};
+  my ($hash)     = @_;
+  my $name       = $hash->{NAME};
   my $dbconn     = $hash->{dbconn};
   my $dbuser     = $hash->{dbuser};
   my $dbpassword = $attr{"sec$name"}{secret};
@@ -2921,7 +2937,7 @@ sub DbLog_ConnectNewDBH($) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });
       } 
   };
- 
+      
   if($@) {
     Log3($name, 2, "DbLog $name - $@");
     my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
@@ -3575,12 +3591,28 @@ sub DbLog_configcheck($) {
   my $current = $hash->{HELPER}{TC};
   my ($check, $rec,%dbconfig);
   
-  ### Start
+  ### Version check
   ####################################################################### 
-  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);
+  my $pv      = sprintf("%vd",$^V);                                              # Perl Version
+  my $dbi     = $DBI::VERSION;                                                   # DBI Version
+  my %drivers = DBI->installed_drivers();
+  my $dv      = "";
+  if($dbmodel =~ /MYSQL/i) {
+      for (keys %drivers) {
+          $dv = $_ if($_ =~ /mysql|mariadb/);
+      }
+  }
+  my $dbd = ($dbmodel =~ /POSTGRESQL/i)?"Pg: ".$DBD::Pg::VERSION:                # DBD Version
+            ($dbmodel =~ /MYSQL/i && $dv)?"$dv: ".$DBD::mysql::VERSION:
+            ($dbmodel =~ /SQLITE/i)?"SQLite: ".$DBD::SQLite::VERSION:"Undefined";
+            
+  my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);                            # DbLog Version
   
   $check  = "<html>";
-  $check .= "<u><b>Result of DbLog version check</u></b><br><br>";
+  $check .= "<u><b>Result of version check</u></b><br><br>";
+  $check .= "Used Perl version: $pv <br>";
+  $check .= "Used DBI (Database independent interface) version: $dbi <br>";
+  $check .= "Used DBD (Database driver) version $dbd <br>";
   if($errcm) {
       $check .= "<b>Recommendation:</b> ERROR - $errcm <br><br>";
   }
@@ -3722,12 +3754,24 @@ sub DbLog_configcheck($) {
 	  @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='UNIT'");
   }
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='unit'");
+      my $sch = AttrVal($name, "dbSchema", "");
+      my $h   = "history";
+      if($sch) {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='unit'");
+      } else {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='unit'");
+      
+      }
   }
   if($dbmodel =~ /SQLITE/) {
       my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
@@ -3801,12 +3845,24 @@ sub DbLog_configcheck($) {
   }
   
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='unit'");
+      my $sch = AttrVal($name, "dbSchema", "");
+      my $c   = "current";
+      if($sch) {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='unit'");
+      } else {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='unit'");
+      
+      }
   }
   if($dbmodel =~ /SQLITE/) {
       my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$current'"))[0];
@@ -3864,7 +3920,7 @@ sub DbLog_configcheck($) {
 	  }
   
       $check .= "<u><b>Result of table '$current' check</u></b><br><br>";
-      $check .= "Column width set in DB $dbname.current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+      $check .= "Column width set in DB $current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
       $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
       $check .= "<b>Recommendation:</b> $rec <br><br>";
 #}
@@ -5854,6 +5910,39 @@ sub DbLog_setVersionInfo($) {
 return;
 }
 
+#########################################################################
+#               Trace of Childhandles
+# dbh    Database handle object
+# sth    Statement handle object
+# drh    Driver handle object (rarely seen or used in applications)
+# h      Any of the handle types above ($dbh, $sth, or $drh)
+#########################################################################
+sub DbLog_startShowChildhandles ($) {
+    my ($str)       = @_;
+    my ($name,$sub) = split(":",$str);
+    my $hash        = $defs{$name};
+    
+    RemoveInternalTimer($hash, "DbLog_startShowChildhandles"); 
+    my $iv = AttrVal($name, "traceHandles", 0);
+    return if(!$iv);
+    
+    my %drivers = DBI->installed_drivers();    
+    DbLog_showChildHandles($name,$drivers{$_}, 0, $_) for (keys %drivers);
+    
+    InternalTimer(gettimeofday()+$iv, "DbLog_startShowChildhandles", "$name:$sub", 0) if($iv);
+return;
+}
+      
+sub DbLog_showChildHandles ($$$$) {
+    my ($name,$h, $level, $key) = @_;
+    
+    my $t = $h->{Type}."h";
+    $t = ($t=~/drh/)?"DriverHandle   ":($t=~/dbh/)?"DatabaseHandle ":($t=~/sth/)?"StatementHandle":"Undefined";
+    Log3($name, 1, "DbLog - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
+    DbLog_showChildHandles($name, $_, $level + 1, $key)
+        for (grep { defined } @{$h->{ChildHandles}});
+}
+
 1;
 
 =pod
@@ -6683,19 +6772,22 @@ return;
     <li><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
 	  
       A new Attribute DbLogInclude will be propagated to all Devices if DBLog is used. 
       DbLogInclude works just like DbLogExclude but to include matching readings.
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
-      lastvalue is equal.
+      last value is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
+      equal the last one and the defined interval is not reached.
+      is not reached and the 
       See also DbLogSelectionMode-Attribute of DbLog device which takes influence on how DbLogExclude and DbLogInclude 
       are handled. <br><br>
 	
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
-      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -6706,19 +6798,21 @@ return;
     <li><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
 	  
       A new attribute DbLogExclude will be propagated to all devices if DBLog is used. 
 	  DbLogExclude will work as regexp to exclude defined readings to log. Each individual regexp-group are separated by 
       comma. 
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
-      lastvalue is equal. 
+      lastvalue is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
+      equal the last one and the defined interval is not reached.
       <br><br>
     
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
-      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -7015,6 +7109,21 @@ attr SMA_Energymeter DbLogValueFn
 	   </ul>
 	   <br>
        
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="traceHandles"></a>
+    <li><b>traceHandles</b>
+    <ul>
+	  <code>attr &lt;device&gt; traceHandles &lt;n&gt;
+	  </code><br>
+	  
+      If set, every &lt;n&gt; seconds the system wide existing database handles are printed out into the logfile.
+      This attribute is only relevant for support cases. (default: 0 = switch off) <br>
+	  
     </ul>
     </li>
   </ul>
@@ -8019,20 +8128,23 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>DbLogInclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogInclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogInclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
       
 	  Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogInclude</i> propagiert. 
 	  DbLogInclude funktioniert im Endeffekt genau wie DbLogExclude, ausser dass Readings mit diesen RegExp 
-	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. Ist MinIntervall angegeben, so wird der Logeintrag 
-      nur dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
-      hat. <br>
-      Siehe auch das DbLog Attribut DbLogSelectionMode. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
+	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. <br>
+      Ist MinIntervall angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert 
+      des Readings sich nicht verändert hat. 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht nicht geloggt, wenn sich der 
+      Wert des Readings verändert hat. <br>
+      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
       werden. <br><br>
 
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
-      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogInclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -8043,18 +8155,23 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>DbLogExclude</b>
     <ul>
       <code>
-      attr &lt;device&gt; DbLogExclude regex:MinInterval,[regex:MinInterval] ...
+      attr &lt;device&gt; DbLogExclude regex:MinInterval[:force],[regex:MinInterval[:force]] ...
       </code><br>
     
       Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogExclude</i> propagiert. 
 	  Der Wert des Attributes wird als Regexp ausgewertet und schliesst die damit matchenden Readings von einem Logging aus. 
-	  Einzelne Regexp werden durch Komma getrennt. Ist MinIntervall angegeben, so wird der Logeintrag nur
-      dann nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert des Readings sich nicht verändert 
-      hat. <br><br>
+	  Einzelne Regexp werden durch Komma getrennt. <br>
+      Ist MinIntervall angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der 
+      Wert des Readings sich nicht verändert hat. 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
+      Wert des Readings verändert hat. <br>
+      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
+      werden. <br><br>
     
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
-      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300,battery:3600</code> <br>
+      <code>attr MyDevice2 DbLogExclude state,(floorplantext|MyUserReading):300:force,battery:3600:force</code>
     </ul>
     </li>
   </ul>
@@ -8351,6 +8468,21 @@ attr SMA_Energymeter DbLogValueFn
 	   </ul>
 	   <br>
        
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="traceHandles"></a>
+    <li><b>traceHandles</b>
+    <ul>
+	  <code>attr &lt;device&gt; traceHandles &lt;n&gt;
+	  </code><br>
+	  
+      Wenn gesetzt, werden alle &lt;n&gt; Sekunden die systemweit vorhandenen Datenbank-Handles im Logfile ausgegeben.
+      Dieses Attribut ist nur für Supportzwecke relevant. (Default: 0 = ausgeschaltet) <br>
+	  
     </ul>
     </li>
   </ul>
