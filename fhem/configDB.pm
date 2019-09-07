@@ -708,8 +708,6 @@ sub _cfgDB_Connect() {
 sub _cfgDB_InsertLine($$$$) {
 	my ($fhem_dbh, $uuid, $line, $counter) = @_;
 	my ($c,$d,$p1,$p2) = split(/ /, $line, 4);
-	$p2 //= "" if $c eq 'setuuid';
-	Log(5,"configDB Debug - c:$c d:$d p1:$p1 p2:$p2 l:$counter u:$uuid");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhemconfig values (?, ?, ?, ?, ?, ?)');
 	$sth->execute($c, $d, $p1, $p2, $counter, $uuid);
 	return;
