@@ -244,6 +244,8 @@ tradfri_processEvent($$) {
 
         CommandAttr(undef, "$name createGroupReadings 1") if( $decoded->{r} eq 'group' );
 
+        CommandAttr(undef,"$cname subType blind") if( $decoded->{type} eq 'blind' );
+
         HUEDeviceSetIcon($cname);
         $defs{$cname}{helper}{fromAutocreate} = 1 ;
 

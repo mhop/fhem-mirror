@@ -179,7 +179,7 @@ sub HUEDevice_Initialize($)
                       "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
                       "setList:textField-long ".
                       "configList:textField-long ".
-                      "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
+                      "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch,blind ".
                       $readingFnAttributes;
 
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
@@ -239,6 +239,12 @@ HUEDevice_devStateIcon($)
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
   return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "dimmer" );
   return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "switch" );
+
+  if( AttrVal($name, "subType", "") eq "blind" ) {
+    my $p = int(10-$pct/10)*10;
+    return ".*:fts_window_2w" if( $p == 0 );
+    return ".*:fts_shutter_$p";
+  }
 
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
@@ -426,7 +432,15 @@ HUEDevice_SetParam($$@)
     $cmd = 'bri';
   }
 
-  if($cmd eq "pct" && $value == 0 ) {
+  my $subtype = AttrVal($name, "subType", "extcolordimmer");
+  if($cmd eq 'up' ) {
+    $cmd = 'pct';
+    $value = 100;
+  } elsif($cmd eq 'down' ) {
+    $cmd = 'pct';
+    $value = 0;
+
+  } if($cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
     $cmd = "off";
     $value = $value2;
   }
@@ -443,19 +457,24 @@ HUEDevice_SetParam($$@)
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq "pct") {
-    my $bri;
-    if( $value > 50 ) {
-      $bri = 2.57 * ($value-50) + 128;
+    if( $subtype  eq 'blind' ) {
+      $obj->{'pct'}  = int($value);
+
     } else {
-      $bri = 2.59 * ($value-50) + 128;
+      my $bri;
+      if( $value > 50 ) {
+        $bri = 2.57 * ($value-50) + 128;
+      } else {
+        $bri = 2.59 * ($value-50) + 128;
+      }
+      $bri = 0 if( $bri < 0 );
+      $bri = 254 if( $bri > 254 );
+      #$value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
+      $obj->{'on'}  = JSON::true;
+      #$obj->{'bri'}  = int(2.55 * $value);
+      $obj->{'bri'}  = int($bri);
+      $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
     }
-    $bri = 0 if( $bri < 0 );
-    $bri = 254 if( $bri > 254 );
-    #$value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
-    $obj->{'on'}  = JSON::true;
-    #$obj->{'bri'}  = int(2.55 * $value);
-    $obj->{'bri'}  = int($bri);
-    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
 
   } elsif($cmd eq "bri") {
     #$value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
@@ -886,6 +905,8 @@ HUEDevice_Set($@)
   $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
   $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy" if( $subtype =~ m/color/ );
 
+  $list = 'up:noArg down:noArg pct:colorpicker,BRI,0,1,100' if( $subtype eq 'blind' );
+
   if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (7<<8) ) {
     $list .= " dimUp:noArg dimDown:noArg" if( $subtype =~ m/dimmer/ );
     $list .= " ctUp:noArg ctDown:noArg" if( $subtype =~ m/ct|ext/ );
@@ -1096,9 +1117,13 @@ HUEDevice_Get($@)
     return HUEDevice_devStateIcon($hash);
   }
 
-  my $list = "rgb:noArg RGB:noArg devStateIcon:noArg";
+  my $subtype = $attr{$name}{subType};
+
+  my $list;
+  $list .= "rgb:noArg RGB:noArg devStateIcon:noArg " if( $hash->{helper}->{devtype} ne 'S' );
+  $list = 'devStateIcon:noArg ' if( $subtype eq 'blind' );
   if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
-    $list .= " startup:noArg";
+    $list .= "startup:noArg ";
   }
   return "Unknown argument $cmd, choose one of $list";
 }
@@ -1321,6 +1346,8 @@ HUEDevice_Parse($$)
   $hash->{manufacturername} = $result->{manufacturername} if( defined($result->{manufacturername}) );
   $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
 
+  $hash->{power} = $result->{power} if( defined($result->{power}) );
+
   if( $hash->{helper}->{devtype} eq 'S' ) {
     my %readings;
 
@@ -1387,6 +1414,8 @@ HUEDevice_Parse($$)
         $lastupdated_local = $lastupdated;
       }
 
+      $readings{reachable} = ($state->{reachable}?1:0) if( defined($state->{reachable}) );
+
       $readings{state} = $state->{status} if( defined($state->{status}) );
       $readings{state} = $state->{flag}?'1':'0' if( defined($state->{flag}) );
       $readings{state} = $state->{open}?'open':'closed' if( defined($state->{open}) );
@@ -1429,7 +1458,7 @@ HUEDevice_Parse($$)
 
     Log3 $name, 4, "$name: lastupdated: $lastupdated, hash->{lastupdated}:  $hash->{lastupdated}, lastupdated_local: $lastupdated_local, offsetUTC: $offset";
     #Log3 $name, 5, "$name: ". Dumper $result if($HUEDevice_hasDataDumper);
-      
+
     $hash->{lastupdated} = $lastupdated;
     $hash->{lastupdated_local} = $lastupdated_local;
 
@@ -1527,6 +1556,7 @@ HUEDevice_Parse($$)
       $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
       $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
       $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
+      $attr{$name}{webCmd} = 'up:down:pct' if( $subtype eq "blind" );
     } elsif( $hash->{helper}->{devtype} eq 'G' ) {
       $attr{$name}{webCmd} = 'on:off';
     }
@@ -1535,6 +1565,7 @@ HUEDevice_Parse($$)
   readingsBeginUpdate($hash);
 
   my $state = $result->{'state'};
+  my $config = $result->{'config'};
 
   my $on        = $state->{on};
      $on = $hash->{helper}{on} if( !defined($on) );
@@ -1555,6 +1586,8 @@ HUEDevice_Parse($$)
   my $rgb       = undef;
      $rgb       = $state->{rgb} if( defined($state->{rgb}) );
 
+  my $battery   = undef;
+     $battery   = $config->{battery} if( defined($config->{battery}) );
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -1575,9 +1608,14 @@ HUEDevice_Parse($$)
 
   if( defined($rgb) && $rgb ne $hash->{helper}{rgb} ) {readingsBulkUpdate($hash,"rgb",$rgb);}
 
+  if( defined($battery) && $battery ne $hash->{helper}{battery} ) {readingsBulkUpdate($hash,"battery",$battery);}
+
   my $s = '';
   my $pct = -1;
-  if( $on )
+  if( defined($state->{'pct'}) ) {
+    $pct = $state->{'pct'};
+    $s = $pct;
+  } elsif( $on )
     {
       $s = 'on';
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
@@ -1620,6 +1658,8 @@ HUEDevice_Parse($$)
   $hash->{helper}{effect} = $effect if( defined($effect) );
 
   $hash->{helper}{rgb} = $rgb if( defined($rgb) );
+
+  $hash->{helper}{battery} = $battery if( defined($battery) );
 
   $hash->{helper}{pct} = $pct;
 
