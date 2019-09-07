@@ -119,53 +119,86 @@ fhemdebug_memusage($)
   $Devel::Size::warn = 0;
   my @param = split(" ", $param);
   my $max = 50;
-  my $re;
+  my $elName = "%main::";
   $max = pop(@param) if(@param > 1 && $param[$#param] =~ m/^\d+$/);
-  $re  = pop(@param) if(@param > 1);
+  $elName = pop(@param) if(@param > 1);
   my %ts;
-  my %mh = (defs=>1, modules=>1, selectlist=>1, attr=>1, readyfnlist=>1);
 
-  my $collectSize = sub($$$$)
-  {
-    my ($fn, $h, $mname,$cleanUp) = @_;
-    return 0 if($h->{__IN__CS__}); # save us from endless recursion
-    return 0 if($h->{__IN__CSS__} && !$cleanUp);
-    $h->{__IN__CSS__} = 1 if(!$cleanUp);
-    $h->{__IN__CS__} = 1;
-    my $sum = 0;
-    foreach my $n (sort keys %$h) {
-      next if(!$n || $n =~ m/^[^A-Za-z]$/ || $n eq "__IN__CS__");
+  my $el;
+  my $cmd = "\$el = \\$elName";
+  eval $cmd;
+  return $@ if($@);
 
-      my $ref = ref $h->{$n};
-      my $name = ($mname eq "main::" ? "$mname$n" : "${mname}::$n");
-      $ref = "HASH" if(!$ref && $mname eq "main::" && $mh{$n});
-      next if($n eq "main::" || $n eq "IODev" || 
-              $ref eq "CODE" || main->can($name) || $ref =~ m/::/);
-      Log 5, " Check $name / $mname / $n / $ref";     # Crash-debugging
-      if($ref eq "HASH") {
-        next if($mname ne "main::defs" && $h->{$n}{TYPE} && $h->{$n}{NAME});
-        $sum += $fn->($fn, $h->{$n}, $name, $cleanUp); 
 
-      } else {
-        my $sz = Devel::Size::size($h->{$n});
-        $ts{$name} = $sz if(!$cleanUp);
-        $sum += $sz;
-      }
+  my $elName2 = $elName;
+  if($elName ne "%main::") {
+    if($elName =~ m/^%\{(\$.*)\}$/) {
+      $elName = $1;
+      $elName2 = $elName;
+      $elName2 =~ s/'/\\'/g;
+    } else {
+      $elName =~ s/%/\$/;
+      $elName2 = $elName;
     }
-    delete($h->{__IN__CS__});
-    delete($h->{__IN__CSS__}) if($cleanUp);
-    $sum += Devel::Size::size($h);
-    $ts{$mname} = $sum if($mname ne "main::" && !$cleanUp);
-    return $sum;
-  };
-  $collectSize->($collectSize, \%main::, "main::", 0);
-  $collectSize->($collectSize, \%main::, "main::", 1);
+  }
 
-  my @sts = sort { $ts{$b} <=> $ts{$a} } keys %ts;
+  no warnings;
+  if(ref $el eq "HASH") {
+    for my $k (keys %{$el}) {
+      next if($elName eq "%main::" && 
+                ($k =~ m/[^A-Z0-9_:]/i ||
+                 $k =~ m/^\d+$/ || 
+                 $k =~ m/::$/ || 
+                 exists &{$k}));
+
+      if($elName eq "%main::") {
+        my $t = '@';
+        if(eval "ref \\$t$k" eq "ARRAY") {
+          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
+          eval $cmd;
+        }
+        $t = '%';
+        if(eval "ref \\$t$k" eq "HASH") {
+          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
+          eval $cmd;
+        }
+        $t = '$';
+        if(eval "ref \\$t$k" eq "SCALAR") {
+          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
+          eval $cmd;
+        }
+      } else {
+        my $k2 = "{$elName\{'$k'}}";
+        my $k3 = "{$elName2\{\\'$k\\'}}";
+        my $k4 = "$elName\{$k}";
+        my $k5 = "$elName2\{\\'$k\\'}";
+        my $t = '@';
+        if(eval "ref \\$t$k2" eq "ARRAY") {
+          $cmd = "\$ts{'$t$k3'} = Devel::Size::total_size(\\$t$k2)";
+          eval $cmd;
+        }
+        $t = '%';
+        if(eval "ref \\$t$k2" eq "HASH") {
+          $cmd = "\$ts{'$t$k3'} = Devel::Size::total_size(\\$t$k2)";
+          eval $cmd;
+        }
+        if(eval "ref \\$k4" eq "SCALAR") {
+          $cmd = "\$ts{'$k5'} = Devel::Size::total_size(\\$k4)";
+          eval $cmd;
+        }
+      }
+
+    }
+  } else {
+    $ts{$elName} = Devel::Size::total_size($el);
+  }
+  use warnings;
+
+  my @sts = sort { $ts{$b} == $ts{$a} ? $a cmp $b :
+                  $ts{$b} <=> $ts{$a} } keys %ts;
   my @ret;
   for(my $i=0; $i < @sts; $i++) {
-    next if($re && $sts[$i] !~ m/$re/);
-    push @ret, sprintf("%4d. %-30s %8d", $i+1,substr($sts[$i],6),$ts{$sts[$i]});
+    push @ret, sprintf("%4d. %-30s %8d", $i+1, $sts[$i], $ts{$sts[$i]});
     last if(@ret >= $max);
   }
   return join("\n", @ret);
@@ -212,21 +245,15 @@ fhemdebug_timerList($)
       disabling it is not necessary.<br>
       </li>
 
-    <li>memusage [regexp] [nr]<br>
+    <li>memusage [datastructure] [nr]<br>
       Dump the name of the first nr datastructures with the largest memory
-      footprint. Filter the names by regexp, if specified.<br>
+      footprint. Dump only datastructure, if specified.<br>
       <b>Notes</b>:
       <ul>
         <li>this function depends on the Devel::Size module, so this must be
           installed first.</li>
-        <li>The used function Devel::Size::size may crash perl (and FHEM) for
-          functions and some other data structures. memusage tries to avoid to
-          call it for such data structures, but as the problem is not
-          identified, it may crash your currently running instance. It works
-          for me, but make sure you saved your fhem.cfg before calling it.</li>
-        <li>To avoid the crash, the size of same data is not computed, so the
-          size reported is probably inaccurate, it should only be used as a
-          hint.  </li>
+        <li>the function will only display globally visible data (no module or
+          function local variables).</li>
       </ul>
       </li>
 
