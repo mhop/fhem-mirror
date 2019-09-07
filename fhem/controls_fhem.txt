@@ -1,4 +1,4 @@
-REV 20115
+REV 20124
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,9 +21,9 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-07_07:45:03 305221 ./CHANGED
+UPD 2019-09-07_20:01:09 305263 ./CHANGED
 UPD 2019-09-05_07:45:02 41648 ./MAINTAINER.txt
-UPD 2019-06-02_07:45:03 39782 ./configDB.pm
+UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2019-08-28_07:45:12 159391 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
@@ -182,10 +182,10 @@ UPD 2016-11-01_07:45:11 3823 FHEM/30_pilight_raw.pm
 UPD 2016-07-04_07:45:16 3754 FHEM/30_pilight_smoke.pm
 UPD 2016-04-25_07:45:10 5350 FHEM/30_pilight_switch.pm
 UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
-UPD 2019-04-03_07:45:02 17081 FHEM/30_tradfri.pm
+UPD 2019-09-07_20:01:09 17167 FHEM/30_tradfri.pm
 UPD 2019-06-22_07:45:02 29102 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2019-08-08_07:45:02 72077 FHEM/31_HUEDevice.pm
+UPD 2019-09-07_20:01:09 73430 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -524,7 +524,7 @@ UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
 UPD 2019-06-10_07:45:02 5818 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
-UPD 2018-05-25_07:45:02 6830 FHEM/98_fhemdebug.pm
+UPD 2019-09-07_20:01:09 6829 FHEM/98_fhemdebug.pm
 UPD 2019-07-25_07:45:03 11474 FHEM/98_fheminfo.pm
 UPD 2019-03-01_07:45:02 65867 FHEM/98_freezemon.pm
 UPD 2019-07-30_07:45:03 9175 FHEM/98_help.pm
@@ -729,12 +729,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-07_07:45:08 4114507 docs/commandref.html
+UPD 2019-09-07_20:01:13 4114071 docs/commandref.html
 UPD 2019-09-07_07:45:10 2548787 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-07_07:45:11 218045 docs/commandref_modular.html
-UPD 2019-09-07_07:45:13 229025 docs/commandref_modular_DE.html
+UPD 2019-09-07_20:01:17 218045 docs/commandref_modular.html
+UPD 2019-09-07_20:01:18 229025 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
