@@ -58,7 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.26.0" => "02.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ",
+  "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                           "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
   "8.25.0" => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
                            "sub DbRep_modAssociatedWith changed ",
   "8.24.0" => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
@@ -4570,11 +4571,12 @@ sub changeval_Push($) {
 	 $new =~ s/'/''/g;       # escape ' with ''
  
      # SQL zusammenstellen für DB-Update
-     my $addon = $old =~ /%/?"WHERE VALUE LIKE '$old'":"WHERE VALUE='$old'";
+     my $addon   = $old =~ /%/?"WHERE VALUE LIKE '$old'":"WHERE VALUE='$old'";
+     my $selspec = "UPDATE $table SET TIMESTAMP=TIMESTAMP,VALUE='$new' $addon AND ";
      if ($IsTimeSet) {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
      } else {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,undef,undef,'');
+         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,'');
      }
 	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
 	 $sth = $dbh->prepare($sql) ;
@@ -9026,111 +9028,6 @@ return $sql;
 }
 
 ####################################################################################################
-#  SQL-Statement zusammenstellen für DB-Updates
-####################################################################################################
-sub DbRep_createUpdateSql($$$$$$$$) {
- my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
- my $name      = $hash->{NAME};
- my $dbmodel   = $hash->{dbloghash}{MODEL};
- my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my $tnfull    = 0;
- my ($sql,$vf,@dwc,@rwc);
- 
- my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
- 
- if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
-     $tnfull = 1;
- }
- 
- if(defined $valfilter) {
-     if ($dbmodel eq "POSTGRESQL") {
-	     $vf = "VALUE ~ '$valfilter' AND ";
-	 } else {
-	     $vf = "VALUE REGEXP '$valfilter' AND ";
-	 }
- }
-
- $sql = "UPDATE $table SET $selspec AND ";
- # included devices
- $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
- if($idevswc && $idevs !~ m(^%$)) {
-     @dwc    = split(",",$idevswc);
-	 my $i   = 1;
-	 my $len = scalar(@dwc);
-	 foreach(@dwc) {
-	     if($i<$len) {
-	         $sql .= "DEVICE LIKE '$_' OR ";
-		 } else {
-		     $sql .= "DEVICE LIKE '$_' ";
-		 }
-		 $i++;
-	 }
-     if($idanz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
- $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
- $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
- # excluded devices
- if($edevswc) {
-     @dwc = split(",",$edevswc);
-	 foreach(@dwc) {
-	     $sql .= "DEVICE NOT LIKE '$_' AND ";
-	 }
- }
- $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
- $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
- $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
- # included readings
- $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
- if($irdswc && $ireading !~ m(^%$)) {
-     @rwc    = split(",",$irdswc);
-	 my $i   = 1;
-	 my $len = scalar(@rwc);
-	 foreach(@rwc) {
-	     if($i<$len) {
-	         $sql .= "READING LIKE '$_' OR ";
-		 } else {
-		     $sql .= "READING LIKE '$_' ";
-		 }
-		 $i++;
-	 }
-     if($iranz) {
-         $sql .= "OR "; 
-     }
- }
- $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) "            if($iranz > 1);
- $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
- # excluded readings
- if($erdswc) {
-     @dwc = split(",",$erdswc);
-	 foreach(@dwc) {
-	     $sql .= "READING NOT LIKE '$_' AND ";
-	 }
- }
- $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
- $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
- # add valueFilter
- $sql .= $vf if(defined $vf);
- # Timestamp Filter
- if (($tf && $tn)) {
-     $sql .= "TIMESTAMP >= $tf AND TIMESTAMP ".($tnfull?"<=":"<")." $tn ";
- } else {
-     if ($dbmodel eq "POSTGRESQL") {
-	     $sql .= "true ";
-	 } else {
-	     $sql .= "1 ";
-	 }
- }
- $sql .= "$addon;";
-
-return $sql;
-}
-
-####################################################################################################
 #  SQL-Statement zusammenstellen für Löschvorgänge
 ####################################################################################################
 sub DbRep_createDeleteSql($$$$$$$) {
@@ -12299,12 +12196,12 @@ return;
 	                               </ul>
                                    <br>
                                  
-                                 For compatibility reasons the reducelog command can optionally be completed with supplements "EXCLUDE" 
+                                 For compatibility reason the reducelog command can optionally be completed with supplements "EXCLUDE" 
                                  respectively "INCLUDE" to exclude and/or include device/reading combinations from reducelog: <br><br>
                                  <ul>
                                  "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
                                  </ul>
-                                 This declaration is evaluated as Regex and overwrites the attributes "device" and "reading",
+                                 This declaration is evaluated as Regex and overwrites the settings made by attributes "device" and "reading",
                                  which won't be considered in this case. <br><br>
           
                                  <ul>
@@ -14752,12 +14649,12 @@ sub bdump {
 	                             </ul>
                                  <br>
                                  
-                                 Aus Kompatibilitätsgründen kann der Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
-                                 ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
+                                 Aus Kompatibilitätsgründen kann der Set-Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
+                                 direkt ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
                                  <ul>
                                  "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
                                  </ul>
-                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Attribute "device" und "reading",
+                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" und "reading",
                                  die in diesem Fall nicht beachtet werden. <br><br>
           
                                  <ul>
