@@ -132,6 +132,8 @@
 #						ErrorListChanges (Fehlereintraege_Historie und Fehlereintraege_aktive) werden jetzt im JSON
 #                          JSON Format ausgegeben (z.B.: "{"new":[],"current":[],"gone":[]}")
 #
+# 2019-09-07		Readings werden wieder erzeugt auch wenn sich der Wert nicht ändert
+#
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
 #                 Nicht bei jedem Lesen neu einloggen (wenn möglich)
@@ -1365,17 +1367,17 @@ sub vitoconnect_getResourceCallback($) {
 				my $Type = $Properties{$Key}{type};
 				my $Value = $Properties{$Key}{value};
 				if ( $Type eq "string" ) {
-					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
+					readingsBulkUpdate($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "number" ) {
-					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
+					readingsBulkUpdate($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "array" ) {
 					my $Array = join(",", @$Value);
-					readingsBulkUpdateIfChanged($hash, $Reading, $Array);
+					readingsBulkUpdate($hash, $Reading, $Array);
 					Log3 $name, 5, "$FieldName".".$Key: $Array ($Type)";
 				} elsif ( $Type eq "boolean" ) {
-					readingsBulkUpdateIfChanged($hash, $Reading, $Value);
+					readingsBulkUpdate($hash, $Reading, $Value);
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				} elsif ( $Type eq "Schedule" ) {
 					# my %Entries = %$Value;
@@ -1390,19 +1392,19 @@ sub vitoconnect_getResourceCallback($) {
 					#	}
 					#}
 					my $Result = encode_json($Value);
-					readingsBulkUpdateIfChanged($hash, $Reading, $Result);
+					readingsBulkUpdate($hash, $Reading, $Result);
 					Log3 $name, 5, "$FieldName".".$Key: $Result ($Type)";
 				} elsif ( $Type eq "ErrorListChanges" ) {
 					# not implemented yet
-					#readingsBulkUpdateIfChanged($hash, $Reading, "ErrorListChanges");
+					#readingsBulkUpdate($hash, $Reading, "ErrorListChanges");
 					#Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 					
 					my $Result = encode_json($Value);
-					readingsBulkUpdateIfChanged($hash, $Reading, $Result);
+					readingsBulkUpdate($hash, $Reading, $Result);
 					Log3 $name, 5, "$FieldName".".$Key: $Result ($Type)";					
 					
  				} else {
-					readingsBulkUpdateIfChanged($hash, $Reading, "Unknown: $Type");
+					readingsBulkUpdate($hash, $Reading, "Unknown: $Type");
 					Log3 $name, 5, "$FieldName".".$Key: $Value ($Type)";
 				}	
 			}
@@ -1415,7 +1417,7 @@ sub vitoconnect_getResourceCallback($) {
 						my @fields = @{$action->{fields}};
 						my $Result = "action: ";
 						for my $field (@fields) { $Result .= $field->{name}." ";	}
-						readingsBulkUpdateIfChanged($hash, $FieldName.".".$action->{"name"}, $Result);
+						readingsBulkUpdate($hash, $FieldName.".".$action->{"name"}, $Result);
 					}	
 				}
 			}
