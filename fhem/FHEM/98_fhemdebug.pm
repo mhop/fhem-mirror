@@ -151,6 +151,7 @@ fhemdebug_memusage($)
                  $k =~ m/::$/ || 
                  exists &{$k}));
 
+      Log 5, "Memusage checking $k";
       if($elName eq "%main::") {
         my $t = '@';
         if(eval "ref \\$t$k" eq "ARRAY") {
@@ -167,6 +168,7 @@ fhemdebug_memusage($)
           $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
           eval $cmd;
         }
+
       } else {
         my $k2 = "{$elName\{'$k'}}";
         my $k3 = "{$elName2\{\\'$k\\'}}";
@@ -254,6 +256,9 @@ fhemdebug_timerList($)
           installed first.</li>
         <li>the function will only display globally visible data (no module or
           function local variables).</li>
+        <li>The used function Devel::Size::total_size may crash perl (and FHEM)
+          for some other data structures. It works for me, but make sure you
+          saved your fhem.cfg before calling it. </li>
       </ul>
       </li>
 
