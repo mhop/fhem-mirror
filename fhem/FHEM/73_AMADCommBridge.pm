@@ -1463,7 +1463,7 @@ sub ParseMsg($$) {
   "release_status": "stable",
   "license": "GPL_2",
   "version": "v4.4.3",
-  "x_flowsetversion": "4.4.1",
+  "x_flowsetversion": "4.4.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
