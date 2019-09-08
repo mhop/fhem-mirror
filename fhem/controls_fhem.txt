@@ -1,4 +1,4 @@
-REV 20124
+REV 20127
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -596,7 +596,7 @@ UPD 2018-08-21_07:45:03 8767 FHEM/ZWLib.pm
 UPD 2019-08-13_07:45:03 42424 FHEM/firmware/ArduCounter.hex
 UPD 2015-07-28_14:05:29 54451 FHEM/firmware/JeeLink_EC3000.hex
 UPD 2017-03-23_07:45:02 77782 FHEM/firmware/JeeLink_LaCrosse.hex
-UPD 2019-07-17_07:45:06 516464 FHEM/firmware/JeeLink_LaCrosseGateway.bin
+UPD 2019-09-08_07:45:03 519600 FHEM/firmware/JeeLink_LaCrosseGateway.bin
 UPD 2015-07-28_14:05:29 34557 FHEM/firmware/JeeLink_PCA301.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_nano328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
@@ -733,8 +733,8 @@ UPD 2019-09-07_20:01:13 4114071 docs/commandref.html
 UPD 2019-09-07_07:45:10 2548787 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-07_20:01:17 218045 docs/commandref_modular.html
-UPD 2019-09-07_20:01:18 229025 docs/commandref_modular_DE.html
+UPD 2019-09-08_07:45:11 218045 docs/commandref_modular.html
+UPD 2019-09-08_07:45:12 229025 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1629,7 +1629,7 @@ UPD 2019-02-14_07:45:03 807 www/images/fhemSVG/telegram.svg
 UPD 2019-06-02_07:45:03 1591 www/images/fhemSVG/telescope.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
-UPD 2017-11-22_07:45:02 2111 www/images/fhemSVG/tradfri_gateway.svg
+UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
 UPD 2019-02-09_07:45:03 2304 www/images/fhemSVG/ubuntu.svg
 UPD 2015-07-28_14:05:32 2613 www/images/fhemSVG/unknown.svg
 UPD 2017-11-14_07:45:02 2414 www/images/fhemSVG/usb.svg
