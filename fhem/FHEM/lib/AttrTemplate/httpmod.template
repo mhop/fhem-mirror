@@ -410,3 +410,92 @@ attr DEVICE stateFormat Dachtemperatur: Temperatur_Sensor1 Drehzahl Pumpe: Drehz
 attr DEVICE timeout 5ercent="([\d\.]+)
 attr DEVICE model C_01a_resol_solar
 
+#################################
+#Show updates for CUL_HM devices, Forum: https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144
+name:X_01a_CUL_HM_firmware_update_downloader
+filter:TYPE=HTTPMOD
+desc: Check eQ3 homepage for available new firmware files; provides also links for direct downloads<br>Define a HTTPMOD device like <br>define eq3 HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800<br><a href="https://https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144">Source: Forum</a><br><a href="https://wiki.fhem.de/wiki/HomeMatic_Firmware_Update#Basis-Definitionen_f.C3.BCr_Device_eq3">Wiki</a>
+defmod DEVICE HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800
+attr DEVICE userattr enableControlSet event-on-change-reading event-on-update-reading reading01AutoNumLen reading01Format reading01Name reading01RegOpt reading01RegOpt:s,i,g reading01Regex readingMaxAge readingMaxAgeReplacementMode readingMaxAgeReplacementMode:text,expression,delete readingMaxAgeReplacementMode:text,reading,internal,expression,delete requestData.* showError showMatched stateFormat userReadings webCmd
+attr DEVICE enableControlSet 1
+attr DEVICE event-on-change-reading .*
+attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
+attr DEVICE httpVersion 1.1
+attr DEVICE reading01AutoNumLen 2
+attr DEVICE reading01Format https://www.eq-3.de%s
+attr DEVICE reading01Name fw_link
+attr DEVICE reading01RegOpt gi
+attr DEVICE reading01Regex <a.href="(\/downloads\/software\/firmware\/hm[^"]+)
+attr DEVICE readingMaxAge 10
+attr DEVICE readingMaxAgeReplacementMode delete
+attr DEVICE requestData.* suchbegriff=&quelle=29&suchkategorie=3&themenbereich=1
+attr DEVICE room CUL_HM
+attr DEVICE showError 1
+attr DEVICE showMatched 1
+attr DEVICE stateFormat { my $ret ="";;     \
+  my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","");;     \
+  $ret .= '<div style="text-align:left">last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html">homematic</a>-fw-check => '.$lastCheck;;     \
+  $ret .= '<br><br><pre>';;     \
+  $ret .= "| device                  | model                   | cur_fw | new_fw | release    |<br>";;     \
+  $ret .= "------------------------------------------------------------------------------------<br>";;     \
+  my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");;     \
+  if($check eq "no fw-updates needed!") {\
+    $ret .= '| ';;\
+    $ret .= '<b style="color:green">';;\
+    $ret .= sprintf("%-80s",$check);;\
+    $ret .= '</b>';;\
+    $ret .= ' |';;\
+  } elsif($check eq "error => no or wrong data from eq3-server!") {\
+    $ret .= '| <b style="color:red">';;\
+    $ret .= sprintf("%-80s",$check);;\
+    $ret .= '</b> |';;\
+  } else { \
+    my @devices = split(',',$check);;\
+    foreach my $devStr (@devices) {\
+      my ($dev,$md,$ofw,$idx,$nfw,$date) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\sfw_(\d+\.\d+)\s=>\sfw(\d\d)_([\d\.]+)\s\|\s([^\)]+)\)$/;;\
+      my $link = ReadingsVal($name,"fw_link-".$idx,"");;\
+      $ret .= '| <a href="/fhem?detail='.$dev.'">';;\
+      $ret .= sprintf("%-23s",$dev);;\
+      $ret .= '</a> | <b';;\
+      $ret .= (($md eq "?")?' title="missing attribute model => set device in teach mode to receive missing data" style="color:yellow"':' style="color:lightgray"').'>';;\
+      $ret .= sprintf("%-23s",$md);;\
+      $ret .= '</b> | <b'.(($ofw eq "0.0")?' title="missing attribute firmware => set device in teach mode to receive missing data" style="color:yellow"':' style="color:lightgray"').'>';;\
+      $ret .= sprintf("%6s",$ofw);;\
+      $ret .= '</b> | <a title="eq3-firmware.tgz" href="'.$link.'"><b style="color:red">';;\
+      $ret .= sprintf("%6s",$nfw);;\
+      $ret .= '</b></a> | ';;\
+      $ret .= sprintf("%-10s",$date);;\
+      $ret .= " |<br>";;\
+    }\
+  }\
+  $ret .= '</pre></div>';;\
+  return $ret;;\
+}
+attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
+  my $ret = "";;\
+  my @data;;\
+  if (ReadingsVal($name,"UNMATCHED_READINGS","?") eq "") {\
+    my @eq3FwList = map{\
+      @data = ReadingsVal($name,"fw_link-".$_,"?") =~ m/firmware\/(.*?)_update_v([\d_]+)_(\d\d)(\d\d)(\d\d)/i;;\
+      $data[0] =~ s/_/-/g;;\
+      sprintf("%s:%s:%s.%s.%s:%s",$data[0],$data[1],$data[4],$data[3],"20".$data[2],$_);;\
+    } ReadingsVal($name,"MATCHED_READINGS","?") =~ m/fw_link-(\d\d)/g;;\
+\
+    foreach my $dev (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=(virtual|)")) {\
+      my $md = AttrVal($dev,"model","?");;\
+      my $v = AttrVal($dev,"firmware","0.0");;\
+      my ($h,$l) = split('\.',$v);;\
+      foreach my $newFw (grep m/^${md}:/i,@eq3FwList) {\
+        my ($nh,$nl,$no,$date,$idx) = $newFw =~ m/^[^:]+:(\d+)_(\d+)_?(\d*):([^:]+):(\d\d)$/;;\
+        if(($nh > $h) || (($nh == $h) && ($nl > $l))) {\
+          $ret .= "," if($ret ne "");;\
+          $ret .= $dev." (".$md." | fw_".$v." => fw".$idx."_".$nh.".".$nl.($no?sprintf(".%d",$no):"")." | ".$date.")";;\
+        }\
+      }\
+    }\
+  } else {\
+    $ret = "error => no or wrong data from eq3-server!";;\
+  }\
+  return ($ret eq "")?"no fw-updates needed!":$ret;;\
+}
+attr DEVICE webCmd reread
