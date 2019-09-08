@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.017
+#  Version 4.3.018
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.017';
+my $HMCCU_VERSION = '4.3.018';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -4751,23 +4751,23 @@ sub HMCCU_IsValidDevice ($$$)
 		elsif (HMCCU_IsDevAddr ($param, 0)) {
 			$a = $param;
 		}
-		else {
-			HMCCU_Log ($hash, 3, "$param is not a valid address", 0);
-		}
+# 		else {
+# 			HMCCU_Log ($hash, 3, "$param is not a valid address", 0);
+# 		}
 
 		if (exists ($hash->{hmccu}{dev}{$a})) {
 			return $hash->{hmccu}{dev}{$a}{valid};		
 		}
-		else {
-			HMCCU_Log ($hash, 3, "Address $param not found", 0);
-		}
+# 		else {
+# 			HMCCU_Log ($hash, 3, "Address $param not found", 0);
+# 		}
 		
 		# Special address for Non-Homematic devices
 		if (($mode & $HMCCU_FL_EXADDRESS) && exists ($hash->{hmccu}{dev}{$param})) {
 			return $hash->{hmccu}{dev}{$param}{valid} && $hash->{hmccu}{dev}{$param}{addtype} eq 'dev' ? 1 : 0;
 		}
 		
-		HMCCU_Log ($hash, 3, "Invalid address $param", 0);
+# 		HMCCU_Log ($hash, 3, "Invalid address $param", 0);
 	}
 	
 	# Name
@@ -4775,9 +4775,9 @@ sub HMCCU_IsValidDevice ($$$)
 		if (exists ($hash->{hmccu}{adr}{$param})) {
 			return $hash->{hmccu}{adr}{$param}{valid} && $hash->{hmccu}{adr}{$param}{addtype} eq 'dev' ? 1 : 0;
 		}
-		else {
-			HMCCU_Log ($hash, 3, "Device $param not found", 0);
-		}
+# 		else {
+# 			HMCCU_Log ($hash, 3, "Device $param not found", 0);
+# 		}
 	}
 
 	return 0;

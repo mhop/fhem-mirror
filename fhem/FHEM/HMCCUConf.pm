@@ -730,7 +730,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	"HmIP-BROLL|HmIP-FROLL" => {
 	_description     => "Rollladenaktor",
 	ccureadingfilter => "3.LEVEL;(ERROR_CODE|ERROR_OVERHEAT|ACTUAL_TEMPERATURE|ACTIVITY_STATE|SELF_CALIBRATION_RESULT)",
-	ccureadingname   => "3.LEVEL$:+control,+pct",
+	ccureadingname   => "3.LEVEL\$:+control,+pct",
 	ccuscaleval      => "LEVEL:0:1:0:100",
 	cmdIcon          => "up:fts_shutter_up stop:fts_shutter_manual down:fts_shutter_down",
 	controldatapoint => "4.LEVEL",

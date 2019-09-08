@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.007
+#  Version 4.3.008
 #
 #  (c) 2019 zap (zap01 <at> t-online <dot> de)
 #
@@ -208,7 +208,7 @@ sub HMCCUCHN_Set ($@)
 	return "No set command specified" if (!defined ($opt));
 
 	my $rocmds = "clear defaults:noArg";
-	my $rwcmds = "clear config control datapoint defaults:noArg devstate rpcParameter";
+	my $rwcmds = "clear config control datapoint defaults:noArg rpcparameter devstate";
 	
 	# Get I/O device, check device state
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
@@ -423,15 +423,25 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return HMCCU_SetState ($hash, "OK");
 	}
-	elsif ($opt eq 'rpcParameter') {
-		return HMCCU_SetError ($hash, "Usage: set $name rpcParameter [MASTER|VALUES] {parameter}={value} [...]")
+	elsif ($opt eq 'rpcparameter') {
+		return HMCCU_SetError ($hash, "Usage: set $name rpcparameter [MASTER|VALUES] {parameter}={value} [...]")
 			if ((scalar keys %{$h}) < 1);	
 		my $key = shift @$a;
 		$key = 'VALUES' if (!defined ($key));
-		return HMCCU_SetError ($hash, "Key must be MASTER or VALUES")
-			if ($key ne 'MASTER' && $key ne 'VALUES');
 		
-		my ($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $key, $h);
+		my $rc;
+		my $res;
+		
+		if ($key eq 'VALUES') {
+			($rc, $res) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h);
+		}
+		elsif ($key eq 'MASTER') {
+			($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $key, $h);
+		}
+		else {
+			return HMCCU_SetError ($hash, "Key must be MASTER or VALUES");
+		}
+		
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return HMCCU_SetState ($hash, "OK");
 	}
@@ -728,6 +738,11 @@ sub HMCCUCHN_Get ($@)
          attr myswitch statevals on:100,off:0<br/>
          set myswitch pct 100 600 10
          </code>
+      </li><br/>
+      <li><b>set &lt;name&gt; rpcparameter { VALUES | MASTER } &lt;parameter&gt;=&lt;value&gt; [...]</b><br/>
+         Set multiple datapoints or config parameters by using RPC interface instead of Rega.
+         Supports attribute 'ccuscaleval' for datapoints. Parameter <i>parameter</i> must be a valid
+         datapoint or config parameter name.
       </li><br/>
       <li><b>set &lt;name&gt; up [&lt;value&gt;]</b><br/>
       	Increment value of datapoint LEVEL. This command is only available if channel contains
