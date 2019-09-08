@@ -451,6 +451,7 @@ MQTT2_SERVER_sendto($$$$)
   $val = "" if(!defined($val));
   foreach my $s (keys %{$hash->{subscriptions}}) {
     my $re = $s;
+    $re =~ s,^#$,.*,g;
     $re =~ s,/?#,\\b.*,g;
     $re =~ s,\+,\\b[^/]+\\b,g;
     if($topic =~ m/^$re$/) {
