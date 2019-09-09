@@ -398,7 +398,7 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
-  on-for-timer {my $duration = $EVTPART1*10; 'CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}
+  on-for-timer {my $duration = $EVTPART1 < 11.2 ? $EVTPART1*10 : $EVTPART1+100; 'CMNDTOPIC/Backlog pulseTime1 '.$duration.'; POWER1 1'}
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
@@ -604,7 +604,7 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
 set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
-set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; SetOption14 1; SetOption81 1; switchmode1 3; switchmode2 3; SaveData 1;
+set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; Interlock0 1; SetOption81 1; switchmode1 3; switchmode2 3; SaveData 1;
 set IO_DEV publish CMNDTOPIC/Restart 1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog SHUTTEROPENDURATION 20;; SHUTTERCLOSEDURATION 20;; SHUTTERINVERT 1;; GROUPTOPIC Rollos;; SaveData 1;;
 attr DEVICE setList \
