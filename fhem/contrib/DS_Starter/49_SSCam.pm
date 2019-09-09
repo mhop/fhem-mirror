@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $
+# $Id: 49_SSCam.pm 19996 2019-08-13 21:21:54Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,10 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.17.0" => "09.09.2019  fix warnings, suport hide buttons in streaming device ",
+  "8.16.3" => "13.08.2019  commandref revised ",
+  "8.16.2" => "17.07.2019  change function SSCam_ptzpanel using css stylesheet ",
+  "8.16.1" => "16.07.2019  fix warnings ",
   "8.16.0" => "14.07.2019  change detail link generation from SSCamSTRM to SSCam ",
   "8.15.2" => "14.07.2019  fix order of snaps in snapgallery when adding new snaps, fix english date formating in composegallery, ".
                            "align center of FTUI table, set compatibility to 8.2.5 ",
@@ -953,7 +957,6 @@ sub SSCam_Set($@) {
       if($spec =~ /STRM:/) {
           $spec =~ m/.*STRM:(.*).*/i;                                  # Snap by SSCamSTRM-Device
           $hash->{HELPER}{INFORM} = $1;
-		  $hash->{HELPER}{SNAPBYSTRMDEV} = 1;
       }	
        
       my $emtxt = AttrVal($name, "snapEmailTxt", "");
@@ -1948,7 +1951,7 @@ sub SSCam_FWdetailFn ($$$$) {
       $ret .= $hash->{".setup"};
   }
   
-  $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($d,$d) if($hash->{".ptzhtml"} eq "");
 
   if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
@@ -6950,19 +6953,24 @@ return ($ret);
 ###############################################################################
 sub SSCam_ptzpanel(@) {
   my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
-  my $hash       = $defs{$name};
-  my $iconpath   = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
-  my $iconprefix = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
-  my $valPresets = ReadingsVal("$name","Presets","");
-  my $valPatrols = ReadingsVal("$name","Patrols","");
-  my $rowisset   = 0;
-  my $ptz_ret;
-  my $row;
+  my $hash        = $defs{$name};
+  my $iconpath    = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
+  my $iconprefix  = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
+  my $valPresets  = ReadingsVal("$name","Presets","");
+  my $valPatrols  = ReadingsVal("$name","Patrols","");
+  my $rowisset    = 0;
+  my ($pbs,$pbsf) = ("","");
+  my ($row,$ptz_ret);
   
   return "" if(SSCam_myVersion($hash) <= 71);
+  
+  $pbs      = AttrVal($ptzcdev,"ptzButtonSize", 100);                                                     # Größe der Druckbuttons in %
+  $pbsf     = AttrVal($ptzcdev,"ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
  
-  $ptz_ret = "<div class=\"ptzpanel\">";
-  $ptz_ret.= '<table class="rc_body">';
+  $ptz_ret  = "";
+  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
+  $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
+  $ptz_ret .= '<table class="rc_body defsize">';
 
   foreach my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
@@ -6970,27 +6978,31 @@ sub SSCam_ptzpanel(@) {
       next if (!$row);
       $rowisset = 1;
       $ptz_ret .= "<tr>";
-      my @btn = split (",",$row);                    # die Anzahl Buttons in einer Reihe
+      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
       
       foreach my $btnnr (0..$#btn) {                 
-          $ptz_ret .= '<td class="rc_button">';
+          $ptz_ret .= '<td class="ptzcontrol">';
           if ($btn[$btnnr] ne "") {
               my $cmd;
               my $img;
-              if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                               # enthält Komando -> <command>:<image>
+              if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                                            # enthält Komando -> <command>:<image>
                   $cmd = $1;
                   $img = $2;
-              } else {                                                                          # button has format <command> or is empty
+              } else {                                                                                       # button has format <command> or is empty
                   $cmd = $btn[$btnnr];
                   $img = $btn[$btnnr];
               }
-		      if ($img =~ m/\.svg/) {                                                           # Verwendung für SVG's
+		      if ($img =~ m/\.svg/) {                                                                        # Verwendung für SVG's
 		          $img = FW_makeImage($img, $cmd, "rc-button");
-		      } else {
-                  $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\">";                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
-		      }
+		      } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+                  if($ftui) {
+                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
+                  } else {
+                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbs%\" width=\"$pbs%\">";  
+                  }
+              }
               if ($cmd || $cmd eq "0") {
-                  my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";            # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+                  my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                         # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
                   $cmd1     = "ftui.setFhemStatus('set $name $cmd')" if($ftui); 
                   $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
               } else {
@@ -7002,9 +7014,7 @@ sub SSCam_ptzpanel(@) {
       }
       $ptz_ret .= "</tr>\n";
   }
-  
   $ptz_ret .= "</table>";
-  $ptz_ret .= "</div>";
   
   ########################
   # add Preset & Patrols
@@ -7021,7 +7031,6 @@ sub SSCam_ptzpanel(@) {
       }
       if($Presets) {
           $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,;
-          # Log3($name, 1, "$name - commandArgs: $Presets");
       } else {
           $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
       }
@@ -7033,33 +7042,24 @@ sub SSCam_ptzpanel(@) {
           last if(defined($Patrols));
       }
       
-      # Rahmenklasse
-      $ptz_ret .= "<div class=\"ptzpanel\">";
-      $ptz_ret .= "<table class=\"rc_body\">";  
+      if($Patrols) {
+          $Patrols =~ s,^<td[^>]*>(.*)</td>$,$1,;
+      } else {
+          $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
+      }
+      
+      $ptz_ret .= '<table class="rc_body defsize">';
+      
       $ptz_ret .= "<tr>";
-      $ptz_ret .= '<td class="rc_button">';
+      $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
+      $ptz_ret .= "</tr>";
       
-      # Dropdown Klasse
-      $ptz_ret .= "<table class=\"webcmd\">";  
       $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td style=\"font-size:250%;\">Preset:  </td><td><div class='col3'>$Presets</div></td>";  
+      $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
       $ptz_ret .= "</tr>";
+
       $ptz_ret .= "</table>";
-      
-      $ptz_ret .= "<table class=\"webcmd\">"; 
-      $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td style=\"font-size:250%;\">Patrol:  </td><td><div class='col3'>$Patrols</div></td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "</table>";
-      
-      # Rahmenklasse end
-      $ptz_ret .= "</td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "</table>";
-      $ptz_ret .= "</div>";
-      
-      #####################
- }
+  }
   
   if ($rowisset) {
       return $ptz_ret;
@@ -7224,19 +7224,21 @@ sub SSCam_StreamDev($$$;$) {
       $cmdrefresh    = "ftui.setFhemStatus('set $camname refresh STRM:$uuid')";      
   }
   
-  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
-  $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmlattr Streaming-Device übersteuern 
+  my $ha  = AttrVal($camname, "htmlattr", 'width="500" height="325"');      # HTML Attribute der Cam
+  $ha     = AttrVal($strmdev, "htmlattr", $ha);                             # htmlattr mit htmlattr Streaming-Device übersteuern 
   if($ftui) {
       $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                         # wenn aus FTUI aufgerufen divers setzen 
   }
   
-  my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
-  $pws       =~ s/"//g if($pws);
+  my $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+  
+  my $pws = AttrVal($strmdev, "popupWindowSize", "");                       # Größe eines Popups
+  $pws    =~ s/"//g if($pws);
   
   my $show = $defs{$streamHash->{PARENT}}->{HELPER}{ACTSTRM} if($streamHash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
   
-  my $alias  = AttrVal($strmdev, "alias", $strmdev);                         # Linktext als Aliasname oder Devicename setzen
+  my $alias  = AttrVal($strmdev, "alias", $strmdev);                        # Linktext als Aliasname oder Devicename setzen
   my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
   
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
@@ -7317,19 +7319,20 @@ sub SSCam_StreamDev($$$;$) {
           $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);               # Statusbit wenn ein Stream aktiviert ist      
       }
-            
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
-          if($ptz_ret) { 
+          my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
+          if($ptz_ret) {         
               $ret .= "<td>$ptz_ret</td>";
           }
       }
@@ -7352,7 +7355,9 @@ sub SSCam_StreamDev($$$;$) {
           } else {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
           }
-          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          if(!$hf) {
+              $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          }
           $ret .= "</td>";
           $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
@@ -7394,19 +7399,21 @@ sub SSCam_StreamDev($$$;$) {
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-      $ret .= $imgblank;
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+          $ret .= $imgblank;
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
+          my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7439,20 +7446,21 @@ sub SSCam_StreamDev($$$;$) {
       
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
-      
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-      $ret .= $imgblank;
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+          $ret .= $imgblank;
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
-          my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
+          my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
           if($ptz_ret) { 
               $ret .= "<td>$ptz_ret</td>";
           }
@@ -7489,7 +7497,7 @@ sub SSCam_StreamDev($$$;$) {
               }              
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/) {
-                  my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
+                  my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
@@ -7604,7 +7612,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
               $ret .= "</td>";
               if(AttrVal($camname,"ptzPanel_use",1)) {
-                  my $ptz_ret = SSCam_ptzpanel($camname,'','',$ftui);
+                  my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
                   if($ptz_ret) { 
                       $ret .= "<td>$ptz_ret</td>";
                   }
@@ -7705,6 +7713,7 @@ sub SSCam_composegallery ($;$$$) {
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
+  my ($alias,$dlink,$hf) = ("","","");
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7715,6 +7724,8 @@ sub SSCam_composegallery ($;$$$) {
 	  my $streamHash = $defs{$strmdev};                                                       # Hash des SSCamSTRM-Devices
 	  $uuid = $streamHash->{FUUID};                                                           # eindeutige UUID des Streamingdevices
 	  delete $streamHash->{HELPER}{STREAM};
+      $alias  = AttrVal($strmdev, "alias", $strmdev);                                         # Linktext als Aliasname oder Devicename setzen
+      $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";  
   }
   
   my $cmddosnap     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";   # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
@@ -7726,16 +7737,14 @@ sub SSCam_composegallery ($;$$$) {
   }
  
   my $ha = AttrVal($name, "snapGalleryHtmlAttr", AttrVal($name, "htmlattr", 'width="500" height="325"'));
-  
-  my $alias  = AttrVal($strmdev, "alias", $strmdev);                                          # Linktext als Aliasname oder Devicename setzen
-  my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
-  
+    
   # falls "SSCam_composegallery" durch ein SSCamSTRM-Device aufgerufen wird
   my $pws      = "";
   if ($strmdev) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
       $pws =~ s/"//g if($pws);
       $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
+      $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
@@ -7814,7 +7823,9 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+  if(!$hf) {
+      $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+  }
   $htmlCode .= "</html>";
 
 return $htmlCode;
@@ -9108,12 +9119,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19996 2019-08-13 21:21:54Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19750 2019-06-30 20:34:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19996 2019-08-13 21:21:54Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10691,14 +10702,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </li>
   
   <a name="recTelegramTxt"></a>
-  <li><b>snapTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
+  <li><b>recTelegramTxt tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]  </b><br>
     Activates the permanent shipping of recordings by TelegramBot after their creation. <br>
     The attribute has to be definied in the form as described. With key "tbot" the TelegramBot device is specified, 
 	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the following placeholders in "subject". <br><br>
+	If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+    
+	You can use the following placeholders within "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10712,14 +10724,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Examples:</b><br>
-        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
-      </ul>
-      <br>
+	<b>Examples:</b><br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the recording $FILE was created. Now it is $TIME. <br>
+    <br>
   </li><br>	 
   
   <a name="rectime"></a>
@@ -10823,8 +10835,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	which is used for shipping the data. Of course, the <a href="http://fhem.de/commandref.html#TelegramBot">TelegramBot device</a> 
     must be available and has to be running well. <br>
 	The setting of "peers" and "subject" is optional, but the keys must (empty) specified. 
-	If "peer" is empty, teh default peer of the TelegramBot is used. <br>
-	You can use the following placeholders in "subject". <br><br>
+	If "peer" is empty, the default peer of the TelegramBot device is used. <br><br>
+    
+	You can use the following placeholders within "subject". <br><br>
 	
 		<ul>   
 		<table>  
@@ -10837,15 +10850,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</table>
 		</ul>     
 		<br>	
-    
-       <ul>
-		<b>Examples:</b><br>
-        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
-      </ul>
-      <br>
+
+	<b>Examples:</b><br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm ($FILE)  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Motion alarm from $CAM. At $CTIME the snapshot $FILE was created <br>
+    <br>
   </li><br>	  
     
   <a name="snapGalleryBoost"></a>
@@ -12512,7 +12525,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	anzugeben, welches für den Versand der Daten verwendet werden soll. 
 	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
-	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Device verwendet. <br><br>
+    
 	Es können die folgenden Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
@@ -12527,13 +12541,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Beispiele:</b><br>
-        recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
-      </ul>
+	<b>Beispiele:</b><br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; recTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME die Aufnahme $FILE erstellt. Jetzt ist es $TIME. <br>
       <br>
   </li><br>
   
@@ -12641,8 +12655,9 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 	anzugeben, welches für den Versand der Daten verwendet werden soll. 
 	Das <a href="http://fhem.de/commandref_DE.html#TelegramBot">TelegramBot-Device</a> muss natürlich vorhanden und funktionstüchtig sein. <br>
 	Die Angabe von "peers" und "subject" ist optional, jedoch muß der Schlüssel (leer) angegeben werden. 
-	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot verwendet. <br>
-	Es können die Platzhalter im subject verwendet werden. <br><br>
+	Wurde "peer" leer gelassen, wird der Default-Peer des TelegramBot-Devices verwendet. <br><br>
+	
+    Es können folgende Platzhalter im subject verwendet werden. <br><br>
 	
 		<ul>   
 		<table>  
@@ -12656,14 +12671,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		</ul>     
 		<br>	
     
-       <ul>
-		<b>Beispiele:</b><br>
-        snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
-		snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
-      </ul>
-      <br>
+	<b>Beispiele:</b><br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm ($FILE)  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; @nabuko @foo @bar, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; #nabugroup, subject =&gt;  <br>
+    attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; -123456, subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt;  <br>
+	attr &lt;device&gt; snapTelegramTxt tbot =&gt; teleBot, peers =&gt; , subject =&gt; Bewegungsalarm bei $CAM. Es wurde $CTIME der Schnappschuss $FILE erstellt <br>
+    <br>
   </li><br>
     
   <a name="snapGalleryBoost"></a>
