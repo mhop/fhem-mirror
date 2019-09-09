@@ -58,6 +58,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                           "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
+  "8.25.0" => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                           "sub DbRep_modAssociatedWith changed ",
   "8.24.0" => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
   "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
   "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
@@ -158,6 +162,12 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.25.0" => "29.08.2019 If a list of devices in attribute \"device\" contains a SQL wildcard (\%), this wildcard is now "
+                          ."dissolved into separate devices if they are still existing in your FHEM configuration. "
+                          ."Please see <a href=\"https://forum.fhem.de/index.php/topic,101756.0.html\">this Forum Thread</a> "
+                          ."for further information. ",
+  "8.24.0" => "24.08.2019 Devices which are specified in attribute \"device\" are marked as \"Associated With\" if they are "
+                          ."still existing in your FHEM configuration. At least fhem.pl 20069 2019-08-27 08:36:02 is needed. ",
   "8.22.0" => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
                           "the value displayed from the VALUE database field before create the appropriate reading. ",
   "8.21.0" => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
@@ -2834,7 +2844,7 @@ sub count_DoParse($) {
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$device|$reading|''|$err|$table";
+     return "$name|''|$device|''|$err|$table";
  }
      
  # only for this block because of warnings if details of readings are not set
@@ -2889,7 +2899,7 @@ sub count_DoParse($) {
          $err = encode_base64($@,"");
          Log3 ($name, 2, "DbRep $name - $@");
          $dbh->disconnect;
-         return "$name|''|$device|$reading|''|$err|$table";
+         return "$name|''|$device|''|$err|$table";
      }
      
      if($ced) {
@@ -2971,7 +2981,8 @@ sub count_ParseDone($) {
       } else {
           my $ds  = $device."__" if ($device);
           my $rds = $reading."__" if ($reading);
-          $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
+          # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
+          $reading_runtime_string = $rsf."COUNT_".$table."__".$runtime_string;
       }
          
 	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?$c:"-");
@@ -4264,7 +4275,7 @@ sub currentfillup_Push($) {
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
- my ($err,$sth,$sql,$devs,$danz,$ranz);
+ my ($err,$sth,$sql,$selspec,$addon,@dwc,@rwc);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -4284,8 +4295,6 @@ sub currentfillup_Push($) {
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
- 
- ($devs,$danz,$reading,$ranz) = DbRep_specsForSql($hash,$device,$reading);
   
  # SQL-Startzeit
  my $st = [gettimeofday];
@@ -4293,82 +4302,34 @@ sub currentfillup_Push($) {
  # insert history mit/ohne primary key
  # SQL zusammenstellen für DB-Operation
  if ($usepkc && $dbloghash->{MODEL} eq 'MYSQL') {
-     $sql  = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
-         $sql .= "1 ";
-     }
-	 $sql .= "group by timestamp,device,reading ;";
+     $selspec = "INSERT IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	 $addon   = "group by timestamp,device,reading";
 	 
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'SQLITE') {
-     $sql  = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-     $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-     $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-     $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-     $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-     $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-     $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-     if ($IsTimeSet) {
-	     $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-     } else {
-         $sql .= "1 ";
-     }
-	 $sql .= "group by timestamp,device,reading ;";
+     $selspec = "INSERT OR IGNORE INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	 $addon   = "group by timestamp,device,reading";
  
  } elsif ($usepkc && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "true ";
-         }
-	 $sql .= "group by device,reading ON CONFLICT ($pkc) DO NOTHING; ";
+     $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+	 $addon   = "group by device,reading ON CONFLICT ($pkc) DO NOTHING";
  
  } else {
      if($dbloghash->{MODEL} ne 'POSTGRESQL') {
 	     # MySQL und SQLite
-         $sql  = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "1 ";
-         }
-	     $sql .= "group by device,reading ;";
+         $selspec = "INSERT INTO current (TIMESTAMP,DEVICE,READING) SELECT timestamp,device,reading FROM history where";
+	     $addon   = "group by device,reading";
 	 } else {
 	     # PostgreSQL
-         $sql  = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where ";
-         $sql .= "DEVICE LIKE '$devs' AND "      if($danz <= 1 && $devs !~ m(^%$) && $devs =~ m(\%));
-         $sql .= "DEVICE = '$devs' AND "         if($danz <= 1 && $devs !~ m(\%));
-         $sql .= "DEVICE IN ($devs) AND "        if($danz > 1);
-         $sql .= "READING LIKE '$reading' AND "  if($ranz <= 1 && $reading !~ m(^%$) && $reading =~ m(\%));
-         $sql .= "READING = '$reading' AND "     if($ranz <= 1 && $reading !~ m(\%));
-         $sql .= "READING IN ($reading) AND "    if($ranz > 1);
-         if ($IsTimeSet) {
-	         $sql .= "TIMESTAMP >= '$runtime_string_first' AND TIMESTAMP < '$runtime_string_next' ";
-         } else {
-             $sql .= "true ";
-         }
-	     $sql .= "group by device,reading;";
+         $selspec = "INSERT INTO current (DEVICE,TIMESTAMP,READING) SELECT device, (array_agg(timestamp ORDER BY reading ASC))[1], reading FROM history where";
+	     $addon   = "group by device,reading";
 	 }
+ }
+ 
+ # SQL-Statement zusammenstellen
+ if ($IsTimeSet || $IsAggrSet) {
+	 $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",$addon);
+ } else {
+	 $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,$addon); 
  }
  
  # Log SQL Statement
@@ -4610,11 +4571,12 @@ sub changeval_Push($) {
 	 $new =~ s/'/''/g;       # escape ' with ''
  
      # SQL zusammenstellen für DB-Update
-     my $addon = $old =~ /%/?"WHERE VALUE LIKE '$old'":"WHERE VALUE='$old'";
+     my $addon   = $old =~ /%/?"WHERE VALUE LIKE '$old'":"WHERE VALUE='$old'";
+     my $selspec = "UPDATE $table SET TIMESTAMP=TIMESTAMP,VALUE='$new' $addon AND ";
      if ($IsTimeSet) {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
+         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
      } else {
-         $sql = DbRep_createUpdateSql($hash,$table,"TIMESTAMP=TIMESTAMP,VALUE='$new' $addon",$device,$reading,undef,undef,'');
+         $sql = DbRep_createCommonSql($hash,$selspec,$device,$reading,undef,undef,'');
      }
 	 Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
 	 $sth = $dbh->prepare($sql) ;
@@ -8329,16 +8291,15 @@ sub DbRep_reduceLog($) {
         $filter = 1;
     }
    
-    my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$d,$r);
+    my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$d,$r);
     
     # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
     my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
     Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
     
     my $sql;
-    my $table = "history";
-    my $selspec = "TIMESTAMP,DEVICE,'',READING,VALUE";
-    my $addon = "ORDER BY TIMESTAMP ASC";
+    my $selspec = "SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history where ";
+    my $addon   = "ORDER BY TIMESTAMP ASC";
     
     if($filter) {
         # Option EX/INCLUDE wurde angegeben
@@ -8346,9 +8307,9 @@ sub DbRep_reduceLog($) {
                     .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
                     ."TIMESTAMP <= '$ots'".($nts?" AND TIMESTAMP >= '$nts' ":" ")."ORDER BY TIMESTAMP ASC";
     } elsif ($IsTimeSet || $IsAggrSet) {
-        $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
+        $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,"'$nts'","'$ots'",$addon);
 	} else {
-	    $sql = DbRep_createSelectSql($hash,$table,$selspec,$d,$r,undef,undef,$addon); 
+	    $sql = DbRep_createCommonSql($hash,$selspec,$d,$r,undef,undef,$addon); 
 	}
     
     Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
@@ -8361,7 +8322,10 @@ sub DbRep_reduceLog($) {
     Log3 ($name, 3, "DbRep $name - reduceLog requested with options: "
         .(($average) ? "$average" : '')
         .($filter ? ((($average && $filter) ? ", " : '').(uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1])) :
-        ((($idanz || $iranz) ? " INCLUDE -> " : '').($idanz ? "Devs: ".$idevs : '').($iranz ? " Readings: ".$ireading : '').(($edanz || $eranz) ? " EXCLUDE -> " : '').($edanz ? "Devs: ".$edevs : '').($eranz ? " Readings: ".$ereading : '')) ));
+        ((($idanz || $idevswc || $iranz || $irdswc) ? " INCLUDE -> " : '').
+           (($idanz || $idevswc)? "Devs: ".($idevs?$idevs:'').($idevswc?$idevswc:'') : '').(($iranz || $irdswc) ? " Readings: ".($ireading?$ireading:'').($irdswc?$irdswc:'') : '').
+           (($edanz || $edevswc || $eranz || $erdswc) ? " EXCLUDE -> " : '').
+           (($edanz || $edevswc)? "Devs: ".($edevs?$edevs:'').($edevswc?$edevswc:'') : '').(($eranz || $erdswc) ? " Readings: ".($ereading?$ereading:'').($erdswc?$erdswc:'') : '')) ));
         
     if ($ots) {
 	    my ($sth_del, $sth_upd, $sth_delD, $sth_updD, $sth_get);
@@ -8854,17 +8818,17 @@ return;
 }
 
 ####################################################################################################
-#  SQL-Statement zusammenstellen für DB-Abfrage
+#               SQL-Statement zusammenstellen Common
 ####################################################################################################
-sub DbRep_createSelectSql($$$$$$$$) {
- my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
+sub DbRep_createCommonSql ($$$$$$$) {
+ my ($hash,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
  my $dbmodel   = $hash->{dbloghash}{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my ($sql,$vf);
- my $tnfull = 0;
+ my $tnfull    = 0;
+ my ($sql,$vf,@dwc,@rwc);
  
- my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
@@ -8878,23 +8842,69 @@ sub DbRep_createSelectSql($$$$$$$$) {
 	 }
  }
  
- $sql = "SELECT $selspec FROM $table where ";
+ $sql = $selspec." ";
  # included devices
- $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
- $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
- $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ if($idevswc && $idevs !~ m(^%$)) {
+     @dwc    = split(",",$idevswc);
+	 my $i   = 1;
+	 my $len = scalar(@dwc);
+	 foreach(@dwc) {
+	     if($i<$len) {
+	         $sql .= "DEVICE LIKE '$_' OR ";
+		 } else {
+		     $sql .= "DEVICE LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($idanz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+ $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+ $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
  # excluded devices
- $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
- $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
- $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ if($edevswc) {
+     @dwc = split(",",$edevswc);
+	 foreach(@dwc) {
+	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+ $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+ $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
  # included readings
- $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
- $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ if($irdswc && $ireading !~ m(^%$)) {
+     @rwc    = split(",",$irdswc);
+	 my $i   = 1;
+	 my $len = scalar(@rwc);
+	 foreach(@rwc) {
+	     if($i<$len) {
+	         $sql .= "READING LIKE '$_' OR ";
+		 } else {
+		     $sql .= "READING LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($iranz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) "            if($iranz > 1);
+ $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
  # excluded readings
- $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
- $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ if($erdswc) {
+     @dwc = split(",",$erdswc);
+	 foreach(@dwc) {
+	     $sql .= "READING NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+ $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
  # add valueFilter
  $sql .= $vf if(defined $vf);
  # Timestamp Filter
@@ -8913,19 +8923,19 @@ return $sql;
 }
 
 ####################################################################################################
-#  SQL-Statement zusammenstellen für DB-Updates
+#               SQL-Statement zusammenstellen für DB-Abfrage Select
 ####################################################################################################
-sub DbRep_createUpdateSql($$$$$$$$) {
+sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
- my $name    = $hash->{NAME};
- my $dbmodel = $hash->{dbloghash}{MODEL};
+ my $name      = $hash->{NAME};
+ my $dbmodel   = $hash->{dbloghash}{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my ($sql,$vf);
- my $tnfull = 0;
+ my $tnfull    = 0;
+ my ($sql,$vf,@dwc,@rwc);
  
- my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
- if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+ if($tn && $tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
  }
  
@@ -8936,24 +8946,70 @@ sub DbRep_createUpdateSql($$$$$$$$) {
 	     $vf = "VALUE REGEXP '$valfilter' AND ";
 	 }
  }
-
- $sql = "UPDATE $table SET $selspec AND ";
+ 
+ $sql = "SELECT $selspec FROM $table where ";
  # included devices
- $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
- $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
- $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ if($idevswc && $idevs !~ m(^%$)) {
+     @dwc    = split(",",$idevswc);
+	 my $i   = 1;
+	 my $len = scalar(@dwc);
+	 foreach(@dwc) {
+	     if($i<$len) {
+	         $sql .= "DEVICE LIKE '$_' OR ";
+		 } else {
+		     $sql .= "DEVICE LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($idanz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+ $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+ $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
  # excluded devices
- $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
- $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
- $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ if($edevswc) {
+     @dwc = split(",",$edevswc);
+	 foreach(@dwc) {
+	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+ $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+ $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
  # included readings
- $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
- $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ if($irdswc && $ireading !~ m(^%$)) {
+     @rwc    = split(",",$irdswc);
+	 my $i   = 1;
+	 my $len = scalar(@rwc);
+	 foreach(@rwc) {
+	     if($i<$len) {
+	         $sql .= "READING LIKE '$_' OR ";
+		 } else {
+		     $sql .= "READING LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($iranz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) "            if($iranz > 1);
+ $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
  # excluded readings
- $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
- $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ if($erdswc) {
+     @dwc = split(",",$erdswc);
+	 foreach(@dwc) {
+	     $sql .= "READING NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+ $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
  # add valueFilter
  $sql .= $vf if(defined $vf);
  # Timestamp Filter
@@ -8963,7 +9019,7 @@ sub DbRep_createUpdateSql($$$$$$$$) {
      if ($dbmodel eq "POSTGRESQL") {
 	     $sql .= "true ";
 	 } else {
-	      $sql .= "1 ";
+	     $sql .= "1 ";
 	 }
  }
  $sql .= "$addon;";
@@ -8976,18 +9032,18 @@ return $sql;
 ####################################################################################################
 sub DbRep_createDeleteSql($$$$$$$) {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
- my $name    = $hash->{NAME};
- my $dbmodel = $hash->{dbloghash}{MODEL};
+ my $name      = $hash->{NAME};
+ my $dbmodel   = $hash->{dbloghash}{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
- my ($sql,$vf);
- my $tnfull = 0;
+ my $tnfull    = 0;
+ my ($sql,$vf,@dwc,@rwc);
  
  if($table eq "current") {
      $sql = "delete FROM $table; ";
 	 return $sql;
  }
  
- my ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz) = DbRep_specsForSql($hash,$device,$reading);
+ my ($idevs,$idevswc,$idanz,$ireading,$iranz,$irdswc,$edevs,$edevswc,$edanz,$ereading,$eranz,$erdswc) = DbRep_specsForSql($hash,$device,$reading);
  
  if($tn =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
      $tnfull = 1;
@@ -9003,21 +9059,67 @@ sub DbRep_createDeleteSql($$$$$$$) {
  
  $sql = "delete FROM $table where ";
  # included devices
- $sql .= "DEVICE LIKE '$idevs' AND "          if($idanz <= 1 && $idevs !~ m(^%$) && $idevs =~ m(\%));
- $sql .= "DEVICE = '$idevs' AND "             if($idanz <= 1 && $idevs !~ m(\%));
- $sql .= "DEVICE IN ($idevs) AND "            if($idanz > 1);
+ $sql .= "( "                                 if(($idanz || $idevswc) && $idevs !~ m(^%$));
+ if($idevswc && $idevs !~ m(^%$)) {
+     @dwc    = split(",",$idevswc);
+	 my $i   = 1;
+	 my $len = scalar(@dwc);
+	 foreach(@dwc) {
+	     if($i<$len) {
+	         $sql .= "DEVICE LIKE '$_' OR ";
+		 } else {
+		     $sql .= "DEVICE LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($idanz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "DEVICE = '$idevs' "                 if($idanz == 1 && $idevs && $idevs !~ m(^%$));
+ $sql .= "DEVICE IN ($idevs) "                if($idanz > 1);
+ $sql .= ") AND "                             if(($idanz || $idevswc) && $idevs !~ m(^%$));
  # excluded devices
- $sql .= "DEVICE NOT LIKE '$edevs' AND "      if($edanz && $edanz == 1 && $edevs =~ m(\%));
- $sql .= "DEVICE != '$edevs' AND "            if($edanz && $edanz == 1 && $edevs !~ m(\%));
- $sql .= "DEVICE NOT IN ($edevs) AND "        if($edanz > 1);
+ if($edevswc) {
+     @dwc = split(",",$edevswc);
+	 foreach(@dwc) {
+	     $sql .= "DEVICE NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "DEVICE != '$edevs' "                if($edanz == 1 && $edanz && $edevs !~ m(^%$));
+ $sql .= "DEVICE NOT IN ($edevs) "            if($edanz > 1);
+ $sql .= "AND "                               if($edanz && $edevs !~ m(^%$));
  # included readings
- $sql .= "READING LIKE '$ireading' AND "      if($iranz <= 1 && $ireading !~ m(^%$) && $ireading =~ m(\%));
- $sql .= "READING = '$ireading' AND "         if($iranz <= 1 && $ireading !~ m(\%));
- $sql .= "READING IN ($ireading) AND "        if($iranz > 1);
+ $sql .= "( "                                 if(($iranz || $irdswc) && $ireading !~ m(^%$));
+ if($irdswc && $ireading !~ m(^%$)) {
+     @rwc    = split(",",$irdswc);
+	 my $i   = 1;
+	 my $len = scalar(@rwc);
+	 foreach(@rwc) {
+	     if($i<$len) {
+	         $sql .= "READING LIKE '$_' OR ";
+		 } else {
+		     $sql .= "READING LIKE '$_' ";
+		 }
+		 $i++;
+	 }
+     if($iranz) {
+         $sql .= "OR "; 
+     }
+ }
+ $sql .= "READING = '$ireading' "             if($iranz == 1 && $ireading && $ireading !~ m(\%));
+ $sql .= "READING IN ($ireading) "            if($iranz > 1);
+ $sql .= ") AND "                             if(($iranz || $irdswc) && $ireading !~ m(^%$));
  # excluded readings
- $sql .= "READING NOT LIKE '$ereading' AND "  if($eranz && $eranz == 1 && $ereading =~ m(\%));
- $sql .= "READING != '$ereading' AND "        if($eranz && $eranz == 1 && $ereading !~ m(\%));
- $sql .= "READING NOT IN ($ereading) AND "    if($eranz > 1);
+ if($erdswc) {
+     @dwc = split(",",$erdswc);
+	 foreach(@dwc) {
+	     $sql .= "READING NOT LIKE '$_' AND ";
+	 }
+ }
+ $sql .= "READING != '$ereading' "            if($eranz && $eranz == 1 && $ereading !~ m(\%));
+ $sql .= "READING NOT IN ($ereading) "        if($eranz > 1);
+ $sql .= "AND "                               if($eranz && $ereading !~ m(^%$));
  # add valueFilter
  $sql .= $vf if(defined $vf);
  # Timestamp Filter
@@ -9040,11 +9142,13 @@ return $sql;
 sub DbRep_specsForSql($$$) {
  my ($hash,$device,$reading) = @_;
  my $name    = $hash->{NAME};
+ my (@idvspcs,@edvspcs,@idvs,@edvs,@idvswc,@edvswc,@residevs,@residevswc);
+ my ($nl,$nlwc) = ("","");
  
  ##### inkludierte / excludierte Devices und deren Anzahl ermitteln #####
- my ($idevice,$edevice) = ('','');
- my ($idevs,$edevs)     = ('','');
- my ($idanz,$edanz)     = (0,0);
+ my ($idevice,$edevice)               = ('','');
+ my ($idevs,$idevswc,$edevs,$edevswc) = ('','','','');
+ my ($idanz,$edanz)                   = (0,0);
  if($device =~ /EXCLUDE=/i) {
      ($idevice,$edevice) = split(/EXCLUDE=/i,$device);
 	 $idevice = $idevice?DbRep_trim($idevice):"%";
@@ -9052,35 +9156,102 @@ sub DbRep_specsForSql($$$) {
      $idevice = $device;
  }
  
- # Devices inkludiert
- my @idvspcs = devspec2array($idevice);
- $idevs = join(",",@idvspcs);
- $idevs =~ s/'/''/g;               # escape ' with ''
+ # Devices exkludiert
+ if($edevice) {
+     @edvs  = split(",",$edevice); 
+     foreach my $e (@edvs) {
+         $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen 
+         @edvspcs = devspec2array($e);
+         @edvspcs = map {s/\.\*/%/g; $_; } @edvspcs;
+		 if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
+			 $edevswc .= "," if($edevswc);
+			 $edevswc .= join(",",@edvspcs);
+		 } else {
+			 $edevs .= "," if($edevs);
+			 $edevs .= join(",",@edvspcs);	 
+		 }
+     }                                           
+ }
+ $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf1)
  
- $idanz = $#idvspcs+1;
+ # Devices inkludiert
+ @idvs  = split(",",$idevice);
+ foreach my $d (@idvs) {
+     $d       =~ s/%/\.*/g if($d !~ /^%$/);                          # SQL Wildcard % auflösen 
+     @idvspcs = devspec2array($d);
+     @idvspcs = map {s/\.\*/%/g; $_; } @idvspcs;
+     if((map {$_ =~ /%/;} @idvspcs) && $idevice !~ /^%$/) {          # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
+		 $idevswc .= "," if($idevswc);
+		 $idevswc .= join(",",@idvspcs);
+     } else {
+		 $idevs .= "," if($idevs);
+		 $idevs .= join(",",@idvspcs);	 
+	 }	 
+ }
+ $idanz = split(",",$idevs);                                         # Anzahl der inkludierten Elemente (Lauf1)
+ 
+ Log3 $name, 5, "DbRep $name - Devices for operation - \n"
+                ."included ($idanz): $idevs \n"
+                ."included with wildcard: $idevswc \n"
+                ."excluded ($edanz): $edevs \n"
+                ."excluded with wildcard: $edevswc";
+ 
+ # exkludierte Devices aus inkludierten entfernen (aufgelöste)
+ @idvs = split(",",$idevs);
+ @edvs = split(",",$edevs);
+ foreach my $in (@idvs) {
+     my $inc = 1;
+     foreach(@edvs) {
+	     next if($in ne $_);
+		 $inc = 0;
+         $nl .= "|" if($nl);
+         $nl .= $_;                                                  # Liste der entfernten devices füllen
+	 }
+	 push(@residevs, $in) if($inc);
+ }
+ $edevs = join(",", map {($_ !~ /$nl/)?$_:();} @edvs) if($nl);
+ 
+ # exkludierte Devices aus inkludierten entfernen (wildcard konnte nicht aufgelöst werden)
+ @idvswc = split(",",$idevswc);
+ @edvswc = split(",",$edevswc);
+ foreach my $inwc (@idvswc) {
+     my $inc = 1;
+     foreach(@edvswc) {
+	     next if($inwc ne $_);
+		 $inc = 0;
+         $nlwc .= "|" if($nlwc);
+         $nlwc .= $_;                                                # Liste der entfernten devices füllen
+	 }
+	 push(@residevswc, $inwc) if($inc);
+ }
+ $edevswc = join(",", map {($_ !~ /$nlwc/)?$_:();} @edvswc) if($nlwc);
+ # Log3($name, 1, "DbRep $name - nlwc: $nlwc, mwc: @mwc");
+ 
+ # Ergebnis zusammenfassen
+ $idevs   = join(",",@residevs);
+ $idevs   =~ s/'/''/g;                                               # escape ' with ''
+ $idevswc = join(",",@residevswc);
+ $idevswc =~ s/'/''/g;                                               # escape ' with ''
+ 
+ $idanz = split(",",$idevs);                                         # Anzahl der inkludierten Elemente (Lauf2)
  if($idanz > 1) {
 	 $idevs =~ s/,/','/g;
 	 $idevs = "'".$idevs."'";
  }
  
- # Devices exkludiert
- if($edevice) {
-	 my @edvspcs = devspec2array($edevice);
-	 $edevs = join(",",@edvspcs);
-	 $edevs =~ s/'/''/g;               # escape ' with ''
-	 
-	 $edanz = $#edvspcs+1;
-	 if($edanz > 1) {
-		 $edevs =~ s/,/','/g;
-		 $edevs = "'".$edevs."'";
-	 }
+ $edanz = split(",",$edevs);                                         # Anzahl der exkludierten Elemente (Lauf2)
+ if($edanz > 1) {
+	 $edevs =~ s/,/','/g;
+	 $edevs = "'".$edevs."'";
  }
  
- Log3 $name, 5, "DbRep $name - Devices for operation - included: $idevs , excluded: $edevs";
  
  ##### inkludierte / excludierte Readings und deren Anzahl ermitteln #####
- my ($ireading,$ereading) = ('','');
- my ($iranz,$eranz)       = (0,0);
+ my ($ireading,$ereading)           = ('','');
+ my ($iranz,$eranz)                 = (0,0);
+ my ($erdswc,$erdgs,$irdswc,$irdgs) = ('','','','');
+ my (@erds,@irds);
+ 
  $reading =~ s/'/''/g;            # escape ' with ''
  
  if($reading =~ /EXCLUDE=/i) {
@@ -9090,27 +9261,54 @@ sub DbRep_specsForSql($$$) {
      $ireading = $reading;
  }
 
+ if($ereading) {
+     @erds  = split(",",$ereading); 
+     foreach my $e (@erds) {
+		 if($e =~ /%/ && $e !~ /^%$/) {       # Readings mit Wildcard (%) erfassen
+			 $erdswc .= "," if($erdswc);
+			 $erdswc .= $e;
+		 } else {
+			 $erdgs .= "," if($erdgs);
+			 $erdgs .= $e;	 
+		 }
+     }                                           
+ }
+ 
  # Readings inkludiert
- my @ireads = split(",",$ireading);
- $iranz = $#ireads+1;
+ @irds  = split(",",$ireading); 
+ foreach my $i (@irds) {
+     if($i =~ /%/ && $i !~ /^%$/) {           # Readings mit Wildcard (%) erfassen
+         $irdswc .= "," if($irdswc);
+         $irdswc .= $i;
+     } else {
+         $irdgs .= "," if($irdgs);
+         $irdgs .= $i;	 
+     }
+ } 
+ 
+ 
+ $iranz = split(",",$irdgs);
  if($iranz > 1) {
-	 $ireading =~ s/,/','/g;
-	 $ireading = "'".$ireading."'";
+	 $irdgs =~ s/,/','/g;
+	 $irdgs = "'".$irdgs."'";
  }
  
  if($ereading) {
      # Readings exkludiert
-	 my @ereads = split(",",$ereading);
-	 $eranz = $#ereads+1;
+	 $eranz = split(",",$erdgs);
 	 if($eranz > 1) {
-		 $ereading =~ s/,/','/g;
-		 $ereading = "'".$ereading."'";
+		 $erdgs =~ s/,/','/g;
+		 $erdgs = "'".$erdgs."'";
 	 }
  }
  
- Log3 $name, 5, "DbRep $name - Readings for operation - included: $ireading, excluded: $ereading ";
+ Log3 $name, 5, "DbRep $name - Readings for operation - \n"
+                ."included ($iranz): $irdgs \n"
+                ."included with wildcard: $irdswc \n"
+                ."excluded ($eranz): $erdgs \n"
+                ."excluded with wildcard: $erdswc";
 
-return ($idevs,$idanz,$ireading,$iranz,$edevs,$edanz,$ereading,$eranz);
+return ($idevs,$idevswc,$idanz,$irdgs,$iranz,$irdswc,$edevs,$edevswc,$edanz,$erdgs,$eranz,$erdswc);
 }
 
 ####################################################################################################
@@ -10796,32 +10994,48 @@ return;
 ###################################################################################
 sub DbRep_modAssociatedWith ($$$) {
   my ($hash,$cmd,$awdev) = @_;
-  my @naw;
-  
-  # my @def = split("{",$hash->{DEF}); 
-  # $hash->{DEF} = $def[0];
+  my $name = $hash->{NAME};
+  my (@naw,@edvs,@edvspcs,$edevswc);
+  my ($edevs,$idevice,$edevice) = ('','','');
   
   if($cmd eq "del") {
       readingsDelete($hash,".associatedWith");
       return;
   }
-
-  my @nadev = split("[, ]", $awdev);
+  
+  ($idevice,$edevice) = split(/EXCLUDE=/i,$awdev);
+  
+  if($edevice) {
+      @edvs = split(",",$edevice); 
+      foreach my $e (@edvs) {
+          $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen 
+          @edvspcs = devspec2array($e);
+          @edvspcs = map {s/\.\*/%/g; $_; } @edvspcs;
+		  if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) aussortieren, die nicht aufgelöst werden konnten
+		      $edevswc .= "|" if($edevswc);
+			  $edevswc .= join(" ",@edvspcs);
+		  } else {
+			  $edevs .= "|" if($edevs);
+			  $edevs .= join("|",@edvspcs);	 
+		  }
+      }                                           
+  }
+  
+  my @nadev = split("[, ]", $idevice);
   
   foreach my $d (@nadev) {
-      if($defs{$d}) {
-          push(@naw, $d);
-          next;
-      }
+      $d    =~ s/%/\.*/g if($d !~ /^%$/);                             # SQL Wildcard % in Regex
       my @a = devspec2array($d);
       foreach(@a) {
           next if(!$defs{$_});
-          push(@naw, $_) if( !( "EXCLUDE=".$_ ~~ @nadev) );
+          push(@naw, $_) if($_ !~ /$edevs/);
       }
   }
   
   if(@naw) {
       ReadingsSingleUpdateValue ($hash, ".associatedWith", join(" ",@naw), 0);
+  } else {
+      readingsDelete($hash, ".associatedWith");
   }
   
 return;
@@ -11982,12 +12196,12 @@ return;
 	                               </ul>
                                    <br>
                                  
-                                 For compatibility reasons the reducelog command can optionally be completed with supplements "EXCLUDE" 
+                                 For compatibility reason the reducelog command can optionally be completed with supplements "EXCLUDE" 
                                  respectively "INCLUDE" to exclude and/or include device/reading combinations from reducelog: <br><br>
                                  <ul>
                                  "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
                                  </ul>
-                                 This declaration is evaluated as Regex and overwrites the attributes "device" and "reading",
+                                 This declaration is evaluated as Regex and overwrites the settings made by attributes "device" and "reading",
                                  which won't be considered in this case. <br><br>
           
                                  <ul>
@@ -12544,11 +12758,9 @@ return $ret;
   
   <a name="device"></a>
   <li><b>device </b>          - Selection of particular or several devices. <br>
-                                You can specify a list of devices separated by "," or use device specifications (devspec). <br> 
-								Inside of lists or device specifications a SQL wildcard (%) will be evaluated as a normal 
-                                ASCII-character. 
-								The device names are derived from device specification and the active devices in FHEM before 
-                                SQL selection will be carried out. <br>
+                                You can specify a list of devices separated by "," or use device specifications (devspec). <br>
+								In that case the device names are derived from the device specification and the existing 
+                                devices in FHEM before carry out the SQL selection. <br>
                                 If the the device, list or device specification is prepended by "EXCLUDE=", 
                                 the devices are excluded from database selection.                                
                                 <br><br>
@@ -12836,18 +13048,18 @@ sub bdump {
   <a name="reading"></a>
   <li><b>reading </b>         - Selection of particular or several readings.
                                 More than one reading can be specified by a comma separated list. <br>
-								If SQL wildcard (%) is set in a list, it will be evaluated as a normal ASCII-character. <br>
-                                If the reading or the reading-list is prepended by "EXCLUDE=", those readings are excluded 
-                                from database selection.
+								SQL wildcard (%) can be used. <br>
+                                If the reading or the reading list is prepended by "EXCLUDE=", those readings are not 
+                                included.
                                 <br><br>  
 								
                                 <ul>
 							    <b>Examples:</b> <br>
-								<code>attr &lt;name&gt; reading etotal</code> <br> 
+								<code>attr &lt;name&gt; reading etotal</code> <br>
 								<code>attr &lt;name&gt; reading et%</code> <br>
 								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
-                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=state  </code> <br>
-                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
+                                <code>attr &lt;name&gt; reading eto%,Einspeisung EXCLUDE=etoday  </code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday,Ein% EXCLUDE=%Wirkleistung  </code> <br>
 								</ul>
 								<br><br>
                                 </li>
@@ -13537,10 +13749,10 @@ sub bdump {
                                  
                                 <table>  
                                 <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                   <tr><td style="vertical-align:top"><b>&lt;old string&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
-									                                                                  <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
-                                   <tr><td style="vertical-align:top"><b>&lt;new string&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
-                                                                                                      <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
+                                   <tr><td style="vertical-align:top"><b>&lt;alter String&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
+									                                                                    <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
+                                   <tr><td style="vertical-align:top"><b>&lt;neuer String&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
+                                                                                                        <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                                                                                                           Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
                                                                                                           des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
                                                                                                           VALUE bzw. UNIT des Datensatzes gespeichert. </li></td></tr>
@@ -14437,12 +14649,12 @@ sub bdump {
 	                             </ul>
                                  <br>
                                  
-                                 Aus Kompatibilitätsgründen kann der Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
-                                 ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
+                                 Aus Kompatibilitätsgründen kann der Set-Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
+                                 direkt ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
                                  <ul>
                                  "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
                                  </ul>
-                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Attribute "device" und "reading",
+                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" und "reading",
                                  die in diesem Fall nicht beachtet werden. <br><br>
           
                                  <ul>
@@ -15022,9 +15234,8 @@ return $ret;
  <a name="device"></a>
   <li><b>device </b>          - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Devices. <br>
                                 Es können Geräte-Spezifikationen (devspec) angegeben werden. <br> 
-								Innerhalb von Geräte-Spezifikationen wird SQL-Wildcard (%) als normales ASCII-Zeichen gewertet. 
-								Die Devicenamen werden vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
-								vorhandenen Devices abgeleitet. <br>
+								In diesem Fall werden die Devicenamen vor der Selektion aus der Geräte-Spezifikationen und den aktuell in FHEM 
+								vorhandenen Devices aufgelöst. <br>
                                 Wird dem Device bzw. der Device-Liste oder Geräte-Spezifikation ein "EXCLUDE=" vorangestellt, 
                                 werden diese Devices von der Selektion ausgeschlossen.                                
                                 <br><br>
@@ -15298,9 +15509,9 @@ sub bdump {
   <li><b>reading </b>         - Abgrenzung der DB-Selektionen auf ein bestimmtes oder mehrere Readings sowie exkludieren von
                                 Readings.
                                 Mehrere Readings werden als Komma separierte Liste angegeben. 
-								SQL Wildcard (%) wird in einer Liste als normales ASCII-Zeichen gewertet. <br>
+                                Es können SQL Wildcard (%) verwendet werden. <br>
                                 Wird dem Reading bzw. der Reading-Liste ein "EXCLUDE=" vorangestellt, werden diese Readings
-                                von der Selektion ausgeschlossen.
+                                nicht inkludiert.
                                 <br><br>  
 								
                                 <ul>
@@ -15308,8 +15519,8 @@ sub bdump {
 								<code>attr &lt;name&gt; reading etotal</code> <br>
 								<code>attr &lt;name&gt; reading et%</code> <br>
 								<code>attr &lt;name&gt; reading etotal,etoday</code> <br>
-                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=state  </code> <br>
-                                <code>attr &lt;name&gt; reading etotal,etoday EXCLUDE=Einspeisung%  </code> <br>
+                                <code>attr &lt;name&gt; reading eto%,Einspeisung EXCLUDE=etoday  </code> <br>
+                                <code>attr &lt;name&gt; reading etotal,etoday,Ein% EXCLUDE=%Wirkleistung  </code> <br>
 								</ul>
 								<br><br>
                                 </li>
