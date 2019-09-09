@@ -3,7 +3,7 @@
 #
 # The file is part of the SIGNALduino project.
 # The purpose of this module is to support many wireless BELL devices.
-# 2018 - HomeAuto_User & elektron-bbs
+# 2018 / 2019 - HomeAuto_User & elektron-bbs
 #
 ####################################################################################################################################
 # - wireless doorbell TCM_234759 Tchibo  [Protocol 15] length 12-20 (3-5)
@@ -35,6 +35,7 @@ package main;
 
 use strict;
 use warnings;
+use lib::SD_Protocols;
 
 ### HASH for all modul models ###
 my %models = (
@@ -67,18 +68,26 @@ my %models = (
 																							Protocol		=> "79",
 																							doubleCode	=> "no"
 																						},
+	"Grothe_Mistral_SE_01" =>	{	hex_lengh		=> "6",	# length of device def, not message!!! message length = "10"
+															Protocol		=> "96",
+															doubleCode	=> "no"
+														},
+	"Grothe_Mistral_SE_03" =>	{	hex_lengh		=> "6",	# length of device def, not message!!! message length = "12"
+															Protocol		=> "96",
+															doubleCode	=> "no"
+														},
 );
 
 
 sub SD_BELL_Initialize($) {
 	my ($hash) = @_;
-	$hash->{Match}			= "^P(?:15|32|41|42|57|79)#.*";
+	$hash->{Match}			= "^P(?:15|32|41|42|57|79|96)#.*";
 	$hash->{DefFn}			= "SD_BELL::Define";
 	$hash->{UndefFn}		= "SD_BELL::Undef";
 	$hash->{ParseFn}		= "SD_BELL::Parse";
 	$hash->{SetFn}			= "SD_BELL::Set";
 	$hash->{AttrFn}			= "SD_BELL::Attr";
-	$hash->{AttrList}		= "repeats:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 model:".join(",", sort keys %models) . " $main::readingFnAttributes";
+	$hash->{AttrList}		= "repeats:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,20,25,30 IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 model:".join(",", sort keys %models) . " $main::readingFnAttributes";
 	$hash->{AutoCreate}	=	{"SD_BELL.*" => {FILTER => "%NAME", autocreateThreshold => "4:180", GPLOT => ""}};
 }
 
@@ -128,7 +137,7 @@ sub Define($$) {
 	# Argument															0	   	1					2		    	3						4
 	return "SD_BELL: wrong syntax: define <name> SD_BELL <Protocol> <HEX-Value> <optional IODEV>" if(int(@a) < 3 || int(@a) > 5);
 	### checks - doubleCode yes ###
-	return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79)/s);
+	return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79|96)/s);
 	return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F)" if (($protocol != 41) && not $a[3] =~ /^[0-9a-fA-F]*$/s);
 	return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F) or length wrong!" if (($protocol == 41) && not $a[3] =~ /^[0-9a-fA-F]{8}_[0-9a-fA-F]{8}$/s);
 
@@ -166,9 +175,26 @@ sub Set($$$@) {
 
 	if ($cmd eq "?") {
 		$ret .= "ring:noArg";
+		$ret .= " Alarm:noArg" if ($protocol == 96);	# only Grothe_Mistral_SE
 	} else {
-		my $rawDatasend = $split[1];													# hex value from def without protocol
-		if ($rawDatasend =~ /[0-9a-fA-F]_[0-9a-fA-F]/s) {			# check doubleCode in def
+		if ($protocol == 96) {;	# only Grothe_Mistral_SE
+			# set sduino434 raw SC;;R=5;;SR;;R=1;;P0=1500;;P1=-215;;D=01;;SM;;R=1;;C=215;;D=47104762003F;;
+			my $msg = "SC;;R=";
+			$msg .= $repeats;
+			$msg .= ";SR;R=1;P0=1500;P1=-215;D=01;SM;R=1;C=215;D=47";
+			my $id = $split[1];
+			$id = sprintf('%06X', hex(substr($id,0,6)) | 0x800000) if ($cmd eq "Alarm");	# set alarm bit
+			$msg .= $id;
+			my $checksum = sprintf('%02X', ((0x47 + hex(substr($id,0,2)) + hex(substr($id,2,2)) + hex(substr($id,4,2))) & 0xFF));
+			$msg .= $checksum;
+			my $model = AttrVal($name,'model', 'Grothe_Mistral_SE_01');
+			$msg .= "3F" if ($model eq "Grothe_Mistral_SE_03");	# only Grothe_Mistral_SE_03
+			$msg .= ";";
+			IOWrite($hash, 'raw', $msg);
+			Log3 $name, 4, "$ioname: $name $msg";
+		} else {
+			my $rawDatasend = $split[1];													# hex value from def without protocol
+			if ($rawDatasend =~ /[0-9a-fA-F]_[0-9a-fA-F]/s) {			# check doubleCode in def
 			$doubleCodeCheck = 1;
 			@splitCode = split("_", $rawDatasend);
 			$rawDatasend = $splitCode[0];
@@ -181,20 +207,19 @@ sub Set($$$@) {
 		my $hlen = length($rawDatasend);
 		my $blen = $hlen * 4;
 		my $bitData = unpack("B$blen", pack("H$hlen", $rawDatasend));
-		
 		my $msg = "P$protocol#" . $bitData;
 		
-		$msg .= "#R$repeats";
-		Log3 $name, 3, "$ioname: $name sendMsg=$msg";
+		if ($model eq "Heidemann_|_Heidemann_HX_|_VTX-BELL") {
+			$msg .= "#R135";
+		} else {
+			$msg .= "#R$repeats";
+		}
 
-		if ($cmd ne "?") {
-			$cmd = "ring";
-		}				
-
-		Log3 $name, 3, "$ioname: $name set $cmd" if ($cmd ne "?");
-		IOWrite($hash, 'sendMsg', $msg);
+			Log3 $name, 3, "$ioname: $name sendMsg=$msg";
+			IOWrite($hash, 'sendMsg', $msg);
+		}
 	}
-
+	Log3 $name, 3, "$ioname: $name set $cmd" if ($cmd ne "?");
 	readingsSingleUpdate($hash, "state" , $cmd, 1) if ($cmd ne "?");
 	return $ret;
 }
@@ -222,6 +247,8 @@ sub Parse($$) {
 	my ($hash_name) = grep { $models{$_}{Protocol} eq $protocol } keys %models;				# search protocol --> model
 	my $deviceCode = $rawData;
 	my $devicedef;
+	my $state = "ring";
+	my $bat;
 
 	Log3 $iohash, 4, "$ioname: SD_BELL_Parse protocol $protocol $hash_name doubleCode=".$models{$hash_name}{doubleCode}." rawData=$rawData";	
 
@@ -312,6 +339,7 @@ sub Parse($$) {
 			$devicedef = $protocol . " " .$doubleCode_known;																									# variant two, RAWMSG in a different order
 			Log3 $iohash, 4, "$ioname: SD_BELL_Parse Check P$protocol doubleCode - $devicedef ready to define!";					# Error detections, another bit
 		}
+
 	### doubleCode no - P42 must be cut manually because message has no separator ###
 	} elsif ($protocol == 42) {
 		## only for RAWMSG receive from device
@@ -321,6 +349,20 @@ sub Parse($$) {
 		## if RAWMSG send from nano, not cut
 		$devicedef = $protocol . " " .$deviceCode;
 		Log3 $iohash, 4, "$ioname: SD_BELL_Parse Check P$protocol - $rawData alone";
+
+	### Grothe_Mistral_SE 01 or 03 length 10 or 12 nibble ###
+	} elsif ($protocol == 96) {
+		my $checksum = ((hex(substr($rawData,0,2)) + hex(substr($rawData,2,2)) + hex(substr($rawData,4,2)) + hex(substr($rawData,6,2))) & 0xFF);
+		if ($checksum != hex(substr($rawData,8,2))) {
+			Log3 $iohash, 3, "$ioname: SD_BELL_Parse Grothe_Mistral_SE $deviceCode - ERROR checksum $checksum";
+			return "";
+		}
+		$deviceCode = sprintf('%06X', hex(substr($rawData,2,6)) & 0x7FFFFF);	# mask alarm bit
+		$devicedef = $protocol . " " .$deviceCode;
+		$state = "Alarm" if (substr($bitData,8,1) eq "1");
+		$bat = substr($bitData,41,1) eq "0" ? "ok" : "low" if ($hlen == 12);	# only Grothe_Mistral_SE_03
+		Log3 $iohash, 4, "$ioname: SD_BELL_Parse Grothe_Mistral_SE P$protocol - $rawData";
+
 	### doubleCode no without P41 ###
 	} else {
 		$devicedef = $protocol . " " .$deviceCode;
@@ -340,12 +382,18 @@ sub Parse($$) {
 	$hash->{lastMSG} = $rawData;
 	$hash->{bitMSG} = $bitData;
 
+	### Grothe_Mistral_SE 01 or 03 length 10 or 12 nibble (only by first message) ###
+	if ($protocol == 96 && $hash->{STATE} eq "???") {
+		$attr{$name}{model} = "Grothe_Mistral_SE_01" if ($hlen == 10);
+		$attr{$name}{model} = "Grothe_Mistral_SE_03" if ($hlen == 12);
+	}
+
 	my $model = AttrVal($name, "model", "unknown");
-	my $state = "ring";
 	Log3 $name, 4, "$ioname: SD_BELL_Parse $name model=$model state=$state ($rawData)";
 
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $state);
+	readingsBulkUpdate($hash, "batteryState", $bat) if (defined($bat) && length($bat) > 0) ;
 	readingsEndUpdate($hash, 1); 		# Notify is done by Dispatch
 
 	return $name;
@@ -366,15 +414,13 @@ sub Attr(@) {
 	#Log3 $name, 3, "SD_BELL_Attr cmd=$cmd attrName=$attrName attrValue=$attrValue oldmodel=$oldmodel";
 
 	if ($cmd eq "set" && $attrName eq "model" && $attrValue ne $oldmodel) {		### set new attr
-
 		$check_ok = 1 if ($models{$attrValue}{hex_lengh} =~ /($hex_lengh)/);
 		return "SD_BELL: ERROR! You want to choose the $oldmodel model to $attrValue.\nPlease check your selection. Your HEX-Value in DEF with a length of " .$hex_lengh. " are not allowed on this model!" if ($check_ok != 1 && $hex_lengh != 0);
 		Log3 $name, 3, "SD_BELL_Attr $cmd $attrName to $attrValue from $oldmodel";
 	}
 
 	if ($cmd eq "del" && $attrName eq "model") {		### delete readings
-		readingsDelete($hash, "LastAction") if(defined(ReadingsVal($hash->{NAME},"LastAction",undef)));
-		readingsDelete($hash, "state") if(defined(ReadingsVal($hash->{NAME},"state",undef)));
+		readingsSingleUpdate($hash, "state" , "Please define a model for the correct processing",1);
 	}
 
 	return undef;
@@ -398,6 +444,7 @@ sub Attr(@) {
 	<li>Pollin 551227 [Protocol 42]</li>
 	<li>m-e doorbell fuer FG- and Basic-Serie  [Protocol 57]</li>
 	<li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protocol 79]</li>
+	<li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protocol 96]</li>
 	<br>
 	<u><i>Special feature Protocol 41, 2 different codes will be sent one after the other!</u></i>
 	</ul><br>
@@ -426,7 +473,8 @@ sub Attr(@) {
 		<li>model<br>
 		The attribute indicates the model type of your device.<br></li></ul>
 	<ul><li><a name="repeats"></a>repeats<br>
-		This attribute can be used to adjust how many repetitions are sent. Default is 5.</li></ul><br>
+		This attribute can be used to adjust how many repetitions are sent. Default is 5.<br>
+		<i>(For the model Heidemann_|_Heidemann_HX_|_VTX-BELL, the value repeats is fixed at 135!)</i></li></ul><br>
 		<br>
 </ul>
 =end html
@@ -443,6 +491,7 @@ sub Attr(@) {
 	<li>Pollin 551227 [Protokoll 42]</li>
 	<li>m-e doorbell f&uuml;r FG- und Basic-Serie  [Protokoll 57]</li>
 	<li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protokoll 79]</li>
+	<li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protokoll 96]</li>
 	<br>
 	<u><i>Besonderheit Protokoll 41, es sendet 2 verschiedene Codes nacheinader!</u></i>
 	</ul><br>
@@ -471,7 +520,8 @@ sub Attr(@) {
 		<li>model<br>
 		Das Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes.<br></li></ul>
 		<ul><li><a name="repeats"></a>repeats<br>
-		Mit diesem Attribut kann angepasst werden, wie viele Wiederholungen sendet werden. Standard ist 5.</li></ul><br>
+		Mit diesem Attribut kann angepasst werden, wie viele Wiederholungen gesendet werden. Standard ist 5.<br>
+		<i>(Bei dem Model Heidemann_|_Heidemann_HX_|_VTX-BELL ist der Wert repeats fest auf 135 gesetzt unabhäning vom eingestellten Attribut!)</i></li></ul><br>
 	<br>
 </ul>
 =end html_DE

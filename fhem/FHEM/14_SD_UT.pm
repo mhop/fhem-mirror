@@ -1093,20 +1093,14 @@ sub SD_UT_Parse($$) {
 		### Manax MX-RCS250 | mumbi [P90] ###
 		if (!$def && $protocol == 90) {
 			$deviceCode = substr($rawData,0,4);
-			my $button = substr($bitData,20,3);
-
-			foreach my $keys (sort keys %{$models{RC_10}{buttons}}) {
-				if ($keys eq $button) {
-					$devicedef = "RC_10 " . $deviceCode ."_".$models{RC_10}{buttons}{$keys};
-					$button = $models{RC_10}{buttons}{$keys};
-					last;
-				}
-			}
-			$def = $modules{SD_UT}{defptr}{$devicedef};
+            my $button = $models{RC_10}{buttons}{substr($bitData,20,3)};
+            $devicedef = "RC_10 ".$deviceCode."_".$button;			
+			$def       = $modules{SD_UT}{defptr}{$devicedef};
 			
-			$state = substr($bitData,23,1);
-			$state = $state eq "1" ? "on" : "off" if ($button ne "all");
-			if ($button eq "all") {
+			if ($button ne "all")
+			{
+				$state = substr($bitData,23,1) eq "1" ? "on" : "off" 
+			} else {
 				$state = substr($bitData,20,4);
 				if ($state eq "0100") {
 					$state = "on";
@@ -1117,11 +1111,16 @@ sub SD_UT_Parse($$) {
 					$def = undef;
 				}
 
-				### if receive device _all, set A | B | C | D ###
-				readingsSingleUpdate($defs{"RC_10_" . $deviceCode ."_A"}, "state" , $state , 1) if (defined $defs{"RC_10_" . $deviceCode ."_A"});
-				readingsSingleUpdate($defs{"RC_10_" . $deviceCode ."_B"}, "state" , $state , 1) if (defined $defs{"RC_10_" . $deviceCode ."_B"});
-				readingsSingleUpdate($defs{"RC_10_" . $deviceCode ."_C"}, "state" , $state , 1) if (defined $defs{"RC_10_" . $deviceCode ."_C"});
-				readingsSingleUpdate($defs{"RC_10_" . $deviceCode ."_D"}, "state" , $state , 1) if (defined $defs{"RC_10_" . $deviceCode ."_D"});
+				### if received data from device _all, set cannels A | B | C | D to state and trigger event ###
+				for ( "A" .. "D" ) {
+					my $defPtr = $modules{SD_UT}{defptr}{"RC_10 ".$deviceCode."_$_"};
+					if (defined $defPtr) {
+						readingsSingleUpdate($defPtr, "state" , $state , 1);
+						DoTrigger($defPtr->{NAME}, undef, 0);
+						Log3 $iohash, 5, "$ioname: SD_UT device - RC_10 devicedef: $defPtr->{NAME}";
+						Log3 $iohash, 5, "$ioname: SD_UT device - RC_10 button: $_ | state: $state";
+					}
+				}
 			}
 			Log3 $iohash, 4, "$ioname: SD_UT device - RC_10 devicedef: $devicedef";
 			Log3 $iohash, 4, "$ioname: SD_UT device - RC_10 button: $button | state: $state";
@@ -1193,8 +1192,10 @@ sub SD_UT_Parse($$) {
 	$model = AttrVal($name, "model", "unknown");
 	Log3 $name, 5, "$ioname: SD_UT_Parse devicedef=$devicedef attr_model=$model protocol=$protocol state=$state (before check)";
 
+	readingsBeginUpdate($hash);
+
 	############ Westinghouse_Delancey RH787T ############ Protocol 83 or 30 ############
-  if ($model eq "RH787T" && ($protocol == 83 || $protocol == 30)) {
+  	if ($model eq "RH787T" && ($protocol == 83 || $protocol == 30)) {
 		$state = substr($bitData,6,6);
 		$deviceCode = substr($bitData,1,4);
 
@@ -1360,11 +1361,9 @@ sub SD_UT_Parse($$) {
 		my $nibble5 = substr($bitData,20,4);			# Button and State
 		my $nibble6to8 = substr($bitData,24,9);		# unknown crc ? | SIGNALduino added to full nibble
 
-		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "x_n4" , $nibble4, 0);
 		readingsBulkUpdate($hash, "x_n5-8_on" , $nibble5.$nibble6to8, 0) if ($state eq "on");
 		readingsBulkUpdate($hash, "x_n5-8_off" , $nibble5.$nibble6to8, 0) if ($state eq "off");
-		readingsEndUpdate($hash, 1);
 
 		$deviceCode = substr($bitData,0,16);
 	} elsif ($model eq "KL_RF01" && $protocol == 93) {
@@ -1389,8 +1388,8 @@ sub SD_UT_Parse($$) {
 		$deviceCode = substr($rawData,0,8);
 	############ unknown ############
 	} else {
-		readingsSingleUpdate($hash, "state", "???", 0);
-		readingsSingleUpdate($hash, "unknownMSG", $bitData."  (protocol: ".$protocol.")", 1) if (AttrVal($name, "model", "unknown") eq "unknown");
+		readingsBulkUpdate($hash, "state", "???");
+		readingsBulkUpdate($hash, "unknownMSG", $bitData."  (protocol: ".$protocol.")") if (AttrVal($name, "model", "unknown") eq "unknown");
 		Log3 $name, 3, "$ioname: SD_UT Please define your model of Device $name in Attributes!" if (AttrVal($name, "model", "unknown") eq "unknown");
 		Log3 $name, 5, "$ioname: SD_UT_Parse devicedef=$devicedef attr_model=$model protocol=$protocol rawData=$rawData, bitData=$bitData";
 	}
@@ -1409,7 +1408,6 @@ sub SD_UT_Parse($$) {
 		}
 	}
 
-	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "deviceCode", $deviceCode, 0) if (defined($deviceCode) && $models{$model}{Typ} eq "remote");
 	readingsBulkUpdate($hash, "unknown_bits", $unknown_bits, 0) if (defined($unknown_bits) && $models{$model}{Typ} eq "remote");
 	readingsBulkUpdate($hash, "contact", $contact) if (defined($contact) && ($model eq "MD_210R" || $model eq "MD_2018R" || $model eq "MD_2003R"));
@@ -1582,7 +1580,7 @@ sub SD_UT_Attr(@) {
 
 			readingsSingleUpdate($hash, "state", $state, 0);
 
-			DoTrigger ("global","UNDEFINED unknown_please_select_model SD_UT unknown") if ($devicename eq "unknown_please_select_model");			# if user push attr return to unknown
+			DoTrigger ("global","UNDEFINED unknown_please_select_model SD_UT unknown") if ($devicename eq "unknown_please_select_model");		# if user push attr return to unknown
 			DoTrigger ("global","UNDEFINED $devicename SD_UT $devicemodel $deviceCode") if ($devicename ne "unknown_please_select_model");		# create new device
 
 			#CommandAttr( undef, "$devicename model $attrValue" ) if ($devicename ne "unknown_please_select_model");	# set model | Function not reliable !!!

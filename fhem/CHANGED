@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_BELL: added model Grothe_Mistral_SE_03 | Grothe_Mistral_SE_01
+                        fixed repeats Heidemann_|_Heidemann_HX_|_VTX-BELL
+ - bugfix: 14_SD_UT: fixed Manax MX-RCS250 | mumbi button ALL
  - feature: 88_HMCCU: new rpc set command
  - bugfix:  74_AMADautomagicFlowset: change Flowset Action TTS to use network
                 engine
