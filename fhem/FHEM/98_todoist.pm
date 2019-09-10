@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.1";
+my $version = "1.2.2";
 
 my $srandUsed;
 
@@ -421,7 +421,7 @@ sub todoist_UpdateTask($$$) {
       elsif ($type eq "delete") {
         $tType = "item_delete";
         %args = (
-          ids => '['.$taskId.']',
+          id => $taskId,
         );
         $method="POST";
       }
@@ -443,7 +443,7 @@ sub todoist_UpdateTask($$$) {
       Log3 $name,4, "todoist ($name): JSON sent to todoist API: ".Dumper($data);
       
       $param = {
-        url        => "https://todoist.com/sync/v8/sync",
+        url        => "https://api.todoist.com/sync/v8/sync",
         data       => $data,
         tTitle     => $title,
         method     => $method,
