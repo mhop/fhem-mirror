@@ -1,4 +1,4 @@
-REV 20134
+REV 20140
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-09_07:45:04 305406 ./CHANGED
+UPD 2019-09-10_07:45:02 305832 ./CHANGED
 UPD 2019-09-05_07:45:02 41648 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -112,9 +112,9 @@ UPD 2018-08-08_07:45:02 5776 FHEM/14_CUL_TX.pm
 UPD 2019-08-18_07:45:03 15593 FHEM/14_CUL_WS.pm
 UPD 2019-02-20_07:45:03 13627 FHEM/14_FLAMINGO.pm
 UPD 2019-02-21_07:45:03 19756 FHEM/14_Hideki.pm
-UPD 2019-02-20_07:45:03 20695 FHEM/14_SD_BELL.pm
+UPD 2019-09-10_07:45:02 23464 FHEM/14_SD_BELL.pm
 UPD 2019-07-20_07:45:03 12458 FHEM/14_SD_RSL.pm
-UPD 2019-08-21_07:45:02 117625 FHEM/14_SD_UT.pm
+UPD 2019-09-10_07:45:02 117310 FHEM/14_SD_UT.pm
 UPD 2019-07-20_07:45:03 56155 FHEM/14_SD_WS.pm
 UPD 2019-07-20_07:45:03 18840 FHEM/14_SD_WS07.pm
 UPD 2019-02-21_07:45:03 37479 FHEM/14_SD_WS09.pm
@@ -442,7 +442,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-04-03_07:45:02 55565 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2019-09-07_07:45:03 405768 FHEM/93_DbLog.pm
-UPD 2019-08-28_07:45:03 823616 FHEM/93_DbRep.pm
+UPD 2019-09-10_07:45:02 829489 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
 UPD 2019-02-19_07:45:03 70621 FHEM/93_PWMR.pm
@@ -547,7 +547,7 @@ UPD 2019-07-10_07:45:02 32751 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
-UPD 2019-04-14_07:45:03 86391 FHEM/98_todoist.pm
+UPD 2019-09-10_07:45:02 86395 FHEM/98_todoist.pm
 UPD 2019-07-31_07:45:02 22674 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
@@ -631,7 +631,7 @@ UPD 2019-09-09_07:45:03 333586 FHEM/lib/74_AMADautomagicFlowset_4.4.2.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-09-09_07:45:03 32875 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-08-01_07:45:03 96559 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-09-10_07:45:02 96588 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -729,12 +729,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-09_07:45:08 4115228 docs/commandref.html
-UPD 2019-09-07_07:45:10 2548787 docs/commandref_DE.html
+UPD 2019-09-10_07:45:07 4115210 docs/commandref.html
+UPD 2019-09-10_07:45:09 2548942 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-09_07:45:11 218045 docs/commandref_modular.html
-UPD 2019-09-09_07:45:13 229025 docs/commandref_modular_DE.html
+UPD 2019-09-10_07:45:10 218045 docs/commandref_modular.html
+UPD 2019-09-10_07:45:11 229025 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
