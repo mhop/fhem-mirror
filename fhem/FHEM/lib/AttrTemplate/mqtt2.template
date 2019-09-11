@@ -71,7 +71,7 @@ attr DEVICE setList\
   log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
   remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
-  y_device_setting:textField zigbee2mqtt/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
+  y_device_setting:textField BASE_TOPIC/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
   x_bind:textField BASE_TOPIC/bridge/bind/$EVTPART1 $EVTPART2\
   x_bind_unbind:textField BASE_TOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
   x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1",""options": {"$EVTPART2": "$EVTPART3"}}\
