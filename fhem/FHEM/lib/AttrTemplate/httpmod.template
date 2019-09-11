@@ -1,5 +1,5 @@
 ###########################################
-# $Id: httpmod.template  $
+# $Id: httpmod.template 20144 2019-09-11 05:51:25Z Beta-User $
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
@@ -426,6 +426,8 @@ attr DEVICE reading01Format https://www.eq-3.de%s
 attr DEVICE reading01Name fw_link
 attr DEVICE reading01RegOpt gi
 attr DEVICE reading01Regex <a.href="(\/downloads\/software\/firmware\/hm[^"]+)
+attr DEVICE reading02AutoNumLen 2
+attr DEVICE reading02Name changeLog_link
 attr DEVICE reading02OExpr $val=~m/(\/downloads\/software\/firmware\/[^"]+)/?"https://www.eq-3.de".$1:"none"
 attr DEVICE reading02RegOpt gis
 attr DEVICE reading02Regex (.{300})<a.href="\/downloads\/software\/firmware\/hm[^"]+
