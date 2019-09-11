@@ -109,6 +109,7 @@ sub KODI_Initialize($$)
   my ($hash) = @_;
   $hash->{DefFn}    = "KODI_Define";
   $hash->{SetFn}    = "KODI_Set";
+  $hash->{GetFn}    = "KODI_Get";
   $hash->{ReadFn}   = "KODI_Read";  
   $hash->{ReadyFn}  = "KODI_Ready";
   $hash->{UndefFn}  = "KODI_Undefine";
@@ -242,6 +243,7 @@ sub KODI_OnConnect($)
   $hash->{LAST_RECV} = time();
   
   KODI_Update($hash);
+  KODI_PvrUpdateChannels($hash);
   
   KODI_QueueIntervalUpdate($hash);
   
@@ -644,6 +646,30 @@ sub KODI_PlayerOnPlay($$)
   }
 }
 
+sub KODI_Get($@) {
+  my ( $hash, $name, $cmd, @args ) = @_;
+
+  return 'Module disabled!' if AttrVal($hash->{NAME}, 'disable', 0);
+
+  if ($cmd eq "update_channels") {
+    KODI_PvrUpdateChannels($hash);
+  }
+  elsif ($cmd eq "channelid") {
+    if ( !defined( $args[0] ) ) {
+      my $msg = "$hash->{NAME} channelid requires channel name parameter";
+      Log3( $hash, 3, $msg );
+      return $msg;
+    }
+
+    my $channel = join(" ", @args);
+    return KODI_PvrGetChannelId($hash, $channel);
+  } else {
+    return "Unknown command '$cmd', choose one of update_channels:noArg channelid";
+  }
+
+  return undef;
+}
+
 sub KODI_ProcessNotification($$) 
 {
   my ($hash,$obj) = @_;
@@ -778,27 +804,50 @@ sub KODI_ProcessResponse($$)
       KODI_Call($hash,$cmd,1);
     }
     delete $hash->{PendingPlayerCMDs}{$id};
-  }  
+  }
   else {
     # this is for handling other responses like responses to Application.GetProperties etc.
     my $result = $obj->{result};
     if($result && ref $result eq "HASH") {
-      Log3($name, 4, "$name: KODI_ProcessResponse: updating readings");
-      readingsBeginUpdate($hash);
-      foreach my $key (keys %$result) {
-        if ($key eq 'item') {
-          my $item = $obj->{result}->{item};
-          foreach my $ikey (keys %$item) {
-            my $value = $item->{$ikey};
-            KODI_CreateReading($hash,$ikey,$value);
+      if(exists($obj->{result}->{channelgroups})) {
+        Log3($name, 4, "$name: KODI_ProcessResponse: received channelgroups information");
+        readingsBeginUpdate($hash);
+        foreach my $cg (@{$obj->{result}->{channelgroups}}) {
+            my $cgid = $cg->{channelgroupid};
+            readingsBulkUpdate($hash, "channelgroup_${cgid}_type", $cg->{channeltype});
+            readingsBulkUpdate($hash, "channelgroup_${cgid}_label", $cg->{label});
+            
+            KODI_PvrGetChannels($hash, $cgid);
+        }
+        readingsEndUpdate($hash, 1);
+      } 
+      elsif(exists($obj->{result}->{channels})) {
+        Log3($name, 4, "$name: KODI_ProcessResponse: received channels information");
+        readingsBeginUpdate($hash);
+        foreach my $c (@{$obj->{result}->{channels}}) {
+            my $cid = $c->{channelid};
+            readingsBulkUpdate($hash, "channel_${cid}", $c->{label});
+        }
+        readingsEndUpdate($hash, 1);
+      }
+      else {
+        Log3($name, 4, "$name: KODI_ProcessResponse: updating readings");
+        readingsBeginUpdate($hash);
+        foreach my $key (keys %$result) {
+          if ($key eq 'item') {
+            my $item = $obj->{result}->{item};
+            foreach my $ikey (keys %$item) {
+              my $value = $item->{$ikey};
+              KODI_CreateReading($hash,$ikey,$value);
+            }
+          }
+          else {
+            my $value = $result->{$key};
+            KODI_CreateReading($hash,$key,$value);
           }
         }
-        else {
-          my $value = $result->{$key};
-          KODI_CreateReading($hash,$key,$value);
-        }
+        readingsEndUpdate($hash, 1);
       }
-      readingsEndUpdate($hash, 1);
     }
     else {
       Log3($name, 5, "$name: KODI_ProcessResponse: ignoring response: $result");
@@ -977,6 +1026,17 @@ sub KODI_Set($@)
   elsif($cmd eq 'openepisodeid') {
     return KODI_Set_Open($hash, 'episode', @args);
   }
+  elsif($cmd eq 'openchannel') {
+    my $channel = join(' ', @args);
+    my $cid = KODI_PvrGetChannelId($hash, $channel);
+    if ($cid == -1) {
+      my $msg = "Could not find channel $channel";
+      Log3($name, 4, "$name: KODI_Set: $msg");
+      return $msg;
+    }
+    @args = ($cid);
+    return KODI_Set_Open($hash, 'channel', @args);
+  }
   elsif($cmd eq 'openchannelid') {
     return KODI_Set_Open($hash, 'channel', @args);
   }
@@ -1121,7 +1181,7 @@ sub KODI_Set($@)
   my $res = "Unknown argument " . $cmd . ", choose one of " . 
     "off play:all,audio,video,picture playpause:all,audio,video,picture pause:all,audio,video,picture " . 
     "prev:all,audio,video,picture next:all,audio,video,picture goto stop:all,audio,video,picture " . 
-    "open opendir openmovieid openepisodeid openchannelid addon shuffle:toggle,on,off repeat:one,all,off volumeUp:noArg volumeDown:noArg " . 
+    "open opendir openmovieid openepisodeid openchannel openchannelid addon shuffle:toggle,on,off repeat:one,all,off volumeUp:noArg volumeDown:noArg " . 
     "seek back:noArg contextmenu:noArg down:noArg home:noArg info:noArg left:noArg " . 
     "right:noArg select:noArg send exec:left,right," . 
     "up,down,pageup,pagedown,select,highlight,parentdir,parentfolder,back," . 
@@ -1416,6 +1476,59 @@ sub KODI_PlayerCommand($$$)
   return KODI_Call($hash,$req,1);
 }
 
+sub KODI_PvrUpdateChannels($)
+{
+  my ($hash) = @_;
+  fhem("deletereading $hash->{NAME} channel_.*", 1);
+  fhem("deletereading $hash->{NAME} channelgroup_.*", 1);
+  
+  KODI_PvrGetChannelGroups($hash, "tv");
+  KODI_PvrGetChannelGroups($hash, "radio");
+}
+
+sub KODI_PvrGetChannelGroups($$) 
+{
+  my ($hash,$type) = @_;
+
+  my $id = KODI_CreateId($hash);
+  my $req = {
+    'method'  => 'PVR.GetChannelGroups',
+    'params' => { 'channeltype' => $type },
+    'id' => $id
+  };
+  return KODI_Call($hash,$req,1);
+}
+
+sub KODI_PvrGetChannels($$) 
+{
+  my ($hash,$channelGroupId) = @_;
+
+  my $id = KODI_CreateId($hash);
+  my $req = {
+    'method'  => 'PVR.GetChannels',
+    'params' => { 'channelgroupid' => $channelGroupId + 0 },
+    'id' => $id
+  };
+  return KODI_Call($hash,$req,1);
+}
+
+sub KODI_PvrGetChannelId($$) {
+  my ($hash, $channelname) = @_;
+  my $name = $hash->{NAME};
+
+  my $cid=1;
+    
+  Log3($name, 4, "$name: KODI_PvrGetChannelId: $channelname"); 
+      
+  my $readings = $defs{$name}{READINGS};
+  foreach my $rname (sort keys %{$readings}) {
+    next if (rindex($rname, "channel_", 0) < 0);
+    my $curname = ReadingsVal($name, $rname, undef);
+    return (split /_/, $rname)[1] if ($curname eq $channelname);
+  }
+  return -1;
+}
+
 #returns 'toggle' if the argument is undef
 #returns JSON::true if the argument is true and not equals "off" otherwise it returns JSON::false
 sub KODI_Toggle($) 
@@ -1684,7 +1797,14 @@ sub KODI_HTTP_Request($$@)
     is a issue of Kodi. The fix of this bug is included in future version of Kodi (> 12.2).
    
   </ul>
-  
+  <br/><br/>
+  <a name="KODIget"></a>
+  <b>Get</b>
+  <ul> 
+    <li><b>update_channels</b> -  fetches all channel groups and all channels from Kodi. The readings "channel_..." and "channelgroup_..." will be filled. Channels will also be automatically updated when the connection is established.</li>
+    <li><b>channelid [&lt;channel_name&gt;]</b> -  resolves a channel name and returns its ID. Returns -1 for unknown channels.</li>
+  </ul>
+      <br/><br/>
   <a name="KODIset"></a>
   <b>Set</b>
   <ul>
@@ -1707,6 +1827,7 @@ sub KODI_HTTP_Request($$@)
     <li><b>opendir &lt;path&gt;</b> -  Plays the content of the directory</li>
     <li><b>openmovieid &lt;path&gt;</b> -  Plays a movie by id</li>
     <li><b>openepisodeid &lt;path&gt;</b> -  Plays an episode by id</li>
+    <li><b>openchannel &lt;path&gt;</b> -  Switches to channel by name.</li>
     <li><b>openchannelid &lt;path&gt;</b> -  Switches to channel by id</li>
     <li><b>addon &lt;addonid&gt; &lt;parametername&gt; &lt;parametervalue&gt;</b> -  Executes addon with one Parameter, for example set kodi addon script.json-cec command activate</li>
     <li><b>seek &lt;hh:mm:ss&gt;</b> - seek to the specified time</li>

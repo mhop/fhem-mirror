@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_KODI: Added fetching of channel names and command openchannel to
+                        open channel by names. Channel IDs will be converted
+                        automatically.
  - feature: 93_DbRep: SQL Wildcard (%) usage possible as placeholder in a 
                       reading- or device-list. Forum: #101756,
                       internal code changes of SQL statement generation
