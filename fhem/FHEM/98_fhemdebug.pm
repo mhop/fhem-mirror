@@ -37,9 +37,6 @@ fhemdebug_Fn($$)
   } elsif($param eq "status") {
     return "fhemdebug is ".($fhemdebug_enabled ? "enabled":"disabled");
 
-  } elsif($param =~ m/^memusage/) {
-    return fhemdebug_memusage($param);
-
   } elsif($param =~ m/^timerList/) {
     return fhemdebug_timerList($param);
 
@@ -49,7 +46,7 @@ fhemdebug_Fn($$)
     return;
 
   } else {
-    return "Usage: fhemdebug {enable | disable | status | memusage | ".
+    return "Usage: fhemdebug {enable | disable | status | ".
                         "timerList | addTimerStacktrace {0|1} }";
   }
 }
@@ -108,104 +105,6 @@ fhemdebug_CallFn(@)
   }
 }
 
-
-sub
-fhemdebug_memusage($)
-{
-  my ($param) = @_;
-  eval "use Devel::Size";
-  return $@ if($@);
-
-  $Devel::Size::warn = 0;
-  my @param = split(" ", $param);
-  my $max = 50;
-  my $elName = "%main::";
-  $max = pop(@param) if(@param > 1 && $param[$#param] =~ m/^\d+$/);
-  $elName = pop(@param) if(@param > 1);
-  my %ts;
-
-  my $el;
-  my $cmd = "\$el = \\$elName";
-  eval $cmd;
-  return $@ if($@);
-
-
-  my $elName2 = $elName;
-  if($elName ne "%main::") {
-    if($elName =~ m/^%\{(\$.*)\}$/) {
-      $elName = $1;
-      $elName2 = $elName;
-      $elName2 =~ s/'/\\'/g;
-    } else {
-      $elName =~ s/%/\$/;
-      $elName2 = $elName;
-    }
-  }
-
-  no warnings;
-  if(ref $el eq "HASH") {
-    for my $k (keys %{$el}) {
-      next if($elName eq "%main::" && 
-                ($k =~ m/[^A-Z0-9_:]/i ||
-                 $k =~ m/^\d+$/ || 
-                 $k =~ m/::$/ || 
-                 exists &{$k}));
-
-      Log 5, "Memusage checking $k";
-      if($elName eq "%main::") {
-        my $t = '@';
-        if(eval "ref \\$t$k" eq "ARRAY") {
-          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
-          eval $cmd;
-        }
-        $t = '%';
-        if(eval "ref \\$t$k" eq "HASH") {
-          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
-          eval $cmd;
-        }
-        $t = '$';
-        if(eval "ref \\$t$k" eq "SCALAR") {
-          $cmd = "\$ts{'$t$k'} = Devel::Size::total_size(\\$t$k)";
-          eval $cmd;
-        }
-
-      } else {
-        my $k2 = "{$elName\{'$k'}}";
-        my $k3 = "{$elName2\{\\'$k\\'}}";
-        my $k4 = "$elName\{$k}";
-        my $k5 = "$elName2\{\\'$k\\'}";
-        my $t = '@';
-        if(eval "ref \\$t$k2" eq "ARRAY") {
-          $cmd = "\$ts{'$t$k3'} = Devel::Size::total_size(\\$t$k2)";
-          eval $cmd;
-        }
-        $t = '%';
-        if(eval "ref \\$t$k2" eq "HASH") {
-          $cmd = "\$ts{'$t$k3'} = Devel::Size::total_size(\\$t$k2)";
-          eval $cmd;
-        }
-        if(eval "ref \\$k4" eq "SCALAR") {
-          $cmd = "\$ts{'$k5'} = Devel::Size::total_size(\\$k4)";
-          eval $cmd;
-        }
-      }
-
-    }
-  } else {
-    $ts{$elName} = Devel::Size::total_size($el);
-  }
-  use warnings;
-
-  my @sts = sort { $ts{$b} == $ts{$a} ? $a cmp $b :
-                  $ts{$b} <=> $ts{$a} } keys %ts;
-  my @ret;
-  for(my $i=0; $i < @sts; $i++) {
-    push @ret, sprintf("%4d. %-30s %8d", $i+1, $sts[$i], $ts{$sts[$i]});
-    last if(@ret >= $max);
-  }
-  return join("\n", @ret);
-}
-
 sub
 fhemdebug_timerList($)
 {
@@ -245,21 +144,6 @@ fhemdebug_timerList($)
       As it frequently examines internal data-structures, it uses a lot of CPU,
       it is not recommended to enable it all the time. A FHEM restart after
       disabling it is not necessary.<br>
-      </li>
-
-    <li>memusage [datastructure] [nr]<br>
-      Dump the name of the first nr datastructures with the largest memory
-      footprint. Dump only datastructure, if specified.<br>
-      <b>Notes</b>:
-      <ul>
-        <li>this function depends on the Devel::Size module, so this must be
-          installed first.</li>
-        <li>the function will only display globally visible data (no module or
-          function local variables).</li>
-        <li>The used function Devel::Size::total_size may crash perl (and FHEM)
-          for some other data structures. It works for me, but make sure you
-          saved your fhem.cfg before calling it. </li>
-      </ul>
       </li>
 
     <li>timerList<br>
