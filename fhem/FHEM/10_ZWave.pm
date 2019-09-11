@@ -146,6 +146,7 @@ my %zwave_class = (
     get   => { ccCapability=> '01', # no more args
                ccStatus    => '03%02x' },
     set   => { # Forum #36050
+               color       => 'ZWave_ccColorSet("%s")',
                rgb         => '05050000010002%02x03%02x04%02x', # Forum #44014
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
     parse => { "043302(..)(..)"=> 'ZWave_ccCapability($1,$2)',
@@ -2534,6 +2535,27 @@ ZWave_doorLLRParse($$)
     return "doorLockLoggingRecord:$val";
   }
 }
+
+
+sub
+ZWave_ccColorSet($)
+{
+  my ($spec) = @_;
+  my @arg = split(/\s+/, $spec);
+  my $usage = "wrong arg, need: colorComponent level colorComponent level ...";
+
+  return ($usage,"") if(@arg < 1 || int(@arg) > 18 || (int(@arg))%2 != 0);
+  my $ret;
+  $ret = sprintf("%02x", (int(@arg))/2);
+  for(my $i=0; $i<@arg; $i+=2) {
+    return ($usage, "") if($arg[$i] !~ m/^(\d)$/ || $1 > 8);
+    $ret .= sprintf("%02x", $arg[$i]);
+    return ($usage, "") if($arg[$i+1] !~ m/^(\d+)$/ || $1 < 0 || $1 > 255);
+    $ret .= sprintf("%02x", $arg[$i+1]);
+  }
+  return ("", "05$ret");
+}
+
 
 my @zwave_wd = ("none","mon","tue","wed","thu","fri","sat","sun");
 
@@ -5934,6 +5956,13 @@ ZWave_firmwareUpdateParse($$$)
     </li>
 
   <br><br><b>Class COLOR_CONTROL</b>
+  <li>color colorComponent level colorComponent level ...<br>
+    Set the colorComponent(s) to level<br>
+    Up to 8 pairs of colorComponent level may be specified.<br>
+    colorComponent is a decimal value from 0 to 8:<br>
+    0 = warm white, 1 = cold white, 2 = red, 3 = green, 4 = blue, 
+    5 = amber,6 = cyan, 7 = purple, 8 = indexed color<br>
+    level is specified with a value from 0 to 255.</li>
   <li>rgb<br>
     Set the color of the device as a 6 digit RGB Value (RRGGBB), each color is
     specified with a value from 00 to ff.</li>
