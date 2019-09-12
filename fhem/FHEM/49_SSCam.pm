@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPHASHOLD ",
   "8.16.3" => "13.08.2019  commandref revised ",
   "8.16.2" => "17.07.2019  change function SSCam_ptzpanel using css stylesheet ",
   "8.16.1" => "16.07.2019  fix warnings ",
@@ -1950,7 +1951,7 @@ sub SSCam_FWdetailFn ($$$$) {
       $ret .= $hash->{".setup"};
   }
   
-  $hash->{".ptzhtml"} = SSCam_ptzpanel($d) if($hash->{".ptzhtml"} eq "");
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($d,$d) if($hash->{".ptzhtml"} eq "");
 
   if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
@@ -5487,7 +5488,9 @@ sub SSCam_camop_parse ($) {
                         my %sendsnaps = ();  # Schnappschuss Hash zum Versand wird leer erstellt
 
                         if($hash->{HELPER}{".SNAPHASH"}) {
-                            $hash->{HELPER}{".SNAPHASHOLD"} = delete($hash->{HELPER}{".SNAPHASH"});
+                        	foreach my $key (sort(keys%{$hash->{HELPER}{".SNAPHASH"}})) {
+                                $hash->{HELPER}{".SNAPHASHOLD"}{$key} = delete($hash->{HELPER}{".SNAPHASH"}{$key});
+	                        }    
                         }
                             
 						while ($data->{'data'}{'data'}[$i]) {
@@ -5531,13 +5534,12 @@ sub SSCam_camop_parse ($) {
                                                													
                         if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
-                            delete $hash->{HELPER}{".SNAPHASHOLD"};
                         }
                         
 					    # prüfen ob Schnappschuß versendet werden soll
@@ -5552,7 +5554,9 @@ sub SSCam_camop_parse ($) {
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
                         if($hash->{HELPER}{".SNAPHASH"}) {
-                            $hash->{HELPER}{".SNAPHASHOLD"} = delete($hash->{HELPER}{".SNAPHASH"});
+                        	foreach my $key (sort(keys%{$hash->{HELPER}{".SNAPHASH"}})) {
+                                $hash->{HELPER}{".SNAPHASHOLD"}{$key} = delete($hash->{HELPER}{".SNAPHASH"}{$key});
+	                        }
                         }
                         
                         while ($data->{'data'}{'data'}[$i]) {
@@ -5589,13 +5593,12 @@ sub SSCam_camop_parse ($) {
                         $sn     = 0; 
                         if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
+                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
-                            delete $hash->{HELPER}{".SNAPHASHOLD"};
                         }
                         
                         # Direktausgabe Snaphash wenn nicht gepollt wird
@@ -5618,7 +5621,8 @@ sub SSCam_camop_parse ($) {
                 
                 SSCam_closeTrans($hash);                                        # Transaktion beenden
 				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
-
+                delete $hash->{HELPER}{".SNAPHASHOLD"};
+                
 				########  fallabhängige Eventgenerierung  ########
                 if ($hash->{HELPER}{INFORM} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
                     # Snap durch SSCamSTRM-Device ausgelöst
@@ -6963,8 +6967,8 @@ sub SSCam_ptzpanel(@) {
   
   return "" if(SSCam_myVersion($hash) <= 71);
   
-  $pbs      = AttrVal("$ptzcdev","ptzButtonSize", 100);                                                     # Größe der Druckbuttons in %
-  $pbsf     = AttrVal("$ptzcdev","ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
+  $pbs      = AttrVal($ptzcdev,"ptzButtonSize", 100);                                                     # Größe der Druckbuttons in %
+  $pbsf     = AttrVal($ptzcdev,"ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
  
   $ptz_ret  = "";
   $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
@@ -7223,19 +7227,21 @@ sub SSCam_StreamDev($$$;$) {
       $cmdrefresh    = "ftui.setFhemStatus('set $camname refresh STRM:$uuid')";      
   }
   
-  my $ha     = AttrVal($camname, "htmlattr", 'width="500" height="325"');   # HTML Attribute der Cam
-  $ha        = AttrVal($strmdev, "htmlattr", $ha);                          # htmlattr mit htmlattr Streaming-Device übersteuern 
+  my $ha  = AttrVal($camname, "htmlattr", 'width="500" height="325"');      # HTML Attribute der Cam
+  $ha     = AttrVal($strmdev, "htmlattr", $ha);                             # htmlattr mit htmlattr Streaming-Device übersteuern 
   if($ftui) {
       $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                         # wenn aus FTUI aufgerufen divers setzen 
   }
   
-  my $pws    = AttrVal($strmdev, "popupWindowSize", "");                    # Größe eines Popups
-  $pws       =~ s/"//g if($pws);
+  my $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+  
+  my $pws = AttrVal($strmdev, "popupWindowSize", "");                       # Größe eines Popups
+  $pws    =~ s/"//g if($pws);
   
   my $show = $defs{$streamHash->{PARENT}}->{HELPER}{ACTSTRM} if($streamHash->{MODEL} =~ /switched/);
   $show = $show?"($show)":"";
   
-  my $alias  = AttrVal($strmdev, "alias", $strmdev);                         # Linktext als Aliasname oder Devicename setzen
+  my $alias  = AttrVal($strmdev, "alias", $strmdev);                        # Linktext als Aliasname oder Devicename setzen
   my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
   
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
@@ -7316,15 +7322,16 @@ sub SSCam_StreamDev($$$;$) {
           $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);               # Statusbit wenn ein Stream aktiviert ist      
       }
-            
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
@@ -7351,7 +7358,9 @@ sub SSCam_StreamDev($$$;$) {
           } else {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
           }
-          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          if(!$hf) {
+              $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          }
           $ret .= "</td>";
           $streamHash->{HELPER}{STREAM} = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                  # Statusbit wenn ein Stream aktiviert ist
@@ -7393,16 +7402,18 @@ sub SSCam_StreamDev($$$;$) {
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-      $ret .= $imgblank;
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+          $ret .= $imgblank;
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
@@ -7438,17 +7449,18 @@ sub SSCam_StreamDev($$$;$) {
       
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
-      
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-      $ret .= $imgblank;
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          }	else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
-          }	      
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";               
+      if(!$hf) {
+          $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+          $ret .= $imgblank;
+          if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
+                 # Aufnahmebutton endlos Start
+                 $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+              }	else {
+                 # Aufnahmebutton Stop
+                 $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+              }	      
+          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      }      
       $ret .= "</td>";      
       if(AttrVal($camname,"ptzPanel_use",1)) {
           my $ptz_ret = SSCam_ptzpanel($camname,$strmdev,'',$ftui);
@@ -7704,7 +7716,7 @@ sub SSCam_composegallery ($;$$$) {
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
-  my ($alias,$dlink) = ("","");
+  my ($alias,$dlink,$hf) = ("","","");
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7735,10 +7747,10 @@ sub SSCam_composegallery ($;$$$) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
       $pws =~ s/"//g if($pws);
       $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
+      $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
-  
   }
   
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
@@ -7814,7 +7826,9 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+  if(!$hf) {
+      $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+  }
   $htmlCode .= "</html>";
 
 return $htmlCode;

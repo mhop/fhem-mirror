@@ -35,6 +35,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.8.0"  => "09.09.2019  new attribute hideFooter ",
   "2.7.0"  => "15.07.2019  FTUI support, new attributes htmlattrFTUI, hideDisplayNameFTUI, ptzButtonSize, ptzButtonSizeFTUI ",
   "2.6.0"  => "21.06.2019  GetFn -> get <name> html ",
   "2.5.0"  => "27.03.2019  add Meta.pm support ",
@@ -85,6 +86,7 @@ sub SSCamSTRM_Initialize($) {
                                 "htmlattrFTUI ".
                                 "hideDisplayName:1,0 ".
                                 "hideDisplayNameFTUI:1,0 ".
+                                "hideButtons:1,0 ".
                                 "popupWindowSize ".
                                 "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
@@ -527,6 +529,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </li>
     
+    <a name="hideButtons"></a>
+    <li><b>hideButtons</b><br>
+      Hide the buttons in the footer. It has no impact for streaming devices of type "switched".    
+    </li>
+    <br>
+    
     <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
       Hide the device/alias name (link to detail view).     
@@ -750,7 +758,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       Devicenamen bzw. das Attribut "popupWindowSize" im Streaming-Device, welches die Größe eines Popup-Windows festlegt.    
     </ul>
     <br><br>
-    </li>    
+    </li> 
+
+    <a name="hideButtons"></a>
+    <li><b>hideButtons</b><br>
+      Verbirgt die Drucktasten in der Fußzeile. Dieses Attribut hat keinen Einfluß bei Streaming-Devices vom Typ "switched".    
+    </li>
+    <br>    
     
     <a name="hideDisplayName"></a>
     <li><b>hideDisplayName</b><br>
