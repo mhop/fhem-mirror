@@ -32,6 +32,15 @@
 # https://api.openweathermap.org/data/2.5/forecast?lat=[lat]&lon=[long]&APPID=[API]   Forecast
 # https://openweathermap.org/weather-conditions     Icons und Conditions ID's
 
+package OpenWeatherMapAPI;
+use strict;
+use warnings;
+use FHEM::Meta;
+use Data::Dumper;
+
+FHEM::Meta::Load(__PACKAGE__);
+use version 0.50; our $VERSION = $main::packages{OpenWeatherMapAPI}{META}{version};
+
 package OpenWeatherMapAPI::Weather;
 use strict;
 use warnings;
@@ -116,7 +125,6 @@ eval "use Encode qw(encode_utf8);1" or $missingModul .= "Encode ";
 # use Data::Dumper;    # for Debug only
 ## API URL
 use constant URL     => 'https://api.openweathermap.org/data/2.5/';
-use constant VERSION => '0.4.0';
 ## URL . 'weather?' for current data
 ## URL . 'forecast?' for forecast data
 
@@ -237,6 +245,15 @@ sub setRetrieveData {
     return 0;
 }
 
+sub setLocation {
+    my ($self,$lat,$long) = @_;
+
+    $self->{lat}            = $lat;
+    $self->{long}           = $long;
+
+    return 0;
+}
+
 sub getFetchTime {
     my $self = shift;
 
@@ -253,11 +270,18 @@ sub _RetrieveDataFromOpenWeatherMap($) {
     my $self = shift;
 
     # retrieve data from cache
-    if ( $self->{endpoint} eq 'none' ) {
-        if ( ( time() - $self->{fetchTime} ) < $self->{cachemaxage} ) {
-            return _CallWeatherCallbackFn($self);
-        }
+    if (  ( time() - $self->{fetchTime} ) < $self->{cachemaxage}
+        and $self->{cached}->{lat} == $self->{lat}
+        and $self->{cached}->{long} == $self->{long}
+      )
+    {
+        return _CallWeatherCallbackFn($self);
     }
+
+    $self->{cached}->{lat}  = $self->{lat}
+      unless ( $self->{cached}->{lat} == $self->{lat} );
+    $self->{cached}->{long} = $self->{long}
+      unless ( $self->{cached}->{long} == $self->{long} );
 
     my $paramRef = {
         timeout  => 15,
@@ -582,7 +606,7 @@ sub _CreateForecastRef($) {
             long => $self->{long},
             apiMaintainer =>
 'Leon Gaultier (<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>)',
-            apiVersion => VERSION,
+            apiVersion    => version->parse(OpenWeatherMapAPI->VERSION())->normal,
         }
     );
 
@@ -611,3 +635,51 @@ sub strftimeWrapper(@) {
 ##############################################################################
 
 1;
+
+
+=pod
+
+=encoding utf8
+
+=for :application/json;q=META.json OpenWeatherMapAPI.pm
+{
+  "abstract": "Weather API for Weather OpenWeatherMap",
+  "x_lang": {
+    "de": {
+      "abstract": "Wetter API für OpenWeatherMap"
+    }
+  },
+  "version": "v1.0.0",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM::Meta": 0,
+        "HttpUtils": 0,
+        "strict": 0,
+        "warnings": 0,
+        "constant": 0,
+        "POSIX": 0,
+        "JSON::PP": 0
+      },
+      "recommends": {
+        "JSON": 0
+      },
+      "suggests": {
+        "JSON::XS": 0,
+        "Cpanel::JSON::XS": 0
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
+=cut

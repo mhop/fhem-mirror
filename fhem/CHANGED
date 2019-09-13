@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 59_Weather.pm: plus all API Files - Add new Modul setter newLocation
  - feature: 49_SSCam(STRM): hide buttons in streaming device with new attribute
                             hideFooter, minor code changes
  - feature  73_AutoShuttersControl: add roommate value for ASC_Up/Down for
