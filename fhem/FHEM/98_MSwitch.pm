@@ -2578,26 +2578,38 @@ sub MSwitch_Attr(@) {
         delete( $hash->{helper}{savemodeblock} );
         delete( $hash->{READINGS}{Safemode} );
         MSwitch_Createtimer($hash);
+		
+		if ( ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne 'no_trigger' 
+		and ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne "MSwitch_Self")
+		{
+		$hash->{NOTIFYDEV} = ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+		}
+		
+		if ( $init_done == 1 and ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) eq "MSwitch_Self")
+		{
+		$hash->{NOTIFYDEV} = $name;
+		}
     }
 
-    if (    $cmd eq 'set'
-         && $aName eq 'disable'
-         && $aVal == 0
-         && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
-         'no_trigger' )
-    {
-        $hash->{NOTIFYDEV} =
-          ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-    }
+    
+   # {
+	
+		# my $notedef = ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+		# if ($notedef  eq "MSwitch_Self" ) {$notedef = $name}
+		# $hash->{NOTIFYDEV} = $notedef;
+	
+	
+        
+    #}
 
-    if (    $cmd eq 'del'
-         && $aName eq 'disable'
-         && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
-         'no_trigger' )
-    {
-        $hash->{NOTIFYDEV} =
-          ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
-    }
+    # if (    $cmd eq 'del'
+         # && $aName eq 'disable'
+         # && ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne
+         # 'no_trigger' )
+    # {
+        # $hash->{NOTIFYDEV} =
+          # ReadingsVal( $name, 'Trigger_device', 'no_trigger' );
+    # }
 
     if ( $aName eq 'MSwitch_Activate_MSwitchcmds' && $aVal == 1 ) {
         addToAttrList('MSwitchcmd');
@@ -2662,12 +2674,33 @@ sub MSwitch_Attr(@) {
             }
         }
 
+
+
+
+
+
+
+
+
+
         if ( $testarg eq 'disable' ) {
             MSwitch_Delete_Delay( $hash, "all" );
             MSwitch_Clear_timer($hash);
             delete( $hash->{helper}{savemodeblock} );
             delete( $hash->{READINGS}{Safemode} );
         }
+
+
+
+
+
+
+
+
+
+
+
+
 
         if ( $testarg eq 'MSwitch_Reset_EVT_CMD1_COUNT' ) {
             delete( $hash->{READINGS}{EVT_CMD1_COUNT} );
@@ -8633,6 +8666,12 @@ sub MSwitch_Createtimer($) {
     my $i  = 0;
     my $id = "";
   LOOP2: foreach my $option (@timer) {
+  
+  
+ 
+  
+  
+  
         $i++;
         $id = "";
 
@@ -8645,8 +8684,11 @@ sub MSwitch_Createtimer($) {
         $option =~ s/$key//ig;
 
         my $y = 0;
+		
+
+
         while ( $option =~
-m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0,7})(.*)?/
+m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9!\$we]{0,7})(.*)?/
           )
         {
             $y++;
@@ -8654,10 +8696,13 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
 
             my $part1 = '';
             $part1 = $1 . ' ' if defined $1;
+			
             my $part6 = '';
-            if ( defined $6 && $part6 ne '' ) { $part6 = '|' . $6 }
+            if ( defined $6 && $6 ne '' ) { $part6 = '|' . $6 }
+			
             my $part7 = '';
             $part7 = ' ' . $7 if defined $7;
+	
             my $sectoadd     = $2 * 3600 + $3 * 60;
             my $t1           = $4;
             my $t2           = $5;
@@ -8692,13 +8737,15 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
             while ( $timecond1 < $timecond2 ) {
 
                 #my $timestamp = FmtDateTime($timecond1);
-                my $timestamp =
-                  substr( FmtDateTime($timecond1), 11, 5 ) . $part6;
+                my $timestamp =substr( FmtDateTime($timecond1), 11, 5 ) . $part6;
+							
                 $timecond1 = $timecond1 + $sectoadd;
                 push( @newarray, $timestamp );
             }
             my $newopt = join( ' ', @newarray );
             my $newoption = $part1 . $newopt . $part7;
+						
+			
             $newoption =~ s/  / /g;
             $option = $newoption;
         }
@@ -8709,33 +8756,40 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
       LOOP3: foreach my $option1 (@optionarray) {
             $id = "";
             next LOOP3 if $option1 eq "";
-            if ( $option1 =~ m/(.*)\|(ID.*)$/ ) {
-                $id = $2;
-                $option1 = $1;
-            }
+			
+			
+            if ( $option1 =~ m/(.*)\|(ID.*)$/ ) 
+				{
+					$id = $2;
+					$option1 = $1;
+				}
 
-            if ( $option1 =~
-                 m/\?(.*)(-)([0-9]{2}:[0-9]{2})(\|[0-9]{0,7})?(.*)?/ )
-            {
-                my $testrandom = $1 . $2 . $3;
-                my $part4      = '';
-                $part4 = $4 if defined $4;
-                my $opdays = $part4;
 
-                #testrandomsaved erstellen
-                my $newoption1 = MSwitch_Createrandom( $hash, $1, $3 );
-                $option1 = $newoption1 . $opdays;
-            }
+            if ( $option1 =~m/\?(.*)(-)([0-9]{2}:[0-9]{2})(\|[0-9]{0,7})?(.*)?/ )
+					{
+						my $testrandom = $1 . $2 . $3;
+						my $part4      = '';
+						$part4 = $4 if defined $4;
+						my $opdays = $part4;
 
-            if ( $option1 =~ m/{/i || $option1 =~ m/}/i ) {
-                my $newoption1 = MSwitch_ChangeCode( $hash, $option1 );
-                $option1 = $newoption1;
-            }
+						#testrandomsaved erstellen
+						my $newoption1 = MSwitch_Createrandom( $hash, $1, $3 );
+						$option1 = $newoption1 . $opdays;
+					}
+
+            if ( $option1 =~ m/{/i || $option1 =~ m/}/i ) 
+					{
+						my $newoption1 = MSwitch_ChangeCode( $hash, $option1 );
+						$option1 = $newoption1;
+					}
+
+
 
             my ( $time, $days ) = split /\|/, $option1;
 
             $time = '' if ( !defined $time );
             $days = '' if ( !defined $days );
+
 
             if ( $days eq '!$we' || $days eq '$we' ) {
                 my $we = AnalyzeCommand( 0, '{return $we}' );
@@ -8752,7 +8806,7 @@ m/(.*?)([0-9]{2}):([0-9]{2})\*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})\|?([0-9]{0
 
             $time = $time . ':00';
             delete( $hash->{helper}{error} );
-            if ( substr( $time, 0, 2 ) > 23 || substr( $time, 3, 2 ) > 59 ) {
+            if ( $time ne "undef:00" and (substr( $time, 0, 2 ) > 23 || substr( $time, 3, 2 ) > 59) ) {
                 $hash->{helper}{wrongtimespec} =
                   "ERROR: wrong timespec. $option $i";
                 return;
