@@ -1,4 +1,4 @@
-REV 20150
+REV 20152
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-12_07:45:02 306152 ./CHANGED
+UPD 2019-09-13_07:45:03 306291 ./CHANGED
 UPD 2019-09-05_07:45:02 41648 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -275,8 +275,8 @@ UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2019-03-14_07:45:02 59185 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2019-08-14_07:45:03 670496 FHEM/49_SSCam.pm
-UPD 2019-07-16_07:45:03 32188 FHEM/49_SSCamSTRM.pm
+UPD 2019-09-13_07:45:03 671318 FHEM/49_SSCam.pm
+UPD 2019-09-13_07:45:03 32696 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
@@ -729,12 +729,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-12_07:45:06 4115677 docs/commandref.html
-UPD 2019-09-10_07:45:09 2548942 docs/commandref_DE.html
+UPD 2019-09-13_07:45:07 4115864 docs/commandref.html
+UPD 2019-09-13_07:45:10 2549156 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-12_07:45:10 218053 docs/commandref_modular.html
-UPD 2019-09-12_07:45:11 229033 docs/commandref_modular_DE.html
+UPD 2019-09-13_07:45:11 218065 docs/commandref_modular.html
+UPD 2019-09-13_07:45:12 229045 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
