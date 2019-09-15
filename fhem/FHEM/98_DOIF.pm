@@ -2164,7 +2164,7 @@ sub CheckReadingDoIf($$$)
 
 sub CheckRegexpDoIf
 {
-  my ($hash,$type,$device,$id,$eventa,$readingupdate)=@_;
+  my ($hash,$type,$device,$id,$eventa,$eventas,$readingupdate)=@_;
   my $nameExp;
   my $notifyExp;
   my $event;
@@ -2208,11 +2208,18 @@ sub CheckRegexpDoIf
               }
               return $i;
             }
-            my $max=defined $eventa ? int(@{$eventa}):0;
+            my $events_temp;
+            if (substr($i,0,1) eq '"') {
+              $events_temp=$eventa;
+            }
+            else {
+              $events_temp=$eventas;
+            }
+            my $max=defined $events_temp ? int(@{$events_temp}):0;
             my $s;
             my $found;
             for (my $j = 0; $j < $max; $j++) {
-              $s = $eventa->[$j];
+              $s = $events_temp->[$j];
               $s = "" if(!defined($s));
               $found = ($s =~ m/$notifyExp/);
               if ($found) {
@@ -2262,7 +2269,7 @@ sub DOIF_Perl_Trigger
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      next if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEventsState},1)));
+      next if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState},1)));
       $event="$device";
     }
     if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
@@ -2322,10 +2329,11 @@ sub DOIF_Trigger
       $event="timer_".($timerNr+1);
       @triggerEvents=($event);
       $hash->{helper}{triggerEvents}=\@triggerEvents;
+      $hash->{helper}{triggerEventsState}=\@triggerEvents;
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEventsState},1))) {
+      if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState},1))) {
         if (!defined ($checkall) and AttrVal($pn, "checkall", 0) !~ "1|all|event") {
           next;
         } 
@@ -2445,7 +2453,7 @@ DOIF_Notify($$)
   #return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !keys %{$hash->{Regex}});
   
   #if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
-  if (defined CheckRegexpDoIf($hash,"itimer",$dev->{NAME},"itimer",$eventas,1)) {
+  if (defined CheckRegexpDoIf($hash,"itimer",$dev->{NAME},"itimer",$eventa,$eventas,1)) {
     for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
       if (CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)) {
         DOIF_SetTimer ($hash,"DOIF_TimerTrigger",$j);
@@ -2463,13 +2471,13 @@ DOIF_Notify($$)
   
   if (defined $hash->{Regex}{"accu"}{"$dev->{NAME}"}) {
     my $device=$dev->{NAME};
-    my $reading=CheckRegexpDoIf($hash,"accu",$dev->{NAME},"accu",$eventas,0);
+    my $reading=CheckRegexpDoIf($hash,"accu",$dev->{NAME},"accu",$eventa,$eventas,0);
     if (defined $reading) {
       accu_setValue($hash,$device,$reading);
     }
   }
 
-  if (defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventas,0)) {
+  if (defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,$eventas,0)) {
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
@@ -2501,7 +2509,7 @@ DOIF_Notify($$)
     $ret=$hash->{MODEL} eq "Perl" ? DOIF_Perl_Trigger($hash,$dev->{NAME}) : DOIF_Trigger($hash,$dev->{NAME});
   }
   
-  if ((defined CheckRegexpDoIf($hash,"STATE",$dev->{NAME},"STATE",$eventas,1)) and !$ret) {
+  if ((defined CheckRegexpDoIf($hash,"STATE",$dev->{NAME},"STATE",$eventa,$eventas,1)) and !$ret) {
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
     $hash->{helper}{triggerDev}=$dev->{NAME};
@@ -2517,7 +2525,7 @@ DOIF_Notify($$)
       if (defined $hash->{Regex}{"DOIF_Readings"}{$device}) {
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventas,0);
+          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventa,$eventas,0);
           setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash, 1);
@@ -2525,7 +2533,7 @@ DOIF_Notify($$)
     }
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
+        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},$hash->{helper}{DOIF_eventas},0);
         setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
@@ -2536,14 +2544,14 @@ DOIF_Notify($$)
       foreach $device ("$dev->{NAME}","") {
         if (defined $hash->{Regex}{$table}{$device}) {
           foreach my $doifId (keys %{$hash->{Regex}{$table}{$device}}) {
-            my $readingregex=CheckRegexpDoIf($hash,$table,$dev->{NAME},$doifId,$eventas,0);
+            my $readingregex=CheckRegexpDoIf($hash,$table,$dev->{NAME},$doifId,$eventa,$eventas,0);
             DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
           }
         }
       }
       if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
         foreach my $doifId (keys %{$hash->{Regex}{$table}{$hash->{NAME}}}) {
-          my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventas},0);
+          my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventas},$doifId,$hash->{helper}{DOIF_eventas},$hash->{helper}{DOIF_eventas},0);
           DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
         }
       }
@@ -2555,7 +2563,7 @@ DOIF_Notify($$)
       if (defined $hash->{Regex}{"event_Readings"}{$device}) {
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventas,0);
+          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas,0);
           setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash,1);
@@ -2563,7 +2571,7 @@ DOIF_Notify($$)
     }
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},0);
+        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventas},$hash->{helper}{DOIF_eventas},0);
         setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
