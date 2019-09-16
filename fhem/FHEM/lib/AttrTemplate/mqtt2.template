@@ -19,10 +19,9 @@ desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread<
 name:A_00_MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
-par:IODEVNAME;Name of the IO-Device; {AttrVal("DEVICE","IODev","") ? AttrVal("DEVICE","IODev","" ) : undef } 
-par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE","")}
+par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
+par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
-#par:IODEVROOM;Room of the IOdevice; {AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) ? AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) : undef } 
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
 defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
@@ -422,8 +421,7 @@ desc: replaces the readingList with defaults, clears the readingList and reboots
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-#par:DEVNAME;ESP's name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,tele/([^/]*)/, ? $1 : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
@@ -439,7 +437,7 @@ name:A_01x_tasmota_prefix_clearing_and_reboot
 filter:TYPE=MQTT2_DEVICE::FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
 attr DEVICE readingList READINGLISTCLEARED
 deletereading -q DEVICE (?!associatedWith).*
@@ -535,7 +533,6 @@ attr DEVICE setList \
   rfsend:textField CMNDTOPIC/RFsend {"Protocol":"$EVTPART1","Bits":$EVTPART2,"Data":"0x$EVTPART3"}
 attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-#  TELETOPIC/RESULT:.*  /SmartHome/Interface/Bridge/tele/RESULT:.* { $EVENT =~ m,..RfReceived....Sync..([A-Za-z0-9]+)..Low..([\d]+)..High..([\d]+)..Data...([A-Za-z0-9]+)...RfKey...([^"]+)..., ? {'$1_$2_$3'=>"$4"} : json2nameValue($EVENT) }\
   TELETOPIC/RESULT:.* { $EVENT =~ m,..RfReceived....Sync..([A-Za-z0-9]+)..Low..([\d]+)..High..([\d]+)..Data...([A-Za-z0-9]+)...RfKey...([^"]+)..., ? {"json_raw"=>$EVENT} : undef }\
   TELETOPIC/RESULT:.* { $EVENT =~ m,..RfReceived....Sync..([A-Za-z0-9]+)..Low..([\d]+)..High..([\d]+)..Data...([A-Za-z0-9]+)...RfKey...([^"]+)..., ? {"Data"=>"$4"} : undef }
 attr DEVICE stateFormat state\
@@ -583,7 +580,6 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat POWER2
-#attr DEVICE_CH2 userReadings state:POWER2:.* { lc(ReadingsVal($name,"POWER2","")) }
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
@@ -651,7 +647,7 @@ name:A_02b_tasmota_2ch_shutter_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_1 instead. 
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set DEVICE attrTemplate A_02b_tasmota_2ch_shutter_invert_1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog SHUTTEROPENDURATION 20;; SHUTTERCLOSEDURATION 20;; SHUTTERINVERT 0;; GROUPTOPIC Rollos;; SaveData 1;;
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
@@ -749,14 +745,14 @@ name:A_01z_tasmota_set_lowercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change ON, OFF etc. sent from tasmota side to lowercase. <br>After applying the template you might consider to delete or change stateFormat, eventMap and/or userReadings attribute values
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SaveData 1
 
 name:A_01z_tasmota_set_uppercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change on, off etc. sent from tasmota side to uppercase. NOTE: this  template only exists for compability reasons to older MQTT implementations; not recommended for other user groups
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 OFF; StateText2 ON; StateText3 TOGGLE; StateText4 HOLD; SetOption26 1
 attr DEVICE userReadings state:POWER1:.* { lc(ReadingsVal($name,"POWER1","")) }
 
@@ -764,7 +760,7 @@ name:A_01z_tasmota_set_power1_state_to_power
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to single relay tasmota devices <br>NOTE: this  template only exists for compability reasons to other HA solutions; not recommended for usage in FHEM context
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set IO_DEV publish CMNDTOPIC/SetOption26 0
 attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
 
@@ -1220,7 +1216,7 @@ attr DEVICE_CH4 setStateList on off
 name:E_01a_eBus_daemon_splitter
 filter:TYPE=MQTT2_DEVICE
 desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID
-par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE","")}
+par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
