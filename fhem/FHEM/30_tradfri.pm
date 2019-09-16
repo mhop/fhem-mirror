@@ -238,7 +238,7 @@ tradfri_processEvent($$) {
         Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $ret";
 
       } else {
-        CommandAttr(undef,"$cname alias ".$decoded->{name});
+        CommandAttr(undef,"$cname alias ".$decoded->{name}) if( $decoded->{name} );
         CommandAttr(undef,"$cname room Tradfri");
         #CommandAttr(undef,"$cname IODev $name");
 
