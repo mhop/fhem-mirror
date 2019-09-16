@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
   "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
                            "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
   "8.25.0" => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
@@ -477,8 +478,8 @@ sub DbRep_Set($@) {
   my $prop1          = $a[3];
   my $dbh            = $hash->{DBH};
   my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbmodel        = $hash->{dbloghash}{MODEL};
+  my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel        = $dbloghash->{MODEL};
   my $dbname         = $hash->{DATABASE};
   my $sd ="";
   
@@ -590,7 +591,6 @@ sub DbRep_Set($@) {
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        Log3 ($name, 3, "DbRep $name - start repair attempt of database ".$hash->{DATABASE}); 
        # closetime Datenbank
-       my $dbloghash = $hash->{dbloghash};
        my $dbl = $dbloghash->{NAME};
        CommandSet(undef,"$dbl reopen $prop");
        
@@ -710,8 +710,8 @@ sub DbRep_Set($@) {
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
-  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
-      my $ro = $hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL};
+  if ($dbloghash->{HELPER}{REOPEN_RUNS} && $opt !~ /\?/) {
+      my $ro = $dbloghash->{HELPER}{REOPEN_RUNS_UNTIL};
       Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
 	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
 	  return;
@@ -921,15 +921,15 @@ return undef;
 sub DbRep_Get($@) {
   my ($hash, @a) = @_;
   return "\"get X\" needs at least an argument" if ( @a < 2 );
-  my $name    = $a[0];
-  my $opt     = $a[1];
-  my $prop    = $a[2];
-  my $dbh     = $hash->{DBH};
-  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbmodel = $hash->{dbloghash}{MODEL};
-  my $dbname  = $hash->{DATABASE};
-  my $to      = AttrVal($name, "timeout", "86400");
+  my $name        = $a[0];
+  my $opt         = $a[1];
+  my $prop        = $a[2];
+  my $dbh         = $hash->{DBH};
+  my $dblogdevice = $hash->{HELPER}{DBLOGDEVICE};
+  my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel     = $dbloghash->{MODEL};
+  my $dbname      = $hash->{DATABASE};
+  my $to          = AttrVal($name, "timeout", "86400");
   
   my $getlist = "Unknown argument $opt, choose one of ".
                 "svrinfo:noArg ".
@@ -945,8 +945,8 @@ sub DbRep_Get($@) {
   
   return if(IsDisabled($name));
   
-  if ($hash->{dbloghash}{HELPER}{REOPEN_RUNS} && $opt !~ /\?|procinfo|blockinginfo/) {
-      my $ro = $hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL};
+  if ($dbloghash->{HELPER}{REOPEN_RUNS} && $opt !~ /\?|procinfo|blockinginfo/) {
+      my $ro = $dbloghash->{HELPER}{REOPEN_RUNS_UNTIL};
       Log3 ($name, 3, "DbRep $name - connection $dblogdevice to db $dbname is closed until $ro - $opt postponed");
 	  ReadingsSingleUpdateValue ($hash, "state", "connection $dblogdevice to $dbname is closed until $ro - $opt postponed", 1);
 	  return;
@@ -1087,9 +1087,9 @@ return undef;
 ###################################################################################
 sub DbRep_Attr($$$$) {
   my ($cmd,$name,$aName,$aVal) = @_;
-  my $hash = $defs{$name};
-  $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbmodel = $hash->{dbloghash}{MODEL};
+  my $hash      = $defs{$name};
+  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbmodel   = $dbloghash->{MODEL};
   my $do;
       
     # $cmd can be "del" or "set"
@@ -1456,12 +1456,11 @@ return undef;
 sub DbRep_firstconnect(@) {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
-  my $hash           = $defs{$name};
-  my $to             = AttrVal($name, "timeout", "86400");
-  $hash->{dbloghash} = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbloghash      = $hash->{dbloghash};
-  my $dbconn         = $dbloghash->{dbconn};
-  my $dbuser         = $dbloghash->{dbuser};
+  my $hash      = $defs{$name};
+  my $to        = AttrVal($name, "timeout", "86400");
+  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbconn    = $dbloghash->{dbconn};
+  my $dbuser    = $dbloghash->{dbuser};
   
   RemoveInternalTimer($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
@@ -1498,7 +1497,7 @@ sub DbRep_getInitData($) {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
   my $hash       = $defs{$name};
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
@@ -1585,9 +1584,8 @@ sub DbRep_getInitDataDone($) {
   my $prop           = $a[5];
   my $fret           = \&{$a[6]} if($a[6]);
   my $idxstate       = $a[7]?decode_base64($a[7]):"";
-  my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
-  $hash->{dbloghash} = $defs{$dblogdevice};
-  my $dbconn         = $hash->{dbloghash}{dbconn};
+  my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbconn         = $dbloghash->{dbconn};
   
   if ($err) {
       readingsBeginUpdate($hash);
@@ -1642,14 +1640,12 @@ return;
 ################################################################################################################
 sub DbRep_Main($$;$) {
  my ($hash,$opt,$prop) = @_;
- my $name           = $hash->{NAME}; 
- my $to             = AttrVal($name, "timeout", "86400");
- my $reading        = AttrVal($name, "reading", "%");
- my $device         = AttrVal($name, "device", "%");
- my $dblogdevice    = $hash->{HELPER}{DBLOGDEVICE};
- $hash->{dbloghash} = $defs{$dblogdevice};
- my $dbloghash      = $hash->{dbloghash};
- my $dbmodel        = $dbloghash->{MODEL};
+ my $name      = $hash->{NAME}; 
+ my $to        = AttrVal($name, "timeout", "86400");
+ my $reading   = AttrVal($name, "reading", "%");
+ my $device    = AttrVal($name, "device", "%");
+ my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+ my $dbmodel   = $dbloghash->{MODEL};
  
  # Entkommentieren für Testroutine im Vordergrund
  # testexit($hash);
@@ -2475,7 +2471,7 @@ sub averval_DoParse($) {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -2828,7 +2824,7 @@ sub count_DoParse($) {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -3003,7 +2999,7 @@ sub maxval_DoParse($) {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -3234,7 +3230,7 @@ sub minval_DoParse($) {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -3468,7 +3464,7 @@ sub diffval_DoParse($) {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -3828,7 +3824,7 @@ sub sumval_DoParse($) {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4009,7 +4005,7 @@ sub del_DoParse($) {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4134,7 +4130,7 @@ return;
 sub insert_Push($) {
  my ($name)     = @_;
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4269,7 +4265,7 @@ sub currentfillup_Push($) {
  my ($string)     = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4424,7 +4420,7 @@ sub change_Push($) {
  my ($string) = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4526,7 +4522,7 @@ sub changeval_Push($) {
  my ($string) = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4657,7 +4653,7 @@ sub changeval_Push($) {
              $value = $VALUE if(defined $VALUE);
  	         $unit  = $UNIT  if(defined $UNIT);
              # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
-             (undef,undef,undef,undef,$value,$unit) = DbLog_cutCol($hash->{dbloghash},"1","1","1","1",$value,$unit);
+             (undef,undef,undef,undef,$value,$unit) = DbLog_cutCol($dbloghash,"1","1","1","1",$value,$unit);
              
              $value =~ s/'/''/g;       # escape ' with ''
              $unit  =~ s/'/''/g;       # escape ' with ''
@@ -4772,7 +4768,7 @@ sub fetchrows_DoParse($) {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -4973,7 +4969,7 @@ sub deldoublets_DoParse($) {
  my ($string) = @_;
  my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -5133,7 +5129,7 @@ sub delseqdoubl_DoParse($) {
  my ($string) = @_;
  my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -5381,7 +5377,7 @@ sub expfile_DoParse($) {
  my ($string) = @_;
  my ($name, $device, $reading, $rsf, $file, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -5570,11 +5566,11 @@ sub impfile_Push($) {
  my ($string) = @_;
  my ($name, $rsf, $file) = split("\\|", $string);
  my $hash       = $defs{$name};
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
- my $dbmodel    = $hash->{dbloghash}{MODEL};
+ my $dbmodel    = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $err=0;
@@ -5771,7 +5767,7 @@ sub sqlCmd_DoParse($) {
   my ($string) = @_;
   my ($name, $opt, $runtime_string_first, $runtime_string_next, $cmd) = split("\\|", $string);
   my $hash       = $defs{$name};
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
@@ -6060,7 +6056,7 @@ sub dbmeta_DoParse($) {
  my $name        = $a[0];
  my $hash        = $defs{$name};
  my $opt         = $a[1];
- my $dbloghash   = $hash->{dbloghash};
+ my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn      = $dbloghash->{dbconn};
  my $db          = $hash->{DATABASE};
  my $dbuser      = $dbloghash->{dbuser};
@@ -6320,7 +6316,7 @@ sub DbRep_Index($) {
   my ($string)   = @_;
   my ($name,$cmdidx) = split("\\|", $string);
   my $hash       = $defs{$name};
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $database   = $hash->{DATABASE};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
@@ -6549,7 +6545,7 @@ return;
 sub DbRep_optimizeTables($) {
  my ($name)        = @_;
  my $hash          = $defs{$name};
- my $dbloghash     = $hash->{dbloghash};
+ my $dbloghash     = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn        = $dbloghash->{dbconn};
  my $dbuser        = $dbloghash->{dbuser};
  my $dblogname     = $dbloghash->{NAME};
@@ -6776,7 +6772,7 @@ return;
 sub mysql_DoDumpClientSide($) {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
- my $dbloghash                  = $hash->{dbloghash};
+ my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn                     = $dbloghash->{dbconn};
  my $dbuser                     = $dbloghash->{dbuser};
  my $dblogname                  = $dbloghash->{NAME};
@@ -7250,7 +7246,7 @@ return "$name|$rt|''|$dump_path$backupfile|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 sub mysql_DoDumpServerSide($) {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
- my $dbloghash                  = $hash->{dbloghash};
+ my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn                     = $dbloghash->{dbconn};
  my $dbuser                     = $dbloghash->{dbuser};
  my $dblogname                  = $dbloghash->{NAME};
@@ -7425,7 +7421,7 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 sub DbRep_sqliteDoDump($) {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
- my $dbloghash                  = $hash->{dbloghash};
+ my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbname                     = $hash->{DATABASE};
  my $dbconn                     = $dbloghash->{dbconn};
  my $dbuser                     = $dbloghash->{dbuser};
@@ -7605,7 +7601,7 @@ return;
 sub DbRep_sqliteRepair($) {
  my ($name)       = @_;
  my $hash         = $defs{$name};
- my $dbloghash    = $hash->{dbloghash};
+ my $dbloghash    = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $db           = $hash->{DATABASE};
  my $dbname       = (split /[\/]/, $db)[-1];
  my $dbpath       = (split /$dbname/, $db)[0];
@@ -7675,7 +7671,7 @@ sub DbRep_RepairDone($) {
   my $hash       = $defs{$a[0]};
   my $brt        = $a[1];
   my $err        = $a[2]?decode_base64($a[2]):undef;
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $name       = $hash->{NAME};
   my $erread;
   
@@ -7718,7 +7714,7 @@ sub DbRep_sqliteRestore ($) {
  my ($string) = @_;
  my ($name,$bfile) = split("\\|", $string);
  my $hash          = $defs{$name};
- my $dbloghash     = $hash->{dbloghash};
+ my $dbloghash     = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn        = $dbloghash->{dbconn};
  my $dbuser        = $dbloghash->{dbuser};
  my $dblogname     = $dbloghash->{NAME};
@@ -7796,7 +7792,7 @@ sub mysql_RestoreServerSide($) {
  my ($string) = @_;
  my ($name, $bfile)      = split("\\|", $string);
  my $hash                = $defs{$name};
- my $dbloghash           = $hash->{dbloghash};
+ my $dbloghash           = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn              = $dbloghash->{dbconn};
  my $dbuser              = $dbloghash->{dbuser};
  my $dblogname           = $dbloghash->{NAME};
@@ -7870,7 +7866,7 @@ sub mysql_RestoreClientSide($) {
  my ($string) = @_;
  my ($name, $bfile)      = split("\\|", $string);
  my $hash                = $defs{$name};
- my $dbloghash           = $hash->{dbloghash};
+ my $dbloghash           = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn              = $dbloghash->{dbconn};
  my $dbuser              = $dbloghash->{dbuser};
  my $dblogname           = $dbloghash->{NAME};
@@ -8105,7 +8101,7 @@ sub DbRep_syncStandby($) {
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my ($dbh,$dbhstby,$err,$sql,$irows,$irowdone);
  # Quell-DB
- my $dbloghash  = $hash->{dbloghash};
+ my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
@@ -8260,7 +8256,7 @@ sub DbRep_reduceLog($) {
     my ($string)   = @_;
     my ($name,$d,$r,$nts,$ots) = split("\\|", $string);
     my $hash       = $defs{$name};
-    my $dbloghash  = $hash->{dbloghash};
+    my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
     my $dbconn     = $dbloghash->{dbconn};
     my $dbuser     = $dbloghash->{dbuser};
     my $dblogname  = $dbloghash->{NAME};
@@ -8617,7 +8613,7 @@ sub DbRep_reduceLogDone($) {
   my $ret       = decode_base64($a[1]);
   my $err       = decode_base64($a[2]) if ($a[2]);
   my $brt       = $a[3];
-  my $dbloghash = $hash->{dbloghash};
+  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $erread;  
   
   delete $hash->{HELPER}{RUNNING_REDUCELOG};
@@ -8795,7 +8791,7 @@ sub DbRep_RepairAborted(@) {
   my ($hash,$cause) = @_;
   my $name      = $hash->{NAME};
   my $dbh       = $hash->{DBH}; 
-  my $dbloghash = $hash->{dbloghash};
+  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $erread;
   
   $cause = $cause?$cause:"Timeout: process terminated";
@@ -8823,7 +8819,8 @@ return;
 sub DbRep_createCommonSql ($$$$$$$) {
  my ($hash,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
- my $dbmodel   = $hash->{dbloghash}{MODEL};
+ my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+ my $dbmodel   = $dbloghash->{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
  my $tnfull    = 0;
  my ($sql,$vf,@dwc,@rwc);
@@ -8928,7 +8925,8 @@ return $sql;
 sub DbRep_createSelectSql($$$$$$$$) {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
- my $dbmodel   = $hash->{dbloghash}{MODEL};
+ my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+ my $dbmodel   = $dbloghash->{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
  my $tnfull    = 0;
  my ($sql,$vf,@dwc,@rwc);
@@ -9033,7 +9031,8 @@ return $sql;
 sub DbRep_createDeleteSql($$$$$$$) {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
- my $dbmodel   = $hash->{dbloghash}{MODEL};
+ my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+ my $dbmodel   = $dbloghash->{MODEL};
  my $valfilter = AttrVal($name, "valueFilter", undef);        # Wertefilter
  my $tnfull    = 0;
  my ($sql,$vf,@dwc,@rwc);
@@ -10031,7 +10030,7 @@ return (undef,$db_MB_start,$db_MB_end);
 sub DbRep_deldumpfiles ($$) {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
-  my $dbloghash     = $hash->{dbloghash};
+  my $dbloghash     = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dump_path_def = $attr{global}{modpath}."/log/";
   my $dump_path_loc = AttrVal($name,"dumpDirLocal", $dump_path_def);
   $dump_path_loc    = $dump_path_loc."/" unless($dump_path_loc =~ m/\/$/);
@@ -10313,13 +10312,13 @@ return \%ncp;
 sub DbRep_OutputWriteToDB($$$$$) {
   my ($name,$device,$reading,$arrstr,$optxt) = @_;
   my $hash       = $defs{$name};
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
-  my $dbmodel    = $hash->{dbloghash}{MODEL};
-  my $DbLogType  = AttrVal($hash->{dbloghash}{NAME}, "DbLogType", "History");
-  my $supk       = AttrVal($hash->{dbloghash}{NAME}, "noSupportPK", 0);
+  my $dbmodel    = $dbloghash->{MODEL};
+  my $DbLogType  = AttrVal($dblogname, "DbLogType", "History");
+  my $supk       = AttrVal($dblogname, "noSupportPK", 0);
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   $device        =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -10331,7 +10330,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
   my $irowdone   = 0;
   my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$timestamp,$value,$date,$time,$rsf,$aggr,@row_array);
   
-  if(!$hash->{dbloghash}{HELPER}{COLSET}) {
+  if(!$dbloghash->{HELPER}{COLSET}) {
       $err = "No result of \"$hash->{LASTCMD}\" to database written. Cause: column width in \"$hash->{DEF}\" isn't set";
       return ($wrt,$irowdone,$err);
   }
@@ -10361,7 +10360,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           }
           if ($value) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
-              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($hash->{dbloghash},$device,$type,$event,$reading,$value,$unit);
+              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
               push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
           } 
       }
@@ -10385,7 +10384,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           }
           if ($value) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
-              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($hash->{dbloghash},$device,$type,$event,$reading,$value,$unit);
+              ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
               push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
           } 
       }
@@ -10548,8 +10547,8 @@ sub DbRep_WriteToDB($$$@) {
   my ($name,$dbh,$dbloghash,$histupd,@row_array) = @_;
   my $hash      = $defs{$name};
   my $dblogname = $dbloghash->{NAME};
-  my $DbLogType = AttrVal($dbloghash->{NAME}, "DbLogType", "History");
-  my $supk      = AttrVal($dbloghash->{NAME}, "noSupportPK", 0);
+  my $DbLogType = AttrVal($dblogname, "DbLogType", "History");
+  my $supk      = AttrVal($dblogname, "noSupportPK", 0);
   my $wrt       = 0;
   my $irowdone  = 0;
   my ($sth_ih,$sth_uh,$sth_ic,$sth_uc,$err);
@@ -10691,10 +10690,10 @@ return ($wrt,$irowdone,$err);
 ################################################################
 sub DbRep_checkUsePK ($$$){
   my ($hash,$dbloghash,$dbh) = @_;
-  my $name       = $hash->{NAME};
-  my $dbconn     = $dbloghash->{dbconn};
-  my $upkh = 0;
-  my $upkc = 0;
+  my $name   = $hash->{NAME};
+  my $dbconn = $dbloghash->{dbconn};
+  my $upkh   = 0;
+  my $upkc   = 0;
   my (@pkh,@pkc);
   
   my $db = (split("=",(split(";",$dbconn))[0]))[1];
@@ -10788,7 +10787,7 @@ return;
 sub DbRep_dbValue($$) {
   my ($name,$cmd) = @_;
   my $hash       = $defs{$name};
-  my $dbloghash  = $hash->{dbloghash};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
@@ -11021,14 +11020,15 @@ sub DbRep_modAssociatedWith ($$$) {
       }                                           
   }
   
-  my @nadev = split("[, ]", $idevice);
-  
-  foreach my $d (@nadev) {
-      $d    =~ s/%/\.*/g if($d !~ /^%$/);                             # SQL Wildcard % in Regex
-      my @a = devspec2array($d);
-      foreach(@a) {
-          next if(!$defs{$_});
-          push(@naw, $_) if($_ !~ /$edevs/);
+  if($idevice) {
+      my @nadev = split("[, ]", $idevice);
+      foreach my $d (@nadev) {
+          $d    =~ s/%/\.*/g if($d !~ /^%$/);                         # SQL Wildcard % in Regex
+          my @a = devspec2array($d);
+          foreach(@a) {
+              next if(!$defs{$_});
+              push(@naw, $_) if($_ !~ /$edevs/);
+          }
       }
   }
   
