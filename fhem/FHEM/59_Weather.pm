@@ -581,7 +581,10 @@ sub Weather_Set($@) {
             ($lat,$long) = split(',',$a[2])
               if ( defined($a[2]) and $a[2] );
             ($lat,$long) = split(',',$hash->{fhem}->{LOCATION})
-              unless ( defined($lat) and defined($long) );
+              unless ( defined($lat)
+                and defined($long)
+                and $lat =~ /(-?\d+(\.\d+)?)/
+                and $long =~ /(-?\d+(\.\d+)?)/ );
 
             $hash->{fhem}->{api}->setLocation($lat,$long);
             Weather_DisarmTimer($hash);
