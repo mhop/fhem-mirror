@@ -1,4 +1,4 @@
-REV 20160
+REV 20167
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-14_07:45:02 306444 ./CHANGED
-UPD 2019-09-05_07:45:02 41648 ./MAINTAINER.txt
+UPD 2019-09-16_07:45:02 306543 ./CHANGED
+UPD 2019-09-16_07:45:02 41711 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2019-08-28_07:45:12 159391 ./fhem.pl
@@ -275,7 +275,7 @@ UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2019-03-14_07:45:02 59185 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2019-09-13_07:45:03 671318 FHEM/49_SSCam.pm
+UPD 2019-09-16_07:45:02 674118 FHEM/49_SSCam.pm
 UPD 2019-09-13_07:45:03 32696 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
@@ -351,6 +351,7 @@ UPD 2015-07-28_14:05:31 20019 FHEM/70_SISPM.pm
 UPD 2016-01-29_07:45:11 16312 FHEM/70_SML.pm
 UPD 2016-12-22_07:45:02 24312 FHEM/70_STV.pm
 UPD 2019-04-05_07:45:02 52079 FHEM/70_SamsungAV.pm
+UPD 2019-09-16_07:45:02 18766 FHEM/70_SolarEdgeAPI.pm
 UPD 2016-04-26_07:45:11 11536 FHEM/70_TellStick.pm
 UPD 2015-07-28_14:05:31 17835 FHEM/70_USBWX.pm
 UPD 2016-01-12_07:45:11 36886 FHEM/70_VIERA.pm
@@ -468,7 +469,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2019-09-14_07:45:02 278734 FHEM/98_DOIF.pm
+UPD 2019-09-16_07:45:02 279253 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -596,7 +597,7 @@ UPD 2018-08-21_07:45:03 8767 FHEM/ZWLib.pm
 UPD 2019-08-13_07:45:03 42424 FHEM/firmware/ArduCounter.hex
 UPD 2015-07-28_14:05:29 54451 FHEM/firmware/JeeLink_EC3000.hex
 UPD 2017-03-23_07:45:02 77782 FHEM/firmware/JeeLink_LaCrosse.hex
-UPD 2019-09-08_07:45:03 519600 FHEM/firmware/JeeLink_LaCrosseGateway.bin
+UPD 2019-09-16_07:45:02 519664 FHEM/firmware/JeeLink_LaCrosseGateway.bin
 UPD 2015-07-28_14:05:29 34557 FHEM/firmware/JeeLink_PCA301.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_nano328.hex
 UPD 2016-10-02_07:45:11 49235 FHEM/firmware/SIGNALduino_promini328.hex
@@ -629,9 +630,9 @@ UPD 2019-07-01_07:45:03 411 FHEM/holiday/st.holiday
 UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-09-14_07:45:02 333575 FHEM/lib/74_AMADautomagicFlowset_4.4.2.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
-UPD 2019-09-14_07:45:02 33650 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2019-09-16_07:45:02 35859 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-09-12_07:45:02 96587 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-09-16_07:45:02 95992 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -729,12 +730,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-14_07:45:06 4116195 docs/commandref.html
-UPD 2019-09-14_07:45:09 2549449 docs/commandref_DE.html
+UPD 2019-09-16_07:45:07 4118068 docs/commandref.html
+UPD 2019-09-16_07:45:09 2549647 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-15_07:45:11 218065 docs/commandref_modular.html
-UPD 2019-09-15_07:45:12 229045 docs/commandref_modular_DE.html
+UPD 2019-09-16_07:45:10 218325 docs/commandref_modular.html
+UPD 2019-09-16_07:45:11 229265 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
