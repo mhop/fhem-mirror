@@ -50,6 +50,7 @@ MQTT2_CLIENT_Initialize($)
     rawEvents
     subscriptions
     SSL
+    sslargs
     username
   );
   use warnings 'qw';
@@ -68,9 +69,7 @@ MQTT2_CLIENT_Define($$)
   MQTT2_CLIENT_Undef($hash, undef) if($hash->{OLDDEF}); # modify
 
   $hash->{DeviceName} = $host;
-  $hash->{clientId} = $hash->{NAME};
-  $hash->{clientId} =~ s/[^0-9a-zA-Z]//g;
-  $hash->{clientId} = "MQTT2_CLIENT" if(!$hash->{clientId});
+  $hash->{clientId} = AttrVal($hash->{NAME}, "clientId", $hash->{NAME});
   $hash->{connecting} = 1;
 
   InternalTimer(1, "MQTT2_CLIENT_connect", $hash, 0); # need attributes
@@ -210,8 +209,14 @@ MQTT2_CLIENT_Attr(@)
 
   if($attrName eq "clientId") {
     $hash->{clientId} = $param[0];
-    $hash->{clientId} =~ s/[^0-9a-zA-Z]//g;
-    $hash->{clientId} = "MQTT2_CLIENT" if(!$hash->{clientId});
+  }
+
+  if($attrName eq "sslargs") {
+    $hash->{sslargs} = {};
+    for my $kv (split(" ",$param[0])) {
+      my ($k, $v) = split(":", $kv, 2);
+      $hash->{sslargs}{$k} = $v;
+    }
   }
 
   my %h = (clientId=>1,lwt=>1,lwtRetain=>1,subscriptions=>1,SSL=>1,username=>1);
@@ -356,7 +361,7 @@ MQTT2_CLIENT_Read($@)
       my $ac = AttrVal($name, "autocreate", "no");
       $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
-      my $cid = $hash->{clientId};
+      my $cid = makeDeviceName($hash->{clientId});
       $tp =~ s/:/_/g; # 96608
       Dispatch($hash, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no");
 
@@ -606,6 +611,12 @@ MQTT2_CLIENT_getStr($$)
     <a name="SSL"></a>
     <li>SSL<br>
       Enable SSL (i.e. TLS)
+      </li><br>
+
+    <a name="sslargs"></a>
+    <li>sslargs<br>
+      a list of space separated tuples of key:value, where key is one of the
+      possible options documented in perldoc IO::Socket::SSL
       </li><br>
 
     <a name="username"></a>

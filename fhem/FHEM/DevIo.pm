@@ -374,6 +374,7 @@ DevIo_OpenDev($$$;$)
         timeout => $timeout,
         url     => $hash->{SSL} ? "https://$dev/" : "http://$dev/",
         NAME    => $hash->{NAME},
+        sslargs => $hash->{sslargs} ? $hash->{sslargs} : {},
         noConn2 => 1,
         callback=> sub() {
           my ($h, $err, undef) = @_;
