@@ -157,7 +157,7 @@ AttrTemplate_Set($$@)
       $perl_code =~ s/\\DEVICE/DEVICE/g;
       my $ret = eval $perl_code;
       return "Error checking template regexp: $@" if($@);
-      if($ret) {
+      if(defined($ret)) {
         $repl{$parname} = $ret;
         next;
       }
