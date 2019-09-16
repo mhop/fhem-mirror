@@ -9,6 +9,7 @@ use IO::Socket::INET;
 use HTTP::Request;
 use HTTP::Cookies;
 use LWP::UserAgent;
+use MIME::Base64;
 use HttpUtils;
 use JSON;
   
@@ -20,7 +21,7 @@ sub Arlo_Initialize($$) {
   $hash->{UndefFn}  = "Arlo_Undef";
   $hash->{GetFn}    = "Arlo_Get";
   $hash->{SetFn}    = "Arlo_Set";
-  $hash->{AttrList} = "disable:1 pingInterval updateInterval downloadDir downloadLink ssePollingInterval ".$readingFnAttributes;  
+  $hash->{AttrList} = "disable:1 pingInterval updateInterval downloadDir downloadLink ssePollingInterval videoDownloadFix:0,1 ".$readingFnAttributes;  
   $hash->{AttrFn}   = "Arlo_Attr";
 }
 
@@ -42,7 +43,7 @@ sub Arlo_Define($$) {
     $hash->{DEF} = "ACCOUNT $cryptUser $cryptPasswd";
     InternalTimer(gettimeofday() + 3, "Arlo_Login", $hash);
 
-  } elsif ($subtype eq 'BASESTATION' && @a == 5) {
+  } elsif (($subtype eq 'BASESTATION' || $subtype eq 'ROUTER') && @a == 5) {
     my $serialNumber = $a[3];
     my $xCloudId = $a[4];
     my $d = $modules{$MODULE}{defptr}{"B$serialNumber"};
@@ -129,7 +130,7 @@ sub Arlo_Undef($$) {
   my $subtype = $hash->{SUBTYPE};
   delete($modules{$MODULE}{defptr}{"L$hash->{serialNumber}"}) if ($subtype eq 'LIGHT');
   delete($modules{$MODULE}{defptr}{"C$hash->{serialNumber}"}) if ($subtype eq 'CAMERA' || $subtype eq 'ARLOQ' || $subtype eq 'BABYCAM');
-  delete($modules{$MODULE}{defptr}{"B$hash->{serialNumber}"}) if ($subtype eq 'BASESTATION' || $subtype eq 'BRIDGE' || $subtype eq 'ARLOQ' || $subtype eq 'BABYCAM');
+  delete($modules{$MODULE}{defptr}{"B$hash->{serialNumber}"}) if ($subtype eq 'BASESTATION' || $subtype eq 'BRIDGE' || $subtype eq 'ROUTER' || $subtype eq 'ARLOQ' || $subtype eq 'BABYCAM');
   if ($subtype eq 'ACCOUNT') {
     delete($modules{$MODULE}{defptr}{'account'});
     Arlo_Logout($hash);
@@ -179,7 +180,7 @@ sub Arlo_Set($) {
     } else {
       return "Unknown argument $opt, choose one of autocreate:noArg readModes:noArg reconnect:noArg updateReadings:noArg ";
     }
-  } elsif ($subtype eq 'BASESTATION') {
+  } elsif ($subtype eq 'BASESTATION' || $subtype eq 'ROUTER') {
     if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
       return "Unknown argument $opt, choose one of arm:noArg disarm:noArg mode subscribe:noArg unsubscribe:noArg siren:on,off";
     }
@@ -198,18 +199,18 @@ sub Arlo_Set($) {
   } elsif ($subtype eq 'ARLOQ') {
     if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
       if (!Arlo_SetCameraCmd($hash, $opt, $value)) {
-	  	  return "Unknown argument $opt, choose one of arm:noArg disarm:noArg subscribe:noArg unsubscribe:noArg snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2";
+        return "Unknown argument $opt, choose one of arm:noArg disarm:noArg subscribe:noArg unsubscribe:noArg snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2";
       }
     }
   } elsif ($subtype eq 'BABYCAM') {
     if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
       if (!Arlo_SetCameraCmd($hash, $opt, $value)) {
-	  	  return "Unknown argument $opt, choose one of arm:noArg disarm:noArg subscribe:noArg unsubscribe:noArg nightlight:on,off nightlight-brightness nightlight-color snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2";
+        return "Unknown argument $opt, choose one of arm:noArg disarm:noArg subscribe:noArg unsubscribe:noArg nightlight:on,off nightlight-brightness nightlight-color snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2";
       }
     }
   } else {
      if (!Arlo_SetCameraCmd($hash, $opt, $value)) {
-		  return "Unknown argument $opt, choose one of on:noArg off:noArg snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2";
+        return "Unknown argument $opt, choose one of on:noArg off:noArg snapshot:noArg startRecording:noArg stopRecording:noArg brightness:-2,-1,0,1,2 downloadLastVideo:noArg";
 	  }
   }
   
@@ -254,6 +255,8 @@ sub Arlo_SetCameraCmd($$$) {
     Arlo_SetNightLightBrightness($hash, $value);
   } elsif ($opt eq 'nightlight-color') {
     Arlo_SetNightLightColor($hash, $value);
+  } elsif ($opt eq 'downloadLastVideo') {
+    Arlo_DownloadLastVideo($hash);
   } else {
     return undef;
   }
@@ -269,7 +272,8 @@ sub Arlo_Get($) {
   my $date = $a[2];
   return "Unknown argument $cmd, choose one of recordings" if ($cmd ne "recordings");
   return "Paramter date (format YYYYMMDD) needed." if (!defined($date) || length($date) != 8);
-  return Arlo_GetRecordings($hash, $date);
+  my @result = Arlo_GetRecordings($hash, $date);
+  return encode_json(\@result);
 }
 
 sub Arlo_Poll($) {
@@ -397,15 +401,15 @@ sub Arlo_PrepareRequest($$;$$$$) {
   my $name = $account->{NAME};
   my $cookies = $account->{helper}{cookies};
   my $token = $account->{helper}{token};
-  my $headers = "Authorization: ".$token."\r\nReferer: https://arlo.netgear.com\r\nContent-Type: application/json; charset=utf-8\r\nCookie: ".$cookies.
-      "\r\nschemaVersion: 1\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0";
+  my $headers = "Authorization: ".$token."\r\nReferer: https://my.arlo.com\r\nContent-Type: application/json; charset=utf-8\r\nCookie: ".$cookies.
+      "\r\nschemaVersion: 1\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:69.0) Gecko/20100101 Firefox/69.0";
   $headers = $headers."\r\n".$additionalHeader if (defined($additionalHeader));
   Log3 $name, 5, "Header: $headers";
   
-  my $url = 'https://arlo.netgear.com/hmsweb'.$urlSuffix;
+  my $url = 'https://my.arlo.com/hmsweb'.$urlSuffix;
   Log3 $name, 5, "URL: $url";
 
-  my $request = {url => $url, method => $method, header => $headers, host => 'arlo.netgear.com'};
+  my $request = {url => $url, method => $method, header => $headers, host => 'my.arlo.com'};
   
   if (defined($body)) {
     my $bodyJson = encode_json $body;
@@ -416,14 +420,18 @@ sub Arlo_PrepareRequest($$;$$$$) {
   return $request;
 }
 
-sub Arlo_Request($$;$$$$$) {
-  my ($hash, $urlSuffix, $method, $body, $additionalHeader, $callback) = @_;
+sub Arlo_Request($$;$$$$$$) {
+  my ($hash, $urlSuffix, $method, $body, $additionalHeader, $callback, $origin) = @_;
   my $request = Arlo_PrepareRequest($hash, $urlSuffix, $method, $body, $additionalHeader);
 
   if (defined($callback)) {
     $request->{callback} = $callback;
   } else {
     $request->{callback} = \&Arlo_DefaultCallback;
+  }
+  
+  if (defined($origin)) {
+    $request->{origin} = $origin;
   }
   
   HttpUtils_NonblockingGet($request);
@@ -448,7 +456,16 @@ sub Arlo_DefaultCallback($$$) {
       if ($response->{success}) {
         Log3 $name, 5, "Response from Arlo: $jsonData";
       } else {
-        Log3 $name, 2, "Arlo call was not successful: $jsonData";
+	    my $logLevel = 2;
+        if ($response->{data}) {
+	      my $data = $response->{data};
+		  my $origin = $hash->{origin};
+		  if ($origin && $data->{error} eq '2059' && $data->{reason} eq 'Device is offline.') {
+            readingsSingleUpdate($origin, 'state', 'offline', 1) if (ReadingsVal($origin->{NAME}, 'state', '') ne 'offline');
+			$logLevel = 5;
+		  }
+		} 
+        Log3 $name, $logLevel, "Arlo call was not successful: $jsonData";
         $response = undef;
       }
     };
@@ -502,6 +519,8 @@ sub Arlo_CreateDevicesCallback($$$)  {
       Log3 $hash->{NAME}, 3, "Found device $deviceType with name $deviceName.";
       if ($deviceType eq 'basestation') {
         Arlo_CreateDevice($hash, 'BASESTATION', 'B', $deviceName, $serialNumber, $xCloudId, $model);
+      } elsif ($deviceType eq 'routerM1') {
+        Arlo_CreateDevice($hash, 'ROUTER', 'B', $deviceName, $serialNumber, $xCloudId, $model);
       } elsif ($deviceType eq 'arlobridge') {
         Arlo_CreateDevice($hash, 'BRIDGE', 'B', $deviceName, $serialNumber, $xCloudId, $model);
       } elsif ($deviceType eq 'camera') {
@@ -550,7 +569,7 @@ sub Arlo_Notify($$;$) {
   my ($hash, $body, $callback) = @_;
   my ($account, $deviceId, $xCloudId) = Arlo_PreparePostRequest($hash, $body);
   Log3 $account->{NAME}, 4, "Notify $deviceId, action: $body->{action} $body->{resource}";
-  Arlo_Request($account, '/users/devices/notify/'.$deviceId, 'POST', $body, 'xcloudId: '.$xCloudId, $callback);
+  Arlo_Request($account, '/users/devices/notify/'.$deviceId, 'POST', $body, 'xcloudId: '.$xCloudId, $callback, $hash);
 }
 
 sub Arlo_Subscribe($) {
@@ -564,7 +583,7 @@ sub Arlo_Subscribe($) {
   if (!defined($account->{RESPONSE_TIMEOUT})) {
     $account->{RESPONSE_TIMEOUT} = gettimeofday() + 30;
   }
-  Arlo_Notify($hash, $body);
+  Arlo_Notify($hash, $body, \&Arlo_SubscribeCallback);
 }
 
 sub Arlo_SubscribeAll($) {
@@ -573,6 +592,16 @@ sub Arlo_SubscribeAll($) {
   foreach my $serialNumber (@basestations) {
     my $device = $modules{$MODULE}{defptr}{"B$serialNumber"};
     Arlo_Subscribe($device);
+  }
+}
+
+sub Arlo_SubscribeCallback($$$)  {
+  my ($hash, $err, $jsonData) = @_;
+  my $response = Arlo_DefaultCallback($hash, $err, $jsonData);
+  my $origin = $hash->{origin};
+  if (defined($response) && $origin && ReadingsVal($origin->{NAME}, 'state', '') eq 'offline') {
+    readingsSingleUpdate($hash, 'state', 'online', 1);
+    InternalTimer(gettimeofday() + 1, 'Arlo_UpdateBasestationReadings', $hash);
   }
 }
 
@@ -613,7 +642,7 @@ sub Arlo_ReadCamerasAndLights($) {
   my @body = ($cam, $lights);
   if (defined($hash->{basestationSerialNumber}) && $hash->{basestationSerialNumber} eq $hash->{serialNumber}) {
     my $mode = {action => 'get', resource => 'modes', publishResponse => \0};
-    my ($account, $deviceId, $xCloudId) = Arlo_PreparePostRequest($hash, $mode);
+    Arlo_PreparePostRequest($hash, $mode);
 	push @body, $mode;
   }
   Arlo_Request($account, '/users/devices/notify/'.$deviceId, 'POST', \@body, 'xcloudId: '.$xCloudId);
@@ -621,7 +650,7 @@ sub Arlo_ReadCamerasAndLights($) {
 
 sub Arlo_UpdateReadings($) {
   my ($hash) = @_;
-  Arlo_Request($hash, '/users/devices/automation/active', 'GET', undef, undef, \&Arlo_UpdateReadingsCallback);
+  Arlo_UpdateBasestationReadings($hash);
   my @basestations = Arlo_GetBasestations($hash);
   my $delay = 2;
   foreach my $serialNumber (@basestations) {
@@ -629,6 +658,11 @@ sub Arlo_UpdateReadings($) {
     InternalTimer(gettimeofday() + $delay, "Arlo_ReadCamerasAndLights", $device);
     $delay += 2;
   }
+}
+
+sub Arlo_UpdateBasestationReadings($) {
+  my ($hash) = @_;
+  Arlo_Request($hash, '/users/devices/automation/active', 'GET', undef, undef, \&Arlo_UpdateReadingsCallback);
 }
 
 sub Arlo_UpdateReadingsCallback($$$)  {
@@ -701,7 +735,7 @@ sub Arlo_SetBasestationMode($$) {
 
 sub Arlo_DoSetBasestationMode($$) {
   my ($hash, $mode) = @_;
-  if (defined($hash->{basestationSerialNumber})) {  # Kamera mit integrierter Basestation
+  if (defined($hash->{basestationSerialNumber}) || $hash->{SUBTYPE} eq 'ROUTER') {  # Kamera mit integrierter Basestation oder Router M1
     my $props = {active => $mode};
     my $body = {action => 'set', resource => 'modes', publishResponse => \1,  properties => $props};
     Arlo_Notify($hash, $body);
@@ -752,7 +786,7 @@ sub Arlo_Snapshot($) {
 
 sub Arlo_StartRecording($)  {
   my ($hash) = @_;
-  my $activityState = ReadingsVal($hash->{NAME}, 'activityState', 'idle') ;
+  my $activityState = ReadingsVal($hash->{NAME}, 'activityState', 'idle');
   if ($activityState eq 'userStreamActive' && defined($hash->{streamURL})) {
     Arlo_Subscribe($hash);
 	return "Camera is still recording.";
@@ -760,7 +794,7 @@ sub Arlo_StartRecording($)  {
     my $basestation = Arlo_GetBasestationForCamera($hash);
     my $cameraId = $hash->{serialNumber};
     my $props = {activityState => 'startUserStream', camera => $cameraId};
-    my $body = {action => 'set', resource => "cameras/$cameraId", publishResponse => \1,  properties => $props};
+    my $body = {action => 'set', resource => "cameras/$cameraId", publishResponse => \1, properties => $props};
     my ($account, $basestationId, $xCloudId) = Arlo_PreparePostRequest($basestation, $body);
     Log3 $account->{NAME}, 4, "Start streaming for camera $cameraId.";
     $hash->{FOLLOW_CALL} = 'startRecord';
@@ -887,7 +921,29 @@ sub Arlo_GetRecordings($$) {
     }
     
   }
-  return encode_json(\@result);
+  return @result;
+}
+
+sub Arlo_DownloadLastVideo($) {
+  my ($hash) = @_;
+  my $cameraId = $hash->{serialNumber};
+  my $date = strftime '%Y%m%d', localtime;
+  my @recordings = Arlo_GetRecordings($hash, $date);
+  my $length = @recordings;
+  if ($length > 0) {
+    my $rec = $recordings[0];
+	my $lastVideoTime = $hash->{lastVideoTime};
+	my $newVideoTime = int($rec->{time});
+	my $account = $modules{$MODULE}{defptr}{"account"};
+	if (!defined($lastVideoTime) || $newVideoTime > $lastVideoTime) {
+	  $hash->{lastVideoTime} = $newVideoTime;
+	  Log3 $account->{NAME}, 4, "Download new recording $newVideoTime.";
+      Arlo_SetReadingAndDownload($account, 'lastVideoThumbnailUrl', $rec->{thumbnail}, $cameraId, '_thumb.jpg', \0);
+      Arlo_SetReadingAndDownload($account, 'lastVideoUrl', $rec->{video}, $cameraId, '.mp4', \1);
+	} else {
+	  Log3 $account->{NAME}, 4, "Don't download recording because there is now new recording. Last Video: $lastVideoTime New Video: $newVideoTime";
+	}
+  }
 }
 
 #
@@ -903,36 +959,56 @@ sub Arlo_Login($) {
     return;
   }
   
-  my $input = {email => $hash->{helper}{username}, password => $hash->{helper}{password}};
+  my $password = encode_base64($hash->{helper}{password}, '');
+  my $input = {email => $hash->{helper}{username}, password => $password, EnvSource => 'prod', language => 'de'};
   my $postData = encode_json $input;
-  my $header = ['Content-Type' => 'application/json; charset=utf-8'];
+  my $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2];
   
   my $cookie_jar = HTTP::Cookies->new;
-  my $ua = LWP::UserAgent->new(cookie_jar => $cookie_jar, agent => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0');
-  my $req = HTTP::Request->new('POST', 'https://arlo.netgear.com/hmsweb/login/v2', $header, $postData);
+  my $ua = LWP::UserAgent->new(cookie_jar => $cookie_jar, agent => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:69.0) Gecko/20100101 Firefox/69.0');
+  my $req = HTTP::Request->new('POST', 'https://ocapi-app.arlo.com/api/auth', $header, $postData);
   my $resp = $ua->request($req);
   
   if ($resp->is_success) {
     eval {
       my $respObj = decode_json $resp->decoded_content;
-      if ($respObj->{success}) {
+      if ($respObj->{meta}{code} == 200) {
         my $data = $respObj->{data};
         $hash->{helper}{token} = $data->{token};
-        $cookie_jar->extract_cookies($resp);
-        $hash->{helper}{cookies} = Arlo_GetCookies($cookie_jar);
-        Log3 $name, 5, $hash->{helper}{cookies};
         $hash->{helper}{userId} = $data->{userId};
-        $hash->{SSE_STATUS} = 200;
-        delete $hash->{RETRY};
-        $hash->{STATE} = 'active';
-        Arlo_Request($hash, '/users/devices');
-        Arlo_EventQueue($hash);
-        Arlo_Ping($hash);
-        if (!defined($hash->{MODES})) {
-          InternalTimer(gettimeofday() + 5, "Arlo_ReadModes", $hash);
-        }
-        InternalTimer(gettimeofday() + 30, "Arlo_Poll", $hash);
-        return;
+		my $validateData = $data->{authenticated};
+		my $authorization = encode_base64($data->{token}, '');
+		$header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $authorization];
+		$req = HTTP::Request->new('GET', 'https://ocapi-app.arlo.com/api/validateAccessToken?data='.$validateData, $header);
+        $resp = $ua->request($req);
+		if ($resp->is_success) {
+		  $respObj = decode_json $resp->decoded_content;
+          if ($respObj->{meta}{code} == 200) {
+		    $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $data->{token}];
+		    $req = HTTP::Request->new('GET', 'https://my.arlo.com/hmsweb/users/session/v2', $header);
+            $resp = $ua->request($req);
+		    if ($resp->is_success) {
+		      $respObj = decode_json $resp->decoded_content;
+              if ($respObj->{success}) {
+		        $cookie_jar->extract_cookies($resp);
+		        $hash->{helper}{cookies} = Arlo_GetCookies($cookie_jar);
+		        Log3 $name, 5, $hash->{helper}{cookies};
+		        $hash->{SSE_STATUS} = 200;
+		        delete $hash->{RETRY};
+		        $hash->{STATE} = 'active';
+		        Arlo_Request($hash, '/users/devices');
+		        Arlo_EventQueue($hash);
+		        Arlo_Ping($hash);
+		        if (!defined($hash->{MODES})) {
+		          InternalTimer(gettimeofday() + 5, "Arlo_ReadModes", $hash);
+		        }
+		        InternalTimer(gettimeofday() + 30, "Arlo_Poll", $hash);
+		        return;
+		      }
+			}
+          }
+		}
+		Log3 $name, 2, 'Arlo ValidateAccessToken not successful: '.$resp->decoded_content;
       } else {
         Log3 $name, 2, 'Arlo Login not successful: '.$resp->decoded_content;
       }
@@ -977,9 +1053,9 @@ sub Arlo_EventQueue($) {
   my $token = $hash->{helper}{token};
   delete $hash->{RESPONSE_TIMEOUT};
 
-  my $headers = "Authorization: ".$token."\r\nAccept: text/event-stream\r\nReferer: https://arlo.netgear.com\r\n".
-          "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0\r\nCookie: ".$cookies;
-  my $con = {url => 'https://arlo.netgear.com/hmsweb/client/subscribe', method => "GET", header => $headers, keepalive => 1, host => 'arlo.netgear.com', httpversion => '1.1'};
+  my $headers = "Authorization: ".$token."\r\nAccept: text/event-stream\r\nReferer: https://my.arlo.com\r\n".
+          "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:69.0) Gecko/20100101 Firefox/69.0\r\nCookie: ".$cookies;
+  my $con = {url => 'https://my.arlo.com/hmsweb/client/subscribe', method => "GET", header => $headers, keepalive => 1, host => 'my.arlo.com', httpversion => '1.1'};
   my $err = HttpUtils_Connect($con);
   if ($err) {
     Log3 $name, 2, "Error in Arlo event queue: $err";
@@ -1012,8 +1088,9 @@ sub Arlo_EventPolling($) {
   vec($rin, $con->{conn}->fileno(), 1) = 1;
   Log3 $name, 5, "Checking for Arlo server response.";
   my $nfound = select($rout=$rin, undef, undef, 0.1);
-  my $buf = '';
+  my $content = '';
   while ($nfound > 0) {
+    my $buf = '';
     my $len = sysread($con->{conn}, $buf, 65536);
     if (!defined($len) || $len <= 0) {
       HttpUtils_Close($con);
@@ -1026,14 +1103,10 @@ sub Arlo_EventPolling($) {
       }
       return;
     }
-    my $lastChar = substr($buf, length($buf) - 1, 1);
-    if ($lastChar eq "\n" || $lastChar eq "\r") {
-      $nfound = 0;
-    } else {
-      $nfound = select($rout=$rin, undef, undef, 1);
-    }
+	$content = $content . $buf;
+	$nfound = select($rout=$rin, undef, undef, 0.1);
   }
-  Arlo_ProcessResponse($hash, $buf) if ($buf ne '');
+  Arlo_ProcessResponse($hash, $content) if ($content ne '');
   if ($hash->{SSE_STATUS} == 299) {
     $hash->{RETRY} = 1;
     InternalTimer(gettimeofday() + 60, "Arlo_Login", $hash);
@@ -1093,7 +1166,8 @@ sub Arlo_ProcessResponse($$) {
           $hash->{SSE_STATUS} = 299;
         }
       } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' 
-          && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir') {
+          && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir' && $check ne 'Stric' && $check ne 'Trans'
+		  && $check ne 'Expec' && $check ne 'CF-RA') {
         Log3 $hash->{NAME}, 2, "Invalid Arlo event response: $line";
       }
     } 
@@ -1145,8 +1219,9 @@ sub Arlo_ProcessEvent($$) {
          
         my $activityState = $props->{activityState};
         if ($activityState) {
-          Arlo_SetReading($hash, $cameraId, 'activityState', $activityState);
           my $camera = $modules{$MODULE}{defptr}{"C$cameraId"};
+		  my $oldActivityState = ReadingsVal($camera->{NAME}, 'activityState', '');
+          Arlo_SetReading($hash, $cameraId, 'activityState', $activityState);
           if ($activityState eq 'startUserStream') {
             my $streamURL = $props->{streamURL};
             if (defined($streamURL)) {
@@ -1154,6 +1229,9 @@ sub Arlo_ProcessEvent($$) {
             }
           } elsif ($activityState eq 'userStreamActive') {
 		    InternalTimer(gettimeofday() + 0.5, "Arlo_StartRecordingStep2", $camera);
+          } elsif ($activityState eq 'idle' && ($oldActivityState eq 'alertStreamActive' || $oldActivityState eq 'userStreamActive') && AttrVal($name, 'videoDownloadFix', 0) == 1) {
+		    Log3 $name, 4, "Download latest video for $camera->{NAME} in 2 seconds";
+            InternalTimer(gettimeofday() + 2, "Arlo_DownloadLastVideo", $camera);
           }
         }
       }
@@ -1168,7 +1246,7 @@ sub Arlo_ProcessEvent($$) {
         Arlo_SetReading($hash, $deviceId, 'motionDetected', $props->{motionDetected});
         Arlo_SetReading($hash, $deviceId, 'state', $props->{lampState});
       }
-    } elsif ($resource eq 'mediaUploadNotification') {
+    } elsif ($resource eq 'mediaUploadNotification' && AttrVal($name, 'videoDownloadFix', 0) == 0) {
       my $cameraId = $event->{deviceId};
       Arlo_SetReading($hash, $cameraId, 'activityState', 'idle');
       Arlo_SetReadingAndDownload($hash, 'lastVideoThumbnailUrl', $event->{presignedThumbnailUrl}, $cameraId, '_thumb.jpg', \0);
@@ -1235,7 +1313,7 @@ sub Arlo_decrypt($) {
 <a name="Arlo"></a> 
 <h3>Arlo</h3>
 <ul>
-  <p>Arlo security cams from NETGEAR are connected to the Arlo Cloud via base stations. The base stations and cameras can be controlled with a REST API. 
+  <p>Arlo security cams are connected to the Arlo Cloud via base stations. The base stations and cameras can be controlled with a REST API. 
      Events (like movement and state changes) are delivery by server-sent events (SSE).</p>
 
   <p><a name="ArloDefine"></a> <b>Define</b></p>
@@ -1359,6 +1437,12 @@ sub Arlo_decrypt($) {
     <p>Subtype BASESTATION: Deactivates the periodic update of the readings from Arlo Cloud.</p>
   </ul> 
 
+  <p><a name="ArloPingVideoDownloadFix"></a> <b>videoDownloadFix</b></p>
+  <ul> 
+    <p>Subtype ACCOUNT: Set this attribute to 1 if videos are not downloaded automatically. Normally the server sents a notification when there is a new video available but sometimes 
+	this doesn't work. Default is 0.</p>
+  </ul>	
+
   <p><a name="ArloPingInterval"></a> <b>pingInterval</b></p>
   <ul> 
     <p>Subtype ACCOUNT: Set the interval in seconds for the heartbeat-ping. Without a heartbeat-ping the session in Arlo Cloud would expire and FHEM wouldn't receive any more events.
@@ -1383,7 +1467,7 @@ sub Arlo_decrypt($) {
 <a name="Arlo"></a> 
 <h3>Arlo</h3>
 <ul>
-  <p>Arlo Sicherheitskameras von NETGEAR werden über eine Basisstation an die Arlo Cloud angebunden. Diese kann über eine REST-API angesprochen werden und liefert
+  <p>Arlo Sicherheitskameras werden über eine Basisstation an die Arlo Cloud angebunden. Diese kann über eine REST-API angesprochen werden und liefert
     Ereignisse (wie z.B. erkannte Bewegungen oder sonstige Statusänderungen) über Server-Sent Events (SSE) zurück.</p>
 
   <p><a name="ArloDefine"></a> <b>Define</b></p>
@@ -1507,6 +1591,12 @@ sub Arlo_decrypt($) {
     <p>Subtype ACCOUNT: Deaktiviert die Verbindung zur Arlo-Cloud.</p>
     <p>Subtype BASESTATION: Deaktiviert die regelmäßige Abfrage der Readings aus der Arlo Cloud.</p>
   </ul> 
+
+  <p><a name="ArloPingVideoDownloadFix"></a> <b>videoDownloadFix</b></p>
+  <ul> 
+    <p>Subtype ACCOUNT: Dieser Wert muss auf 1 gesetzt werden, falls Videos nach der Aufnahme nicht automatisch heruntergeladen werden. Normalerweise werden Events vom Server gesendet,
+	sobald eine neue Aufnahme vorhanden ist, aber manchmal funktioniert das nicht. Standard ist 0 (ausgeschaltet).</p>
+  </ul>	
 
   <p><a name="ArloPingInterval"></a> <b>pingInterval</b></p>
   <ul> 
