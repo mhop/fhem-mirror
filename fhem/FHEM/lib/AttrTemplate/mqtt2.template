@@ -598,7 +598,7 @@ desc:Configures a dual chanel tasmota device as shutter; needs a special firmwar
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev","")}
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
 set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; Interlock0 1; SetOption81 1; switchmode1 3; switchmode2 3; SaveData 1;
 set IO_DEV publish CMNDTOPIC/Restart 1
