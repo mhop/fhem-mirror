@@ -138,6 +138,7 @@
 #   2019-04-17  better logging
 #   2019-05-11  convert multiple spaces, tabs or newlines in maps to just one blank
 #   2019-06-01  fix bug where disabling tcp master results in mass log (Close, ready, close ...)
+#   2019-09-17  remove only partly commented debug log
 #
 #
 #
@@ -328,7 +329,7 @@ sub ModbusLD_GetIOHash($);
 sub ModbusLD_DoRequest($$$;$$$$);
 sub ModbusLD_StartUpdateTimer($);
 
-my $Modbus_Version = '4.1.4 - 1.6.2019';
+my $Modbus_Version = '4.1.5 - 17.9.2019';
 my $Modbus_PhysAttrs = 
         "queueDelay " .
         "queueMax " .
@@ -2957,8 +2958,9 @@ sub ModbusLD_DoRequest($$$;$$$$){
     my $qlen   = ($ioHash->{QUEUE} ? scalar(@{$ioHash->{QUEUE}}) : 0);
     
     #Log3 $name, 4, "$name: DoRequest called from " . Modbus_Caller() . " with $type$adr, objLen $objLen / reqLen " .
-        ($reqLen ? $reqLen : "-") . " to id $devId, op $op, qlen $qlen" .
-        ((defined($v1) && $op eq 'write') ? ", value hex " . unpack ('H*', $v1) : "");
+    #    ($reqLen ? $reqLen : "-") . " to id $devId, op $op, qlen $qlen" .
+    #    ((defined($v1) && $op eq 'write') ? ", value hex " . unpack ('H*', $v1) : "");
+    
     $reqLen = $objLen if (!$reqLen);            # combined reqLen from GetUpdate or scans
 
     return if (ModbusLD_CheckDisable($hash));   # returns if there is no io device
