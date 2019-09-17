@@ -104,7 +104,7 @@
 */ 
 
 /* Remove this before compiling */
-#define TestConfig // include my SSID / secret
+/* #define TestConfig // include my SSID / secret */
 
 
 /* allow printing of every pin change to Serial */
