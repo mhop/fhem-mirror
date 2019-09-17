@@ -290,7 +290,10 @@ MQTT2_CLIENT_Read($@)
 
   if(!$reread) {
     my $buf = DevIo_SimpleRead($hash);
-    return "" if(!defined($buf));
+    if(!defined($buf)) {
+      MQTT2_CLIENT_Disco($hash);
+      return "";
+    }
     $hash->{BUF} .= $buf;
   }
 
