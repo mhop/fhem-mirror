@@ -88,8 +88,9 @@ my %zwave_class = (
                                              "state:dim ".hex($1)))',
                "052603(..)(..)(..)" => 'sprintf("swmStatus:%s target %s '.
                     'duration %s", hex($1), hex($2), ZWave_byte2time($3))', # V4
-               "..260100.."=> "state:setOff",
-               "..2601ff.."=> "state:setOn",
+               "..2601(..).."=> '($1 eq "00" ? "state:setOff" :
+                                 ($1 eq "ff" ? "state:setOn" :
+                                               "state:setDim ".hex($1)))',
                "..260420"  => "state:swmBeginUp",
                "..260460"  => "state:swmBeginDown",
                "..2604(..)(..)(..)(..)"  => 'ZWave_swmParse($1,$2,$3,$4)',
