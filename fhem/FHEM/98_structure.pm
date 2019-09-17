@@ -478,8 +478,12 @@ structure_Set($@)
         $ret .= $sret;
       }
       if($list[1] eq "?") {
-        $sret =~ s/.*one of //;
-        map { $pars{$_} = 1 } split(" ", $sret);
+        if(!defined($sret)) {
+          Log 1, "$me: 'set $d ?' returned undef";
+        } else {
+          $sret =~ s/.*one of //;
+          map { $pars{$_} = 1 } split(" ", $sret);
+        }
       }
     }
   }
