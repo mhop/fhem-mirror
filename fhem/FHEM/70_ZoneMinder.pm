@@ -96,7 +96,30 @@ sub ZoneMinder_Define {
   DevIo_CloseDev($hash) if (DevIo_IsOpen($hash));
   DevIo_OpenDev($hash, 0, undef);
 
+  my $triggerPortState = $hash->{STATE};
+  ZoneMinder_updateState( $hash, $triggerPortState, 'n/a' );
+
   ZoneMinder_afterInitialized($hash);
+
+  return undef;
+}
+
+sub ZoneMinder_updateState {
+  my ( $hash, $triggerPortState, $apiState ) = @_;
+
+  if ( defined( $triggerPortState  ) ) {
+    $hash->{helper}{ZM_TRIGGER_STATE} = $triggerPortState;
+  } else {
+    $triggerPortState = $hash->{helper}{ZM_TRIGGER_STATE};
+  }
+
+  if ( defined( $apiState ) ) {
+    $hash->{helper}{ZM_API_STATE} = $apiState;
+  } else {
+    $apiState = $hash->{helper}{ZM_API_STATE};
+  }
+
+  readingsSingleUpdate( $hash, 'state', "Trigger-Port: $triggerPortState, API: $apiState", 0 );
 
   return undef;
 }
@@ -188,12 +211,17 @@ sub ZoneMinder_API_Login_Callback {
   $hash->{APILoginStatus} = $param->{code};
   Log3 $name, 3, "ZoneMinder ($name) - login status: $hash->{APILoginStatus}";
 
+  my $apiState = undef;
   if($err ne "") {
     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
     $hash->{APILoginError} = $err;
+    $apiState = 'error';
+    
   } elsif($data ne "") {
     if ($data =~ m/Invalid username or password/) {
       $hash->{APILoginError} = "Invalid username or password.";
+      $apiState = 'login failed';
+
     } else {
       delete($defs{$name}{APILoginError});
       
@@ -206,9 +234,12 @@ sub ZoneMinder_API_Login_Callback {
         ZoneMinder_SimpleGet($hash, "$zmApiUrl/host/getVersion.json", \&ZoneMinder_API_ReadHostInfo_Callback);
         ZoneMinder_SimpleGet($hash, "$zmApiUrl/configs.json", \&ZoneMinder_API_ReadConfig_Callback);
         ZoneMinder_API_getLoad($hash);
+
+        $apiState = 'opened';
       }
     }
   }
+  ZoneMinder_updateState( $hash, undef, $apiState );
 
   RemoveInternalTimer($hash, "ZoneMinder_API_Login");
   my $interval = AttrVal($name, 'loginInterval', 3600);
@@ -716,16 +747,10 @@ sub ZoneMinder_Ready {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  if ( $hash->{STATE} eq "disconnected" ) {
-    return DevIo_OpenDev($hash, 1, undef ); #if success, $err is undef
-  }
+  ZoneMinder_updateState( $hash, 'disappeared', undef );
 
-  # This is relevant for Windows/USB only
-  if(defined($hash->{USBDev})) {
-    my $po = $hash->{USBDev};
-    my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
-    return ( $InBytes > 0 );
-  }
+  return DevIo_OpenDev($hash, 1, undef ); #if success, $err is undef
+
 }
 
 1;
