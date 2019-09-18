@@ -545,8 +545,10 @@ return undef;
 ################################################################
 sub SSCam_Undef($$) {
   my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash);
+  delete $data{SSCam}{$name};
    
 return undef;
 }
