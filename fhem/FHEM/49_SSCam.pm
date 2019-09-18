@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.18.1" => "18.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610 ",
   "8.18.0" => "13.09.2019  change usage of own hashes to central %data hash, release unnecessary allocated memory ",
   "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPHASHOLD ",
   "8.16.3" => "13.08.2019  commandref revised ",
@@ -7751,7 +7752,7 @@ sub SSCam_composegallery ($;$$$) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
       $pws =~ s/"//g if($pws);
       $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
-      $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+      $hf  = AttrVal($strmdev, "hideButtons", 0);                                             # Drucktasten im unteren Bereich ausblenden ?
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
@@ -7773,12 +7774,15 @@ sub SSCam_composegallery ($;$$$) {
   }
   
   # Header Generierung
-  my $header;  
-  if($ftui) {
-      $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
-  } else {
-      $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+  my $header;
+  if($strmdev) {                                                                             # Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610
+      if($ftui) {
+          $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
+      } else {
+          $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
+      } 
   } 
+  
   if ($lang eq "EN") {
       $header .= "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
 	  $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
