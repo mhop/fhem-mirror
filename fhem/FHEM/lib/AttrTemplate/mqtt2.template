@@ -304,6 +304,17 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model L_07_TempHumHpa_TempSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
+name:L_07a_zigbee2mqtt_TempHumSensor
+desc: Temp/hum sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia WSDCGQ01LM Temperature Humidity Sensor
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE stateFormat T: temperature H: humidity
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model L_07a_TempHumSensor
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_08_zigbee2mqtt_Human_Motion_Sensor
 desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCGQ11LM Human Motion Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
@@ -313,6 +324,18 @@ attr DEVICE stateFormat Motion: occupancy Luminance: illuminance
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model L_08_Human_Motion_TempSensor
+
+#source post: https://forum.fhem.de/index.php/topic,94495.msg975785.html#msg975785
+# Osram Lightify, Smart+ Motion Sensor
+name:L_08a_zigbee2mqtt_TempMotion_sensor
+desc: Temperature and motion sensor via zigbee2mqtt <br>Tested with: Osram Lightify Motion Sensor
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+attr DEVICE stateFormat Motion: occupancy T: temperature
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model L_08a_zigbee2mqtt_TempMotion_sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:L_09_zigbee2mqtt_Motion_Sensor
@@ -406,6 +429,7 @@ attr DEVICE readingList \
   STATTOPIC/RESULT:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
+attr DEVICE comment NOTE: on-for-timer is limited to 18h max duration!
 attr DEVICE autocreate 0
 attr DEVICE model A_01a_tasmota_basic_state_power1
 
