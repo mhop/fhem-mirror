@@ -555,7 +555,7 @@ sub sendMessage($%) {
 sub _scheduleTimer($) {
   my ($hash) = @_;
   $hash->{outstandingAck} = 0;
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash,"MYSENSORS::Timer");
   my $next;
   foreach my $radioid (keys %{$hash->{messagesForRadioId}}) {
     my $msgsForId = $hash->{messagesForRadioId}->{$radioid};
