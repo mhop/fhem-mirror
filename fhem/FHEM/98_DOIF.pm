@@ -2208,18 +2208,18 @@ sub CheckRegexpDoIf
               }
               return $i;
             }
-            my $events_temp;
+            my @events_temp;
             if (substr($i,0,1) eq '"') {
-              $events_temp=$eventa;
+              @events_temp=@{$eventa};
             }
             else {
-              $events_temp=$eventas;
+              @events_temp=@{$eventas};
             }
-            my $max=defined $events_temp ? int(@{$events_temp}):0;
+            #my $max=defined @events_temp ? int(@events_temp):0;
             my $s;
             my $found;
-            for (my $j = 0; $j < $max; $j++) {
-              $s = $events_temp->[$j];
+            for (my $j = 0; $j < @events_temp; $j++) {
+              $s = $events_temp[$j];
               $s = "" if(!defined($s));
               $found = ($s =~ m/$notifyExp/);
               if ($found) {
