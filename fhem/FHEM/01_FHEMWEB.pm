@@ -2042,7 +2042,7 @@ FW_svgCollect($)
   my $h = $FW_svgData{$cname};
   my ($res, $atEnds) = ($h->{RES}, $h->{ATENDS});
   $res->{$d} = decode_base64($enc);
-  return if(int(keys %{$res}) != int(@{$atEnds}));
+  return if(!defined($atEnds) || int(keys %{$res}) != int(@{$atEnds}));
   $FW_RET = $h->{FW_RET};
   delete($FW_svgData{$cname});
   FW_svgDone($res, $atEnds, 1);
