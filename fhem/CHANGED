@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 95_Dashboard: new attribute "noLinks" - no links to devices detail
  - feature: 49_SSCamSTRM: new attribute "noLink" - suppress link to detail view
  - bugfix:  49_SSCam: fix warnings, Forum: 45671#msg975610
 -  change:  70_ZoneMinder: improved contents of state (thx Florian_GT)

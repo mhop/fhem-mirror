@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.11.1" => "16.09.2019  new attribute noLinks ",
   "3.11.0" => "16.09.2019  attr dashboard_activetab is now working properly, commandref revised, calculate attribute ".
               "dashboard_activetab (is now a userattr) ",
   "3.10.1" => "29.06.2018  added FW_hideDisplayName, Forum #88727 ",
@@ -84,19 +85,19 @@ sub Dashboard_Initialize ($) {
   $hash->{FW_detailFn} = "Dashboard_DetailFN";    
   $hash->{AttrFn}      = "Dashboard_attr";
   $hash->{AttrList}    = "disable:0,1 ".
-  						 "dashboard_colcount:1,2,3,4,5 ".						 						 
-						 "dashboard_debug:0,1 ".						 
+						 "dashboard_backgroundimage ".
+  						 "dashboard_colcount:1,2,3,4,5 ".	
+						 "dashboard_customcss " .                         
+						 "dashboard_debug:0,1 ".
+						 "dashboard_flexible " .						 
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
-						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".						 
-						 "dashboard_showtogglebuttons:0,1 ".						 					 
-						 "dashboard_width ".
+						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".	
 						 "dashboard_rowcenterheight ".
 						 "dashboard_rowcentercolwidth ".
 						 "dashboard_showfullsize:0,1 ".
 						 "dashboard_showtabs:tabs-and-buttonbar-at-the-top,tabs-and-buttonbar-on-the-bottom,tabs-and-buttonbar-hidden ".
-						 "dashboard_customcss " .
-						 "dashboard_flexible " .
+						 "dashboard_showtogglebuttons:0,1 ".
 						 "dashboard_tab1name " .
 						 "dashboard_tab1groups " .
 						 "dashboard_tab1devices " .
@@ -113,7 +114,8 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_tab[0-9]+colcount " .
 						 "dashboard_tab[0-9]+rowcentercolwidth " .
 						 "dashboard_tab[0-9]+backgroundimage " .
-						 "dashboard_backgroundimage";
+						 "dashboard_width ".
+                         "noLinks:1,0 ";
   
   $data{FWEXT}{jquery}{SCRIPT}      = "/pgm2/".$fwjquery   if (!$data{FWEXT}{jquery}{SCRIPT});
   $data{FWEXT}{jqueryui}{SCRIPT}    = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
@@ -147,8 +149,8 @@ sub Dashboard_define ($$) {
 
   my $url = '/dashboard/' . $name;
 
-  $data{FWEXT}{$url}{CONTENTFUNC} = 'Dashboard_CGI';
-  $data{FWEXT}{$url}{LINK}        = 'dashboard/' . $name;
+  $data{FWEXT}{$url}{CONTENTFUNC} = 'Dashboard_CGI';                             # $data{FWEXT} = FHEMWEB Extension, siehe 01_FHEMWEB.pm
+  $data{FWEXT}{$url}{LINK}        = 'dashboard/'.$name;
   $data{FWEXT}{$url}{NAME}        = $name;
 		
 return;
@@ -180,6 +182,7 @@ sub Dashboard_Get($@) {
   
   my $arg  = (defined($a[1]) ? $a[1] : "");
   my $arg2 = (defined($a[2]) ? $a[2] : "");
+  
   if ($arg eq "config") {
       my $name = $hash->{NAME};
       my $attrdata  = $attr{$name};
@@ -217,9 +220,10 @@ sub Dashboard_Get($@) {
           $res .= "}\n";			
           return $res;
       }		
+  
   } elsif ($arg eq "groupWidget") {
-#### Comming Soon ######
-# For dynamic load of GroupWidgets from JavaScript  
+        #### Comming Soon ######
+        # For dynamic load of GroupWidgets from JavaScript  
 		#my $dbgroup = "";
 		#for (my $p=2;$p<@a;$p++){$dbgroup .= @a[$p]." ";} #For Groupnames with Space
 		#for (my $p=2;$p<@a;$p++){$dbgroup .= $a[$p]." ";} #For Groupnames with Space
@@ -228,17 +232,17 @@ sub Dashboard_Get($@) {
 		#%group = Dashboard_BuildGroupList($dashboard_groupListfhem);
 		#$res .= Dashboard_BuildGroupWidgets(1,1,1212,trim($dbgroup),"t1c1,".trim($dbgroup).",true,0,0:"); 
 		#return $res;		
-  #For dynamic loading of tabs
+        #For dynamic loading of tabs
   
   } elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
       return Dashboard_BuildDashboardTab($arg2, $hash->{NAME});
+  
   } elsif ($arg eq "icon") {
       shift @a;
       shift @a;
-
       my $icon = join (' ', @a);
-
       return FW_iconPath($icon);
+      
   } else {
       return "Unknown argument $arg choose one of config:noArg groupWidget tab icon";
   }
@@ -248,8 +252,9 @@ sub Dashboard_Escape($) {
   my $a = shift;
   return "null" if(!defined($a));
   my %esc = ("\n" => '\n', "\r" => '\r', "\t" => '\t', "\f" => '\f', "\b" => '\b', "\"" => '\"', "\\" => '\\\\', "\'" => '\\\'', );
-  $a =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
-  return $a;
+  $a      =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
+  
+return $a;
 }
 
 ################################################################
@@ -288,7 +293,7 @@ sub Dashboard_attr($$$) {
 
       if ($attrName =~ m/alias/) {
           # if an alias is set to the dashboard, replace the name shown in the left navigation by this alias
-          my $url = '/dashboard/' . $name;
+          my $url = '/dashboard/'.$name;
           $data{FWEXT}{$url}{NAME} = $attrVal;
       }
   }
@@ -296,7 +301,7 @@ sub Dashboard_attr($$$) {
   # die Argumente für das Attribut dashboard_activetab dynamisch ermitteln und setzen
   my $f = Dashboard_calcAttrActiveTab ($name);
   delFromDevAttrList($name, "dashboard_activetab");
-  addToDevAttrList($name, "dashboard_activetab:$f");
+  addToDevAttrList  ($name, "dashboard_activetab:$f");
 
 return;  
 }
@@ -311,10 +316,10 @@ sub Dashboard_DetailFN() {
 	my $ret = ""; 
 	$ret .= "<table class=\"block wide\" id=\"dashboardtoolbar\"  style=\"width:100%\">\n";
 	$ret .= "<tr><td>Helper:\n<div>\n";   
-	$ret .= "	   <a href=\"$FW_ME/dashboard/" . $d . "\"><button type=\"button\">Return to Dashboard</button></a>\n";
-	$ret .= "	   <a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
-	$ret .= "	   <a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
-	$ret .= "  </div>\n";
+	$ret .= "<a href=\"$FW_ME/dashboard/".$d."\"><button type=\"button\">Return to Dashboard</button></a>\n";
+	$ret .= "<a href=\"$FW_ME?cmd=shutdown restart\"><button type=\"button\">Restart FHEM</button></a>\n";
+	$ret .= "<a href=\"$FW_ME?cmd=save\"><button type=\"button\">Save config</button></a>\n";
+	$ret .= "</div>\n";
 	$ret .= "</td></tr>\n"; 	
 	$ret .= "</table>\n";
 	
@@ -327,15 +332,15 @@ return $ret;
 sub Dashboard_CGI($) {
   my ($htmlarg) = @_;
 
-  $htmlarg =~ s/^\///;                                                             # eliminate leading /
+  $htmlarg   =~ s/^\///;                                                           # eliminate leading /
   my @params = split(/\//,$htmlarg);                                               # split URL by /
-  my $ret = '';
-  my $name = $params[1];
+  my $ret    = '';
+  my $name   = $params[1];
 
   $ret = '<div id="content">';
   
   if ($name && defined($defs{$name})) {                                                                
-      my $showfullsize  = AttrVal($defs{$name}{NAME}, "dashboard_showfullsize", 0); 
+      my $showfullsize  = AttrVal($name, "dashboard_showfullsize", 0); 
 
       if ($showfullsize) {
           if ($FW_RET =~ m/<body[^>]*class="([^"]+)"[^>]*>/) {
@@ -346,7 +351,7 @@ sub Dashboard_CGI($) {
       }
       $ret .= Dashboard_SummaryFN($FW_wname,$name,$FW_room,undef);
   } else {
-      $ret .= 'Dashboard "' . $name . '" not found';
+      $ret .= 'Dashboard "'.$name.'" not found';
   }
 
   $ret .= '</div>';
@@ -367,7 +372,8 @@ sub DashboardAsHtml($) {
 }
 
 #############################################################################################
-#           SummaryFn
+#    zentrale Dashboard Generierung 
+#   (beachte $data{FWEXT} bzw. $data{FWEXT}{CONTENTFUNC} in 01_FHEMWEB.pm)
 #############################################################################################
 sub Dashboard_SummaryFN ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_;
@@ -413,11 +419,11 @@ sub Dashboard_SummaryFN ($$$$) {
 	  return "";
   }
  
-  if ($debug == 1)                                     { $debugfield = "edit"; }
+  if ($debug == 1)                                     { $debugfield    = "edit"; }
   if ($showtabs eq "tabs-and-buttonbar-at-the-top")    { $showbuttonbar = "top"; }
   if ($showtabs eq "tabs-and-buttonbar-on-the-bottom") { $showbuttonbar = "bottom"; }
-  if ($showbuttonbar eq "hidden")                      { $lockstate = "lock"; }
-  if ($activetab > $tabcount)                          { $activetab = $tabcount; }
+  if ($showbuttonbar eq "hidden")                      { $lockstate     = "lock"; }
+  if ($activetab > $tabcount)                          { $activetab     = $tabcount; }
 
   $colwidth =~ tr/,/:/;
   if (not ($colheight =~ /^\d+$/))       { $colheight = 400; }
@@ -434,29 +440,29 @@ sub Dashboard_SummaryFN ($$$$) {
  
   if ($room ne "all") { 
       ############################ Set FHEM url to avoid hardcoding it in javascript ############################ 
-	  $ret .= "<script type='text/javascript'>var fhemUrl = '" . $FW_ME . "';</script>";
+	  $ret .= "<script type='text/javascript'>var fhemUrl = '".$FW_ME."';</script>";
  
  	  $ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
-	  $ret .= "	<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
-	  $ret .= "		<ul class=\"dashboard dashboard_tabnav\">\n";
-	  $ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Current Tab</a></li>\n";
-	  $ret .= "			<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Common</a></li>\n";
-	  $ret .= "		</ul>\n";	
-	  $ret .= "		<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
-	  $ret .= "			<table>\n";
-	  $ret .= "				<tr colspan=\"2\"><td><div id=\"tabID\"></div></td></tr>\n";		
-	  $ret .= "				<tr><td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td></tr>";
-	  $ret .= "				<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td></tr>";
+	  $ret .= "<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
+	  $ret .= "<ul class=\"dashboard dashboard_tabnav\">\n";
+	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Current Tab</a></li>\n";
+	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Common</a></li>\n";
+	  $ret .= "</ul>\n";	
+	  $ret .= "<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
+	  $ret .= "<table>\n";
+	  $ret .= "<tr colspan=\"2\"><td><div id=\"tabID\"></div></td></tr>\n";		
+	  $ret .= "<tr><td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td></tr>";
+	  $ret .= "<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td></tr>";
 	  # the method FW_multipleSelect seems not to be available any more in fhem
-	  #$ret .= "				<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\" onfocus=\"FW_multipleSelect(this)\" allvals=\"multiple,$dashboard_groupListfhem\" readonly=\"readonly\"></td></tr>";	
-	  $ret .= "				<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td></tr>";	
-	  $ret .= "				<tr><td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td></tr>";	
-	  $ret .= "			</table>\n";
-	  $ret .= "		</div>\n";	
-	  $ret .= "		<div id=\"tabs-2\" class=\"dashboard_tabcontent\">\n";
+	  #$ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\" onfocus=\"FW_multipleSelect(this)\" allvals=\"multiple,$dashboard_groupListfhem\" readonly=\"readonly\"></td></tr>";	
+	  $ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td></tr>";	
+	  $ret .= "<tr><td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td></tr>";	
+	  $ret .= "</table>\n";
+	  $ret .= "</div>\n";	
+	  $ret .= "<div id=\"tabs-2\" class=\"dashboard_tabcontent\">\n";
 	  $ret .= "Comming soon";
-	  $ret .= "		</div>\n";	
-	  $ret .= "	</div>\n";		
+	  $ret .= "</div>\n";	
+	  $ret .= "</div>\n";		
 	  $ret .= "</div>\n";
 
 	  $ret .= "<div id=\"dashboard_define\" style=\"display: none;\">$name</div>\n";
@@ -466,7 +472,7 @@ sub Dashboard_SummaryFN ($$$$) {
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtogglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss,$flexible\">\n";
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	  $ret .= "</div></td></tr>\n"; 
-	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "") . " no-repeat !important;\">\n";  
+	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".($backgroundimage ? "url(/fhem/images/" .FW_iconPath($backgroundimage).")" : "")." no-repeat !important;\">\n";  
 
 	  ########################### Dashboard Tab-Liste ##############################################
 	  $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
@@ -503,21 +509,22 @@ return $ret;
 #           Dashboard Tabs erstellen
 #############################################################################################
 sub Dashboard_BuildDashboardTab ($$) {
-	my ($t, $d) = @_;
+	my ($t, $name) = @_;
+    my $hash = $defs{$name};
 
-	my $id              = $defs{$d}{NR};
-	my $colcount        = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'colcount', AttrVal($defs{$d}{NAME}, "dashboard_colcount", 1));
-	my $colwidths       = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'rowcentercolwidth', AttrVal($defs{$d}{NAME}, "dashboard_rowcentercolwidth", 100));
+	my $id              = $hash->{NR};
+	my $colcount        = AttrVal($name, 'dashboard_tab'.($t + 1).'colcount', AttrVal($name, "dashboard_colcount", 1));
+	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t + 1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
     $colwidths          =~ tr/,/:/;
-	my $backgroundimage = AttrVal($defs{$d}{NAME}, 'dashboard_tab' . ($t + 1) . 'backgroundimage', "");
-	my $row             = AttrVal($defs{$d}{NAME}, "dashboard_row", "center");
-	my $tabcount        = Dashboard_GetTabCount($defs{$d}, 1);
-    my $tabgroups       = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "groups", "");
-    my $tabsortings     = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "sorting", "");
-    my $tabdevicegroups = AttrVal($defs{$d}{NAME}, "dashboard_tab" . ($t + 1) . "devices", "");
+	my $backgroundimage = AttrVal($name, 'dashboard_tab'.($t + 1).'backgroundimage', "");
+	my $row             = AttrVal($name, "dashboard_row", "center");
+    my $tabgroups       = AttrVal($name, "dashboard_tab".($t + 1)."groups", "");
+    my $tabsortings     = AttrVal($name, "dashboard_tab".($t + 1)."sorting", "");
+    my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t + 1)."devices", "");
+    my $tabcount        = Dashboard_GetTabCount($hash, 1);
 
 	unless ($tabgroups || $tabdevicegroups) { 
-		readingsSingleUpdate( $defs{$d}, "state", "No Groups or devices set", 0 );
+		readingsSingleUpdate($hash, "state", "No Groups or devices set", 0);
 		return "";
 	}
 	
@@ -547,16 +554,16 @@ sub Dashboard_BuildDashboardTab ($$) {
 		my @index = grep { $groups[$_] eq $stabgroup[0] } (0 .. @groups-1);
 
         if (@index == 0) {
-			my $matchGroup = '^' . $stabgroup[0] . '$';
+			my $matchGroup = '^'.$stabgroup[0] . '$';
 			@index = grep { $groups[$_] =~ m/$matchGroup/ } (0 .. @groups-1);
 		}
 
 		if (@index > 0) {
 			for (my $j=0; $j<@index;$j++) {
 				my $groupname = @groups[$index[$j]];
-				$groupname .= '$$$' . 'a:group=' . $groupname;
+				$groupname .= '$$$'.'a:group='.$groupname;
 				if (@stabgroup > 1) {
-					$groupname .= '$$$' . $stabgroup[1];
+					$groupname .= '$$$'.$stabgroup[1];
 				}
 				push(@tabdevicegroups,$groupname);
 			}
@@ -568,7 +575,7 @@ sub Dashboard_BuildDashboardTab ($$) {
     # add sortings for groups not already having a defined sorting
     for (my $i=0;$i<@tabdevicegroups;$i++) {
 		my @stabgroup = split(/\$\$\$/, trim($tabdevicegroups[$i]));		
-		my $matchGroup = "," . quotemeta(trim($stabgroup[0])) . ",";
+		my $matchGroup = ",".quotemeta(trim($stabgroup[0])).",";
 
 		if ($tabsortings !~ m/$matchGroup/) {
 			$tabsortings = $tabsortings."t".$t."c".Dashboard_GetMaxColumnId($row,$colcount).",".trim($stabgroup[0]).",true,0,0:";
@@ -576,21 +583,22 @@ sub Dashboard_BuildDashboardTab ($$) {
 	}
 
 	my $ret = "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
-	$ret   .= "   <ul class=\"dashboard_tabcontent\">\n";
-	$ret   .= "	<table class=\"dashboard_tabcontent\">\n";	 
+	$ret   .= " <ul class=\"dashboard_tabcontent\">\n";
+	$ret   .= "	<table class=\"dashboard_tabcontent\">\n";
+    
 	##################### Top Row (only one Column) #############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){
-		$ret .= Dashboard_BuildDashboardTopRow($t,$id,$tabgroups,$tabsortings);
+		$ret .= Dashboard_BuildDashboardTopRow($name,$t,$id,$tabgroups,$tabsortings);
 	}
 	##################### Center Row (max. 5 Column) ############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "center-bottom" || $row eq "center") {
-		$ret .= Dashboard_BuildDashboardCenterRow($t,$id,$tabgroups,$tabsortings,$colcount);
+		$ret .= Dashboard_BuildDashboardCenterRow($name,$t,$id,$tabgroups,$tabsortings,$colcount);
 	}
 	############################# Bottom Row (only one Column) ############################################
 	if ($row eq "top-center-bottom" || $row eq "center-bottom" || $row eq "bottom"){
-		$ret .= Dashboard_BuildDashboardBottomRow($t,$id,$tabgroups,$tabsortings);
+		$ret .= Dashboard_BuildDashboardBottomRow($name,$t,$id,$tabgroups,$tabsortings);
 	}
-	#############################################################################################	 
+	 
 	$ret .= "	</table>\n";
 	$ret .= " 	</ul>\n";
 	$ret .= "	</div>\n";
@@ -601,14 +609,14 @@ return $ret;
 #############################################################################################
 #           Oberste Zeile erstellen
 #############################################################################################
-sub Dashboard_BuildDashboardTopRow ($$$$) {
-  my ($t,$id, $devicegroups, $groupsorting) = @_;
+sub Dashboard_BuildDashboardTopRow ($$$$$) {
+  my ($name,$t,$id, $devicegroups, $groupsorting) = @_;
   my $ret; 
   
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
   $ret .= "<div id=\"dashboard_rowtop_tab".$t."\" class=\"dashboard dashboard_rowtop\">\n";
   $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
-  $ret .= Dashboard_BuildGroupWidgets($t,"100",$id,$devicegroups,$groupsorting); 
+  $ret .= Dashboard_BuildGroupWidgets($name,$t,"100",$id,$devicegroups,$groupsorting); 
   $ret .= "		</div>\n";
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
@@ -619,8 +627,8 @@ return $ret;
 #############################################################################################
 #           
 #############################################################################################
-sub Dashboard_BuildDashboardCenterRow ($$$$$) {
-  my ($t,$id, $devicegroups, $groupsorting, $colcount) = @_;
+sub Dashboard_BuildDashboardCenterRow ($$$$$$) {
+  my ($name,$t,$id, $devicegroups, $groupsorting, $colcount) = @_;
 
   my $ret = "<tr><td  class=\"dashboard_row\">\n";
   $ret   .= "<div id=\"dashboard_rowcenter_tab".$t."\" class=\"dashboard dashboard_rowcenter\">\n";
@@ -639,7 +647,7 @@ sub Dashboard_BuildDashboardCenterRow ($$$$$) {
 
   for (my $i=0;$i<$colcount;$i++){
 	  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
-	  $ret .= Dashboard_BuildGroupWidgets($t,$i,$id,$devicegroups,$groupsorting); 
+	  $ret .= Dashboard_BuildGroupWidgets($name,$t,$i,$id,$devicegroups,$groupsorting); 
 	  $ret .= "		</div>\n";
   }
   $ret .= "</div>\n";
@@ -651,13 +659,13 @@ return $ret;
 #############################################################################################
 #           
 #############################################################################################
-sub Dashboard_BuildDashboardBottomRow ($$$$) {
-  my ($t,$id, $devicegroups, $groupsorting) = @_;
+sub Dashboard_BuildDashboardBottomRow ($$$$$) {
+  my ($name,$t,$id, $devicegroups, $groupsorting) = @_;
   my $ret; 
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
   $ret .= "<div id=\"dashboard_rowbottom_tab".$t."\" class=\"dashboard dashboard_rowbottom\">\n";
   $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
-  $ret .= Dashboard_BuildGroupWidgets($t,"200",$id,$devicegroups,$groupsorting); 
+  $ret .= Dashboard_BuildGroupWidgets($name,$t,"200",$id,$devicegroups,$groupsorting); 
   $ret .= "		</div>\n";
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
@@ -668,13 +676,13 @@ return $ret;
 #############################################################################################
 #           
 #############################################################################################
-sub Dashboard_BuildGroupWidgets ($$$$$) {
-  my ($tab,$column,$id,$devicegroups, $groupsorting) = @_;
+sub Dashboard_BuildGroupWidgets ($$$$$$) {
+  my ($name,$tab,$column,$id,$devicegroups,$groupsorting) = @_;
   my $ret = "";
 
-  my $counter = 0;
-  my %sorting = ();
-  my %groups = ();
+  my $counter    = 0;
+  my %sorting    = ();
+  my %groups     = ();
   my @groupnames = ();
 
   foreach (split(":", $groupsorting)) {
@@ -707,7 +715,7 @@ sub Dashboard_BuildGroupWidgets ($$$$$) {
           next if (index($sorting{$groupname}, 't'.$tab.'c'.$column) < 0);
 	      my $groupId    = $id."t".$tab."c".$column."w".$counter;
 
-	      $ret .= BuildGroup( ($groupname,$groupdevices,$sorting{$groupname},$groupId,$groupicon) );
+	      $ret .= Dashboard_BuildGroup($name,$groupname,$groupdevices,$sorting{$groupname},$groupId,$groupicon);
           $counter++;
       }
 		
@@ -752,33 +760,33 @@ return $ret;
 #############################################################################################
 #           
 #############################################################################################
-sub BuildGroup {
-  my ($groupname,$devices,$sorting,$groupId,$icon) = @_;
-  my $ret = ""; 
-  my $row = 1;
-  my %extPage = ();
+sub Dashboard_BuildGroup ($$$$$$) {
+  my ($name,$groupname,$devices,$sorting,$groupId,$icon) = @_; 
+  my $row          = 1;
+  my %extPage      = ();
   my $foundDevices = 0;
   my $replaceGroup = "";
+  my $ret          = "";
  
-  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
-
-  $ret .= "  <div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$sorting."\" id=\"".$groupId."\">\n";
-  $ret .= "   <div class=\"dashboard_widgetinner\">\n";	
+  my $rf = ($FW_room ? "&amp;room=$FW_room" : "");                             # stay in the room
+  
+  $ret .= "<div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$sorting."\" id=\"".$groupId."\">\n";
+  $ret .= "<div class=\"dashboard_widgetinner\">\n";	
 
   if ($groupname && $groupname ne $devices) {
-      $ret .= "    <div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
+      $ret .= "<div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
 	  if ($icon) {
 	      $ret.= FW_makeImage($icon,$icon,"dashboard_group_icon");
       }
-      $ret .= $groupname . "</div>\n";
+      $ret .= $groupname."</div>\n";
   }
-  $ret .= "    <div data-userheight=\"\" class=\"dashboard_content\">\n";
+  $ret .= "<div data-userheight=\"\" class=\"dashboard_content\">\n";
   $ret .= "<table class=\"dashboard block wide\" id=\"TYPE_$groupname\">";
 
   my %seen;
   
   # make sure devices are not contained twice in the list
-  my @devices = grep { ! $seen{$_} ++ } devspec2array($devices);
+  my @devices = grep { !$seen{$_}++ } devspec2array($devices);
   
   # sort the devices in alphabetical order by sortby, alias, name
   @devices = sort { lc(AttrVal($a,'sortby',AttrVal($a,'alias',$a))) cmp lc(AttrVal($b,'sortby',AttrVal($b,'alias',$b))) } @devices;
@@ -789,40 +797,43 @@ sub BuildGroup {
 
 	  $ret .= sprintf("<tr class=\"%s\">", ($row&1)?"odd":"even");
 		
-	  my $type = $defs{$d}{TYPE};
+	  my $type    = $defs{$d}{TYPE};
 	  my $devName = AttrVal($d, "alias", $d);
-	  my $icon = AttrVal($d, "icon", "");
-
-	  $icon = FW_makeImage($icon,$icon,"icon dashboard_groupicon") . "&nbsp;" if($icon);
-	
-      $devName="" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName});            # Forum 88667
-	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                           # Don't show Link for "atEnd"-devices
-	      $ret .= FW_pH "detail=$d", "$icon$devName", 1, "col1", 1; 
-	  }			
+	  my $icon    = AttrVal($d, "icon", "");
+	  $icon       = FW_makeImage($icon,$icon,"icon dashboard_groupicon")."&nbsp;" if($icon);
+      $devName    = "" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName});                    # Forum 88667
+      
+	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                                        # Don't show Link for "atEnd"-devices
+	      if(AttrVal($name, "noLinks", 0)) {
+              $ret .= "<td>$icon$devName</td>";                                              # keine Links zur Detailansicht des Devices
+          } else {
+              $ret .= FW_pH ("detail=$d", "$icon$devName", 1, "col1", 1);                    # FW_pH = add href (<link>, <Text>, <?>, <class>, <Wert zurückgeben>, <?>)
+          } 
+      }			
 		
 	  $row++;		
 			
-      $extPage{group} = $groupname;
+      $extPage{group}               = $groupname;
 	  my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
-	  $allSets = FW_widgetOverride($d, $allSets);
+	  $allSets                      = FW_widgetOverride($d, $allSets);
 		
 	  ##############   Customize Result for Special Types #####################
 	  my @txtarray = split(">", $txt);				
       if ($modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {
 	      no strict "refs"; 
-		  my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d,
-                                                        $FW_room, \%extPage);
- 		  $ret .= "<td class=\"dashboard_dev_container\"";
+		  my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, $FW_room, \%extPage);
+ 		  $ret      .= "<td class=\"dashboard_dev_container\"";
 		  if ($devret !~ /informId/i) {
 		      $ret .= " informId=\"$d\"";
   		  }
 		  $ret .= ">$devret</td>";
 		  use strict "refs"; 
-	  } else  {
+	  
+      } else  {
 		  $ret .= "<td informId=\"$d\">$txt</td>";
 	  }
 
-	  ###### Commands, slider, dropdown
+	  ##############   Commands, slider, dropdown   #####################
 	  my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
 	  if((!$FW_ss || $smallscreenCommands) && $cmdlist) {	
 	      my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
@@ -1255,6 +1266,18 @@ return;
         Default: 100%
     </li>
     <br>
+    
+    <a name="noLinks"></a>
+    <li><b>noLinks</b><br>
+      No link generation to the detail view of the devices takes place. <br><br>
+
+      <b>Note: </b><br>
+      Some device types deliver the links to their detail view integrated in the devices name or alias. 
+      In such cases you have to deactivate the link generation inside of the device (for example in devices of type readingsGroup, 
+      SSCamSTRM or SMAPortal).      
+    </li>
+    <br>
+    
   </ul>
   </ul>
   </ul>
@@ -1329,13 +1352,15 @@ return;
     <a name="dashboard_activetab"></a>	
     <li><b>dashboard_activetab </b><br>
         Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt aktivierte Tab ausgewählt (Default: 1)
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Zeig in Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
         passen oder diese überschreiten.
-    </li><br>	
+    </li>
+    <br>	
     
     <a name="dashboard_colcount"></a>	
     <li><b>dashboard_colcount </b><br>
@@ -1343,33 +1368,38 @@ return;
         in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
         Standard: 1
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_debug"></a>		
     <li><b>dashboard_debug </b><br>
         Zeigt Debug-Felder an. Sollte nicht gesetzt werden!<br>
         Standard: 0
-    </li><br>	
+    </li>
+    <br>	
     
     <a name="dashboard_flexible"></a>	
     <li><b>dashboard_flexible </b><br>
         Hat dieser Parameter  einen Wert > 0, dann können die Widgets in den Tabs frei positioniert werden und hängen nicht 
         mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zu schnappt".
         Standard: 0
-    </li><br>
+    </li>
+    <br>
 	
     <a name="dashboard_row"></a>	
     <li><b>dashboard_row </b><br>
         Auswahl welche Zeilen angezeigt werden sollen. top (nur Oben), center (nur Mitte), bottom (nur Unten) und den 
         Kombinationen daraus.<br>
         Standard: center
-    </li><br>	
+    </li>
+    <br>	
 	
     <a name="dashboard_rowcenterheight"></a>	
     <li><b>dashboard_rowcenterheight </b><br>
         Höhe der mittleren Zeile, in der die Gruppen angeordnet werden. <br>
         Standard: 400
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_rowcentercolwidth"></a>	
     <li><b>dashboard_rowcentercolwidth </b><br>
@@ -1379,13 +1409,15 @@ return;
         Sind mehr Spalten als Breiten definiert werden die fehlenden Breiten um die Differenz zu 100 festgelegt. Sind hingegen weniger Spalten als Werte definiert werden 
         die überschüssigen Werte ignoriert.<br>
         Standard: 100
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_rowtopheight"></a>	
     <li><b>dashboard_rowtopheight </b><br>
         Höhe der oberen Zeile, in der die Gruppen angeordnet werden. <br>
         Standard: 250
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_rowbottomheight"></a>	
     <li><b>dashboard_rowbottomheight </b><br>
@@ -1398,14 +1430,16 @@ return;
         Blendet die FHEMWEB Raumliste (kompleter linker Bereich der Seite) und den oberen Bereich von FHEMWEB aus wenn der 
         Wert auf 1 gesetzt ist.<br>
         Default: 0
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_showtabs"></a>	
     <li><b>dashboard_showtabs </b><br>
         Zeigt die Tabs/Schalterleiste des Dashboards oben oder unten an, oder blendet diese aus. Wenn die Schalterleiste 
         ausgeblendet wird ist das Dashboard gespert.<br>
         Standard: tabs-and-buttonbar-at-the-top
-    </li><br>
+    </li>
+    <br>
 	
     <a name="dashboard_showtogglebuttons"></a>		
     <li><b>dashboard_showtogglebuttons </b><br>
@@ -1416,13 +1450,15 @@ return;
     <a name="dashboard_tabXname"></a>
     <li><b>dashboard_tabXname </b><br>
         Titel des X Tab.
-    </li><br>	
+    </li>
+    <br>	
     
     <a name="dashboard_tabXsorting"></a>	
     <li><b>dashboard_tabXsorting </b><br>
         Enthält die Positionierung jeder Gruppe im Tab X. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
         empfohlen dieses Attribut manuell zu ändern.
-    </li><br>		
+    </li>
+    <br>		
     
     <a name="dashboard_tabXgroups"></a>	
     <li><b>dashboard_tab1groups </b><br>
@@ -1433,7 +1469,8 @@ return;
         Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
         Der Gruppenname kann ebenfalls einen regulären Ausdruck beinhalten, um alle Gruppen anzuzeigen, die darauf passen.<br/>
         Beispiel: .*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
-    </li><br>	
+    </li>
+    <br>	
 	
     <a name="dashboard_tabXdevices"></a>	
     <li><b>dashboard_tabXdevices </b><br>
@@ -1442,13 +1479,15 @@ return;
         Das Icon ist optional. Auch der Gruppenname muss nicht vorhanden sein. Im Falle dass dieser fehlt, werden die gefunden 
         Geräte nicht gruppiert sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich devspec:
         <a href="#devspec">Dev-Spec</a>
-    </li><br>	
+    </li>
+    <br>	
 	
     <a name="dashboard_tabXicon"></a>	
     <li><b>dashboard_tabXicon </b><br>
         Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es 
         sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_tabXcolcount"></a>	
     <li><b>dashboard_tabXcolcount </b><br>
@@ -1456,20 +1495,34 @@ return;
         in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
         Standard: &lt;dashboard_colcount&gt;
-    </li><br>
+    </li>
+    <br>
     
     <a name="dashboard_tabXbackgroundimage"></a>	
     <li><b>dashboard_tabXbackgroundimage </b><br>
         Zeigt ein Hintergrundbild für den X-ten Tab an. Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs 
         passen oder diese überschreiten. 
-    </li><br>
+    </li>
+    <br>
 	
     <a name="dashboard_width"></a>	
     <li><b>dashboard_width </b><br>
         Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) 
         in Pixel.<br>
         Standard: 100%
-    </li><br>
+    </li>
+    <br>
+    
+    <a name="noLinks"></a>
+    <li><b>noLinks</b><br>
+      Es erfolgt keine Linkerstellung zur Detailansicht von Devices. <br><br>
+
+      <b>Hinweis: </b><br>
+      Bei manchen Devicetypen wird der Link zur Detailansicht integriert im Namen bzw. Alias des Device mitgeliefert. 
+      In diesen Fällen muß die Linkgenerierung direkt im Device abgestellt werden (z.B. bei Devices der Typen readingsGroup, 
+      SSCamSTRM oder SMAPortal).      
+    </li>
+    <br>
 
 </ul>
 </ul>
