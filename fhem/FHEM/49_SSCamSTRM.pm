@@ -35,6 +35,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.9.0"  => "19.09.2019  new attribute noLink ",
   "2.8.0"  => "09.09.2019  new attribute hideFooter ",
   "2.7.0"  => "15.07.2019  FTUI support, new attributes htmlattrFTUI, hideDisplayNameFTUI, ptzButtonSize, ptzButtonSizeFTUI ",
   "2.6.0"  => "21.06.2019  GetFn -> get <name> html ",
@@ -87,6 +88,7 @@ sub SSCamSTRM_Initialize($) {
                                 "hideDisplayName:1,0 ".
                                 "hideDisplayNameFTUI:1,0 ".
                                 "hideButtons:1,0 ".
+                                "noLink:1,0 ".
                                 "popupWindowSize ".
                                 "popupStreamFW:$fwd ".
                                 "popupStreamTo:OK,1,2,3,4,5,6,7,8,9,10,15,20,25,30,40,50,60 ".
@@ -569,6 +571,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </li>
     <br>
     
+    <a name="noLink"></a>
+    <li><b>noLink</b><br>
+      The device name or alias doesn't contain a link to the detail device view. 
+    </li>
+    <br>
+    
     <a name="popupStreamFW"></a>
     <li><b>popupStreamFW</b><br>
       You can specify a particular FHEMWEB device whose active browser pages should open a popup window by the 
@@ -797,6 +805,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         <b>Beispiel: </b><br>
         attr &lt;name&gt; htmlattr width="580" height="460"  <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="noLink"></a>
+    <li><b>noLink</b><br>
+      Der Devicename oder Alias enthält keinen Link zur Detailansicht. 
     </li>
     <br>
     
