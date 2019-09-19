@@ -4308,7 +4308,6 @@ sub EnOcean_Set($@)
         } elsif ($cmd eq "up") {
           # up
           if (defined $a[1]) {
-            #if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
             if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart - $a[1] / $shutTime * 100;
               if ($angleTime) {
@@ -4345,7 +4344,6 @@ sub EnOcean_Set($@)
         } elsif ($cmd eq "down") {
           # down
           if (defined $a[1]) {
-            #if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
             if ($a[1] =~ m/^[+-]?\d*[.]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart + $a[1] / $shutTime * 100;
               if ($angleTime) {
@@ -6856,12 +6854,13 @@ sub EnOcean_Set($@)
       return "Unknown argument $cmd, choose one of $cmdList";
 
     } else {
+######
       # subtype does not support set commands
       $updateState = -1;
       if (AttrVal($name, "remoteManagement", "off") eq "manager") {
         return "Unknown argument $cmd, choose one of $cmdList";
       } else {
-        return;
+        return "Unknown argument $cmd, choose one of";
       }
     }
 
@@ -11186,9 +11185,9 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "switch.0A") {
       # Push Button - Single Button EEP D2-03-0A
-      if (!exists($hash->{helper}{batteryPrecent}) || $hash->{helper}{batteryPrecent} != $db[1]) {
-        push @event, "3:batteryPrecent:$db[1]";
-        $hash->{helper}{batteryPrecent} = $db[1];
+      if (!exists($hash->{helper}{batteryPercent}) || $hash->{helper}{batteryPercent} != $db[1]) {
+        push @event, "3:batteryPercent:$db[1]";
+        $hash->{helper}{batteryPercent} = $db[1];
       }
       if ($db[0] == 1) {
         push @event, "3:buttonS:on";
@@ -12116,7 +12115,7 @@ sub EnOcean_Parse($$)
       $hash->{Dev_ACK} = 'signal';
       DoTrigger($name, "SIGNAL: Dev_ACK", 1);
     } elsif ($signalMID == 6) {
-      push @event, "3:batteryPrecent:$db[0]";
+      push @event, "3:batteryPercent:$db[0]";
     } elsif ($signalMID == 7) {
       push @event, "3:hwVersion:" . substr($data, 10, 8);
       push @event, "3:swVersion:" . substr($data, 2, 8);
@@ -20414,7 +20413,7 @@ EnOcean_Delete($$)
      <ul>
          <li>on</li>
          <li>off</li>
-         <li>batteryPrecent: r/% (Sensor Range: r = 1 % ... 100 %)</li>
+         <li>batteryPercent: r/% (Sensor Range: r = 1 % ... 100 %)</li>
          <li>buttonD: on|off</li>
          <li>buttonL: on|off</li>
          <li>buttonS: on|off</li>
