@@ -1274,7 +1274,7 @@ return;
       <b>Note: </b><br>
       Some device types deliver the links to their detail view integrated in the devices name or alias. 
       In such cases you have to deactivate the link generation inside of the device (for example in devices of type readingsGroup, 
-      SSCamSTRM or SMAPortal).      
+      SSCamSTRM, SVG or SMAPortal).      
     </li>
     <br>
     
@@ -1520,7 +1520,7 @@ return;
       <b>Hinweis: </b><br>
       Bei manchen Devicetypen wird der Link zur Detailansicht integriert im Namen bzw. Alias des Device mitgeliefert. 
       In diesen Fällen muß die Linkgenerierung direkt im Device abgestellt werden (z.B. bei Devices der Typen readingsGroup, 
-      SSCamSTRM oder SMAPortal).      
+      SSCamSTRM, SVG oder SMAPortal).      
     </li>
     <br>
 
