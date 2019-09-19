@@ -55,7 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
-  "3.11.1" => "16.09.2019  new attribute noLinks ",
+  "3.12.0" => "16.09.2019  new attribute noLinks, review comref and get-options ",
   "3.11.0" => "16.09.2019  attr dashboard_activetab is now working properly, commandref revised, calculate attribute ".
               "dashboard_activetab (is now a userattr) ",
   "3.10.1" => "29.06.2018  added FW_hideDisplayName, Forum #88727 ",
@@ -184,7 +184,7 @@ sub Dashboard_Get($@) {
   my $arg2 = (defined($a[2]) ? $a[2] : "");
   
   if ($arg eq "config") {
-      my $name = $hash->{NAME};
+      my $name      = $hash->{NAME};
       my $attrdata  = $attr{$name};
       if ($attrdata) {
           my $x = keys %$attrdata;
@@ -201,7 +201,7 @@ sub Dashboard_Get($@) {
           foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
           
           $res .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . Dashboard_GetTabCount($hash, 0). ", \"dashboard_activetab\": " . Dashboard_GetActiveTab($hash->{NAME});
-          $res .=  ($i != $x) ? ",\n" : "\n";
+          $res .= ($i != $x) ? ",\n" : "\n";
           
           foreach my $attr (sort keys %$attrdata) {
               $i++;				
@@ -214,7 +214,7 @@ sub Dashboard_Get($@) {
               } else {
                   next;
               }
-              $res .=  ($i != $x) ? ",\n" : "\n";
+              $res .= ($i != $x) ? ",\n" : "\n";
           }
           $res .= "  }\n";
           $res .= "}\n";			
@@ -240,11 +240,12 @@ sub Dashboard_Get($@) {
   } elsif ($arg eq "icon") {
       shift @a;
       shift @a;
+      return "Please provide only one icon whose path and full name is to show." if(!@a || $a[1]);
       my $icon = join (' ', @a);
       return FW_iconPath($icon);
       
   } else {
-      return "Unknown argument $arg choose one of config:noArg groupWidget tab icon";
+      return "Unknown argument $arg choose one of config:noArg icon";
   }
 }
 
@@ -1103,7 +1104,22 @@ return;
   <b>Get</b> 
   <ul>
   <ul>
-    N/A
+
+    <a name="config"></a>
+    <li><b>get &lt;name&gt; config </b><br>
+	Delivers the configuration of the dashboard back. <br>
+    <br>
+    </li>
+    
+    <a name="icon"></a>
+    <li><b>get &lt;name&gt; icon &lt;icon name&gt; </b><br>
+	Delivers the path and full name of the denoted icon back. <br><br>
+    
+    <b>Example: </b><br>
+    get &lt;name&gt; icon measure_power_meter
+    <br>
+    </li>
+
   </ul>
   </ul>
   <br>
@@ -1337,7 +1353,22 @@ return;
   <b>Get</b> 
   <ul>
   <ul>
-    N/A
+  
+    <a name="config"></a>
+    <li><b>get &lt;name&gt; config </b><br>
+	Liefert die Konfiguration des Dashboards zurück. <br>
+    <br>
+    </li>
+    
+    <a name="icon"></a>
+    <li><b>get &lt;name&gt; icon &lt;icon name&gt; </b><br>
+	Liefert den Pfad und vollen Namen des angegebenen Icons zurück. <br><br>
+    
+    <b>Beispiel: </b><br>
+    get &lt;name&gt; icon measure_power_meter
+    <br>
+    </li>
+    
   </ul>
   </ul>
   <br>
