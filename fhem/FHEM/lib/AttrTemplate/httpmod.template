@@ -9,63 +9,65 @@
 # If undef, the user has to specify them (the comment is shown to the user)
 
 ###########################################
-name:0_00_General_Info
+name:General_Info
 filter:TYPE=HTTPMOD
 desc: Forum <a href="https://forum.fhem.de/index.php/topic,97694.0.html">link</a> for suggestions or bug reports on httpmod-template
+order:00000000
 
 
 #################################
 #Clever Tanken
 #
 #Single station prices, Forum: https://forum.fhem.de/index.php/topic,94640.msg873905.html#msg873905
-name:A_01a_clever_tanken_single_station
+name:clever_tanken_single_station
 filter:TYPE=HTTPMOD
 desc: Get prices for a single gas station.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://www.clever-tanken.de/tankstelle_details/29092 1800 <br>Change station ID to your needs <br><a href="https://forum.fhem.de/index.php/topic,94640.msg873905.html#msg873905">Source: Forum</a>
+order: 10000
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex readingOExpr
 attr DEVICE enableControlSet 1
 attr DEVICE reading01Name Diesel
-attr DEVICE reading01Regex "price-type-name">Diesel</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
+attr DEVICE reading01Regex "current-price-1">(\d.\d{2})
 attr DEVICE reading02Name SuperE10
-attr DEVICE reading02Regex "price-type-name">Super E10</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
+attr DEVICE reading02Regex "current-price-2">(\d.\d{2})
 attr DEVICE reading03Name SuperE5
-attr DEVICE reading03Regex "price-type-name">Super E5</div>[\d\D]{700,900}"current-price-.">([0-9\.]+[^0-9]+suffix-price-.">[0-9])
+attr DEVICE reading03Regex "current-price-3">(\d.\d{2})
 attr DEVICE readingOExpr $val =~ tr/,/./;;$val
 attr DEVICE stateFormat E5: SuperE5 € / E10: SuperE10 € / D: Diesel €
 attr DEVICE timeout 10
 attr DEVICE verbose 2
 attr DEVICE room WHICHROOM
-attr DEVICE model A_01a_clever_tanken_single_station
-
-#defmod FileLogSpritE5 FileLog ./log/SpritE5-%Y.log TankeJetRueckmarsdorfer:SuperE5:.*|DEVICE:SuperE5:.*
+attr DEVICE model clever_tanken_single_station
 
 #Station overview, one product, Forum: https://forum.fhem.de/index.php/topic,94640.msg873841.html#msg873841
 name:A_01a_clever_tanken_multi_station
 filter:TYPE=HTTPMOD
 desc: Get prices for one product as environment search.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD https://www.clever-tanken.de/tankstelle_liste?spritsorte=3&r=10&ort=52152  1800 <br>Change PLZ, radius and product to your needs <br><a href="https://forum.fhem.de/index.php/topic,94640.msg873841.html#msg873841">Source: Forum</a>
+order: 100001
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE reading01Name Tankstellenname
-attr DEVICE reading01Regex <div class=\"row fuel-station-location-name\">(.*)<\/div>
+attr DEVICE reading01Regex <span class=\"fuel-station-location-name\">([^<]+)<\/span>
 attr DEVICE reading01RegOpt g
 attr DEVICE reading02Name Preis
-attr DEVICE reading02Regex <div class=\"price\">(.*)<sup>
+attr DEVICE reading02Regex <div class=\"price-text price text-color-ct-blue\">.*(\d.\d{2})<sup>
 attr DEVICE reading02RegOpt g
 attr DEVICE reading03Name Strasse
-attr DEVICE reading03Regex <div id=\"fuel-station-location-street\">(.*)<\/div>
+attr DEVICE reading03Regex <div class=\"fuel-station-location-street\">(.*)<\/div>
 attr DEVICE reading03RegOpt g
 attr DEVICE reading04Name Ort
-attr DEVICE reading04Regex <div id=\"fuel-station-location-city\"> (.*)<\/div>       
+attr DEVICE reading04Regex <div class=\"fuel-station-location-city\"> (.*)<\/div>   
 attr DEVICE reading04RegOpt g
 attr DEVICE reading05Name Entfernung
-attr DEVICE reading05Regex <div >(.*)<\/div>
+attr DEVICE reading05Regex <div class=\"fuel-station-location-distance d-flex justify-content-end\">.*<span>([^<]+)<\/span>
 attr DEVICE reading05RegOpt g
 attr DEVICE room WHICHROOM
-attr DEVICE model A_01a_clever_tanken_multi_station
+attr DEVICE model a_clever_tanken_multi_station
 
 #German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
-name:A_02a_DWD_weather_warnings
+name:DWD_weather_warnings
 filter:TYPE=HTTPMOD
 desc: Get weather warnings from DWD.<br>Define a HTTPMOD device like <br>defmod Wetterwarner HTTPMOD https://www.dwd.de/DWD/warnungen/warnapp/json/warnings.json 0 <br>Change region to your needs <br><a href="https://forum.fhem.de/index.php/topic,45176.msg906203.html#msg906203">Source: Forum</a>
+order:200000
 par:REGIONCODE;Get region code from https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv?__blob=publicationFile&v=3;{ undef }
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE enableControlSet 1
@@ -74,12 +76,13 @@ attr DEVICE extractAllJSONFilter REGIONCODE
 attr DEVICE readingEncode UTF-8
 attr DEVICE preProcessRegex s/warnWetter..............|\);;|\t|\n|\r//g
 attr DEVICE room WHICHROOM
-attr DEVICE model A_02a_DWD_weather_warnings
+attr DEVICE model DWD_weather_warnings
 
 #German river water levels, Wiki: https://wiki.fhem.de/wiki/Flusspegel
-name:A_02d_pegelonline
+name:pegelonline
 filter:TYPE=HTTPMOD
 desc: Get water level infor for german rivers from www.pegelonline.wsv.de.<br>Define a HTTPMOD device like <br>defmod Pegelstaende HTTPMOD https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/070b1eb4-3872-4e07-b2e5-e25fd9251b93/W/currentmeasurement.json 3600<br>Change station argument to your needs <br><a href="https://wiki.fhem.de/wiki/Flusspegel">Source: Wiki</a><br><a href="https://forum.fhem.de/index.php/topic,97560.msg908176.html#msg908176">Source: Forum</a>
+order:200001
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE enableControlSet 1
 attr DEVICE extractAllJSON 1
@@ -446,9 +449,10 @@ attr DEVICE model C_01a_resol_solar
 
 #################################
 #Show updates for CUL_HM devices, Forum: https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144
-name:X_01a_CUL_HM_firmware_update_downloader
+name:CUL_HM_firmware_update_downloader
 filter:TYPE=HTTPMOD
 desc: Check eQ3 homepage for available new firmware files; provides also links for direct downloads<br>Define a HTTPMOD device like <br>define eq3 HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800<br><a href="https://https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144">Source: Forum</a><br><a href="https://wiki.fhem.de/wiki/HomeMatic_Firmware_Update#Basis-Definitionen_f.C3.BCr_Device_eq3">Wiki</a>
+order:X_01a
 par:WHICHROOM;Actual room of the device; {AttrVal("DEVICE","room","CUL_HM" )} 
 defmod DEVICE HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800
 attr DEVICE userattr enableControlSet event-on-change-reading event-on-update-reading reading01AutoNumLen reading01Format reading01Name reading01RegOpt reading01RegOpt:s,i,g reading01Regex readingMaxAge readingMaxAgeReplacementMode readingMaxAgeReplacementMode:text,expression,delete readingMaxAgeReplacementMode:text,reading,internal,expression,delete requestData.* showError showMatched stateFormat userReadings webCmd
@@ -545,3 +549,4 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
   return ($ret eq "")?"no fw-updates needed!":$ret;;\
 }
 attr DEVICE webCmd reread
+attr DEVICE model CUL_HM_firmware_update_downloader
