@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.13.0" => "20.09.2019  change attribute noLinks to dashboard_noLinks, eliminate links for PageEnd-Devices ",
   "3.12.0" => "16.09.2019  new attribute noLinks, review comref and get-options ",
   "3.11.0" => "16.09.2019  attr dashboard_activetab is now working properly, commandref revised, calculate attribute ".
               "dashboard_activetab (is now a userattr) ",
@@ -115,7 +116,7 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_tab[0-9]+rowcentercolwidth " .
 						 "dashboard_tab[0-9]+backgroundimage " .
 						 "dashboard_width ".
-                         "noLinks:1,0 ";
+                         "dashboard_noLinks:1,0 ";
   
   $data{FWEXT}{jquery}{SCRIPT}      = "/pgm2/".$fwjquery   if (!$data{FWEXT}{jquery}{SCRIPT});
   $data{FWEXT}{jqueryui}{SCRIPT}    = "/pgm2/".$fwjqueryui if (!$data{FWEXT}{jqueryui}{SCRIPT});
@@ -805,12 +806,12 @@ sub Dashboard_BuildGroup ($$$$$$) {
       $devName    = "" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName});                    # Forum 88667
       
 	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                                        # Don't show Link for "atEnd"-devices
-	      if(AttrVal($name, "noLinks", 0)) {
+	      if(AttrVal($name, "dashboard_noLinks", 0)) {
               $ret .= "<td>$icon$devName</td>";                                              # keine Links zur Detailansicht des Devices
           } else {
               $ret .= FW_pH ("detail=$d", "$icon$devName", 1, "col1", 1);                    # FW_pH = add href (<link>, <Text>, <?>, <class>, <Wert zurückgeben>, <?>)
           } 
-      }			
+      }	     
 		
 	  $row++;		
 			
@@ -827,6 +828,9 @@ sub Dashboard_BuildGroup ($$$$$$) {
 		  if ($devret !~ /informId/i) {
 		      $ret .= " informId=\"$d\"";
   		  }
+          if(AttrVal($name, "dashboard_noLinks", 0)) {
+              $devret =~ s/.*(<a\s+href="\/fhem\?detail=.*>(.*)<\/a>).*/$2/mg;               # keine Links zur Detailansicht des Devices für PageEnd Devices (bringen Link inkludiert mit)
+          }
 		  $ret .= ">$devret</td>";
 		  use strict "refs"; 
 	  
@@ -1283,8 +1287,8 @@ return;
     </li>
     <br>
     
-    <a name="noLinks"></a>
-    <li><b>noLinks</b><br>
+    <a name="dashboard_noLinks"></a>
+    <li><b>dashboard_noLinks</b><br>
       No link generation to the detail view of the devices takes place. <br><br>
 
       <b>Note: </b><br>
@@ -1544,8 +1548,8 @@ return;
     </li>
     <br>
     
-    <a name="noLinks"></a>
-    <li><b>noLinks</b><br>
+    <a name="dashboard_noLinks"></a>
+    <li><b>dashboard_noLinks</b><br>
       Es erfolgt keine Linkerstellung zur Detailansicht von Devices. <br><br>
 
       <b>Hinweis: </b><br>
