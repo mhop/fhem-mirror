@@ -89,6 +89,7 @@ use vars qw(%FW_visibleDeviceHash);
 use vars qw(@FW_httpheader); # HTTP header, line by line
 use vars qw(%FW_httpheader); # HTTP header, as hash
 use vars qw($FW_userAgent); # user agent string
+use vars qw($FW_addJs);     # Only for helper like AttrTemplate
 
 $FW_formmethod = "post";
 
@@ -1064,6 +1065,7 @@ FW_answerCall($)
     my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
     FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
   } @jsList;
+  FW_pO $FW_addJs if($FW_addJs);
 
   ########################
   # FW Extensions
