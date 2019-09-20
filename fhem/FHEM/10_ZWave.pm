@@ -919,7 +919,9 @@ ZWave_execInits($$;$)
 
   # ZWavePlus devices with MCA need mcaAdd instead of associationAdd
   my $cls = AttrVal($NAME, "classes", "");
-  my $isMc = ($cls =~ m/ZWAVEPLUS_INFO/ && $cls =~ m/MULTI_CHANNEL_ASSOCIATION/);
+  my $isMc = ($cls =~ m/ZWAVEPLUS_INFO/ &&
+              $cls =~ m/MULTI_CHANNEL_ASSOCIATION/ &&
+              $cls =~ m/MULTI_CHANNEL\b/);
 
   my @cmd;
   my $nih = $hash->{nodeIdHex};
