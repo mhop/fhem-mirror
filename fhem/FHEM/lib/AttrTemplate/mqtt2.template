@@ -9,16 +9,18 @@
 # If undef, the user has to specify them (the comment is shown to the user)
 
 ###########################################
-name:0_00_General_Info
+name:General_Info
 filter:TYPE=MQTT2_DEVICE
 desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread</a> for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
+order:000000
 
 ###############
 #MQTT2_CLIENT_Bridge
 #
-name:A_00_MQTT2_CLIENT_general_bridge
+name:MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
+order:000001
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
 par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
@@ -39,14 +41,15 @@ deletereading -q DEVCID (?!associatedWith).*
 setreading DEVCID associatedWith DEVICE
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
-attr DEVCID model A_00_MQTT2_CLIENT_general_bridge
+attr DEVCID model MQTT2_CLIENT_general_bridge
 
 ###########################################
 # zigbee2mqtt
 # The zigbee2mqtt bridge device (entire hex id of devices as bridgeRegexp)
-name:L_01_zigbee2mqtt_bridge
+name:zigbee2mqtt_bridge
 desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
+order:L_01 
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:([^/]+)[/].*:, ? $1 : undef }
 attr DEVICE bridgeRegexp\
  BASE_TOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
@@ -85,30 +88,14 @@ attr DEVICE setList\
   z_rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
   z_reset_CC:noArg BASE_TOPIC/bridge/config/reset
 attr DEVICE setStateList on off
-attr DEVICE model L_01_zigbee2mqtt_bridge
+attr DEVICE model zigbee2mqtt_bridge
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
-name:L_01a_zigbee2mqtt_bridge_0x
-desc:The zigbee2mqtt bridge device <br>Outdated version, using entire device name including "0x". <br>Kept in repo for compability reasons. 
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:([^/]+)[/].*:, ? $1 : undef }
-set DEVICE attrTemplate L_01_zigbee2mqtt_bridge
-attr DEVICE bridgeRegexp BASE_TOPIC/(0x[A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
-attr DEVICE model L_01a_zigbee2mqtt_bridge_0x
-  
-# The zigbee2mqtt bridge device
-name:L_01x_zigbee2mqtt_bridge_outdated
-desc:The zigbee2mqtt bridge device <br>Original version, kept in repo for compability reasons. <br>Truncs device name from "0x"
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
-par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
-set DEVICE attrTemplate L_01_zigbee2mqtt_bridge
-attr DEVICE bridgeRegexp BASE_TOPIC/0x([A-Za-z0-9]*)[/]?.*:.* "zigbee_$1"
-attr DEVICE model L_01x_zigbee2mqtt_bridge_outdated
-
 # A dimmable light connected via zigbee2mqtt
-name:L_02a_zigbee2mqtt_light_dimmer
+name:zigbee2mqtt_light_dimmer
 desc: A dimmable light connected via zigbee2mqtt <br>Tested with: Tradfri LED1650R5, Osram Lightify W32
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_02a
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon light_control
@@ -120,12 +107,13 @@ attr DEVICE setList \
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
-attr DEVICE model L_02a_zigbee2mqtt_light_dimmer
+attr DEVICE model zigbee2mqtt_light_dimmer
 
 # A dimmable color light connected via zigbee2mqtt
-name:L_02b_zigbee2mqtt_light_cct
+name:zigbee2mqtt_light_cct
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 desc: A dimmable light with color temperature via zigbee2mqtt
+order:L_02b
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon light_control
@@ -136,12 +124,13 @@ attr DEVICE setList \
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}
-attr DEVICE model L_02b_zigbee2mqtt_light_cct
+attr DEVICE model zigbee2mqtt_light_cct
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
-name:L_02c_zigbee2mqtt_light_rgb_hex
+name:zigbee2mqtt_light_rgb_hex
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
+order:L_02c
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -155,11 +144,12 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}
-attr DEVICE model L_02c_zigbee2mqtt_light_rgb_hex
+attr DEVICE model zigbee2mqtt_light_rgb_hex
 
-name:L_02c_zigbee2mqtt_light_rgb_rgb
+name:zigbee2mqtt_light_rgb_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
+order:L_02c
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -172,12 +162,13 @@ attr DEVICE setList \
   off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-attr DEVICE model L_02c_zigbee2mqtt_light_rgb_rgb
+attr DEVICE model zigbee2mqtt_light_rgb_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
-name:L_02d_zigbee2mqtt_light_rgbw_hex
+name:zigbee2mqtt_light_rgbw_hex
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>tested with Mueller Light tint RGBW bulb
+order:L_02d
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -194,11 +185,12 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}  
-attr DEVICE model L_02d_zigbee2mqtt_light_rgbw_hex
+attr DEVICE model zigbee2mqtt_light_rgbw_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
-name:L_02d_zigbee2mqtt_light_rgbw_rgb
+name:zigbee2mqtt_light_rgbw_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_02d1
 desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -213,12 +205,13 @@ attr DEVICE setList \
   white:noArg BASE_TOPIC/DEV_ID/set {"color_temp": 154 , "color_temp": 500}\
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-attr DEVICE model L_02d_zigbee2mqtt_light_rgbw_rgb
+attr DEVICE model zigbee2mqtt_light_rgbw_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
-name:L_02e_zigbee2mqtt_light_rgbcct_hex
+name:zigbee2mqtt_light_rgbcct_hex
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_02e
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE icon hue_filled_white_and_color_e27_b22
@@ -232,11 +225,12 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
-attr DEVICE model L_02e_zigbee2mqtt_light_rgbcct_hex
+attr DEVICE model zigbee2mqtt_light_rgbcct_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
-name:L_02e_zigbee2mqtt_light_rgbcct_rgb
+name:zigbee2mqtt_light_rgbcct_rgb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_02e1
 desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Tested with: RGB-CCT GL-C-008
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
@@ -251,26 +245,29 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-attr DEVICE model L_02e_zigbee2mqtt_light_rgbcct_rgb
+attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
 
-name:L_03_zigbee2mqtt_smokeDetector
+name:zigbee2mqtt_smokeDetector
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_03
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE icon secur_smoke_detector
 attr DEVICE stateFormat smoke
-attr DEVICE model L_03_zigbee2mqtt_smokeDetector
+attr DEVICE model zigbee2mqtt_smokeDetector
 
-name:L_04_zigbee2mqtt_hueMotionSensor
+name:zigbee2mqtt_hueMotionSensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_04
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
-attr DEVICE model L_04_zigbee2mqtt_hueMotionSensor
+attr DEVICE model zigbee2mqtt_hueMotionSensor
 
-name:L_05_zigbee2mqtt_smart+plug
+name:zigbee2mqtt_smart+plug
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_05
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
@@ -278,11 +275,12 @@ attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   off BASE_TOPIC/DEV_ID/set OFF\
   on BASE_TOPIC/DEV_ID/set ON
-attr DEVICE model L_05_zigbee2mqtt_smart+plug
+attr DEVICE model zigbee2mqtt_smart+plug
 
-name:L_06_zigbee2mqtt_ContactSensor
+name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_06
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat contact
@@ -291,115 +289,125 @@ attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
 attr DEVICE eventMap true:close false:open
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_06_zigbee2mqtt_ContactSensor
+attr DEVICE model zigbee2mqtt_ContactSensor
 
-name:L_07_zigbee2mqtt_TempHumHpaSensor
+name:zigbee2mqtt_TempHumHpaSensor
 desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara WSDCGQ11LM Temperature Humidity Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_07
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%% Pressure: %.1fhpa", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0), ReadingsVal($name,"pressure",0)) }
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_07_TempHumHpa_TempSensor
+attr DEVICE model zigbee2mqtt_TempHumHpaSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
-name:L_07a_zigbee2mqtt_TempHumSensor
+name:zigbee2mqtt_TempHumSensor
 desc: Temp/hum sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia WSDCGQ01LM Temperature Humidity Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_07a
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat T: temperature H: humidity
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_07a_TempHumSensor
+attr DEVICE model zigbee2mqtt_TempHumSensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
-name:L_08_zigbee2mqtt_Human_Motion_Sensor
+name:zigbee2mqtt_Human_Motion_Sensor
 desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCGQ11LM Human Motion Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_08
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Motion: occupancy Luminance: illuminance
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_08_Human_Motion_TempSensor
+attr DEVICE model zigbee2mqtt_Human_Motion_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg975785.html#msg975785
 # Osram Lightify, Smart+ Motion Sensor
-name:L_08a_zigbee2mqtt_TempMotion_sensor
+name:zigbee2mqtt_TempMotion_sensor
 desc: Temperature and motion sensor via zigbee2mqtt <br>Tested with: Osram Lightify Motion Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_08a
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Motion: occupancy T: temperature
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_08a_zigbee2mqtt_TempMotion_sensor
+attr DEVICE model zigbee2mqtt_TempMotion_sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
-name:L_09_zigbee2mqtt_Motion_Sensor
+name:zigbee2mqtt_Motion_Sensor
 desc: Smart motion sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara DJT11LM Smart Motion Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_09
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Motion: action X: angle_x Y: angle_y Z: angle_z
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_09_Motion_Sensor
+attr DEVICE model zigbee2mqtt_Motion_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
-name:L_10_zigbee2mqtt_Water_Leak_Sensor
+name:zigbee2mqtt_Water_Leak_Sensor
 desc: Water leak sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara SJCGQ11LM Water Leak Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_10
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
 attr DEVICE stateFormat Leak: water_leak
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_10_Water_Leak_Sensor
+attr DEVICE model zigbee2mqtt_Water_Leak_Sensor
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
-name:L_11_zigbee2mqtt_Light_Switch
+name:zigbee2mqtt_Light_Switch
 desc: Smart light switch 2btn via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG02LM 2btn Smart Light Switch
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_11
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat click
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_11_Light_Switch
+attr DEVICE model zigbee2mqtt_Light_Switch
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg916789.html#msg916789
-name:L_12_zigbee2mqtt_Wireless_Button
+name:zigbee2mqtt_Wireless_Button
 desc: Wireless button via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG12LM wireless switch with gyroscope
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_12
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Click: click Action: action
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_12_Wireless_Button
+attr DEVICE model zigbee2mqtt_Wireless_Button
 
-name:L_13_zigbee2mqtt_wireless_button_old
+name:zigbee2mqtt_wireless_button_old
 desc: Wireless button without gyro via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG11LM wireless button
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_13
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Click: click
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_13_wireless_button_old
+attr DEVICE model zigbee2mqtt_wireless_button_old
 
-name:L_14_zigbee2mqtt_aqara_cube
+name:zigbee2mqtt_aqara_cube
 desc: Aqara smarthome cube via zigbee2mqtt <br>Tested with: Xiaomi Aqara MFKZQ01LM smarthome cube
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_14
 par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge in the topics;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Action: action
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model L_14_aqara_cube
+attr DEVICE model zigbee2mqtt_aqara_cube
 
 
 
@@ -408,14 +416,15 @@ attr DEVICE model L_14_aqara_cube
 # The regexp must handle
 # - tele/sonoff/LWT: => cmnd/sonoff/
 # - DVES_XXXXXX:/SmartHome/Esszimmer/Stehlampe/tele/LWT: => /SmartHome/Esszimmer/Stehlampe/cmnd/
-name:A_01a_tasmota_basic_state_power1
+name:tasmota_basic_state_power1
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff Basic, S20 using POWER1-topic for relay state <br>NOTE: The format the device is sending data will also be changed to lowercase!<br>NOTE: This template is intended to configure also channel one of multi-channel tasmota devices
+order:A_01a
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 attr DEVICE stateFormat POWER1
-set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
+set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -431,17 +440,19 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: on-for-timer is limited to 18h max duration!
 attr DEVICE autocreate 0
-attr DEVICE model A_01a_tasmota_basic_state_power1
+attr DEVICE model tasmota_basic_state_power1
 
 # sonoff 1 channel device flashed with Tasmota.
-name:A_01_tasmota_basic
+name:tasmota_basic
 filter:TYPE=MQTT2_DEVICE
-desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>NOTE:<br>- Power topic will be set to POWER1; <br>- the format the device is sending data will also be changed to lowercase!<br>- finally, you'll see the device as model A_01a_tasmota_basic_state_power1.
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>NOTE:<br>- Power topic will be set to POWER1; <br>- the format the device is sending data will also be changed to lowercase!<br>- finally, you'll see the device as model tasmota_basic_state_power1.
+order:A_01
+set DEVICE attrTemplate tasmota_basic_state_power1
 
-name:A_01x_tasmota_clear_readings_reset_readingsList_and_reboot
+name:tasmota_clear_readings_reset_readingsList_and_reboot
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc: replaces the readingList with defaults, clears the readingList and reboots to get all readings
+order:A_01x
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -457,9 +468,10 @@ deletereading -q DEVICE (?!associatedWith).*
 set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
 
-name:A_01x_tasmota_prefix_clearing_and_reboot
+name:tasmota_prefix_clearing_and_reboot
 filter:TYPE=MQTT2_DEVICE::FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
+order:A_01x1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
@@ -469,10 +481,11 @@ set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
 
 # tasmota device with one relay, one motion sensor via switch
-name:A_01b_tasmota_1ch+motion+SI7021
+name:tasmota_1ch+motion+SI7021
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_01b
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
@@ -497,13 +510,14 @@ attr DEVICE devStateIcon {\
     ReadingsVal($name,"SI7021_Humidity",0)\
     ) . "</div>"\
   }
-attr DEVICE model A_01b_tasmota_1ch+motion+SI7021
+attr DEVICE model tasmota_1ch+motion+SI7021
 
-name:A_01c_tasmota_POW
+name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
+order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -513,13 +527,14 @@ attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kW
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
-attr DEVICE model A_01c_tasmota_POW
+attr DEVICE model tasmota_POW
 
 
 #tasmota device with Infrared-circuit
-name:A_01d_tasmota_ir
+name:tasmota_ir
 desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">set <devicename> irsend</a>
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+order:A_01d
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
@@ -539,12 +554,13 @@ attr DEVICE stateFormat state\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE event-on-change-reading .*
 attr DEVICE icon IR
-attr DEVICE model A_01d_tasmota_ir
+attr DEVICE model tasmota_ir
 
 #tasmota device with rf-circuit
-name:A_01d_tasmota_rf
+name:tasmota_rf
 desc:Demonstrates multiple options how to configure tasmota devices as rf remote control extension.<br><a href=<br><a href="https://forum.fhem.de/index.php/topic,99042.0.html">Forum Thread</a><br>NOTE: still widely untested...
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+order:A_01d1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 #par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
@@ -563,13 +579,14 @@ attr DEVICE stateFormat state\
 <br>\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE event-on-change-reading .*
-attr DEVICE model A_01d_tasmota_rf
+attr DEVICE model tasmota_rf
 
 # tasmota 2ch as one FHEM device.
-name:A_02a_tasmota_2ch_unified
+name:tasmota_2ch_unified
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_02a
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -593,13 +610,14 @@ attr DEVICE stateFormat LWT\
 <br>\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2
-attr DEVICE model A_02a_tasmota_2ch_unified
+attr DEVICE model tasmota_2ch_unified
 
 # sonoff 2 channel device flashed with Tasmota.
-name:A_02_tasmota_2channel_split
+name:tasmota_2channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_02
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
@@ -611,19 +629,20 @@ attr DEVICE_CH2 setList \
   on:noArg     CMNDTOPIC/POWER2 1\
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
-attr DEVICE model A_02_tasmota_2channel_split
-attr DEVICE_CH2 model A_02_tasmota_2channel_split
+attr DEVICE model tasmota_2channel_split
+attr DEVICE_CH2 model tasmota_2channel_split
 
 #contributed by 87insane
 # tasmota 2ch as shutter device.
-name:A_02b_tasmota_2ch_shutter_invert_1
+name:tasmota_2ch_shutter_invert_1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in ROLLO style with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_0, if you need a Homematic-style device pct 100% = open.
+desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in ROLLO style with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_0, if you need a Homematic-style device pct 100% = open.
+order:A_02b
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
-set DEVICE attrTemplate A_01z_tasmota_set_lowercase_texts_and_state1
+set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; Interlock0 1; SetOption81 1; switchmode1 3; switchmode2 3; SaveData 1;
 set IO_DEV publish CMNDTOPIC/Restart 1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog SHUTTEROPENDURATION 20;; SHUTTERCLOSEDURATION 20;; SHUTTERINVERT 1;; GROUPTOPIC Rollos;; SaveData 1;;
@@ -664,25 +683,27 @@ Shutter specific commands available: SHUTTEROPENDURATION, SHUTTERCLOSEDURATION, 
 commands may need restart to take effect.\
 For calibration and further information on the available commands see https://github.com/stefanbode/Sonoff-Tasmota/wiki/Shutter-blinds-working-with-two-relays.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://github.com/stefanbode/Sonoff-Tasmota/wiki/Shutter-blinds-working-with-two-relays">firmware contributor's wiki</a>.
-attr DEVICE model A_02b_tasmota_2ch_shutter_invert_1
+attr DEVICE model tasmota_2ch_shutter_invert_1
 
 # tasmota 2ch as shutter device.
-name:A_02b_tasmota_2ch_shutter_invert_0
+name:tasmota_2ch_shutter_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template A_02b_tasmota_2ch_shutter_invert_1 instead. 
+desc:Configures a dual chanel tasmota device as shutter; needs a special firmware version to operate.<br><a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_1 instead. 
+order:A_02b1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
-set DEVICE attrTemplate A_02b_tasmota_2ch_shutter_invert_1
+set DEVICE attrTemplate tasmota_2ch_shutter_invert_1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog SHUTTEROPENDURATION 20;; SHUTTERCLOSEDURATION 20;; SHUTTERINVERT 0;; GROUPTOPIC Rollos;; SaveData 1;;
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
-attr DEVICE model A_02b_tasmota_2ch_shutter_invert_0
+attr DEVICE model tasmota_2ch_shutter_invert_0
 
 # sonoff 4 channel device flashed with Tasmota.
 # contributed by Blauhorn, https://forum.fhem.de/index.php/topic,94495.msg976113.html#msg976113
-name:A_04_tasmota_4channel_split
+name:tasmota_4channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 4 channel device flashed with Tasmota. <br>NOTE: a second, third and fourth device will be created for each additional channel
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_04
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
@@ -717,16 +738,17 @@ attr DEVICE_CH4 setList \
   toggle:noArg CMNDTOPIC/POWER4 2
 attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
-attr DEVICE model A_04_tasmota_4channel_split
-attr DEVICE_CH2 model A_04_tasmota_4channel_split
-attr DEVICE_CH3 model A_04_tasmota_4channel_split
-attr DEVICE_CH4 model A_04_tasmota_4channel_split
+attr DEVICE model tasmota_4channel_split
+attr DEVICE_CH2 model tasmota_4channel_split
+attr DEVICE_CH3 model tasmota_4channel_split
+attr DEVICE_CH4 model tasmota_4channel_split
 
 # tasmota 4ch as one FHEM device.
-name:A_04b_tasmota_4ch_unified_icon
+name:tasmota_4ch_unified_icon
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings <br>NOTE: Clicking on icons will issue a corresponding toggle command
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_04b
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -755,13 +777,14 @@ attr DEVICE stateFormat LWT\
 <br>\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4
-attr DEVICE model A_04b_tasmota_4ch_unified_icon
+attr DEVICE model tasmota_4ch_unified_icon
 
 # tasmota 4ch as one FHEM device.
-name:A_04a_tasmota_4ch_unified_basic_text
+name:tasmota_4ch_unified_basic_text
 desc:Configures a single device
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_04a1
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -779,13 +802,14 @@ attr DEVICE setList \
 attr DEVICE setStateList on off toggle
 attr DEVICE stateFormat P1: POWER1 P2: POWER2 P3: POWER3 P4: POWER4
 attr DEVICE webCmd POWER1 toggle:POWER2 toggle:POWER3 toggle:POWER4 toggle
-attr DEVICE model A_04a_tasmota_4ch_unified_basic_text
+attr DEVICE model tasmota_4ch_unified_basic_text
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg899041.html#msg899041
-name:A_05a_tasmota_rgb_led_controller
+name:tasmota_rgb_led_controller
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Tasmota RGB controller tested with RGB variant of Magichome, arilux LC-01 ,etc... -> https://github.com/arendst/Sonoff-Tasmota/wiki/MagicHome-LED-strip-controller
-set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+order:A_05a
+set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -808,26 +832,29 @@ attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","POWE
 attr DEVICE icon light_control
 attr DEVICE stateFormat POWER1
 attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
-attr DEVICE model A_05a_tasmota_rgb_led_controller
+attr DEVICE model tasmota_rgb_led_controller
 
-name:A_01z_tasmota_set_lowercase_texts_and_state1
+name:tasmota_set_lowercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change ON, OFF etc. sent from tasmota side to lowercase. <br>After applying the template you might consider to delete or change stateFormat, eventMap and/or userReadings attribute values
+order:A_01z
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SaveData 1
 
-name:A_01z_tasmota_set_uppercase_texts_and_state1
+name:tasmota_set_uppercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change on, off etc. sent from tasmota side to uppercase. NOTE: this  template only exists for compability reasons to older MQTT implementations; not recommended for other user groups
+order:A_01z1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 OFF; StateText2 ON; StateText3 TOGGLE; StateText4 HOLD; SetOption26 1
 attr DEVICE userReadings state:POWER1:.* { lc(ReadingsVal($name,"POWER1","")) }
 
-name:A_01z_tasmota_set_power1_state_to_power
+name:tasmota_set_power1_state_to_power
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to single relay tasmota devices <br>NOTE: this  template only exists for compability reasons to other HA solutions; not recommended for usage in FHEM context
+order:A_01z2
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set IO_DEV publish CMNDTOPIC/SetOption26 0
@@ -838,9 +865,10 @@ attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
 # SHELLY
 #
 # shelly1 using original firmware.
-name:A_10_shelly1
+name:shelly1
 filter:TYPE=MQTT2_DEVICE
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+order:A_10
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/relay/0/command off\
   on:noArg shellies/DEVNAME/relay/0/command on\
@@ -854,20 +882,22 @@ attr DEVICE readingList \
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model A_10_shelly1
+attr DEVICE model shelly1
 
 # shellyplug using original firmware.
-name:A_10a_shellyplug
+name:shellyplug
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+order:A_10a
 par:DEVNAME;ShellyPlug name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-set DEVICE attrTemplate A_10_shelly1
+set DEVICE attrTemplate shelly1
 attr DEVICE getList power:noArg shellies/DEVNAME/relay/power power
-attr DEVICE model A_10a_shellyplug
+attr DEVICE model shellyplug
 
 #contributed by 87insane, https://forum.fhem.de/index.php/topic,94060.msg934614.html#msg934614
 # shelly1pm using original firmware.
-name:A_10b_shelly1_w_energy_meassuring
+name:shelly1_w_energy_meassuring
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+order:A_10b
 desc:Applies to single relay Shelly devices offering energy meassuring like Shelly 1PM or Shelly Plug S
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE setList\
@@ -891,12 +921,13 @@ attr DEVICE readingList \
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Temp: $temp °C</div>"}
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
-attr DEVICE model A_10b_shelly1_w_energy_meassuring
+attr DEVICE model shelly1_w_energy_meassuring
 
 # shelly2 using original firmware in roller mode.
-name:A_11b_shelly2_roller
+name:shelly2_roller
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2 using original firmware. <br>NOTE: shelly2 roller operated, change settings first!
+order:A_11b
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE comment shelly2 roller operated
 attr DEVICE setList \
@@ -920,13 +951,14 @@ attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_
 attr DEVICE stateFormat pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close stop
-attr DEVICE model A_11b_shelly2_roller
+attr DEVICE model shelly2_roller
 
 # shelly25 using original firmware in roller mode.
 # contributed by 87insane, https://forum.fhem.de/index.php/topic,94060.msg940978.html#msg940978
-name:A_11b1a_shelly25_roller_invert_0
+name:shelly25_roller_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly25 using original firmware. <br>NOTE: shelly25 roller operated, change settings first!
+order:A_11b1a
 par:DEVNAME;Shellyswitch25 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE comment Shelly 2.5 in Roller-Mode. 100=opened / 0=closed
 attr DEVICE setList \
@@ -963,11 +995,12 @@ online\
 state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
-attr DEVICE model A_11b1a_shelly25_roller_invert_0
+attr DEVICE model shelly25_roller_invert_0
 
-name:A_11b1b_shelly25_roller_invert_1
+name:shelly25_roller_invert_1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly25 using original firmware. <br>NOTE: shelly25 roller operated, change settings first!
+order:A_11b1b
 par:DEVNAME;Shellyswitch25 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE comment  Shelly 2.5 in Roller-Mode. 0=opened / 100=closed
 attr DEVICE setList \
@@ -1004,14 +1037,15 @@ online\
 state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
-attr DEVICE model A_11b1b_shelly25_roller_invert_1
+attr DEVICE model shelly25_roller_invert_1
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
-name:A_11a_shelly2_split
+name:shelly2_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2 using original firmware. <br>NOTE: a second device will be created for the second channel
-set DEVICE attrTemplate A_10a_shellyplug
+order:A_11a
+set DEVICE attrTemplate shellyplug
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 copy DEVICE DEVICE_CH2
@@ -1021,15 +1055,17 @@ setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
-attr DEVICE model A_11a_shelly2_split
+attr DEVICE model shelly2_split
+attr DEVICE_CH2 model shelly2_split
 
 # shelly2.5 using original firmware.
 # Based on user 87insane contribution in https://forum.fhem.de/index.php/topic,94060.msg962167.html#msg962167
 # NOTE: a second device will be created for the second channel
-name:A_11a1_shelly25_split
+name:shelly25_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2.5 using original firmware. <br>NOTE: a second device will be created for the second channel
-set DEVICE attrTemplate A_10a_shellyplug
+order:A_11a1
+set DEVICE attrTemplate shellyplug
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
@@ -1061,14 +1097,15 @@ setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
-attr DEVICE model A_11a1_shelly25_split
+attr DEVICE model shelly25_split
 
 # shelly4pro using original firmware
-name:A_14a_shelly4pro_split
+name:shelly4pro_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly4pro using original firmware <br>NOTE: for each of the second to fourth channel, a new device will be created
+order:A_14a1
 par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-set DEVICE attrTemplate A_10a_shellyplug
+set DEVICE attrTemplate shellyplug
 attr DEVICE getList \
   power0:noArg shellies/DEVNAME/relay/0/power power0\
   energy0:noArg shellies/DEVNAME/relay/0/energy energy0
@@ -1104,18 +1141,19 @@ attr DEVICE_CH4 getList \
   power3:noArg shellies/DEVNAME/relay/3/power power3\
   energy3:noArg shellies/DEVNAME/relay/3/energy energy3
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
-attr DEVICE model A_14a_shelly4pro_split
-attr DEVICE_CH2 model A_14a_shelly4pro_split
-attr DEVICE_CH3 model A_14a_shelly4pro_split
-attr DEVICE_CH4 model A_14a_shelly4pro_split
+attr DEVICE model shelly4pro_split
+attr DEVICE_CH2 model shelly4pro_split
+attr DEVICE_CH3 model shelly4pro_split
+attr DEVICE_CH4 model shelly4pro_split
 
 # shelly4pro unified device using original firmware
 # source: https://forum.fhem.de/index.php/topic,97218.msg905689.html#msg905689
-name:A_14b_shelly4pro_unified
+name:shelly4pro_unified
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly4pro using original firmware <br>NOTE: UNTESTED! feedback is apreciated, please try also to add toggle commands <br>NOTE: only one device will be created.
+order:A_14b
 par:DEVNAME;Shelly4Pro name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-set DEVICE attrTemplate A_10a_shellyplug
+set DEVICE attrTemplate shellyplug
 attr DEVICE getList \
   power0:noArg shellies/DEVNAME/relay/0/power power0\
   energy0:noArg shellies/DEVNAME/relay/0/energy energy0\
@@ -1154,12 +1192,13 @@ attr DEVICE setList \
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE webCmd relay0:relay1:relay2:relay3
 attr DEVICE stateFormat R0: relay0 R1: relay1 R2: relay2 R3: relay3
-attr DEVICE model A_14b_shelly4pro_unified
+attr DEVICE model shelly4pro_unified
 
 # shellybulb using original firmware
-name:A_15_shellybulb
+name:shellybulb
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellybulb using original firmware <br>Tested with 1.49
+order:A_15
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
@@ -1178,25 +1217,27 @@ attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {
 attr DEVICE webCmd on:off:pct:ct:rgb
 attr DEVICE genericDeviceType light
 attr DEVICE icon light_control
-attr DEVICE model A_15_shellybulb
+attr DEVICE model shellybulb
 
 # shellyht using original firmware
-name:A_16_shellyht
+name:shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyht using original firmware <br>Just adds stateFormat and icon
+order:A_16
 attr DEVICE setList \
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE icon temperature_humidity
 attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
-attr DEVICE model A_16_shellyht
+attr DEVICE model shellyht
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
 # shellyrgbw2 color mode
-name:A_17_shelly2rgbw_color
+name:shelly2rgbw_color
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyrgbw2 color mode <br>Tested with 1.5.0-rgbw2-hotfix1
+order:A_17
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
@@ -1219,12 +1260,13 @@ attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
 attr DEVICE icon light_control
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
-attr DEVICE model A_17_shelly2rgbw_color
+attr DEVICE model shelly2rgbw_color
 
 #contributed by user sledge
-name:A_17a_shelly2rgbw_4w_split
+name:shelly2rgbw_4w_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2rgbw configured with 4 white channels, one device for each channel<br>Tested with v1.4.8
+order:A_17a
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVENT)}\
   shellies/DEVNAME/white/0:.* state\
@@ -1240,7 +1282,7 @@ attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
 attr DEVICE webCmd on:off:brightness
-attr DEVICE model A_17a_shelly2rgbw_4w_split
+attr DEVICE model shelly2rgbw_4w_split
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE icon light_control
 attr DEVICE autocreate 0
@@ -1283,9 +1325,10 @@ attr DEVICE_CH4 setStateList on off
 #ebusd
 #
 #ebus daemon device
-name:E_01a_eBus_daemon_splitter
+name:eBus_daemon_splitter
 filter:TYPE=MQTT2_DEVICE
 desc:Device containing all status messages from the ebus daemon itself<br>NOTE: acts also as a bridge device to split up the hardware on the bus into different mqtt2_devices<br>NOTE:<br>- for use with MQTT2_CLIENT use a copy of the Device with the same clientId than the IO, delete original's readingList after applying the template!<br>- this might change the devices CID
+order:E_01a
 par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
 modify DEVICE DEV_ID
@@ -1303,7 +1346,7 @@ attr DEVICE devStateIcon 1.true:it_net 1.false:it_net@red  2.true:lan_rs485 2.fa
 attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
   getAll:noArg DEV_ID/list
 set DEVICE getKnown
-attr DEVICE model E_01a_eBus_daemon_splitter
+attr DEVICE model eBus_daemon_splitter
 
 
 ###############
@@ -1314,9 +1357,10 @@ attr DEVICE model E_01a_eBus_daemon_splitter
 #
 #The ESP-Milight-Hub bridge device
 #Atm there are no furter commands to be set to the esp itself
-name:X_01_esp_milight_hub_bridge
+name:esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>#recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
+order:X_01
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x....)/.*/([0-8])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
@@ -1326,12 +1370,13 @@ status\
 </a>Version: \
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
-attr DEVICE model X_01_esp_milight_hub_bridge
+attr DEVICE model esp_milight_hub_bridge
 
 #rgbw-bulb
-name:X_01_esp_milight_hub_rgbw_bulb
+name:esp_milight_hub_rgbw_bulb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
+order:X_011
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*tes/.*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
@@ -1356,12 +1401,13 @@ attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_
 attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE setExtensionsEvent 1
-attr DEVICE model X_01_esp_milight_hub_rgbw_bulb
+attr DEVICE model esp_milight_hub_rgbw_bulb
 
 #rgbw-group
-name:X_01a_esp_milight_hub_make_rgbw_group
+name:esp_milight_hub_make_rgbw_group
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
+order:X_01a
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*tes/.*:, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
@@ -1383,12 +1429,13 @@ attr milight_REMOTE_ID_0 setList\
 attr milight_REMOTE_ID_0 setStateList on off
 #attr milight_REMOTE_ID_0 userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
-attr milight_REMOTE_ID_0 model X_01a_esp_milight_hub_make_rgbw_group
+attr milight_REMOTE_ID_0 model esp_milight_hub_make_rgbw_group
 
 #rgbw_cct-bulb
-name:X_01a_esp_milight_hub_rgb_cct_bulb
+name:esp_milight_hub_rgb_cct_bulb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br><a href="https://forum.fhem.de/index.php/topic,86932.msg877986.html#msg877986">Source: Forum</a>
+order:X_01a1
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*ates/.*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
@@ -1422,12 +1469,13 @@ attr DEVICE webCmdLabel   brightness:dim\
 attr DEVICE setStateList on off
 # computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-attr DEVICE model X_01a_esp_milight_hub_rgb_cct_bulb
+attr DEVICE model esp_milight_hub_rgb_cct_bulb
 
 #cct-only-bulb
-name:X_01b_esp_milight_hub_cct_only_bulb
+name:esp_milight_hub_cct_only_bulb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br>simple CCT device
+order:X_01b
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*ates/.*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
@@ -1454,12 +1502,13 @@ attr DEVICE webCmdLabel :dim\
   :::
 attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-attr DEVICE model X_01b_esp_milight_hub_cct_only_bulb
+attr DEVICE model esp_milight_hub_cct_only_bulb
 
 #rgbw-bulb
-name:X_01x_esp_milight_hub_max_features_bulb
+name:esp_milight_hub_max_features_bulb
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
+order:X_01x
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*ates/.*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
@@ -1493,5 +1542,19 @@ attr DEVICE webCmdLabel An:Aus\
   :Sättigung:Modus
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-attr DEVICE model X_01x_esp_milight_hub_max_features_bulb
+attr DEVICE model esp_milight_hub_max_features_bulb
 
+#remote for event generation only
+name:esp_milight_hub_remote_events_only
+filter:TYPE=MQTT2_DEVICE
+desc:For use with X_01_esp_milight_hub_bridge <br>See <a href="https://forum.fhem.de/index.php/topic,103493.0.html">Forum Thread</a> for examples how to control a MPD, HUEDevice bulbs or shutters by a MiLight remote.
+order:X_01y
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/].*ates/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x....)[/].*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+deletereading -q DEVICE .*_.*
+attr DEVICE readingList \
+  BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { }\
+  BASE_ID/updates/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { json2nameValue($EVENT) }
+attr DEVICE model esp_milight_hub_remote_events_only
