@@ -73,7 +73,7 @@ attr DEVICE setList\
   y_device_setting:textField BASE_TOPIC/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
   x_bind:textField BASE_TOPIC/bridge/bind/$EVTPART1 $EVTPART2\
   x_bind_unbind:textField BASE_TOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
-  x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1",""options": {"$EVTPART2": "$EVTPART3"}}\
+  x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1","options": {"$EVTPART2": "$EVTPART3"}}\
   x_group_add_to:textField BASE_TOPIC/bridge/group/$EVTPART1/add $EVTPART2\
   x_group_rm_from:textField BASE_TOPIC/bridge/group/$EVTPART1/remove $EVTPART2\
   x_group_rm_from_all:textField BASE_TOPIC/bridge/group/$EVTPART1/remove_all $EVTPART2\
@@ -677,6 +677,51 @@ defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
 attr DEVICE model A_02b_tasmota_2ch_shutter_invert_0
 
+# sonoff 4 channel device flashed with Tasmota.
+# contributed by Blauhorn, https://forum.fhem.de/index.php/topic,94495.msg976113.html#msg976113
+name:A_04_tasmota_4channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:sonoff 4 channel device flashed with Tasmota. <br>NOTE: a second, third and fourth device will be created for each additional channel
+set DEVICE attrTemplate A_01a_tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
+#create device for CH2
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 stateFormat POWER2
+setreading DEVICE associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+attr DEVICE_CH2 setList \
+  off:noArg    CMNDTOPIC/POWER2 0\
+  on:noArg     CMNDTOPIC/POWER2 1\
+  toggle:noArg CMNDTOPIC/POWER2 2
+attr DEVICE_CH2 setStateList on off toggle
+#create device for CH3
+copy DEVICE DEVICE_CH3
+attr DEVICE_CH3 stateFormat POWER3
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
+attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+attr DEVICE_CH3 setList \
+  off:noArg    CMNDTOPIC/POWER3 0\
+  on:noArg     CMNDTOPIC/POWER3 1\
+  toggle:noArg CMNDTOPIC/POWER3 2
+attr DEVICE_CH3 setStateList on off toggle
+#create device for CH4
+copy DEVICE DEVICE_CH4
+attr DEVICE_CH4 stateFormat POWER4
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
+attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
+attr DEVICE_CH4 setList \
+  off:noArg    CMNDTOPIC/POWER4 0\
+  on:noArg     CMNDTOPIC/POWER4 1\
+  toggle:noArg CMNDTOPIC/POWER4 2
+attr DEVICE_CH4 setStateList on off toggle
+#set the model attr for all new devices
+attr DEVICE model A_04_tasmota_4channel_split
+attr DEVICE_CH2 model A_04_tasmota_4channel_split
+attr DEVICE_CH3 model A_04_tasmota_4channel_split
+attr DEVICE_CH4 model A_04_tasmota_4channel_split
+
 # tasmota 4ch as one FHEM device.
 name:A_04b_tasmota_4ch_unified_icon
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1028,9 +1073,9 @@ attr DEVICE getList \
   power0:noArg shellies/DEVNAME/relay/0/power power0\
   energy0:noArg shellies/DEVNAME/relay/0/energy energy0
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
-attr DEVICE_CH2 comment Channel 2 for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
@@ -1041,7 +1086,6 @@ attr DEVICE getList \
 attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 copy DEVICE DEVICE_CH3
 attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
-attr DEVICE_CH3 comment Channel 3 for DEVICE
 setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
@@ -1052,7 +1096,6 @@ attr DEVICE getList \
 attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
-attr DEVICE_CH4 comment Channel 4 for DEVICE
 setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
@@ -1062,6 +1105,9 @@ attr DEVICE_CH4 getList \
   energy3:noArg shellies/DEVNAME/relay/3/energy energy3
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE model A_14a_shelly4pro_split
+attr DEVICE_CH2 model A_14a_shelly4pro_split
+attr DEVICE_CH3 model A_14a_shelly4pro_split
+attr DEVICE_CH4 model A_14a_shelly4pro_split
 
 # shelly4pro unified device using original firmware
 # source: https://forum.fhem.de/index.php/topic,97218.msg905689.html#msg905689
