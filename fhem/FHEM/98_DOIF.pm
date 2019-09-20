@@ -78,6 +78,8 @@ sub DOIF_delAll($)
   delete ($hash->{accu});
   delete ($hash->{Regex});
   
+ 
+  
 
   #foreach my $key (keys %{$hash->{Regex}}) {
   #  delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
@@ -1455,6 +1457,7 @@ sub setDOIF_Reading
     readingsSingleUpdate ($hash,$DOIF_Reading,$ret,1);
   } elsif ($ret ne ReadingsVal($hash->{NAME},$DOIF_Reading,"") or !defined $defs{$hash->{NAME}}{READINGS}{$DOIF_Reading}) {
       push (@{$hash->{helper}{DOIF_Readings_events}},"$DOIF_Reading: $ret");
+      push (@{$hash->{helper}{DOIF_Readings_eventsState}},"$DOIF_Reading: $ret");
       readingsSingleUpdate ($hash,$DOIF_Reading,$ret,0);
     }
 }
@@ -2213,27 +2216,29 @@ sub CheckRegexpDoIf
               }
               return $i;
             }
-            my @events_temp;
-            if (substr($i,0,1) eq '"') {
-              @events_temp=@{$eventa};
-            }
-            else {
-              @events_temp=@{$eventas};
-            }
-            #my $max=defined @events_temp ? int(@events_temp):0;
-            my $s;
-            my $found;
-            for (my $j = 0; $j < @events_temp; $j++) {
-              $s = $events_temp[$j];
-              $s = "" if(!defined($s));
-              $found = ($s =~ m/$notifyExp/);
-              if ($found) {
-                if ($readingupdate==1) {
-                  #readingsSingleUpdate ($hash, "matched_regex_$id",$s,0);
-                } elsif ($readingupdate==2) {
-                  #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$s);
+            if (defined $eventa and defined $eventas) {
+              my @events_temp;
+              if (substr($i,0,1) eq '"') {
+                @events_temp=@{$eventa};
+              }
+              else {
+                @events_temp=@{$eventas};
+              }
+              #my $max=defined @events_temp ? int(@events_temp):0;
+              my $s;
+              my $found;
+              for (my $j = 0; $j < @events_temp; $j++) {
+                $s = $events_temp[$j];
+                $s = "" if(!defined($s));
+                $found = ($s =~ m/$notifyExp/);
+                if ($found) {
+                  if ($readingupdate==1) {
+                    #readingsSingleUpdate ($hash, "matched_regex_$id",$s,0);
+                  } elsif ($readingupdate==2) {
+                    #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$s);
+                  }
+                  return $i;
                 }
-                return $i;
               }
             }
           }
@@ -2271,6 +2276,7 @@ sub DOIF_Perl_Trigger
       $event="timer_".($timerNr+1);
       @triggerEvents=($event);
       $hash->{helper}{triggerEvents}=\@triggerEvents;
+      $hash->{helper}{triggerEventsState}=\@triggerEvents;
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
@@ -2586,8 +2592,9 @@ DOIF_Notify($$)
   if (defined $hash->{helper}{DOIF_Readings_events}) {
     if ($dev->{NAME} ne $hash->{NAME}) {
       @{$hash->{CHANGED}}=@{$hash->{helper}{DOIF_Readings_events}};
-      @{$hash->{CHANGEDWITHSTATE}}=@{$hash->{helper}{DOIF_Readings_events}};
-      $hash->{helper}{DOIF_Readings_events}=();
+      @{$hash->{CHANGEDWITHSTATE}}=@{$hash->{helper}{DOIF_Readings_eventsState}};
+      delete $hash->{helper}{DOIF_Readings_events};
+      delete $hash->{helper}{DOIF_Readings_eventsState};
       DOIF_Notify($hash,$hash);
     }
   }
@@ -2996,6 +3003,7 @@ CmdDoIfPerl($$)
   my $err="";
   my $i=0;
   $hs=$hash;
+  $hash->{NOTIFYDEV}="global";
   #def modify
   if ($init_done)
   {
@@ -3007,7 +3015,7 @@ CmdDoIfPerl($$)
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
     foreach my $key (keys %{$attr{$hash->{NAME}}}) {
-      if (AttrVal($hash->{NAME},$key,"")) {
+      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
         DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
       }
     }
@@ -3016,7 +3024,6 @@ CmdDoIfPerl($$)
   
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
-  $hash->{NOTIFYDEV} = "global";
 
   return("","") if ($tail =~ /^ *$/);
 
@@ -3079,8 +3086,9 @@ CmdDoIf($$)
   my $i=0;
   my $j=0;
   my $last_do;
-
-#def modify
+  
+  #def modify
+  $hash->{NOTIFYDEV}="global";
   if ($init_done)
   {
     DOIF_delTimer($hash);
@@ -3091,8 +3099,9 @@ CmdDoIf($$)
     readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
+    
     foreach my $key (keys %{$attr{$hash->{NAME}}}) {
-      if (AttrVal($hash->{NAME},$key,"")) {
+      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
         DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
       }
     }
@@ -3100,7 +3109,7 @@ CmdDoIf($$)
 
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
-  $hash->{NOTIFYDEV} = "global";
+  
 
   return("","") if ($tail =~ /^ *$/);
   
@@ -3196,7 +3205,7 @@ DOIF_Define($$$)
     $cmd =~ s/(##.*\n)|(##.*$)/ /g;
     $cmd =~ s/\$SELF/$hash->{NAME}/g;
   }
-  
+
   if ($cmd =~ /^\s*(\(|$)/) {
     $hash->{MODEL}="FHEM";
     ($msg,$err)=CmdDoIf($hash,$cmd);
@@ -3227,6 +3236,7 @@ DOIF_Attr(@)
   my $pn=$hash->{NAME};
   my $ret="";
   $hs=$hash;
+  
   if (($a[0] eq "set" and $a[2] eq "disable" and ($a[3] eq "0")) or (($a[0] eq "del" and $a[2] eq "disable")))
   {
     my $cmd = $defs{$hash->{NAME}}{DEF};
@@ -3253,6 +3263,7 @@ DOIF_Attr(@)
       return ("$err: $msg");
     }
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
+    $hash->{NOTIFYDEV}="global";
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
@@ -3395,6 +3406,8 @@ DOIF_Set($@)
       readingsSingleUpdate ($hash,"mode","enabled",1)
   } elsif ($arg eq "checkall" ) {
     $hash->{helper}{triggerDev}="";
+    delete $hash->{helper}{triggerEvents};
+    delete $hash->{helper}{triggerEventsState};
     DOIF_Trigger ($hash,$pn,1);
   } elsif ($arg =~ /^cmd_(.*)/ ) {
     if (ReadingsVal($pn,"mode","") ne "disabled") {
