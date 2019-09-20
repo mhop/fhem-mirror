@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.2";
+my $version = "1.2.3";
 
 my $srandUsed;
 
@@ -364,11 +364,11 @@ sub todoist_UpdateTask($$$) {
         ## change title
         $args{'content'} = $h->{"title"} if($h->{'title'});
         ## change dueDate
-        $args{'date_string'} = $h->{"dueDate"} if($h->{'dueDate'});
-        $args{'date_string'} = "" if ($h->{'dueDate'} && $h->{'dueDate'} =~ /(null|none|nix|leer|del)/);
+        $args{'due'}{'string'} = $h->{"dueDate"} if($h->{'dueDate'});
+        $args{'due'}{'string'} = "" if ($h->{'dueDate'} && $h->{'dueDate'} =~ /(null|none|nix|leer|del)/);
         ## change dueDate (if someone uses due_date in stead of dueDate)
-        $args{'date_string'} = $h->{"due_date"} if ($h->{'due_date'});
-        $args{'date_string'} = "" if ($h->{'dueDate'} && $h->{'due_date'} =~ /(null|none|nix|leer|del)/);
+        $args{'due'}{'string'} = $h->{"due_date"} if ($h->{'due_date'});
+        $args{'due'}{'string'} = "" if ($h->{'due_date'} && $h->{'due_date'} =~ /(null|none|nix|leer|del)/);
         ## change priority
         $args{'priority'} = int($h->{"priority"}) if ($h->{"priority"});
         ## Who is responsible for the task
@@ -521,6 +521,7 @@ sub todoist_CreateTask($$) {
           content              => $title,
           token                => $pwd,
         };
+        
         
         ## check for dueDate as Parameter or part of title - push to hash
         if (!$tmp[1] && $h->{"dueDate"}) { ## parameter
@@ -943,10 +944,10 @@ sub todoist_GetTasksCallback($$$){
           }
           
           ## set due_date if present
-          if (defined($task->{due_date_utc}) && $task->{due_date_utc} ne 'null') {
+          if (defined($task->{due}) && $task->{due_date_utc} ne 'null') {
             ## if there is a task with due date, we create a new reading
-            readingsBulkUpdate($hash, "Task_".$t."_dueDate",FmtDateTime(str2time($task->{due_date_utc})));
-            $hash->{helper}{"DUE_DATE"}{$taskID}=FmtDateTime(str2time($task->{due_date_utc}));
+            readingsBulkUpdate($hash, "Task_".$t."_dueDate",FmtDateTime(str2time($task->{due}{date})));
+            $hash->{helper}{"DUE_DATE"}{$taskID}=FmtDateTime(str2time($task->{due}{date}));
           }
           
           ## set responsible_uid if present
@@ -1922,8 +1923,10 @@ sub todoist_Html(;$$$) {
   
   my $r=0;
   
+  my $width = 95;
+  
   my $count = @devs;
-  my $width = 95/$count;
+  $width = $width/$count if ($count>=1);
   
   # refresh request? don't return everything
   if (!$refreshGet) {
