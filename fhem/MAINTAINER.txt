@@ -411,6 +411,7 @@ FHEM/88_IPWE.pm              tdressler            Sonstiges
 FHEM/88_Itach_IRDevice       ulimaass             Sonstige Systeme
 FHEM/88_Itach_Relay.pm       jeschkec             Automatisierung
 FHEM/88_LINDY_HDMI_SWITCH.pm jeschkec             Multimedia
+FHEM/88_Timer.pm             HomeAuto_User/elektron-bbs        Automatisierung
 FHEM/88_VantagePro2.pm       jeschkec             Sonstiges
 FHEM/88_WEBCOUNT.pm          jeschkec             Sonstiges
 FHEM/88_xs1Bridge.pm         HomeAuto_User        Sonstige Systeme
