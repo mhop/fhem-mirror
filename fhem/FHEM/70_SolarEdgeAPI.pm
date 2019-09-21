@@ -1,69 +1,89 @@
 ###############################################################################
-# 
+#
 # $Id$
 #
-#  By (c) 2018 Felix Martens  (felix at martensmail dot de)
+# By (c) 2019 FHEM user 'pizmus' (pizmus at web de)
 #
-#  Based on 46_TeslaPowerwall2AC by
-#  (c) 2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+# Based on 70_SolarEdgeAPI.pm from https://github.com/felixmartens/fhem by 
+# (c) 2018 Felix Martens (felix at martensmail dot de)
 #
-#  All rights reserved
+# Based on 46_TeslaPowerwall2AC by
+# (c) 2017 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #
-#  This script is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  any later version.
+# All rights reserved
 #
-#  The GNU General Public License can be found at
-#  http://www.gnu.org/copyleft/gpl.html.
-#  A copy is found in the textfile GPL.txt and important notices to the license
-#  from the author is found in LICENSE.txt distributed with these scripts.
+# This script is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# any later version.
 #
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# The GNU General Public License can be found at
+# http://www.gnu.org/copyleft/gpl.html.
+# A copy is found in the textfile GPL.txt and important notices to the license
+# from the author is found in LICENSE.txt distributed with these scripts.
 #
-#
+# This script is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
 ###############################################################################
-##
-##
-## Das JSON Modul immer in einem eval aufrufen
-# $data = eval{decode_json($data)};
-#
-# if($@){
-#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
-#  
-#   readingsSingleUpdate($hash, "state", "error", 1);
-#
-#   return;
-# }
-#
-#######
-#######
-
-#
-##
-##
-
-
 
 package main;
 
-
-my $solarEdgeAPI_missingModul = "";
-
 use strict;
 use warnings;
-
 use HttpUtils;
+
+###############################################################################
+#
+# Note: Always call the JSON module via "eval":
+#
+# $data = eval{decode_json($data)};
+# if($@){
+#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");  
+#   readingsSingleUpdate($hash, "state", "error", 1);
+#   return;
+# }
+#
+###############################################################################
+
+my $solarEdgeAPI_missingModul = "";
 eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 
-my $solarEdgeAPI_version = "1.0.0";
+###############################################################################
+#
+# versioning scheme: <majorVersion>.<minorVersion>.<patchVersion>[betaXYZ]
+#
+# The <majorVersion> is incremented for changes which are not backward compatible.
+# A change of the <majorVersion> may require adaptations on the user side, for
+# some or all users, e.g. because a reading is removed or has a new meaning.
+#
+# The <minorVersion> is incremented for changes which are backward compatible,
+# e.g. added functionality which does not impact old functionality.
+#
+# The <patchVersion> is incremented for small bug fixes, changes of source code
+# comments or documentation.
+#
+# A string starting with "beta" is attached for release candidates which are 
+# distributed for testing. If no issues are found in a beta version, the "beta" 
+# string is removed and the source file is submitted.
+#
+###############################################################################
+# 
+# 1.0.0     initial version as copied from https://github.com/felixmartens/fhem
+#           with minimal changes to be able to submit it to FHEM SVN
+#
+# 1.1.0     Detect that site does not support the "currentPowerFlow" API.
+#           Read "overview" API to get the current power.
+#           Added attributes enableStatusReadings, enableAggregatesReadings, 
+#           and enableOverviewReadings.
+#
+###############################################################################
 
+my $solarEdgeAPI_version = "1.1.0beta";
 
-
+###############################################################################
 
 # Declare functions
 sub SolarEdgeAPI_Attr(@);
@@ -76,17 +96,16 @@ sub SolarEdgeAPI_Undef($$);
 sub SolarEdgeAPI_ResponseProcessing($$$);
 sub SolarEdgeAPI_ReadingsProcessing_Aggregates($$);
 sub SolarEdgeAPI_ReadingsProcessing_Status($$);
+sub SolarEdgeAPI_ReadingsProcessing_Overview($$);
 sub SolarEdgeAPI_ErrorHandling($$$);
 sub SolarEdgeAPI_WriteReadings($$$);
 sub SolarEdgeAPI_Timer_GetData($);
 
-
-
-
-my %solarEdgeAPI_paths = (   'status'         => 'currentPowerFlow.json',
-                'aggregates'        => 'energyDetails'
+my %solarEdgeAPI_paths = (
+  'status' => 'currentPowerFlow.json',
+  'aggregates' => 'energyDetails',
+  'overview' => 'overview'
 );
-
 
 sub SolarEdgeAPI_Initialize($) {
 
@@ -101,6 +120,9 @@ sub SolarEdgeAPI_Initialize($) {
     $hash->{AttrFn}     = "SolarEdgeAPI_Attr";
     $hash->{AttrList}   = "interval ".
                           "disable:1 ".
+                          "enableStatusReadings:1,0 " .
+                          "enableAggregatesReadings:1,0 " .
+                          "enableOverviewReadings:1,0 " .
                           $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{SolarEdgeAPI}{defptr}}) {
@@ -190,16 +212,15 @@ sub SolarEdgeAPI_Attr(@) {
     
     if( $attrName eq "interval" ) {
         if( $cmd eq "set" ) {
-			if($attrVal eq "auto" || $attrVal > 120){
-				RemoveInternalTimer($hash);
+            if($attrVal eq "auto" || $attrVal > 120) {
+                RemoveInternalTimer($hash);
                 $hash->{INTERVAL} = $attrVal;
                 Log3 $name, 3, "SolarEdgeAPI ($name) - set interval to $attrVal";
                 SolarEdgeAPI_Timer_GetData($hash);
-			}else {
+            } else {
                 Log3 $name, 3, "SolarEdgeAPI ($name) - interval too small, please use something >= 120 (sec), default is 300 (sec)";
                 return "interval too small, please use something >= 120 (sec), default is 300 (sec) daytime and 1200 (sec) nighttime";
             }
-            
         } elsif( $cmd eq "del" ) {
             RemoveInternalTimer($hash);
             $hash->{INTERVAL} = 'auto';
@@ -207,7 +228,46 @@ sub SolarEdgeAPI_Attr(@) {
             SolarEdgeAPI_Timer_GetData($hash);
         }
     }
+   
+    if ($attrName eq "enableStatusReadings") 
+    {
+        if($cmd eq "set")
+        {
+            if (not (($attrVal eq "0") || ($attrVal eq "1")))
+            {
+                my $message = "illegal value for enableStatusReadings";
+                Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
+                return $message; 
+            }
+        } 
+    }
     
+    if ($attrName eq "enableAggregatesReadings") 
+    {
+        if($cmd eq "set")
+        {
+            if (not (($attrVal eq "0") || ($attrVal eq "1")))
+            {
+                my $message = "illegal value for enableAggregatesReadings";
+                Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
+                return $message; 
+            }
+        } 
+    }
+  
+    if ($attrName eq "enableOverviewReadings") 
+    {
+        if($cmd eq "set")
+        {
+            if (not (($attrVal eq "0") || ($attrVal eq "1")))
+            {
+                my $message = "illegal value for enableOverviewReadings";
+                Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
+                return $message; 
+            }
+        } 
+    }
+  
     return undef;
 }
 
@@ -244,9 +304,13 @@ sub SolarEdgeAPI_Get($@) {
     
         $arg    = lc($cmd);
     
+    } elsif( $cmd eq 'overview' ) {
+    
+        $arg    = lc($cmd);
+    
     } else {
     
-        my $list = 'status:noArg aggregates:noArg';
+        my $list = 'status:noArg aggregates:noArg overview:noArg';
         
         return "Unknown argument $cmd, choose one of $list";
     }
@@ -264,12 +328,18 @@ sub SolarEdgeAPI_Timer_GetData($) {
 
     my $hash    = shift;
     my $name    = $hash->{NAME};
-	my $interval   = $hash->{INTERVAL};
+    my $interval   = $hash->{INTERVAL};
 
     if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) == 0 ) {
         if( not IsDisabled($name) ) {
-            while( my $obj = each %solarEdgeAPI_paths ) {
-                unshift( @{$hash->{actionQueue}}, $obj );
+            while( my $obj = each %solarEdgeAPI_paths ) 
+            {
+                if ( (($obj eq "status") and (AttrVal($name, "enableStatusReadings", 1))) or
+                     (($obj eq "aggregates") and (AttrVal($name, "enableAggregatesReadings", 1))) or
+                     (($obj eq "overview") and (AttrVal($name, "enableOverviewReadings", 0))) )
+                {
+                    unshift( @{$hash->{actionQueue}}, $obj );
+                }
             }
         
             SolarEdgeAPI_GetData($hash);
@@ -390,7 +460,7 @@ sub SolarEdgeAPI_ErrorHandling($$$) {
     SolarEdgeAPI_GetData($hash)
     if( defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0 );
     
-    Log3 $name, 4, "SolarEdgeAPI ($name) - Recieve JSON data: $data";
+    Log3 $name, 4, "SolarEdgeAPI ($name) - Receive JSON data: $data";
     
     SolarEdgeAPI_ResponseProcessing($hash,$param->{setCmd},$data);
 }
@@ -421,7 +491,10 @@ sub SolarEdgeAPI_ResponseProcessing($$$) {
         
     } elsif( $path eq 'status') {
         $readings = SolarEdgeAPI_ReadingsProcessing_Status($hash,$decode_json);
-        
+
+    } elsif( $path eq 'overview') {
+        $readings = SolarEdgeAPI_ReadingsProcessing_Overview($hash,$decode_json);
+
     } else {
         $readings = $decode_json;
     }
@@ -494,63 +567,77 @@ sub SolarEdgeAPI_ReadingsProcessing_Status($$) {
     
     my $name                    = $hash->{NAME};
     my %readings;
-  	my $data = $decode_json->{'siteCurrentPowerFlow'};
+    my $data = $decode_json->{'siteCurrentPowerFlow'};
 
-    
-    	$readings{'unit'} = $data->{'unit'}||"Error Reading Response";		
-		$readings{'updateRefreshRate'} = $data->{'updateRefreshRate'}||"Error Reading Response";		
-		
-		# Connections / Directions
-		
-		my $pv2load = 0;
-		my $pv2storage = 0;
-		my $load2storage = 0;
-		my $storage2load = 0;
-		my $load2grid = 0;
-		my $grid2load = 0;
-		foreach my $connection ( @{ $data->{'connections'} }) {
-			my $from = lc($connection->{'from'});
-			my $to = lc($connection->{'to'});
-			if($from  eq 'grid'&&$to  eq "load"){ $grid2load = 1;}
-			if($from eq "load"&&$to  eq 'grid') {$load2grid = 1;}
-			if($from eq 'load'&&$to eq "storage"){ $load2storage = 1;}
-			if($from eq 'pv'&&$to eq "storage") {$pv2storage = 1;}
-			if($from eq 'pv'&&$to eq "load") {$pv2load = 1;}
-			if($from eq 'storage'&&$to eq "load"){ $storage2load = 1;}
-			
-		}
-		
-	
-		# GRID
-		
-		$readings{'grid_status'} = $data->{'GRID'}->{"status"}||"Error Reading Response";		
-		$readings{'grid_power'} = ($load2grid >0 ? "-" : "") . $data->{'GRID'}->{"currentPower"};
-		
-		# LOAD
-		$readings{'load_status'} = $data->{'LOAD'}->{"status"}||"Error Reading Response";	
-		$readings{'load_power'} = $data->{'LOAD'}->{"currentPower"};		
-		
-		# PV
-		
-		$readings{'pv_status'} = $data->{'PV'}->{"status"}||"Error Reading Response";	
-		$readings{'pv_power'} = $data->{'PV'}->{"currentPower"};		
-		
-		
-		
-		# Storage
-		
-		$readings{'storage_status'} = $data->{'STORAGE'}->{"status"}||"No storage found";
-			if	($readings{'storage_status'} ne "No storage found"){		
-				$readings{'storage_power'} = ($storage2load >0 ? "-" : "") . $data->{'STORAGE'}->{"currentPower"};
-				$readings{'storage_level'} = $data->{'STORAGE'}->{"chargeLevel"}||"Error Reading Response";		
-				$readings{'storage_critical'} = $data->{'STORAGE'}->{"critical"};		
-			}
-		
+    if ((defined $data) && (!defined $data->{'unit'}))
+    {
+        Log3 $name, 3, "SolarEdgeAPI ($name) - API currentPowerFlow is not supported. Avoid unsuccessful server queries by setting attribute enableStatusReadings=0.";
+        $readings{'error'} = 'API currentPowerFlow is not supported by site.';
+    }
+    else
+    {
+        $readings{'unit'} = $data->{'unit'}||"Error Reading Response";		
+        $readings{'updateRefreshRate'} = $data->{'updateRefreshRate'}||"Error Reading Response";		
+
+        # Connections / Directions
+
+        my $pv2load = 0;
+        my $pv2storage = 0;
+        my $load2storage = 0;
+        my $storage2load = 0;
+        my $load2grid = 0;
+        my $grid2load = 0;
+        foreach my $connection ( @{ $data->{'connections'} }) {
+            my $from = lc($connection->{'from'});
+            my $to = lc($connection->{'to'});
+            if($from  eq 'grid'&&$to  eq "load"){ $grid2load = 1;}
+            if($from eq "load"&&$to  eq 'grid') {$load2grid = 1;}
+            if($from eq 'load'&&$to eq "storage"){ $load2storage = 1;}
+            if($from eq 'pv'&&$to eq "storage") {$pv2storage = 1;}
+            if($from eq 'pv'&&$to eq "load") {$pv2load = 1;}
+            if($from eq 'storage'&&$to eq "load"){ $storage2load = 1;}
+        }
+
+        # GRID
+
+        $readings{'grid_status'} = $data->{'GRID'}->{"status"}||"Error Reading Response";		
+        $readings{'grid_power'} = ($load2grid >0 ? "-" : "") . $data->{'GRID'}->{"currentPower"};
+
+        # LOAD
+        
+        $readings{'load_status'} = $data->{'LOAD'}->{"status"}||"Error Reading Response";	
+        $readings{'load_power'} = $data->{'LOAD'}->{"currentPower"};		
+
+        # PV
+
+        $readings{'pv_status'} = $data->{'PV'}->{"status"}||"Error Reading Response";	
+        $readings{'pv_power'} = $data->{'PV'}->{"currentPower"};		
+
+        # Storage
+
+        $readings{'storage_status'} = $data->{'STORAGE'}->{"status"}||"No storage found";
+        if ($readings{'storage_status'} ne "No storage found")
+        {		
+            $readings{'storage_power'} = ($storage2load >0 ? "-" : "") . $data->{'STORAGE'}->{"currentPower"};
+            $readings{'storage_level'} = $data->{'STORAGE'}->{"chargeLevel"}||"Error Reading Response";		
+            $readings{'storage_critical'} = $data->{'STORAGE'}->{"critical"};		
+        }
+    }
     
     return \%readings;
 }
 
-
+sub SolarEdgeAPI_ReadingsProcessing_Overview($$) {
+    my ($hash, $decode_json) = @_;
+    my $name = $hash->{NAME};
+    
+    my %readings;
+    my $data = $decode_json->{'overview'};
+    
+    $readings{'power'} = $data->{'currentPower'}->{"power"};            
+    
+    return \%readings;
+}
 
 
 1;
@@ -558,57 +645,65 @@ sub SolarEdgeAPI_ReadingsProcessing_Status($$) {
 
 =pod
 =item device
-=item summary       Modul to retrieve data from a SolarEdge PV System via official API
+=item summary       Retrieves data from a SolarEdge PV system via the SolarEdge Monitoring API
 =item summary_DE 
 =begin html
 
 <a name="SolarEdgeAPI"></a>
-<h3>SolarEdge API</h3>
+<h3>SolarEdgeAPI</h3>
+
 <ul>
-    <u><b>SolarEdge API - Retrieves data from the SolarEdge Monitoring API</b></u>
-    <br>
-    With this module it is possible to read the data from a SolarEdge PV and to set it as reading.
-    <br><br>
-    <a name="SolarEdgeAPIdefine"></a>
-    <b>Define</b>
-    <ul><br>
-        <code>define &lt;name&gt; SolarEdgeAPI &lt;API-Key&gt; &lt;API-Key&gt;</code>
-    <br><br>
-    Example:
-    <ul><br>
-        <code>define myPVSite SolarEdgeAPI ABC123 123456</code><br>
-    </ul>
-    <br>
-    This statement creates a Device with the name myPV using API-Key ABC123 for fetching data of Site-Id 123456<br>
-    After the device has been created, the current data of the site is automatically read from the API.
-    The API-Key has to be enabled in the "Admin" Section of the Monitoring-Portal. There you can find your Site-ID, too.
-    According to the docs there is a limit of 300 total requests per day.
-    </ul>
-    <br><br>
-    <a name="SolarEdgeAPIreadings"></a>
-    <b>Readings</b>
-    <ul>
-        <li>actionQueue     - information about the entries in the action queue</li>
-        <li>aggregates-*    - cumulative data of the energyDetails response</li>
-        <li>status-*        - readings of the currentPowerFlow response</li>
-    </ul>
-    <a name="SolarEdgeAPIget"></a>
-    <b>get</b>
-    <ul>
-        <li>aggregates      - fetch data from energyDetails.json</li>
-        <li>status          - fetch data currentPowerFlow.json </li>
-    </ul>
-    <a name="SolarEdgeAPIattribute"></a>
-    <b>Attribute</b>
-    <ul>
-        <li>interval - interval in seconds for automatically fetch data (default auto = 300 (sec) daytime and 1200 (sec) nighttime)</li>
-    </ul>
+  This module retrieves data from a SolarEdge PV system via the SolarEdge Server Monitoring API.<br>
+  <br>
+  Data is retrieved from the server periodically. The interval during day time is higher compared<br>
+  to night time. According to the API documentation the total number of server queries per day is<br>
+  limited to 300.<br>
+  The total number of queries per day can be controlled with attributes. In each interval each enabled<br>
+  group of readings is generated once. You can reduce the number of server queries by disabling groups<br>
+  of readings and by increasing the interval.<br>
+  <br>
+
+  <a name="SolarEdgeAPI_Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SolarEdgeAPI &lt;API Key&gt; &lt;Site ID&gt; &lt;interval&gt|auto;</code><br>
+    The &lt;API Key&gt; and the &lt;Site ID&gt can be retrieved from the SolarEdge<br>
+    Monitoring Portal. The &lt;API Key&gt; has to be enabled in the "Admin" Secion<br>
+    of the web portal.<br>
+  </ul>
+  <br>
+    
+  <a name="SolarEdgeAPI_Readings"></a>
+  <b>Readings</b>
+  <ul>
+    <li>actionQueue     - information about the entries in the action queue (for debug only)</li>
+    <li>status-*        - readings generated from currentPowerFlow API response. This API is not supported by all sites.</li>
+    <li>aggregates-*    - cumulative data of the energyDetails response</li>
+    <li>overview-*      - readings generated from overview API response</li>    
+  </ul>
+  <br>
+    
+  <a name="SolarEdgeAPI_Get"></a>
+  <b>Get</b>
+  <ul>
+    <li>status          - fetch data from currentPowerFlow API (for debug only)</li>
+    <li>aggregates      - fetch data from energyDetails API (for debug only)</li>
+    <li>overview        - fetch data from overview API (for debug only)</li>
+  </ul>
+  <br>
+    
+  <a name="SolarEdgeAPI_Attributes"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>interval - interval in seconds for automatically fetch data (default auto = 300 (sec) daytime and 1200 (sec) nighttime)</li>
+    <li>enableStatusReadings Enable the status-* readings. Default: 1</li>
+    <li>enableAggregatesReadings Enable the aggregates-* readings. Default: 1</li>
+    <li>enableOverviewReadings Enable the overview-* readings. Default: 0 (for backward compatiblity)</li> 
+  </ul>
+  <br>
+  
 </ul>
+
 =end html
 
-=begin html_DE
-
-<a name="SolarEdgeAPI"></a>
-<h3>SolarEdge API Anbindung</h3>
-=end html_DE
 =cut
