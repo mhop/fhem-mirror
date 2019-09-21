@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 20165 2019-09-15 21:04:28Z DS_Starter $
+# $Id: 49_SSCam.pm 20198 2019-09-19 17:14:20Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.0" => "21.09.2019  support attr \"hideAudio\" SSCamSTRM-device ",
+  "8.18.2" => "19.09.2019  sample streams changed in comref, support of attr noLink in Streaming-Device ",
   "8.18.1" => "18.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610 ",
   "8.18.0" => "13.09.2019  change usage of own hashes to central %data hash, release unnecessary allocated memory ",
   "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPHASHOLD ",
@@ -164,6 +166,7 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "8.18.2" => "19.09.2019 SSCam supports the new attribute \"noLink\" in streaming devices ",
   "8.15.0" => "09.07.2019 support of integrating Streaming-Devices in a SSCam FTUI widget ",
   "8.14.0" => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
@@ -545,8 +548,10 @@ return undef;
 ################################################################
 sub SSCam_Undef($$) {
   my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash);
+  delete $data{SSCam}{$name};
    
 return undef;
 }
@@ -7238,7 +7243,8 @@ sub SSCam_StreamDev($$$;$) {
       $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                         # wenn aus FTUI aufgerufen divers setzen 
   }
   
-  my $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+  my $hb  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im Footer ausblenden ?
+  my $hau = AttrVal($strmdev, "hideAudio", 0);                              # Audio Steuerblock im Footer ausblenden ?
   
   my $pws = AttrVal($strmdev, "popupWindowSize", "");                       # Größe eines Popups
   $pws    =~ s/"//g if($pws);
@@ -7248,6 +7254,7 @@ sub SSCam_StreamDev($$$;$) {
   
   my $alias  = AttrVal($strmdev, "alias", $strmdev);                        # Linktext als Aliasname oder Devicename setzen
   my $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";
+  $dlink     = $alias if(AttrVal($strmdev, "noLink", 0));                   # keine Links im Stream-Dev generieren
   
   my $StmKey = ReadingsVal($camname,"StmKey",undef);
   
@@ -7327,7 +7334,7 @@ sub SSCam_StreamDev($$$;$) {
           $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);               # Statusbit wenn ein Stream aktiviert ist      
       }
-      if(!$hf) {
+      if(!$hb) {
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                  # Aufnahmebutton endlos Start
                  $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
@@ -7344,7 +7351,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<td>$ptz_ret</td>";
           }
       }
-      if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+      if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
           $ret .= '</tr>';
           $ret .= '<tr class="odd">';
           $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
@@ -7363,7 +7370,7 @@ sub SSCam_StreamDev($$$;$) {
           } else {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
           }
-          if(!$hf) {
+          if(!$hb) {
               $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
           }
           $ret .= "</td>";
@@ -7407,7 +7414,7 @@ sub SSCam_StreamDev($$$;$) {
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      if(!$hf) {
+      if(!$hb) {
           $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
           $ret .= $imgblank;
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
@@ -7454,7 +7461,7 @@ sub SSCam_StreamDev($$$;$) {
       
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
-      if(!$hf) {
+      if(!$hb) {
           $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
           $ret .= $imgblank;
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
@@ -7510,7 +7517,7 @@ sub SSCam_StreamDev($$$;$) {
                       $ret .= "<td>$ptz_ret</td>";
                   }
               }
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/ && !$hau) {
                   $ret .= "</tr>";
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7537,7 +7544,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
               $ret .= "</td>";
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
                   $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7563,7 +7570,7 @@ sub SSCam_StreamDev($$$;$) {
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
               $ret .= "</td>";
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
                   $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7721,7 +7728,7 @@ sub SSCam_composegallery ($;$$$) {
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
-  my ($alias,$dlink,$hf) = ("","","");
+  my ($alias,$dlink,$hb) = ("","","");
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7733,7 +7740,11 @@ sub SSCam_composegallery ($;$$$) {
 	  $uuid = $streamHash->{FUUID};                                                           # eindeutige UUID des Streamingdevices
 	  delete $streamHash->{HELPER}{STREAM};
       $alias  = AttrVal($strmdev, "alias", $strmdev);                                         # Linktext als Aliasname oder Devicename setzen
-      $dlink  = "<a href=\"/fhem?detail=$strmdev\">$alias</a>";  
+      if(AttrVal($strmdev, "noLink", 0)) {      
+          $dlink = $alias;                                                                    # keine Links im Stream-Dev generieren
+      } else {
+          $dlink = "<a href=\"/fhem?detail=$strmdev\">$alias</a>"; 
+      }
   }
   
   my $cmddosnap     = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";   # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
@@ -7752,7 +7763,7 @@ sub SSCam_composegallery ($;$$$) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
       $pws =~ s/"//g if($pws);
       $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
-      $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+      $hb  = AttrVal($strmdev, "hideButtons", 0);                                             # Drucktasten im unteren Bereich ausblenden ?
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
@@ -7775,7 +7786,7 @@ sub SSCam_composegallery ($;$$$) {
   
   # Header Generierung
   my $header;
-  if($strmdev) {  
+  if($strmdev) {                                                                             # Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610
       if($ftui) {
           $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
       } else {
@@ -7834,7 +7845,7 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  if(!$hf) {
+  if(!$hb) {
       $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   }
   $htmlCode .= "</html>";
@@ -9171,12 +9182,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20165 2019-09-15 21:04:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20198 2019-09-19 17:14:20Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20165 2019-09-15 21:04:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20198 2019-09-19 17:14:20Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -10613,10 +10624,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
         <ul>
 		<b>Examples:</b><br>
-        attr &lt;name&gt; hlsStrmObject https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8  <br>
-        # a video stream used for testing the streaming device function (internet connection is needed) <br><br>
+        attr &lt;name&gt; hlsStrmObject https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8  <br>
+        attr &lt;name&gt; hlsStrmObject https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8  <br>
+        # Sample video streams used for testing the streaming device function (internet connection is needed) <br><br>
+        
         attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/CamHE1.m3u8  <br>
         # playback a HLS video stream of a camera witch is delivered by e.g. a ffmpeg conversion process   <br><br>
+        
         attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/$NAME.m3u8  <br>
         # Same as example above, but use the replacement with variable $NAME for "CamHE1"     
         </ul>
@@ -12429,10 +12443,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
         <ul>
 		<b>Beispiele:</b><br>
-        attr &lt;name&gt; hlsStrmObject https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8  <br>
-        # ein Beispielstream der zum Test des Streaming Devices verwendet werden kann (Internetverbindung nötig) <br><br>
+        attr &lt;name&gt; hlsStrmObject https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8  <br>
+        attr &lt;name&gt; hlsStrmObject https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8  <br>
+        # Beispielstreams der zum Test des Streaming Devices verwendet werden kann (Internetverbindung nötig) <br><br>
+        
         attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/CamHE1.m3u8  <br>
         # Wiedergabe eines Kamera HLS-Streams der z.B. durch ffmpeg bereitgestellt wird  <br><br>
+        
         attr &lt;name&gt; hlsStrmObject http://192.168.2.10:32000/$NAME.m3u8  <br>
         # Wie obiges Beispiel mit der Variablennutzung für "CamHE1"     
         </ul>
