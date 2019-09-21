@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.13.2" => "21.09.2019  new solution to eliminate links for all Devices ",
   "3.13.1" => "21.09.2019  don't eliminate links for PageEnd-Devices ",
   "3.13.0" => "20.09.2019  change attribute noLinks to dashboard_noLinks, eliminate links for PageEnd-Devices ",
   "3.12.0" => "16.09.2019  new attribute noLinks, review comref and get-options ",
@@ -865,6 +866,9 @@ sub Dashboard_BuildGroup ($$$$$$) {
 		  }
 	  }
 	  $ret .= "</tr>";
+      if(AttrVal($name, "dashboard_noLinks", 0)) {   
+          $ret   =~ s/(<a\s+href="\/fhem\?detail=$d">(.*)<\/a>)/$2/s;           # keine Links zur Detailansicht des Devices
+      }
   }
 	
   $ret .= "</table>";
@@ -1290,9 +1294,8 @@ return;
       No link generation to the detail view of the devices takes place. <br><br>
 
       <b>Note: </b><br>
-      Some device types deliver the links to their detail view integrated in the devices name or alias. 
-      In such cases you have to deactivate the link generation inside of the device (for example in devices of type readingsGroup, 
-      SSCamSTRM, SVG or SMAPortal).      
+      Some device types deliver the links to their detail view integrated in the device. 
+      In such cases you have to deactivate the link generation inside of the device (for example in SMAPortalSPG).      
     </li>
     <br>
     
@@ -1551,9 +1554,8 @@ return;
       Es erfolgt keine Linkerstellung zur Detailansicht von Devices. <br><br>
 
       <b>Hinweis: </b><br>
-      Bei manchen Devicetypen wird der Link zur Detailansicht integriert im Namen bzw. Alias des Device mitgeliefert. 
-      In diesen Fällen muß die Linkgenerierung direkt im Device abgestellt werden (z.B. bei Devices der Typen readingsGroup, 
-      SSCamSTRM, SVG oder SMAPortal).      
+      Bei manchen Devicetypen wird der Link zur Detailansicht integriert im Device mitgeliefert. 
+      In diesen Fällen muß die Linkgenerierung direkt im Device abgestellt werden (z.B. bei SMAPortalSPG).      
     </li>
     <br>
 
