@@ -44,7 +44,7 @@ sub LaCrosse_Define($$) {
     return $msg;
   }
 
-  $a[2] =~ m/^([\da-f]{2})$/i;
+  $a[2] =~ m/^([\da-f]{2,4})$/i;
   return "$a[2] is not a valid LaCrosse address" if( !defined($1) );
 
   my $name = $a[0];
