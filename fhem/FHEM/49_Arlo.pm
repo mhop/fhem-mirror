@@ -445,7 +445,8 @@ sub Arlo_BlockingRequest($$;$$$$) {
 
 sub Arlo_DefaultCallback($$$) {
   my ($hash, $err, $jsonData) = @_;
-  my $name = $modules{$MODULE}{defptr}{"account"}{NAME};
+  my $account = $modules{$MODULE}{defptr}{"account"};
+  my $name = $account->{NAME};
   if ($err) {
     Log3 $name, 2, "Error occured when calling Arlo daemon: $err";
     return undef;
@@ -462,6 +463,12 @@ sub Arlo_DefaultCallback($$$) {
 		  my $origin = $hash->{origin};
 		  if ($origin && $data->{error} eq '2059' && $data->{reason} eq 'Device is offline.') {
             readingsSingleUpdate($origin, 'state', 'offline', 1) if (ReadingsVal($origin->{NAME}, 'state', '') ne 'offline');
+			$logLevel = 5;
+		  } elsif ($data->{error} eq '1022' && $data->{reason} eq 'Access token is invalid') {
+			Log3 $name, 3, "Arlo access token was invalid. Reconnect to Arlo.";
+			if ($hash->{STATE} eq 'active') {
+              Arlo_Login($account);
+            }
 			$logLevel = 5;
 		  }
 		} 
@@ -932,17 +939,17 @@ sub Arlo_DownloadLastVideo($) {
   my $length = @recordings;
   if ($length > 0) {
     my $rec = $recordings[0];
-	my $lastVideoTime = $hash->{lastVideoTime};
-	my $newVideoTime = int($rec->{time});
-	my $account = $modules{$MODULE}{defptr}{"account"};
-	if (!defined($lastVideoTime) || $newVideoTime > $lastVideoTime) {
-	  $hash->{lastVideoTime} = $newVideoTime;
-	  Log3 $account->{NAME}, 4, "Download new recording $newVideoTime.";
+    my $lastVideoTime = $hash->{lastVideoTime};
+    my $newVideoTime = int($rec->{time});
+    my $account = $modules{$MODULE}{defptr}{"account"};
+    if (!defined($lastVideoTime) || $newVideoTime > $lastVideoTime) {
+      $hash->{lastVideoTime} = $newVideoTime;
+      Log3 $account->{NAME}, 4, "Download new recording $newVideoTime.";
       Arlo_SetReadingAndDownload($account, 'lastVideoThumbnailUrl', $rec->{thumbnail}, $cameraId, '_thumb.jpg', \0);
       Arlo_SetReadingAndDownload($account, 'lastVideoUrl', $rec->{video}, $cameraId, '.mp4', \1);
-	} else {
-	  Log3 $account->{NAME}, 4, "Don't download recording because there is now new recording. Last Video: $lastVideoTime New Video: $newVideoTime";
-	}
+    } else {
+      Log3 $account->{NAME}, 4, "Don't download recording because there is now new recording. Last Video: $lastVideoTime New Video: $newVideoTime";
+    }
   }
 }
 
@@ -958,6 +965,8 @@ sub Arlo_Login($) {
   if (AttrVal($name, 'disable', 0) == 1) {
     return;
   }
+
+  $hash->{STATE} = 'inactive';
   
   my $password = encode_base64($hash->{helper}{password}, '');
   my $input = {email => $hash->{helper}{username}, password => $password, EnvSource => 'prod', language => 'de'};
@@ -1103,8 +1112,8 @@ sub Arlo_EventPolling($) {
       }
       return;
     }
-	$content = $content . $buf;
-	$nfound = select($rout=$rin, undef, undef, 0.1);
+    $content = $content . $buf;
+    $nfound = select($rout=$rin, undef, undef, 0.1);
   }
   Arlo_ProcessResponse($hash, $content) if ($content ne '');
   if ($hash->{SSE_STATUS} == 299) {
@@ -1167,7 +1176,7 @@ sub Arlo_ProcessResponse($$) {
         }
       } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' 
           && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir' && $check ne 'Stric' && $check ne 'Trans'
-		  && $check ne 'Expec' && $check ne 'CF-RA') {
+          && $check ne 'Expec' && $check ne 'CF-RA') {
         Log3 $hash->{NAME}, 2, "Invalid Arlo event response: $line";
       }
     } 
@@ -1220,7 +1229,7 @@ sub Arlo_ProcessEvent($$) {
         my $activityState = $props->{activityState};
         if ($activityState) {
           my $camera = $modules{$MODULE}{defptr}{"C$cameraId"};
-		  my $oldActivityState = ReadingsVal($camera->{NAME}, 'activityState', '');
+          my $oldActivityState = ReadingsVal($camera->{NAME}, 'activityState', '');
           Arlo_SetReading($hash, $cameraId, 'activityState', $activityState);
           if ($activityState eq 'startUserStream') {
             my $streamURL = $props->{streamURL};
@@ -1230,7 +1239,7 @@ sub Arlo_ProcessEvent($$) {
           } elsif ($activityState eq 'userStreamActive') {
 		    InternalTimer(gettimeofday() + 0.5, "Arlo_StartRecordingStep2", $camera);
           } elsif ($activityState eq 'idle' && ($oldActivityState eq 'alertStreamActive' || $oldActivityState eq 'userStreamActive') && AttrVal($name, 'videoDownloadFix', 0) == 1) {
-		    Log3 $name, 4, "Download latest video for $camera->{NAME} in 2 seconds";
+            Log3 $name, 4, "Download latest video for $camera->{NAME} in 2 seconds";
             InternalTimer(gettimeofday() + 2, "Arlo_DownloadLastVideo", $camera);
           }
         }
