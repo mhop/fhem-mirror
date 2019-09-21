@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.13.1" => "21.09.2019  don't eliminate links for PageEnd-Devices ",
   "3.13.0" => "20.09.2019  change attribute noLinks to dashboard_noLinks, eliminate links for PageEnd-Devices ",
   "3.12.0" => "16.09.2019  new attribute noLinks, review comref and get-options ",
   "3.11.0" => "16.09.2019  attr dashboard_activetab is now working properly, commandref revised, calculate attribute ".
@@ -828,9 +829,6 @@ sub Dashboard_BuildGroup ($$$$$$) {
 		  if ($devret !~ /informId/i) {
 		      $ret .= " informId=\"$d\"";
   		  }
-          if(AttrVal($name, "dashboard_noLinks", 0)) {
-              $devret =~ s/.*(<a\s+href="\/fhem\?detail=.*>(.*)<\/a>).*/$2/mg;               # keine Links zur Detailansicht des Devices für PageEnd Devices (bringen Link inkludiert mit)
-          }
 		  $ret .= ">$devret</td>";
 		  use strict "refs"; 
 	  
@@ -890,7 +888,7 @@ return $ret;
 #############################################################################################
 sub Dashboard_GetMaxColumnId ($$) {
   my ($row, $colcount) = @_;
-  my $maxcolid = "0";
+  my $maxcolid         = "0";
 	
   if (index($row,"bottom") > 0)    { $maxcolid = "200"; } 
   elsif (index($row,"center") > 0) { $maxcolid = $colcount-1; } 
@@ -903,8 +901,8 @@ return $maxcolid;
 #           
 #############################################################################################
 sub Dashboard_CheckDashboardEntry ($) {
-  my ($hash) = @_;
-  my $now = time();
+  my ($hash)     = @_;
+  my $now        = time();
   my $timeToExec = $now + 5;
 	
   RemoveInternalTimer($hash);
