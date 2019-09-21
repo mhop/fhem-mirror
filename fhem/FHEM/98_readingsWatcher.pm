@@ -88,6 +88,7 @@ BEGIN {
           ReadingsVal
           setReadingsVal
           CommandSetReading
+          CommandDeleteReading
           gettimeofday
           TimeNow
         )
@@ -133,7 +134,7 @@ sub Define($$)
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "FHEM::readingsWatcher::OnTimer", $hash, 0);
-  #return $@ unless ( FHEM::Meta::SetInternals($hash) ) if(!$modMetaAbsent);
+  if (!$modMetaAbsent) {return $@ unless ( FHEM::Meta::SetInternals($hash) ) }
   return undef;
 }
 
@@ -187,65 +188,113 @@ sub Set($@)
 sub Get($@)
 {
  my ($hash, @a)= @_;
- my ($ret, @parts, $deviceName, $rSA, $d, $curVal, $age, $st);
- my @devs;
+ my (@parts, $deviceName, $rSA, $d, $curVal, $age , @devs, $state);
 
  return join(' ', sort keys %gets) if(@a < 2);
 
+ my $name = $hash->{NAME};
+ my ($dw,$rw,$tw,$sw,$aw) = (1,1,1,1,1);
+
  if ($a[1] eq 'devices')
  {
-  @devs = devspec2array("readingsWatcher!="); # wer hat alles ein Attribut readingsWatcher ?
-
-  foreach $deviceName (@devs) 
+  foreach $deviceName (devspec2array("readingsWatcher!="))
   {
-   $st   = '';
    $rSA  = ($deviceName eq  $a[0]) ? '' : AttrVal($deviceName, 'readingsWatcher', '');
- 
+   $dw   = length($deviceName) if (length($deviceName) > $dw);
+
    if ($rSA)
    {
-    if (IsDisabled($deviceName) || IsIgnored($deviceName)) { $st = '(disable)'; }
+    if (IsDisabled($deviceName)) 
+    { 
+      $sw  = 8 if ($sw<8);
+      push @devs, "$deviceName,-,-,disabled,-";
+    }
+    elsif (IsIgnored($deviceName))
+    { 
+      $sw  = 7 if ($sw<7);
+      push @devs, "$deviceName,-,-,ignored,-";
+    }
     else
      { 
-       ($rSA,undef) = split(';', $rSA);
-       @parts = split(',', $rSA);
+       my @r = split(';',$rSA);
+
+       foreach (@r)
+       {
+       @parts = split(',', $_);
        if (@parts > 2) 
        { 
-        my $timeout = $parts[0];
-        shift @parts;
-        shift @parts;
+        my $timeout = int($parts[0]);
+        $tw =  length($timeout) if(length($timeout) > $tw);
+
+        shift @parts;   # Timeoutwert
+        shift @parts;   # Ersatzwert
+
         foreach (@parts) # alle zu überwachenden Readings
         {
-          $_ =~ s/^\s+|\s+$//g;
-          $_ = 'state' if ($_ eq 'STATE');
+          $_  =~ s/^\s+|\s+$//g;
+          $_  = 'state' if ($_ eq 'STATE');
+          $rw =  length($_) if(length($_) > $rw); 
 
-          $age = ReadingsAge($deviceName, $_, undef);
-
-          if (!defined($age))
+          if (($_ eq 'state') && (ReadingsVal($deviceName,'state','') eq 'inactive'))
           {
-           $ret .= $deviceName.':'.$_ ." (no Timestamp)\n";
+            $state   = 'inactive';
+            $age     = '-';
           }
           else
           {
-           my $s = ($age>$timeout) ? 'timeout ('.$timeout.')' : 'ok ('.$timeout.')';
-           $ret .= $deviceName.':'.$_." $s -> $age sec\n";
+           $age = ReadingsAge($deviceName, $_, undef);
+ 
+           if (!defined($age))
+           {
+            $state   = 'unknown';
+            $age     = 'undef';
+           }
+           else
+           {
+            $state = ($age>$timeout) ? 'timeout' : 'ok';
+           }
           }
+          $aw = length($age)   if(length($age)   > $aw);
+          $sw = length($state) if(length($state) > $sw);
+          push @devs, "$deviceName,".$_.",$timeout,$state,$age";
         }
-       } else { $st= '(wrong parameters)'; } # @parts >2
-      } # disabled
+       } # @parts >2 
+       
+       else 
+       { 
+         $sw   = 16 if ($sw<16);
+         push @devs, "$deviceName,-,-,wrong parameters,-";
+       } 
+      } # not disabled
     } # rSA
+   }
   } # foreach
 
-  if ($ret)
+  if (int(@devs))
   {
-   my $head  = 'Devices';
-   my $width = 10;
-   my @arr = split('\n',$ret.$st);
-   foreach(@arr) { $width = length($_) if(length($_) > $width); }
-   return $head."\n".('-' x $width)."\n".$ret.$st;
+   $dw += 2;
+   $rw += 2;
+   $sw += 4;
+   $aw += 2;
+
+   my $s  = 'Device'.(' ' x ($dw-6)).'Reading'.(' ' x ($rw-7)).(' ' x ($tw-2)).'TO'.(' ' x ($sw-5)).'State'.(' ' x ($aw-3)).'Age';
+   $s    .= "\n".('-' x length($s))."\n"; # --------------------------
+
+   foreach(@devs) 
+   { 
+      @a  = split(',',$_);
+      $s .= $a[0] . (' ' x ($dw - length$a[0])); # linksbündig
+      $s .= $a[1] . (' ' x ($rw - length$a[1])); # linksbündig
+      $s .= (' ' x ($tw - length$a[2])).$a[2];   # rechtsbündig
+      $s .= (' ' x ($sw - length$a[3])).$a[3];   # rechtsbündig
+      $s .= (' ' x ($aw - length$a[4])).$a[4];   # rechtsbündig
+      $s .= "\n";
+   }
+   return $s;
   }
   return 'Sorry, no devices with valid attribute readingsWatcher found !';
  } # get devices
- return $hash->{NAME}.' get with unknown argument '.$a[1].', choose one of ' . join(' ', sort keys %gets); 
+ return 'get '.$name.' with unknown argument '.$a[1].', choose one of ' . join(' ', sort keys %gets); 
 }
 
 #####################################################################################
@@ -277,7 +326,7 @@ sub OnTimer($)
 
   my ($areading,$dead,$alive) = split(":",AttrVal($name,'readingActivity','none:dead:alive'));
   $dead = 'dead'  if(!$dead);
-  $alive= 'aöive' if(!$alive);
+  $alive= 'alive' if(!$alive);
   $areading = ''  if ($areading eq 'none');
 
   readingsBeginUpdate($hash);
@@ -285,21 +334,20 @@ sub OnTimer($)
   foreach  $deviceName (@devs) 
   {
 
-      $rSA = ($deviceName eq  $name) ? '' : AttrVal($deviceName, 'readingsWatcher', undef);
+    $rSA = ($deviceName eq  $name) ? '' : AttrVal($deviceName, 'readingsWatcher', undef);
 
-      if(defined($rSA) && !IsDisabled($deviceName) && !IsIgnored($deviceName)) 
+    if(defined($rSA) && !IsDisabled($deviceName) && !IsIgnored($deviceName)) 
+    {
+      push @devices, $deviceName if  !grep {/$deviceName/} @devices; # keine doppelten Namen
+
+      # rSA: timeout, errorValue, reading1, reading2, reading3, ...
+      #      120,---,temperature,humidity,battery
+      # or   900,,current,eState / no errorValue = do not change reading
+
+      my @r = split(';', $rSA);
+      foreach (@r)
       {
-        push @devices, $deviceName if  !grep {/$deviceName/} @devices; # keine doppelten Namen
-
-        # rSA: timeout, errorValue, reading1, reading2, reading3, ...
-        #      120,---,temperature,humidity,battery
-        # or   900,,current,eState / no errorValue = do not change reading
-
-
-        #($rSA,$areading) = split(';', $rSA);
-        #($areading,$alive,$dead) = split(':', $areading) if ($areading);
-
-        @parts = split(',', $rSA);
+        @parts = split(',', $_);
         if (@parts > 2)
         {
         $timeout    = int($parts[0]);
@@ -369,7 +417,8 @@ sub OnTimer($)
          $error = 'insufficient parameters for device '.$deviceName;
          Log3 $name,2,$name.', '.$error.' - skipped !';
        }
-      }# if $readingsWatcherAttribute  
+      }# if $readingsWatcherAttribute
+    }
    }# foreach $deviceName
 
    readingsBulkUpdate($hash,'readings'       , $readings);
@@ -422,18 +471,25 @@ sub Attr (@)
  my $hash = $defs{$name};
  my $error;
 
- if ($cmd eq "set")
+ if ($cmd eq 'set')
  {
-   if ($attrName eq "disable")
+   if ($attrName eq 'disable')
    {
-    readingsSingleUpdate($hash,"state","disabled",1) if ($attrVal == 1);
+    readingsSingleUpdate($hash,'state','disabled',1) if ($attrVal == 1);
     OnTimer($hash) if ($attrVal == 0);
     $_[3] = $attrVal;
    }
+   if (($attrName eq 'readingActivity') && ($attrVal eq 'state'))
+   {
+    $_[3] = '';
+    my $err = 'forbidden value state !';
+    Log3 $name,1,$name.', readingActivity '.$err;
+    return $err;
+   }
  }
- elsif ($cmd eq "del")
+ elsif ($cmd eq 'del')
  {
-  if ($attrName eq "disable")
+  if ($attrName eq 'disable')
   {
    OnTimer($hash);
   }
@@ -531,7 +587,7 @@ sub Attr (@)
     Definiert ein readingsWatcher Device.<br><br>
     Danach besitzt jedes FHEM Device das neue globale Attribut readingsWatcher<br>
     Dieses Attribut ist bei allen zu &uuml;berwachenden Ger&auml;ten wie folgt zu belegen :<br>
-    <code>attr mydevice timeout,[Ersatz],Readings1,[Readings2][;Activity:]</code>
+    <code>attr mydevice timeout,[Ersatz],Readings1,[Readings2][;timeout2,Ersatz2,Reading,Reading]</code>
     Timeout in Sekunden, neuer Reading Wert, Reading1 des Devices, Reading2, usw.<br><br>
     Beispiel : Ein Funk Thermometer sendet in regelm&auml;&szlig;igen Abst&auml;nden ( z.b.5 Sekunden ) seine Werte.<br> 
     Bleiben diese nun für eine bestimmte Zeit aus, so kann das Modul diesen nun nicht mehr aktuellen Werte (oder Werte)<br>
