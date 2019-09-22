@@ -1460,7 +1460,8 @@ FW_createSelect(elName, devName, vArr, currVal, set, params, cmd)
   var vHash = {};
   for(var j=1; j < vArr.length; j++) {
     var o = document.createElement('option');
-    o.text = o.value = vArr[j].replace(/#/g," ");
+    if(!vArr[j].match(/&#[0-9a-f]{1,4};/i))
+      o.text = o.value = vArr[j].replace(/#/g," ");
     vHash[vArr[j]] = 1;
     newEl.options[j-1] = o;
   }
