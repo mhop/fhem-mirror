@@ -1,4 +1,4 @@
-﻿# $Id: 95_Dashboard.pm 20211 2019-09-20 22:02:11Z DS_Starter $
+﻿# $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $
 ########################################################################################
 #       95_Dashboard.pm
 #
@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.14.0" => "22.09.2019  new attribute dashboard_activetabRefresh, activate the active tab in browser ",
   "3.13.2" => "21.09.2019  new solution to eliminate links for all Devices ",
   "3.13.1" => "21.09.2019  don't eliminate links for PageEnd-Devices ",
   "3.13.0" => "20.09.2019  change attribute noLinks to dashboard_noLinks, eliminate links for PageEnd-Devices ",
@@ -81,13 +82,16 @@ my $fwjqueryui       = "jquery-ui.min.js";
 sub Dashboard_Initialize ($) {
   my ($hash) = @_;
   
+  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  
   $hash->{DefFn}       = "Dashboard_define";
   $hash->{SetFn}       = "Dashboard_Set";  
   $hash->{GetFn}       = "Dashboard_Get";
   $hash->{UndefFn}     = "Dashboard_undef";
   $hash->{FW_detailFn} = "Dashboard_DetailFN";    
-  $hash->{AttrFn}      = "Dashboard_attr";
+  $hash->{AttrFn}      = "Dashboard_Attr";
   $hash->{AttrList}    = "disable:0,1 ".
+                         "dashboard_activetabRefresh:multiple-strict,$fwd ".
 						 "dashboard_backgroundimage ".
   						 "dashboard_colcount:1,2,3,4,5 ".	
 						 "dashboard_customcss " .                         
@@ -279,8 +283,12 @@ return undef;
 ################################################################
 #   Attr
 ################################################################
-sub Dashboard_attr($$$) {
+sub Dashboard_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $hash = $defs{$name};
+  
+  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  $hash->{HELPER}{FW} = $fwd;
 
   if ($cmd eq "set") {
       if ($attrName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $attrName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
@@ -300,12 +308,18 @@ sub Dashboard_attr($$$) {
           my $url = '/dashboard/'.$name;
           $data{FWEXT}{$url}{NAME} = $attrVal;
       }
+      
+      if ($attrName =~ m/dashboard_activetab/) {
+          Dashboard_actTab ($name,$attrVal);
+      }
   }
-  
+      
   # die Argumente für das Attribut dashboard_activetab dynamisch ermitteln und setzen
-  my $f = Dashboard_calcAttrActiveTab ($name);
+  my $f  = Dashboard_calcAttrActiveTab ($name);
+  my $at = $attr{$name}{dashboard_activetab};
   delFromDevAttrList($name, "dashboard_activetab");
   addToDevAttrList  ($name, "dashboard_activetab:$f");
+  $attr{$name}{dashboard_activetab} = $at if($at);
 
 return;  
 }
@@ -382,12 +396,12 @@ sub DashboardAsHtml($) {
 sub Dashboard_SummaryFN ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_;
  
-  my $ret           = "";
-  my $showbuttonbar = "hidden";
-  my $debugfield    = "hidden";
-  my $hash          = $defs{$d};
-  my $name          = $d;
-  my $id            = $defs{$d}{NR};
+  my $ret             = "";
+  my $showbuttonbar   = "hidden";
+  my $debugfield      = "hidden";
+  my $hash            = $defs{$d};
+  my $name            = $d;
+  my $id              = $defs{$d}{NR};
  
   ######################### Read Dashboard Attributes and set Default-Values ####################################
   my $lockstate         = ReadingsVal($name, "lockstate", "unlock");
@@ -1034,12 +1048,12 @@ sub Dashboard_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {   # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                    # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20211 2019-09-20 22:02:11Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20211 2019-09-20 22:02:11Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );   # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden                                       
       }
@@ -1047,6 +1061,27 @@ sub Dashboard_setVersionInfo($) {
 	  $hash->{VERSION} = $v;                                                      # herkömmliche Modulstruktur
   }
   
+return;
+}
+
+#############################################################################################
+#           Tabumschaltung bei setzen Attribut dashboard_activetab
+#############################################################################################
+sub Dashboard_actTab ($$) {
+  my ($name,$tab) = @_;
+  my $hash = $defs{$name};
+  
+  $tab--;
+  my $web = AttrVal($name, "dashboard_activetabRefresh", $hash->{HELPER}{FW});
+  my @wa  = split(",", $web);
+  
+  { map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".');$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } @wa }
+  
+  # Andere Triggermöglichkeiten:
+  # { map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".')', "") } $web }
+  # { map { FW_directNotify("#FHEMWEB:$_", '$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } $web }
+  # CommandTrigger(undef,'WEB  JS:dashboard_load_tab('."$tab".');JS:$("#dashboardtabs").tabs("option", "active", '."$tab".')' );
+
 return;
 }
 
