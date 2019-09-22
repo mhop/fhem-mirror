@@ -1386,6 +1386,7 @@ sub AddRegexpTriggerDoIf
     } elsif ($regexp) {
       $hash->{Regex}{$type}{$dev}{$element}{$regexpid}="\^$dev\$:$regexp";
     }
+    %ntfyHash = ();
     return;
   }
   my($regdev)=split(/:/,$regexp);
@@ -1405,6 +1406,7 @@ sub AddRegexpTriggerDoIf
   }
   $hash->{NOTIFYDEV}.=",$regdev" if ($hash->{NOTIFYDEV}!~/,$regdev(,|$)/);
   $hash->{Regex}{$type}{$dev}{$element}{$regexpid}=$regexp;
+  %ntfyHash = ();
 }
 
 sub addDOIF_Readings
@@ -2408,6 +2410,7 @@ DOIF_Notify($$)
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
   delete ($hash->{helper}{DOIF_eventas});
+  delete ($hash->{helper}{DOIF_eventa});
   
   if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,'^INITIALIZED$') or EventCheckDoif($dev->{NAME},"global",$eventa,'^REREADCFG$')))
   {
@@ -3004,6 +3007,7 @@ CmdDoIfPerl($$)
   my $i=0;
   $hs=$hash;
   $hash->{NOTIFYDEV}="global";
+  %ntfyHash = ();
   #def modify
   if ($init_done)
   {
@@ -3089,6 +3093,7 @@ CmdDoIf($$)
   
   #def modify
   $hash->{NOTIFYDEV}="global";
+  %ntfyHash = ();
   if ($init_done)
   {
     DOIF_delTimer($hash);
@@ -3264,6 +3269,7 @@ DOIF_Attr(@)
     }
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
     $hash->{NOTIFYDEV}="global";
+    %ntfyHash = ();
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
