@@ -35,8 +35,9 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.10.0" => "21.09.2019  new attribute hideAudio ",
   "2.9.0"  => "19.09.2019  new attribute noLink ",
-  "2.8.0"  => "09.09.2019  new attribute hideFooter ",
+  "2.8.0"  => "09.09.2019  new attribute hideButtons ",
   "2.7.0"  => "15.07.2019  FTUI support, new attributes htmlattrFTUI, hideDisplayNameFTUI, ptzButtonSize, ptzButtonSizeFTUI ",
   "2.6.0"  => "21.06.2019  GetFn -> get <name> html ",
   "2.5.0"  => "27.03.2019  add Meta.pm support ",
@@ -85,9 +86,10 @@ sub SSCamSTRM_Initialize($) {
                                 "genericStrmHtmlTag ".
                                 "htmlattr ".
                                 "htmlattrFTUI ".
+                                "hideAudio:1,0 ".
+                                "hideButtons:1,0 ".
                                 "hideDisplayName:1,0 ".
                                 "hideDisplayNameFTUI:1,0 ".
-                                "hideButtons:1,0 ".
                                 "noLink:1,0 ".
                                 "popupWindowSize ".
                                 "popupStreamFW:$fwd ".
@@ -531,6 +533,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <br><br>
     </li>
     
+    <a name="hideAudio"></a>
+    <li><b>hideAudio</b><br>
+      Hide the control block for audio playback in the footer.    
+    </li>
+    <br>
+    
     <a name="hideButtons"></a>
     <li><b>hideButtons</b><br>
       Hide the buttons in the footer. It has no impact for streaming devices of type "switched".    
@@ -767,6 +775,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     </ul>
     <br><br>
     </li> 
+    
+    <a name="hideAudio"></a>
+    <li><b>hideAudio</b><br>
+      Verbirgt die Steuerungsbereich für die Audiowiedergabe in der Fußzeile.    
+    </li>
+    <br>  
 
     <a name="hideButtons"></a>
     <li><b>hideButtons</b><br>

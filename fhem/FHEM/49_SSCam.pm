@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.0" => "21.09.2019  support attr \"hideAudio\" SSCamSTRM-device ",
   "8.18.2" => "19.09.2019  sample streams changed in comref, support of attr noLink in Streaming-Device ",
   "8.18.1" => "18.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610 ",
   "8.18.0" => "13.09.2019  change usage of own hashes to central %data hash, release unnecessary allocated memory ",
@@ -7242,7 +7243,8 @@ sub SSCam_StreamDev($$$;$) {
       $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                         # wenn aus FTUI aufgerufen divers setzen 
   }
   
-  my $hf  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im unteren Bereich ausblenden ?
+  my $hb  = AttrVal($strmdev, "hideButtons", 0);                            # Drucktasten im Footer ausblenden ?
+  my $hau = AttrVal($strmdev, "hideAudio", 0);                              # Audio Steuerblock im Footer ausblenden ?
   
   my $pws = AttrVal($strmdev, "popupWindowSize", "");                       # Größe eines Popups
   $pws    =~ s/"//g if($pws);
@@ -7332,7 +7334,7 @@ sub SSCam_StreamDev($$$;$) {
           $streamHash->{HELPER}{STREAM}       = "<img src=$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
           $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);               # Statusbit wenn ein Stream aktiviert ist      
       }
-      if(!$hf) {
+      if(!$hb) {
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
                  # Aufnahmebutton endlos Start
                  $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
@@ -7349,7 +7351,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<td>$ptz_ret</td>";
           }
       }
-      if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+      if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
           $ret .= '</tr>';
           $ret .= '<tr class="odd">';
           $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
@@ -7368,7 +7370,7 @@ sub SSCam_StreamDev($$$;$) {
           } else {
               $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
           }
-          if(!$hf) {
+          if(!$hb) {
               $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
           }
           $ret .= "</td>";
@@ -7412,7 +7414,7 @@ sub SSCam_StreamDev($$$;$) {
       }
       $ret .= "<br>";
       Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
-      if(!$hf) {
+      if(!$hb) {
           $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
           $ret .= $imgblank;
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
@@ -7459,7 +7461,7 @@ sub SSCam_StreamDev($$$;$) {
       
       $streamHash->{HELPER}{STREAM} = "<video $pws id=video_$d></video>";  # Stream für "set <SSCamSTRM-Device> popupStream" speichern   
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                             # Statusbit wenn ein Stream aktiviert ist
-      if(!$hf) {
+      if(!$hb) {
           $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
           $ret .= $imgblank;
           if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
@@ -7515,7 +7517,7 @@ sub SSCam_StreamDev($$$;$) {
                       $ret .= "<td>$ptz_ret</td>";
                   }
               }
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/ && !$hau) {
                   $ret .= "</tr>";
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7542,7 +7544,7 @@ sub SSCam_StreamDev($$$;$) {
               $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
               $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
               $ret .= "</td>";
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
                   $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7568,7 +7570,7 @@ sub SSCam_StreamDev($$$;$) {
               $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);         # Statusbit wenn ein Stream aktiviert ist
               $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
               $ret .= "</td>";
-              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/) {
+              if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
                   $ret .= '</tr>';
                   $ret .= '<tr class="odd">';
                   $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -7726,7 +7728,7 @@ sub SSCam_composegallery ($;$$$) {
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
-  my ($alias,$dlink,$hf) = ("","","");
+  my ($alias,$dlink,$hb) = ("","","");
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7761,7 +7763,7 @@ sub SSCam_composegallery ($;$$$) {
       $pws = AttrVal($strmdev, "popupWindowSize", "");                                        # Größe eines Popups (umgelegt: Forum:https://forum.fhem.de/index.php/topic,45671.msg927912.html#msg927912)
       $pws =~ s/"//g if($pws);
       $ha  = AttrVal($strmdev, "htmlattr", $ha);                                              # htmlattr vom SSCamSTRM-Device übernehmen falls von SSCamSTRM-Device aufgerufen und gesetzt                                                 
-      $hf  = AttrVal($strmdev, "hideButtons", 0);                                             # Drucktasten im unteren Bereich ausblenden ?
+      $hb  = AttrVal($strmdev, "hideButtons", 0);                                             # Drucktasten im unteren Bereich ausblenden ?
       if($ftui) {
           $ha = AttrVal($strmdev, "htmlattrFTUI", $ha);                                       # wenn aus FTUI aufgerufen divers setzen 
       }
@@ -7843,7 +7845,7 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  if(!$hf) {
+  if(!$hb) {
       $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   }
   $htmlCode .= "</html>";
