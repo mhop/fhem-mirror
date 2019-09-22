@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
   "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
   "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
                            "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
@@ -855,7 +856,8 @@ sub DbRep_Set($@) {
       }
       if($opt eq "sqlCmdHistory") {
           $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
-          $prop =~ s/<c>/,/g;          
+          $prop =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
+          $prop =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html                   
           $sqlcmd = $prop;
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
@@ -5968,8 +5970,9 @@ sub sqlCmd_ParseDone($) {
   # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
   # my $hl      = $hash->{HELPER}{SQLHIST};
   my @sqlhist = split(",",$hash->{HELPER}{SQLHIST});
-  $cmd =~ s/\s/&nbsp;/g;
-  $cmd =~ s/,/<c>/g;
+  $cmd =~ s/\s+/&nbsp;/g; 
+  $cmd =~ s/,/&#65292;/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
+  $cmd =~ s/&#65292;&nbsp;/&#65292;/g;
   my $hlc = AttrVal($name, "sqlCmdHistoryLength", 0);                       # Anzahl der Einträge in Drop-Down Liste
   if(!@sqlhist || (@sqlhist && !($cmd ~~ @sqlhist))) {
       unshift @sqlhist,$cmd;
@@ -12394,9 +12397,8 @@ return;
 
     <li><b> sqlCmdHistory </b>   - If history is activated by <a href="#DbRepattr">attribute</a> "sqlCmdHistoryLength", an already
                                    successfully executed sqlCmd-command can be repeated from a drop-down list. <br>
-                                   By execution of the last list entry, "__purge_historylist__", the list itself can be deleted. <br>
-								   If the statement contains "," this character is displayed as "&lt;c&gt;" in the history 
-                                   list due to technical restrictions. <br><br>
+                                   By execution of the last list entry, "__purge_historylist__", the list itself can be 
+                                   deleted. <br><br>								   
                              
                                    For a better overview the relevant attributes for this command are listed in a table: <br><br>
 
@@ -14833,7 +14835,7 @@ sub bdump {
 	                                  <tr><td> <b>executeBeforeProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) vor der Operation ausführen </td></tr>
                                       <tr><td> <b>executeAfterProc</b>    </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>allowDeletion</b>       </td><td>: aktiviert Löschmöglichkeit </td></tr>
-                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnis fest  </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>     </td><td>: legt die Darstellung des Kommandoergebnisses fest  </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
                                       <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung des SQL-Statements </td></tr>
@@ -14853,9 +14855,7 @@ sub bdump {
     <li><b> sqlCmdHistory </b>   - Wenn mit dem <a href="#DbRepattr">Attribut</a> "sqlCmdHistoryLength" aktiviert, kann
                                    aus einer Liste ein bereits erfolgreich ausgeführtes sqlCmd-Kommando wiederholt werden. <br>
                                    Mit Ausführung des letzten Eintrags der Liste, "__purge_historylist__", kann die Liste gelöscht 
-                                   werden. <br>
-                                   Falls das Statement "," enthält, wird dieses Zeichen aus technischen Gründen in der 
-                                   History-Liste als "&lt;c&gt;" dargestellt. <br><br>
+                                   werden. <br><br>
                                    
                                    Zur besseren Übersicht sind die zur Steuerung dieser Funktion von relevanten Attribute 
                                    hier noch einmal zusammenstellt: <br><br>
