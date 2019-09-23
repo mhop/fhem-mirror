@@ -1,4 +1,4 @@
-REV 20223
+REV 20230
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-22_07:45:02 307675 ./CHANGED
+UPD 2019-09-23_07:45:03 307801 ./CHANGED
 UPD 2019-09-22_07:45:02 41790 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -275,8 +275,8 @@ UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2019-09-22_07:45:02 64185 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2019-09-20_07:45:03 675386 FHEM/49_SSCam.pm
-UPD 2019-09-20_07:45:03 33101 FHEM/49_SSCamSTRM.pm
+UPD 2019-09-23_07:45:03 675609 FHEM/49_SSCam.pm
+UPD 2019-09-23_07:45:03 33523 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
@@ -444,7 +444,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-04-03_07:45:02 55565 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2019-09-07_07:45:03 405768 FHEM/93_DbLog.pm
-UPD 2019-09-17_07:45:03 830094 FHEM/93_DbRep.pm
+UPD 2019-09-23_07:45:03 830255 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
 UPD 2019-02-19_07:45:03 70621 FHEM/93_PWMR.pm
@@ -470,7 +470,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2019-09-21_07:45:02 279983 FHEM/98_DOIF.pm
+UPD 2019-09-23_07:45:03 280118 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -633,7 +633,7 @@ UPD 2019-09-14_07:45:02 333575 FHEM/lib/74_AMADautomagicFlowset_4.4.2.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-09-21_07:45:02 36249 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-09-21_07:45:02 100044 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-09-23_07:45:03 99813 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-04-16_07:45:02 4962 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -731,12 +731,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-09-22_07:45:06 4127297 docs/commandref.html
-UPD 2019-09-22_07:45:09 2558250 docs/commandref_DE.html
+UPD 2019-09-23_07:45:07 4127317 docs/commandref.html
+UPD 2019-09-23_07:45:10 2558216 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-22_07:45:10 218699 docs/commandref_modular.html
-UPD 2019-09-22_07:45:11 229642 docs/commandref_modular_DE.html
+UPD 2019-09-23_07:45:11 218709 docs/commandref_modular.html
+UPD 2019-09-23_07:45:13 229652 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2168,7 +2168,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2019-08-28_07:45:03 30859 www/pgm2/f18.js
 UPD 2019-06-26_07:45:02 9996 www/pgm2/f18style.css
 UPD 2018-05-27_13:13:25 7515 www/pgm2/fhemdoc_modular.js
-UPD 2019-08-07_07:45:03 61134 www/pgm2/fhemweb.js
+UPD 2019-09-23_07:45:03 61180 www/pgm2/fhemweb.js
 UPD 2019-01-26_07:45:02 13786 www/pgm2/fhemweb_colorpicker.js
 UPD 2019-01-09_07:45:02 4402 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
