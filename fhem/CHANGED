@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  89_FULLY: Support Fully version 1.34
  - change:  93_DbRep: comma can be shown in sqlCmdHistory, Forum: #103908
  - feature: 49_SSCamSTRM: new attribute "hideAudio"
  - bugfix:  73_AutoShuttersControl: change code in ShuttersCommandSet

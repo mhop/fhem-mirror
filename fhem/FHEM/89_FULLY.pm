@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.3
+#  89_FULLY.pm 1.35
 #
 #  $Id$
 #
@@ -37,7 +37,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.3";
+my $FULLY_VERSION = "1.35";
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -416,8 +416,17 @@ sub FULLY_Get ($@)
 		}
 
 		$response = '';
-		while ($result =~ /table-cell\">([^<]+)<\/td><td class="table-cell">([^<]+)</g) {
-			$response .= "$1 = $2<br/>\n";
+#		while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>([^<]+)</g) {
+		while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>(.*?)<\/td>/g) {
+			my ($in, $iv) = ($1, $2);
+			if ($iv =~ /^<a .*?>(.*?)<\/a>/) {
+				$iv = $1;
+			}
+			elsif ($iv =~ /(.*?)</) {
+				$iv = $1;
+			}
+			$iv =~ s/[ ]+$//;
+			$response .= "$in = $iv<br/>\n";
 		}
 		
 		return $response;
@@ -541,6 +550,7 @@ sub FULLY_ExecuteCB ($$$)
 			Log3 $name, 4, "FULLY: [$name] Last command executed. Processing results";
 			Log3 $name, 5, "FULLY: [$name] $data";
 			my $result = FULLY_ProcessDeviceInfo ($name, $data);
+			Log3 $name, 4, "FULLY: [$name] $result";
 			if (!FULLY_UpdateReadings ($hash, $result)) {
 				Log3 $name, 2, "FULLY: [$name] Command failed";
 			}
@@ -661,13 +671,23 @@ sub FULLY_ProcessDeviceInfo ($$)
 	# <td class='table-cell'>Kiosk mode</td><td class='table-cell'>off</td>
 	
 	my $parameters = "$name|1";
-	while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>([^<]+)</g) {
+	while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>(.*?)<\/td>/g) {
 		my $rn = lc($1);
 		my $rv = $2;
+		
+		if ($rv =~ /^<a .*?>(.*?)<\/a>/) {
+			$rv = $1;
+		}
+		elsif ($rv =~ /(.*?)</) {
+			$rv = $1;
+		}
+		$rv =~ s/[ ]+$//;
+		
 		$rv =~ s/\s+$//;
 		$rn =~ s/\:/\./g;
 		$rn =~ s/[^A-Za-z\d_\.-]+/_/g;
 		$rn =~ s/[_]+$//;
+		next if ($rn eq 'webview_ua');
 		if ($rn eq 'battery_level') {
 			if ($rv =~ /^([0-9]+)% \(([^\)]+)\)$/) {
 				$parameters .= "|$rn=$1|power=$2";
