@@ -202,6 +202,13 @@ sub ElsnerWS_Read($) {
     $sunWest = pack('H*', $sunWest) * 1000;
     $sunEast = pack('H*', $sunEast) * 1000;
     $brightness = pack('H*', $brightness);
+    $windSpeed = pack('H*', $windSpeed);
+    $hash->{helper}{wind}{windSpeedNumArrayElements} = ElsnerWS_updateArrayElement($hash, 'windSpeed', $windSpeed, 'wind', 600);
+    my ($windGustCurrent, undef, undef) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windGustCurrent', undef, undef, 'wind', 3);
+    my ($windAvg2min, undef, undef) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg2min', undef, undef, 'wind', 120);
+    my ($windAvg10min, $windSpeedMin10min, $windSpeedMax10min) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windSpeedGustAvg10min', 'windSpeedMax10min', 'windSpeedMin10min', 'wind', 600);
+    my $windGust10min = $windSpeedMax10min > $windSpeedMin10min + 5.144 ? $windSpeedMax10min : $windAvg10min;
+    my $windPeak10min = $windSpeedMax10min > 12.86 ? $windSpeedMax10min : $windAvg10min;
     my @sunlight = ($sunSouth, $sunWest, $sunEast);
     my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
     $sunSouth = $sunSouth == 0 ? $brightness : $sunSouth;
@@ -224,11 +231,23 @@ sub ElsnerWS_Read($) {
     $sunEast = ElsnerWS_readingsBulkUpdate($hash, "sunEast", $sunEast, 0.1, 0.7, "%d");
     $brightness = ElsnerWS_readingsBulkUpdate($hash, "brightness", $brightness, 0.1, 0.7, "%d");
     $isRaining = $isRaining eq '4A' ? 'yes' : 'no';
-    $windSpeed = ElsnerWS_readingsBulkUpdate($hash, "windSpeed", pack('H*', $windSpeed), 0.1, 0.7, "%0.1f");
+    $windSpeed = ElsnerWS_readingsBulkUpdate($hash, "windSpeed", $windSpeed, 0.1, 0.7, "%0.1f");
     my @windStrength = (0.2, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 28.4, 32.6);
     my $windStrength = 0;
     while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
       $windStrength ++;
+    }
+    if (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60) {
+      # update every 60 sec
+      #readingsBulkUpdate($hash, "windGustCurrent", $windGustCurrent);
+      #readingsBulkUpdate($hash, "windAvg2min", $windAvg2min);
+      #readingsBulkUpdate($hash, "windGust10min", $windGust10min);
+      #readingsBulkUpdate($hash, "windPeak10min", $windPeak10min);
+      readingsBulkUpdateIfChanged($hash, "windGustCurrent", sprintf("%0.1f", $windGustCurrent));
+      readingsBulkUpdateIfChanged($hash, "windAvg2min", sprintf("%0.1f", $windAvg2min));
+      readingsBulkUpdateIfChanged($hash, "windGust10min", sprintf("%0.1f", $windGust10min));
+      readingsBulkUpdateIfChanged($hash, "windPeak10min", sprintf("%0.1f", $windPeak10min));
+      $hash->{helper}{timer}{lastUpdate} = gettimeofday();
     }
     if (exists $hash->{helper}{timer}{heartbeat}) {
       readingsBulkUpdateIfChanged($hash, "dayNight", $twilightFlag);
@@ -364,30 +383,48 @@ sub ElsnerWS_Read($) {
   return;
 }
 
-sub ElsnerWS_SMA($$$$) {
-  # simple moving average (SMA)
-  my ($hash, $readingName, $readingVal, $averageOrder) = @_;
-  my $average = exists($hash->{helper}{sma}{$readingName}{average}) ? $hash->{helper}{sma}{$readingName}{average} : $readingVal;
-  my $numArrayElements = $#{$hash->{helper}{sma}{$readingName}{val}};
-  if (defined($numArrayElements) && $numArrayElements >= 0) {
-    if ($numArrayElements < $averageOrder - 1) {
-      $average = $average + $readingVal / ($numArrayElements + 1)
-                          - $hash->{helper}{sma}{$readingName}{val}[$numArrayElements] / ($numArrayElements + 1);
-    } else {
-      $average = $average + $readingVal / ($numArrayElements + 1)
-                          - pop(@{$hash->{helper}{sma}{$readingName}{val}}) / ($numArrayElements + 1);
-    }
+#####
+sub ElsnerWS_updateArrayElement($$$$$) {
+  # read und update values to array
+  my ($hash, $readingName, $readingVal, $arrayName, $numArrayElementsMax) = @_;
+  my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
+  if (!defined $numArrayElements) {
+    $numArrayElements = 1;
+  } elsif ($numArrayElements + 1 >= $numArrayElementsMax) {
+    $numArrayElements = $numArrayElementsMax;
+    pop(@{$hash->{helper}{$arrayName}{$readingName}{val}});
   } else {
-    $average = $readingVal;
+    $numArrayElements ++;
   }
-  unshift(@{$hash->{helper}{sma}{$readingName}{val}}, $readingVal);
-  $hash->{helper}{sma}{$readingName}{average} = $average;
-  return $average;
+  unshift(@{$hash->{helper}{$arrayName}{$readingName}{val}}, $readingVal);
+  return $numArrayElements;
+}
+
+sub ElsnerWS_SMA($$$$$$$$) {
+  # simple moving average (SMA)
+  my ($hash, $readingName, $readingVal, $averageName, $valMaxName, $valMinName, $arrayName, $numArrayElementsCalc) = @_;
+  my $average = exists($hash->{helper}{$arrayName}{$readingName}{average}) ? $hash->{helper}{$arrayName}{$readingName}{average} : $readingVal;
+  my ($valMin, $valMax) = ($readingVal, $readingVal);
+  my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
+  if (!defined $numArrayElements) {
+    $average = $readingVal;
+  } else {
+    $numArrayElements = $numArrayElementsCalc - 1 if ($numArrayElements + 1 >= $numArrayElementsCalc);
+    $average = $average + $readingVal / ($numArrayElements + 1)
+                        - $hash->{helper}{$arrayName}{$readingName}{val}[$numArrayElements] / ($numArrayElements + 1);
+  }
+  if (defined($valMaxName) && defined($valMinName)) {
+    ($valMin, $valMax) = (sort {$a <=> $b} @{$hash->{helper}{$arrayName}{$readingName}{val}})[0, $numArrayElements];
+    $hash->{helper}{$arrayName}{$readingName}{$valMaxName} = $valMax;
+    $hash->{helper}{$arrayName}{$readingName}{$valMinName} = $valMin;
+  }
+  $hash->{helper}{$arrayName}{$readingName}{$averageName} = $average;
+  return ($average, $valMin, $valMax);
 }
 
 sub ElsnerWS_LWMA($$$$) {
   # linear weighted moving average (LWMA)
-  my ($hash, $readingName, $readingVal, $averageOrder) = @_;
+  my ($hash, $readingName, $readingVal, $numArrayElementsMax) = @_;
   push(@{$hash->{helper}{lwma}{$readingName}{val}}, $readingVal);
   my $average = 0;
   my $numArrayElements = $#{$hash->{helper}{lwma}{$readingName}{val}} + 1;
@@ -395,7 +432,7 @@ sub ElsnerWS_LWMA($$$$) {
     $average += $i * $hash->{helper}{lwma}{$readingName}{val}[$numArrayElements - $i];
   }
   $average = $average * 2 / $numArrayElements / ($numArrayElements + 1);
-  if ($numArrayElements >= $averageOrder) {
+  if ($numArrayElements >= $numArrayElementsMax) {
     shift(@{$hash->{helper}{lwma}{$readingName}{val}});
   }
   return $average;
@@ -701,6 +738,7 @@ sub ElsnerWS_Delete($$) {
     <ul>
       <li>Evaluation modul for the weather sensors P03/3-RS485 or P04/3-RS485 (Basic|CET|GPS)</li>
       <li>Processing weather raw data and creates graphic representation</li>
+      <li>For wind observations, average speeds, gusts and peak values are calculated.</li>
       <li>Alarm signal in case of failure of the weather sensor</li>
       <li>Up/down readings for blinds according to wind, rain and sun</li>
       <li>Adjustable switching thresholds and delay times</li>
@@ -857,6 +895,10 @@ sub ElsnerWS_Delete($$) {
       <li>timeZone: CET|CEST|UTC</li>
       <li>weekday: Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday</li>
       <li>twilight: T/% (Sensor Range: T = 0 % ... 100 %)</li>
+      <li>windAvg2min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windGustCurrent: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windGust10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windPeak10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windSpeed: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windStrength: B (Sensor Range: B = 0 Beaufort ... 12 Beaufort)</li>
       <li>state: T: t/&#176C B: E/lx W: v/m/s IR: no|yes</li>
