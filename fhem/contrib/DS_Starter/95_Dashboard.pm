@@ -56,7 +56,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 # Versions History intern
 our %Dashboard_vNotesIntern = (
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
-                           "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes ",
+                           "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes, comref revised ",
   "3.14.0" => "22.09.2019  new attribute dashboard_activetabRefresh, activate the active tab in browser ",
   "3.13.2" => "21.09.2019  new solution to eliminate links for all Devices ",
   "3.13.1" => "21.09.2019  don't eliminate links for PageEnd-Devices ",
@@ -1150,9 +1150,14 @@ return $a;
 <a name="Dashboard"></a>
 <h3>Dashboard</h3>
 <ul>
-  Creates a Dashboard in any group can be arranged. The positioning may depend the Groups and column width are made<br>
-  arbitrarily by drag'n drop. Also, the width and height of a Group can be increased beyond the minimum size.<br>
+  Creates a Dashboard in any group and/or devices can be arranged. The positioning may depend the objects and column width are made
+  arbitrarily by drag'n drop. Also, the width and height of an object can be increased beyond the minimum size. <br><br>
+  
+  <b>Note: </b><br>
+  A group name in the dashboard respectively the attribute "dashboard_tabXgroups" equates the group name in FHEM and depict the 
+  devices which are contained in that group.
   <br> 
+  <br>
   
   <a name="Dashboarddefine"></a>
   <b>Define</b>
@@ -1420,9 +1425,13 @@ return $a;
 <a name="Dashboard"></a>
 <h3>Dashboard</h3>
 <ul>
-  Erstellt eine Übersicht in der Gruppen angeordnet werden können. Dabei können die Gruppen mit Drag'n Drop frei positioniert<br>
-  und in mehreren Spalten angeordnet werden. Auch kann die Breite und Höhe einer Gruppe über die Mindestgröße hinaus gezogen 
-  werden. 
+  Erstellt eine Übersicht in der Gruppen und/oder Geräte angeordnet werden können. Dabei können die Objekte mit Drag'n Drop 
+  frei positioniert und in mehreren Spalten angeordnet werden. Auch kann die Breite und Höhe eines Objektes über die 
+  Mindestgröße hinaus gezogen werden. <br><br>
+  
+  <b>Hinweis: </b><br>
+  Ein Gruppenname im Dashboard bzw. dem Attribut "dashboard_tabXgroups" entspricht der Gruppe in FHEM und stellt die darin enthaltenen 
+  Geräte im Dashboard dar.
   <br>
   <br> 
   
@@ -1619,10 +1628,15 @@ return $a;
         Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 1 angezeigt werden. Falsche Gruppennamen werden 
         hervorgehoben. <br>
         Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt 
-        werden. <br>
-        Beispiel: Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow<br/>
-        Der Gruppenname kann ebenfalls einen regulären Ausdruck beinhalten, um alle Gruppen anzuzeigen, die darauf passen.<br/>
-        Beispiel: .*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
+        werden. <br><br>
+		
+        <b>Beispiel: </b><br>
+		Light:Icon_Fisch@blue,AVIcon_Fisch@red,Single Lights:Icon_Fisch@yellow <br><br>
+		
+        Der Gruppenname kann ebenfalls einen regulären Ausdruck beinhalten, um alle Gruppen anzuzeigen, die darauf passen. <br><br>
+		
+        <b>Beispiel: </b><br>
+		.*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
     </li>
     <br>	
 	
