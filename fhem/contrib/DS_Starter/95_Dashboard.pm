@@ -55,13 +55,15 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
+                           "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes ",
   "3.14.0" => "22.09.2019  new attribute dashboard_activetabRefresh, activate the active tab in browser ",
   "3.13.2" => "21.09.2019  new solution to eliminate links for all Devices ",
   "3.13.1" => "21.09.2019  don't eliminate links for PageEnd-Devices ",
   "3.13.0" => "20.09.2019  change attribute noLinks to dashboard_noLinks, eliminate links for PageEnd-Devices ",
   "3.12.0" => "16.09.2019  new attribute noLinks, review comref and get-options ",
   "3.11.0" => "16.09.2019  attr dashboard_activetab is now working properly, commandref revised, calculate attribute ".
-              "dashboard_activetab (is now a userattr) ",
+                           "dashboard_activetab (is now a userattr) ",
   "3.10.1" => "29.06.2018  added FW_hideDisplayName, Forum #88727 ",
   "1.0.0"  => "20.12.2013  initial version released to testers "
 );
@@ -82,8 +84,6 @@ my $fwjqueryui       = "jquery-ui.min.js";
 sub Dashboard_Initialize ($) {
   my ($hash) = @_;
   
-  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
-  
   $hash->{DefFn}       = "Dashboard_define";
   $hash->{SetFn}       = "Dashboard_Set";  
   $hash->{GetFn}       = "Dashboard_Get";
@@ -91,7 +91,6 @@ sub Dashboard_Initialize ($) {
   $hash->{FW_detailFn} = "Dashboard_DetailFN";    
   $hash->{AttrFn}      = "Dashboard_Attr";
   $hash->{AttrList}    = "disable:0,1 ".
-                         "dashboard_activetabRefresh:multiple-strict,$fwd ".
 						 "dashboard_backgroundimage ".
   						 "dashboard_colcount:1,2,3,4,5 ".	
 						 "dashboard_customcss " .                         
@@ -152,9 +151,10 @@ sub Dashboard_define ($$) {
   readingsSingleUpdate( $hash, "state", "Initialized", 0 ); 
   
   RemoveInternalTimer($hash);
-  InternalTimer      ($now + 5, 'Dashboard_CheckDashboardAttributUssage', $hash, 0);
+  InternalTimer      ($now+2, 'Dashboard_init', $hash, 0);
+  InternalTimer      ($now+5, 'Dashboard_CheckDashboardAttributUssage', $hash, 0);
 
-  my $url = '/dashboard/' . $name;
+  my $url = '/dashboard/'.$name;
 
   $data{FWEXT}{$url}{CONTENTFUNC} = 'Dashboard_CGI';                             # $data{FWEXT} = FHEMWEB Extension, siehe 01_FHEMWEB.pm
   $data{FWEXT}{$url}{LINK}        = 'dashboard/'.$name;
@@ -167,17 +167,31 @@ return;
 #   Set
 ################################################################
 sub Dashboard_Set($@) {
-	my ( $hash, $name, $cmd, @args ) = @_;
-	
-	if ( $cmd eq "lock" ) {
-		readingsSingleUpdate( $hash, "lockstate", "lock", 0 ); 
-		return;
-	} elsif ( $cmd eq "unlock" ) {
-		readingsSingleUpdate( $hash, "lockstate", "unlock", 0 );
-		return;
-	}else { 
-		return "Unknown argument " . $cmd . ", choose one of lock:noArg unlock:noArg";
-	}
+  my ($hash, $name, $cmd, @args) = @_;
+    
+  my $setlist = "Unknown argument $cmd, choose one of ".
+	             "lock:noArg ".
+                 "unlock:noArg "
+                 ;
+  
+  my $tl = Dashboard_possibleTabs ($name);	
+  
+  $setlist .= "activateTab:$tl " if($tl);
+    
+  if ( $cmd eq "lock" ) {
+      readingsSingleUpdate ($hash, "lockstate", "lock", 0); 
+	  return;
+  } elsif ( $cmd eq "unlock" ) {
+	  readingsSingleUpdate ($hash, "lockstate", "unlock", 0);
+	  return;
+  } elsif ( $cmd eq "activateTab" ) {
+	  Dashboard_activateTab ($name,$args[0]);
+	  return;
+  } else { 
+	  return $setlist;
+  }
+  
+return;
 }
 
 ################################################################
@@ -207,7 +221,7 @@ sub Dashboard_Get($@) {
           
           foreach my $idir  (@iconFolders) {$iconDirs .= "$attr{global}{modpath}/www/images/".$idir.",";}
           
-          $res .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . Dashboard_GetTabCount($hash, 0). ", \"dashboard_activetab\": " . Dashboard_GetActiveTab($hash->{NAME});
+          $res .= "    \"icondirs\": \"$iconDirs\", \"dashboard_tabcount\": " . Dashboard_GetTabCount($hash, 0). ", \"dashboard_homeTab\": " . Dashboard_GetActiveTab($name);
           $res .= ($i != $x) ? ",\n" : "\n";
           
           foreach my $attr (sort keys %$attrdata) {
@@ -216,7 +230,7 @@ sub Dashboard_Get($@) {
               if (@splitattr == 2) {
                   $res .= "    \"".Dashboard_Escape($attr)."\": \"".$splitattr[0]."\",\n";
                   $res .= "    \"".Dashboard_Escape($attr)."color\": \"".$splitattr[1]."\"";
-              } elsif ($attr ne "dashboard_activetab") { 
+              } elsif ($attr ne "dashboard_homeTab") { 
                   $res .= "    \"".Dashboard_Escape($attr)."\": \"".$attrdata->{$attr}."\"";
               } else {
                   next;
@@ -256,39 +270,12 @@ sub Dashboard_Get($@) {
   }
 }
 
-sub Dashboard_Escape($) {
-  my $a = shift;
-  return "null" if(!defined($a));
-  my %esc = ("\n" => '\n', "\r" => '\r', "\t" => '\t', "\f" => '\f', "\b" => '\b', "\"" => '\"', "\\" => '\\\\', "\'" => '\\\'', );
-  $a      =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
-  
-return $a;
-}
-
-################################################################
-#   Undefine
-################################################################
-sub Dashboard_undef ($$) {
-  my ($hash,$arg) = @_;
-
-  # remove dashboard links from left menu
-  my $url = '/dashboard/' . $hash->{NAME};
-  delete $data{FWEXT}{$url};
-
-  RemoveInternalTimer($hash);
-  
-return undef;
-}
-
 ################################################################
 #   Attr
 ################################################################
 sub Dashboard_Attr($$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
-  
-  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
-  $hash->{HELPER}{FW} = $fwd;
 
   if ($cmd eq "set") {
       if ($attrName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $attrName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
@@ -309,19 +296,29 @@ sub Dashboard_Attr($$$) {
           $data{FWEXT}{$url}{NAME} = $attrVal;
       }
       
-      if ($attrName =~ m/dashboard_activetab/) {
-          Dashboard_actTab ($name,$attrVal);
+      if ($attrName =~ m/dashboard_homeTab/) {
+          Dashboard_activateTab ($name,$attrVal);
       }
   }
       
-  # die Argumente für das Attribut dashboard_activetab dynamisch ermitteln und setzen
-  my $f  = Dashboard_calcAttrActiveTab ($name);
-  my $at = $attr{$name}{dashboard_activetab};
-  delFromDevAttrList($name, "dashboard_activetab");
-  addToDevAttrList  ($name, "dashboard_activetab:$f");
-  $attr{$name}{dashboard_activetab} = $at if($at);
+  InternalTimer (time()+2, 'Dashboard_init', $hash, 0);
 
 return;  
+}
+
+################################################################
+#   Undefine
+################################################################
+sub Dashboard_undef ($$) {
+  my ($hash,$arg) = @_;
+
+  # remove dashboard links from left menu
+  my $url = '/dashboard/'.$hash->{NAME};
+  delete $data{FWEXT}{$url};
+
+  RemoveInternalTimer($hash);
+  
+return undef;
 }
 
 ################################################################
@@ -404,28 +401,28 @@ sub Dashboard_SummaryFN ($$$$) {
   my $id              = $defs{$d}{NR};
  
   ######################### Read Dashboard Attributes and set Default-Values ####################################
-  my $lockstate         = ReadingsVal($name, "lockstate", "unlock");
-  my $showhelper        = ($lockstate eq "unlock") ? 1 : 0; 
-  my $disable           = AttrVal($name, "disable", 0);
-  my $colcount          = AttrVal($name, "dashboard_colcount", 1);
-  my $colwidth          = AttrVal($name, "dashboard_rowcentercolwidth", 100);
-  my $colheight         = AttrVal($name, "dashboard_rowcenterheight", 400); 
-  my $rowtopheight      = AttrVal($name, "dashboard_rowtopheight", 250);
-  my $rowbottomheight   = AttrVal($name, "dashboard_rowbottomheight", 250);  
-  my $showtabs          = AttrVal($name, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
-  my $showtogglebuttons = AttrVal($name, "dashboard_showtogglebuttons", 1); 
-  my $showfullsize      = AttrVal($name, "dashboard_showfullsize", 0); 
-  my $flexible          = AttrVal($name, "dashboard_flexible", 0);
-  my $customcss         = AttrVal($name, "dashboard_customcss", "none");
-  my $backgroundimage   = AttrVal($name, "dashboard_backgroundimage", "");
-  my $row               = AttrVal($name, "dashboard_row", "center");
-  my $debug             = AttrVal($name, "dashboard_debug", "0");
-  my $activetab         = Dashboard_GetActiveTab($name);
-  my $tabcount          = Dashboard_GetTabCount($hash, 1);
-  my $dashboardversion  = $hash->{HELPER}{VERSION};
-  my $dbwidth           = AttrVal($name, "dashboard_width", "100%");   
-  my @tabnames          = ();
-  my @tabsortings       = ();
+  my $lockstate            = ReadingsVal($name, "lockstate", "unlock");
+  my $showhelper           = ($lockstate eq "unlock") ? 1 : 0; 
+  my $disable              = AttrVal($name, "disable", 0);
+  my $colcount             = AttrVal($name, "dashboard_colcount", 1);
+  my $colwidth             = AttrVal($name, "dashboard_rowcentercolwidth", 100);
+  my $colheight            = AttrVal($name, "dashboard_rowcenterheight", 400); 
+  my $rowtopheight         = AttrVal($name, "dashboard_rowtopheight", 250);
+  my $rowbottomheight      = AttrVal($name, "dashboard_rowbottomheight", 250);  
+  my $showtabs             = AttrVal($name, "dashboard_showtabs", "tabs-and-buttonbar-at-the-top"); 
+  my $showtogglebuttons    = AttrVal($name, "dashboard_showtogglebuttons", 1); 
+  my $showfullsize         = AttrVal($name, "dashboard_showfullsize", 0); 
+  my $flexible             = AttrVal($name, "dashboard_flexible", 0);
+  my $customcss            = AttrVal($name, "dashboard_customcss", "none");
+  my $backgroundimage      = AttrVal($name, "dashboard_backgroundimage", "");
+  my $row                  = AttrVal($name, "dashboard_row", "center");
+  my $debug                = AttrVal($name, "dashboard_debug", "0");
+  my ($activetab,$tabname) = Dashboard_GetActiveTab($name,1);
+  my $tabcount             = Dashboard_GetTabCount($hash, 1);
+  my $dashboardversion     = $hash->{HELPER}{VERSION};
+  my $dbwidth              = AttrVal($name, "dashboard_width", "100%");   
+  my @tabnames             = ();
+  my @tabsortings          = ();
 
   for (my $i = 0; $i < $tabcount; $i++) {
      $tabnames[$i]    = AttrVal($name, "dashboard_tab" . ($i + 1) . "name", "Dashboard-Tab " . ($i + 1));
@@ -450,9 +447,11 @@ sub Dashboard_SummaryFN ($$$$) {
  
   #------------------- Check dashboard_sorting on false content ------------------------------------
   for (my $i=0;$i<@tabsortings;$i++){ 
-	 if (($tabsortings[$i-1] !~ /[0-9]+/ || $tabsortings[$i-1] !~ /:/ || $tabsortings[$i-1] !~ /,/  ) && ($tabsortings[$i-1] ne "," && $tabsortings[$i-1] ne "")){
-	     Log3 $name, 3, "[".$name." V".$dashboardversion."] Value of attribut dashboard_tab".$i."sorting is wrong. Saved sorting can not be set. Fix Value or delete the Attribute. [".$tabsortings[$i-1]."]";	
-	 } else { Log3 $name, 5, "[".$name." V".$dashboardversion."] Sorting OK or Empty: dashboard_tab".$i."sorting "; }	
+	 if (($tabsortings[$i-1] !~ /[0-9]+/ || $tabsortings[$i-1] !~ /:/ || $tabsortings[$i-1] !~ /,/  ) && ($tabsortings[$i-1] ne "," && $tabsortings[$i-1] ne "")) {
+	     Log3 ($name, 3, "Dashboard $name - Value of attribut dashboard_tab".$i."sorting is wrong. Saved sorting can not be set. Fix Value or delete the Attribute. [".$tabsortings[$i-1]."]");
+	 } else {
+		 Log3 ($name, 5, "Dashboard $name - Sorting OK or Empty: dashboard_tab".$i."sorting");
+     }	
   }
   #-------------------------------------------------------------------------------------------------
  
@@ -939,41 +938,41 @@ sub Dashboard_CheckDashboardAttributUssage($) {
   my $detailnote       = "";
  
   # --------- Set minimal Attributes in the hope to make it easier for beginners --------------------
-  my $tab1groups = AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", "<noGroup>");
+  my $tab1groups = AttrVal($d, "dashboard_tab1groups", "<noGroup>");
   if ($tab1groups eq "<noGroup>") { 
       FW_fC("attr ".$d." dashboard_tab1groups Set Your Groups - See Attribute dashboard_tab1groups-"); 
   }
 
   # ---------------- Delete empty Groups entries ---------------------------------------------------------- 
-  my $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab1groups", "999");
+  my $tabgroups = AttrVal($d, "dashboard_tab1groups", "999");
   if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab1groups"); }
-  $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab2groups", "999");
+  $tabgroups = AttrVal($d, "dashboard_tab2groups", "999");
   if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab2groups"); } 
-  $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab3groups", "999");
+  $tabgroups = AttrVal($d, "dashboard_tab3groups", "999");
   if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab3groups"); }  
-  $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab4groups", "999");
+  $tabgroups = AttrVal($d, "dashboard_tab4groups", "999");
   if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab4groups"); }   
-  $tabgroups = AttrVal($defs{$d}{NAME}, "dashboard_tab5groups", "999");
+  $tabgroups = AttrVal($d, "dashboard_tab5groups", "999");
   if ($tabgroups eq "1"  ) { FW_fC("deleteattr ".$d." dashboard_tab5groups"); }   
   
-  my $lockstate = AttrVal($defs{$d}{NAME}, "dashboard_lockstate", "");                  # outdates 04.2014
+  my $lockstate = AttrVal($d, "dashboard_lockstate", "");                  # outdates 04.2014
   if ($lockstate ne "") {
       { FW_fC("deleteattr ".$d." dashboard_lockstate"); }
-	  Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_lockstate]";
+      Log3 ($d, 3, "Dashboard $d - Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_lockstate]");
   } 
-  my $showhelper = AttrVal($defs{$d}{NAME}, "dashboard_showhelper", "");                # outdates 04.2014 
+  my $showhelper = AttrVal($d, "dashboard_showhelper", "");                # outdates 04.2014 
   if ($showhelper ne "") {
       { FW_fC("deleteattr ".$d." dashboard_showhelper"); }
-	  Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_showhelper]";
+	  Log3 $hash, 3, "[".$d. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [dashboard_showhelper]";
   }  
-  my $showtabs = AttrVal($defs{$d}{NAME}, "dashboard_showtabs", "");                    # delete values 04.2014 
+  my $showtabs = AttrVal($d, "dashboard_showtabs", "");                    # delete values 04.2014 
   if ($showtabs eq "tabs-at-the-top-buttonbar-hidden") {
       { FW_fC("set ".$d." dashboard_showtabs tabs-and-buttonbar-at-the-top"); }
-	  Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-at-the-top-buttonbar-hidden]";
+	  Log3 $hash, 3, "[".$d. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-at-the-top-buttonbar-hidden]";
   }
   if ($showtabs eq "tabs-on-the-bottom-buttonbar-hidden") {
       { FW_fC("set ".$d." dashboard_showtabs tabs-and-buttonbar-on-the-bottom"); } 
-	  Log3 $hash, 3, "[".$hash->{NAME}. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-on-the-bottom-buttonbar-hidden]";
+	  Log3 $hash, 3, "[".$d. " V".$dashboardversion."]"." Using an outdated no longer used Attribute or Value. This has been corrected. Don't forget to save config. [tabs-on-the-bottom-buttonbar-hidden]";
   }  
   
 return;
@@ -996,31 +995,39 @@ return $tabCount ? $tabCount : $defaultTabCount;
 
 #############################################################################################
 #           Aktives Tab selektieren 
+#           $gtn setzen um Tabnamen mit abzurufen
 #############################################################################################
-sub Dashboard_GetActiveTab ($) {
-  my ($d) = @_;
+sub Dashboard_GetActiveTab ($;$) {
+  my ($name,$gtn) = @_;
 
-  my $maxTab = Dashboard_GetTabCount($defs{$d}, 1);
+  my $maxTab = Dashboard_GetTabCount($defs{$name}, 1);
   my $activeTab = 1;
   
   if (defined($FW_httpheader{Cookie})) {
       my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
-      if (defined($cookie{dashboard_activetab})) {
-          $activeTab = $cookie{dashboard_activetab};
+      if (defined($cookie{dashboard_homeTab})) {
+          $activeTab = $cookie{dashboard_homeTab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
       }
   }
   
-  my $dat = AttrVal($d, 'dashboard_activetab', $activeTab);
-  $dat    = ($dat <= $maxTab)?$dat:$maxTab;
+  my $tabno = AttrVal($name, 'dashboard_homeTab', $activeTab);
+  $tabno    = ($tabno <= $maxTab)?$tabno:$maxTab;
+  my $tabname = AttrVal($name, "dashboard_tab".($tabno)."name", "");
+  
+  Log3 ($name, 5, "Dashboard $name - Dashboard active tab: $tabno/$tabname");
 
-return $dat;
+  if($gtn) {
+      return ($tabno,$tabname);
+  } else {
+      return $tabno;
+  }
 }
 
 #############################################################################################
-#           Wertevorrat für Attribut dashboard_activetab ermitteln und setzen
+#           Wertevorrat der möglichen Tabs ermitteln
 #############################################################################################
-sub Dashboard_calcAttrActiveTab ($) {
+sub Dashboard_possibleTabs ($) {
   my ($name) = @_;
   my $f;
 
@@ -1065,24 +1072,71 @@ return;
 }
 
 #############################################################################################
-#           Tabumschaltung bei setzen Attribut dashboard_activetab
+#  Tabumschaltung bei setzen Attribut dashboard_homeTab bzw. "set ... activeTab"
 #############################################################################################
-sub Dashboard_actTab ($$) {
+sub Dashboard_activateTab ($$) {
   my ($name,$tab) = @_;
-  my $hash = $defs{$name};
+  my $hash        = $defs{$name};
+  
+  my $url = '/dashboard/'.$name;
+  return if(!$data{FWEXT}{$url});
   
   $tab--;
-  my $web = AttrVal($name, "dashboard_activetabRefresh", $hash->{HELPER}{FW});
+  my $web = AttrVal($name, "dashboard_webRefresh", $hash->{HELPER}{FW});
   my @wa  = split(",", $web);
   
   { map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".');$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } @wa }
   
   # Andere Triggermöglichkeiten:
-  # { map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".')', "") } $web }
-  # { map { FW_directNotify("#FHEMWEB:$_", '$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } $web }
+  #{ map { FW_directNotify("#FHEMWEB:$_", 'dashboard_load_tab('."$tab".')', "") } @wa }
+  #{ map { FW_directNotify("#FHEMWEB:$_", '$("#dashboardtabs").tabs("option", "active", '."$tab".')', "") } @wa }
   # CommandTrigger(undef,'WEB  JS:dashboard_load_tab('."$tab".');JS:$("#dashboardtabs").tabs("option", "active", '."$tab".')' );
 
 return;
+}
+
+######################################################################################
+#                   initiale Routinen für Dashboard
+######################################################################################
+sub Dashboard_init ($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  RemoveInternalTimer($hash, "Dashboard_init");
+  
+  if ($init_done == 1) {
+      # die Argumente für das Attribut dashboard_webRefresh dynamisch ermitteln und setzen
+      my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+      $hash->{HELPER}{FW} = $fwd;
+      my $atr = $attr{$name}{dashboard_webRefresh};
+      delFromDevAttrList($name, "dashboard_webRefresh");
+      addToDevAttrList  ($name, "dashboard_webRefresh:multiple-strict,$fwd");
+	  $attr{$name}{dashboard_webRefresh} = $atr if($atr);
+	  
+      # die Argumente für das Attribut dashboard_homeTab dynamisch ermitteln und setzen
+      my $f  = Dashboard_possibleTabs ($name);
+      my $at = $attr{$name}{dashboard_homeTab};
+      delFromDevAttrList($name, "dashboard_homeTab");
+      addToDevAttrList  ($name, "dashboard_homeTab:$f");
+      $attr{$name}{dashboard_homeTab} = $at if($at);
+  
+  } else {
+      InternalTimer(time()+3, "Dashboard_init", $hash, 0);
+  }
+  
+return;
+}
+
+######################################################################################
+#                   Zeichen escapen
+######################################################################################
+sub Dashboard_Escape($) {
+  my $a = shift;
+  return "null" if(!defined($a));
+  my %esc = ("\n" => '\n', "\r" => '\r', "\t" => '\t', "\f" => '\f', "\b" => '\b', "\"" => '\"', "\\" => '\\\\', "\'" => '\\\'', );
+  $a      =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
+  
+return $a;
 }
 
 1;
@@ -1129,6 +1183,14 @@ return;
   
   <ul>
   <ul>
+  
+    <li><b>set &lt;name&gt; activateTab &lt;TabNo&gt; </b><br>
+	The Tab with the defined number will be activated. 
+	If the attribute "dashboard_homeTab" is set, this defined tab will be reactivated at next 
+	browser refresh. <br>
+    <br>
+    </li>
+  
     <li><b>set &lt;name&gt; lock </b><br>
 	Locks the Dashboard so that no position changes can be made. 
     </li><br>
@@ -1173,11 +1235,7 @@ return;
   
   <ul>
   <ul>    
-    <a name="dashboard_activetab"></a>
-    <li><b>dashboard_activetab </b><br>
-        Specifies which tab is activated. If it isn't set, the last active tab will also be the current tab. (Default: 1)
-    </li><br>
-    
+        
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Displays a background image for the complete dashboard. The image is not stretched in any way so the size should 
@@ -1205,6 +1263,11 @@ return;
         the tab.<br/>
         The value for this parameter also defines the grid, in which the position "snaps in".
         Default: 0
+    </li><br>
+	
+    <a name="dashboard_homeTab"></a>
+    <li><b>dashboard_homeTab </b><br>
+        Specifies which tab is activated. If it isn't set, the last selected tab will also be the active tab. (Default: 1)
     </li><br>
     
     <a name="dashboard_row"></a>	
@@ -1317,13 +1380,6 @@ return;
         or extend it.
     </li><br>		
     
-    <a name="dashboard_width"></a>	
-    <li><b>dashboard_width </b><br>
-        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%).<br>
-        Default: 100%
-    </li>
-    <br>
-    
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
       No link generation to the detail view of the devices takes place. <br><br>
@@ -1331,6 +1387,26 @@ return;
       <b>Note: </b><br>
       Some device types deliver the links to their detail view integrated in the device. 
       In such cases you have to deactivate the link generation inside of the device (for example in SMAPortalSPG).      
+    </li>
+    <br>
+	
+    <a name="dashboard_webRefresh"></a>	
+    <li><b>dashboard_webRefresh </b><br>
+      With this attribute the FHEMWEB-Devices are determined, which: <br><br>
+	  <ul>
+        <li> are activating the tab of a dashboard when the attribute "dashboard_homeTab" will be set </li>
+	    <li> are positioning to the tab specified by command "set &lt;name&gt; activateTab" </li>
+	  </ul>
+	  <br>
+	  (default: all)
+	  <br>
+    </li>
+    <br>
+	
+    <a name="dashboard_width"></a>	
+    <li><b>dashboard_width </b><br>
+        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%).<br>
+        Default: 100%
     </li>
     <br>
     
@@ -1376,8 +1452,15 @@ return;
   <ul>
   <ul>
   
+    <li><b>set &lt;name&gt; activateTab &lt;TabNo&gt; </b><br>
+	Das Tab mit der angegebenen Nummer wird im Dashboard aktiviert.
+    Ist das Attribut "dashboard_homeTab" gesetzt, wird das in diesem Attribut 
+	definierte Tab beim nächsten Browser-Refresh reaktiviert. <br>
+    <br>
+    </li>
+  
     <li><b>set &lt;name&gt; lock </b><br>
-	Sperrt das Dashboard sodass keine Positionsänderungen vorgenommen werden können. <br>
+	Sperrt das Dashboard. Es können keine Positionsänderungen vorgenommen werden. <br>
     <br>
     </li>
     
@@ -1420,12 +1503,6 @@ return;
   <ul>
   <ul>	  
     
-    <a name="dashboard_activetab"></a>	
-    <li><b>dashboard_activetab </b><br>
-        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt aktivierte Tab ausgewählt (Default: 1)
-    </li>
-    <br>
-    
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Zeig in Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
@@ -1454,6 +1531,12 @@ return;
         Hat dieser Parameter  einen Wert > 0, dann können die Widgets in den Tabs frei positioniert werden und hängen nicht 
         mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zu schnappt".
         Standard: 0
+    </li>
+    <br>
+	
+    <a name="dashboard_homeTab"></a>	
+    <li><b>dashboard_homeTab </b><br>
+        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt gewählte Tab das aktive Tab. (Default: 1)
     </li>
     <br>
 	
@@ -1575,14 +1658,6 @@ return;
         passen oder diese überschreiten. 
     </li>
     <br>
-	
-    <a name="dashboard_width"></a>	
-    <li><b>dashboard_width </b><br>
-        Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) 
-        in Pixel.<br>
-        Standard: 100%
-    </li>
-    <br>
     
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
@@ -1591,6 +1666,28 @@ return;
       <b>Hinweis: </b><br>
       Bei manchen Devicetypen wird der Link zur Detailansicht integriert im Device mitgeliefert. 
       In diesen Fällen muß die Linkgenerierung direkt im Device abgestellt werden (z.B. bei SMAPortalSPG).      
+    </li>
+    <br>
+	
+    
+    <a name="dashboard_webRefresh"></a>	
+    <li><b>dashboard_webRefresh </b><br>
+      Mit diesem Attribut werden FHEMWEB-Devices bestimmt, die: <br><br>
+	  <ul>
+        <li> beim Setzen des Attributes "dashboard_homeTab" diesen Tab im Dashboard sofort aktivieren </li>
+	    <li> beim Ausführen von "set &lt;name&gt; activateTab" auf diesen Tab im Dashboard positionieren </li>
+	  </ul>
+	  <br>
+	  (default: alle)
+	  <br>
+    </li>
+    <br>
+	
+    <a name="dashboard_width"></a>	
+    <li><b>dashboard_width </b><br>
+        Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) 
+        in Pixel.<br>
+        Standard: 100%
     </li>
     <br>
 
