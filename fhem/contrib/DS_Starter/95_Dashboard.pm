@@ -1003,19 +1003,24 @@ sub Dashboard_GetActiveTab ($;$) {
   my $maxTab = Dashboard_GetTabCount($defs{$name}, 1);
   my $activeTab = 1;
   
+  foreach my $key (%FW_httpheader) {
+      Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key});
+  }
+  
   if (defined($FW_httpheader{Cookie})) {
+      Log3 ($name, 4, "Dashboard $name - Cookie set: ".$FW_httpheader{Cookie});
       my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
-      if (defined($cookie{dashboard_homeTab})) {
-          $activeTab = $cookie{dashboard_homeTab};
+      if (defined($cookie{dashboard_activetab})) {
+          $activeTab = $cookie{dashboard_activetab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
       }
   }
   
-  my $tabno = AttrVal($name, 'dashboard_homeTab', $activeTab);
-  $tabno    = ($tabno <= $maxTab)?$tabno:$maxTab;
+  my $tabno   = AttrVal($name, 'dashboard_homeTab', $activeTab);
+  $tabno      = ($tabno <= $maxTab)?$tabno:$maxTab;
   my $tabname = AttrVal($name, "dashboard_tab".($tabno)."name", "");
   
-  Log3 ($name, 5, "Dashboard $name - Dashboard active tab: $tabno/$tabname");
+  Log3 ($name, 4, "Dashboard $name - Dashboard active tab: $tabno/$tabname");
 
   if($gtn) {
       return ($tabno,$tabname);
