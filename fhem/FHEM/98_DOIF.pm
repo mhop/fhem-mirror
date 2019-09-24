@@ -53,6 +53,7 @@ sub DOIF_delAll($)
 {
   my ($hash) = @_;
   DOIF_killBlocking($hash);
+  
   delete ($hash->{helper});
   delete ($hash->{condition});
   delete ($hash->{do});
@@ -77,9 +78,6 @@ sub DOIF_delAll($)
   delete ($hash->{var});
   delete ($hash->{accu});
   delete ($hash->{Regex});
-  
- 
-  
 
   #foreach my $key (keys %{$hash->{Regex}}) {
   #  delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
@@ -1380,33 +1378,14 @@ sub AddRegexpTriggerDoIf
   $reading="" if (!defined($reading));
   my $regexpid='"'.$regexp.'"';
   if ($dev) {
-    $hash->{NOTIFYDEV}.=",$dev" if ($hash->{NOTIFYDEV}!~/,$dev(,|$)/);
     if ($reading){
       $hash->{Regex}{$type}{$dev}{$element}{$reading}=(($reading =~ "^\&") ? "\^$dev\$":"\^$dev\$:\^$reading: ");
     } elsif ($regexp) {
       $hash->{Regex}{$type}{$dev}{$element}{$regexpid}="\^$dev\$:$regexp";
     }
-    %ntfyHash = ();
     return;
   }
-  my($regdev)=split(/:/,$regexp);
-  if ($regdev eq "") {
-    $regdev=".*";
-  } else {
-    if ($regdev=~/^\^/) {
-      $regdev=~s/^\^//;
-    } else {
-      $regdev=".*".$regdev;
-    }
-    if ($regdev=~/\$$/) {
-      $regdev=~s/\$$//;
-    } else {
-      $regdev.=".*";
-    }
-  }
-  $hash->{NOTIFYDEV}.=",$regdev" if ($hash->{NOTIFYDEV}!~/,$regdev(,|$)/);
   $hash->{Regex}{$type}{$dev}{$element}{$regexpid}=$regexp;
-  %ntfyHash = ();
 }
 
 sub addDOIF_Readings
@@ -2390,7 +2369,51 @@ sub DOIF_Trigger
   return undef;
 }
 
-
+sub DOIF_Set_Filter 
+{
+  my ($hash) = @_;
+  $hash->{helper}{NOTIFYDEV}="global";
+  $hash->{helper}{DEVFILTER}="\^global\$";
+  foreach my $type (keys %{$hash->{Regex}}) {
+    foreach my $device (keys %{$hash->{Regex}{$type}}) {
+      foreach my $id (keys %{$hash->{Regex}{$type}{$device}}) {
+        foreach my $reading (keys %{$hash->{Regex}{$type}{$device}{$id}}) {
+          my $devreg=$hash->{Regex}{$type}{$device}{$id}{$reading};
+          my($regdev)=split(/:/,$devreg);
+          my $devfilter=$regdev;
+          if ($regdev eq "") {
+            $regdev='.*';
+          } else {
+            if ($regdev=~/^\^/) {
+              $regdev=~s/^\^//;
+            } else {
+              $regdev="\.\*".$regdev;
+            }
+            if ($regdev=~/\$$/) {
+              $regdev=~s/\$$//;
+            } else {
+              $regdev.='.*';
+            }
+          }
+          my $found=0;
+          foreach my $item (split(/\|/,$hash->{helper}{NOTIFYDEV})) {
+            if ($regdev eq $item) {
+              $found=1;
+              last;
+            }
+          }
+          if (!$found) {
+            $hash->{helper}{NOTIFYDEV}.="\|$regdev" ;
+            $hash->{helper}{DEVFILTER}.="\|$devfilter" ;
+          }
+          #$hash->{helper}{NOTIFYDEV}.="\|$regdev" if ($hash->{helper}{NOTIFYDEV}!~/\|$regdev(\||$)/);
+          #$hash->{helper}{DEVFILTER}.="\|$devfilterori" if ($hash->{helper}{DEVFILTER}!~/\|$devfilter(\||$)/);
+        }
+      }
+    }
+  }
+  notifyRegexpChanged($hash,$hash->{helper}{NOTIFYDEV});
+}
 
 sub
 DOIF_Notify($$)
@@ -2406,6 +2429,10 @@ DOIF_Notify($$)
   my $err;
   my $eventa;
   my $eventas;
+  
+ 
+  return "" if ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/);
+  #Log3 ($pn,1,"pn: $pn, dev: $dev->{NAME}, devfilter: $devfilter");
 
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
@@ -2462,6 +2489,7 @@ DOIF_Notify($$)
       my $err=DOIF_uiTable_def($hash,$uiState,"uiState");
       Log3 ($pn,3,"$pn: error in uiState: $err") if ($err);
     }
+    DOIF_Set_Filter ($hash);
   }
 
   return "" if (!$hash->{helper}{globalinit});
@@ -3006,9 +3034,10 @@ CmdDoIfPerl($$)
   my $err="";
   my $i=0;
   $hs=$hash;
-  $hash->{NOTIFYDEV}="global";
-  %ntfyHash = ();
+  
+  
   #def modify
+
   if ($init_done)
   {
     DOIF_delTimer($hash);
@@ -3023,9 +3052,8 @@ CmdDoIfPerl($$)
         DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
       }
     }
-
   }
-  
+
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
 
@@ -3092,8 +3120,6 @@ CmdDoIf($$)
   my $last_do;
   
   #def modify
-  $hash->{NOTIFYDEV}="global";
-  %ntfyHash = ();
   if ($init_done)
   {
     DOIF_delTimer($hash);
@@ -3227,6 +3253,7 @@ DOIF_Define($$$)
     my $errmsg="$name $type: $err: $msg";
     return $errmsg;
   } else {
+    DOIF_Set_Filter ($hash);
     return undef;
   }
 }
@@ -3268,8 +3295,6 @@ DOIF_Attr(@)
       return ("$err: $msg");
     }
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
-    $hash->{NOTIFYDEV}="global";
-    %ntfyHash = ();
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
@@ -3351,6 +3376,7 @@ DOIF_Attr(@)
      return ("error in startup $a[3], $err");
     }
   }
+  DOIF_Set_Filter($hash);
   return undef;
 }
 
