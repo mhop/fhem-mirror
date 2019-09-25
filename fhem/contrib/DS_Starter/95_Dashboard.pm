@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.15.1" => "25.09.2019  chage initial attributes, commandref revised ",
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
                            "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes, comref revised ",
   "3.14.0" => "22.09.2019  new attribute dashboard_activetabRefresh, activate the active tab in browser ",
@@ -112,14 +113,6 @@ sub Dashboard_Initialize ($) {
 						 "dashboard_tab1colcount " .
 						 "dashboard_tab1rowcentercolwidth " .
 						 "dashboard_tab1backgroundimage " .
-						 "dashboard_tab[0-9]+name " .
-						 "dashboard_tab[0-9]+groups " .
-						 "dashboard_tab[0-9]+devices " .
-						 "dashboard_tab[0-9]+sorting " .
-						 "dashboard_tab[0-9]+icon " .
-						 "dashboard_tab[0-9]+colcount " .
-						 "dashboard_tab[0-9]+rowcentercolwidth " .
-						 "dashboard_tab[0-9]+backgroundimage " .
 						 "dashboard_width ".
                          "dashboard_noLinks:1,0 ";
   
@@ -938,10 +931,15 @@ sub Dashboard_CheckDashboardAttributUssage($) {
   my $detailnote       = "";
  
   # --------- Set minimal Attributes in the hope to make it easier for beginners --------------------
-  my $tab1groups = AttrVal($d, "dashboard_tab1groups", "<noGroup>");
-  if ($tab1groups eq "<noGroup>") { 
-      FW_fC("attr ".$d." dashboard_tab1groups Set Your Groups - See Attribute dashboard_tab1groups-"); 
+  my $tab1groups = AttrVal($d, "dashboard_tab1groups", "");
+  if (!$tab1groups) { 
+      FW_fC("attr ".$d." dashboard_tab1groups Set your FHEM groups here and arrange them on tab 1"); 
   }
+  
+  my $tab1devs = AttrVal($d, "dashboard_tab1devices", "");
+  if (!$tab1devs) { 
+      FW_fC("attr ".$d." dashboard_tab1devices Set your FHEM devices here and arrange them on tab 1"); 
+  }  
 
   # ---------------- Delete empty Groups entries ---------------------------------------------------------- 
   my $tabgroups = AttrVal($d, "dashboard_tab1groups", "999");
@@ -1334,20 +1332,21 @@ return $a;
         Default: 0
     </li><br>
     
-    <a name="dashboard_tabXname"></a>
-    <li><b>dashboard_tabXname </b><br>
-        Title of Tab at position X.
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Title of Tab. (also valid for further dashboard_tabXname)
     </li><br>
     
-    <a name="dashboard_tabXsorting"></a>	
-    <li><b>dashboard_tabXsorting </b><br>
-        Contains the position of each group in Tab X. Value is written by the "Set" button. It is not recommended to take 
-        manual changes.
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Contains the position of each group in Tab. (also valid for further dashboard_tabXsorting) <br>
+		Value is written by the "Set" button. It is not recommended to take manual changes.
     </li><br>
     
-    <a name="dashboard_tabXgroups"></a>	
-    <li><b>dashboard_tabXgroups </b><br>
-        Comma-separated list of the names of the groups to be displayed in Tab X.<br>
+    <a name="dashboard_tab1groups"></a>	
+    <li><b>dashboard_tab1groups </b><br>
+        Comma separated list of FHEM groups (see attribute "group" in a device) to be displayed in Tab. 
+		(also valid for further dashboard_tabXgroups) <br>
         Each group can be given an icon for this purpose the group name, the following must be 
         completed ":&lt;icon&gt;@&lt;color&gt;" <br><br>
         
@@ -1360,34 +1359,37 @@ return $a;
         .*Light.* to show all groups that contain the string "Light"
     </li><br>
     
-    <a name="dashboard_tabXdevices"></a>	
-    <li><b>dashboard_tabXdevices </b><br>
-        devspec list of devices that should appear in the tab. The format is:<br/>
-        GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME <br><br>
-        
-        The icon name is optional. Also the group name is optional. In case of missing group name, the matching devices are 
-        not grouped but shown as separate widgets without titles. 
-        For further details on the devspec format see <a href="#devspec">Dev-Spec</a>.
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec list of devices that should appear in the tab. (also valid for further dashboard_tabXdevices) <br>
+		The format is: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+	    </ul>        
+        ICONNAME is optional. Also GROUPNAME is optional. In case of missing GROUPNAME, the matching devices are 
+        not grouped, but shown as separate widgets without titles. 
+        For further details on the DevSpec format see <a href="#devspec">DevSpec</a>.
     </li><br>
     
-    <a name="dashboard_tabXicon"></a>	
-    <li><b>dashboard_tabXicon </b><br>
-        Set the icon for a Tab. There must exist an icon with the name ico.(png|svg) in the modpath directory. If the image is 
+    <a name="dashboard_tab1icon"></a>	
+    <li><b>dashboard_tab1icon </b><br>
+        Set the icon for a Tab. (also valid for further dashboard_tabXicon) <br>
+		There must exist an icon with the name ico.(png|svg) in the modpath directory. If the image is 
         referencing an SVG icon, then you can use the @colorname suffix to color the image. 
     </li><br>
     
-    <a name="dashboard_tabXcolcount"></a>	
-    <li><b>dashboard_tabXcolcount </b><br>
-        Number of columns for a specific tab in which the groups can be displayed. Nevertheless, it is possible to have 
-        multiple groups. <br>
-        to be positioned in a column next to each other. This depends on the width of columns and groups. <br>
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Number of columns for a specific tab in which the groups can be displayed. (also valid for further dashboard_tabXcolcount) <br>
+		Nevertheless, it is possible to have multiple groups to be positioned in a column next to each other. 
+		This depends on the width of columns and groups. <br>
         Default: &lt;dashboard_colcount&gt;
     </li><br>
 	
-    <a name="dashboard_tabXbackgroundimage"></a>	
-    <li><b>dashboard_tabXbackgroundimage </b><br>
-        Shows a background image for the X tab. The image is not stretched in any way, it should therefore match the tab size 
-        or extend it.
+    <a name="dashboard_tab1backgroundimage"></a>	
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
+		The image is not stretched in any way, it should therefore match the tab size or extend it.
     </li><br>		
     
     <a name="dashboard_noLinks"></a>
@@ -1615,23 +1617,24 @@ return $a;
         Standard: 0
     </li><br>	
     
-    <a name="dashboard_tabXname"></a>
-    <li><b>dashboard_tabXname </b><br>
-        Titel des X Tab.
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Titel des Tab. (gilt ebenfalls für weitere dashboard_tabXname)
     </li>
     <br>	
     
-    <a name="dashboard_tabXsorting"></a>	
-    <li><b>dashboard_tabXsorting </b><br>
-        Enthält die Positionierung jeder Gruppe im Tab X. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
-        empfohlen dieses Attribut manuell zu ändern.
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Enthält die Positionierung jeder Gruppe im Tab. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
+        empfohlen dieses Attribut manuell zu ändern. (gilt ebenfalls für weitere dashboard_tabXsorting)
     </li>
     <br>		
     
-    <a name="dashboard_tabXgroups"></a>	
+    <a name="dashboard_tab1groups"></a>	
     <li><b>dashboard_tab1groups </b><br>
-        Durch Komma getrennte Liste mit den Namen der Gruppen, die im Tab 1 angezeigt werden. Falsche Gruppennamen werden 
-        hervorgehoben. <br>
+        Durch Komma getrennte Liste der FHEM-Gruppen (siehe Attribut "group" eines Devices), die im Tab angezeigt werden. 
+		(gilt ebenfalls für weitere dashboard_tabXgroups)
+		Falsche Gruppennamen werden hervorgehoben. <br>
         Jede Gruppe kann zusätzlich ein Icon anzeigen, dazu muss der Gruppen name um ":&lt;icon&gt;@&lt;farbe&gt;"ergänzt 
         werden. <br><br>
 		
@@ -1645,13 +1648,16 @@ return $a;
     </li>
     <br>	
 	
-    <a name="dashboard_tabXdevices"></a>	
-    <li><b>dashboard_tabXdevices </b><br>
-        devspec Liste von Geräten, die im Tab angezeigt werden sollen. Das format ist:<br/>
-            GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME</br/>
-        Das Icon ist optional. Auch der Gruppenname muss nicht vorhanden sein. Im Falle dass dieser fehlt, werden die gefunden 
-        Geräte nicht gruppiert sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich devspec:
-        <a href="#devspec">Dev-Spec</a>
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec Liste von Geräten, die im Tab angezeigt werden sollen. (gilt ebenfalls für weitere dashboard_tabXdevices) <br>
+		Das Format ist: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+		</ul>	
+        ICONNAME ist optional. Auch GROUPNAME muss nicht vorhanden sein. Fehlt GROUPNAME, werden die angegebenen 
+        Geräte nicht gruppiert, sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich DevSpec: 
+        <a href="#devspec">DevSpec</a>
     </li>
     <br>	
 	
@@ -1662,19 +1668,20 @@ return $a;
     </li>
     <br>
     
-    <a name="dashboard_tabXcolcount"></a>	
-    <li><b>dashboard_tabXcolcount </b><br>
-        Die Anzahl der Spalten im Tab X in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
-        in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Die Anzahl der Spalten im Tab in der Gruppen dargestellt werden können. (gilt ebenfalls für weitere dashboard_tabXcolcount) <br>
+		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
+		der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
         Standard: &lt;dashboard_colcount&gt;
     </li>
     <br>
     
-    <a name="dashboard_tabXbackgroundimage"></a>	
-    <li><b>dashboard_tabXbackgroundimage </b><br>
-        Zeigt ein Hintergrundbild für den X-ten Tab an. Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs 
-        passen oder diese überschreiten. 
+    <a name="dashboard_tab1backgroundimage"></a>	
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
+		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. 
     </li>
     <br>
     
