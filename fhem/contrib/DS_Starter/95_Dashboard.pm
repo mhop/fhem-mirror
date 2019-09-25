@@ -935,11 +935,6 @@ sub Dashboard_CheckDashboardAttributUssage($) {
   if (!$tab1groups) { 
       FW_fC("attr ".$d." dashboard_tab1groups Set your FHEM groups here and arrange them on tab 1"); 
   }
-  
-  my $tab1devs = AttrVal($d, "dashboard_tab1devices", "");
-  if (!$tab1devs) { 
-      FW_fC("attr ".$d." dashboard_tab1devices Set your FHEM devices here and arrange them on tab 1"); 
-  }  
 
   # ---------------- Delete empty Groups entries ---------------------------------------------------------- 
   my $tabgroups = AttrVal($d, "dashboard_tab1groups", "999");
