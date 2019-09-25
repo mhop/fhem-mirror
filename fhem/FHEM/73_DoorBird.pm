@@ -37,7 +37,6 @@
 # Check problems with error message after startup: "PERL WARNING: Prototype mismatch: sub main::memcmp: none vs ($$;$) at /usr/local/share/perl/5.24.1/Sub/Exporter.pm line 445."
 #
 #
-#
 ########################################################################################################################
 
 package main;
@@ -161,7 +160,7 @@ sub DoorBird_Define($$)
 
 	###START###### Writing values to global hash ###############################################################START####
 	  $hash->{NAME}										= $name;
-	  $hash->{RevisonAPI}								= "0.25";
+	  $hash->{RevisonAPI}								= "0.26";
 	  $hash->{helper}{SOX}	  							= "/usr/bin/sox"; #On Windows systems use "C:\Programme\sox\sox.exe"
 	  $hash->{helper}{URL}	  							= $url;
 	  $hash->{helper}{SipDevice}						= AttrVal($name,"SipDevice","");
@@ -176,6 +175,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", 0);
 	  $hash->{helper}{EventReset}						= AttrVal($name, "EventReset", 5);
 	  $hash->{helper}{WaitForHistory}					= AttrVal($name, "WaitForHistory", 7);
+	  $hash->{helper}{CameraInstalled}					= false;
 	  $hash->{helper}{SessionId}						= 0;
 	  $hash->{helper}{UdpMessageId}						= 0;
 	  $hash->{helper}{UdpMotionId}						= 0;
@@ -391,22 +391,34 @@ sub DoorBird_Attr(@)
 	elsif ($a[2] eq "SessionIdSec") {	
 		### Remove Timer for LostConn
 		RemoveInternalTimer($hash, "DoorBird_RenewSessionID");
+
+		### If the attribute has not been deleted entirely
+		if (defined $a[3]) {
 	
-		### Check whether SessionIdSec is 0 = disabled
-		if ($a[3] == int($a[3]) && ($a[3] == 0)) {
-			### Save attribute as internal
-			$hash->{helper}{SessionIdSec}  = 0;
-		}
-		### If KeepAliveTimeout is numeric and greater than 9s
-		elsif ($a[3] == int($a[3]) &&  ($a[3] > 9)) {
+			### Check whether SessionIdSec is 0 = disabled
+			if ($a[3] == int($a[3]) && ($a[3] == 0)) {
+				### Save attribute as internal
+				$hash->{helper}{SessionIdSec}  = 0;
+			}
+			### If KeepAliveTimeout is numeric and greater than 9s
+			elsif ($a[3] == int($a[3]) &&  ($a[3] > 9)) {
 
-			### Save attribute as internal
-			$hash->{helper}{SessionIdSec}  = $a[3];
+				### Save attribute as internal
+				$hash->{helper}{SessionIdSec}  = $a[3];
 
-			### Re-Initiate the timer
-			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+				### Re-Initiate the timer
+				InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+			}
+			### If KeepAliveTimeout is NOT numeric or smaller than 10
+			else{
+				### Save standard interval as internal
+				$hash->{helper}{SessionIdSec}  = 540;
+				
+				### Re-Initiate the timer
+				InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
+			}
 		}
-		### If KeepAliveTimeout is NOT numeric or smaller than 10
+		### If the attribute has been deleted entirely
 		else{
 			### Save standard interval as internal
 			$hash->{helper}{SessionIdSec}  = 540;
@@ -497,19 +509,18 @@ sub DoorBird_Get($@)
 	
 	### Define "get" menu
 	my $usage	= "Unknown argument, choose one of ";
-	   $usage  .= "Image_Request:noArg History_Request:noArg ";
+	   $usage  .= "Info_Request:noArg List_Favorites:noArg List_Schedules:noArg ";
 	
-	
-	### If debug modus is enabled and allows JSON extract
-	if ($hash->{helper}{debug} == 1) {
-		$usage .= " Info_Request:,JSON List_Favorites:,JSON List_Schedules:,JSON";
+	### If DoorBird has a Camera installed
+	if ($hash->{helper}{CameraInstalled} == true) {
+		$usage .= "Image_Request:noArg History_Request:noArg "
 	}
-	### If debug modus is NOT enabled
+	### If DoorBird has NO Camera installed
 	else {
-		$usage .= " Info_Request:noArg List_Favorites:noArg List_Schedules:noArg";
+		# Do not add anything
 	}
+	### Return values
 	return $usage if $command eq '?';
-
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Get - usage                              : " . $usage;
@@ -588,11 +599,20 @@ sub DoorBird_Set($@)
 	Log3 $name, 5, $name. " : DoorBird_Set - RelayAdresses                      : " . join(",", @RelayAdresses);
 	
 	### Define "set" menu
-	my $usage	= 'Unknown argument, choose one of ';
+	my $usage	= "Unknown argument, choose one of ";
+		$usage .= "Open_Door:" . join(",", @RelayAdresses) . " Restart:noArg Transmit_Audio ";
 
-	### Create Selection List
-	$usage .= "Live_Video:on,off Open_Door:" . join(",", @RelayAdresses) . " Light_On:noArg Restart:noArg Live_Audio:on,off Transmit_Audio";
-
+	### If DoorBird has a Camera installed
+	if ($hash->{helper}{CameraInstalled} == true) {
+		### Create Selection List for camera
+		$usage .= "Live_Video:on,off Light_On:noArg Live_Audio:on,off ";
+	}
+	### If DoorBird has NO Camera installed
+	else {
+		# Do not add anything
+	}
+	
+	### Return values
 	return $usage if $command eq '?';
 	
 	### Log Entry for debugging purposes
@@ -1349,196 +1369,201 @@ sub DoorBird_FW_detailFn($$$$) {
 	my $VideoURL		= ReadingsVal($name, ".VideoURL", "");
 	my $ImageURL		= ReadingsVal($name, ".ImageURL", "");
 	my $AudioURL		= ReadingsVal($name, ".AudioURL", "");
+	my $htmlCode;
 	my $VideoHtmlCode;
 	my $ImageHtmlCode;
 	my $ImageHtmlCodeBig;
 	my $AudioHtmlCode;
 	my @HistoryDoorbell;
 	my @HistoryMotion;
-	
-	### Log Entry for debugging purposes
-	if (defined $hash->{helper}{Images}{History}{doorbell}) {
-		@HistoryDoorbell = @{$hash->{helper}{Images}{History}{doorbell}};
-		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - Size ImageData doorbell    : " . @HistoryDoorbell;
-	}
-	### Log Entry for debugging purposes
-	if (defined $hash->{helper}{Images}{History}{motionsensor}) {
-		@HistoryMotion   = @{$hash->{helper}{Images}{History}{motionsensor}};
-		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - Size ImageData motion      : " . @HistoryMotion;
-	}
-	
-	### If VideoURL is empty
-	if ($VideoURL eq "") {
-		### Create Standard Response
-		$VideoHtmlCode = "Video Stream deactivated";
-	}
-	### If VideoURL is NOT empty
-	else {
 
-		### Create proper html code including popup
-		my $ImageHtmlCodeBig =  "<img src=\\'" . $VideoURL . "\\'>";
-		my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
-		$VideoHtmlCode    =  '<img ' . $PopupfunctionCode . ' width="400" height="300"  src="' . $VideoURL . '">';
 
-		### Create proper html link
-		#$VideoHtmlCode = '<img src="' . $VideoURL . '" width="400px" height="300px">';
-	}
-	
-	### If ImageData is empty
-	if ($ImageData eq "") {
-		### Create Standard Response
-		$ImageHtmlCode = "Image not available";
-	}
-	### If ImageData is NOT empty
-	else {
-		### Create proper html code including popup
-		my $ImageHtmlCodeBig  =  "<img src=\\'data:image/jpeg;base64," . $ImageData . "\\'><br><center>" . $ImageTimeStamp . "</center>";
-		my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
-		$ImageHtmlCode   	  =  '<img ' . $PopupfunctionCode . ' width="400" height="300" alt="tick" src="data:image/jpeg;base64,' . $ImageData . '">';
-	}
-	
-		### If AudioURL is empty
-	if ($AudioURL eq "") {
-		### Create Standard Response
-		$AudioHtmlCode = "Audio Stream deactivated";
-	}
-	### If AudioURL is NOT empty
-	else {
-		### Create proper html code
-		$AudioHtmlCode =  '<audio id="audio_with_controls" controls src="' . $AudioURL . '" ">Your Browser cannot play this audio stream.</audio>';
-	}
-	#type="audio/wav
-	
-	### Create html Code
-	my $htmlCode = '
-	<table border="1" style="border-collapse:separate;">
-		<tbody >
-			<tr>
-				<td width="400px" align="center"><b>Image from ' . $ImageTimeStamp . '</b></td>
-				<td width="400px" align="center"><b>Live Stream</b></td>
-			</tr>
-			
-			<tr>
-				<td id="ImageCell" width="430px" height="300px" align="center">
-					' . $ImageHtmlCode  . '
-				</td>
+	### Only if DoorBird has a Camera installed view the Image and History Part
+	if ($hash->{helper}{CameraInstalled} == true) {
+		
+		### Log Entry for debugging purposes
+		if (defined $hash->{helper}{Images}{History}{doorbell}) {
+			@HistoryDoorbell = @{$hash->{helper}{Images}{History}{doorbell}};
+			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - Size ImageData doorbell    : " . @HistoryDoorbell;
+		}
+		### Log Entry for debugging purposes
+		if (defined $hash->{helper}{Images}{History}{motionsensor}) {
+			@HistoryMotion   = @{$hash->{helper}{Images}{History}{motionsensor}};
+			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - Size ImageData motion      : " . @HistoryMotion;
+		}
+		
+		### If VideoURL is empty
+		if ($VideoURL eq "") {
+			### Create Standard Response
+			$VideoHtmlCode = "Video Stream deactivated";
+		}
+		### If VideoURL is NOT empty
+		else {
 
-				<td id="ImageCell" width="435px" height="300px" align="center">
-					' . $VideoHtmlCode . '<BR>
-				</td>
-			</tr>
-			
-			<tr>
-				<td></td>
-				<td align="center">' . $AudioHtmlCode . '</td>
-			</tr>	
-		</tbody>
-	</table>
-	';
-	
-	### Log Entry for debugging purposes
-#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCode              : " . $ImageHtmlCode;
-#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - VideoHtmlCode              : " . $VideoHtmlCode;
-#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - AudioHtmlCode              : " . $AudioHtmlCode;
-	
-	if ((@HistoryDoorbell > 0) || (@HistoryMotion > 0)) {
-		$htmlCode .=	
-		'
-		<BR>
-		<BR>
+			### Create proper html code including popup
+			my $ImageHtmlCodeBig =  "<img src=\\'" . $VideoURL . "\\'>";
+			my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
+			$VideoHtmlCode    =  '<img ' . $PopupfunctionCode . ' width="400" height="300"  src="' . $VideoURL . '">';
+
+			### Create proper html link
+			#$VideoHtmlCode = '<img src="' . $VideoURL . '" width="400px" height="300px">';
+		}
+		
+		### If ImageData is empty
+		if ($ImageData eq "") {
+			### Create Standard Response
+			$ImageHtmlCode = "Image not available";
+		}
+		### If ImageData is NOT empty
+		else {
+			### Create proper html code including popup
+			my $ImageHtmlCodeBig  =  "<img src=\\'data:image/jpeg;base64," . $ImageData . "\\'><br><center>" . $ImageTimeStamp . "</center>";
+			my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
+			$ImageHtmlCode   	  =  '<img ' . $PopupfunctionCode . ' width="400" height="300" alt="tick" src="data:image/jpeg;base64,' . $ImageData . '">';
+		}
+		
+			### If AudioURL is empty
+		if ($AudioURL eq "") {
+			### Create Standard Response
+			$AudioHtmlCode = "Audio Stream deactivated";
+		}
+		### If AudioURL is NOT empty
+		else {
+			### Create proper html code
+			$AudioHtmlCode =  '<audio id="audio_with_controls" controls src="' . $AudioURL . '" ">Your Browser cannot play this audio stream.</audio>';
+		}
+		#type="audio/wav
+		
+		### Create html Code
+		$htmlCode = '
 		<table border="1" style="border-collapse:separate;">
 			<tbody >
 				<tr>
-					<td align="center" colspan="5"><b>History of events - Last download: ' . $hash->{helper}{HistoryTime} . '</b></td>
+					<td width="400px" align="center"><b>Image from ' . $ImageTimeStamp . '</b></td>
+					<td width="400px" align="center"><b>Live Stream</b></td>
 				</tr>
+				
+				<tr>
+					<td id="ImageCell" width="430px" height="300px" align="center">
+						' . $ImageHtmlCode  . '
+					</td>
 
-				<tr>
-					<td align="center" colspan="2"><b>Doorbell</b></td>
-					<td align="center"></td>
-					<td align="center" colspan="2"><b>Motion-Sensor</b></td>
+					<td id="ImageCell" width="435px" height="300px" align="center">
+						' . $VideoHtmlCode . '<BR>
+					</td>
 				</tr>
+				
 				<tr>
-					<td width="195px" align="center"><b>Picture</b></td>
-					<td width="195px" align="center"><b>Timestamp</b></td>
-					<td width="20px" align="center">#</td>
-					<td width="195px" align="center"><b>Picture</b></td>
-					<td width="195px" align="center"><b>Timestamp</b></td>
-				</tr>		
+					<td></td>
+					<td align="center">' . $AudioHtmlCode . '</td>
+				</tr>	
+			</tbody>
+		</table>
 		';
-
 		
 		### Log Entry for debugging purposes
-		Log3 $name, 5, $name. " : DoorBird_FW_detailFn - hash->{helper}{MaxHistory} : " . $hash->{helper}{MaxHistory};
+		#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCode              : " . $ImageHtmlCode;
+		#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - VideoHtmlCode              : " . $VideoHtmlCode;
+		#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - AudioHtmlCode              : " . $AudioHtmlCode;
 		
-		### For all entries in Picture-Array do
-		for (my $i=0; $i <= ($hash->{helper}{MaxHistory} - 1); $i++) {
+		if ((@HistoryDoorbell > 0) || (@HistoryMotion > 0)) {
+			$htmlCode .=	
+			'
+			<BR>
+			<BR>
+			<table border="1" style="border-collapse:separate;">
+				<tbody >
+					<tr>
+						<td align="center" colspan="5"><b>History of events - Last download: ' . $hash->{helper}{HistoryTime} . '</b></td>
+					</tr>
+
+					<tr>
+						<td align="center" colspan="2"><b>Doorbell</b></td>
+						<td align="center"></td>
+						<td align="center" colspan="2"><b>Motion-Sensor</b></td>
+					</tr>
+					<tr>
+						<td width="195px" align="center"><b>Picture</b></td>
+						<td width="195px" align="center"><b>Timestamp</b></td>
+						<td width="20px" align="center">#</td>
+						<td width="195px" align="center"><b>Picture</b></td>
+						<td width="195px" align="center"><b>Timestamp</b></td>
+					</tr>		
+			';
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - hash->{helper}{MaxHistory} : " . $hash->{helper}{MaxHistory};
 			
-			my $ImageHtmlCodeDoorbell;
-			my $ImageHtmlCodeMotion;
-			
-			### Create proper html code for image triggered by doorbell
-			if ($HistoryDoorbell[$i]{data} ne "") {
-				### If element contains an error message
-				if ($HistoryDoorbell[$i]{data} =~ m/Error/) {
-					$ImageHtmlCodeDoorbell     = $HistoryDoorbell[$i]{data};
+			### For all entries in Picture-Array do
+			for (my $i=0; $i <= ($hash->{helper}{MaxHistory} - 1); $i++) {
+				
+				my $ImageHtmlCodeDoorbell;
+				my $ImageHtmlCodeMotion;
+				
+				### Create proper html code for image triggered by doorbell
+				if ($HistoryDoorbell[$i]{data} ne "") {
+					### If element contains an error message
+					if ($HistoryDoorbell[$i]{data} =~ m/Error/) {
+						$ImageHtmlCodeDoorbell     = $HistoryDoorbell[$i]{data};
+					}
+					### If element does not contain an error message
+					else {
+						### Create proper html code including popup
+						my $ImageHtmlCodeBig =  "<img src=\\'data:image/jpeg;base64," . $HistoryDoorbell[$i]{data} . "\\'><br><center>" . $HistoryDoorbell[$i]{timestamp} . "</center>";
+						my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
+						$ImageHtmlCodeDoorbell    =  '<img ' . $PopupfunctionCode . ' width="190" height="auto" alt="tick" src="data:image/jpeg;base64,' . $HistoryDoorbell[$i]{data} . '">';
+					}
 				}
-				### If element does not contain an error message
 				else {
-					### Create proper html code including popup
-					my $ImageHtmlCodeBig =  "<img src=\\'data:image/jpeg;base64," . $HistoryDoorbell[$i]{data} . "\\'><br><center>" . $HistoryDoorbell[$i]{timestamp} . "</center>";
-					my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
-					$ImageHtmlCodeDoorbell    =  '<img ' . $PopupfunctionCode . ' width="190" height="auto" alt="tick" src="data:image/jpeg;base64,' . $HistoryDoorbell[$i]{data} . '">';
+					$ImageHtmlCodeDoorbell =  'No image available';
 				}
-			}
-			else {
-				$ImageHtmlCodeDoorbell =  'No image available';
-			}
-			### Create proper html code for image triggered by motionsensor
-			if ($HistoryMotion[$i]{data} ne "") {
-				### If element contains an error message
-				if ($HistoryMotion[$i]{data} =~ m/Error/) {
-					$ImageHtmlCodeMotion = $HistoryMotion[$i]{data};
+				### Create proper html code for image triggered by motionsensor
+				if ($HistoryMotion[$i]{data} ne "") {
+					### If element contains an error message
+					if ($HistoryMotion[$i]{data} =~ m/Error/) {
+						$ImageHtmlCodeMotion = $HistoryMotion[$i]{data};
+					}
+					### If element does not contain an error message
+					else {
+						### Create proper html code including popup
+						my $ImageHtmlCodeBig =  "<img src=\\'data:image/jpeg;base64," . $HistoryMotion[$i]{data} . "\\'><br><center>" . $HistoryMotion[$i]{timestamp} . "</center>";
+						my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
+						$ImageHtmlCodeMotion    =  '<img ' . $PopupfunctionCode . ' width="190" height="auto" alt="tick" src="data:image/jpeg;base64,' . $HistoryMotion[$i]{data} . '">';
+					}
 				}
-				### If element does not contain an error message
 				else {
-					### Create proper html code including popup
-					my $ImageHtmlCodeBig =  "<img src=\\'data:image/jpeg;base64," . $HistoryMotion[$i]{data} . "\\'><br><center>" . $HistoryMotion[$i]{timestamp} . "</center>";
-					my $PopupfunctionCode = "onclick=\"FW_okDialog(\'" . $ImageHtmlCodeBig . "\') \" ";
-					$ImageHtmlCodeMotion    =  '<img ' . $PopupfunctionCode . ' width="190" height="auto" alt="tick" src="data:image/jpeg;base64,' . $HistoryMotion[$i]{data} . '">';
-				}
+					$ImageHtmlCodeMotion =  'No image available';
+				}			
+				
+				$htmlCode .=
+				'
+					<tr>
+						<td align="center">' . $ImageHtmlCodeDoorbell . '</td>
+						<td align="center">' . $HistoryDoorbell[$i]{timestamp} . '</td>
+						<td align="center">' . ($i + 1) . '</td>
+						<td align="center">' . $ImageHtmlCodeMotion . '</td>
+						<td align="center">' . $HistoryMotion[$i]{timestamp} . '</td>
+					</tr>
+				';
+				### Log Entry for debugging purposes
+				#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCodeDoorbell      : " . $ImageHtmlCodeDoorbell;
+				#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCodeMotion        : " . $ImageHtmlCodeMotion;
 			}
-			else {
-				$ImageHtmlCodeMotion =  'No image available';
-			}			
 			
+			### Finish table
 			$htmlCode .=
 			'
-				<tr>
-					<td align="center">' . $ImageHtmlCodeDoorbell . '</td>
-					<td align="center">' . $HistoryDoorbell[$i]{timestamp} . '</td>
-					<td align="center">' . ($i + 1) . '</td>
-					<td align="center">' . $ImageHtmlCodeMotion . '</td>
-					<td align="center">' . $HistoryMotion[$i]{timestamp} . '</td>
-				</tr>
+				</tbody>
+			</table>	
 			';
-			### Log Entry for debugging purposes
-#			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCodeDoorbell      : " . $ImageHtmlCodeDoorbell;
-#			Log3 $name, 5, $name. " : DoorBird_FW_detailFn - ImageHtmlCodeMotion        : " . $ImageHtmlCodeMotion;
-		}
-		
-		### Finish table
-		$htmlCode .=
-		'
-			</tbody>
-		</table>	
-		';
-		
-	}	
+			
+		}	
+	}
 	### Log Entry for debugging purposes
-#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - htmlCode                   : " . $htmlCode;
+	#	Log3 $name, 5, $name. " : DoorBird_FW_detailFn - htmlCode                   : " . $htmlCode;
 
-# my $infoBtn = "</td><td><a onClick='FW_cmd(FW_root+\"?cmd.$name=get $name all&XHR=1\",function(data){FW_okDialog(data)})'\>$info</a>"
-# <a href=\"#!\" onclick=\"FW_okDialog('Testtitle<br><br>TestDescription')\">Testtitle</a>
+	# my $infoBtn = "</td><td><a onClick='FW_cmd(FW_root+\"?cmd.$name=get $name all&XHR=1\",function(data){FW_okDialog(data)})'\>$info</a>"
+	# <a href=\"#!\" onclick=\"FW_okDialog('Testtitle<br><br>TestDescription')\">Testtitle</a>
 	
 	return($htmlCode );
 }
@@ -1572,7 +1597,7 @@ sub DoorBird_Info_Request($$) {
 	
 	### If no error has been handed back
 	if ($err eq "") {
-		### If the option is  asking for the JSON string
+		### If the option is asking for the JSON string
 		if (defined($option) && ($option =~ /JSON/i)) {
 			return $data;		
 		}
@@ -1628,6 +1653,21 @@ sub DoorBird_Info_Request($$) {
 						readingsBulkUpdate($hash, "RelayAddr_" . sprintf("%02d", $RelayNumber), $RelayAddress);
 					}
 				}
+				### If the entry has the information about the device type
+				elsif ( $key eq "DEVICE-TYPE") {
+				
+					### If the Device Type is not containing type numbers which have no camera installed - Currently only "DoorBird D301A - Door Intercom IP Upgrade"
+					if ($VersionContent -> {$key} !~ m/301/) {
+						### Set Information about Camera installed to true
+						$hash->{helper}{CameraInstalled} = true;
+					}
+			
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Info_Request - Content of" . sprintf("%15s %-s", $key, ": " . $VersionContent -> {$key});
+
+					### Update Reading
+					readingsBulkUpdate($hash, $key, $VersionContent -> {$key} );
+				}
 				### For all other entries
 				else {
 					
@@ -1640,6 +1680,9 @@ sub DoorBird_Info_Request($$) {
 			}
 			### Update Reading for Firmware-Status
 			readingsBulkUpdate($hash, "Firmware-Status", "up-to-date");
+
+			### Update SessionId
+			DoorBird_RenewSessionID($hash);
 
 			### Execute Readings Bulk Update
 			readingsEndUpdate($hash, 1);
