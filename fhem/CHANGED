@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCam: set compatibility to SVS version 8.2.6
  - feature: 73_DoorBird: No Picture/video menue for stations without camera
  - new:     70_CanOverEthernet: introducing new module
  - change:  70_SolarEdgeAPI: source code formatting
