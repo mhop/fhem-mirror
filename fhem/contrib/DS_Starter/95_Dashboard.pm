@@ -931,8 +931,8 @@ sub Dashboard_CheckDashboardAttributUssage($) {
   my $detailnote       = "";
  
   # --------- Set minimal Attributes in the hope to make it easier for beginners --------------------
-  my $tab1groups = AttrVal($d, "dashboard_tab1groups", "");
-  if (!$tab1groups) { 
+  my $tab1groups = AttrVal($d, "dashboard_tab1groups", "<noGroup>");
+  if ($tab1groups eq "<noGroup>") { 
       FW_fC("attr ".$d." dashboard_tab1groups Set your FHEM groups here and arrange them on tab 1"); 
   }
 
