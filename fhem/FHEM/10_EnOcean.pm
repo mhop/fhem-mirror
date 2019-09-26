@@ -6860,7 +6860,8 @@ sub EnOcean_Set($@)
       if (AttrVal($name, "remoteManagement", "off") eq "manager") {
         return "Unknown argument $cmd, choose one of $cmdList";
       } else {
-        return "Unknown argument $cmd, choose one of";
+        return;
+        #return "Unknown argument $cmd, choose one of";
       }
     }
 
