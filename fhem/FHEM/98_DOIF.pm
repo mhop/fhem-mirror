@@ -2413,6 +2413,11 @@ sub DOIF_Set_Filter
     }
   }
   notifyRegexpChanged($hash,$hash->{helper}{NOTIFYDEV});
+  if (defined ($hash->{NOTIFYDEV})) {
+    delete ($hash->{DOIFDEV});
+  } else {
+    $hash->{DOIFDEV}=$hash->{helper}{DEVFILTER};
+  }
 }
 
 sub
@@ -2446,6 +2451,7 @@ DOIF_Notify($$)
     foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
       delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ "^timer_");
     }
+    delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     if ($hash->{helper}{last_timer} > 0){
       for (my $j=0; $j<$hash->{helper}{last_timer};$j++) { 
         DOIF_SetTimer ($hash,"DOIF_TimerTrigger",$j);
