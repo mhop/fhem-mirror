@@ -176,7 +176,6 @@ sub ElsnerWS_Read($) {
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
-  my $averageOrder = 10;
   #Log3 $name, 5, "ElsnerWS $name received DATA: " . uc(unpack('H*', $buf));
   Log3 $name, 5, "ElsnerWS $name received DATA: $data";
 
@@ -204,11 +203,16 @@ sub ElsnerWS_Read($) {
     $brightness = pack('H*', $brightness);
     $windSpeed = pack('H*', $windSpeed);
     $hash->{helper}{wind}{windSpeedNumArrayElements} = ElsnerWS_updateArrayElement($hash, 'windSpeed', $windSpeed, 'wind', 600);
-    my ($windGustCurrent, undef, undef) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windGustCurrent', undef, undef, 'wind', 3);
+    my ($windAvg10min, $windSpeedMin10min, $windSpeedMax10min) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg10min', 'windSpeedMax10min', 'windSpeedMin10min', 'wind', 600);
     my ($windAvg2min, undef, undef) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg2min', undef, undef, 'wind', 120);
-    my ($windAvg10min, $windSpeedMin10min, $windSpeedMax10min) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windSpeedGustAvg10min', 'windSpeedMax10min', 'windSpeedMin10min', 'wind', 600);
-    my $windGust10min = $windSpeedMax10min > $windSpeedMin10min + 5.144 ? $windSpeedMax10min : $windAvg10min;
-    my $windPeak10min = $windSpeedMax10min > 12.86 ? $windSpeedMax10min : $windAvg10min;
+    my ($windAvg20s, $windSpeedMin20s, $windSpeedMax20s) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg20s', 'windSpeedMax20s', 'windSpeedMin20s', 'wind', 20);
+    my ($windGustCurrent, undef, undef) = ElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windGustCurrent', undef, undef, 'wind', 3);
+    my $windPeak10min = $windSpeedMax10min >= 12.86 ? $windSpeedMax10min : $windAvg2min;
+    my $windGust20s = $windGustCurrent >= $windSpeedMin20s + 5.144 ? $windGustCurrent : 0;
+    $windGustCurrent = $windGustCurrent >= $windSpeedMin20s + 5.144 ? $windGustCurrent : $windAvg2min;
+    $hash->{helper}{wind}{windGustNumArrayElements} = ElsnerWS_updateArrayElement($hash, 'windGust', $windGust20s, 'wind', 600);
+    my ($windGustAvg10min, $windGustMin10min, $windGustMax10min) = ElsnerWS_SMA($hash, 'windGust', $windGust20s, 'windGustAvg10min', 'windGustMax10min', 'windGustMin10min', 'wind', 600);
+    my $windGust10min = $windGustMax10min >= 5.144 ? $windGustMax10min : $windAvg2min;
     my @sunlight = ($sunSouth, $sunWest, $sunEast);
     my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
     $sunSouth = $sunSouth == 0 ? $brightness : $sunSouth;
@@ -220,10 +224,6 @@ sub ElsnerWS_Read($) {
     } else {
       $twilightFlag = ElsnerWS_swayCtrl($hash, "dayNight", $brightness, "brightnessDayNight", "brightnessDayNightDelay", 10, 20, 600, 600, 'night', 'day');
     }
-    #$sunSouth = ElsnerWS_SMA($hash, 'sunSouth', $sunSouth, $averageOrder);
-    #$sunWest = ElsnerWS_SMA($hash, 'sunWest', $sunWest, $averageOrder);
-    #$sunEast = ElsnerWS_SMA($hash, 'sunEast', $sunEast, $averageOrder);
-    #$brightness = ElsnerWS_SMA($hash, 'brightness', $brightness, $averageOrder);
     readingsBeginUpdate($hash);
     $temperature = ElsnerWS_readingsBulkUpdate($hash, "temperature", ($temperatureSign eq '2B' ? '' : '-') . pack('H*', $temperature), 0.025, undef,  "%0.1f");
     $sunSouth = ElsnerWS_readingsBulkUpdate($hash, "sunSouth", $sunSouth, 0.1, 0.7, "%d");
@@ -239,10 +239,6 @@ sub ElsnerWS_Read($) {
     }
     if (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60) {
       # update every 60 sec
-      #readingsBulkUpdate($hash, "windGustCurrent", $windGustCurrent);
-      #readingsBulkUpdate($hash, "windAvg2min", $windAvg2min);
-      #readingsBulkUpdate($hash, "windGust10min", $windGust10min);
-      #readingsBulkUpdate($hash, "windPeak10min", $windPeak10min);
       readingsBulkUpdateIfChanged($hash, "windGustCurrent", sprintf("%0.1f", $windGustCurrent));
       readingsBulkUpdateIfChanged($hash, "windAvg2min", sprintf("%0.1f", $windAvg2min));
       readingsBulkUpdateIfChanged($hash, "windGust10min", sprintf("%0.1f", $windGust10min));
