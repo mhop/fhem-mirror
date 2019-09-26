@@ -173,6 +173,20 @@ sub ModbusElsnerWS_Eval($$$) {
   my $name = $hash->{NAME};
   my $ctrl = 1;
   my ($temperature, $sunSouth, $sunWest, $sunEast, $brightness, $windSpeed, $gps, $isRaining, $date, $time, $sunAzimuth, $sunElevation, $latitude, $longitude) = split(' ', $readingVal);
+  my ($windAvg2min, $windGust10min, $windGustCurrent, $windPeak10min);
+  if ($hash->{INTERVAL} =~ m/^1$/) {
+    $hash->{helper}{wind}{windSpeedNumArrayElements} = ModubusElsnerWS_updateArrayElement($hash, 'windSpeed', $windSpeed, 'wind', 600);
+    my ($windAvg10min, $windSpeedMin10min, $windSpeedMax10min) = ModubusElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg10min', 'windSpeedMax10min', 'windSpeedMin10min', 'wind', 600);
+    ($windAvg2min, undef, undef) = ModubusElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg2min', undef, undef, 'wind', 120);
+    my ($windAvg20s, $windSpeedMin20s, $windSpeedMax20s) = ModubusElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg20s', 'windSpeedMax20s', 'windSpeedMin20s', 'wind', 20);
+    ($windGustCurrent, undef, undef) = ModubusElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windGustCurrent', undef, undef, 'wind', 3);
+    $windPeak10min = $windSpeedMax10min >= 12.86 ? $windSpeedMax10min : $windAvg2min;
+    my $windGust20s = $windGustCurrent >= $windSpeedMin20s + 5.144 ? $windGustCurrent : 0;
+    $windGustCurrent = $windGustCurrent >= $windSpeedMin20s + 5.144 ? $windGustCurrent : $windAvg2min;
+    $hash->{helper}{wind}{windGustNumArrayElements} = ModubusElsnerWS_updateArrayElement($hash, 'windGust', $windGust20s, 'wind', 600);
+    my ($windGustAvg10min, $windGustMin10min, $windGustMax10min) = ModubusElsnerWS_SMA($hash, 'windGust', $windGust20s, 'windGustAvg10min', 'windGustMax10min', 'windGustMin10min', 'wind', 600);
+    $windGust10min = $windGustMax10min >= 5.144 ? $windGustMax10min : $windAvg2min;
+  }
   my @sunlight = ($sunSouth, $sunWest, $sunEast);
   my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
   $sunSouth = $sunSouth == 0 ? $brightness : $sunSouth;
@@ -190,6 +204,14 @@ sub ModbusElsnerWS_Eval($$$) {
   my $windStrength = 0;
   while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
     $windStrength ++;
+  }
+  if ($hash->{INTERVAL} =~ m/^1$/ && (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60)) {
+    # update every 60 sec
+    readingsBulkUpdateIfChanged($hash, "windAvg2min", sprintf("%0.1f", $windAvg2min));
+    readingsBulkUpdateIfChanged($hash, "windGust10min", sprintf("%0.1f", $windGust10min));
+    readingsBulkUpdateIfChanged($hash, "windGustCurrent", sprintf("%0.1f", $windGustCurrent));
+    readingsBulkUpdateIfChanged($hash, "windPeak10min", sprintf("%0.1f", $windPeak10min));
+    $hash->{helper}{timer}{lastUpdate} = gettimeofday();
   }
   if (exists $hash->{helper}{timer}{heartbeat}) {
     readingsBulkUpdateIfChanged($hash, "isRaining", $isRaining);
@@ -356,25 +378,42 @@ sub ModbusElsnerWS_Notify(@) {
   return undef;
 }
 
-sub ModbusElsnerWS_SMA($$$$) {
-  # simple moving average (SMA)
-  my ($hash, $readingName, $readingVal, $averageOrder) = @_;
-  my $average = exists($hash->{helper}{sma}{$readingName}{average}) ? $hash->{helper}{sma}{$readingName}{average} : $readingVal;
-  my $numArrayElements = $#{$hash->{helper}{sma}{$readingName}{val}};
-  if (defined($numArrayElements) && $numArrayElements >= 0) {
-    if ($numArrayElements < $averageOrder - 1) {
-      $average = $average + $readingVal / ($numArrayElements + 1)
-                          - $hash->{helper}{sma}{$readingName}{val}[$numArrayElements] / ($numArrayElements + 1);
-    } else {
-      $average = $average + $readingVal / ($numArrayElements + 1)
-                          - pop(@{$hash->{helper}{sma}{$readingName}{val}}) / ($numArrayElements + 1);
-    }
+sub ModubusElsnerWS_updateArrayElement($$$$$) {
+  # read und update values to array
+  my ($hash, $readingName, $readingVal, $arrayName, $numArrayElementsMax) = @_;
+  my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
+  if (!defined $numArrayElements) {
+    $numArrayElements = 1;
+  } elsif ($numArrayElements + 1 >= $numArrayElementsMax) {
+    $numArrayElements = $numArrayElementsMax;
+    pop(@{$hash->{helper}{$arrayName}{$readingName}{val}});
   } else {
-    $average = $readingVal;
+    $numArrayElements ++;
   }
-  unshift(@{$hash->{helper}{sma}{$readingName}{val}}, $readingVal);
-  $hash->{helper}{sma}{$readingName}{average} = $average;
-  return $average;
+  unshift(@{$hash->{helper}{$arrayName}{$readingName}{val}}, $readingVal);
+  return $numArrayElements;
+}
+
+sub ModubusElsnerWS_SMA($$$$$$$$) {
+  # simple moving average (SMA)
+  my ($hash, $readingName, $readingVal, $averageName, $valMaxName, $valMinName, $arrayName, $numArrayElementsCalc) = @_;
+  my $average = exists($hash->{helper}{$arrayName}{$readingName}{average}) ? $hash->{helper}{$arrayName}{$readingName}{average} : $readingVal;
+  my ($valMin, $valMax) = ($readingVal, $readingVal);
+  my $numArrayElements = $#{$hash->{helper}{$arrayName}{$readingName}{val}};
+  if (!defined $numArrayElements) {
+    $average = $readingVal;
+  } else {
+    $numArrayElements = $numArrayElementsCalc - 1 if ($numArrayElements + 1 >= $numArrayElementsCalc);
+    $average = $average + $readingVal / ($numArrayElements + 1)
+                        - $hash->{helper}{$arrayName}{$readingName}{val}[$numArrayElements] / ($numArrayElements + 1);
+  }
+  if (defined($valMaxName) && defined($valMinName)) {
+    ($valMin, $valMax) = (sort {$a <=> $b} @{$hash->{helper}{$arrayName}{$readingName}{val}})[0, $numArrayElements];
+    $hash->{helper}{$arrayName}{$readingName}{$valMaxName} = $valMax;
+    $hash->{helper}{$arrayName}{$readingName}{$valMinName} = $valMin;
+  }
+  $hash->{helper}{$arrayName}{$readingName}{$averageName} = $average;
+  return ($average, $valMin, $valMax);
 }
 
 sub ModbusElsnerWS_LWMA($$$$) {
@@ -596,6 +635,7 @@ sub ModbusElsnerWS_Delete($$) {
     <ul>
       <li>Evaluation modul for the weather sensors P03/3-Modbus and P03/3-Modbus GPS</li>
       <li>Processing weather raw data and creates graphic representation</li>
+      <li>For wind observations, average speeds, gusts and peak values are calculated.</li>
       <li>Alarm signal in case of failure of the weather sensor</li>
       <li>Up/down readings for blinds according to wind, rain and sun</li>
       <li>Adjustable switching thresholds and delay times</li>
@@ -630,7 +670,9 @@ sub ModbusElsnerWS_Delete($$) {
     <ul>
       <code>define &lt;name&gt; ModbusElsnerWS id=&lt;ID&gt; interval=&lt;Interval&gt;|passive</code><br><br>
       The module connects to the Elsner Weather Station with the Modbus Id &lt;ID&gt; through an already defined Modbus device
-      and actively requests data from the system every &lt;Interval&gt; seconds. The query interval should be set to 1 second.<br>
+      and actively requests data from the system every &lt;Interval&gt; seconds. The query interval should be set to 1 second.
+      The readings windAvg2min, windGust10min, windGustCurrent and windPeak10min required for wind observation are calculated
+      only at a query interval of 1 second.<br>
       The following parameters apply to the default factory settings and an RS485 transceiver to USB.
       <br><br>
       Example:<br>
@@ -756,6 +798,10 @@ sub ModbusElsnerWS_Delete($$) {
       <li>time: hh:mm:ss</li>
       <li>timeZone: CET|CEST|UTC</li>
       <li>twilight: T/% (Sensor Range: T = 0 % ... 100 %)</li>
+      <li>windAvg2min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windGust10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windGustCurrent: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windPeak10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windSpeed: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windStrength: B (Sensor Range: B = 0 Beaufort ... 12 Beaufort)</li>
       <li>state: T: t/&#176C B: E/lx W: v/m/s IR: no|yes</li>
