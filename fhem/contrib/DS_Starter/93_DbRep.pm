@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.27.2" => "26.09.2019  fix export data to file ",
+  "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
   "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
   "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
   "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
@@ -766,6 +766,9 @@ sub DbRep_Set($@) {
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "readingRename") {
+      shift @a;
+      shift @a;
+      $prop = join(" ",@a);      # Readingname kann Leerzeichen enthalten
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($oldread, $newread) = split(",",$prop);
       if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set $name readingRename oldreadingname,newreadingname\" ";}
@@ -4468,12 +4471,12 @@ sub change_Push($) {
 	 $sth = $dbh->prepare($sql) ;
  
  } elsif ($renmode eq "readren") {
-     $old = delete $hash->{HELPER}{OLDREAD};        # Wert besteht aus [device]:old_readingname
-     ($dev,$old) = split(":",$old,2);
+     $old = delete $hash->{HELPER}{OLDREAD};              
+     ($dev,$old) = split(":",$old,2) if($old =~ /:/);        # Wert besteht aus [device]:old_readingname, device ist optional
      $new = delete $hash->{HELPER}{NEWREAD};
 	 
 	 # SQL zusammenstellen für DB-Operation
-     Log3 ($name, 5, "DbRep $name -> Rename old reading name \"$old\" ".($dev?"(of device $dev)":"")." to new reading name \"$new\" in database $dblogname ");
+     Log3 ($name, 5, "DbRep $name -> Rename old reading name \"".($dev?"$dev:$old":"$old")."\" to new reading name \"$new\" in database $dblogname ");
 	 
 	 # prepare DB operation
 	 $old =~ s/'/''/g;       # escape ' with ''
@@ -4976,6 +4979,7 @@ sub deldoublets_DoParse($) {
  my $dbconn     = $dbloghash->{dbconn};
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
+ my $model      = $dbloghash->{MODEL};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $limit      = AttrVal($name, "limit", 1000);
@@ -5068,7 +5072,7 @@ sub deldoublets_DoParse($) {
              $dev  =~ s/'/''/g;                                 # escape ' with ''
              $read =~ s/'/''/g;                                 # escape ' with ''
              $val  =~ s/'/''/g;                                 # escape ' with ''
-			 $val  =~ s/\\/\\\\/g;                              # escape ' with ''
+			 $val  =~ s/\\/\\\\/g if($model eq "MYSQL");        # escape \ with \\ für MySQL
              $st = [gettimeofday];
              my $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
              my $sthd = $dbh->prepare($dsql); 
