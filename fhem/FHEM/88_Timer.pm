@@ -26,17 +26,16 @@ my @names;
 my @designations;
 my $description_all;
 my $cnt_attr_userattr = 0;
+my $language = uc(AttrVal("global", "language", "EN"));
 
-if (!$attr{global}{language} || $attr{global}{language} eq "EN") {
-	@designations = ("sunrise","sunset","local time","","SR","SS");
-	$description_all = "all";     # using in RegEx
-	@names = ("No.","Year","Month","Day","Hour","Minute","Second","Device or label","Action","Mon","Tue","Wed","Thu","Fri","Sat","Sun","active","");
-}
-
-if ($attr{global}{language} && $attr{global}{language} eq "DE") {
+if ($language eq "DE") {
 	@designations = ("Sonnenaufgang","Sonnenuntergang","lokale Zeit","Uhr","SA","SU");
 	$description_all = "alle";   # using in RegEx
 	@names = ("Nr.","Jahr","Monat","Tag","Stunde","Minute","Sekunde","Ger&auml;t oder Bezeichnung","Aktion","Mo","Di","Mi","Do","Fr","Sa","So","aktiv","");
+} else {
+	@designations = ("SSnrise","SSnset","local time","","SR","SS");
+	$description_all = "all";     # using in RegEx
+	@names = ("No.","Year","Month","Day","Hour","Minute","Second","Device or label","Action","Mon","Tue","Wed","Thu","Fri","Sat","SSn","active","");
 }
 
 ##########################
@@ -147,6 +146,7 @@ sub Timer_Set($$$@) {
 
 	if ($cmd eq "sortTimer") {
 		my @timers_unsortet;
+												
 		my @userattr_values;
 		my @attr_values_names;
 		my $timer_nr_new;
@@ -168,6 +168,7 @@ sub Timer_Set($$$@) {
 		}
 
 		my @timers_sort = sort @timers_unsortet;                              # Timer in neues Array sortieren
+										 
 
 		for (my $i=0; $i<scalar(@timers_unsortet); $i++) {
 			$array_diff++ if ($timers_unsortet[$i] ne $timers_sort[$i]);
@@ -287,7 +288,8 @@ sub Timer_Get($$$@) {
 		}
 
 		if ($cmd2 eq "yes") {
-			my $error = 0;
+			my $error = "";
+			my $line = 0;
 			my @lines_readings;
 			my @attr_values;
 			my @attr_values_names;
@@ -295,34 +297,36 @@ sub Timer_Get($$$@) {
 
 			open (InputFile,"<./FHEM/lib/$name"."_conf.txt") || return "ERROR: No file $name"."_conf.txt found in ./FHEM/lib directory from FHEM!";
 			while (<InputFile>){
-				if ($_ =~ /^Timer_\d{2},/) {
+				$line++;
+				if ($_ =~ /^(.*),.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,[0-1]$/) {
 					chomp ($_);                            # Zeilenende entfernen
 					push(@lines_readings,$_);              # lines in array
 					my @values = split(",",$_);            # split line in array to check
-					$error++ if (scalar(@values) != 17);
+					#$error.= "- scalar arrray\n" if (scalar(@values) != 17);
 					push(@attr_values_names, $values[0]."_set") if($values[8] eq "Def");
 					for (my $i=0;$i<@values;$i++) {
-						$error++ if ($i == 0 && $values[0] !~ /^Timer_\d{2}$/);
-						$error++ if ($i == 1 && $values[1] !~ /^\d{4}$|^$description_all$/);
+						$error.= "- ".$values[0]." is no $name description" if ($i == 0 && $values[0] !~ /^Timer_\d{2}$/);
+						$error.= "- ".$values[1]." invalid value" if ($i == 1 && $values[1] !~ /^\d{4}$|^$description_all$/);
 						if ($i >= 2 && $i <= 5 && $values[$i] ne "$description_all") {
-							$error++ if ($i >= 2 && $i <= 3 && $values[$i] !~ /^\d{2}$/);
-							$error++ if ($i == 2 && ($values[2] * 1) < 1 && ($values[2] * 1) > 12);
-							$error++ if ($i == 3 && ($values[3] * 1) < 1 && ($values[3] * 1) > 31);
+							$error.= "- ".$values[$i]." not decimal" if ($i >= 2 && $i <= 3 && $values[$i] !~ /^\d{2}$/);
+							$error.= "- ".$values[2]." wrong value (allowed 1-12)" if ($i == 2 && ($values[2] * 1) < 1 && ($values[2] * 1) > 12);
+							$error.= "- ".$values[3]." wrong value (allowed 1-31)" if ($i == 3 && ($values[3] * 1) < 1 && ($values[3] * 1) > 31);
 
 							if ($i >= 4 && $i <= 5 && $values[$i] ne $designations[4] && $values[$i] ne $designations[5]) { # SA -> 4 SU -> 5
-								$error++ if ($i >= 4 && $i <= 5 && $values[$i] !~ /^\d{2}$/);
-								$error++ if ($i == 4 && ($values[4] * 1) > 23);
-								$error++ if ($i == 5 && ($values[5] * 1) > 59);
+								$error.= "- ".$values[$i]." not support" if ($i >= 4 && $i <= 5 && $values[$i] !~ /^\d{2}$/);
+								$error.= "- ".$values[4]." wrong value (allowed 00-23)" if ($i == 4 && ($values[4] * 1) > 23);
+								$error.= "- ".$values[5]." wrong value (allowed 00-59)" if ($i == 5 && ($values[5] * 1) > 59);
 							}
 						}
-						$error++ if ($i == 6 && $values[$i] % 10 != 0);
-						$error++ if ($i == 8 && not grep { $values[$i] eq $_ } @action);
-						$error++ if ($i >= 9 && $values[$i] ne "0" && $values[$i] ne "1");
+						$error.= "- ".$values[$i]." is no % 10\n" if ($i == 6 && $values[$i] % 10 != 0);
+						$error.= "- ".$values[$i]." is no allowed action \n" if ($i == 8 && not grep { $values[$i] eq $_ } @action);
+						$error.= "- ".$values[$i]." is not 0 or 1 \n" if ($i >= 9 && $values[$i] ne "0" && $values[$i] ne "1");
 
-						if ($error != 0) {
+						if ($error ne "") {
 							close InputFile;
 							Timer_Check($hash);
-							return "ERROR: your file is NOT valid! ($error)";
+							$error.= "\nYour language is wrong! ($language)" if ($error =~ /-\s(all\s|alle\s|SA\s|SU\s|SR\s|SS\s)/);
+							return "ERROR: your file is NOT valid!\n\nline $line\n$error";
 						}
 					}
 				}
@@ -646,6 +650,13 @@ sub Timer_FW_Detail($$$$) {
 		for(var i=start; i<id; i++) {
 			allVals.push(document.getElementById(i).value);
 		}
+
+		/* check Semicolon description */
+		var n = allVals[7].search(";");       /* return -1 if not found */
+		if (n != -1) {
+			FW_errmsg("ERROR: Semicolon not allowed in description!", 4000);
+			return;
+		}
 		FW_cmd(FW_root+ \'?XHR=1"'.$FW_CSRF.'"&cmd={FW_pushed_savebutton("'.$name.'","\'+allVals+\'","'.$FW_room_dupl.'")}\');
 	}
 	</script>';
@@ -672,6 +683,8 @@ sub FW_pushed_savebutton {
 	my ($sec, $min, $hour, $mday, $month, $year) = ($timestamp_values[5], $timestamp_values[4], $timestamp_values[3], $timestamp_values[2], $timestamp_values[1], $timestamp_values[0]);
 
 	Log3 $name, 5, "$name: FW_pushed_savebutton is running";
+
+	return "ERROR: Comma not allowed in description!" if ($cnt_names > 17);
 
 	foreach my $d (sort keys %{$hash->{READINGS}}) {
 		if ($d =~ /^Timer_(\d+)$/) {

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_Timer: fix code #103848 + added check load file
  - feature: 95_Dashboard: new attr "dashboard_homeTab", "dashboard_webRefresh",
                           new set command activateTab, bugfixes, comref revised
  - change:  49_SSCam: set compatibility to SVS version 8.2.6
