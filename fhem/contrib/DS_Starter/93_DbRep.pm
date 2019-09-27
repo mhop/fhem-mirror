@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.27.2" => "26.09.2019  fix log of export data to file ",
+  "8.27.2" => "26.09.2019  fix export data to file ",
   "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
   "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
   "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
@@ -5068,6 +5068,7 @@ sub deldoublets_DoParse($) {
              $dev  =~ s/'/''/g;                                 # escape ' with ''
              $read =~ s/'/''/g;                                 # escape ' with ''
              $val  =~ s/'/''/g;                                 # escape ' with ''
+			 $val  =~ s/\\/\\\\/g;                              # escape ' with ''
              $st = [gettimeofday];
              my $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
              my $sthd = $dbh->prepare($dsql); 
@@ -5422,7 +5423,6 @@ sub expfile_DoParse($) {
  }
  
  $rsf =~ s/[:\s]/_/g; 
- # my ($f,$e) = split(/\./,$file);
  my ($f,$e) = $file =~ /(.*)\.(.*)/;
  $e    = $e?$e:"";
  $f    =~ s/%TSB/$rsf/g;
