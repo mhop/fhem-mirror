@@ -1,5 +1,5 @@
 ###########################################
-# $Id: httpmod.template 20144 2019-09-11 05:51:25Z Beta-User $
+# $Id$
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands

@@ -1,5 +1,5 @@
 ###########################################
-# $Id: $
+# $Id$
 #
 # Comments start with #. Empty lines are ignored.
 # Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
