@@ -1,26 +1,26 @@
-//########################################################################################
+//###########################################################################################################################################
 // dashboard.js
-//########################################################################################
+//###########################################################################################################################################
 // Released : 14.11.2013 Sascha Hermann
-// Version : 
-// 1.01: Released to testers 
-// 1.02: Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
-//			wrong set of +Toogle Icon on Siderefresh
-// 2.00: First Changes vor Dashboard Tabs. Change method store Positiondata. optimization restore Positiondata. Clear poor routines.
-//			  Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
-// 2.01: Add Longpoll function. Dashboard can hide FHEMWEB Roomliste and Header.
-// 2.02: Tabs can set on top, bottom or hidden
-// 2.03: Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
-//			 been fixed.
-// 2.04: Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
-// 2.05: Delete function for set lockstate
-// 2.06: change Set and Detail Button.
-// 2.07: Insert Configdialog for Tabs. Change handling of parameters in both directions.
+// Modified : 24.09.2019 Heiko Maaz
 //
-// Known Bugs/Todo's
-// See 95_Dashboard.pm
-//########################################################################################
-//########################################################################################
+// Version : 
+// 2.0.8:   dashboard_load_tab(tabIndex) test of defined fhemUrl
+// 2.0.7:   Insert Configdialog for Tabs. Change handling of parameters in both directions.
+// 2.0.6:   change Set and Detail Button.
+// 2.0.5:   Delete function for set lockstate
+// 2.0.4:   Dashboard position near Top in showfullsize-mode. Restore ActiveTab funktion
+// 2.0.3:   Fix showhelper Bug on lock/unlock. The error that after a trigger action the curren tab is changed to the "old" activetab tab has 
+//			been fixed.
+// 2.0.2:   Tabs can set on top, bottom or hidden
+// 2.0.1:   Add Longpoll function. Dashboard can hide FHEMWEB Roomliste and Header.
+// 2.0.0:   First Changes vor Dashboard Tabs. Change method store Positiondata. optimization restore Positiondata. Clear poor routines.
+//		    Change max/min Values for Groupresize.	Top- and Bottom-Row always 100%
+// 1.0.2:   Add DebugMsg. Fix independent Groupsize adjustment after set & siterefresh. Fix
+//			wrong set of +Toogle Icon on Siderefresh
+// 1.0.1:   Released to testers 
+//
+//###########################################################################################################################################
 
 var DashboardConfigHash = {};
 var dashboard_buttonbar = "top";
@@ -471,15 +471,17 @@ function dashboard_load_tab(tabIndex) {
         if ($('#dashboard_tab' + tabIndex).length) {
 		return;
         }
-
-	dashboard_getData(
-		fhemUrl+"?cmd=get "+$('#dashboard_define').text(),
-		"tab " + tabIndex,
-		"html",
-		function (tabIndex, data) {
-			dashboard_insert_tab(tabIndex, data);
-		}.bind(null, tabIndex)
-	);
+    
+	if (typeof(fhemUrl) !== 'undefined') {
+		dashboard_getData(
+			fhemUrl+"?cmd=get "+$('#dashboard_define').text(),
+			"tab " + tabIndex,
+			"html",
+			function (tabIndex, data) {
+				dashboard_insert_tab(tabIndex, data);
+			}.bind(null, tabIndex)
+		);
+	}
 }
 
 function dashboard_insert_tab(tabIndex, content) {
