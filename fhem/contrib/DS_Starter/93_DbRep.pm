@@ -5422,7 +5422,8 @@ sub expfile_DoParse($) {
  }
  
  $rsf =~ s/[:\s]/_/g; 
- my ($f,$e) = split(/\./,$file);
+ # my ($f,$e) = split(/\./,$file);
+ my ($f,$e) = $file =~ /(.*)\.(.*)/;
  $e    = $e?$e:"";
  $f    =~ s/%TSB/$rsf/g;
  my @t = localtime;
