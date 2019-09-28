@@ -1897,29 +1897,31 @@ sub DOIF_SetState($$$$$) {
 
 sub DOIF_we($) {
   my ($wday)=@_;
-  my $we = (($wday==0 || $wday==6) ? 1 : 0);
-  if(!$we) {
-    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
-      if($h2we && Value($h2we)) {
-        my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
-        $we = 1 if($b ne "none");
-      }
-    }
-  }
+  my $we=IsWe("",$wday);
+  #my $we = (($wday==0 || $wday==6) ? 1 : 0);
+  #if(!$we) {
+  #  foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
+  #    if($h2we && Value($h2we)) {
+  #      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
+  #      $we = 1 if($b ne "none");
+  #    }
+  #  }
+  #}
   return $we;
 }
 
 sub DOIF_tomorrow_we($) {
   my ($wday)=@_;
-  my $we = (($wday==5 || $wday==6) ? 1 : 0);
-  if(!$we) {
-    foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
-      if($h2we && ReadingsVal($h2we,"tomorrow",0)) {
-        my ($a, $b) = ReplaceEventMap($h2we, [$h2we, ReadingsVal($h2we,"tomorrow",0)], 0);
-        $we = 1 if($b ne "none");
-      }
-    }
-  }
+  my $we=IsWe("tomorrow",$wday);
+  #my $we = (($wday==5 || $wday==6) ? 1 : 0);
+  #if(!$we) {
+  #  foreach my $h2we (split(",", AttrVal("global", "holiday2we", ""))) {
+  #    if($h2we && ReadingsVal($h2we,"tomorrow",0)) {
+  #      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, ReadingsVal($h2we,"tomorrow",0)], 0);
+  #      $we = 1 if($b ne "none");
+  #    }
+  #  }
+  #}
   return $we;
 }
 
@@ -2436,8 +2438,11 @@ DOIF_Notify($$)
   my $eventas;
   
  
-  return "" if ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/);
-  #Log3 ($pn,1,"pn: $pn, dev: $dev->{NAME}, devfilter: $devfilter");
+  if (!defined($hash->{helper}{DEVFILTER})) {
+    return "";
+  } elsif ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/) {
+    return "";
+  }
 
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
