@@ -1621,7 +1621,7 @@ par:OFFCOMMANDREGEX;OFFCOMMANDREGEX typically is one or more Codes like 13381408
 par:OFF_COMMAND;ON_COMMAND typically is a set of parameters like "value":"13381408","protocol":4,"length":24,"delay":350;undef
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
-par:DEVCID;CID of the new device - try to read the last RF value; { ReadingVal("DEVICE","value","unknown") }
+par:DEVCID;CID of the new device - try to read the last RF value; { ReadingsVal("DEVICE","value","unknown") }
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )}
 defmod OMG_DEVCID MQTT2_\DEVICE DEVCID
 deletereading -q OMG_DEVCID (?!associatedWith).*
