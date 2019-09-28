@@ -33,7 +33,7 @@ if ($language eq "DE") {
 	$description_all = "alle";   # using in RegEx
 	@names = ("Nr.","Jahr","Monat","Tag","Stunde","Minute","Sekunde","Ger&auml;t oder Bezeichnung","Aktion","Mo","Di","Mi","Do","Fr","Sa","So","aktiv","");
 } else {
-	@designations = ("SSnrise","SSnset","local time","","SR","SS");
+	@designations = ("Sunrise","Sunset","local time","","SR","SS");
 	$description_all = "all";     # using in RegEx
 	@names = ("No.","Year","Month","Day","Hour","Minute","Second","Device or label","Action","Mon","Tue","Wed","Thu","Fri","Sat","SSn","active","");
 }
