@@ -1,4 +1,4 @@
-REV 20263
+REV 20268
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-28_07:45:02 308434 ./CHANGED
+UPD 2019-09-29_07:45:03 308473 ./CHANGED
 UPD 2019-09-28_07:45:02 41924 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -428,7 +428,7 @@ UPD 2015-07-28_14:05:31 5836 FHEM/88_IPWE.pm
 UPD 2016-02-05_07:45:11 8459 FHEM/88_Itach_IRDevice.pm
 UPD 2015-07-28_14:05:31 3937 FHEM/88_Itach_Relay.pm
 UPD 2019-06-27_07:45:02 3701 FHEM/88_LINDY_HDMI_SWITCH.pm
-UPD 2019-09-28_07:45:02 49685 FHEM/88_Timer.pm
+UPD 2019-09-29_07:45:03 49685 FHEM/88_Timer.pm
 UPD 2015-07-28_14:05:31 12845 FHEM/88_VantagePro2.pm
 UPD 2019-07-31_07:45:02 4293 FHEM/88_WEBCOUNT.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
@@ -472,7 +472,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2019-09-27_07:45:02 281431 FHEM/98_DOIF.pm
+UPD 2019-09-29_07:45:03 281514 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -635,7 +635,7 @@ UPD 2019-09-14_07:45:02 333575 FHEM/lib/74_AMADautomagicFlowset_4.4.2.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-09-28_07:45:02 36249 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-09-28_07:45:02 103217 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-09-29_07:45:03 105894 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -737,8 +737,8 @@ UPD 2019-09-28_07:45:07 4130972 docs/commandref.html
 UPD 2019-09-28_07:45:09 2561080 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-09-28_07:45:10 219133 docs/commandref_modular.html
-UPD 2019-09-28_07:45:12 230062 docs/commandref_modular_DE.html
+UPD 2019-09-29_07:45:11 219133 docs/commandref_modular.html
+UPD 2019-09-29_07:45:12 230062 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
