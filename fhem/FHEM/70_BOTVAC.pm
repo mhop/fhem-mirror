@@ -32,6 +32,7 @@ use warnings;
 
 sub BOTVAC_Initialize($) {
     my ($hash) = @_;
+    our $readingFnAttributes;
 
     $hash->{DefFn}    = "BOTVAC::Define";
     $hash->{GetFn}    = "BOTVAC::Get";
@@ -44,7 +45,7 @@ sub BOTVAC_Initialize($) {
     $hash->{AttrList} = "disable:0,1 " .
                         "actionInterval " .
                         "boundaries:textField-long " .
-                         $::readingFnAttributes;
+                         $readingFnAttributes;
 }
 
 package BOTVAC;
@@ -147,7 +148,8 @@ sub Define($$) {
     $hash->{INTERVAL} = $interval;
 
     unless ( defined( AttrVal( $name, "webCmd", undef ) ) ) {
-        $::attr{$name}{webCmd} = 'startCleaning:stop:sendToBase';
+      no warnings "once";
+      $::attr{$name}{webCmd} = 'startCleaning:stop:sendToBase';
     }
 
     # start the status update timer
@@ -692,7 +694,10 @@ sub SendCommand($$;$$@) {
     $header .= "\r\nContent-Type: application/json";
 
     if ($service eq "sessions") {
-      return if (!defined($password));
+      if (!defined($password)) {
+        readingsSingleUpdate($hash, "state", "Password missing (see instructions)",1);
+        return;
+      }
       my $token = createUniqueId() . createUniqueId();
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/sessions";
@@ -1186,10 +1191,15 @@ sub ReceiveCommand($$$) {
                 push(@robotList, $r);
               }
               $hash->{helper}{ROBOTS} = \@robotList;
-
-              SetRobot($hash, ReadingsNum($name, "robot", 0));
-
-              push(@successor , ["robots", "maps"]);
+              if (@robotList) {
+                SetRobot($hash, ReadingsNum($name, "robot", 0));
+                push(@successor , ["robots", "maps"]);
+              } else {
+                Log3($name, 3, "BOTVAC $name: no robots found");
+                Log3($name, 4, "BOTVAC $name: drop successors");
+                LogSuccessors($hash, @successor);
+                @successor = ();
+              }
             }
           }
         }
