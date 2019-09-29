@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
   "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
                            "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes, comref revised ",
@@ -997,7 +998,7 @@ sub Dashboard_GetActiveTab ($;$) {
   my $activeTab = 1;
   
   foreach my $key (%FW_httpheader) {
-      Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key});
+      Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key}) if(defined $FW_httpheader{$key});
   }
   
   if (defined($FW_httpheader{Cookie})) {
