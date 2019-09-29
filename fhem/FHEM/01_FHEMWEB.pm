@@ -3665,10 +3665,10 @@ FW_show($$)
         <ul>
         Space separated list of regexp:icon-name:cmd triples, icon-name and cmd
         may be empty.<br>
-        If the state of the device matches regexp, then icon-name will be
+        If the STATE of the device matches regexp, then icon-name will be
         displayed as the status icon in the room, and (if specified) clicking
-        on the icon executes cmd.  If fhem cannot find icon-name, then the
-        status text will be displayed. 
+        on the icon executes cmd.  If FHEM cannot find icon-name, then the
+        STATE text will be displayed. 
         Example:<br>
         <ul>
         attr lamp devStateIcon on:closed off:open<br>
@@ -4405,10 +4405,10 @@ FW_show($$)
         Leerzeichen getrennte Auflistung von regexp:icon-name:cmd
         Dreierp&auml;rchen, icon-name und cmd d&uuml;rfen leer sein.<br>
 
-        Wenn der Zustand des Ger&auml;tes mit der regexp &uuml;bereinstimmt,
+        Wenn STATE des Ger&auml;tes mit der regexp &uuml;bereinstimmt,
         wird als icon-name das entsprechende Status Icon angezeigt, und (falls
         definiert), l&ouml;st ein Klick auf das Icon das entsprechende cmd aus.
-        Wenn fhem icon-name nicht finden kann, wird der Status als Text
+        Wenn FHEM icon-name nicht finden kann, wird STATE als Text
         angezeigt. 
         Beispiel:<br>
         <ul>
