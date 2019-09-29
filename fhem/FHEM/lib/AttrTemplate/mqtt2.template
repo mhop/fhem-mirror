@@ -1594,7 +1594,7 @@ par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "oMQTTgw_MCU" : InternalVal("DEVICE","DEF","mosquitto")}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE bridgeRegexp\
-  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* "oMQTTgw_BT_$1"\
+  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* "oMQTTgw_BT"\
   BASE_ID/DEVNAME/433toMQTT:.* "oMQTTgw_433"\
   BASE_ID/DEVNAME/IRtoMQTT:.* "oMQTTgw_IR"\
   BASE_ID/DEVNAME/CLIMAtoMQTT/(.*):.* "DEVNAME_$1"
@@ -1603,16 +1603,28 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT:.* { json2nameValue($EVENT,'Sys_')}\
   homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : undef }
-attr DEVICE setList\
-  BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
-  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":$EVTPART1}\
-  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"black-list":[$EVTPART1]}\
-  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
 </a>Version: version
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
+
+name:OpenMQTTGateway_BT_scanner
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.
+order:X_02b
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+attr DEVICE readingList\
+  BASE_ID/DEVNAME//BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
+  BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
+attr DEVICE setList\
+  BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
+  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":$EVTPART1}\
+  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"black-list":[$EVTPART1]}\
+  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}
+attr DEVICE stateFormat Last: last
+attr DEVICE model OpenMQTTGateway_BT_scanner
 
 name:OpenMQTTGateway_simple_RF433_switch
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
@@ -1652,7 +1664,7 @@ defmod DEVICE MQTT2_\DEVICE DEVCID
 attr DEVICE autocreate 0
 attr DEVICE readingList\
   BASE_ID/DEVNAME/CLIMAtoMQTT/bme:.* { json2nameValue($EVENT, 'BME_') }
-attr DEVICE stateformat BME_tempc °C - BME_hum % - hpa hPa
+attr DEVICE stateFormat BME_tempc °C - BME_hum % - hpa hPa
 attr DEVICE userReadings hpa:BME_hpa.* {ReadingsVal($name,"BME_pa",0)/100}
 attr DEVICE model OpenMQTTGateway_bme
 
