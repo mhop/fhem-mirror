@@ -391,8 +391,11 @@ structure_Set($@)
   my %pars;
 
   # see Forum # 28623 for .cachedHelp
-  return $hash->{".cachedHelp"}
-        if(@list > 1 && $list[1] eq "?" && $hash->{".cachedHelp"});
+  if(@list > 1 && $list[1] eq "?") {
+    return $hash->{".cachedHelp"} if($hash->{".cachedHelp"});
+  } elsif(IsDisabled($me)) {
+    return undef;
+  }
 
   my @devList = @{$hash->{".memberList"}};
   if(@list > 1 && $list[$#list] eq "reverse") {
