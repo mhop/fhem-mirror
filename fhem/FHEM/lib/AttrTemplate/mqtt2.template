@@ -1616,7 +1616,7 @@ order:X_02b
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
 attr DEVICE readingList\
-  BASE_ID/DEVNAME//BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
+  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
   BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
@@ -1665,6 +1665,6 @@ attr DEVICE autocreate 0
 attr DEVICE readingList\
   BASE_ID/DEVNAME/CLIMAtoMQTT/bme:.* { json2nameValue($EVENT, 'BME_') }
 attr DEVICE stateFormat BME_tempc °C - BME_hum % - hpa hPa
-attr DEVICE userReadings hpa:BME_hpa.* {ReadingsVal($name,"BME_pa",0)/100}
+attr DEVICE userReadings hpa:BME_pa.* {ReadingsVal($name,"BME_pa",0)/100}
 attr DEVICE model OpenMQTTGateway_bme
 
