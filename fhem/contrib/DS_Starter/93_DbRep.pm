@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 20228 2019-09-22 13:55:54Z DS_Starter $
+# $Id: 93_DbRep.pm 20263 2019-09-27 20:37:25Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.28.0" => "28.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
   "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
   "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
   "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
@@ -1243,7 +1244,16 @@ sub DbRep_Attr($$$$) {
         }
         
 		if ($aName =~ /seqDoubletsVariance/) {
-            unless (looks_like_number($aVal)) { return " The Value of $aName is not valid. Only figures are allowed !";}
+            my $edge = "";
+            if($aVal =~ /EDGE=/) {
+                ($aVal,$edge) = split("EDGE=", $aVal);
+                unless ($edge =~ /^balanced$|^negative$/i) { return " The parameter EDGE can only be \"balanced\" or \"negative\" !";}
+            }            
+            my ($varpos,$varneg) = split(" ", $aVal);
+            $varpos = DbRep_trim($varpos);
+            $varneg = $varpos if(!$varneg);
+            $varneg = DbRep_trim($varneg);
+            unless (looks_like_number($varpos) && looks_like_number($varneg)) { return " The Value of $aName is not valid. Only figures are allowed (except \"EDGE\") !";}
         }
         
 		if ($aName eq "timeYearPeriod") {
@@ -5144,9 +5154,24 @@ sub delseqdoubl_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $limit      = AttrVal($name, "limit", 1000);
- my $var        = AttrVal($name, "seqDoubletsVariance", undef);
+ my $var        = AttrVal($name, "seqDoubletsVariance", undef);                  # allgemeine Varianz
  my $table      = "history";
- my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st,$var1,$var2);
+ my ($err,$dbh,$sth,$sql,$rowlist,$nrows,$selspec,$st,$varo,$varu);
+ 
+ # positive und negative Flankenvarianz spezifizieren
+ my $edge = "balanced";
+ if($var && $var =~ /EDGE=/) {
+     ($var,$edge) = split("EDGE=", $var);
+ }
+ my ($varpos,$varneg);
+ if (defined $var) {
+     ($varpos,$varneg) = split(" ",$var);
+     $varpos = DbRep_trim($varpos);
+     $varneg = $varpos if(!$varneg);
+     $varneg = DbRep_trim($varneg);
+ }
+ Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: $varpos, negative variance: $varneg, EDGE: $edge");
+ $edge = ($edge =~ /balanced/i)?0:1;
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -5209,24 +5234,32 @@ sub delseqdoubl_DoParse($) {
      my ($or,$oor,$odev,$oread,$oval,$ooval,$ndev,$nread,$nval);
      my $i = 0;
      foreach my $nr (map { $_->[0]."_ESC_".$_->[1]."_ESC_".($_->[2] =~ s/ /_ESC_/r)."_ESC_".$_->[3] } @{$sth->fetchall_arrayref()}) {               
-         ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);    # Werte des aktuellen Elements
-	     $or = pop @sel;                                            # das letzte Element der Liste                         
-         ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);    # Value des letzten Elements      
-         if (looks_like_number($oval) && $var) {                    # Varianz +- falls $val numerischer Wert
-             $var1 = $oval + $var;
-             $var2 = $oval - $var;
+         ($ndev,$nread,undef,undef,$nval) = split("_ESC_", $nr);                     # Werte des aktuellen Elements
+	     $or = pop @sel;                                                             # das letzte Element der Liste                         
+         ($odev,$oread,undef,undef,$oval) = split("_ESC_", $or);                     # Value des letzten Elements      
+         
+         if (looks_like_number($oval) && defined $varpos && defined $varneg) {       # unterschiedliche Varianz +/- für numerische Werte
+             $varo = $oval + $varpos;
+             $varu = $oval - $varneg;
+         } elsif (looks_like_number($oval) && defined $varpos && !defined $varneg) { # identische Varianz +/- für numerische Werte
+             $varo = $oval + $varpos;
+             $varu = $oval - $varpos;
          } else {
-             undef $var1;
-             undef $var2;
+             undef $varo;
+             undef $varu;
          }
 	     $oor = pop @sel;                                           # das vorletzte Element der Liste
 		 $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
-		 if ($ndev.$nread ne $odev.$oread) {
+		 
+         if ($ndev.$nread ne $odev.$oread) {
              $i = 0;                                                # neues Device/Reading in einer Periode -> ooor soll erhalten bleiben
 		     push (@sel,$oor) if($oor);
 		     push (@sel,$or) if($or);
 		     push (@sel,$nr);
-		 } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || ($i>=2 && $var1 && $var2 && ($ooval <= $var1) && ($var2 <= $ooval) && ($nval <= $var1) && ($var2 <= $nval)) ) {
+		 
+         } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
+                 ($i>=2 && $varo && $varu && !$edge && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) || 
+                 ($i>=2 && $varo && $varu && $edge &&  ($ooval <= $varo) && ($ooval >= $varu) && ($nval >= $oval)) ) {
 		     push (@sel,$oor);
 		     push (@sel,$nr);
              push (@warp,$or);                                      # Array der zu löschenden Datensätze				 
@@ -5273,10 +5306,10 @@ sub delseqdoubl_DoParse($) {
      $nremain = $nremain + $#sel+1 if(@sel);
      $ntodel = $ntodel + $#warp+1 if(@warp);
      my $sum = $nremain+$ntodel;
-     Log3 ($name, 3, "DbRep $name -> rows analyzed by \"$hash->{LASTCMD}\": $sum") if($sum && $opt =~ /advice/); 
+     Log3 ($name, 3, "DbRep $name - rows analyzed by \"$hash->{LASTCMD}\": $sum") if($sum && $opt =~ /advice/); 
  }
  
- Log3 ($name, 3, "DbRep $name -> rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
+ Log3 ($name, 3, "DbRep $name - rows deleted by \"$hash->{LASTCMD}\": $ndel") if($ndel);
   
  my $retn = ($opt =~ /adviceRemain/)?$nremain:($opt =~ /adviceDelete/)?$ntodel:$ndel; 
 
@@ -5291,7 +5324,7 @@ sub delseqdoubl_DoParse($) {
  }
  
  use warnings;
- Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
+ Log3 ($name, 5, "DbRep $name - row result list:\n$rowlist");
 
  $dbh->disconnect;
  
@@ -10771,12 +10804,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20228 2019-09-22 13:55:54Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20263 2019-09-27 20:37:25Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20228 2019-09-22 13:55:54Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20263 2019-09-27 20:37:25Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -15548,17 +15581,21 @@ sub bdump {
                                 </li> <br>
 
   <a name="seqDoubletsVariance"></a>								
-  <li><b>seqDoubletsVariance </b> - akzeptierte Abweichung (+/-) für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
+  <li><b>seqDoubletsVariance  &lt;Abweichung [untere Abweichung]&gt; </b> 
+                                    - akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
                                     Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische 
-                                    Werte (VALUE) von Datensätze als gleich angesehen und gelöscht werden sollen. 
-                                    "seqDoubletsVariance" ist ein absoluter Zahlenwert, 
-                                    der sowohl als positive als auch negative Abweichung verwendet wird. 
+                                    Werte (VALUE) von Datensätze als gleich angesehen und gelöscht werden sollen.
+                                    Ist in "seqDoubletsVariance" nur Zahlenwert angegeben, wird er sowohl als positive als 
+                                    auch negative Abweichung verwendet. Optional kann ein zweiter Zahlenwert für eine 
+                                    negative Abweichung, getrennt durch Leerzeichen, angegeben werden. Es sind absolute 
+                                    Zahlenwerte anzugeben.
                                     <br><br>
 
                                     <ul>
 							        <b>Beispiele:</b> <br>
-								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014 </code> <br>
-								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
+                                    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
 								    </ul>
 								    <br><br>
                                     </li>                                    
