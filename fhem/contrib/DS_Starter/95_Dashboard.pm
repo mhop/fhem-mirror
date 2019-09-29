@@ -1,4 +1,4 @@
-﻿# $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $
+﻿# $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $
 ########################################################################################
 #       95_Dashboard.pm
 #
@@ -55,7 +55,8 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
-  "3.15.1" => "25.09.2019  chage initial attributes, commandref revised ",
+  "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
+  "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
                            "rename dashboard_activetabRefresh to dashboard_webRefresh, some bugfixes, comref revised ",
   "3.14.0" => "22.09.2019  new attribute dashboard_activetabRefresh, activate the active tab in browser ",
@@ -997,7 +998,7 @@ sub Dashboard_GetActiveTab ($;$) {
   my $activeTab = 1;
   
   foreach my $key (%FW_httpheader) {
-      Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key});
+      Log3 ($name, 5, "Dashboard $name - FW_httpheader $key: ".$FW_httpheader{$key}) if(defined $FW_httpheader{$key});
   }
   
   if (defined($FW_httpheader{Cookie})) {
@@ -1053,12 +1054,12 @@ sub Dashboard_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {   # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                    # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20215 2019-09-21 08:02:04Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );   # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden                                       
       }
