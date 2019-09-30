@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.28.0" => "28.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
+  "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
   "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
   "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
   "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
@@ -5171,7 +5171,6 @@ sub delseqdoubl_DoParse($) {
      $varneg = DbRep_trim($varneg);
  }
  Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: $varpos, negative variance: $varneg, EDGE: $edge");
- $edge = ($edge =~ /balanced/i)?0:1;
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -5250,7 +5249,8 @@ sub delseqdoubl_DoParse($) {
          }
 	     $oor = pop @sel;                                           # das vorletzte Element der Liste
 		 $ooval = (split '_ESC_', $oor)[-1];                        # Value des vorletzten Elements
-		 
+		 # Log3 ($name, 1, "DbRep $name - OOVAL: $ooval, OVAL: $oval, VARO: $varo, VARU: $varu"); 
+         
          if ($ndev.$nread ne $odev.$oread) {
              $i = 0;                                                # neues Device/Reading in einer Periode -> ooor soll erhalten bleiben
 		     push (@sel,$oor) if($oor);
@@ -5258,11 +5258,17 @@ sub delseqdoubl_DoParse($) {
 		     push (@sel,$nr);
 		 
          } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
-                 ($i>=2 && $varo && $varu && !$edge && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) || 
-                 ($i>=2 && $varo && $varu && $edge &&  ($ooval <= $varo) && ($ooval >= $varu) && ($nval >= $oval)) ) {
-		     push (@sel,$oor);
-		     push (@sel,$nr);
-             push (@warp,$or);                                      # Array der zu löschenden Datensätze				 
+                 ($i>=2 && $varo && $varu && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) ) {
+             if ($edge =~ /negative/i && ($ooval > $oval)) {              
+                 push (@sel,$oor);                                  # negative Flanke -> der abfallende DS und desssen Vorgänger 
+                 push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
+                 push (@sel,$nr);                                                     
+             } else {
+                 push (@sel,$oor);                                  # Array der zu behaltenden Datensätze
+                 push (@sel,$nr);                                   # Array der zu behaltenden Datensätze
+                 push (@warp,$or);                                  # Array der zu löschenden Datensätze                         
+             }
+             
              if ($opt =~ /delete/ && $or) {                         # delete Datensätze
 		         my ($dev,$read,$date,$time,$val) = split("_ESC_", $or);
 				 my $dt = $date." ".$time;
@@ -15581,14 +15587,18 @@ sub bdump {
                                 </li> <br>
 
   <a name="seqDoubletsVariance"></a>								
-  <li><b>seqDoubletsVariance  &lt;Abweichung [untere Abweichung]&gt; </b> 
-                                    - akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
+  <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative]&gt; </b> <br> 
+                                    Akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
                                     Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische 
-                                    Werte (VALUE) von Datensätze als gleich angesehen und gelöscht werden sollen.
-                                    Ist in "seqDoubletsVariance" nur Zahlenwert angegeben, wird er sowohl als positive als 
-                                    auch negative Abweichung verwendet. Optional kann ein zweiter Zahlenwert für eine 
-                                    negative Abweichung, getrennt durch Leerzeichen, angegeben werden. Es sind absolute 
-                                    Zahlenwerte anzugeben.
+                                    Werte (VALUE) von Datensätzen als gleich angesehen werden sollen.
+                                    Ist in "seqDoubletsVariance" nur ein Zahlenwert angegeben, wird er sowohl als positive als 
+                                    auch negative Abweichung verwendet und bilden den "Löschkorridor". 
+                                    Optional kann ein zweiter Zahlenwert für eine negative Abweichung, getrennt durch 
+                                    Leerzeichen, angegeben werden. 
+                                    Es sind immer absolute, d.h. positive Zahlenwerte anzugeben. <br>
+                                    Ist der Zusatz "EDGE=negative" angegeben, werden Werte an einer negativen Flanke 
+                                    (z.B. beim Wechel von 4.0 - 1.0) nicht gelöscht auch wenn sie sich im "Löschkorridor"
+                                    befinden.
                                     <br><br>
 
                                     <ul>
