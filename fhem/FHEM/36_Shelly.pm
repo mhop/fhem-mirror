@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.06";
+my $version = "2.07";
 
 #-- these we may get on request
 my %gets = (
@@ -1449,17 +1449,17 @@ sub Shelly_updown2($){
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt;</code>
                 <br />switches device on or off for &lt;time&gt; seconds. </li> 
             <li>
-                <code>set &lt;name&gt; hsv &lt;hue value 0..360&gt;&lt;saturation value 0..1&gt;&lt;brightness value 0..1&gt; </code>
-                <br />6-digit hex string to set the color.</li>    
+                <code>set &lt;name&gt; hsv &lt;hue value 0..360&gt;,&lt;saturation value 0..1&gt;,&lt;brightness value 0..1&gt; </code>
+                <br />comma separated list of hue, saturation and value to set the color</li>    
             <li>
                 <code>set &lt;name&gt; rgb &lt;rrggbb&gt; </code>
-                <br />6-digit hex string to set the color.</li>      
+                <br />6-digit hex string to set the color</li>      
             <li>
                 <code>set &lt;name&gt; rgbw &lt;rrggbbww&gt; </code>
                 <br />8-digit hex string to set the color and white value</li>    
             <li>
                 <code>set &lt;name&gt; white &lt;integer&gt;</code>
-                <br /> number 0..255 to set the white value </li>    
+                <br /> number 0..255 to set the white value</li>    
         </ul>
         <a name="Shellyget" id="Shellyget"></a>
         <h4>Get</h4>

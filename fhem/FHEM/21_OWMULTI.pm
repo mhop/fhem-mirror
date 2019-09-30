@@ -41,14 +41,11 @@ BEGIN {
 	};
 };
 
-use ProtoThreads;
-no warnings 'deprecated';
-
 sub Log($$);
 
-my $owx_version="7.02";
+my $owx_version="7.2";
 #-- flexible channel name
-my ($owg_channel,$owg_schannel);
+my ($owg_channel,$owg_schannel,$owg_sichannel);
 
 my %gets = (
   "id"          => ":noArg",
@@ -61,6 +58,10 @@ my %gets = (
 
 my %sets = (
   "interval"    => "",
+  "inittime"    => ":noArg",
+  "offset"      => ":-3,-2,-1,0,1,2,3",
+  "calibrate"   => ":noArg",
+  "startdischarge" => ":noArg"
 );
 
 my %updates = (
@@ -93,20 +94,17 @@ sub OWMULTI_Initialize ($) {
   $hash->{InitFn}  = "OWMULTI_Init";
   $hash->{AttrFn}  = "OWMULTI_Attr";
 
-  #tempOffset = a temperature offset added to the temperature reading for correction 
-  #tempUnit   = a unit of measure: C/F/K
-  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 verbose:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "IODev do_not_notify:0,1 model:DS2438 verbose:0,1,2,3,4,5 ".
                      "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin ".
-                     "VName VUnit VFunction WName WUnit WFunction ".
+                     "VName VUnit VFunction WName WUnit WFunction XName XUnit XFunction ".
                      "interval ".
                      $readingFnAttributes;
                      
   #-- temperature and voltage globals - always the raw values from the device
-  $hash->{owg_val}->[0] = undef;
-  $hash->{owg_val}->[1] = undef;
-  $hash->{owg_val}->[2] = undef;
-  $hash->{owg_val}->[3] = undef;
-                     
+  for(my $i=0;$i<7;$i++){
+    $hash->{owg_val}->[$i] = undef;
+  }
+               
   #-- make sure OWX is loaded so OWX_CRC is available if running with OWServer
   main::LoadModule("OWX");	
 }
@@ -143,7 +141,6 @@ sub OWMULTI_Attr(@) {
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
           if ($init_done) {
             OWMULTI_Init($hash);
           }
@@ -239,9 +236,7 @@ sub OWMULTI_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
-  }
+  } 
 
   $main::modules{OWMULTI}{defptr}{$id} = $hash;
   #--
@@ -325,7 +320,7 @@ sub OWMULTI_ChannelNames($) {
   
   
   #-- Set channel name, channel unit for sense channel
-  $cname = defined($attr{$name}{"WName"})  ? $attr{$name}{"WName"} : "sense|s";
+  $cname = defined($attr{$name}{"WName"})  ? $attr{$name}{"WName"} : "vsense|vs";
   @cnama = split(/\|/,$cname);
   if( int(@cnama)!=2){
     push(@cnama,$cnama[0]);
@@ -344,6 +339,27 @@ sub OWMULTI_ChannelNames($) {
   $hash->{READINGS}{$owg_schannel}{VAL}      = " ";  
   $hash->{READINGS}{$owg_schannel}{ABBR}     = $cnama[1];  
   $hash->{READINGS}{$owg_schannel}{UNIT}     = $unit;
+  
+  #-- Set channel name, channel unit for sense integrated channel
+  $cname = defined($attr{$name}{"XName"})  ? $attr{$name}{"XName"} : "vsense.t|vs.t";
+  @cnama = split(/\|/,$cname);
+  if( int(@cnama)!=2){
+    push(@cnama,$cnama[0]);
+  }
+ 
+  #-- unit
+  $unit = defined($attr{$name}{"XUnit"})  ? $attr{$name}{"XUnit"} : "Vs";
+  if($unit eq "none"){
+    $unit = ""
+  }else{
+    $unit = " ".$unit
+  }  
+    
+  #-- put into readings
+  $owg_sichannel = $cnama[0]; 
+  $hash->{READINGS}{$owg_sichannel}{VAL}      = " ";  
+  $hash->{READINGS}{$owg_sichannel}{ABBR}     = $cnama[1];  
+  $hash->{READINGS}{$owg_sichannel}{UNIT}     = $unit;
     
   #-- temperature scale 
   $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
@@ -386,11 +402,11 @@ sub OWMULTI_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($toffset,$tfactor,$tval,$vfunc,$wfunc,$vval,$wval);
+  my ($toffset,$tfactor,$tval,$vfunc,$wfunc,$xfunc,$vval,$wval,$xval);
   my $svalue  = "";
   
-  #-- no change in any value if invalid reading
-  return if( ($hash->{owg_val}->[0] eq "") || ($hash->{owg_val}->[1] eq "") || ($hash->{owg_val}->[2] eq "") || ($hash->{owg_val}->[3] eq ""));
+  #-- no change in any value if invalid reading DOES NOT WORK !!
+  return if( ($hash->{owg_val}->[0] eq "") || ($hash->{owg_val}->[1] eq "") || ($hash->{owg_val}->[2] eq "") || ($hash->{owg_val}->[3] eq "") || ($hash->{owg_val}->[4] eq ""));
   
   #-- obtain channel names
   OWMULTI_ChannelNames($hash);
@@ -403,19 +419,19 @@ sub OWMULTI_FormatValues($) {
   #-- attribute V/WFunction defined ?
   $vfunc   = defined($attr{$name}{"VFunction"}) ? $attr{$name}{"VFunction"} : "V";
   $wfunc   = defined($attr{$name}{"WFunction"}) ? $attr{$name}{"WFunction"} : "W";
+  $xfunc   = defined($attr{$name}{"XFunction"}) ? $attr{$name}{"XFunction"} : "X";
 
   #-- replace by proper values 
   $vfunc =~ s/VDD/\$hash->{owg_val}->[1]/g;
   $vfunc =~ s/V/\$hash->{owg_val}->[2]/g;
-  $vfunc =~ s/W/\$hash->{owg_val}->[3]/g;
   $vfunc =~ s/T/\$tval/g;
-  $wfunc =~ s/VDD/\$hash->{owg_val}->[1]/g;
-  $wfunc =~ s/V/\$hash->{owg_val}->[2]/g;
+  
   $wfunc =~ s/W/\$hash->{owg_val}->[3]/g;
-  $wfunc =~ s/T/\$tval/g;
+ 
+  $xfunc =~ s/X/\$hash->{owg_val}->[4]/g;
   
   #-- determine the measured value from the function
-  $vfunc = "\$hash->{owg_val}->[1] = $hash->{owg_val}->[1]; \$hash->{owg_val}->[2] = $hash->{owg_val}->[2]; \$hash->{owg_val}->[3] = $hash->{owg_val}->[3]; \$tval = $tval; ".$vfunc;
+  $vfunc = "\$hash->{owg_val}->[1] = $hash->{owg_val}->[1]; \$hash->{owg_val}->[2] = $hash->{owg_val}->[2]; \$tval = $tval; ".$vfunc;
   #Log 1, "vfunc= ".$vfunc;
   $vfunc = eval($vfunc);
   if( !$vfunc ){
@@ -426,26 +442,61 @@ sub OWMULTI_FormatValues($) {
     $vval = "???"; 
   }
   
-  $wfunc = "\$hash->{owg_val}->[1] = $hash->{owg_val}->[1]; \$hash->{owg_val}->[2] = $hash->{owg_val}->[2]; \$hash->{owg_val}->[3] = $hash->{owg_val}->[3]; \$tval = $tval; ".$wfunc;
-  #Log 1, "wfunc= ".$wfunc;
+  $wfunc = "\$hash->{owg_val}->[3] = $hash->{owg_val}->[3]; ".$wfunc;
   $wfunc = eval($wfunc);
   if( !$wfunc ){
     $wval = 0.0;
   } elsif( $wfunc ne "" ){
-    $wval = int( $wfunc*100+0.5)/100;
+    if( abs($wfunc) > 1 ){
+      $wval = int( $wfunc*100+0.5)/100;
+    }elsif( abs($wfunc) > 0.1 ){ 
+      $wval = int( $wfunc*1000+0.5)/1000;
+    }elsif( abs($wfunc) > 0.01 ){ 
+      $wval = int( $wfunc*10000+0.5)/10000;
+    }elsif( abs($wfunc) > 0.001 ){ 
+      $wval = int( $wfunc*100000+0.5)/100000;    
+    }else{
+      $wval = $wfunc;
+    }   
   } else {
     $wval = "???";
   }
   
+  $xfunc = "\$hash->{owg_val}->[4] = $hash->{owg_val}->[4]; ".$xfunc;
+  #Log 1, "xfunc= ".$xfunc;
+  $xfunc = eval($xfunc);
+  if( !$xfunc ){
+    $xval = 0.0;
+  } elsif( $xfunc ne "" ){
+    if( abs($xfunc) > 1 ){
+      $xval = int( $xfunc*100+0.5)/100;
+    }elsif( abs($xfunc) > 0.1 ){ 
+      $xval = int( $xfunc*1000+0.5)/1000;
+    }elsif( abs($xfunc) > 0.01 ){ 
+      $xval = int( $wfunc*10000+0.5)/10000;
+    }elsif( abs($xfunc) > 0.001 ){ 
+      $xval = int( $xfunc*100000+0.5)/100000;    
+    }else{
+      $xval = $xfunc;
+    }   
+  } else {
+    $xval = "???";
+  }
+  
   #-- string buildup for return value, STATE 
-  $svalue .= sprintf( "%s: %5.2f%s (T: %5.1f%s %s: %5.2f%s)", 
+  $svalue .= sprintf( "%s: %5.2f%s (T: %5.1f%s %s: %5.2f%s %s: %5.2f%s)", 
     $hash->{READINGS}{$owg_channel}{ABBR}, $vval,$hash->{READINGS}{$owg_channel}{UNIT},
-    $tval,$hash->{READINGS}{"temperature"}{UNIT}, $hash->{READINGS}{$owg_schannel}{ABBR}, $wval,$hash->{READINGS}{$owg_schannel}{UNIT});
+    $tval,$hash->{READINGS}{"temperature"}{UNIT}, $hash->{READINGS}{$owg_schannel}{ABBR}, $wval,$hash->{READINGS}{$owg_schannel}{UNIT},
+                                                  $hash->{READINGS}{$owg_sichannel}{ABBR}, $xval,$hash->{READINGS}{$owg_sichannel}{UNIT});
+  
+  $hash->{offset}=$hash->{owg_val}->[5];
   
   #-- put into READINGS
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,$owg_channel,$vval);
   readingsBulkUpdate($hash,$owg_schannel,$wval);
+  readingsBulkUpdate($hash,$owg_sichannel,$xval);
+  readingsBulkUpdate($hash,"time",$hash->{owg_val}->[6]);
   readingsBulkUpdate($hash,"VDD",sprintf("%4.2f",$hash->{owg_val}->[1]));
   readingsBulkUpdate($hash,"temperature",$tval);
   
@@ -508,11 +559,6 @@ sub OWMULTI_Get($@) {
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
     $ret = OWXMULTI_GetValues($hash);
-  }elsif( $interface eq "OWX_ASYNC"){
-    eval {
-      $ret = OWX_ASYNC_RunToCompletion($hash,OWXMULTI_PT_GetValues($hash));
-    };
-    $ret = GP_Catch($@) if $@;
   #-- OWFS interface  
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
@@ -584,11 +630,6 @@ sub OWMULTI_GetValues($) {
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
     $ret = OWXMULTI_GetValues($hash);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXMULTI_PT_GetValues($hash) );
-    };
-    $ret = GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_GetValues($hash);
   }else{
@@ -617,11 +658,9 @@ sub OWMULTI_InitializeDevice($) {
   my $name   = $hash->{NAME};
   
   #-- Initial readings
-  $hash->{owg_val}->[0] = "";
-  $hash->{owg_val}->[1] = "";
-  $hash->{owg_val}->[2] = "";  
-  $hash->{owg_val}->[3] = "";  
-  
+  for( my $i=0;$i<7;$i++){
+    $hash->{owg_val}->[$i] = "";
+  }
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
 }
@@ -639,12 +678,14 @@ sub OWMULTI_Set($@) {
   my ($hash, @a) = @_;
 
   #-- for the selector: which values are possible
-  return join(" ", sort keys %sets) if(@a == 2);
+  #return join(" ", sort keys %sets) if(@a == 2);
+  #return join(" ", map { "$_$sets{$_}" } keys %sets) if(@a <= 2);
+
   #-- check syntax
-  return "OWMULTI: Set needs one parameter"
-    if(int(@a) != 3);
+  #return "OWMULTI: Set needs one parameter"
+  #  if(int(@a) != 3);
   #-- check argument
-  return "OWMULTI: Set with unknown argument $a[1], choose one of ".join(",", sort keys %sets)
+  return "OWMULTI: Set with unknown argument $a[1], choose one of ".join(" ", map { "$_$sets{$_}" } keys %sets)
       if(!defined($sets{$a[1]}));
       
   #-- define vars
@@ -668,26 +709,22 @@ sub OWMULTI_Set($@) {
 
   #-- set other values depending on interface type
   my $interface = $hash->{IODev}->{TYPE};
-  my $offset    = $hash->{tempf}{offset};
-  my $factor    = $hash->{tempf}{factor};
+  
+  #my $offset    = $hash->{tempf}{offset};
+  #my $factor    = $hash->{tempf}{factor};
     
   #-- find upper and lower boundaries for given offset/factor
-  my $mmin = (-55+$offset)*$factor;
-  my $mmax = (125+$offset)*$factor;
-  return sprintf("OWMULTI: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
-    if($value < $mmin || $value > $mmax);
+  #my $mmin = (-55+$offset)*$factor;
+  #my $mmax = (125+$offset)*$factor;
+  #return sprintf("OWMULTI: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
+  #  if($value < $mmin || $value > $mmax);
     
   #-- seems to be ok, put into the device
-  $a[2]  = int($value/$factor-$offset);
+  #$a[2]  = int($value/$factor-$offset);
 
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXMULTI_SetValues($hash,@a);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXMULTI_PT_SetValues($hash,@a) );
-    };
-    $ret = GP_Catch($@) if $@;
   #-- OWFS interface 
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSMULTI_SetValues($hash,@a);
@@ -755,7 +792,59 @@ sub OWFSMULTI_GetValues($) {
   $hash->{owg_val}->[0]   = OWServer_Read($master,"/$owx_add/temperature");
   $hash->{owg_val}->[1]   = OWServer_Read($master,"/$owx_add/VDD");
   $hash->{owg_val}->[2]   = OWServer_Read($master,"/$owx_add/VAD");
-  $hash->{owg_val}->[3]   = OWServer_Read($master,"/$owx_add/vis");
+  #$hash->{owg_val}->[3]   = OWServer_Read($master,"/$owx_add/vis"); 
+    
+  #-- page 0
+  my ($value,$lsb,$msb,$sign);
+  my $res = OWServer_Read($master,"/$owx_add/pages/page.0");
+  my @data=split(//,$res);
+  
+  #-- external voltage
+  #$lsb  = ord($data[3]);
+  #$msb  = ord($data[4]) & 3;
+  #$hash->{owg_val}->[2] = ($msb*256 + $lsb)/100.;
+  
+  #-- check if it really differs from supply voltage - if not, we assume an error
+  if( $hash->{owg_val}->[1] == $hash->{owg_val}->[2] ){
+     return "false return from OWServer, VAD not different from VDD ";
+  }
+  
+  #-- external current
+  $lsb  = ord($data[5]);
+  $msb  = ord($data[6]) & 3;  
+  $sign = ord($data[6]) & 128;   
+  if( $sign==0 ){
+    $hash->{owg_val}->[3] = ($msb*256 + $lsb)/4096.;
+  }else{
+    $hash->{owg_val}->[3] = -((3-$msb)*256 + (255-$lsb)+ 1)/4096.; 
+  }
+  
+  #-- check if it really differs from supply voltage - if not, we assume an error
+  if( $hash->{owg_val}->[1] == $hash->{owg_val}->[2] ){
+     return "false return from OWServer, VAD not different from VDD ";
+  }
+  
+  #-- page 1
+  $res = OWServer_Read($master,"/$owx_add/pages/page.1");
+  @data=split(//,$res);
+  
+  #-- time 
+  $hash->{owg_val}->[6] = ord($data[0]) + 256*( ord($data[1]) + 256*( ord($data[2]) + 256*ord($data[3]) ) );
+     
+  #-- integrated current
+  $lsb  = ord($data[4]);
+  $hash->{owg_val}->[4] = $lsb/2048;
+    
+  #-- offset
+  $lsb  = ord($data[5]) & 248;
+  $msb  = ord($data[6]) & 15;
+  $sign = ord($data[6]) & 16;
+       
+  if( $sign==0 ){
+    $hash->{owg_val}->[5] = ($msb*256. + $lsb)/8;  
+  }else{
+    $hash->{owg_val}->[5] = -((15-$msb)*256. + (248-$lsb))/8; 
+  } 
   
   return "no return from OWServer"
     if( (!defined($hash->{owg_val}->[0])) || (!defined($hash->{owg_val}->[1])) || (!defined($hash->{owg_val}->[2])) || (!defined($hash->{owg_val}->[3])) );
@@ -764,7 +853,7 @@ sub OWFSMULTI_GetValues($) {
     
   #-- and now from raw to formatted values 
   $hash->{PRESENT}  = 1;
-  my $value = OWMULTI_FormatValues($hash);
+  $value = OWMULTI_FormatValues($hash);
   return undef;
 }
 
@@ -779,7 +868,84 @@ sub OWFSMULTI_GetValues($) {
 
 sub OWFSMULTI_SetValues($@) {
   my ($hash, @a) = @_;
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
   
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #-- define vars
+  my $key   = $a[1];
+  my $value = $a[2];
+  my ($res0,$res1,$cmd,$offset,$offset2,$sign,$offmsb,$offlsb);
+  my $nocur=0;
+  
+  #-- page 0
+  my @data0=();
+  #-- page 1
+  $res1 = OWServer_Read($master,"/$owx_add/pages/page.1");
+  my @data1=split(//,$res1);
+
+  #-- zero the time register
+  if( $key eq "inittime" ){
+    $cmd = sprintf("\x00\x00\x00\x00%c%c%c%c",ord($data1[4]),ord($data1[5]),ord($data1[6]),ord($data1[7]));
+  }elsif( $key eq "startdischarge" ){
+    $cmd = sprintf("\x00\x00\x00\x00\xFF%c%c%c",ord($data1[5]),ord($data1[6]),ord($data1[7]));
+  #-- write the offset register
+  }elsif( $key eq "offset" ){
+    $nocur=1;
+    #-- page 0
+    $res0 = OWServer_Read($master,"/$owx_add/pages/page.0");
+    if( $value >= 0 ){
+      $offlsb=8*$value;
+      $offmsb=0;
+    }else{
+      $offlsb= 248+8*$value;
+      $offmsb= 31;
+    }  
+    $cmd = sprintf("%c%c%c%c%c%c%c%c",$data1[0],$data1[1],$data1[2],$data1[3],$data1[4],$offlsb,$offmsb,$data1[7]);
+  #-- calibrate the offset register 
+  }elsif( $key eq "calibrate" ){
+    $nocur=1;
+    #-- page 0
+    $res0 = OWServer_Read($master,"/$owx_add/pages/page.0");
+    my ($lsb,$msb,$sign);
+    @data0=split(//,$res0);
+    #-- external current
+    $lsb  = ord($data0[5]);
+    $msb  = ord($data0[6]) & 3;  
+    $sign = ord($data0[6]) & 128;   
+    if( $sign==0 ){
+      $hash->{owg_val}->[3] = ($msb*256 + $lsb)/4096.;
+    }else{
+      $hash->{owg_val}->[3] = -((3-$msb)*256 + (255-$lsb))/4096.; 
+    }
+    $offset = -$hash->{owg_val}->[3];
+    #-- 2's complement form = signed bytes
+    if( $offset>0 ){
+      $offset2 = abs($offset)*4096*8;
+      $sign    = 0;
+    }else{
+      $offset2 = 8*(1024+$offset*4096);
+      $sign    = 16;
+    }  
+    $offlsb = $offset2 & 255;
+    $offmsb = int($offset2/256) & 15 + $sign;
+    $cmd    = sprintf("%c%c%c%c%c%c%c%c",$data1[0],$data1[1],$data1[2],$data1[3],$data1[4],$offlsb,$offmsb,$data1[7]);
+  }else{
+    Log 1, "OWFSMULTI_SetValues: Unknown key $key";
+    return undef;
+  }
+  if( $nocur==1 ){
+    OWServer_Write($master, "/$owx_add/pages/page.0",sprintf("\x00%c%c%c%c%c%c%c",ord($data0[1]),ord($data0[2]),ord($data0[3]),ord($data0[4]),ord($data0[5]),ord($data0[6]),ord($data0[7])));
+  }
+  OWServer_Write(  $master, "/$owx_add/pages/page.1",$cmd);
+  if( $nocur==1 ){
+    OWServer_Write($master, "/$owx_add/pages/page.0",sprintf("\x01%c%c%c%c%c%c%c",ord($data0[1]),ord($data0[2]),ord($data0[3]),ord($data0[4]),ord($data0[5]),ord($data0[6]),ord($data0[7])));
+  }
+  return undef
+ 
 }
 
 ########################################################################################
@@ -826,7 +992,7 @@ sub OWXMULTI_BinValues($$$$$$$) {
   OWX_WDBGL($name,4,"OWXMULTI_BinValues: called for device $name in context $context with data ",$res);
   
   #-- always check for success, unused are reset, numread
-  return unless ($context =~ /^ds2438.getv[ad]d$/);
+  return unless ($context =~ /^ds2438.get.*$/);
 
   #-- we have to get rid  of the first 11 bytes
   if( length($res) == 20 ){
@@ -835,7 +1001,7 @@ sub OWXMULTI_BinValues($$$$$$$) {
   @data=split(//,$res);
     
   #-- process results
-  if ((ord($data[0]) & 112)!=0) {
+  if ( ($context =~ /^ds2438.getv[ad]$/) && ((ord($data[0]) & 112)!=0) ) {
     $msg   = "$name: conversion not complete or data invalid in context $context ";
     $error = 1;
   }elsif (OWX_CRC8(substr($res,0,8),$data[8]) eq "\0x00") {
@@ -851,16 +1017,12 @@ sub OWXMULTI_BinValues($$$$$$$) {
   #   family = A6 => DS2438a
   #-- transform binary rep of VDD
   if( $context eq "ds2438.getvdd") { 
-    #-- possible addtional check: $data[0] must be 08
+    #-- possible addtional check: $data[0] must be 09
+    
     #-- temperature
     $lsb  = ord($data[1]);
     $msb  = ord($data[2]) & 127;
     $sign = ord($data[2]) & 128;
-          
-    #-- test with -55 degrees
-    #$lsb   = 0;
-    #$sign  = 1;
-    #$msb   = 73;
          
     #-- 2's complement form = signed bytes
     $hash->{owg_val}->[0] = $msb+ $lsb/256.;   
@@ -868,38 +1030,68 @@ sub OWXMULTI_BinValues($$$$$$$) {
        $hash->{owg_val}->[0] = -128+$hash->{owg_val}->[0];
     }
       
-    #-- voltage
+    #-- supply voltage
     $lsb  = ord($data[3]);
     $msb  = ord($data[4]) & 3;
-          
-    #-- test with 5V
-    #$lsb  = 244;
-    #$msb  = 1;
-         
-    #-- supply voltage
     $hash->{owg_val}->[1] = ($msb*256+ $lsb)/100.;
     
   #-- transform binary rep of VAD
   }elsif( $context eq "ds2438.getvad") {      
-    #-- possible addtional check: $data[0] must be 08
-    #-- voltage
+    #-- possible addtional check: $data[0] must be 01
+     
+    #-- external voltage
     $lsb  = ord($data[3]);
     $msb  = ord($data[4]) & 3;
-          
-    #-- test with 7.2 V
-    #$lsb  = 208;
-    #$msb  = 2;
-          
-    #-- external voltage
-    $hash->{owg_val}->[2] = ($msb*256+ $lsb)/100.;
+    $hash->{owg_val}->[2] = ($msb*256 + $lsb)/100.;
     
-    #-- current
-    $lsb  = ord($data[5]);
-    $msb  = ord($data[6]) & 3;        
-          
+    #-- check if it really differs from supply voltage - if not, we assume an error
+    if( $hash->{owg_val}->[1] == $hash->{owg_val}->[2] ){
+      $msg   = "$name: VAD not different from VDD ";
+      $error = 1;
+      OWX_WDBGL($name,5-4*$error,"OWXMULTI_BinValues:  ".$msg,undef);
+    }
+    
     #-- external current
-    $hash->{owg_val}->[3] = ($msb*256.+ $lsb)/4096;
+    $lsb  = ord($data[5]);
+    $msb  = ord($data[6]) & 3;  
+    $sign = ord($data[6]) & 128;   
+    if( $sign==0 ){
+      $hash->{owg_val}->[3] = ($msb*256 + $lsb)/4096.;
+    }else{
+      $hash->{owg_val}->[3] = -((3-$msb)*256 + (255-$lsb) + 1)/4096.; 
+    }
     
+  }elsif( $context eq "ds2438.getiac") {      
+    #-- time 
+    $hash->{owg_val}->[6] = ord($data[0]) + 256*( ord($data[1]) + 256*( ord($data[2]) + 256*ord($data[3]) ) );
+     
+    #-- integrated current
+    $lsb  = ord($data[4]);
+    $hash->{owg_val}->[4] = $lsb/2048;
+    
+    #-- offset
+    $lsb  = ord($data[5]) & 248;
+    $msb  = ord($data[6]) & 15;
+    $sign = ord($data[6]) & 16;
+    
+    if( $sign==0 ){
+      $hash->{owg_val}->[5] = ($msb*256. + $lsb)/8;  
+    }else{
+      $hash->{owg_val}->[5] = -((15-$msb)*256. + (248-$lsb))/8; 
+    }
+    #-- check
+    #my( $offset,$offset2,$offmsb,$offlsb);
+    #  $offset = $hash->{owg_val}->[5];
+    #if( $offset >= 0 ){
+    #  $offmsb = int($offset/32);
+    #  $offlsb = int($offset-32*$offmsb)*8;
+    #}else{
+    #  $offmsb = 15 - int(-$offset/32);   
+    #  $offlsb = 248 - int(-$offset-32*(15-$offmsb))*8
+    #  #$offmsb += 16;
+    #}
+    #Log 1,"======> Offset $offset from register msb=$msb lsb=$lsb vs. calculated msb=$offmsb lsb=$offlsb";
+   
     #-- and now from raw to formatted values
     if( $error ){
       $hash->{ERRCOUNT}++;
@@ -935,18 +1127,17 @@ sub OWXMULTI_GetValues($) {
   #-- reset presence
   $hash->{PRESENT}  = 0;
   #------------------------------------------------------------------------------------
-  #-- switch the device to current measurement off, VDD only
+  #-- switch the device to current measurement on, VDD only
   #-- issue the match ROM command \x55 and the write scratchpad command
-  #-- OLD OWX interface
+  #-- synchronous OWX interface
   if( !$master->{ASYNCHRONOUS} ){
     OWX_Reset($master);
-    #if( OWX_Complex($master,$owx_dev,"\x4E\x00\x08",0) eq 0 ){
     if( OWX_Complex($master,$owx_dev,"\x4E\x00\x09",0) eq 0 ){
       return "$owx_dev write status failed";
     }
   
     #-- copy scratchpad to register
-    #-- issue the match ROM command \x55 and the copy scratchpad command
+    #-- issue the match ROM command \x55 and the copy scratchpad command 
     OWX_Reset($master);
     if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
       return "$owx_dev copy scratchpad failed"; 
@@ -989,12 +1180,12 @@ sub OWXMULTI_GetValues($) {
     return "$owx_dev has returned invalid data"
       if( length($res)!=20);
     $ret = OWXMULTI_BinValues($hash,"ds2438.getvdd",undef,$owx_dev,undef,undef,substr($res,11));
+    #Log 1,"==============> TEMP/VDD obtained, ret=$ret";
     return $ret if (defined $ret);
     #------------------------------------------------------------------------------------
-    #-- switch the device to current measurement off, V external only
+    #-- switch the device to current measurement on, V external only
     #-- issue the match ROM command \x55 and the write scratchpad command
     OWX_Reset($master);
-    #if( OWX_Complex($master,$owx_dev,"\x4E\x00\x00",0) eq 0 ){
     if( OWX_Complex($master,$owx_dev,"\x4E\x00\x01",0) eq 0 ){
       return "$owx_dev write status failed";
     } 
@@ -1025,21 +1216,43 @@ sub OWXMULTI_GetValues($) {
     #-- NOW ask the specific device 
     #-- issue the match ROM command \x55 and the read scratchpad command \xBE
     #-- reading 9 + 2 + 9 data bytes = 20 bytes
-    my $context = "ds2438.getvad";
     OWX_Reset($master);
     $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
+    #Log 1,"OWXMULTI: data length from reading device is ".length($res)." bytes";
+    return "$owx_dev not accessible in 2nd step"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=20);
+    $ret = OWXMULTI_BinValues($hash,"ds2438.getvad",undef,$owx_dev,undef,undef,substr($res,11));
+    #Log 1,"==============> VAD obtained, ret=$ret";
+    return $ret if (defined $ret);
+    #------------------------------------------------------------------------------------
+    #-- read second memory page  
+    #-- from memory to scratchpad
+    #-- copy needs some 12 ms !
+    #-- issue the match ROM command \x55 and the recall memory command
+    OWX_Reset($master);
+    if( OWX_Complex($master,$owx_dev,"\xB8\x01",0.02) eq 0 ){
+      return "$owx_dev recall memory failed";
+    } 
+    select(undef,undef,undef,0.012);
+  
+    #-- NOW ask the specific device 
+    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+    #-- reading 9 + 2 + 9 data bytes = 20 bytes
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,"\xBE\x01",9);
+    
     #-- process results
     return "$owx_dev not accessible in 2nd step"
       if( $res eq 0 );
     return "$owx_dev has returned invalid data"
       if( length($res)!=20);
-    return OWXMULTI_BinValues($hash,$context,undef,$owx_dev,undef,undef,substr($res,11));
-#-- NEW OWX interface
+    $ret = OWXMULTI_BinValues($hash,"ds2438.getiac",undef,$owx_dev,undef,undef,substr($res,11));
+    #Log 1,"==============> 2nd page obtained, ret=$ret";
+    return $ret;
+  #-- asynchronous OWX interface
   }else{
-    #-- switch the device to current measurement off, VDD only
-    #-- issue the match ROM command \x55 and the write scratchpad command
-    ####        master   slave  context  proc  owx_dev   data            crcpart  numread  startread callback delay
-    #OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x08", 0,       0,       0,        undef,   undef); 
     #-- switch the device to current measurement on, VDD only
     #-- issue the match ROM command \x55 and the write scratchpad command
     ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
@@ -1064,7 +1277,7 @@ sub OWXMULTI_GetValues($) {
   
     #-- from memory to scratchpad
     #-- copy needs some 12 ms !
-    #-- issue the match ROM command \x55 and the recall memory command
+    #-- issue the match ROM command \x55 and the recall memory command (page 0)
     ####        master   slave  context     proc  owx_dev   data        crcpart  numread  startread callback delay
     OWX_Qomplex($master, $hash, "recall",   0,    $owx_dev, "\xB8\x00", 0,       2,       0,        undef,   0.015); 
     
@@ -1075,15 +1288,10 @@ sub OWXMULTI_GetValues($) {
     #                                              1 provides additional reset after last operation
     OWX_Qomplex($master, $hash, "ds2438.getvdd",   1,    $owx_dev, "\xBE\x00", 0,       20,       0,        \&OWXMULTI_BinValues,   0.015); 
    
-    #-- switch the device to current measurement off, V external only
-    #-- issue the match ROM command \x55 and the write scratchpad command
-    ####        master   slave  context  proc  owx_dev   data            crcpart  numread  startread callback delay
-    #OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x00", 0,       0,       0,        undef,   undef); 
-    #-- switch the device to current measurement on, V external only
+    #-- switch the device to current measurement on, V external only. Wait a little bit longer !
     #-- issue the match ROM command \x55 and the write scratchpad command
     ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
-    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x01", 0,       1,       0,        undef,   0.015); 
-
+    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x01", 0,       1,       0,        undef,   0.025); 
 
     #-- copy scratchpad to register
     #-- issue the match ROM command \x55 and the copy scratchpad command
@@ -1098,7 +1306,7 @@ sub OWXMULTI_GetValues($) {
    
     #-- from memory to scratchpad
     #-- copy needs some 12 ms !
-    #-- issue the match ROM command \x55 and the recall memory command
+    #-- issue the match ROM command \x55 and the recall memory command (page 0)
     ####        master   slave  context   proc  owx_dev   data        crcpart  numread  startread callback delay
     OWX_Qomplex($master, $hash, "recall", 0,    $owx_dev, "\xB8\x00", 0,       1,       0,        undef,   0.015); 
     
@@ -1108,6 +1316,20 @@ sub OWXMULTI_GetValues($) {
     ####        master   slave  context            proc  owx_dev   data        crcpart  numread  startread callback delay
     #                                              1 provides additional reset after last operation
     OWX_Qomplex($master, $hash, "ds2438.getvad",   1,    $owx_dev, "\xBE\x00", 0,      20,       0,        \&OWXMULTI_BinValues,   0.015);
+    
+    #-- from memory to scratchpad
+    #-- copy needs some 12 ms !
+    #-- issue the match ROM command \x55 and the recall memory command (page 1)
+    ####        master   slave  context   proc  owx_dev   data        crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "recall", 0,    $owx_dev, "\xB8\x01", 0,       1,       0,        undef,   0.015); 
+    
+    #-- NOW ask the specific device 
+    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+    #-- reading 9 + 2 + 9 data bytes = 20 bytes
+    ####        master   slave  context            proc  owx_dev   data        crcpart  numread  startread callback delay
+    #                                              1 provides additional reset after last operation
+    OWX_Qomplex($master, $hash, "ds2438.getiac",   1,    $owx_dev, "\xBE\x01", 0,      20,       0,        \&OWXMULTI_BinValues,   0.015);
+
 
     return undef;
   }   
@@ -1124,8 +1346,6 @@ sub OWXMULTI_GetValues($) {
 sub OWXMULTI_SetValues($@) {
   my ($hash, @a) = @_;
   
-  my ($i,$j,$k);
-  
   my $name = $hash->{NAME};
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -1135,216 +1355,155 @@ sub OWXMULTI_SetValues($@) {
   #-- define vars
   my $key   = $a[1];
   my $value = $a[2];
-
-  #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-  #   followed by the write EEPROM command \x48
-  #
-  #   so far writing the EEPROM does not work properly.
-  #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
-  #   2. \x48 appended to match ROM => command not ok. 
-  #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
+  my ($cmd1,$cmd2);
+  my $nocur=0;
   
-  my $select=sprintf("\x4E%c%c\x48",0,0); 
-  OWX_Reset($master);
-  my $res=OWX_Complex($master,$owx_dev,$select,0);
-  if( $res eq 0 ){
-    return "OWXMULTI: Device $owx_dev not accessible"; 
-  } 
+  #-- iac register from value
+  my $iac    = int($hash->{owg_val}->[4]*2048);
   
-  return undef;
-}
-
-########################################################################################
-#
-# OWXMULTI_PT_GetValues - Get reading from one device async
-#
-# Parameter hash = hash of device addressed
-#           final= 1 if FormatValues is to be called
-#
-########################################################################################
-
-sub OWXMULTI_PT_GetValues($) {
-
-  my ($hash) = @_;
-
-  return PT_THREAD(sub {
-
-    my ($thread) = @_;
-
-    my ($i,$j,$k,$res,$ret,$response);
-
-    #-- ID of the device
-    my $owx_dev = $hash->{ROM_ID};
-    #-- hash of the busmaster
-    my $master = $hash->{IODev};
-
-    PT_BEGIN($thread);
-    #------------------------------------------------------------------------------------
-    #-- switch the device to current measurement off, VDD only
-    #-- issue the match ROM command \x55 and the write scratchpad command
-    #"ds2438.writestatusvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x4E\x00\x08",0);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- copy scratchpad to register
-    #-- issue the match ROM command \x55 and the copy scratchpad command
-    #"ds2438.copyscratchpadvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x48\x00",0);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- initiate temperature conversion
-    #-- conversion needs some 12 ms !
-    #-- issue the match ROM command \x55 and the start conversion command
-    #"ds2438.temperaturconversionvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
-    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
+  #-- offset register from value
+  my( $sign,$offset,$offset2,$offmsb,$offlsb);
+    $offset = $hash->{owg_val}->[5];
+  if( $offset >= 0 ){
+    $offmsb = int($offset/32);
+    $offlsb = int($offset-32*$offmsb)*8;
+  }else{
+    $offmsb = 15 - int(-$offset/32);   
+    $offlsb = 248 - int(-$offset-32*(15-$offmsb))*8;
+    $offmsb += 16;
+  }
   
-    #-- initiate voltage conversion
-    #-- conversion needs some 6 ms  !
-    #-- issue the match ROM command \x55 and the start conversion command
-    #"ds2438.voltageconversionvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
-    $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
-  
-    #-- from memory to scratchpad
-    #-- copy needs some 12 ms !
-    #-- issue the match ROM command \x55 and the recall memory command
-    #"ds2438.recallmemoryvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
-    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
-
-    #-- NOW ask the specific device 
-    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-    #-- reading 9 + 2 + 9 data bytes = 20 bytes
-    #"ds2438.getvdd"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE\x00",9);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    $res = $thread->{pt_execute}->PT_RETVAL();
-    unless (defined $res and length($res)==9) {
-      PT_EXIT("$owx_dev has returned invalid data");
-    }
-    $ret = OWXMULTI_BinValues($hash,"ds2438.getvdd",undef,$owx_dev,undef,undef,$res);
-    if ($ret) {
-      die $ret;
-    }
-    #------------------------------------------------------------------------------------
-    #-- switch the device to current measurement off, V external only
-    #-- issue the match ROM command \x55 and the write scratchpad command
-    #"ds2438.writestatusvad"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x4E\x00\x00",0);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- copy scratchpad to register
-    #-- issue the match ROM command \x55 and the copy scratchpad command
-    #"ds2438.copyscratchpadvad"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x48\x00",0);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- initiate voltage conversion
-    #-- conversion needs some 6 ms  !
-    #-- issue the match ROM command \x55 and the start conversion command
-    #"ds2438.voltageconversionvad"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB4",0);
-    $thread->{ExecuteTime} = gettimeofday() + 0.02; # was 0.006
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
+  #-- time register from value
+  my $timea   = $hash->{owg_val}->[6];
+  my $time3  = int($timea/16777216);
+  my $time2  = int(($timea - $time3*16777216)/65536);
+  my $time1  = int(($timea - $time3*16777216 - $time2*65536)/256);
+  my $time0  = $timea - $time3*16777216 - $time2*65536 - $time1*256;  
  
-    #-- from memory to scratchpad
-    #-- copy needs some 12 ms !
-    #-- issue the match ROM command \x55 and the recall memory command
-    #"ds2438.recallmemoryvad"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xB8\x00",0);
-    $thread->{ExecuteTime} = gettimeofday() + 0.03; # was 0.012
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-    delete $thread->{ExecuteTime};
-
-    #-- NOW ask the specific device 
-    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-    #-- reading 9 + 2 + 9 data bytes = 20 bytes
-    #"ds2438.getvad"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE\x00", 9);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- process results
-    $res = $thread->{pt_execute}->PT_RETVAL();
-    unless (defined $res and length($res)==9) {
-      PT_EXIT("$owx_dev has returned invalid data");
+  #------------------------------------------------------------------------------------
+  #-- zero the time register
+  if( $key eq "inittime" ){
+    $cmd1 = sprintf("\x4E\x01\x00\x00\x00\x00%c%c%c",$iac,$offlsb,$offmsb);
+    $cmd2 = "\x48\x01";
+  }elsif( $key eq "startdischarge" ){
+    $cmd1 = sprintf("\x4E\x01\x00\x00\x00\x00\xFF%c%c",$offlsb,$offmsb);
+    $cmd2 = "\x48\x01";
+  #-- write the offset register
+  }elsif( $key eq "offset" ){
+    $nocur=1;
+    if( $value >= 0 ){
+      $offlsb=8*$value;
+      $offmsb=0;
+    }else{
+      $offlsb= 248+8*$value;
+      $offmsb= 31;
+    }  
+    #Log 1,"========> Setting offset to msb=$offmsb lsb=$offlsb";
+    $cmd1 = sprintf("\x4E\x01%c%c%c%c%c%c%c",$time0,$time1,$time2,$time3,$iac,$offlsb,$offmsb);
+    $cmd2 = "\x48\x01";
+  #-- calibrate the offset register 
+  }elsif( $key eq "calibrate" ){
+    $nocur=1;
+    #-- get current value now
+    $offset = -$hash->{owg_val}->[3];
+    #-- 2's complement form = signed bytes
+    if( $offset>=0 ){
+      $offset2 = abs($offset)*4096*8;
+      $sign    = 0;
+    }else{
+      $offset2 = 8*(1024+$offset*4096)+1;
+      $sign    = 16;
+    }  
+    $offlsb = $offset2 & 255;
+    $offmsb = int($offset2/256) & 15 + $sign;
+    $cmd1 = sprintf("\x4E\x01%c%c%c%c%c%c%c",$time0,$time1,$time2,$time3,$iac,$offlsb,$offmsb);
+    $cmd2 = "\x48\x01";
+  }else{
+    Log 1, "OWXMULTI_SetValues: Unknown key $key";
+    return undef;
+  }
+  #------------------------------------------------------------------------------------
+  #-- synchronous OWX interface
+  if( !$master->{ASYNCHRONOUS} ){
+    #-- switch the current measurement off
+    if( $nocur==1 ){
+      OWX_Reset($master);
+      if( OWX_Complex($master,$owx_dev,"\x4E\x00\x09",0) eq 0 ){
+        return "$owx_dev write status failed";
+      }
+  
+      #-- copy scratchpad to register
+      #-- issue the match ROM command \x55 and the copy scratchpad command 
+      OWX_Reset($master);
+      if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
+        return "$owx_dev copy scratchpad failed"; 
+      }
     }
-    $ret = OWXMULTI_BinValues($hash,"ds2438.getvad",undef,$owx_dev,undef,undef,$res);
-    if ($ret) {
-      die $ret;
+    
+    #-- issue the match ROM command \x55 and the write scratchpad command
+    OWX_Reset($master);
+    if( OWX_Complex($master,$owx_dev,$cmd1,0) eq 0 ){
+      return "$owx_dev write status failed";
     }
-    PT_END;
-  });
-}
   
-#######################################################################################
-#
-# OWXMULTI_PT_SetValues - Set values in device async
-# 
-# Parameter hash = hash of device addressed
-#           a = argument array
-#
-########################################################################################
-
-sub OWXMULTI_PT_SetValues($@) {
-  my ($hash, @a) = @_;
+    #-- copy scratchpad to register
+    #-- issue the match ROM command \x55 and the copy scratchpad command 
+    OWX_Reset($master);
+    if( OWX_Complex($master,$owx_dev,$cmd2,0) eq 0){
+      return "$owx_dev copy scratchpad failed"; 
+    }
+    
+    #-- switch the device to current measurement on, VDD only
+    if( $nocur==1 ){
+    #-- issue the match ROM command \x55 and the write scratchpad command
+      OWX_Reset($master);
+      if( OWX_Complex($master,$owx_dev,"\x4E\x00\x09",0) eq 0 ){
+        return "$owx_dev write status failed";
+      }
   
-  return PT_THREAD(sub {
+      #-- copy scratchpad to register
+      #-- issue the match ROM command \x55 and the copy scratchpad command 
+      OWX_Reset($master);
+      if( OWX_Complex($master,$owx_dev,"\x48\x00",0) eq 0){
+        return "$owx_dev copy scratchpad failed"; 
+      }
+    }
+  #-- asynchronous OWX interface
+  }else{
+    #-- switch the current measurement off
+    if( $nocur==1 ){
+      #-- issue the match ROM command \x55 and the write scratchpad command
+      ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
+      OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x00", 0,       1,       0,        undef,   0.015); 
+
+      #-- copy scratchpad to register
+      #-- issue the match ROM command \x55 and the copy scratchpad command
+      ####        master   slave  context      proc  owx_dev   data        crcpart  numread  startread callback delay
+      OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       1,       0,        undef,   0.015); 
+    }
+    
+    #-- issue the match ROM command \x55 and the write scratchpad command
+    ####        master   slave  context       proc  owx_dev   data   crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, $cmd1, 0,       2,       0,        undef,  0.015); 
   
-    my ($thread) = @_;
-  
-    my ($i,$j,$k);
-  
-    my $name = $hash->{NAME};
-    #-- ID of the device
-    my $owx_dev = $hash->{ROM_ID};
-    #-- hash of the busmaster
-    my $master = $hash->{IODev};
+    #-- copy scratchpad to register
+    #-- issue the match ROM command \x55 and the copy scratchpad command
+    ####        master   slave  context      proc  owx_dev   data   crcpart  numread  startread callback delay
+    OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, $cmd2, 0,       1,       0,        undef,  0.015); 
+    
+    #-- switch the device to current measurement on, V external only
+    if( $nocur==1 ){
+      #-- issue the match ROM command \x55 and the write scratchpad command
+      ####        master   slave  context       proc  owx_dev   data            crcpart  numread  startread callback delay
+      OWX_Qomplex($master, $hash, "write SP",   0,    $owx_dev, "\x4E\x00\x01", 0,       1,       0,        undef,   0.015); 
 
-    PT_BEGIN($thread);
-    #-- define vars
-    my $key   = $a[1];
-    my $value = $a[2];
-
-    #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-    #   followed by the write EEPROM command \x48
-    #
-    #   so far writing the EEPROM does not work properly.
-    #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
-    #   2. \x48 appended to match ROM => command not ok. 
-    #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
-
-    my $select=sprintf("\x4E%c%c\x48",0,0);
-    #"setvalues"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select, 0);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    PT_END;
-  });
+      #-- copy scratchpad to register
+      #-- issue the match ROM command \x55 and the copy scratchpad command
+      ####        master   slave  context      proc  owx_dev   data        crcpart  numread  startread callback delay
+      OWX_Qomplex($master, $hash, "copy SP",   0,    $owx_dev, "\x48\x00", 0,       1,       0,        undef,   0.015); 
+    }
+  } 
+  return undef;
 }
 
 1;
@@ -1357,36 +1516,61 @@ sub OWXMULTI_PT_SetValues($@) {
  <a name="OWMULTI"></a>
         <h3>OWMULTI</h3>
         <ul>
-        <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
-            monitor<br /> <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+        <p>FHEM module to commmunicate with 1-Wire smart battery
+            monitor DS2438 <br /> <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
                 (prerequisite: Add this module's name to the list of clients in OWServer).
             Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first.</p>
        <h4>Example</h4>
+        In this example, the DS2438 is used to monitor a rechargeable battery of 8.5 V and 8.8 Ah capacity. For this capacity the 
+        data sheet of the DS2438 suggests a resistor of 0.015 Ohm across the Vsense+ ... Vsense- terminals.
         <p>
-            <code>define OWX_M OWMULTI 7C5034010000 45</code>
+            <code>define USV OWMULTI 7C5034010000 30</code>
             <br />
-            <code>attr OWX_M VName humidity|rH</code>
+            <code>attr USV VName battery voltage|Vbatt</code>
+            <br/>
+            <code>attr USV WName battery current|Ibatt</code>
             <br />
-            <code>attr OWX_M VUnit %</code>
+            <code>attr USV WUnit mA</code>
             <br />
-            <code>attr OWX_M VFunction (161.29 * V / VDD - 25.8065)/(1.0546 - 0.00216 * T)</code>
+            <code>attr USV WFunction 1000*W/0.015</code>
+            <br/>
+            <code>attr USV XName battery capacity|Cbatt</code>
+            <br />
+            <code>attr USV XUnit mAh</code>
+            <br />
+            <code>attr USV XFunction 8800-1000*(255/2048.-X)/0.015</code>
         </p>
+         Notes: <ul>
+         <li>The voltage at the VAD terminal must be in the range from 2.4 ... 10 V</li>
+         <li>The voltage between the Vsense+ and Vsense- terminals must be in the range from -0.25 ... 0.25 V</li>
+         <li>For calibration of the Vsense measurement:
+           <ol><li>Execute the command <code>set &lt;name&gt; offset 0</code> to clear the offset register</li>
+           <li>Force zero voltage across the Vsense+ and Vsense- terminals (=zero current)</li>
+           <li>Execute the command <code>set &lt;name&gt; calibrate</code> to set the offset register</li>
+           </ol></li>
+         <li>Due to the limitations of the integration process, the value functions for the sense channel <code>WFunction</code> and
+           for the sense integrated channel <code>XFunction</code> must be functions involving a linear and a constant term, see example above.</li>
+         <li>To obtain the proper current in A, one must set <code>WFunction</code> to the value of
+         (W/resistor value).</li>
+         <li>The maximum value for the Vsense.t integration is 255/2048 = 0.1245117 Vh. This value is put into the register by executing the command 
+         <code>set &lt;name&gt; startdischarge</code>. To obtain the proper remaining battery capacity in Ah, one must set <code>XFunction</code> to the value of
+         (max. battery capacity (in Ah) - (255/2048-X)/resistor value).</li>
+         <li>The time register is incremented by 1 each second, see commands below.</li>
+         </ul>
         <a name="OWMULTIdefine"></a>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
             <code>define &lt;name&gt; OWMULTI &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
-            <br /><br /> Define a 1-Wire multi-sensor</p>
+            <br /><br /> Define a 1-Wire smart battery monitor</p>
         <ul>
             <li>
-                <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus 1-Wire family
+                <code>[&lt;model&gt;]</code><br /> Defines the model (and thus 1-Wire family
                 id), currently the following values are permitted: <ul>
-                    <li>model DS2438 with family id 26 (default if the model parameter is omitted).
-                        Measured is a temperature value, an external voltage and the current supply
-                        voltage</li>
-                    <li>model DS2438a with family id A6.
-                        Measured is a temperature value, an external voltage and the current supply
-                        voltage</li>
+                    <li>model DS2438 with family id 26 (default if the model parameter is omitted) or DS2438a with family id A6.
+                        For both, a temperature value T, an external voltage VAD (1.5V < VAD < 2 VDD), the supply
+                        voltage VDD and a sense voltage Vsens (-0.25V < Vsens < 0.25V) are measured. Calculated are running time in seconds and time integrated sense voltage Vsens.t.</li>
+                 
                 </ul>
             </li>
              <li>
@@ -1404,6 +1588,14 @@ sub OWXMULTI_PT_SetValues($@) {
         <a name="OWMULTIset"></a>
         <h4>Set</h4>
         <ul>
+            <li><a name="owmulti_calibrate">
+                    <code>set &lt;name&gt; calibrate</code></a><br /> Write the inverse value of the Vsense register into the offset register, see notes above </li>
+            <li><a name="owmulti_offset">
+                    <code>set &lt;name&gt; offset [-1,-2,-1,0,1,2,3] </code></a><br /> Write this value into the offset register, see notes above </li>
+            <li><a name="owmulti_inittime">
+                    <code>set &lt;name&gt; inittime</code></a><br /> Write a zero into the time register, see notes above </li>
+            <li><a name="owmulti_startdischarge">
+                    <code>set &lt;name&gt; startdischarge</code></a><br /> Write the maximum value into the time integrated sense register, see notes above </li>
             <li><a name="owmulti_interval">
                     <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
                 interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update. </li>
@@ -1415,48 +1607,53 @@ sub OWXMULTI_PT_SetValues($@) {
                     <code>get &lt;name&gt; id</code></a>
                 <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
             <li><a name="owmulti_reading">
-                    <code>get &lt;name&gt; reading</code></a><br />Obtain all three measurement values. </li>
+                    <code>get &lt;name&gt; reading</code></a><br />Obtain all measurement values. </li>
             <li><a name="owmulti_temperature">
                     <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
             <li><a name="owmulti_vdd">
-                    <code>get &lt;name&gt; VDD</code></a><br />Obtain the current supply voltage. </li>
+                    <code>get &lt;name&gt; VDD</code></a><br />Obtain the actual supply voltage. </li>
             <li><a name="owmulti_raw">
-                    <code>get &lt;name&gt; raw</code></a><br />Obtain the raw readings for V and W.</li>
+                    <code>get &lt;name&gt; raw</code></a><br />Obtain the raw readings for VAD=V, Vsense=W and VSense.t=X.</li>
         </ul>
         <a name="OWMULTIattr"></a>
         <h4>Attributes</h4>
         <ul><li><a name="owtherm_interval2">
-                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                    <code>attr &lt;name&gt; interval &lt;int&gt;</code></a><br /> measurement
                 interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
             <li><a name="owmulti_vname"><code>attr &lt;name&gt; VName
                         &lt;string&gt;[|&lt;string&gt;]</code></a>
-                <br />name for the voltage channel [|short name used in state reading]. </li>
-            
+                <br />name for the voltage channel [|short name used in state reading]. </li>         
             <li><a name="owmulti_vunit"><code>attr &lt;name&gt; VUnit
                         &lt;string&gt;</code></a>
                 <br />unit of measurement for the voltage channel used in state reading (default "V", set to "none" for  empty).</li>
             <li><a name="owmulti_vfunction"><code>attr &lt;name&gt; VFunction
                     &lt;string&gt;</code></a>
-                <br />arbitrary functional expression involving the values VDD, V, W and T. Example see
-                above. <ul>
+                <br />arbitrary functional expression involving the values VDD, V and T: <ul>
                     <li>VDD is replaced by the measured supply voltage in Volt,</li>
-                    <li>V by the measured external voltage channel,</li>
-                    <li>W by the measured external sense channel,</li>
+                    <li>V by the measured external voltage channel VAD,</li>                
                     <li>T by the measured and corrected temperature in its unit</li>
                 </ul></li>
             <li><a name="owmulti_wname"><code>attr &lt;name&gt; WName
                         &lt;string&gt;[|&lt;string&gt;]</code></a>
-                <br />name for the sense channel [|short name used in state reading]. </li>
+                <br />name for the sense channel [|short name used in state reading] </li>
             <li><a name="owmulti_wunit"><code>attr &lt;name&gt; WUnit
                         &lt;string&gt;</code></a>
-                <br />unit of measurement for the sense channel used in state reading (default “V", set to "none" for empty).</li>
+                <br />unit of measurement for the sense channel used in state reading (default "V", set to "none" for empty).</li>
             <li><a name="owmulti_wfunction"><code>attr &lt;name&gt; WFunction
                     &lt;string&gt;</code></a>
-                <br />arbitrary functional expression involving the values VDD, V, W and T. Example and usage see
-                above.</li>
+                <br />linear functional expression involving the value W which is replaced by the measured external sense channel Vsense</li>
+            <li><a name="owmulti_xname"><code>attr &lt;name&gt; XName
+                        &lt;string&gt;[|&lt;string&gt;]</code></a>
+                <br />name for the time integrated sense channel [|short name used in state reading]. </li>
+            <li><a name="owmulti_xunit"><code>attr &lt;name&gt; XUnit
+                        &lt;string&gt;</code></a>
+                <br />unit of measurement for the time integrated sense channel used in state reading (default "Vs", set to "none" for empty).</li>
+            <li><a name="owmulti_xfunction"><code>attr &lt;name&gt; XFunction
+                    &lt;string&gt;</code></a>
+                <br />linear functional expression involving the value X which is replaced by the time integrated external sense channel Vsense.t</li>
             <li><a name="owmulti_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>
                 </a>
-                <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+                <br />temperature offset in K added to the raw temperature reading. </li>
             <li><a name="owmulti_tempUnit"><code>attr &lt;name&gt; tempUnit
                         Celsius|Kelvin|Fahrenheit</code>
                 </a>

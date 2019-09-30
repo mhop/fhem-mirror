@@ -42,12 +42,11 @@ BEGIN {
 	};
 };
 
-use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="7.01";
+my $owx_version="7.2";
 
 my %gets = (
   "id"          => ":noArg",
@@ -206,9 +205,7 @@ sub OWTHERM_Define ($$) {
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
   #-- if coupled, test if ASYNC or not
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
-  }
+  } 
 
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
@@ -446,13 +443,6 @@ sub OWTHERM_Get($@) {
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_GetValues($hash);
 
-  #-- OWX_ASYNC interface
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      $ret = OWX_ASYNC_RunToCompletion($hash,OWXTHERM_PT_GetValues($hash));
-    };
-    $ret = GP_Catch($@) if $@;
-
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
@@ -513,16 +503,10 @@ sub OWTHERM_GetValues($@) {
 
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
+  #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_GetValues($hash);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    #-- skip, if the conversion is driven by master
-    unless ( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXTHERM_PT_GetValues($hash) );
-      };
-      $ret = GP_Catch($@) if $@;
-    }
+  #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
@@ -616,11 +600,6 @@ sub OWTHERM_InitializeDevice($) {
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,$args);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      $ret = OWX_ASYNC_RunToCompletion($hash,OWXTHERM_PT_SetValues($hash,$args));
-    };
-    $ret = GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_SetValues($hash,$args);
@@ -712,12 +691,6 @@ sub OWTHERM_Set($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXTHERM_SetValues($hash,$args);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      $args->{format} = 1;
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXTHERM_PT_SetValues($hash,$args) );
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSTHERM_SetValues($hash,$args);
@@ -1002,14 +975,14 @@ sub OWXTHERM_GetValues($) {
   #-- issue the match ROM command \x55 and the start conversion command \x44
   #-- conversion needs some 950 ms - but we may also do it in shorter time !
   if( $con==1 ){
-    #-- OLD OWX interface
+    #-- synchronous OWX interface
     if( !$master->{ASYNCHRONOUS} ){
       OWX_Reset($master);     
       if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
         return "OWTHERM: $name not accessible";
       } 
       select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
-    #-- NEW OWX interface
+    #-- asynchronous OWX interface
     }else{
       ####        master   slave  context     proc  owx_dev   data     crcpart numread startread callback delay
       OWX_Qomplex($master, $hash, "convert",  5,    $owx_dev, "\x44",  0,      1,      undef,    undef, $convtimes{AttrVal($name,"resolution",12)}*0.001 ); 
@@ -1019,7 +992,7 @@ sub OWXTHERM_GetValues($) {
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  #-- OLD OWX interface
+  #-- synchronous OWX interface
   if( !$master->{ASYNCHRONOUS} ){
     OWX_Reset($master);
     my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
@@ -1029,7 +1002,7 @@ sub OWXTHERM_GetValues($) {
        if( length($res)!=19);
     return OWXTHERM_BinValues($hash,"getsp",$owx_dev,undef,undef,9,substr($res,10,9));
 
-  #-- NEW OWX interface
+  #-- asynchronous OWX interface
   }else{
     ####        master   slave  context    proc owx_dev   data    crcpart numread startread callback              delay 
     OWX_Qomplex($master, $hash, "readsp",  1,   $owx_dev, "\xBE", 0,      19,     0,       \&OWXTHERM_BinValues, undef); 
@@ -1094,127 +1067,6 @@ sub OWXTHERM_SetValues($$) {
     OWX_Qomplex($master, $hash, "writesp",  0,   $owx_dev, $select, 0,      3,      10,       undef,   undef); 
   }
   return undef;
-}
-
-########################################################################################
-#
-# OWXTHERM_GetValues - Trigger reading from one device 
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWXTHERM_PT_GetValues($) {
-
-  my ($hash) = @_;
-  
-  return PT_THREAD(sub {
-    my ($thread) = @_;
-    #-- For default, perform the conversion now
-    my $con=1;
-
-    #-- ID of the device
-    my $owx_dev = $hash->{ROM_ID};
-
-    #-- hash of the busmaster
-    my $master = $hash->{IODev};
-    my $name   = $hash->{NAME};
-
-    PT_BEGIN($thread);
-
-    #-- check, if the conversion has been called before for all sensors
-    if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
-      $con=0;
-    }  
-
-    #-- if the conversion has not been called before 
-    if( $con==1 ){
-      #-- issue the match ROM command \x55 and the start conversion command \x44
-      my $now = gettimeofday();
-      my $delay = $convtimes{AttrVal($name,"resolution",12)};
-      $thread->{ExecuteTime} = $now + $delay*0.001;
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\x44",0);
-      PT_WAIT_THREAD($thread->{pt_execute});
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-      PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-      delete $thread->{ExecuteTime};
-    }
-    #-- NOW ask the specific device
-    #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-    #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE",9);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    OWXTHERM_BinValues($hash,undef,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
-    PT_END;
-  });
-} 
-
-#######################################################################################
-#
-# OWXTHERM_PT_SetValues - Implements SetFn function async
-# 
-# Parameter hash = hash of device addressed
-#           a = argument array
-#
-########################################################################################
-
-sub OWXTHERM_PT_SetValues($$) {
-  
-  my ($hash,$args) = @_;
-  
-  return PT_THREAD( sub {
-    my ($thread) = @_;
-
-    my ($i,$j,$k);
-
-    my $name = $hash->{NAME};
-
-    #-- ID of the device
-    my $owx_dev = $hash->{ROM_ID};
-    #-- hash of the busmaster
-    my $master = $hash->{IODev};
-
-    PT_BEGIN($thread);
-
-    unless (defined $args->{resolution} or defined $args->{tempLow} or defined $args->{tempHigh}) {
-      PT_EXIT;
-    }
-
-    #-- $owg_tl and $owg_th are preset and may be changed here
-    foreach my $key (keys %$args) {
-    	$hash->{owg_tl} = $args->{$key} if( lc($key) eq "templow");
-    	$hash->{owg_th} = $args->{$key} if( lc($key) eq "temphigh");
-    	$hash->{owg_cf} = $args->{$key} if( lc($key) eq "resolution");
-    }
-
-    #-- put into 2's complement formed (signed byte)
-    my $tlp = $hash->{owg_tl} < 0 ? 128 - $hash->{owg_tl} : $hash->{owg_tl}; 
-    my $thp = $hash->{owg_th} < 0 ? 128 - $hash->{owg_th} : $hash->{owg_th};
-    #-- resolution is defined in bits 5+6 of configuration register
-    my $cfg = defined $hash->{owg_cf} ? (($hash->{owg_cf}-9) << 5) | 0x1f : 0x7f;
-
-    #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
-    #   followed by 3 bytes of data (alarm_temp_high, alarm_temp_low, config)
-    #   config-byte of 0x7F means 12 bit resolution (750ms convert time)
-    #
-    #   so far writing the EEPROM does not work properly.
-    #   1. \x48 directly appended to the write scratchpad command => command ok, no effect on EEPROM
-    #   2. \x48 appended to match ROM => command not ok. 
-    #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
-
-    my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg); 
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,$select,3);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- process results
-    $hash->{PRESENT} = 1;
-    if ($args->{format}) {
-      OWTHERM_FormatValues($hash);
-    }
-    PT_END;
-  });
 }
 
 1;

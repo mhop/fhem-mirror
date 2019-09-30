@@ -53,7 +53,7 @@ sub Log3($$$);
 use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 # 1-Wire devices 
 # http://owfs.sourceforge.net/family.html
-%owg_family = (
+my %owg_family = (
   "01"  => ["DS2401/DS2411/DS1990A","OWID DS2401"],
   "05"  => ["DS2405","OWID DS2405"],
   "09"  => ["DS2502","OWID DS2502"],
@@ -79,7 +79,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- These we may get on request
-%gets = (
+my %gets = (
    "alarms"  => "A",
    "devices" => "D",
    "version" => "V",
@@ -88,7 +88,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 
 #-- These occur in a pulldown menu as settable values for the bus master 
 #   (expert mode: all, standard mode: only reopen)
-%sets = (
+my %sets = (
    "close"        => "c", 
    "open"         => "O", 
    "reopen"       => "R",
@@ -99,7 +99,7 @@ use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.11";
+$owx_version="7.21";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;
@@ -191,7 +191,7 @@ sub OWX_Define ($$) {
     $hwdevice = OWX_I2C->new($hash);
     
   #-- check if we have a COC/CUNO interface attached  
-  }elsif( $defs{$dev} && $defs{$dev}->{VERSION}  && $defs{$dev}->{VERSION} =~ m/CSM|CUNO|MapleCUN...(4|5|6|7|C|D|E|F)/ ){
+  }elsif( $defs{$dev} && $defs{$dev}->{VERSION}  && $defs{$dev}->{VERSION} =~ m/CSM|CUNO|CUBE|MapleCUN...(4|5|6|7|C|D|E|F)/ ){
      require "$attr{global}{modpath}/FHEM/11_OWX_CCC.pm";
      $hwdevice = OWX_CCC->new($hash);
     
@@ -1542,7 +1542,7 @@ sub OWX_PrQueue($){
     if ( defined($slave->{NEXTSEND})){
       if( $now < $slave->{NEXTSEND} ){ 
         #-- reschedule, if necessary
-        if( ($qlen==1) || (($qlen > 1) && ($queue->[1]{$hash} eq $slave)) ){
+        if( ($qlen==1) || (($qlen > 1) && $queue->[1]{$hash} && ($queue->[1]{$hash} eq $slave)) ){
           #Log 1, "OWX_PrQueue: device ".$slave->{NAME}." mindelay not over, rescheduling."
           InternalTimer($now+$shortDelay, "OWX_PrQueue", "queue:$name", 0);
           return;
@@ -1733,7 +1733,7 @@ sub OWX_WDBGL($$$$) {
 <a name="OWX"></a>
 <h3>OWX</h3>
 <ul>
-<a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="/fhem/docs/commandref.html#OWX">OWX</a> 
+<a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire">Deutsche Dokumentation im Wiki</a> vorhanden, die englische Version gibt es hier: <a href="commandref.html#OWX">OWX</a> 
 </ul>
 =end html_DE
 =cut
