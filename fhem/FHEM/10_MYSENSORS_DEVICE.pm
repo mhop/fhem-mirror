@@ -415,7 +415,7 @@ sub onStreamMessage($$) {
     last;
     };
     $type == ST_FIRMWARE_REQUEST and do {
-        last if ($msg->{ack});
+        last if ($msg->{ack} or !defined $hash->{FW_DATA});
         if (length($msg->{payload}) == 12) {
           my $version = hex2Short(substr($msg->{payload}, 4, 4));
           my $block = hex2Short(substr($msg->{payload}, 8, 4));

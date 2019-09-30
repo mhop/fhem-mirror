@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+- bugfix:   10_MYSENSORS_DEVICE: Prevent FHEM crash in case of ext. OTA update
  - change:  70_BOTVAC: new state "Password missing",
                        added check for robots in account
  - bugfix:  95_Dashboard: fix warnings
