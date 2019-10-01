@@ -1133,6 +1133,9 @@ sub ReceiveCommand($$$) {
         }
 
         $newstate = ProcessCommandData( $param, $return, \@successor );
+    } else {
+      # Android 8: timeshift mode or app mode
+      $newstate = "on" if ($service eq "getScheduleList");
     }
 
     if ( defined( $newstate ) ) {
