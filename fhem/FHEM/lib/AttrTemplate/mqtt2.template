@@ -897,6 +897,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $light = ReadingsVal($name,"state","off");; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a>" }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model shelly1
 
@@ -930,16 +931,28 @@ attr DEVICE readingList \
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/relay/0/power:.* relay_0_power\
-  shellies/DEVNAME/relay/0/power:.* { my $limit = 100;; my $compare = $EVTPART0<$limit ? "off":"on";; ReadingsVal($NAME,"loadState","on") eq $compare ? undef: {loadState => $compare} }\ 
+  shellies/DEVNAME/relay/0/power:.* { my $compare = $EVTPART0 < 100 ? "off":"on"; ReadingsVal($NAME,"loadState","off") ne $compare ? { 'loadState' => $compare } : undef }\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
   shellies/DEVNAME/relay/0/energy:.* {'relay_0_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/longpush/0:.* longpush_0
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $total = ReadingsVal($name,"relay_0_kWh","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Total: $total/ Temp: $temp °C</div>"}
+attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs.
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model shelly1_w_energy_meassuring
+
+name:shelly1_w_energy_meassuring_washer_example
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+order:A_10b1
+desc:Example how to configure a single relay Shelly device offering energy meassuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off. 
+par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+set DEVICE attrTemplate shelly1_w_energy_meassuring
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
+attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","total",0) },gang:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","gang",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
+attr DEVICE comment Adopt $limit in readingList to your needs to get appropriate loadState changes; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results.
+attr DEVICE model shelly1_w_energy_meassuring_washer_example
 
 # shelly2 using original firmware in roller mode.
 name:shelly2_roller
@@ -1592,12 +1605,13 @@ order:X_02
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "oMQTTgw_MCU" : InternalVal("DEVICE","DEF","mosquitto")}
+par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE bridgeRegexp\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* "oMQTTgw_BT"\
   BASE_ID/DEVNAME/433toMQTT:.* "oMQTTgw_433"\
   BASE_ID/DEVNAME/IRtoMQTT:.* "oMQTTgw_IR"\
-  BASE_ID/DEVNAME/CLIMAtoMQTT/(.*):.* "DEVNAME_$1"
+  BASE_ID/DEVNAME/CLIMAtoMQTT/([a-zA-Z0-9]+):.* "DEVNAME_$1"
 attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
@@ -1606,6 +1620,7 @@ attr DEVICE readingList\
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
 </a>Version: version
+attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
 
