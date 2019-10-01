@@ -385,14 +385,13 @@ sub onStreamMessage($$) {
     my ($hash, $msg) = @_;
     my $name = $hash->{NAME};
     my $type = $msg->{subType};
-    #my $typeStr = datastreamTypeToStr($type);
     my $blType = AttrVal($name, "OTA_BL_Type", "");
-    my $blVersion = hex(substr($msg->{payload}, 16, 2)) . "." . hex(substr($msg->{payload}, 18, 2));
     my $fwType = hex2Short(substr($msg->{payload}, 0, 4));
 
     TYPE_HANDLER: {
     $type == ST_FIRMWARE_CONFIG_REQUEST and do {
     if (length($msg->{payload}) == 20) {
+        my $blVersion = hex(substr($msg->{payload}, 16, 2)) . "." . hex(substr($msg->{payload}, 18, 2));
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, 'FW_TYPE', $fwType) if ($blType eq "Optiboot");
         readingsBulkUpdate($hash, 'FW_VERSION', hex2Short(substr($msg->{payload}, 4, 4))) if ($blType eq "Optiboot");
