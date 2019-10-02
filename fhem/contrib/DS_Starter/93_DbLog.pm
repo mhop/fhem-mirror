@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $
+# $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,6 +30,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.7.3"   => "02.10.2019 Test ",
+  "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
+  "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
   "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
   "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
   "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
@@ -224,8 +227,7 @@ sub DbLog_dbReadings($@);
 sub DbLog_showChildHandles($$$$);
 
 ################################################################
-sub DbLog_Initialize($)
-{
+sub DbLog_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}             = "DbLog_Define";
@@ -237,36 +239,36 @@ sub DbLog_Initialize($)
   $hash->{SVG_regexpFn}      = "DbLog_regexpFn";
   $hash->{DelayedShutdownFn} = "DbLog_DelayedShutdown";
   $hash->{AttrList}          = "addStateEvent:0,1 ".
+							   "asyncMode:1,0 ".
                                "bulkInsert:1,0 ".
                                "commitMode:basic_ta:on,basic_ta:off,ac:on_ta:on,ac:on_ta:off,ac:off_ta:on ".
+							   "cacheEvents:2,1,0 ".
+							   "cacheLimit ".
                                "colEvent ".
                                "colReading ".
 							   "colValue ".
+                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
+                               "DbLogType:Current,History,Current/History,SampleFill/History ".
                                "dbSchema ".
                                "disable:1,0 ".
-                               "DbLogType:Current,History,Current/History,SampleFill/History ".
-                               "suppressUndef:0,1 ".
-		                       "verbose4Devs ".
 							   "excludeDevs ".
 							   "expimpdir ".
                                "exportCacheAppend:1,0 ".
+							   "noSupportPK:1,0 ".
 							   "noNotifyDev:1,0 ".
 							   "showproctime:1,0 ".
 							   "suppressAddLogV3:1,0 ".
-                               "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
-                               "traceLevel:0,1,2,3,4,5,6,7 ".
-                               "traceHandles ".
-							   "asyncMode:1,0 ".
-							   "cacheEvents:2,1,0 ".
-							   "cacheLimit ".
-							   "noSupportPK:1,0 ".
+                               "suppressUndef:0,1 ".
 							   "syncEvents:1,0 ".
 							   "syncInterval ".
 							   "showNotifyTime:1,0 ".
+                               "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
+                               "traceLevel:0,1,2,3,4,5,6,7 ".
+                               "traceHandles ".
 							   "timeout ".
 							   "useCharfilter:0,1 ".
 							   "valueFn:textField-long ".
-                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
+		                       "verbose4Devs ".
 							   $readingFnAttributes;  
 
   addToAttrList("DbLogInclude");
@@ -282,8 +284,7 @@ return;
 }
 
 ###############################################################
-sub DbLog_Define($@)
-{
+sub DbLog_Define($@) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
@@ -293,6 +294,7 @@ sub DbLog_Define($@)
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
   
+  my $name               = $hash->{NAME};
   $hash->{CONFIGURATION} = $a[2];
   my $regexp             = $a[3];
 
@@ -316,7 +318,7 @@ sub DbLog_Define($@)
   $hash->{PID} = $$;
   
   # CacheIndex für Events zum asynchronen Schreiben in DB
-  $hash->{cache}{index} = 0;
+  $data{DbLog}{$name}{cache}{index} = 0;
 
   # read configuration data
   my $ret = DbLog_readCfg($hash);
@@ -348,6 +350,7 @@ sub DbLog_Undef($$) {
   BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
   $dbh->disconnect() if(defined($dbh));
   RemoveInternalTimer($hash);
+  delete $data{DbLog}{$name};
   
 return undef;
 }
@@ -485,7 +488,9 @@ sub DbLog_Attr(@) {
   }
   
   if ($aName eq "traceHandles") {
-      unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+      if($cmd eq "set") {
+          unless ($aVal =~ /^[0-9]+$/) {return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+	  }
       RemoveInternalTimer($hash, "DbLog_startShowChildhandles");
       if($cmd eq "set") {
           $do = ($aVal) ? 1 : 0;
@@ -671,7 +676,7 @@ sub DbLog_Set($@) {
         $ret = "Rereadcfg executed.";
     }
 	elsif ($a[1] eq 'purgeCache') {
-	    delete $hash->{cache};
+	    delete $data{DbLog}{$name}{cache};
         readingsSingleUpdate($hash, 'CacheUsage', 0, 1);		
 	}
 	elsif ($a[1] eq 'commitCache') {
@@ -679,8 +684,8 @@ sub DbLog_Set($@) {
 	}
 	elsif ($a[1] eq 'listCache') {
 	    my $cache;
-	    foreach my $key (sort{$a <=>$b}keys%{$hash->{cache}{".memcache"}}) { 
-            $cache .= $key." => ".$hash->{cache}{".memcache"}{$key}."\n"; 			
+	    foreach my $key (sort{$a <=>$b}keys %{$data{DbLog}{$name}{cache}{memcache}}) { 
+            $cache .= $key." => ".$data{DbLog}{$name}{cache}{memcache}{$key}."\n"; 			
 		}
 	    return $cache;
 	}
@@ -742,8 +747,8 @@ sub DbLog_Set($@) {
         }
         
         if(!$error) {
-	        foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-                $cln = $hash->{cache}{".memcache"}{$key}."\n";
+	        foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+                $cln = $data{DbLog}{$name}{cache}{memcache}{$key}."\n";
                 print FH $cln ;
                 $crows++; 			
 		    }
@@ -761,7 +766,7 @@ sub DbLog_Set($@) {
         Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
 		
 		if (lc($a[-1]) =~ m/^purgecache/i) {
-	        delete $hash->{cache};
+	        delete $data{DbLog}{$name}{cache};
             readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
 			Log3($name, 3, "DbLog $name: Cache purged after exporting rows to $outfile.");
 		}
@@ -1488,11 +1493,11 @@ sub DbLog_Log($$) {
 				  if($async) {
 				      # asynchoner non-blocking Mode
 					  # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-					  $hash->{cache}{index}++;
-				      my $index = $hash->{cache}{index};
-				      $hash->{cache}{".memcache"}{$index} = $row;
+					  $data{DbLog}{$name}{cache}{index}++;
+				      my $index = $data{DbLog}{$name}{cache}{index};
+				      $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 					  
-					  my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+					  my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	                  if($ce == 1) {
                           readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	                  } else {
@@ -1518,7 +1523,7 @@ sub DbLog_Log($$) {
           }
       }
   }; 
-  if(!$async) {    
+  if(!$async) {  
       if(@row_array) {
 	      # synchoner Mode
           return if($hash->{HELPER}{REOPEN_RUNS});              # return wenn "reopen" mit Ablaufzeit gestartet ist          
@@ -2109,7 +2114,7 @@ sub DbLog_execmemcache ($) {
 	  }
   }
   
-  $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+  $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
   if($ce == 2) {
       readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
   } else {
@@ -2121,12 +2126,13 @@ sub DbLog_execmemcache ($) {
       Log3 $name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
 	  Log3 $name, 4, "DbLog $name -> MemCache contains $memcount entries to process";
-	  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType";
+	  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType"; 
 		  
-	  foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$hash->{cache}{".memcache"}{$key};
-		  push(@row_array, delete($hash->{cache}{".memcache"}{$key})); 
-	  }
+	  foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
+		  push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
+	  }  
+      delete $data{DbLog}{$name}{cache}{memcache};                                           # sicherheitshalber Memory freigeben: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
@@ -2697,15 +2703,15 @@ sub DbLog_PushAsyncDone ($) {
      eval { 
 	   foreach my $row (@row_array) {
 	       # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-		   $hash->{cache}{index}++;
-		   my $index = $hash->{cache}{index};
-		   $hash->{cache}{".memcache"}{$index} = $row;
+		   $data{DbLog}{$name}{cache}{index}++;
+		   my $index = $data{DbLog}{$name}{cache}{index};
+		   $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 	   }
-	   $memcount = scalar(keys%{$hash->{cache}{".memcache"}});
-	 };
+	   $memcount = scalar(keys %{$data{DbLog}{$name}{cache}{memcache}});
+	 };                                                 
   }
 
-  $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+  $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
   readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
  
   if(AttrVal($name, "showproctime", undef) && $bt) {
@@ -3201,6 +3207,7 @@ sub DbLog_Get($@) {
     $minval    =  (~0 >> 1);
     $maxval    = -(~0 >> 1);
     $deltacalc = 0;
+    my $ldetad    = "";           # Test
 
     if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
       $deltacalc = 1;
@@ -3296,24 +3303,24 @@ sub DbLog_Get($@) {
       # Value angepasst.
       ####################################################################
       if($readings[$i]->[4]) {
-        #evaluate
-        my $val = $sql_value;
-        my $ts  = $sql_timestamp;
-        eval("$readings[$i]->[4]");
-        $sql_value = $val;
-        $sql_timestamp = $ts;
-        if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+          #evaluate
+          my $val = $sql_value;
+          my $ts  = $sql_timestamp;
+          eval("$readings[$i]->[4]");
+          $sql_value = $val;
+          $sql_timestamp = $ts;
+          if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
       }
 
       if($sql_timestamp lt $from && $deltacalc) {
-        if(Scalar::Util::looks_like_number($sql_value)){
-          #nur setzen wenn nummerisch
-          $minval = $sql_value if($sql_value < $minval);
-          $maxval = $sql_value if($sql_value > $maxval);
-          $lastv[$i] = $sql_value;
-        }
+          if(Scalar::Util::looks_like_number($sql_value)){
+              #nur setzen wenn numerisch
+              $minval    = $sql_value if($sql_value < $minval);
+              $maxval    = $sql_value if($sql_value > $maxval);
+              $lastv[$i] = $sql_value;
+          }
+      
       } else {
-
         $writeout   = 0;
         $out_value  = "";
         $out_tstamp = "";
@@ -3350,93 +3357,100 @@ sub DbLog_Get($@) {
           $out_value = sprintf("%02d", $akt_ts - $last_ts);
           if(lc($sql_value) =~ m(hide)){$writeout=0;} else {$writeout=1;}
 
-        } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
-          #Berechnung eines Stundenwertes
-          %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-          if($lastd[$i] eq "undef") {
-            %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-            $lasttstamp{hour} = "00";
-          } else {
-            %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-          }
-          #    04                   01
-          #    06                   23
-          if("$tstamp{hour}" ne "$lasttstamp{hour}") {
-            # Aenderung der stunde, Berechne Delta
-            #wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
-            $retvaldummy = "";
-            if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
-              for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
-                $out_value  = "0";
-                $hour = $j;
-                $hour = '0'.$j if $j<10;
-                $cnt[$i]++;
-                $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
-                if ($outf =~ m/(all)/) {
-                  # Timestamp: Device, Type, Event, Reading, Value, Unit
-                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-              
-                } elsif ($outf =~ m/(array)/) {
-                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-              
-                } else {
-                  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-                  $retvaldummy .= "$out_tstamp $out_value\n";
-                }
-              }
+        } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {            # Berechnung eines Delta-Stundenwertes
+            %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+            if($lastd[$i] eq "undef") {
+                %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+                $lasttstamp{hour} = "00";
+            } else {
+                %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
             }
-            if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
-              for (my $j=0; $j < $tstamp{hour}; $j++) {
-                $out_value  = "0";
-                $hour = $j;
-                $hour = '0'.$j if $j<10;
-                $cnt[$i]++;
-                $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
-                if ($outf =~ m/(all)/) {
-                  # Timestamp: Device, Type, Event, Reading, Value, Unit
-                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+            #    04                   01
+            #    06                   23
+            if("$tstamp{hour}" ne "$lasttstamp{hour}") {
+                # Aenderung der stunde, Berechne Delta
+                # wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
+                $retvaldummy = "";
+                if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
+                    for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
+                        $out_value  = "0";
+                        $hour = $j;
+                        $hour = '0'.$j if $j<10;
+                        $cnt[$i]++;
+                        $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                        if ($outf =~ m/(all)/) {
+                            # Timestamp: Device, Type, Event, Reading, Value, Unit
+                            $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
               
-                } elsif ($outf =~ m/(array)/) {
-                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                        } elsif ($outf =~ m/(array)/) {
+                            push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
               
-                } else {
-                  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-                  $retvaldummy .= "$out_tstamp $out_value\n";
+                        } else {
+                            $out_tstamp =~ s/\ /_/g; #needed by generating plots
+                            $retvaldummy .= "$out_tstamp $out_value\n";
+                        }
+                    }
                 }
-              }
+                if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
+                    for (my $j=0; $j < $tstamp{hour}; $j++) {
+                        $out_value  = "0";
+                        $hour = $j;
+                        $hour = '0'.$j if $j<10;
+                        $cnt[$i]++;
+                        $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                        if ($outf =~ m/(all)/) {
+                            # Timestamp: Device, Type, Event, Reading, Value, Unit
+                            $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+                  
+                        } elsif ($outf =~ m/(array)/) {
+                            push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                  
+                        } else {
+                            $out_tstamp =~ s/\ /_/g; #needed by generating plots
+                            $retvaldummy .= "$out_tstamp $out_value\n";
+                        }
+                    }
+                }
+                
+                $out_value = sprintf("%g", $maxval - $minval);
+                $sum[$i] += $out_value;
+                $cnt[$i]++;
+                $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
+                # $minval =  (~0 >> 1);
+                $minval = $maxval;
+                # $maxval = -(~0 >> 1);
+                $writeout = 1;
+                
+                $writeout = 0 if($out_value eq $ldetad);       # Test
             }
-            $out_value = sprintf("%g", $maxval - $minval);
-            $sum[$i] += $out_value;
-            $cnt[$i]++;
-            $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-            #$minval =  (~0 >> 1);
-            $minval = $maxval;
-#            $maxval = -(~0 >> 1);
-            $writeout=1;
-          }
+        
         } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
-          #Berechnung eines Tageswertes
-          %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-          if($lastd[$i] eq "undef") {
-            %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-          } else {
-            %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-          }
-          if("$tstamp{day}" ne "$lasttstamp{day}") {
-            # Aenderung des Tages, Berechne Delta
-            $out_value = sprintf("%g", $maxval - $minval);
-            $sum[$i] += $out_value;
-            $cnt[$i]++;
-            $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-#            $minval =  (~0 >> 1);
-            $minval = $maxval;
-#            $maxval = -(~0 >> 1);
-            $writeout=1;
-          }
+            #Berechnung eines Tageswertes
+            %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+            
+            if($lastd[$i] eq "undef") {
+                %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+            } else {
+                %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+            }
+          
+            if("$tstamp{day}" ne "$lasttstamp{day}") {
+                # Aenderung des Tages, Berechne Delta
+                $out_value = sprintf("%g", $maxval - $minval);
+                $sum[$i] += $out_value;
+                $cnt[$i]++;
+                $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
+                # $minval =  (~0 >> 1);
+                $minval = $maxval;
+                # $maxval = -(~0 >> 1);
+                $writeout = 1;
+                $ldetad   = $out_value;             # Test
+            }
+        
         } else {
-          $out_value = $sql_value;
-          $out_tstamp = $sql_timestamp;
-          $writeout=1;
+            $out_value  = $sql_value;
+            $out_tstamp = $sql_timestamp;
+            $writeout   = 1;
         }
 
         # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
@@ -3445,22 +3459,22 @@ sub DbLog_Get($@) {
         ###################### Ausgabe ###########################
         if($writeout) {
             if ($outf =~ m/(all)/) {
-              # Timestamp: Device, Type, Event, Reading, Value, Unit
-              $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-              $retval .= $retvaldummy;
+                # Timestamp: Device, Type, Event, Reading, Value, Unit
+                $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+                $retval .= $retvaldummy;
             
             } elsif ($outf =~ m/(array)/) {
-              push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
               
             } else {
-              $out_tstamp =~ s/\ /_/g; #needed by generating plots
-              $retval .= "$out_tstamp $out_value\n";
-              $retval .= $retvaldummy;
+                $out_tstamp =~ s/\ /_/g; #needed by generating plots
+                $retval .= "$out_tstamp $out_value\n";
+                $retval .= $retvaldummy;
             }
         }
 
-        if(Scalar::Util::looks_like_number($sql_value)){
-          #nur setzen wenn nummerisch
+        if(Scalar::Util::looks_like_number($sql_value)) {
+          # nur setzen wenn numerisch
           if($deltacalc) {
             if(Scalar::Util::looks_like_number($out_value)){
               if($out_value < $min[$i]) {
@@ -3473,6 +3487,7 @@ sub DbLog_Get($@) {
               }
             }
             $maxval = $sql_value;
+          
           } else {
             if($sql_value < $min[$i]) {
               $min[$i] = $sql_value;
@@ -3486,6 +3501,7 @@ sub DbLog_Get($@) {
             $minval = $sql_value if($sql_value < $minval);
             $maxval = $sql_value if($sql_value > $maxval);
           }
+        
         } else {
           $min[$i] = 0;
           $max[$i] = 0;
@@ -3493,15 +3509,16 @@ sub DbLog_Get($@) {
           $minval  = 0;
           $maxval  = 0;
         }
+        
         if(!$deltacalc) {
-          $cnt[$i]++;
-          $lastv[$i] = $sql_value;
+            $cnt[$i]++;
+            $lastv[$i] = $sql_value;
         } else {
-          $lastv[$i] = $out_value if($out_value);
+            $lastv[$i] = $out_value if($out_value);
         }
         $lastd[$i] = $sql_timestamp;
       }
-    } #while fetchrow
+    }                                                                   # while fetchrow Ende 
 
     ######## den letzten Abschlusssatz rausschreiben ##########
     if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
@@ -3752,12 +3769,24 @@ sub DbLog_configcheck($) {
 	  @sr_unt = DbLog_sqlget($hash,"SHOW FIELDS FROM $history where FIELD='UNIT'");
   }
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$history' and column_name='unit'");
+      my $sch = AttrVal($name, "dbSchema", "");
+      my $h   = "history";
+      if($sch) {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='unit'");
+      } else {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='unit'");
+      
+      }
   }
   if($dbmodel =~ /SQLITE/) {
       my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
@@ -3831,12 +3860,24 @@ sub DbLog_configcheck($) {
   }
   
   if($dbmodel =~ /POSTGRESQL/) {
-      @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='device'");
-      @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='type'");
-	  @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='event'");
-	  @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='reading'");
-	  @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='value'");
-	  @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$current' and column_name='unit'");
+      my $sch = AttrVal($name, "dbSchema", "");
+      my $c   = "current";
+      if($sch) {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='unit'");
+      } else {
+          @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='device'");
+          @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='type'");
+          @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='event'");
+          @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='reading'");
+          @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='value'");
+          @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='unit'");
+      
+      }
   }
   if($dbmodel =~ /SQLITE/) {
       my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$current'"))[0];
@@ -3894,7 +3935,7 @@ sub DbLog_configcheck($) {
 	  }
   
       $check .= "<u><b>Result of table '$current' check</u></b><br><br>";
-      $check .= "Column width set in DB $dbname.current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
+      $check .= "Column width set in DB $current: 'DEVICE' = $cdat_dev, 'TYPE' = $cdat_typ, 'EVENT' = $cdat_evt, 'READING' = $cdat_rdg, 'VALUE' = $cdat_val, 'UNIT' = $cdat_unt <br>";
       $check .= "Column width used by $name: 'DEVICE' = $cmod_dev, 'TYPE' = $cmod_typ, 'EVENT' = $cmod_evt, 'READING' = $cmod_rdg, 'VALUE' = $cmod_val, 'UNIT' = $cmod_unt <br>";
       $check .= "<b>Recommendation:</b> $rec <br><br>";
 #}
@@ -4364,10 +4405,10 @@ sub DbLog_AddLog($$$$$) {
           if($async) {
               # asynchoner non-blocking Mode
 	          # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-	          $hash->{cache}{index}++;
-	          my $index = $hash->{cache}{index};
-	          $hash->{cache}{".memcache"}{$index} = $row;
-		      my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+	          $data{DbLog}{$name}{cache}{index}++;
+	          my $index = $data{DbLog}{$name}{cache}{index};
+	          $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
+		      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	          if($ce == 1) {
                   readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	          } else {
@@ -4451,11 +4492,11 @@ sub DbLog_addCacheLine($$$$$$$$) {
   use warnings;
   
   eval {         # one transaction
-      $hash->{cache}{index}++;
-	  my $index = $hash->{cache}{index};
-	  $hash->{cache}{".memcache"}{$index} = $row;
+      $data{DbLog}{$name}{cache}{index}++;
+	  my $index = $data{DbLog}{$name}{cache}{index};
+	  $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 					  
-      my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	  if($ce == 1) {
           readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	  } else {
@@ -5864,13 +5905,13 @@ sub DbLog_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $ im Kopf komplett! vorhanden )
+	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20093 2019-09-02 07:17:38Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -5912,7 +5953,7 @@ sub DbLog_showChildHandles ($$$$) {
     
     my $t = $h->{Type}."h";
     $t = ($t=~/drh/)?"DriverHandle   ":($t=~/dbh/)?"DatabaseHandle ":($t=~/sth/)?"StatementHandle":"Undefined";
-    Log3($name, 1, "DbLog - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
+    Log3($name, 1, "DbLog $name - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
     DbLog_showChildHandles($name, $_, $level + 1, $key)
         for (grep { defined } @{$h->{ChildHandles}});
 }
@@ -7051,7 +7092,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>timeout</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; timeout <n>
+	  attr &lt;device&gt; timeout &lt;n&gt;
 	  </code><br>
       setup timeout of the write cycle into database in asynchronous mode (default 86400s) <br>
     </ul>
@@ -7064,7 +7105,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceFlag</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
 	  </code><br>
       Trace flags are used to enable tracing of specific activities within the DBI and drivers. The attribute is only used for  
       tracing of errors in case of support. <br><br>
@@ -7096,7 +7137,7 @@ attr SMA_Energymeter DbLogValueFn
 	  </code><br>
 	  
       If set, every &lt;n&gt; seconds the system wide existing database handles are printed out into the logfile.
-      This attribute is only relevant for support cases. (default: 0 = switch off) <br>
+      This attribute is only relevant in case of support. (default: 0 = switch off) <br>
 	  
     </ul>
     </li>
@@ -7108,7 +7149,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceLevel</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
 	  </code><br>
       Switch on the tracing function of the module. <br>
       <b>Caution !</b> The attribute is only used for tracing errors or in case of support. If switched on <b>very much entries</b> 
@@ -8410,7 +8451,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>timeout</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; timeout <n>
+	  attr &lt;device&gt; timeout &lt;n&gt;
 	  </code><br>
       Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 86400s). <br>
     </ul>
@@ -8423,7 +8464,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceFlag</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
 	  </code><br>
       Bestimmt das Tracing von bestimmten Aktivitäten innerhalb des Datenbankinterfaces und Treibers. Das Attribut ist nur 
       für den Fehler- bzw. Supportfall gedacht. <br><br>
@@ -8467,7 +8508,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceLevel</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
 	  </code><br>
       Schaltet die Trace-Funktion des Moduls ein. <br>
       <b>Achtung !</b> Das Attribut ist nur für den Fehler- bzw. Supportfall gedacht. Es werden <b>sehr viele Einträge</b> in 
@@ -8610,7 +8651,9 @@ attr SMA_Energymeter DbLogValueFn
         "Encode": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0
+        "FHEM::Meta": 0,
+        "Devel::Size": 0,
+        "Data::Peek": 0
       },
       "suggests": {
         "DBD::Pg" :0,
