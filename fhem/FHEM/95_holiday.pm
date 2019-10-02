@@ -100,6 +100,7 @@ holiday_refresh($;$$)
   $hash->{HOLIDAYFILE} = "$dir/$name.holiday";
 
   my @foundList;
+  my %foundHash;
   foreach my $l (@holidayfile) {
     next if($l =~ m/^\s*#/);
     next if($l =~ m/^\s*$/);
@@ -216,7 +217,10 @@ holiday_refresh($;$$)
            $found = $args[3];
         }
     }
-    push @foundList, $found if($found && !grep(m/^$found$/,@foundList));
+    if($found && !$foundHash{$found}) {
+      push @foundList, $found;
+      $foundHash{$found} = 1;
+    }
 
   }
 
