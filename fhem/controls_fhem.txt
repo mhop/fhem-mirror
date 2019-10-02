@@ -1,4 +1,4 @@
-REV 20283
+REV 20287
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-09-30_07:45:03 308701 ./CHANGED
+UPD 2019-10-02_07:45:02 308734 ./CHANGED
 UPD 2019-09-28_07:45:02 41924 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -85,7 +85,7 @@ UPD 2019-08-28_07:45:03 30344 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2019-06-29_07:45:02 167185 FHEM/10_MQTT_GENERIC_BRIDGE.pm
-UPD 2019-09-30_07:45:03 55415 FHEM/10_MYSENSORS_DEVICE.pm
+UPD 2019-10-02_07:45:02 55372 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2019-04-01_07:45:02 19526 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
@@ -330,7 +330,7 @@ UPD 2015-07-28_14:05:31 11667 FHEM/64_ESA2000.pm
 UPD 2018-03-11_07:45:03 42374 FHEM/66_ECMD.pm
 UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
 UPD 2019-09-30_07:45:03 88148 FHEM/70_BOTVAC.pm
-UPD 2019-04-16_07:45:02 89674 FHEM/70_BRAVIA.pm
+UPD 2019-10-02_07:45:02 89792 FHEM/70_BRAVIA.pm
 UPD 2019-09-25_07:45:02 5603 FHEM/70_CanOverEthernet.pm
 UPD 2017-04-23_07:45:02 6641 FHEM/70_EGPM.pm
 UPD 2019-03-23_07:45:03 123026 FHEM/70_ENIGMA2.pm
@@ -635,7 +635,7 @@ UPD 2019-09-14_07:45:02 333575 FHEM/lib/74_AMADautomagicFlowset_4.4.2.xml
 UPD 2019-05-09_07:45:02 442824 FHEM/lib/74_AMADtaskerset_4.4.1.prj.xml
 UPD 2019-09-28_07:45:02 36249 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-09-30_07:45:03 108459 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-10-02_07:45:02 111044 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -737,8 +737,8 @@ UPD 2019-10-01_07:45:07 4135317 docs/commandref.html
 UPD 2019-10-01_07:45:09 2561058 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-10-01_07:45:10 219252 docs/commandref_modular.html
-UPD 2019-10-01_07:45:11 230181 docs/commandref_modular_DE.html
+UPD 2019-10-02_07:45:10 219252 docs/commandref_modular.html
+UPD 2019-10-02_07:45:11 230181 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
