@@ -176,7 +176,7 @@ sub KeyValueProtocol_Parse($$) {
           $key = $newKey if ($newKey);
         }
 
-        readingsBulkUpdate($rhash, $key, $value) if ($value);
+        readingsBulkUpdate($rhash, $key, $value) if ($value ne "");
       }
 
       readingsEndUpdate($rhash, 1);
