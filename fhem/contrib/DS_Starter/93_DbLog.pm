@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.7.3"   => "02.10.2019 Test ",
+  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn ",
+  "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
   "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
   "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
   "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
@@ -1447,7 +1448,11 @@ sub DbLog_Log($$) {
 					      next;  
 					  }
 					  
-					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+                      if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) {
+					      $timestamp = $TIMESTAMP;
+                      } else {
+                          Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
+                      }                      
  				      $reading   = $READING    if($READING ne '');
  		  	          $value     = $VALUE      if(defined $VALUE);
  				      $unit      = $UNIT       if(defined $UNIT);
@@ -1475,7 +1480,11 @@ sub DbLog_Log($$) {
 					      next;  
 					  }
 					  
-					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+                      if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) {
+					      $timestamp = $TIMESTAMP;
+                      } else {
+                          Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                      } 
  				      $dev_name  = $DEVICE     if($DEVICE ne '');
  				      $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
  				      $reading   = $READING    if($READING ne '');
@@ -3285,7 +3294,7 @@ sub DbLog_Get($@) {
       while($sth->fetch()) {
           no warnings 'uninitialized';
           my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
-          Log3 ($name, 4, "$name - SQL-result -> $ds");
+          Log3 ($name, 5, "$name - SQL-result -> $ds");
           use warnings;
           
           ############ Auswerten des 5. Parameters: Regexp ###################
@@ -3318,9 +3327,9 @@ sub DbLog_Get($@) {
               }
           
           } else {
-              $writeout   = 0;
-              $out_value  = "";
-              $out_tstamp = "";
+              $writeout    = 0;
+              $out_value   = "";
+              $out_tstamp  = "";
               $retvaldummy = "";
 
               if($readings[$i]->[4]) {
@@ -3330,7 +3339,7 @@ sub DbLog_Get($@) {
 
               ############ Auswerten des 4. Parameters: function ###################
               if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                  # nur den integerwert uebernehmen falls zb value=15°C
-                  $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
+                  $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
                   $writeout=1;
 
@@ -3421,7 +3430,7 @@ sub DbLog_Get($@) {
                       # $maxval = -(~0 >> 1);
                       $writeout = 1;
                        
-                      Log3 ($name, 4, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                      Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
                   }
             
               } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {      # Berechnung eines Tageswertes
@@ -3444,7 +3453,7 @@ sub DbLog_Get($@) {
                       # $maxval = -(~0 >> 1);
                       $writeout = 1;
                       
-                      Log3 ($name, 4, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                      Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
                   }
             
               } else {
