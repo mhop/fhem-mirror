@@ -3316,9 +3316,14 @@ sub DbLog_Get($@) {
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
               eval("$readings[$i]->[4]");
-              $sql_value = $val;
-              $sql_timestamp = $ts;
-              if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+              if($@) {
+                  Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";
+              } else {
+                  $sql_value     = $val;
+                  $sql_timestamp = $ts;
+              }
+              $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
+              Log3 ($name, 5, "$name - Result after Regex -> $ds");
           }
 
           if($sql_timestamp lt $from && $deltacalc) {
@@ -3337,19 +3342,19 @@ sub DbLog_Get($@) {
 
               if($readings[$i]->[4]) {
                   $out_tstamp = $sql_timestamp;
-                  $writeout=1 if(!$deltacalc);
+                  $writeout   = 1 if(!$deltacalc);
               }
 
               ############ Auswerten des 4. Parameters: function ###################
               if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                  # nur den integerwert uebernehmen falls zb value=15°C
                   $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
                   $out_tstamp = $sql_timestamp;
-                  $writeout=1;
+                  $writeout   = 1;
 
               } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
-                  $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
+                  $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
                   $out_tstamp = $sql_timestamp;
-                  $writeout=1;
+                  $writeout   = 1;
 
               } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
                   # Berechung der vergangen Sekunden seit dem letzten Logeintrag
@@ -3361,12 +3366,12 @@ sub DbLog_Get($@) {
                   }
                   my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
                   $out_tstamp = $sql_timestamp;
-                  $out_value = sprintf("%02d", $akt_ts - $last_ts);
+                  $out_value  = sprintf("%02d", $akt_ts - $last_ts);
               
                   if(lc($sql_value) =~ m(hide)) {
-                      $writeout=0;
+                      $writeout = 0;
                   } else {
-                      $writeout=1;
+                      $writeout = 1;
                   }
 
               } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
@@ -3387,8 +3392,8 @@ sub DbLog_Get($@) {
                       if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
                           for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
-                              $hour = $j;
-                              $hour = '0'.$j if $j<10;
+                              $hour       = $j;
+                              $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
                               if ($outf =~ m/(all)/) {
@@ -3399,7 +3404,7 @@ sub DbLog_Get($@) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                  
                               } else {
-                                  $out_tstamp =~ s/\ /_/g; #needed by generating plots
+                                  $out_tstamp   =~ s/\ /_/g; #needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
                           }
@@ -3408,8 +3413,8 @@ sub DbLog_Get($@) {
                       if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
                           for (my $j=0; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
-                              $hour = $j;
-                              $hour = '0'.$j if $j<10;
+                              $hour       = $j;
+                              $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
                               if ($outf =~ m/(all)/) {
@@ -3425,7 +3430,7 @@ sub DbLog_Get($@) {
                       }
                     
                       $out_value = sprintf("%g", $maxval - $minval);
-                      $sum[$i] += $out_value;
+                      $sum[$i]  += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
                       # $minval =  (~0 >> 1);
