@@ -30,7 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn ",
+  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog",
   "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
   "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
   "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
@@ -1448,11 +1448,13 @@ sub DbLog_Log($$) {
 					      next;  
 					  }
 					  
-                      if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) {
-					      $timestamp = $TIMESTAMP;
+                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      if (!$@) {
+                          $timestamp = $TIMESTAMP;
                       } else {
                           Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
-                      }                      
+                      }
  				      $reading   = $READING    if($READING ne '');
  		  	          $value     = $VALUE      if(defined $VALUE);
  				      $unit      = $UNIT       if(defined $UNIT);
@@ -1479,12 +1481,13 @@ sub DbLog_Log($$) {
 						                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
 					      next;  
 					  }
-					  
-                      if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) {
-					      $timestamp = $TIMESTAMP;
+                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      if (!$@) {
+                          $timestamp = $TIMESTAMP;
                       } else {
                           Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
-                      } 
+                      }
  				      $dev_name  = $DEVICE     if($DEVICE ne '');
  				      $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
  				      $reading   = $READING    if($READING ne '');
@@ -4392,8 +4395,14 @@ sub DbLog_AddLog($$$$$) {
  	          eval $value_fn;
 	          Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
 	          next if($IGNORE);  # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
-		 
-              $ts           = $TIMESTAMP  if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2} \d{2}):(\d{2}):(\d{2})$/);
+              
+              my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+              eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+              if (!$@) {
+                  $ts = $TIMESTAMP;
+              } else {
+                  Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+              }
  	          $dev_name     = $DEVICE     if($DEVICE ne '');
 	          $dev_type     = $DEVICETYPE if($DEVICETYPE ne '');
  	          $dev_reading  = $READING    if($READING ne '');
