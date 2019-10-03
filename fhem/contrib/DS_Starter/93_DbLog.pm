@@ -3315,6 +3315,7 @@ sub DbLog_Get($@) {
               #evaluate
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
+              no warnings 'uninitialized';
               eval("$readings[$i]->[4]");
               if($@) {
                   Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";
@@ -3324,6 +3325,7 @@ sub DbLog_Get($@) {
               }
               $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
               Log3 ($name, 5, "$name - Result after Regex -> $ds");
+              use warnings;
           }
 
           if($sql_timestamp lt $from && $deltacalc) {
