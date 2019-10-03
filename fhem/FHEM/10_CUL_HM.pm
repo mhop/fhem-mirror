@@ -4714,7 +4714,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
-
     $state = "";
     my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
     
@@ -4776,7 +4775,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
 #    if (($list == 3) ||($list == 4)   # peer is necessary for list 3/4
     if ($reg->{p} eq 'y'              # peer is necessary 
-        ||($peerChnIn))              {# and if requested by user
+        ||(defined $peerChnIn and $peerChnIn))   {# and if requested by user
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
       ($peerId,$peerChn) = unpack 'A6A2',$peerId.'01';
@@ -4795,9 +4794,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $addrData;
     if ($dLen < 8){# fractional byte see whether we have stored the register
       #read full 8 bit!!!
-      my $rName = CUL_HM_id2Name($dst.$lChn);
-      $rName =~ s/_chn-\d\d$//;
-      my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
+      my $cName = CUL_HM_id2Name($dst.$lChn);
+      $cName =~ s/_chn-\d\d$//;
+      my $curVal = CUL_HM_getRegFromStore($cName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
 	    return "peer required for $regName" if ($curVal =~ m/peer/);
         return "cannot calculate value. Please issue set $name getConfig first - $curVal";
@@ -8189,27 +8188,27 @@ sub CUL_HM_DumpProtocol($$@) {
 sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my($name,$regName,$list,$peerId,$regLN)=@_;
   my $hash = $defs{$name};
-  my ($size,$pos,$conv,$factor,$unit) = (8,0,"",1,""); # default
+  my ($size,$pos,$conv,$factor,$unit,$peerRq) = (8,0,"",1,"","n"); # default
   my $addr = $regName;
   my $reg = $culHmRegDefine->{$regName};
   if ($reg) { # get the register's information
-    $addr = $reg->{a};
-    $pos = ($addr*10)%10;
-    $addr = int($addr);
-    $list = $reg->{l};
-    $size = $reg->{s};
-    $size = int($size)*8 + ($size*10)%10;
-    $conv = $reg->{c}; #unconvert formula
+    $addr   = $reg->{a};
+    $pos    = ($addr*10)%10;
+    $addr   = int($addr);
+    $size   = $reg->{s};
+    $size   = int($size)*8 + ($size*10)%10;
+    $list   = $reg->{l};
+    $conv   = $reg->{c}; #unconvert formula
     $factor = $reg->{f};
-    $unit = ($reg->{u}?" ".$reg->{u}:"");
+    $peerRq = $reg->{p};
+    $unit   = ($reg->{u} ? " ".$reg->{u} : "");
   }
   else{
-    return "invalid:regname or address"
-            if($addr<1 ||$addr>255);
+    return "invalid:regname or address" if($addr < 1 ||$addr > 255);
+    $peerRq = hex($peerId) != 0 ? "y":"n";
   }
-
-  return "invalid:no peer for this register" if(($reg->{p} eq "n" && hex($peerId) != 0)
-                                              ||($reg->{p} eq "y" && hex($peerId) == 0));
+  return "invalid:no peer for this register" if((hex($peerId) != 0 && $peerRq eq "n" )
+                                              ||(hex($peerId) == 0 && $peerRq eq "y"));
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ($hash->{helper}{expert}{raw}?"":".")
@@ -8256,7 +8255,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 
   $data = ($data>>$pos) & (0xffffffff>>(32-$size));
   if (!$conv){                ;# do nothing
-  } elsif($conv eq "lit"     ){$data = defined $reg->{litInv}{$data}?$reg->{litInv}{$data}:"undef lit:$data";
+  } elsif($conv eq "lit"     ){$data = defined $reg->{litInv}{$data} ? $reg->{litInv}{$data} : "undef lit:$data";
   } elsif($conv eq "fltCvT"  ){$data = CUL_HM_CvTflt($data);
   } elsif($conv eq "fltCvT60"){$data = CUL_HM_CvTflt60($data);
   } elsif($conv eq "min2time"){$data = CUL_HM_min2time($data);
