@@ -950,7 +950,7 @@ desc:Example how to configure a single relay Shelly device offering energy meass
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate shelly1_w_energy_meassuring
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
-attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","total",0) },gang:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","gang",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
+attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","total",0) },wash:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","wash",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
 attr DEVICE comment Adopt $limit in readingList to your needs to get appropriate loadState changes; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results.
 attr DEVICE model shelly1_w_energy_meassuring_washer_example
 
@@ -1410,7 +1410,7 @@ desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rg
 order:X_011
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE icon light_control
@@ -1440,7 +1440,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
 order:X_01a
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 copy DEVICE milight_REMOTE_ID_0
 deletereading -q milight_REMOTE_ID_0 .*_.*
@@ -1469,7 +1469,7 @@ desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is exp
 order:X_01a1
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE icon light_control
@@ -1509,7 +1509,7 @@ desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is exp
 order:X_01b
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE icon light_control
@@ -1542,7 +1542,7 @@ desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more opti
 order:X_01x
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE icon light_control
@@ -1582,7 +1582,7 @@ desc:For use with X_01_esp_milight_hub_bridge <br>See <a href="https://forum.fhe
 order:X_01y
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1,4})[/].*:, ? $2 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE readingList \
