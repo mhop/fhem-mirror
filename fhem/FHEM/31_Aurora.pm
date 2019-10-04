@@ -567,7 +567,7 @@ Aurora_Set($@)
 }
 
 sub
-cttorgb($)
+Aurora_cttorgb($)
 {
   my ($ct) = @_;
 
@@ -604,7 +604,7 @@ cttorgb($)
 }
 
 sub
-xyYtorgb($$$)
+Aurora_xyYtorgb($$$)
 {
   # calculation from http://www.brucelindbloom.com/index.html
   my ($x,$y,$Y) = @_;
@@ -668,7 +668,7 @@ Aurora_Get($@)
     my $cm = ReadingsVal($name,"colormode","");
     if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+)/ ) {
-        ($r,$g,$b) = cttorgb(1000000/$1);
+        ($r,$g,$b) = Aurora_cttorgb(1000000/$1);
       }
     } else {
       my $h = ReadingsVal($name,"hue",0) / 359.0;
@@ -689,7 +689,7 @@ Aurora_Get($@)
     my $cm = ReadingsVal($name,"colormode","");
     if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
-        ($r,$g,$b) = cttorgb($1);
+        ($r,$g,$b) = Aurora_cttorgb($1);
       }
     } else {
       my $h = ReadingsVal($name,"hue",0) / 359.0;
