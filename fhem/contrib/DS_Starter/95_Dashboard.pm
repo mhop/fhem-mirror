@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.17.0" => "04.10.2019  Path handling of backgroundimage changed ",
   "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
   "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
   "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
@@ -429,6 +430,10 @@ sub Dashboard_SummaryFN ($$$$) {
 	  readingsSingleUpdate($hash, "state", "Disabled", 0 );
 	  return "";
   }
+  
+  # Hintergrundbild bauen
+  my $bimg = $backgroundimage?"url(/fhem/images/$backgroundimage)":"";
+  Log3 ($name, 5, "Dashboard $name - Backgroundimage to display: $bimg");
  
   if ($debug == 1)                                     { $debugfield    = "edit"; }
   if ($showtabs eq "tabs-and-buttonbar-at-the-top")    { $showbuttonbar = "top"; }
@@ -485,7 +490,7 @@ sub Dashboard_SummaryFN ($$$$) {
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtogglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss,$flexible\">\n";
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	  $ret .= "</div></td></tr>\n"; 
-	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".($backgroundimage ? "url(/fhem/images/" .FW_iconPath($backgroundimage).")" : "")." no-repeat !important;\">\n";  
+	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".$bimg." no-repeat !important;\">\n";  
 
 	  ########################### Dashboard Tab-Liste ##############################################
 	  $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
@@ -1245,7 +1250,13 @@ return $a;
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
-        match/extend the dashboard height/width.
+        match/extend the dashboard height/width. The relative path to "./www/images" has to be used. <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_backgroundimage dashboard/cam_video.PNG      <br>        
+		# File ./www/images/dashboard/cam_video.PNG is shown        <br>
+		attr dashboard_backgroundimage cam_video.PNG                <br>    
+		# File ./www/images/cam_video.PNG is shown                  <br>
     </li><br>
     
     <a name="dashboard_colcount"></a>	
@@ -1528,7 +1539,13 @@ return $a;
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Zeigt ein Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
-        passen oder diese überschreiten.
+        passen oder diese überschreiten. Es ist der relative Pfad zum Verzeichnis "./www/images" anzugeben. <br><br>
+		
+		<b>Beispiel</b><br>
+		attr dashboard_backgroundimage dashboard/cam_video.PNG      <br>        
+		# Bild ./www/images/dashboard/cam_video.PNG wird angezeigt  <br>
+		attr dashboard_backgroundimage cam_video.PNG                <br>    
+		# Bild ./www/images/cam_video.PNG wird angezeigt            <br>
     </li>
     <br>	
     
