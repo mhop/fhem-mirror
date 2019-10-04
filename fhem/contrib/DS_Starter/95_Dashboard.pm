@@ -1,4 +1,4 @@
-﻿# $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $
+﻿# $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $
 ########################################################################################
 #       95_Dashboard.pm
 #
@@ -55,6 +55,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
   "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
   "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
@@ -97,7 +98,8 @@ sub Dashboard_Initialize ($) {
   						 "dashboard_colcount:1,2,3,4,5 ".	
 						 "dashboard_customcss " .                         
 						 "dashboard_debug:0,1 ".
-						 "dashboard_flexible " .						 
+						 "dashboard_flexible " .		
+                         "dashboard_hideGroupHeader:1,0 " .						 
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".	
@@ -784,7 +786,7 @@ sub Dashboard_BuildGroup ($$$$$$) {
   $ret .= "<div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$sorting."\" id=\"".$groupId."\">\n";
   $ret .= "<div class=\"dashboard_widgetinner\">\n";	
 
-  if ($groupname && $groupname ne $devices) {
+  if ($groupname && $groupname ne $devices && !AttrVal($name,"dashboard_hideGroupHeader",0)) {
       $ret .= "<div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
 	  if ($icon) {
 	      $ret.= FW_makeImage($icon,$icon,"dashboard_group_icon");
@@ -1054,12 +1056,12 @@ sub Dashboard_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {   # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                    # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20260 2019-09-27 13:08:21Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );   # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden                                       
       }
@@ -1242,7 +1244,7 @@ return $a;
         
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
-        Displays a background image for the complete dashboard. The image is not stretched in any way so the size should 
+        Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
         match/extend the dashboard height/width.
     </li><br>
     
@@ -1256,7 +1258,7 @@ return $a;
 	
     <a name="dashboard_debug"></a>		
     <li><b>dashboard_debug </b><br>
-        Show Hiddenfields. Only for Maintainer's use.<br>
+        Show Hiddenfields. Only for Maintainer's use. <br>
         Default: 0
     </li>
     <br>
@@ -1265,24 +1267,32 @@ return $a;
     <li><b>dashboard_flexible </b><br>
         If set to a value > 0, the widgets are not positioned in columns any more but can be moved freely to any position in 
         the tab.<br/>
-        The value for this parameter also defines the grid, in which the position "snaps in".
+        The value for this parameter also defines the grid, in which the position "snaps in". <br> 
         Default: 0
     </li><br>
 	
+    <a name="dashboard_hideGroupHeader"></a>	
+    <li><b>dashboard_hideGroupHeader </b><br>
+        If set, the header containing the group name and group icon above the pictured FHEM-group (see also dashboard_tab1groups) is hidden. <br> 
+		Default: 0
+    </li>
+    <br>
+	
     <a name="dashboard_homeTab"></a>
     <li><b>dashboard_homeTab </b><br>
-        Specifies which tab is activated. If it isn't set, the last selected tab will also be the active tab. (Default: 1)
+        Specifies which tab is activated. If it isn't set, the last selected tab will also be the active tab. <br>
+		Default: 1
     </li><br>
     
     <a name="dashboard_row"></a>	
     <li><b>dashboard_row </b><br>
-        To select which rows are displayed. top only; center only; bottom only; top and center; center and bottom; top,center and bottom.<br>
+        To select which rows are displayed. top only; center only; bottom only; top and center; center and bottom; top,center and bottom. <br>
         Default: center
     </li><br>
     
     <a name="dashboard_rowbottomheight"></a>	
     <li><b>dashboard_rowbottomheight </b><br>
-        Height of the bottom row in which the groups may be positioned.<br>
+        Height of the bottom row in which the groups may be positioned. <br>
         Default: 250
     </li><br>
     
@@ -1300,7 +1310,7 @@ return $a;
         specifies the width of the first column, the second value of the width of the second column, etc. Is the sum of the 
         width greater than 100 it is reduced. 
         If more columns defined as widths the missing widths are determined by the difference to 100. However, are less 
-        columns are defined as the values ​​of ignores the excess values​​.<br>
+        columns are defined as the values ​​of ignores the excess values​​. <br>
         Default: 100
     </li><br>
     
@@ -1312,19 +1322,19 @@ return $a;
 	
     <a name="dashboard_showfullsize"></a>	
     <li><b>dashboard_showfullsize </b><br>
-        Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1.<br>
+        Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1. <br>
         Default: 0
     </li><br>	
 	
     <a name="dashboard_showtabs"></a>	
     <li><b>dashboard_showtabs </b><br>
-        Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used.<br>
+        Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used. <br>
         Default: tabs-and-buttonbar-at-the-top
     </li><br>
     
     <a name="dashboard_showtogglebuttons"></a>		
     <li><b>dashboard_showtogglebuttons </b><br>
-        Displays a Toogle Button on each Group do collapse.<br>
+        Displays a Toogle Button on each Group do collapse. <br>
         Default: 0
     </li><br>
     
@@ -1406,14 +1416,14 @@ return $a;
 	    <li> are positioning to the tab specified by command "set &lt;name&gt; activateTab" </li>
 	  </ul>
 	  <br>
-	  (default: all)
+	  Default: all
 	  <br>
     </li>
     <br>
 	
     <a name="dashboard_width"></a>	
     <li><b>dashboard_width </b><br>
-        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%).<br>
+        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%). <br>
         Default: 100%
     </li>
     <br>
@@ -1517,7 +1527,7 @@ return $a;
     
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
-        Zeig in Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
+        Zeigt ein Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
         passen oder diese überschreiten.
     </li>
     <br>	
@@ -1527,43 +1537,51 @@ return $a;
         Die Anzahl der Spalten in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
         in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
-        Standard: 1
+        Default: 1
     </li>
     <br>
     
     <a name="dashboard_debug"></a>		
     <li><b>dashboard_debug </b><br>
-        Zeigt Debug-Felder an. Sollte nicht gesetzt werden!<br>
-        Standard: 0
+        Zeigt Debug-Felder an. Sollte nicht gesetzt werden! <br>
+        Default: 0
     </li>
     <br>	
     
     <a name="dashboard_flexible"></a>	
     <li><b>dashboard_flexible </b><br>
         Hat dieser Parameter  einen Wert > 0, dann können die Widgets in den Tabs frei positioniert werden und hängen nicht 
-        mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zu schnappt".
-        Standard: 0
+        mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zuschnappt". <br> 
+        Default: 0
+    </li>
+    <br>
+	
+    <a name="dashboard_hideGroupHeader"></a>	
+    <li><b>dashboard_hideGroupHeader </b><br>
+        Wenn gesetzt, wird der Kopf mit Gruppenname und -icon der dargestellten FHEM-Gruppe (siehe dashboard_tab1groups) verborgen. <br> 
+		Default: 0
     </li>
     <br>
 	
     <a name="dashboard_homeTab"></a>	
     <li><b>dashboard_homeTab </b><br>
-        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt gewählte Tab das aktive Tab. (Default: 1)
+        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt gewählte Tab das aktive Tab. <br> 
+		Default: 1
     </li>
     <br>
 	
     <a name="dashboard_row"></a>	
     <li><b>dashboard_row </b><br>
         Auswahl welche Zeilen angezeigt werden sollen. top (nur Oben), center (nur Mitte), bottom (nur Unten) und den 
-        Kombinationen daraus.<br>
-        Standard: center
+        Kombinationen daraus. <br>
+        Default: center
     </li>
     <br>	
 	
     <a name="dashboard_rowcenterheight"></a>	
     <li><b>dashboard_rowcenterheight </b><br>
         Höhe der mittleren Zeile, in der die Gruppen angeordnet werden. <br>
-        Standard: 400
+        Default: 400
     </li>
     <br>
     
@@ -1573,28 +1591,28 @@ return $a;
         Die Werte sind durch ein Komma (ohne Leerzeichen) zu trennen. Jeder Wert bestimmt die Spaltenbreite in %! Der erste Wert gibt die Breite der ersten Spalte an, 
         der zweite Wert die Breite der zweiten Spalte usw. Ist die Summe der Breite größer als 100 werden die Spaltenbreiten reduziert.
         Sind mehr Spalten als Breiten definiert werden die fehlenden Breiten um die Differenz zu 100 festgelegt. Sind hingegen weniger Spalten als Werte definiert werden 
-        die überschüssigen Werte ignoriert.<br>
-        Standard: 100
+        die überschüssigen Werte ignoriert. <br>
+        Default: 100
     </li>
     <br>
     
     <a name="dashboard_rowtopheight"></a>	
     <li><b>dashboard_rowtopheight </b><br>
         Höhe der oberen Zeile, in der die Gruppen angeordnet werden. <br>
-        Standard: 250
+        Default: 250
     </li>
     <br>
     
     <a name="dashboard_rowbottomheight"></a>	
     <li><b>dashboard_rowbottomheight </b><br>
-        Höhe der unteren Zeile, in der die Gruppen angeordnet werden.<br>
-        Standard: 250
+        Höhe der unteren Zeile, in der die Gruppen angeordnet werden. <br>
+        Default: 250
     </li><br>
     
     <a name="dashboard_showfullsize"></a>	
     <li><b>dashboard_showfullsize </b><br>
         Blendet die FHEMWEB Raumliste (kompleter linker Bereich der Seite) und den oberen Bereich von FHEMWEB aus wenn der 
-        Wert auf 1 gesetzt ist.<br>
+        Wert auf 1 gesetzt ist. <br>
         Default: 0
     </li>
     <br>
@@ -1602,15 +1620,15 @@ return $a;
     <a name="dashboard_showtabs"></a>	
     <li><b>dashboard_showtabs </b><br>
         Zeigt die Tabs/Schalterleiste des Dashboards oben oder unten an, oder blendet diese aus. Wenn die Schalterleiste 
-        ausgeblendet wird ist das Dashboard gespert.<br>
-        Standard: tabs-and-buttonbar-at-the-top
+        ausgeblendet wird ist das Dashboard gespert. <br>
+        Default: tabs-and-buttonbar-at-the-top
     </li>
     <br>
 	
     <a name="dashboard_showtogglebuttons"></a>		
     <li><b>dashboard_showtogglebuttons </b><br>
-        Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann.<br>
-        Standard: 0
+        Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann. <br>
+        Default: 0
     </li><br>	
     
     <a name="dashboard_tab1name"></a>
@@ -1670,7 +1688,7 @@ return $a;
 		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
 		der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
-        Standard: &lt;dashboard_colcount&gt;
+        Default: &lt;dashboard_colcount&gt;
     </li>
     <br>
     
@@ -1700,7 +1718,7 @@ return $a;
 	    <li> beim Ausführen von "set &lt;name&gt; activateTab" auf diesen Tab im Dashboard positionieren </li>
 	  </ul>
 	  <br>
-	  (default: alle)
+	  Default: alle
 	  <br>
     </li>
     <br>
@@ -1708,8 +1726,8 @@ return $a;
     <a name="dashboard_width"></a>	
     <li><b>dashboard_width </b><br>
         Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) 
-        in Pixel.<br>
-        Standard: 100%
+        in Pixel. <br>
+        Default: 100%
     </li>
     <br>
 
