@@ -1,4 +1,4 @@
-REV 20290
+REV 20301
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2019-10-02_07:45:02 308734 ./CHANGED
+UPD 2019-10-04_07:45:03 308810 ./CHANGED
 UPD 2019-09-28_07:45:02 41924 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -64,7 +64,7 @@ UPD 2018-06-04_07:45:02 52079 FHEM/02_RSS.pm
 UPD 2018-03-11_07:45:03 4860 FHEM/09_BS.pm
 UPD 2019-01-24_07:45:02 21854 FHEM/09_CUL_FHTTK.pm
 UPD 2018-03-11_07:45:03 6824 FHEM/09_USF1000.pm
-UPD 2019-08-12_07:45:03 612687 FHEM/10_CUL_HM.pm
+UPD 2019-10-04_07:45:03 612791 FHEM/10_CUL_HM.pm
 UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
@@ -214,7 +214,7 @@ UPD 2017-10-02_07:45:02 11999 FHEM/36_EleroDrive.pm
 UPD 2017-07-25_07:45:02 15277 FHEM/36_EleroStick.pm
 UPD 2017-07-25_07:45:02 8549 FHEM/36_EleroSwitch.pm
 UPD 2017-07-14_07:45:02 36839 FHEM/36_JeeLink.pm
-UPD 2019-08-22_07:45:03 7287 FHEM/36_KeyValueProtocol.pm
+UPD 2019-10-04_07:45:03 7293 FHEM/36_KeyValueProtocol.pm
 UPD 2019-09-22_07:45:02 20128 FHEM/36_LaCrosse.pm
 UPD 2019-01-18_07:45:03 33269 FHEM/36_LaCrosseGateway.pm
 UPD 2019-07-01_07:45:03 7519 FHEM/36_Level.pm
@@ -571,7 +571,7 @@ UPD 2015-07-28_14:05:29 5739 FHEM/FhemUtils/update-20130127-001
 UPD 2018-05-06_07:45:03 3548 FHEM/FritzBoxUtils.pm
 UPD 2019-06-21_07:45:02 2767 FHEM/GPUtils.pm
 UPD 2019-09-09_07:45:04 62889 FHEM/HMCCUConf.pm
-UPD 2019-04-21_07:45:02 200942 FHEM/HMConfig.pm
+UPD 2019-10-04_07:45:03 200817 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
 UPD 2019-08-21_07:45:02 29655 FHEM/HttpUtils.pm
 UPD 2015-07-28_14:05:31 2324 FHEM/MaxCommon.pm
@@ -708,8 +708,8 @@ UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2019-08-10_07:45:02 2691 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
-UPD 2019-08-10_07:45:02 536137 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2019-08-10_07:45:02 148090 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
+UPD 2019-10-04_07:45:03 148192 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-09-07_07:45:03 18901 FHEM/msgSchema.pm
@@ -737,8 +737,8 @@ UPD 2019-10-01_07:45:07 4135317 docs/commandref.html
 UPD 2019-10-01_07:45:09 2561058 docs/commandref_DE.html
 UPD 2019-07-02_07:45:03 79480 docs/commandref_frame.html
 UPD 2019-07-02_07:45:03 89244 docs/commandref_frame_DE.html
-UPD 2019-10-03_07:45:10 219252 docs/commandref_modular.html
-UPD 2019-10-03_07:45:11 230181 docs/commandref_modular_DE.html
+UPD 2019-10-04_07:45:10 219252 docs/commandref_modular.html
+UPD 2019-10-04_07:45:11 230181 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
