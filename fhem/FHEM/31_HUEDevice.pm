@@ -432,8 +432,9 @@ HUEDevice_SetParam($$@)
     $cmd = 'bri';
   }
 
+  my $subtype = "extcolordimmer";
   if( $name ) {
-    my $subtype = AttrVal($name, "subType", "extcolordimmer");
+    $subtype = AttrVal($name, "subType", $subtype);
     if($cmd eq 'up' ) {
       $cmd = 'pct';
       $value = 100;
@@ -1077,7 +1078,7 @@ HUEDevice_Get($@)
       $b *= 255;
     } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
       my ($x,$y) = ($1, $2);
-      my $Y = ReadingsVal($name,"bri","") / 254.0;
+      my $Y = ReadingsVal($name,"bri",0) / 254.0;
 
       ($r,$g,$b) = xyYtorgb($x,$y,$Y);
     }
