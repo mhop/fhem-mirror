@@ -609,7 +609,7 @@ fakeRoku_Parse($$;$$$)
 
   if( !$handled ) {
     $peerhost = $peerhost ? " from $peerhost" : '';
-    Log3 $name, 2, "$name: unhandled message$peerhost: $msg";
+    Log3 $name, 4, "$name: unhandled message$peerhost: $msg";
   }
 
   return undef;
