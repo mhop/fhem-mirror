@@ -964,7 +964,7 @@ HUEDevice_Set($@)
 }
 
 sub
-cttorgb($)
+HUEDevice_cttorgb($)
 {
   my ($ct) = @_;
 
@@ -1001,7 +1001,7 @@ cttorgb($)
 }
 
 sub
-xyYtorgb($$$)
+HUEDevice_xyYtorgb($$$)
 {
   # calculation from http://www.brucelindbloom.com/index.html
   my ($x,$y,$Y) = @_;
@@ -1065,7 +1065,7 @@ HUEDevice_Get($@)
     my $cm = ReadingsVal($name,"colormode","");
     if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
-        ($r,$g,$b) = cttorgb($1);
+        ($r,$g,$b) = HUEDevice_cttorgb($1);
       }
     } elsif( $cm eq "hs" ) {
       my $h = ReadingsVal($name,"hue",0) / 65535.0;
@@ -1080,7 +1080,7 @@ HUEDevice_Get($@)
       my ($x,$y) = ($1, $2);
       my $Y = ReadingsVal($name,"bri",0) / 254.0;
 
-      ($r,$g,$b) = xyYtorgb($x,$y,$Y);
+      ($r,$g,$b) = HUEDevice_xyYtorgb($x,$y,$Y);
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
   } elsif($cmd eq "RGB") {
@@ -1091,7 +1091,7 @@ HUEDevice_Get($@)
     my $cm = ReadingsVal($name,"colormode","");
     if( $cm eq "ct" ) {
       if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
-        ($r,$g,$b) = cttorgb($1);
+        ($r,$g,$b) = HUEDevice_cttorgb($1);
       }
     } elsif( $cm eq "hs" ) {
       my $h = ReadingsVal($name,"hue",0) / 65535.0;
@@ -1106,7 +1106,7 @@ HUEDevice_Get($@)
       my ($x,$y) = ($1, $2);
       my $Y = 1;
 
-      ($r,$g,$b) = xyYtorgb($x,$y,$Y);
+      ($r,$g,$b) = HUEDevice_xyYtorgb($x,$y,$Y);
     }
     return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
   } elsif ( $cmd eq "startup" ) {
