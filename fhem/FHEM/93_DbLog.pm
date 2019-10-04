@@ -30,6 +30,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog",
+  "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
+  "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
+  "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
   "4.7.0"   => "04.09.2019 attribute traceHandles, extract db driver versions in configCheck ",
   "4.6.0"   => "03.09.2019 add-on parameter \"force\" for MinInterval, Forum: #97148 ",
   "4.5.0"   => "28.08.2019 consider attr global logdir in set exportCache ",
@@ -224,8 +228,7 @@ sub DbLog_dbReadings($@);
 sub DbLog_showChildHandles($$$$);
 
 ################################################################
-sub DbLog_Initialize($)
-{
+sub DbLog_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}             = "DbLog_Define";
@@ -237,36 +240,36 @@ sub DbLog_Initialize($)
   $hash->{SVG_regexpFn}      = "DbLog_regexpFn";
   $hash->{DelayedShutdownFn} = "DbLog_DelayedShutdown";
   $hash->{AttrList}          = "addStateEvent:0,1 ".
+							   "asyncMode:1,0 ".
                                "bulkInsert:1,0 ".
                                "commitMode:basic_ta:on,basic_ta:off,ac:on_ta:on,ac:on_ta:off,ac:off_ta:on ".
+							   "cacheEvents:2,1,0 ".
+							   "cacheLimit ".
                                "colEvent ".
                                "colReading ".
 							   "colValue ".
+                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
+                               "DbLogType:Current,History,Current/History,SampleFill/History ".
                                "dbSchema ".
                                "disable:1,0 ".
-                               "DbLogType:Current,History,Current/History,SampleFill/History ".
-                               "suppressUndef:0,1 ".
-		                       "verbose4Devs ".
 							   "excludeDevs ".
 							   "expimpdir ".
                                "exportCacheAppend:1,0 ".
+							   "noSupportPK:1,0 ".
 							   "noNotifyDev:1,0 ".
 							   "showproctime:1,0 ".
 							   "suppressAddLogV3:1,0 ".
-                               "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
-                               "traceLevel:0,1,2,3,4,5,6,7 ".
-                               "traceHandles ".
-							   "asyncMode:1,0 ".
-							   "cacheEvents:2,1,0 ".
-							   "cacheLimit ".
-							   "noSupportPK:1,0 ".
+                               "suppressUndef:0,1 ".
 							   "syncEvents:1,0 ".
 							   "syncInterval ".
 							   "showNotifyTime:1,0 ".
+                               "traceFlag:SQL,CON,ENC,DBD,TXN,ALL ".
+                               "traceLevel:0,1,2,3,4,5,6,7 ".
+                               "traceHandles ".
 							   "timeout ".
 							   "useCharfilter:0,1 ".
 							   "valueFn:textField-long ".
-                               "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
+		                       "verbose4Devs ".
 							   $readingFnAttributes;  
 
   addToAttrList("DbLogInclude");
@@ -282,8 +285,7 @@ return;
 }
 
 ###############################################################
-sub DbLog_Define($@)
-{
+sub DbLog_Define($@) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
@@ -293,6 +295,7 @@ sub DbLog_Define($@)
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
   
+  my $name               = $hash->{NAME};
   $hash->{CONFIGURATION} = $a[2];
   my $regexp             = $a[3];
 
@@ -316,7 +319,7 @@ sub DbLog_Define($@)
   $hash->{PID} = $$;
   
   # CacheIndex für Events zum asynchronen Schreiben in DB
-  $hash->{cache}{index} = 0;
+  $data{DbLog}{$name}{cache}{index} = 0;
 
   # read configuration data
   my $ret = DbLog_readCfg($hash);
@@ -348,6 +351,7 @@ sub DbLog_Undef($$) {
   BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
   $dbh->disconnect() if(defined($dbh));
   RemoveInternalTimer($hash);
+  delete $data{DbLog}{$name};
   
 return undef;
 }
@@ -673,7 +677,7 @@ sub DbLog_Set($@) {
         $ret = "Rereadcfg executed.";
     }
 	elsif ($a[1] eq 'purgeCache') {
-	    delete $hash->{cache};
+	    delete $data{DbLog}{$name}{cache};
         readingsSingleUpdate($hash, 'CacheUsage', 0, 1);		
 	}
 	elsif ($a[1] eq 'commitCache') {
@@ -681,8 +685,8 @@ sub DbLog_Set($@) {
 	}
 	elsif ($a[1] eq 'listCache') {
 	    my $cache;
-	    foreach my $key (sort{$a <=>$b}keys%{$hash->{cache}{".memcache"}}) { 
-            $cache .= $key." => ".$hash->{cache}{".memcache"}{$key}."\n"; 			
+	    foreach my $key (sort{$a <=>$b}keys %{$data{DbLog}{$name}{cache}{memcache}}) { 
+            $cache .= $key." => ".$data{DbLog}{$name}{cache}{memcache}{$key}."\n"; 			
 		}
 	    return $cache;
 	}
@@ -744,8 +748,8 @@ sub DbLog_Set($@) {
         }
         
         if(!$error) {
-	        foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-                $cln = $hash->{cache}{".memcache"}{$key}."\n";
+	        foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+                $cln = $data{DbLog}{$name}{cache}{memcache}{$key}."\n";
                 print FH $cln ;
                 $crows++; 			
 		    }
@@ -763,7 +767,7 @@ sub DbLog_Set($@) {
         Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
 		
 		if (lc($a[-1]) =~ m/^purgecache/i) {
-	        delete $hash->{cache};
+	        delete $data{DbLog}{$name}{cache};
             readingsSingleUpdate($hash, 'CacheUsage', 0, 1);
 			Log3($name, 3, "DbLog $name: Cache purged after exporting rows to $outfile.");
 		}
@@ -1444,7 +1448,13 @@ sub DbLog_Log($$) {
 					      next;  
 					  }
 					  
-					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      if (!$@) {
+                          $timestamp = $TIMESTAMP;
+                      } else {
+                          Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
+                      }
  				      $reading   = $READING    if($READING ne '');
  		  	          $value     = $VALUE      if(defined $VALUE);
  				      $unit      = $UNIT       if(defined $UNIT);
@@ -1471,8 +1481,13 @@ sub DbLog_Log($$) {
 						                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
 					      next;  
 					  }
-					  
-					  $timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+                      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+                      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      if (!$@) {
+                          $timestamp = $TIMESTAMP;
+                      } else {
+                          Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+                      }
  				      $dev_name  = $DEVICE     if($DEVICE ne '');
  				      $dev_type  = $DEVICETYPE if($DEVICETYPE ne '');
  				      $reading   = $READING    if($READING ne '');
@@ -1490,11 +1505,11 @@ sub DbLog_Log($$) {
 				  if($async) {
 				      # asynchoner non-blocking Mode
 					  # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-					  $hash->{cache}{index}++;
-				      my $index = $hash->{cache}{index};
-				      $hash->{cache}{".memcache"}{$index} = $row;
+					  $data{DbLog}{$name}{cache}{index}++;
+				      my $index = $data{DbLog}{$name}{cache}{index};
+				      $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 					  
-					  my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+					  my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	                  if($ce == 1) {
                           readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	                  } else {
@@ -1520,7 +1535,7 @@ sub DbLog_Log($$) {
           }
       }
   }; 
-  if(!$async) {    
+  if(!$async) {  
       if(@row_array) {
 	      # synchoner Mode
           return if($hash->{HELPER}{REOPEN_RUNS});              # return wenn "reopen" mit Ablaufzeit gestartet ist          
@@ -2111,7 +2126,7 @@ sub DbLog_execmemcache ($) {
 	  }
   }
   
-  $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+  $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
   if($ce == 2) {
       readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
   } else {
@@ -2123,12 +2138,13 @@ sub DbLog_execmemcache ($) {
       Log3 $name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
 	  Log3 $name, 4, "DbLog $name -> MemCache contains $memcount entries to process";
-	  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType";
+	  Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType"; 
 		  
-	  foreach my $key (sort(keys%{$hash->{cache}{".memcache"}})) {
-          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$hash->{cache}{".memcache"}{$key};
-		  push(@row_array, delete($hash->{cache}{".memcache"}{$key})); 
-	  }
+	  foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
+		  push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
+	  }  
+      undef $data{DbLog}{$name}{cache}{memcache};                                           # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes, bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
@@ -2699,15 +2715,15 @@ sub DbLog_PushAsyncDone ($) {
      eval { 
 	   foreach my $row (@row_array) {
 	       # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-		   $hash->{cache}{index}++;
-		   my $index = $hash->{cache}{index};
-		   $hash->{cache}{".memcache"}{$index} = $row;
+		   $data{DbLog}{$name}{cache}{index}++;
+		   my $index = $data{DbLog}{$name}{cache}{index};
+		   $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 	   }
-	   $memcount = scalar(keys%{$hash->{cache}{".memcache"}});
-	 };
+	   $memcount = scalar(keys %{$data{DbLog}{$name}{cache}{memcache}});
+	 };                                                 
   }
 
-  $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+  $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
   readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
  
   if(AttrVal($name, "showproctime", undef) && $bt) {
@@ -3034,30 +3050,33 @@ sub DbLog_Get($@) {
      "  <in> is not used, only for compatibility for FileLog, please use - \n" .
      "  <out> is a prefix, - means stdout\n"
      if(int(@a) < 5);
+  
   shift @a;
   my $inf  = lc(shift @a);
-  my $outf = lc(shift @a);
+  my $outf = lc(shift @a);               # Wert ALL: get all colums from table, including a header
+                                         # Wert Array: get the columns as array of hashes
+                                         # Wert INT: internally used by generating plots
   my $from = shift @a;
-  my $to   = shift @a; # Now @a contains the list of column_specs
+  my $to   = shift @a;                   # Now @a contains the list of column_specs
   my ($internal, @fld);
 
   if($inf eq "-") {
-    $inf = "history";
+      $inf = "history";
   }
 
   if($outf eq "int" && $inf eq "current") {
-    $inf = "history";
-    Log3 $hash->{NAME}, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
+      $inf = "history";
+      Log3 $hash->{NAME}, 3, "Defining DbLog SVG-Plots with :CURRENT is deprecated. Please define DbLog SVG-Plots with :HISTORY instead of :CURRENT. (define <mySVG> SVG <DbLogDev>:<gplotfile>:HISTORY)";
   }
 
   if($outf eq "int") {
-    $outf = "-";
-    $internal = 1;
+      $outf = "-";
+      $internal = 1;
   } elsif($outf eq "array") {
 
   } elsif(lc($outf) eq "webchart") {
-    # redirect the get request to the DbLog_chartQuery function
-    return DbLog_chartQuery($hash, @_);
+      # redirect the get request to the DbLog_chartQuery function
+      return DbLog_chartQuery($hash, @_);
   }
 
   ########################
@@ -3087,18 +3106,19 @@ sub DbLog_Get($@) {
   my @ReturnArray;
   my $writeout = 0;
   my (@min, @max, @sum, @cnt, @lastv, @lastd, @mind, @maxd);
-  my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval, $deltacalc); #fuer delta-h/d Berechnung
+  my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval, $deltacalc);   # fuer delta-h/d Berechnung
 
-  #extract the Device:Reading arguments into @readings array
+  # extract the Device:Reading arguments into @readings array
+  # Ausgangspunkt ist z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
   for(my $i = 0; $i < int(@a); $i++) {
-    @fld = split(":", $a[$i], 5);
-    $readings[$i][0] = $fld[0]; # Device
-    $readings[$i][1] = $fld[1]; # Reading
-    $readings[$i][2] = $fld[2]; # Default
-    $readings[$i][3] = $fld[3]; # function
-    $readings[$i][4] = $fld[4]; # regexp
+      @fld = split(":", $a[$i], 5);
+      $readings[$i][0] = $fld[0]; # Device
+      $readings[$i][1] = $fld[1]; # Reading
+      $readings[$i][2] = $fld[2]; # Default
+      $readings[$i][3] = $fld[3]; # function
+      $readings[$i][4] = $fld[4]; # regexp
 
-    $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0); #falls Reading nicht gefuellt setze Joker
+      $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0);   # falls Reading nicht gefuellt setze Joker
   }
 
   Log3 $name, 4, "DbLog $name -> ################################################################";
@@ -3106,26 +3126,12 @@ sub DbLog_Get($@) {
   Log3 $name, 4, "DbLog $name -> ################################################################";
   Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
   
-#  $dbh = $hash->{DBHP};
-#  if ( !$dbh || not $dbh->ping ) {
-#      # DB Session dead, try to reopen now !
-#      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
-#	  $dbh = $hash->{DBHP};
-#  } 
-  
-#  if( $hash->{PID} != $$ ) {
-#      #create new connection for plotfork
-#      $dbh->disconnect(); 
-#      return "Can't connect to database." if(!DbLog_ConnectPush($hash,1));
-#	  $dbh = $hash->{DBHP};
-#  }
-  
-  
   my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
   # $hash->{PID} != $$ -> create new connection for plotfork
   if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
       $dbh = DbLog_ConnectNewDBH($hash);
 	  return "Can't connect to database." if(!$dbh);
+  
   } else {
       $dbh = $hash->{DBHP};
       eval {
@@ -3142,437 +3148,460 @@ sub DbLog_Get($@) {
       }
   } 
 
-  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
+  # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{MODEL} eq "POSTGRESQL") {
-    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-    #$sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
-    $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
-    $sqlspec{max_value}      = "MAX(VALUE)";
-    $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
+      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
+      #$sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
+      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
   } elsif ($hash->{MODEL} eq "ORACLE") {
-    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
-    $sqlspec{max_value}      = "MAX(VALUE)";
-    $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
+      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   } elsif ($hash->{MODEL} eq "MYSQL") {
-    $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
-    $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
-    $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
-    $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
-    $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
-    $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
+      $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
+      $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
+      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
   } elsif ($hash->{MODEL} eq "SQLITE") {
-    $sqlspec{get_timestamp}  = "TIMESTAMP";
-    $sqlspec{from_timestamp} = "'$from'";
-    $sqlspec{to_timestamp}   = "'$to'";
-    $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
-    $sqlspec{max_value}      = "MAX(VALUE)";
-    $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
+      $sqlspec{get_timestamp}  = "TIMESTAMP";
+      $sqlspec{from_timestamp} = "'$from'";
+      $sqlspec{to_timestamp}   = "'$to'";
+      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
   } else {
-    $sqlspec{get_timestamp}  = "TIMESTAMP";
-    $sqlspec{from_timestamp} = "'$from'";
-    $sqlspec{to_timestamp}   = "'$to'";
-    $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
-    $sqlspec{max_value}      = "MAX(VALUE)";
-    $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
+      $sqlspec{get_timestamp}  = "TIMESTAMP";
+      $sqlspec{from_timestamp} = "'$from'";
+      $sqlspec{to_timestamp}   = "'$to'";
+      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
   }
 
   if($outf =~ m/(all|array)/) {
-    $sqlspec{all}  = ",TYPE,EVENT,UNIT";
-    $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
+      $sqlspec{all}  = ",TYPE,EVENT,UNIT";
+      $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
   } else {
-    $sqlspec{all}  = "";
-    $sqlspec{all_max}  = "";
+      $sqlspec{all}  = "";
+      $sqlspec{all_max}  = "";
   }
 
   for(my $i=0; $i<int(@readings); $i++) {
-    # ueber alle Readings
-    # Variablen initialisieren
-    $min[$i]   =  (~0 >> 1);
-    $max[$i]   = -(~0 >> 1);
-    $sum[$i]   = 0;
-    $cnt[$i]   = 0;
-    $lastv[$i] = 0;
-    $lastd[$i] = "undef";
-    $mind[$i]  = "undef";
-    $maxd[$i]  = "undef";
-    $minval    =  (~0 >> 1);
-    $maxval    = -(~0 >> 1);
-    $deltacalc = 0;
+      # ueber alle Readings
+      # Variablen initialisieren
+      $min[$i]   =  (~0 >> 1);
+      $max[$i]   = -(~0 >> 1);
+      $sum[$i]   = 0;
+      $cnt[$i]   = 0;
+      $lastv[$i] = 0;
+      $lastd[$i] = "undef";
+      $mind[$i]  = "undef";
+      $maxd[$i]  = "undef";
+      $minval    =  (~0 >> 1);
+      $maxval    = -(~0 >> 1);
+      $deltacalc = 0;
 
-    if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-      $deltacalc = 1;
-    }
+      if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
+          $deltacalc = 1;
+      }
 
-    my $stm;
-    my $stm2;
-    my $stmdelta;
-    $stm =  "SELECT
+      my $stm;
+      my $stm2;
+      my $stmdelta;
+      $stm =  "SELECT
                   MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
                   MAX(DEVICE) AS DEVICE,
                   MAX(READING) AS READING,
                   $sqlspec{max_value}
                   $sqlspec{all_max} ";
 
-    $stm .= "FROM $current " if($inf eq "current");
-    $stm .= "FROM $history " if($inf eq "history");
+      $stm .= "FROM $current " if($inf eq "current");
+      $stm .= "FROM $history " if($inf eq "history");
 
-    $stm .= "WHERE 1=1 ";
+      $stm .= "WHERE 1=1 ";
     
-    $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-    $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+      $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
+      $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
 
-    $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-    $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+      $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+      $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
 
-    $stmdelta = $stm;
+      $stmdelta = $stm;
 
-    $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
-    $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
+      $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
+      $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
 
-    $stm .= "UNION ALL ";
+      $stm .= "UNION ALL ";
 
-    $stm2 =  "SELECT
+      $stm2 =  "SELECT
                   $sqlspec{get_timestamp},
                   DEVICE,
                   READING,
                   VALUE
                   $sqlspec{all} ";
 
-    $stm2 .= "FROM $current " if($inf eq "current");
-    $stm2 .= "FROM $history " if($inf eq "history");
+      $stm2 .= "FROM $current " if($inf eq "current");
+      $stm2 .= "FROM $history " if($inf eq "history");
 
-    $stm2 .= "WHERE 1=1 ";
+      $stm2 .= "WHERE 1=1 ";
 
-    $stm2 .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-    $stm2 .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+      $stm2 .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
+      $stm2 .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
 
-    $stm2 .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-    $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+      $stm2 .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+      $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
 
-    $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-    $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
-    $stm2 .= "ORDER BY TIMESTAMP";
+      $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+      $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
+      $stm2 .= "ORDER BY TIMESTAMP";
 
-    if($deltacalc) {
-      $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-      $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
+      if($deltacalc) {
+          $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+          $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
 
-      $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
-      $stmdelta .= "ORDER BY TIMESTAMP";
-      $stm .= $stmdelta;
-    } else {
-      $stm = $stm2;
-    }
+          $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
+          $stmdelta .= "ORDER BY TIMESTAMP";
+          $stm .= $stmdelta;
+      } else {
+          $stm = $stm2;
+      }
 
-    Log3 $hash->{NAME}, 4, "Processing Statement: $stm";
+      Log3 ($name, 4, "$name - Processing Statement: $stm");
 
-    my $sth= $dbh->prepare($stm) ||
-      return "Cannot prepare statement $stm: $DBI::errstr";
-    my $rc= $sth->execute() ||
-      return "Cannot execute statement $stm: $DBI::errstr";
+      my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
+      my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
 
-    if($outf =~ m/(all|array)/) {
-      $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
-    }
-    else {
-      $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
-    }
+      if($outf =~ m/(all|array)/) {
+          $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
+      } else {
+          $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
+      }
 
-    if ($outf =~ m/(all)/) {
-      $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
-      $retval .= "=====================================================\n";
-    }
+      if ($outf =~ m/(all)/) {
+          $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
+          $retval .= "=====================================================\n";
+      }
     
-    ################################
-    #        Select Auswertung      
-    ################################    
-    while($sth->fetch()) {
-
-      ############ Auswerten des 5. Parameters: Regexp ###################
-      # die Regexep wird vor der Function ausgewertet und der Wert im Feld
-      # Value angepasst.
-      ####################################################################
-      if($readings[$i]->[4]) {
-        #evaluate
-        my $val = $sql_value;
-        my $ts  = $sql_timestamp;
-        eval("$readings[$i]->[4]");
-        $sql_value = $val;
-        $sql_timestamp = $ts;
-        if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
-      }
-
-      if($sql_timestamp lt $from && $deltacalc) {
-        if(Scalar::Util::looks_like_number($sql_value)){
-          #nur setzen wenn nummerisch
-          $minval = $sql_value if($sql_value < $minval);
-          $maxval = $sql_value if($sql_value > $maxval);
-          $lastv[$i] = $sql_value;
-        }
-      } else {
-
-        $writeout   = 0;
-        $out_value  = "";
-        $out_tstamp = "";
-        $retvaldummy = "";
-
-        if($readings[$i]->[4]) {
-          $out_tstamp = $sql_timestamp;
-          $writeout=1 if(!$deltacalc);
-        }
-
-        ############ Auswerten des 4. Parameters: function ###################
-        if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {
-          #nur den integerwert uebernehmen falls zb value=15°C
-          $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
-          $out_tstamp = $sql_timestamp;
-          $writeout=1;
-
-        } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {
-          #Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
-          $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
-          $out_tstamp = $sql_timestamp;
-          $writeout=1;
-
-        } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
-          #Berechung der vergangen Sekunden seit dem letten Logeintrag
-          #zb. die Zeit zwischen on/off
-          my @a = split("[- :]", $sql_timestamp);
-          my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
-          if($lastd[$i] ne "undef") {
-            @a = split("[- :]", $lastd[$i]);
-          }
-          my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
-          $out_tstamp = $sql_timestamp;
-          $out_value = sprintf("%02d", $akt_ts - $last_ts);
-          if(lc($sql_value) =~ m(hide)){$writeout=0;} else {$writeout=1;}
-
-        } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
-          #Berechnung eines Stundenwertes
-          %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-          if($lastd[$i] eq "undef") {
-            %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-            $lasttstamp{hour} = "00";
-          } else {
-            %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-          }
-          #    04                   01
-          #    06                   23
-          if("$tstamp{hour}" ne "$lasttstamp{hour}") {
-            # Aenderung der stunde, Berechne Delta
-            #wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
-            $retvaldummy = "";
-            if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
-              for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
-                $out_value  = "0";
-                $hour = $j;
-                $hour = '0'.$j if $j<10;
-                $cnt[$i]++;
-                $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
-                if ($outf =~ m/(all)/) {
-                  # Timestamp: Device, Type, Event, Reading, Value, Unit
-                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-              
-                } elsif ($outf =~ m/(array)/) {
-                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-              
-                } else {
-                  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-                  $retvaldummy .= "$out_tstamp $out_value\n";
-                }
-              }
-            }
-            if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
-              for (my $j=0; $j < $tstamp{hour}; $j++) {
-                $out_value  = "0";
-                $hour = $j;
-                $hour = '0'.$j if $j<10;
-                $cnt[$i]++;
-                $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
-                if ($outf =~ m/(all)/) {
-                  # Timestamp: Device, Type, Event, Reading, Value, Unit
-                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-              
-                } elsif ($outf =~ m/(array)/) {
-                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-              
-                } else {
-                  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-                  $retvaldummy .= "$out_tstamp $out_value\n";
-                }
-              }
-            }
-            $out_value = sprintf("%g", $maxval - $minval);
-            $sum[$i] += $out_value;
-            $cnt[$i]++;
-            $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-            #$minval =  (~0 >> 1);
-            $minval = $maxval;
-#            $maxval = -(~0 >> 1);
-            $writeout=1;
-          }
-        } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
-          #Berechnung eines Tageswertes
-          %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-          if($lastd[$i] eq "undef") {
-            %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-          } else {
-            %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-          }
-          if("$tstamp{day}" ne "$lasttstamp{day}") {
-            # Aenderung des Tages, Berechne Delta
-            $out_value = sprintf("%g", $maxval - $minval);
-            $sum[$i] += $out_value;
-            $cnt[$i]++;
-            $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-#            $minval =  (~0 >> 1);
-            $minval = $maxval;
-#            $maxval = -(~0 >> 1);
-            $writeout=1;
-          }
-        } else {
-          $out_value = $sql_value;
-          $out_tstamp = $sql_timestamp;
-          $writeout=1;
-        }
-
-        # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
-        $writeout = 0 if (!defined($sql_value) && AttrVal($hash->{NAME}, "suppressUndef", 0));
- 
-        ###################### Ausgabe ###########################
-        if($writeout) {
-            if ($outf =~ m/(all)/) {
-              # Timestamp: Device, Type, Event, Reading, Value, Unit
-              $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-              $retval .= $retvaldummy;
-            
-            } elsif ($outf =~ m/(array)/) {
-              push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-              
-            } else {
-              $out_tstamp =~ s/\ /_/g; #needed by generating plots
-              $retval .= "$out_tstamp $out_value\n";
-              $retval .= $retvaldummy;
-            }
-        }
-
-        if(Scalar::Util::looks_like_number($sql_value)){
-          #nur setzen wenn nummerisch
-          if($deltacalc) {
-            if(Scalar::Util::looks_like_number($out_value)){
-              if($out_value < $min[$i]) {
-                $min[$i] = $out_value;
-                $mind[$i] = $out_tstamp;
-              }
-              if($out_value > $max[$i]) {
-                $max[$i] = $out_value;
-                $maxd[$i] = $out_tstamp;
-              }
-            }
-            $maxval = $sql_value;
-          } else {
-            if($sql_value < $min[$i]) {
-              $min[$i] = $sql_value;
-              $mind[$i] = $sql_timestamp;
-            }
-            if($sql_value > $max[$i]) {
-              $max[$i] = $sql_value;
-              $maxd[$i] = $sql_timestamp;
-            }
-            $sum[$i] += $sql_value;
-            $minval = $sql_value if($sql_value < $minval);
-            $maxval = $sql_value if($sql_value > $maxval);
-          }
-        } else {
-          $min[$i] = 0;
-          $max[$i] = 0;
-          $sum[$i] = 0;
-          $minval  = 0;
-          $maxval  = 0;
-        }
-        if(!$deltacalc) {
-          $cnt[$i]++;
-          $lastv[$i] = $sql_value;
-        } else {
-          $lastv[$i] = $out_value if($out_value);
-        }
-        $lastd[$i] = $sql_timestamp;
-      }
-    } #while fetchrow
-
-    ######## den letzten Abschlusssatz rausschreiben ##########
-    if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-      if($lastd[$i] eq "undef") {
-        $out_value  = "0";
-        $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, $from_datetime{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
-        $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
-      } else {
-        %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-        $out_value = sprintf("%g", $maxval - $minval);
-        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
-        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
-      }  
-      $sum[$i] += $out_value;
-      $cnt[$i]++;
-      if($outf =~ m/(all)/) {
-        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-      
-      } elsif ($outf =~ m/(array)/) {
-        push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+      ################################
+      #        Select Auswertung      
+      ################################    
+      while($sth->fetch()) {
+          no warnings 'uninitialized';
+          my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
+          Log3 ($name, 5, "$name - SQL-result -> $ds");
+          use warnings;
           
-      } else {
-        $out_tstamp =~ s/\ /_/g; #needed by generating plots
-        $retval .= "$out_tstamp $out_value\n";
-      }
-    }
-    # DatenTrenner setzen
-    $retval .= "#$readings[$i]->[0]";
-    $retval .= ":";
-    $retval .= "$readings[$i]->[1]" if($readings[$i]->[1]);
-    $retval .= ":";
-    $retval .= "$readings[$i]->[2]" if($readings[$i]->[2]);
-    $retval .= ":";
-    $retval .= "$readings[$i]->[3]" if($readings[$i]->[3]);
-    $retval .= ":";
-    $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
-    $retval .= "\n";
-  } #for @readings
+          ############ Auswerten des 5. Parameters: Regexp ###################
+          # die Regexep wird vor der Function ausgewertet und der Wert im Feld
+          # Value angepasst.
+          # z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
+          #                            0    1  2  3     
+          # $readings[$i][0] = Device
+          # $readings[$i][1] = Reading
+          # $readings[$i][2] = Default
+          # $readings[$i][3] = function
+          # $readings[$i][4] = regexp
+          ####################################################################
+          if($readings[$i]->[4]) {
+              #evaluate
+              my $val = $sql_value;
+              my $ts  = $sql_timestamp;
+              eval("$readings[$i]->[4]");
+              $sql_value = $val;
+              $sql_timestamp = $ts;
+              if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+          }
 
-  #Ueberfuehren der gesammelten Werte in die globale Variable %data
+          if($sql_timestamp lt $from && $deltacalc) {
+              if(Scalar::Util::looks_like_number($sql_value)) {
+                  # nur setzen wenn numerisch
+                  $minval    = $sql_value if($sql_value < $minval);
+                  $maxval    = $sql_value if($sql_value > $maxval);
+                  $lastv[$i] = $sql_value;
+              }
+          
+          } else {
+              $writeout    = 0;
+              $out_value   = "";
+              $out_tstamp  = "";
+              $retvaldummy = "";
+
+              if($readings[$i]->[4]) {
+                  $out_tstamp = $sql_timestamp;
+                  $writeout   = 1 if(!$deltacalc);
+              }
+
+              ############ Auswerten des 4. Parameters: function ###################
+              if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {                  # nur den integerwert uebernehmen falls zb value=15°C
+                  $out_value  = $1 if($sql_value =~ m/^(\d+).*/o);
+                  $out_tstamp = $sql_timestamp;
+                  $writeout   = 1;
+
+              } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {  # Uebernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+                  $out_value  = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
+                  $out_tstamp = $sql_timestamp;
+                  $writeout   = 1;
+
+              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-ts" && lc($sql_value) !~ m(ignore)) {
+                  # Berechung der vergangen Sekunden seit dem letzten Logeintrag
+                  # zb. die Zeit zwischen on/off
+                  my @a = split("[- :]", $sql_timestamp);
+                  my $akt_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+                  if($lastd[$i] ne "undef") {
+                      @a = split("[- :]", $lastd[$i]);
+                  }
+                  my $last_ts = mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
+                  $out_tstamp = $sql_timestamp;
+                  $out_value  = sprintf("%02d", $akt_ts - $last_ts);
+              
+                  if(lc($sql_value) =~ m(hide)) {
+                      $writeout = 0;
+                  } else {
+                      $writeout = 1;
+                  }
+
+              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {       # Berechnung eines Delta-Stundenwertes
+                  %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+                  if($lastd[$i] eq "undef") {
+                      %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+                      $lasttstamp{hour} = "00";
+                  } else {
+                      %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+                  }
+                  #    04                   01
+                  #    06                   23
+                  if("$tstamp{hour}" ne "$lasttstamp{hour}") {
+                      # Aenderung der Stunde, Berechne Delta
+                      # wenn die Stundendifferenz größer 1 ist muss ein Dummyeintrag erstellt werden
+                      $retvaldummy = "";
+                    
+                      if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
+                          for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
+                              $out_value  = "0";
+                              $hour       = $j;
+                              $hour       = '0'.$j if $j<10;
+                              $cnt[$i]++;
+                              $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                              if ($outf =~ m/(all)/) {
+                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
+                                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+                  
+                              } elsif ($outf =~ m/(array)/) {
+                                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                 
+                              } else {
+                                  $out_tstamp   =~ s/\ /_/g; #needed by generating plots
+                                  $retvaldummy .= "$out_tstamp $out_value\n";
+                              }
+                          }
+                      }
+                    
+                      if(($tstamp{hour}-$lasttstamp{hour}) < 0) {
+                          for (my $j=0; $j < $tstamp{hour}; $j++) {
+                              $out_value  = "0";
+                              $hour       = $j;
+                              $hour       = '0'.$j if $j<10;
+                              $cnt[$i]++;
+                              $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                              if ($outf =~ m/(all)/) {
+                                  # Timestamp: Device, Type, Event, Reading, Value, Unit
+                                  $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+                              } elsif ($outf =~ m/(array)/) {
+                                  push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                              } else {
+                                  $out_tstamp =~ s/\ /_/g;                        # needed by generating plots
+                                  $retvaldummy .= "$out_tstamp $out_value\n";
+                              }
+                          }
+                      }
+                    
+                      $out_value = sprintf("%g", $maxval - $minval);
+                      $sum[$i]  += $out_value;
+                      $cnt[$i]++;
+                      $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
+                      # $minval =  (~0 >> 1);
+                      $minval = $maxval;
+                      # $maxval = -(~0 >> 1);
+                      $writeout = 1;
+                       
+                      Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                  }
+            
+              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {      # Berechnung eines Tageswertes
+                  %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+                
+                  if($lastd[$i] eq "undef") {
+                      %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+                  } else {
+                      %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+                  }
+              
+                  if("$tstamp{day}" ne "$lasttstamp{day}") {
+                      # Aenderung des Tages, Berechne Delta
+                      $out_value = sprintf("%g", $maxval - $minval);
+                      $sum[$i] += $out_value;
+                      $cnt[$i]++;
+                      $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
+                      # $minval =  (~0 >> 1);
+                      $minval = $maxval;
+                      # $maxval = -(~0 >> 1);
+                      $writeout = 1;
+                      
+                      Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                  }
+            
+              } else {
+                  $out_value  = $sql_value;
+                  $out_tstamp = $sql_timestamp;
+                  $writeout   = 1;
+              }
+
+              # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
+              $writeout = 0 if (!defined($sql_value) && AttrVal($hash->{NAME}, "suppressUndef", 0));
+     
+              ###################### Ausgabe ###########################
+              if($writeout) {
+                  if ($outf =~ m/(all)/) {
+                      # Timestamp: Device, Type, Event, Reading, Value, Unit
+                      $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+                      $retval .= $retvaldummy;
+                
+                  } elsif ($outf =~ m/(array)/) {
+                      push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+                  
+                  } else {                                                       # generating plots
+                      $out_tstamp =~ s/\ /_/g;                                   # needed by generating plots
+                      $retval .= "$out_tstamp $out_value\n";
+                      $retval .= $retvaldummy;
+                  }
+              }  
+
+              if(Scalar::Util::looks_like_number($sql_value)) {
+                  # nur setzen wenn numerisch
+                  if($deltacalc) {
+                      if(Scalar::Util::looks_like_number($out_value)) {
+                          if($out_value < $min[$i]) {
+                              $min[$i]  = $out_value;
+                              $mind[$i] = $out_tstamp;
+                          }
+                          if($out_value > $max[$i]) {
+                              $max[$i]  = $out_value;
+                              $maxd[$i] = $out_tstamp;
+                          }
+                      }
+                      $maxval = $sql_value;
+              
+                  } else {
+                      if($sql_value < $min[$i]) {
+                          $min[$i] = $sql_value;
+                          $mind[$i] = $sql_timestamp;
+                      }
+                      if($sql_value > $max[$i]) {
+                          $max[$i] = $sql_value;
+                          $maxd[$i] = $sql_timestamp;
+                      }
+                      $sum[$i] += $sql_value;
+                      $minval = $sql_value if($sql_value < $minval);
+                      $maxval = $sql_value if($sql_value > $maxval);
+                  }
+            
+              } else {
+                  $min[$i] = 0;
+                  $max[$i] = 0;
+                  $sum[$i] = 0;
+                  $minval  = 0;
+                  $maxval  = 0;
+              }
+            
+              if(!$deltacalc) {
+                  $cnt[$i]++;
+                  $lastv[$i] = $sql_value;
+              } else {
+                  $lastv[$i] = $out_value if($out_value);
+              }
+              $lastd[$i] = $sql_timestamp;
+          }
+      }                                                                   # while fetchrow Ende 
+
+      ######## den letzten Abschlusssatz rausschreiben ##########
+      if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
+          if($lastd[$i] eq "undef") {
+              $out_value  = "0";
+              $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, $from_datetime{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
+              $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
+          } else {
+              %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+              $out_value = sprintf("%g", $maxval - $minval);
+              $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
+              $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
+          }  
+          $sum[$i] += $out_value;
+          $cnt[$i]++;
+          if($outf =~ m/(all)/) {
+              $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
+      
+          } elsif ($outf =~ m/(array)/) {
+              push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
+          
+          } else {
+             $out_tstamp =~ s/\ /_/g; #needed by generating plots
+             $retval .= "$out_tstamp $out_value\n";
+          }
+      }
+      
+      # Datentrenner setzen
+      $retval .= "#$readings[$i]->[0]";
+      $retval .= ":";
+      $retval .= "$readings[$i]->[1]" if($readings[$i]->[1]);
+      $retval .= ":";
+      $retval .= "$readings[$i]->[2]" if($readings[$i]->[2]);
+      $retval .= ":";
+      $retval .= "$readings[$i]->[3]" if($readings[$i]->[3]);
+      $retval .= ":";
+      $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
+      $retval .= "\n";
+  
+  }                                                                # Ende for @readings-Schleife über alle Readinggs im get
+
+  # Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
-    my $k = $j+1;
-    $data{"min$k"} = $min[$j];
-    $data{"max$k"} = $max[$j];
-    $data{"avg$k"} = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
-    $data{"sum$k"} = $sum[$j];
-    $data{"cnt$k"} = $cnt[$j];
-    $data{"currval$k"} = $lastv[$j];
-    $data{"currdate$k"} = $lastd[$j];
-    $data{"mindate$k"} = $mind[$j];
-    $data{"maxdate$k"} = $maxd[$j];
+      my $k = $j+1;
+      $data{"min$k"}      = $min[$j];
+      $data{"max$k"}      = $max[$j];
+      $data{"avg$k"}      = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
+      $data{"sum$k"}      = $sum[$j];
+      $data{"cnt$k"}      = $cnt[$j];
+      $data{"currval$k"}  = $lastv[$j];
+      $data{"currdate$k"} = $lastd[$j];
+      $data{"mindate$k"}  = $mind[$j];
+      $data{"maxdate$k"}  = $maxd[$j];
   }
 
-  #cleanup (plotfork) connection
+  # cleanup (plotfork) connection
   # $dbh->disconnect() if( $hash->{PID} != $$ );
   
   $dbh->disconnect() if($nh || $hash->{PID} != $$);
 
   if($internal) {
-    $internal_data = \$retval;
-    return undef;
+      $internal_data = \$retval;
+      return undef;
 
   } elsif($outf =~ m/(array)/) {
-    return @ReturnArray;
+      return @ReturnArray;
   
   } else {
-    $retval = Encode::encode_utf8($retval) if($utf8);
-    # Log3 $name, 5, "DbLog $name -> Result of get:\n$retval";
-    return $retval;
+      $retval = Encode::encode_utf8($retval) if($utf8);
+      # Log3 $name, 5, "DbLog $name -> Result of get:\n$retval";
+      return $retval;
   }
 }
 
@@ -4366,8 +4395,14 @@ sub DbLog_AddLog($$$$$) {
  	          eval $value_fn;
 	          Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
 	          next if($IGNORE);  # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
-		 
-              $ts           = $TIMESTAMP  if($TIMESTAMP =~ /^(\d{4})-(\d{2})-(\d{2} \d{2}):(\d{2}):(\d{2})$/);
+              
+              my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+              eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+              if (!$@) {
+                  $ts = $TIMESTAMP;
+              } else {
+                  Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+              }
  	          $dev_name     = $DEVICE     if($DEVICE ne '');
 	          $dev_type     = $DEVICETYPE if($DEVICETYPE ne '');
  	          $dev_reading  = $READING    if($READING ne '');
@@ -4390,10 +4425,10 @@ sub DbLog_AddLog($$$$$) {
           if($async) {
               # asynchoner non-blocking Mode
 	          # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-	          $hash->{cache}{index}++;
-	          my $index = $hash->{cache}{index};
-	          $hash->{cache}{".memcache"}{$index} = $row;
-		      my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+	          $data{DbLog}{$name}{cache}{index}++;
+	          my $index = $data{DbLog}{$name}{cache}{index};
+	          $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
+		      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	          if($ce == 1) {
                   readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	          } else {
@@ -4477,11 +4512,11 @@ sub DbLog_addCacheLine($$$$$$$$) {
   use warnings;
   
   eval {         # one transaction
-      $hash->{cache}{index}++;
-	  my $index = $hash->{cache}{index};
-	  $hash->{cache}{".memcache"}{$index} = $row;
+      $data{DbLog}{$name}{cache}{index}++;
+	  my $index = $data{DbLog}{$name}{cache}{index};
+	  $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
 					  
-      my $memcount = $hash->{cache}{".memcache"}?scalar(keys%{$hash->{cache}{".memcache"}}):0;
+      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
 	  if($ce == 1) {
           readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
 	  } else {
@@ -5890,7 +5925,7 @@ sub DbLog_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
 	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
@@ -5938,7 +5973,7 @@ sub DbLog_showChildHandles ($$$$) {
     
     my $t = $h->{Type}."h";
     $t = ($t=~/drh/)?"DriverHandle   ":($t=~/dbh/)?"DatabaseHandle ":($t=~/sth/)?"StatementHandle":"Undefined";
-    Log3($name, 1, "DbLog - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
+    Log3($name, 1, "DbLog $name - traceHandles (system wide) - Driver: ".$key.", ".$t.": ".("\t" x $level).$h);
     DbLog_showChildHandles($name, $_, $level + 1, $key)
         for (grep { defined } @{$h->{ChildHandles}});
 }
@@ -6847,6 +6882,7 @@ attr SMA_Energymeter DbLogValueFn
   }
   if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
     $IGNORE=1;
+  }
 }
 	   </pre>
      </ul>
@@ -7077,7 +7113,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>timeout</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; timeout <n>
+	  attr &lt;device&gt; timeout &lt;n&gt;
 	  </code><br>
       setup timeout of the write cycle into database in asynchronous mode (default 86400s) <br>
     </ul>
@@ -7090,7 +7126,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceFlag</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
 	  </code><br>
       Trace flags are used to enable tracing of specific activities within the DBI and drivers. The attribute is only used for  
       tracing of errors in case of support. <br><br>
@@ -7122,7 +7158,7 @@ attr SMA_Energymeter DbLogValueFn
 	  </code><br>
 	  
       If set, every &lt;n&gt; seconds the system wide existing database handles are printed out into the logfile.
-      This attribute is only relevant for support cases. (default: 0 = switch off) <br>
+      This attribute is only relevant in case of support. (default: 0 = switch off) <br>
 	  
     </ul>
     </li>
@@ -7134,7 +7170,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceLevel</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
 	  </code><br>
       Switch on the tracing function of the module. <br>
       <b>Caution !</b> The attribute is only used for tracing errors or in case of support. If switched on <b>very much entries</b> 
@@ -8206,6 +8242,7 @@ attr SMA_Energymeter DbLogValueFn
   }
   if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
     $IGNORE=1;
+  }
 }
 	   </pre>
      </ul>
@@ -8436,7 +8473,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>timeout</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; timeout <n>
+	  attr &lt;device&gt; timeout &lt;n&gt;
 	  </code><br>
       Setzt den Timeout-Wert für den Schreibzyklus in die Datenbank im asynchronen Modus (default 86400s). <br>
     </ul>
@@ -8449,7 +8486,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceFlag</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceFlag [ALL|SQL|CON|ENC|DBD|TXN] <n>
+	  attr &lt;device&gt; traceFlag &lt;ALL|SQL|CON|ENC|DBD|TXN&gt;
 	  </code><br>
       Bestimmt das Tracing von bestimmten Aktivitäten innerhalb des Datenbankinterfaces und Treibers. Das Attribut ist nur 
       für den Fehler- bzw. Supportfall gedacht. <br><br>
@@ -8493,7 +8530,7 @@ attr SMA_Energymeter DbLogValueFn
     <li><b>traceLevel</b>
     <ul>
 	  <code>
-	  attr &lt;device&gt; traceLevel [0|1|2|3|4|5|6|7] <n>
+	  attr &lt;device&gt; traceLevel &lt;0|1|2|3|4|5|6|7&gt;
 	  </code><br>
       Schaltet die Trace-Funktion des Moduls ein. <br>
       <b>Achtung !</b> Das Attribut ist nur für den Fehler- bzw. Supportfall gedacht. Es werden <b>sehr viele Einträge</b> in 
@@ -8636,7 +8673,9 @@ attr SMA_Energymeter DbLogValueFn
         "Encode": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0
+        "FHEM::Meta": 0,
+        "Devel::Size": 0,
+        "Data::Peek": 0
       },
       "suggests": {
         "DBD::Pg" :0,

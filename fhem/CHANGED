@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: change cache from %defs to %data, improved log infos
+                      with verbose 5 of SVG generation, bugfix check TIMESTAMP
+                      in attribute DbLogValueFn or attribute valueFn
  - bugfix:  73_AutoShuttersControl: fix partyMode and window open condition
  - bugfix:  70_BRAVIA: fix state
  - bugfix:  10_MYSENSORS_DEVICE: Prevent FHEM crash in case of ext. OTA update
