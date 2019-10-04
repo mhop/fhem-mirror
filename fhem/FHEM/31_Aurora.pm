@@ -338,6 +338,25 @@ Aurora_SetParam($$@)
 
   $cmd = "off" if($cmd eq "pct" && $value == 0 );
 
+  if( $cmd eq "previousEffect" 
+      || $cmd eq "nextEffect" ) {
+    my $hash = $defs{$name};
+    if( $hash->{helper}{effects} ) {
+      my $count = @{$hash->{helper}{effects}};
+      if( my ($index) = grep { $hash->{helper}{effects}[$_] eq $hash->{helper}{effect} } (0 .. $count-1) ) {
+        if( $cmd eq "nextEffect" ) {
+          $index = 0 if( ++$index > $count-1 );
+        } elsif( $cmd eq "nextEffect" ) {
+          $index = $count-1 if( --$index < 0 );
+        }
+
+        $cmd = 'effect';
+        $value = $hash->{helper}{effects}[$index];
+      }
+
+    }
+  }
+
   if($cmd eq 'on') {
     $obj->{on} = { value => JSON::true };
     $obj->{on}{duration} = $value * 10 if( defined($value) );
@@ -451,6 +470,7 @@ Aurora_SetParam($$@)
     $obj->{'select'} = "$value";
     $obj->{'select'} .= " $value2" if( $value2 );
     $obj->{'select'} .= " ". join(" ", @a) if( @a );
+
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
   } elsif( $name &&  $cmd eq "delayedUpdate" ) {
@@ -540,6 +560,7 @@ Aurora_Set($@)
     my $effects = join(',',@{$hash->{helper}{effects}});
     $effects =~ s/\s/#/g;
     $list .= " effect:,$effects";
+    $list .= " previousEffect:noArg nextEffect:noArg";
   }
 
   return SetExtensions($hash, $list, $name, @aa);
@@ -814,9 +835,9 @@ Aurora_Parse($$)
   $attr{$name}{devStateIcon} = '{(Aurora_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
   if( !defined($attr{$name}{webCmd}) ) {
-    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:color 2040:color 2600:color 3700:color 6250:effect:on:off';
+    $attr{$name}{webCmd} = 'rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:ct 490:ct 380:ct 270:ct 160:effect:on:off';
     #$attr{$name}{webCmd} = 'hue:rgb:rgb ff0000:rgb 00ff00:rgb 0000ff:toggle:on:off';
-    #$attr{$name}{webCmd} = 'color 2040:color 2600:color 3700:color 6250:toggle:on:off';
+    #$attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off';
     #$attr{$name}{webCmd} = 'pct:toggle:on:off';
     #$attr{$name}{webCmd} = 'toggle:on:off';
   }
@@ -991,6 +1012,8 @@ Aurora_Attr($$$;$)
       <li>satUp [delta]</li>
       <li>satDown [delta]</li>
       <li>effect &lt;name&gt;</li>
+      <li>previousEffect</li>
+      <li>nextEffect</li>
       <li>rgb &lt;rrggbb&gt;<br>
         set the color to (the nearest equivalent of) &lt;rrggbb&gt;</li>
       <br>
