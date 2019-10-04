@@ -432,17 +432,19 @@ HUEDevice_SetParam($$@)
     $cmd = 'bri';
   }
 
-  my $subtype = AttrVal($name, "subType", "extcolordimmer");
-  if($cmd eq 'up' ) {
-    $cmd = 'pct';
-    $value = 100;
-  } elsif($cmd eq 'down' ) {
-    $cmd = 'pct';
-    $value = 0;
-
-  } if($cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
-    $cmd = "off";
-    $value = $value2;
+  if( $name ) {
+    my $subtype = AttrVal($name, "subType", "extcolordimmer");
+    if($cmd eq 'up' ) {
+      $cmd = 'pct';
+      $value = 100;
+    } elsif($cmd eq 'down' ) {
+      $cmd = 'pct';
+      $value = 0;
+  
+    } if($cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
+      $cmd = "off";
+      $value = $value2;
+    }
   }
 
   if($cmd eq 'on') {
@@ -519,29 +521,29 @@ HUEDevice_SetParam($$@)
     }
 
   } elsif($cmd eq "satUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'sat_inc'}  = 25;
       $obj->{'sat_inc'} = 0+$value if( defined($value) );
   } elsif($cmd eq "satDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'sat_inc'}  = -25;
       $obj->{'sat_inc'} = 0+$value if( defined($value) );
 
   } elsif($cmd eq "hueUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'hue_inc'}  = 6553;
       $obj->{'hue_inc'} = 0+$value if( defined($value) );
   } elsif($cmd eq "hueDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'hue_inc'}  = -6553;
       $obj->{'hue_inc'} = 0+$value if( defined($value) );
 
   } elsif($cmd eq "ctUp") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'ct_inc'}  = 16;
       $obj->{'ct_inc'} = 0+$value if( defined($value) );
   } elsif($cmd eq "ctDown") {
-      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'on'}  = JSON::true if( $name && !$defs{$name}->{helper}{on} );
       $obj->{'ct_inc'}  = -16;
       $obj->{'ct_inc'} = 0+$value if( defined($value) );
 
