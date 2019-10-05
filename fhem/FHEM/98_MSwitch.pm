@@ -679,6 +679,7 @@ sub MSwitch_Define($$) {
     $hash->{Version_Datenstruktur}         = $vupdate;
     $hash->{Version_autoupdate}            = $autoupdate;
     $hash->{MODEL}                         = $startmode;
+	$hash->{Support_Fhemforum}             = "https://forum.fhem.de/index.php/topic,86199.0.html";
 
     if ( $defstring ne "" and $defstring =~ m/(\(.+?\))/ ) {
 
