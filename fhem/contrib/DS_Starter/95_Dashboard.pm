@@ -76,6 +76,8 @@ our %Dashboard_vNotesIntern = (
 #########################
 # Forward declaration
 sub Dashboard_GetGroupList();
+sub Dashboard_searchImage($$$$);
+use vars qw($FW_dir);     # base directory for web server
 
 #########################
 # Global variables
@@ -271,11 +273,11 @@ sub Dashboard_Get($@) {
 #   Attr
 ################################################################
 sub Dashboard_Attr($$$) {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my ($cmd, $name, $aName, $aVal) = @_;
   my $hash = $defs{$name};
 
   if ($cmd eq "set") {
-      if ($attrName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $attrName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
+      if ($aName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $aName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
           # add dynamic attributes
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "name");
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "devices");
@@ -287,14 +289,31 @@ sub Dashboard_Attr($$$) {
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "backgroundimage");
       }
 
-      if ($attrName =~ m/alias/) {
+      if ($aName =~ m/alias/) {
           # if an alias is set to the dashboard, replace the name shown in the left navigation by this alias
           my $url = '/dashboard/'.$name;
-          $data{FWEXT}{$url}{NAME} = $attrVal;
+          $data{FWEXT}{$url}{NAME} = $aVal;
       }
       
-      if ($attrName =~ m/dashboard_homeTab/) {
-          Dashboard_activateTab ($name,$attrVal);
+      if ($aName =~ m/dashboard_homeTab/) {
+          Dashboard_activateTab ($name,$aVal);
+      }
+  }
+  
+  if ($aName =~ m/dashboard_(.*)backgroundimage/) {
+      my $container = "";
+      if (!$1) {
+          $container = "MAIN";
+      } else {
+          $container = $1;
+      }
+      delete $hash->{HELPER}{BIMG}{$container};
+      if($cmd eq "set") {
+          Dashboard_searchImage($name, "$FW_dir/images", $aVal,$container); 
+          if (!$hash->{HELPER}{BIMG}{$container}) {       
+              Log3 ($name, 2, "Dashboard $name - Background image file not found: $aVal");          
+              return "Background image file not found: $aVal";   
+          } 
       }
   }
       
@@ -411,7 +430,6 @@ sub Dashboard_SummaryFN ($$$$) {
   my $showfullsize         = AttrVal($name, "dashboard_showfullsize", 0); 
   my $flexible             = AttrVal($name, "dashboard_flexible", 0);
   my $customcss            = AttrVal($name, "dashboard_customcss", "none");
-  my $backgroundimage      = AttrVal($name, "dashboard_backgroundimage", "");
   my $row                  = AttrVal($name, "dashboard_row", "center");
   my $debug                = AttrVal($name, "dashboard_debug", "0");
   my ($activetab,$tabname) = Dashboard_GetActiveTab($name,1);
@@ -432,8 +450,7 @@ sub Dashboard_SummaryFN ($$$$) {
   }
   
   # Hintergrundbild bauen
-  my $bimg = $backgroundimage?"url(/fhem/images/$backgroundimage)":"";
-  Log3 ($name, 5, "Dashboard $name - Backgroundimage to display: $bimg");
+  my $bimg = $hash->{HELPER}{BIMG}{MAIN}?"url(/fhem/images/$hash->{HELPER}{BIMG}{MAIN})":"none";
  
   if ($debug == 1)                                     { $debugfield    = "edit"; }
   if ($showtabs eq "tabs-and-buttonbar-at-the-top")    { $showbuttonbar = "top"; }
@@ -531,20 +548,23 @@ sub Dashboard_BuildDashboardTab ($$) {
     my $hash = $defs{$name};
 
 	my $id              = $hash->{NR};
-	my $colcount        = AttrVal($name, 'dashboard_tab'.($t + 1).'colcount', AttrVal($name, "dashboard_colcount", 1));
-	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t + 1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
+	my $colcount        = AttrVal($name, 'dashboard_tab'.($t+1).'colcount', AttrVal($name, "dashboard_colcount", 1));
+	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t+1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
     $colwidths          =~ tr/,/:/;
-	my $backgroundimage = AttrVal($name, 'dashboard_tab'.($t + 1).'backgroundimage', "");
 	my $row             = AttrVal($name, "dashboard_row", "center");
-    my $tabgroups       = AttrVal($name, "dashboard_tab".($t + 1)."groups", "");
-    my $tabsortings     = AttrVal($name, "dashboard_tab".($t + 1)."sorting", "");
-    my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t + 1)."devices", "");
+    my $tabgroups       = AttrVal($name, "dashboard_tab".($t+1)."groups", "");
+    my $tabsortings     = AttrVal($name, "dashboard_tab".($t+1)."sorting", "");
+    my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t+1)."devices", "");
     my $tabcount        = Dashboard_GetTabCount($hash, 1);
 
 	unless ($tabgroups || $tabdevicegroups) { 
 		readingsSingleUpdate($hash, "state", "No Groups or devices set", 0);
 		return "";
 	}
+    
+    # Hintergrundbild bauen
+    my $container = "tab".($t+1);
+    my $bimg = $hash->{HELPER}{BIMG}{$container}?"url(/fhem/images/$hash->{HELPER}{BIMG}{$container})":"none";
 	
     my @temptabdevicegroup = split(' ', $tabdevicegroups);
     my @tabdevicegroups    = ();
@@ -600,7 +620,7 @@ sub Dashboard_BuildDashboardTab ($$) {
 		}
 	}
 
-	my $ret = "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
+	my $ret = "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: ".$bimg." no-repeat !important;\">\n";
 	$ret   .= " <ul class=\"dashboard_tabcontent\">\n";
 	$ret   .= "	<table class=\"dashboard_tabcontent\">\n";
     
@@ -1145,6 +1165,30 @@ sub Dashboard_Escape($) {
 return $a;
 }
 
+######################################################################################
+#           angegebenes $file im $dir und Unterverzeichnissen suchen
+#           und mit Pfad ab ".../images/" in $container speichern wenn gefunden
+######################################################################################
+sub Dashboard_searchImage($$$$) {
+  my ($name,$dir,$file,$container) = @_;
+  my $hash = $defs{$name};
+  
+  my ($t,$im);
+  opendir(DIR, $dir);
+  my(@files) = grep {!/^\.\.?$/ } readdir(DIR);
+  closedir(DIR);
+  foreach (@files) {
+      if (-d ($t = "$dir/$_")) {                           # -d returns true if the following string is a directory.
+          Dashboard_searchImage($name,$t,$file,$container);
+      } else {
+          next if ($_ ne $file);
+          $im = (split("images\/", $dir."/".$_))[1];
+          $hash->{HELPER}{BIMG}{$container} = $im;         # Ergebnisfile in Container speichern wenn gefunden
+          Log3 ($name, 5, "Dashboard $name - Background image file found in: $dir/$_");
+      }
+  }
+}
+
 1;
 
 =pod
@@ -1259,6 +1303,20 @@ return $a;
 		# File ./www/images/cam_video.PNG is shown                  <br>
     </li><br>
     
+    <a name="dashboard_backgroundimage"></a>		
+    <li><b>dashboard_backgroundimage </b><br>
+        Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
+        match/extend the dashboard height/width. Only the filename has to be set. <br>
+        The file must be located anywhere below the directory "./www/images/". <br>
+        <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
+        <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_backgroundimage cam_video.PNG      <br> 
+
+    </li>
+    <br>
+    
     <a name="dashboard_colcount"></a>	
     <li><b>dashboard_colcount </b><br>
         Number of columns in which the groups can be displayed. Nevertheless, it is possible to have multiple groups <br>
@@ -1349,15 +1407,39 @@ return $a;
         Default: 0
     </li><br>
     
-    <a name="dashboard_tab1name"></a>
-    <li><b>dashboard_tab1name </b><br>
-        Title of Tab. (also valid for further dashboard_tabXname)
-    </li><br>
+    <a name="dashboard_tab1backgroundimage"></a>		
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
+		The image is not stretched in any way, it should therefore match the tab size or extend it. 
+        Only the filename has to be set. <br>
+        The file must be located anywhere below the directory "./www/images/". <br>
+        <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
+        <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_tab1backgroundimage cam_video.PNG      <br> 
+
+    </li>
+    <br>
     
-    <a name="dashboard_tab1sorting"></a>	
-    <li><b>dashboard_tab1sorting </b><br>
-        Contains the position of each group in Tab. (also valid for further dashboard_tabXsorting) <br>
-		Value is written by the "Set" button. It is not recommended to take manual changes.
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Number of columns for a specific tab in which the groups can be displayed. (also valid for further dashboard_tabXcolcount) <br>
+		Nevertheless, it is possible to have multiple groups to be positioned in a column next to each other. 
+		This depends on the width of columns and groups. <br>
+        Default: &lt;dashboard_colcount&gt;
+    </li><br>	
+    
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec list of devices that should appear in the tab. (also valid for further dashboard_tabXdevices) <br>
+		The format is: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+	    </ul>        
+        ICONNAME is optional. Also GROUPNAME is optional. In case of missing GROUPNAME, the matching devices are 
+        not grouped, but shown as separate widgets without titles. 
+        For further details on the DevSpec format see <a href="#devspec">DevSpec</a>.
     </li><br>
     
     <a name="dashboard_tab1groups"></a>	
@@ -1376,18 +1458,6 @@ return $a;
         .*Light.* to show all groups that contain the string "Light"
     </li><br>
     
-    <a name="dashboard_tab1devices"></a>	
-    <li><b>dashboard_tab1devices </b><br>
-        DevSpec list of devices that should appear in the tab. (also valid for further dashboard_tabXdevices) <br>
-		The format is: <br><br>
-		<ul>
-            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
-	    </ul>        
-        ICONNAME is optional. Also GROUPNAME is optional. In case of missing GROUPNAME, the matching devices are 
-        not grouped, but shown as separate widgets without titles. 
-        For further details on the DevSpec format see <a href="#devspec">DevSpec</a>.
-    </li><br>
-    
     <a name="dashboard_tab1icon"></a>	
     <li><b>dashboard_tab1icon </b><br>
         Set the icon for a Tab. (also valid for further dashboard_tabXicon) <br>
@@ -1395,19 +1465,16 @@ return $a;
         referencing an SVG icon, then you can use the @colorname suffix to color the image. 
     </li><br>
     
-    <a name="dashboard_tab1colcount"></a>	
-    <li><b>dashboard_tab1colcount </b><br>
-        Number of columns for a specific tab in which the groups can be displayed. (also valid for further dashboard_tabXcolcount) <br>
-		Nevertheless, it is possible to have multiple groups to be positioned in a column next to each other. 
-		This depends on the width of columns and groups. <br>
-        Default: &lt;dashboard_colcount&gt;
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Title of Tab. (also valid for further dashboard_tabXname)
     </li><br>
-	
-    <a name="dashboard_tab1backgroundimage"></a>	
-    <li><b>dashboard_tab1backgroundimage </b><br>
-        Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
-		The image is not stretched in any way, it should therefore match the tab size or extend it.
-    </li><br>		
+    
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Contains the position of each group in Tab. (also valid for further dashboard_tabXsorting) <br>
+		Value is written by the "Set" button. It is not recommended to take manual changes.
+    </li><br>	
     
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
@@ -1539,13 +1606,14 @@ return $a;
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
         Zeigt ein Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
-        passen oder diese überschreiten. Es ist der relative Pfad zum Verzeichnis "./www/images" anzugeben. <br><br>
+        passen oder diese überschreiten. Es ist nur der Filename anzugeben. <br>
+        Das File muss sich irgendwo unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
+        <br><br>
 		
 		<b>Beispiel</b><br>
-		attr dashboard_backgroundimage dashboard/cam_video.PNG      <br>        
-		# Bild ./www/images/dashboard/cam_video.PNG wird angezeigt  <br>
-		attr dashboard_backgroundimage cam_video.PNG                <br>    
-		# Bild ./www/images/cam_video.PNG wird angezeigt            <br>
+		attr dashboard_backgroundimage cam_video.PNG      <br> 
+
     </li>
     <br>	
     
@@ -1648,18 +1716,43 @@ return $a;
         Default: 0
     </li><br>	
     
-    <a name="dashboard_tab1name"></a>
-    <li><b>dashboard_tab1name </b><br>
-        Titel des Tab. (gilt ebenfalls für weitere dashboard_tabXname)
+    <a name="dashboard_tab1backgroundimage"></a>	
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
+		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. Es ist nur der 
+        Filename anzugeben. <br>
+        Das File muss sich irgendwo unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
+        <br><br>
+		
+		<b>Beispiel</b><br>
+		attr dashboard_tab1backgroundimage cam_video.PNG      <br> 
+        
     </li>
-    <br>	
+    <br>
     
-    <a name="dashboard_tab1sorting"></a>	
-    <li><b>dashboard_tab1sorting </b><br>
-        Enthält die Positionierung jeder Gruppe im Tab. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
-        empfohlen dieses Attribut manuell zu ändern. (gilt ebenfalls für weitere dashboard_tabXsorting)
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Die Anzahl der Spalten im Tab in der Gruppen dargestellt werden können. (gilt ebenfalls für weitere dashboard_tabXcolcount) <br>
+		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
+		der Spalten und Gruppen. <br>
+        Gilt nur für die mittlere Spalte! <br>
+        Default: &lt;dashboard_colcount&gt;
     </li>
-    <br>		
+    <br>
+	
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec Liste von Geräten, die im Tab angezeigt werden sollen. (gilt ebenfalls für weitere dashboard_tabXdevices) <br>
+		Das Format ist: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+		</ul>	
+        ICONNAME ist optional. Auch GROUPNAME muss nicht vorhanden sein. Fehlt GROUPNAME, werden die angegebenen 
+        Geräte nicht gruppiert, sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich DevSpec: 
+        <a href="#devspec">DevSpec</a>
+    </li>
+    <br>
     
     <a name="dashboard_tab1groups"></a>	
     <li><b>dashboard_tab1groups </b><br>
@@ -1677,44 +1770,29 @@ return $a;
         <b>Beispiel: </b><br>
 		.*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
     </li>
-    <br>	
-	
-    <a name="dashboard_tab1devices"></a>	
-    <li><b>dashboard_tab1devices </b><br>
-        DevSpec Liste von Geräten, die im Tab angezeigt werden sollen. (gilt ebenfalls für weitere dashboard_tabXdevices) <br>
-		Das Format ist: <br><br>
-		<ul>
-            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
-		</ul>	
-        ICONNAME ist optional. Auch GROUPNAME muss nicht vorhanden sein. Fehlt GROUPNAME, werden die angegebenen 
-        Geräte nicht gruppiert, sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich DevSpec: 
-        <a href="#devspec">DevSpec</a>
-    </li>
-    <br>	
-	
-    <a name="dashboard_tabXicon"></a>	
-    <li><b>dashboard_tabXicon </b><br>
-        Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es 
+    <br>
+   
+    <a name="dashboard_tab1icon"></a>	
+    <li><b>dashboard_tab1icon </b><br>
+        Zeigt am Tab ein Icon an (gilt ebenfalls für weitere dashboard_tabXicon). 
+        Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es 
         sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
     </li>
     <br>
     
-    <a name="dashboard_tab1colcount"></a>	
-    <li><b>dashboard_tab1colcount </b><br>
-        Die Anzahl der Spalten im Tab in der Gruppen dargestellt werden können. (gilt ebenfalls für weitere dashboard_tabXcolcount) <br>
-		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
-		der Spalten und Gruppen. <br>
-        Gilt nur für die mittlere Spalte! <br>
-        Default: &lt;dashboard_colcount&gt;
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Titel des Tab. (gilt ebenfalls für weitere dashboard_tabXname)
     </li>
-    <br>
+    <br>	
     
-    <a name="dashboard_tab1backgroundimage"></a>	
-    <li><b>dashboard_tab1backgroundimage </b><br>
-        Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
-		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. 
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Enthält die Positionierung jeder Gruppe im Tab (gilt ebenfalls für weitere dashboard_tabXsorting). <br>
+        Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
+        empfohlen dieses Attribut manuell zu ändern.
     </li>
-    <br>
+    <br>				
     
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
