@@ -55,6 +55,8 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.17.0" => "06.10.2019  Path handling of backgroundimage changed ",
+  "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
   "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
   "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
   "3.15.0" => "24.09.2019  set activateTab, rename dashboard_activetab to dashboard_homeTab, ".
@@ -74,6 +76,8 @@ our %Dashboard_vNotesIntern = (
 #########################
 # Forward declaration
 sub Dashboard_GetGroupList();
+sub Dashboard_searchImage($$$$);
+use vars qw($FW_dir);     # base directory for web server
 
 #########################
 # Global variables
@@ -97,7 +101,8 @@ sub Dashboard_Initialize ($) {
   						 "dashboard_colcount:1,2,3,4,5 ".	
 						 "dashboard_customcss " .                         
 						 "dashboard_debug:0,1 ".
-						 "dashboard_flexible " .						 
+						 "dashboard_flexible " .		
+                         "dashboard_hideGroupHeader:1,0 " .						 
 						 "dashboard_rowtopheight ".
 						 "dashboard_rowbottomheight ".
 						 "dashboard_row:top,center,bottom,top-center,center-bottom,top-center-bottom ".	
@@ -268,11 +273,11 @@ sub Dashboard_Get($@) {
 #   Attr
 ################################################################
 sub Dashboard_Attr($$$) {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my ($cmd, $name, $aName, $aVal) = @_;
   my $hash = $defs{$name};
 
   if ($cmd eq "set") {
-      if ($attrName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $attrName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
+      if ($aName =~ m/dashboard_tab([1-9][0-9]*)groups/ || $aName =~ m/dashboard_tab([1-9][0-9]*)devices/) {
           # add dynamic attributes
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "name");
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "devices");
@@ -284,14 +289,31 @@ sub Dashboard_Attr($$$) {
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "backgroundimage");
       }
 
-      if ($attrName =~ m/alias/) {
+      if ($aName =~ m/alias/) {
           # if an alias is set to the dashboard, replace the name shown in the left navigation by this alias
           my $url = '/dashboard/'.$name;
-          $data{FWEXT}{$url}{NAME} = $attrVal;
+          $data{FWEXT}{$url}{NAME} = $aVal;
       }
       
-      if ($attrName =~ m/dashboard_homeTab/) {
-          Dashboard_activateTab ($name,$attrVal);
+      if ($aName =~ m/dashboard_homeTab/) {
+          Dashboard_activateTab ($name,$aVal);
+      }
+  }
+  
+  if ($aName =~ m/dashboard_(.*)backgroundimage/) {
+      my $ct = "";
+      if (!$1) {
+          $ct = "MAIN";
+      } else {
+          $ct = $1;
+      }
+      delete $hash->{HELPER}{BIMG}{$ct};
+      if($cmd eq "set") {
+          Dashboard_searchImage($name, "$FW_dir/images", $aVal,$ct); 
+          if (!$hash->{HELPER}{BIMG}{$ct}) {       
+              Log3 ($name, 2, "Dashboard $name - Background image file not found: $aVal");          
+              return "Background image file not found: $aVal";   
+          } 
       }
   }
       
@@ -408,8 +430,7 @@ sub Dashboard_SummaryFN ($$$$) {
   my $showfullsize         = AttrVal($name, "dashboard_showfullsize", 0); 
   my $flexible             = AttrVal($name, "dashboard_flexible", 0);
   my $customcss            = AttrVal($name, "dashboard_customcss", "none");
-  my $backgroundimage      = AttrVal($name, "dashboard_backgroundimage", "");
-  my $row                  = AttrVal($name, "dashboard_row", "center");
+  # my $row                  = AttrVal($name, "dashboard_row", "center");
   my $debug                = AttrVal($name, "dashboard_debug", "0");
   my ($activetab,$tabname) = Dashboard_GetActiveTab($name,1);
   my $tabcount             = Dashboard_GetTabCount($hash, 1);
@@ -427,6 +448,9 @@ sub Dashboard_SummaryFN ($$$$) {
 	  readingsSingleUpdate($hash, "state", "Disabled", 0 );
 	  return "";
   }
+  
+  # Hintergrundbild bauen
+  my $bimg = $hash->{HELPER}{BIMG}{MAIN}?"url(/fhem/images/$hash->{HELPER}{BIMG}{MAIN})":"none";
  
   if ($debug == 1)                                     { $debugfield    = "edit"; }
   if ($showtabs eq "tabs-and-buttonbar-at-the-top")    { $showbuttonbar = "top"; }
@@ -453,28 +477,44 @@ sub Dashboard_SummaryFN ($$$$) {
       ############################ Set FHEM url to avoid hardcoding it in javascript ############################ 
 	  $ret .= "<script type='text/javascript'>var fhemUrl = '".$FW_ME."';</script>";
  
+      ## Dashboard-Tab Details Tabelle (Stift rechte Seite im Kopf)
  	  $ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
 	  $ret .= "<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
-	  $ret .= "<ul class=\"dashboard dashboard_tabnav\">\n";
+	  
+      $ret .= "<ul class=\"dashboard dashboard_tabnav\">\n";
 	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Current Tab</a></li>\n";
 	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Common</a></li>\n";
-	  $ret .= "</ul>\n";	
-	  $ret .= "<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
+	  $ret .= "</ul>\n";
+      
+      $ret .= "<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
 	  $ret .= "<table>\n";
-	  $ret .= "<tr colspan=\"2\"><td><div id=\"tabID\"></div></td></tr>\n";		
-	  $ret .= "<tr><td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td></tr>";
-	  $ret .= "<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td></tr>";
+	  $ret .= "<tr colspan=\"2\">";
+      $ret .= "<td><div id=\"tabID\"></div></td>";
+      $ret .= "</tr>\n";		
+	  $ret .= "<tr>";
+      $ret .= "<td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td>";
+      $ret .= "</tr>";
+	  $ret .= "<tr>";
+      $ret .= "<td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td>";
+      $ret .= "</tr>";
 	  # the method FW_multipleSelect seems not to be available any more in fhem
 	  #$ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\" onfocus=\"FW_multipleSelect(this)\" allvals=\"multiple,$dashboard_groupListfhem\" readonly=\"readonly\"></td></tr>";	
-	  $ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td></tr>";	
-	  $ret .= "<tr><td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td></tr>";	
+	  $ret .= "<tr>";
+      $ret .= "<td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td>";
+      $ret .= "</tr>";	
+	  $ret .= "<tr>";
+      $ret .= "<td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td>";
+      $ret .= "</tr>";	
 	  $ret .= "</table>\n";
-	  $ret .= "</div>\n";	
+	  $ret .= "</div>\n";
+      
 	  $ret .= "<div id=\"tabs-2\" class=\"dashboard_tabcontent\">\n";
 	  $ret .= "Comming soon";
 	  $ret .= "</div>\n";	
-	  $ret .= "</div>\n";		
+	  
+      $ret .= "</div>\n";		
 	  $ret .= "</div>\n";
+      ## Ende Dashboard-Tab Details Tabelle
 
 	  $ret .= "<div id=\"dashboard_define\" style=\"display: none;\">$name</div>\n";
 	  $ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
@@ -483,7 +523,10 @@ sub Dashboard_SummaryFN ($$$$) {
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtogglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss,$flexible\">\n";
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	  $ret .= "</div></td></tr>\n"; 
-	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".($backgroundimage ? "url(/fhem/images/" .FW_iconPath($backgroundimage).")" : "")." no-repeat !important;\">\n";  
+	  
+      ## Tab Content
+      $ret .= "<tr><td>\n";
+      $ret .= "<div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".$bimg." no-repeat !important;\">";
 
 	  ########################### Dashboard Tab-Liste ##############################################
 	  $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
@@ -498,7 +541,8 @@ sub Dashboard_SummaryFN ($$$$) {
 		 	 $ret .= Dashboard_BuildDashboardTab($t, $name);
 		 }
 	  }
-	  $ret .= "</div></td></tr>\n";
+	  $ret .= "</div>";
+      $ret .= "</td></tr>\n";
 	  $ret .= "</table>\n";
       
   } else { 
@@ -522,22 +566,26 @@ return $ret;
 sub Dashboard_BuildDashboardTab ($$) {
 	my ($t, $name) = @_;
     my $hash = $defs{$name};
+    my $ret;
 
 	my $id              = $hash->{NR};
-	my $colcount        = AttrVal($name, 'dashboard_tab'.($t + 1).'colcount', AttrVal($name, "dashboard_colcount", 1));
-	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t + 1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
+	my $colcount        = AttrVal($name, 'dashboard_tab'.($t+1).'colcount', AttrVal($name, "dashboard_colcount", 1));
+	my $colwidths       = AttrVal($name, 'dashboard_tab'.($t+1).'rowcentercolwidth', AttrVal($name, "dashboard_rowcentercolwidth", 100));
     $colwidths          =~ tr/,/:/;
-	my $backgroundimage = AttrVal($name, 'dashboard_tab'.($t + 1).'backgroundimage', "");
 	my $row             = AttrVal($name, "dashboard_row", "center");
-    my $tabgroups       = AttrVal($name, "dashboard_tab".($t + 1)."groups", "");
-    my $tabsortings     = AttrVal($name, "dashboard_tab".($t + 1)."sorting", "");
-    my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t + 1)."devices", "");
+    my $tabgroups       = AttrVal($name, "dashboard_tab".($t+1)."groups", "");
+    my $tabsortings     = AttrVal($name, "dashboard_tab".($t+1)."sorting", "");
+    my $tabdevicegroups = AttrVal($name, "dashboard_tab".($t+1)."devices", "");
     my $tabcount        = Dashboard_GetTabCount($hash, 1);
 
 	unless ($tabgroups || $tabdevicegroups) { 
 		readingsSingleUpdate($hash, "state", "No Groups or devices set", 0);
 		return "";
 	}
+    
+    # Hintergrundbild bauen
+    my $ct = "tab".($t+1);
+    my $bimg = $hash->{HELPER}{BIMG}{$ct}?"url(/fhem/images/$hash->{HELPER}{BIMG}{$ct})":"none";
 	
     my @temptabdevicegroup = split(' ', $tabdevicegroups);
     my @tabdevicegroups    = ();
@@ -593,9 +641,9 @@ sub Dashboard_BuildDashboardTab ($$) {
 		}
 	}
 
-	my $ret = "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "none") . " no-repeat !important;\">\n";
-	$ret   .= " <ul class=\"dashboard_tabcontent\">\n";
-	$ret   .= "	<table class=\"dashboard_tabcontent\">\n";
+	$ret  = "<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: ".$bimg." no-repeat !important;\">\n";
+	$ret .= "<ul class=\"dashboard_tabcontent\">\n";
+	$ret .= "<table class=\"dashboard_tabcontent\">\n";
     
 	##################### Top Row (only one Column) #############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){
@@ -610,9 +658,9 @@ sub Dashboard_BuildDashboardTab ($$) {
 		$ret .= Dashboard_BuildDashboardBottomRow($name,$t,$id,$tabgroups,$tabsortings);
 	}
 	 
-	$ret .= "	</table>\n";
-	$ret .= " 	</ul>\n";
-	$ret .= "	</div>\n";
+	$ret .= "</table>\n";
+	$ret .= "</ul>\n";
+	$ret .= "</div>\n";
 
 return $ret;
 }
@@ -626,9 +674,11 @@ sub Dashboard_BuildDashboardTopRow ($$$$$) {
   
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
   $ret .= "<div id=\"dashboard_rowtop_tab".$t."\" class=\"dashboard dashboard_rowtop\">\n";
-  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
+  
+  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
   $ret .= Dashboard_BuildGroupWidgets($name,$t,"100",$id,$devicegroups,$groupsorting); 
-  $ret .= "		</div>\n";
+  $ret .= "</div>\n";
+  
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
  
@@ -646,7 +696,7 @@ sub Dashboard_BuildDashboardCenterRow ($$$$$$) {
 
   my $currentcol  = $colcount;
   my $maxcolindex = $colcount - 1;
-  my $replace     = "t" . $t . "c" . $maxcolindex . ",";
+  my $replace     = "t".$t."c".$maxcolindex.",";
 
   # replace all sortings referencing not existing columns
   # this does only work if there is no empty column inbetween
@@ -657,9 +707,9 @@ sub Dashboard_BuildDashboardCenterRow ($$$$$$) {
   }
 
   for (my $i=0;$i<$colcount;$i++){
-	  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
+	  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
 	  $ret .= Dashboard_BuildGroupWidgets($name,$t,$i,$id,$devicegroups,$groupsorting); 
-	  $ret .= "		</div>\n";
+	  $ret .= "</div>\n";
   }
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
@@ -674,10 +724,11 @@ sub Dashboard_BuildDashboardBottomRow ($$$$$) {
   my ($name,$t,$id, $devicegroups, $groupsorting) = @_;
   my $ret; 
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
-  $ret .= "<div id=\"dashboard_rowbottom_tab".$t."\" class=\"dashboard dashboard_rowbottom\">\n";
-  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
+  
+  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
   $ret .= Dashboard_BuildGroupWidgets($name,$t,"200",$id,$devicegroups,$groupsorting); 
-  $ret .= "		</div>\n";
+  $ret .= "</div>\n";
+  
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
 
@@ -784,7 +835,7 @@ sub Dashboard_BuildGroup ($$$$$$) {
   $ret .= "<div class=\"dashboard dashboard_widget ui-widget\" data-groupwidget=\"".$sorting."\" id=\"".$groupId."\">\n";
   $ret .= "<div class=\"dashboard_widgetinner\">\n";	
 
-  if ($groupname && $groupname ne $devices) {
+  if ($groupname && $groupname ne $devices && !AttrVal($name,"dashboard_hideGroupHeader",0)) {
       $ret .= "<div class=\"dashboard_widgetheader ui-widget-header dashboard_group_header\">";
 	  if ($icon) {
 	      $ret.= FW_makeImage($icon,$icon,"dashboard_group_icon");
@@ -1138,6 +1189,30 @@ sub Dashboard_Escape($) {
 return $a;
 }
 
+######################################################################################
+#           angegebenes $file im $dir und Unterverzeichnissen suchen
+#           und mit Pfad ab ".../images/" in $ct speichern wenn gefunden
+######################################################################################
+sub Dashboard_searchImage($$$$) {
+  my ($name,$dir,$file,$ct) = @_;
+  my $hash = $defs{$name};
+  
+  my ($t,$im);
+  opendir(DIR, $dir);
+  my(@files) = grep {!/^\.\.?$/ } readdir(DIR);
+  closedir(DIR);
+  foreach (@files) {
+      if (-d ($t = "$dir/$_")) {                           # -d returns true if the following string is a directory.
+          Dashboard_searchImage($name,$t,$file,$ct);
+      } else {
+          next if ($_ ne $file);
+          $im = (split("images\/", $dir."/".$_))[1];
+          $hash->{HELPER}{BIMG}{$ct} = $im;         # Ergebnisfile in Container speichern wenn gefunden
+          Log3 ($name, 5, "Dashboard $name - Background image file found in: $dir/$_");
+      }
+  }
+}
+
 1;
 
 =pod
@@ -1242,9 +1317,29 @@ return $a;
         
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
-        Displays a background image for the complete dashboard. The image is not stretched in any way so the size should 
-        match/extend the dashboard height/width.
+        Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
+        match/extend the dashboard height/width. The relative path to "./www/images" has to be used. <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_backgroundimage dashboard/cam_video.PNG      <br>        
+		# File ./www/images/dashboard/cam_video.PNG is shown        <br>
+		attr dashboard_backgroundimage cam_video.PNG                <br>    
+		# File ./www/images/cam_video.PNG is shown                  <br>
     </li><br>
+    
+    <a name="dashboard_backgroundimage"></a>		
+    <li><b>dashboard_backgroundimage </b><br>
+        Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
+        match/extend the dashboard height/width. Only the filename has to be set. <br>
+        The file must be at any location below the directory "./www/images/". <br>
+        <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
+        <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_backgroundimage cam_video.PNG      <br> 
+
+    </li>
+    <br>
     
     <a name="dashboard_colcount"></a>	
     <li><b>dashboard_colcount </b><br>
@@ -1256,7 +1351,7 @@ return $a;
 	
     <a name="dashboard_debug"></a>		
     <li><b>dashboard_debug </b><br>
-        Show Hiddenfields. Only for Maintainer's use.<br>
+        Show Hiddenfields. Only for Maintainer's use. <br>
         Default: 0
     </li>
     <br>
@@ -1265,24 +1360,32 @@ return $a;
     <li><b>dashboard_flexible </b><br>
         If set to a value > 0, the widgets are not positioned in columns any more but can be moved freely to any position in 
         the tab.<br/>
-        The value for this parameter also defines the grid, in which the position "snaps in".
+        The value for this parameter also defines the grid, in which the position "snaps in". <br> 
         Default: 0
     </li><br>
 	
+    <a name="dashboard_hideGroupHeader"></a>	
+    <li><b>dashboard_hideGroupHeader </b><br>
+        If set, the header containing the group name and group icon above the pictured FHEM-group (see also dashboard_tab1groups) is hidden. <br> 
+		Default: 0
+    </li>
+    <br>
+	
     <a name="dashboard_homeTab"></a>
     <li><b>dashboard_homeTab </b><br>
-        Specifies which tab is activated. If it isn't set, the last selected tab will also be the active tab. (Default: 1)
+        Specifies which tab is activated. If it isn't set, the last selected tab will also be the active tab. <br>
+		Default: 1
     </li><br>
     
     <a name="dashboard_row"></a>	
     <li><b>dashboard_row </b><br>
-        To select which rows are displayed. top only; center only; bottom only; top and center; center and bottom; top,center and bottom.<br>
+        To select which rows are displayed. top only; center only; bottom only; top and center; center and bottom; top,center and bottom. <br>
         Default: center
     </li><br>
     
     <a name="dashboard_rowbottomheight"></a>	
     <li><b>dashboard_rowbottomheight </b><br>
-        Height of the bottom row in which the groups may be positioned.<br>
+        Height of the bottom row in which the groups may be positioned. <br>
         Default: 250
     </li><br>
     
@@ -1300,7 +1403,7 @@ return $a;
         specifies the width of the first column, the second value of the width of the second column, etc. Is the sum of the 
         width greater than 100 it is reduced. 
         If more columns defined as widths the missing widths are determined by the difference to 100. However, are less 
-        columns are defined as the values ​​of ignores the excess values​​.<br>
+        columns are defined as the values ​​of ignores the excess values​​. <br>
         Default: 100
     </li><br>
     
@@ -1312,31 +1415,55 @@ return $a;
 	
     <a name="dashboard_showfullsize"></a>	
     <li><b>dashboard_showfullsize </b><br>
-        Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1.<br>
+        Hide FHEMWEB Roomliste (complete left side) and Page Header if Value is 1. <br>
         Default: 0
     </li><br>	
 	
     <a name="dashboard_showtabs"></a>	
     <li><b>dashboard_showtabs </b><br>
-        Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used.<br>
+        Displays the Tabs/Buttonbar on top or bottom, or hides them. If the Buttonbar is hidden lockstate is "lock" is used. <br>
         Default: tabs-and-buttonbar-at-the-top
     </li><br>
     
     <a name="dashboard_showtogglebuttons"></a>		
     <li><b>dashboard_showtogglebuttons </b><br>
-        Displays a Toogle Button on each Group do collapse.<br>
+        Displays a Toogle Button on each Group do collapse. <br>
         Default: 0
     </li><br>
     
-    <a name="dashboard_tab1name"></a>
-    <li><b>dashboard_tab1name </b><br>
-        Title of Tab. (also valid for further dashboard_tabXname)
-    </li><br>
+    <a name="dashboard_tab1backgroundimage"></a>		
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
+		The image is not stretched in any way, it should therefore match the tab size or extend it. 
+        Only the filename has to be set. <br>
+        The file must be at any location below the directory "./www/images/". <br>
+        <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
+        <br><br>
+		
+		<b>Example</b><br>
+		attr dashboard_tab1backgroundimage cam_video.PNG      <br> 
+
+    </li>
+    <br>
     
-    <a name="dashboard_tab1sorting"></a>	
-    <li><b>dashboard_tab1sorting </b><br>
-        Contains the position of each group in Tab. (also valid for further dashboard_tabXsorting) <br>
-		Value is written by the "Set" button. It is not recommended to take manual changes.
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Number of columns for a specific tab in which the groups can be displayed. (also valid for further dashboard_tabXcolcount) <br>
+		Nevertheless, it is possible to have multiple groups to be positioned in a column next to each other. 
+		This depends on the width of columns and groups. <br>
+        Default: &lt;dashboard_colcount&gt;
+    </li><br>	
+    
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec list of devices that should appear in the tab. (also valid for further dashboard_tabXdevices) <br>
+		The format is: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+	    </ul>        
+        ICONNAME is optional. Also GROUPNAME is optional. In case of missing GROUPNAME, the matching devices are 
+        not grouped, but shown as separate widgets without titles. 
+        For further details on the DevSpec format see <a href="#devspec">DevSpec</a>.
     </li><br>
     
     <a name="dashboard_tab1groups"></a>	
@@ -1355,18 +1482,6 @@ return $a;
         .*Light.* to show all groups that contain the string "Light"
     </li><br>
     
-    <a name="dashboard_tab1devices"></a>	
-    <li><b>dashboard_tab1devices </b><br>
-        DevSpec list of devices that should appear in the tab. (also valid for further dashboard_tabXdevices) <br>
-		The format is: <br><br>
-		<ul>
-            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
-	    </ul>        
-        ICONNAME is optional. Also GROUPNAME is optional. In case of missing GROUPNAME, the matching devices are 
-        not grouped, but shown as separate widgets without titles. 
-        For further details on the DevSpec format see <a href="#devspec">DevSpec</a>.
-    </li><br>
-    
     <a name="dashboard_tab1icon"></a>	
     <li><b>dashboard_tab1icon </b><br>
         Set the icon for a Tab. (also valid for further dashboard_tabXicon) <br>
@@ -1374,19 +1489,16 @@ return $a;
         referencing an SVG icon, then you can use the @colorname suffix to color the image. 
     </li><br>
     
-    <a name="dashboard_tab1colcount"></a>	
-    <li><b>dashboard_tab1colcount </b><br>
-        Number of columns for a specific tab in which the groups can be displayed. (also valid for further dashboard_tabXcolcount) <br>
-		Nevertheless, it is possible to have multiple groups to be positioned in a column next to each other. 
-		This depends on the width of columns and groups. <br>
-        Default: &lt;dashboard_colcount&gt;
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Title of Tab. (also valid for further dashboard_tabXname)
     </li><br>
-	
-    <a name="dashboard_tab1backgroundimage"></a>	
-    <li><b>dashboard_tab1backgroundimage </b><br>
-        Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
-		The image is not stretched in any way, it should therefore match the tab size or extend it.
-    </li><br>		
+    
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Contains the position of each group in Tab. (also valid for further dashboard_tabXsorting) <br>
+		Value is written by the "Set" button. It is not recommended to take manual changes.
+    </li><br>	
     
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
@@ -1406,14 +1518,14 @@ return $a;
 	    <li> are positioning to the tab specified by command "set &lt;name&gt; activateTab" </li>
 	  </ul>
 	  <br>
-	  (default: all)
+	  Default: all
 	  <br>
     </li>
     <br>
 	
     <a name="dashboard_width"></a>	
     <li><b>dashboard_width </b><br>
-        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%).<br>
+        To determine the Dashboardwidth. The value can be specified, or an absolute width value (eg 1200) in pixels in% (eg 80%). <br>
         Default: 100%
     </li>
     <br>
@@ -1517,8 +1629,15 @@ return $a;
     
     <a name="dashboard_backgroundimage"></a>		
     <li><b>dashboard_backgroundimage </b><br>
-        Zeig in Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
-        passen oder diese überschreiten.
+        Zeigt ein Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
+        passen oder diese überschreiten. Es ist nur der Filename anzugeben. <br>
+        Das File muss sich an beliebiger Stelle unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
+        <br><br>
+		
+		<b>Beispiel</b><br>
+		attr dashboard_backgroundimage cam_video.PNG      <br> 
+
     </li>
     <br>	
     
@@ -1527,43 +1646,51 @@ return $a;
         Die Anzahl der Spalten in der  Gruppen dargestellt werden können. Dennoch ist es möglich, mehrere Gruppen <br>
         in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite der Spalten und Gruppen. <br>
         Gilt nur für die mittlere Spalte! <br>
-        Standard: 1
+        Default: 1
     </li>
     <br>
     
     <a name="dashboard_debug"></a>		
     <li><b>dashboard_debug </b><br>
-        Zeigt Debug-Felder an. Sollte nicht gesetzt werden!<br>
-        Standard: 0
+        Zeigt Debug-Felder an. Sollte nicht gesetzt werden! <br>
+        Default: 0
     </li>
     <br>	
     
     <a name="dashboard_flexible"></a>	
     <li><b>dashboard_flexible </b><br>
         Hat dieser Parameter  einen Wert > 0, dann können die Widgets in den Tabs frei positioniert werden und hängen nicht 
-        mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zu schnappt".
-        Standard: 0
+        mehr an den Spalten fest. Der Wert gibt ebenfalls das Raster an, in dem die Positionierung "zuschnappt". <br> 
+        Default: 0
+    </li>
+    <br>
+	
+    <a name="dashboard_hideGroupHeader"></a>	
+    <li><b>dashboard_hideGroupHeader </b><br>
+        Wenn gesetzt, wird der Kopf mit Gruppenname und -icon der dargestellten FHEM-Gruppe (siehe dashboard_tab1groups) verborgen. <br> 
+		Default: 0
     </li>
     <br>
 	
     <a name="dashboard_homeTab"></a>	
     <li><b>dashboard_homeTab </b><br>
-        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt gewählte Tab das aktive Tab. (Default: 1)
+        Legt das aktuell aktivierte Tab fest. Wenn nicht gesetzt, wird das zuletzt gewählte Tab das aktive Tab. <br> 
+		Default: 1
     </li>
     <br>
 	
     <a name="dashboard_row"></a>	
     <li><b>dashboard_row </b><br>
         Auswahl welche Zeilen angezeigt werden sollen. top (nur Oben), center (nur Mitte), bottom (nur Unten) und den 
-        Kombinationen daraus.<br>
-        Standard: center
+        Kombinationen daraus. <br>
+        Default: center
     </li>
     <br>	
 	
     <a name="dashboard_rowcenterheight"></a>	
     <li><b>dashboard_rowcenterheight </b><br>
         Höhe der mittleren Zeile, in der die Gruppen angeordnet werden. <br>
-        Standard: 400
+        Default: 400
     </li>
     <br>
     
@@ -1573,28 +1700,28 @@ return $a;
         Die Werte sind durch ein Komma (ohne Leerzeichen) zu trennen. Jeder Wert bestimmt die Spaltenbreite in %! Der erste Wert gibt die Breite der ersten Spalte an, 
         der zweite Wert die Breite der zweiten Spalte usw. Ist die Summe der Breite größer als 100 werden die Spaltenbreiten reduziert.
         Sind mehr Spalten als Breiten definiert werden die fehlenden Breiten um die Differenz zu 100 festgelegt. Sind hingegen weniger Spalten als Werte definiert werden 
-        die überschüssigen Werte ignoriert.<br>
-        Standard: 100
+        die überschüssigen Werte ignoriert. <br>
+        Default: 100
     </li>
     <br>
     
     <a name="dashboard_rowtopheight"></a>	
     <li><b>dashboard_rowtopheight </b><br>
         Höhe der oberen Zeile, in der die Gruppen angeordnet werden. <br>
-        Standard: 250
+        Default: 250
     </li>
     <br>
     
     <a name="dashboard_rowbottomheight"></a>	
     <li><b>dashboard_rowbottomheight </b><br>
-        Höhe der unteren Zeile, in der die Gruppen angeordnet werden.<br>
-        Standard: 250
+        Höhe der unteren Zeile, in der die Gruppen angeordnet werden. <br>
+        Default: 250
     </li><br>
     
     <a name="dashboard_showfullsize"></a>	
     <li><b>dashboard_showfullsize </b><br>
         Blendet die FHEMWEB Raumliste (kompleter linker Bereich der Seite) und den oberen Bereich von FHEMWEB aus wenn der 
-        Wert auf 1 gesetzt ist.<br>
+        Wert auf 1 gesetzt ist. <br>
         Default: 0
     </li>
     <br>
@@ -1602,29 +1729,54 @@ return $a;
     <a name="dashboard_showtabs"></a>	
     <li><b>dashboard_showtabs </b><br>
         Zeigt die Tabs/Schalterleiste des Dashboards oben oder unten an, oder blendet diese aus. Wenn die Schalterleiste 
-        ausgeblendet wird ist das Dashboard gespert.<br>
-        Standard: tabs-and-buttonbar-at-the-top
+        ausgeblendet wird ist das Dashboard gespert. <br>
+        Default: tabs-and-buttonbar-at-the-top
     </li>
     <br>
 	
     <a name="dashboard_showtogglebuttons"></a>		
     <li><b>dashboard_showtogglebuttons </b><br>
-        Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann.<br>
-        Standard: 0
+        Zeigt eine Schaltfläche in jeder Gruppe mit der man diese auf- und zuklappen kann. <br>
+        Default: 0
     </li><br>	
     
-    <a name="dashboard_tab1name"></a>
-    <li><b>dashboard_tab1name </b><br>
-        Titel des Tab. (gilt ebenfalls für weitere dashboard_tabXname)
+    <a name="dashboard_tab1backgroundimage"></a>	
+    <li><b>dashboard_tab1backgroundimage </b><br>
+        Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
+		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. Es ist nur der 
+        Filename anzugeben. <br>
+        Das File muss sich an beliebiger Stelle unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
+        <br><br>
+		
+		<b>Beispiel</b><br>
+		attr dashboard_tab1backgroundimage cam_video.PNG      <br> 
+        
     </li>
-    <br>	
+    <br>
     
-    <a name="dashboard_tab1sorting"></a>	
-    <li><b>dashboard_tab1sorting </b><br>
-        Enthält die Positionierung jeder Gruppe im Tab. Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
-        empfohlen dieses Attribut manuell zu ändern. (gilt ebenfalls für weitere dashboard_tabXsorting)
+    <a name="dashboard_tab1colcount"></a>	
+    <li><b>dashboard_tab1colcount </b><br>
+        Die Anzahl der Spalten im Tab in der Gruppen dargestellt werden können. (gilt ebenfalls für weitere dashboard_tabXcolcount) <br>
+		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
+		der Spalten und Gruppen. <br>
+        Gilt nur für die mittlere Spalte! <br>
+        Default: &lt;dashboard_colcount&gt;
     </li>
-    <br>		
+    <br>
+	
+    <a name="dashboard_tab1devices"></a>	
+    <li><b>dashboard_tab1devices </b><br>
+        DevSpec Liste von Geräten, die im Tab angezeigt werden sollen. (gilt ebenfalls für weitere dashboard_tabXdevices) <br>
+		Das Format ist: <br><br>
+		<ul>
+            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
+		</ul>	
+        ICONNAME ist optional. Auch GROUPNAME muss nicht vorhanden sein. Fehlt GROUPNAME, werden die angegebenen 
+        Geräte nicht gruppiert, sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich DevSpec: 
+        <a href="#devspec">DevSpec</a>
+    </li>
+    <br>
     
     <a name="dashboard_tab1groups"></a>	
     <li><b>dashboard_tab1groups </b><br>
@@ -1642,44 +1794,29 @@ return $a;
         <b>Beispiel: </b><br>
 		.*Licht.* zeigt alle Gruppen an, die das Wort "Licht" im Namen haben.
     </li>
-    <br>	
-	
-    <a name="dashboard_tab1devices"></a>	
-    <li><b>dashboard_tab1devices </b><br>
-        DevSpec Liste von Geräten, die im Tab angezeigt werden sollen. (gilt ebenfalls für weitere dashboard_tabXdevices) <br>
-		Das Format ist: <br><br>
-		<ul>
-            GROUPNAME:devspec1,devspec2,...,devspecX:ICONNAME <br><br>
-		</ul>	
-        ICONNAME ist optional. Auch GROUPNAME muss nicht vorhanden sein. Fehlt GROUPNAME, werden die angegebenen 
-        Geräte nicht gruppiert, sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich DevSpec: 
-        <a href="#devspec">DevSpec</a>
-    </li>
-    <br>	
-	
-    <a name="dashboard_tabXicon"></a>	
-    <li><b>dashboard_tabXicon </b><br>
-        Zeigt am Tab ein Icon an. Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es 
+    <br>
+   
+    <a name="dashboard_tab1icon"></a>	
+    <li><b>dashboard_tab1icon </b><br>
+        Zeigt am Tab ein Icon an (gilt ebenfalls für weitere dashboard_tabXicon). 
+        Es muss sich dabei um ein exisitereindes Icon mit modpath Verzeichnis handeln. Handelt es 
         sich um ein SVG Icon kann der Suffix @colorname für die Farbe des Icons angegeben werden.
     </li>
     <br>
     
-    <a name="dashboard_tab1colcount"></a>	
-    <li><b>dashboard_tab1colcount </b><br>
-        Die Anzahl der Spalten im Tab in der Gruppen dargestellt werden können. (gilt ebenfalls für weitere dashboard_tabXcolcount) <br>
-		Dennoch ist es möglich, mehrere Gruppen in einer Spalte nebeneinander zu positionieren. Dies ist abhängig von der Breite 
-		der Spalten und Gruppen. <br>
-        Gilt nur für die mittlere Spalte! <br>
-        Standard: &lt;dashboard_colcount&gt;
+    <a name="dashboard_tab1name"></a>
+    <li><b>dashboard_tab1name </b><br>
+        Titel des Tab. (gilt ebenfalls für weitere dashboard_tabXname)
     </li>
-    <br>
+    <br>	
     
-    <a name="dashboard_tab1backgroundimage"></a>	
-    <li><b>dashboard_tab1backgroundimage </b><br>
-        Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
-		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. 
+    <a name="dashboard_tab1sorting"></a>	
+    <li><b>dashboard_tab1sorting </b><br>
+        Enthält die Positionierung jeder Gruppe im Tab (gilt ebenfalls für weitere dashboard_tabXsorting). <br>
+        Der Wert wird mit der Schaltfläche "Set" geschrieben. Es wird nicht 
+        empfohlen dieses Attribut manuell zu ändern.
     </li>
-    <br>
+    <br>				
     
     <a name="dashboard_noLinks"></a>
     <li><b>dashboard_noLinks</b><br>
@@ -1700,7 +1837,7 @@ return $a;
 	    <li> beim Ausführen von "set &lt;name&gt; activateTab" auf diesen Tab im Dashboard positionieren </li>
 	  </ul>
 	  <br>
-	  (default: alle)
+	  Default: alle
 	  <br>
     </li>
     <br>
@@ -1708,8 +1845,8 @@ return $a;
     <a name="dashboard_width"></a>	
     <li><b>dashboard_width </b><br>
         Zum bestimmen der Dashboardbreite. Der Wert kann in % (z.B. 80%) angegeben werden oder als absolute Breite (z.B. 1200) 
-        in Pixel.<br>
-        Standard: 100%
+        in Pixel. <br>
+        Default: 100%
     </li>
     <br>
 

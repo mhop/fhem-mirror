@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 95_Dashboard: new attribute dashboard_hideGroupHeader, path 
+                          handling of backgroundimage changed, comref revised
  - bugfix:  98_weekprofile: read weekprofile from HMCCUDEV|HM-TC-IT-WM-W-EU
  - change:  93_DbLog: change cache from %defs to %data, improved log infos
                       with verbose 5 of SVG generation, bugfix check TIMESTAMP
