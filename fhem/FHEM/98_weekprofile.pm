@@ -229,9 +229,18 @@ sub weekprofile_readDayProfile($@)
 
       $prfTime = ReadingsVal($device, "R-ENDTIME_$reading"."_$i", "") if (!$prfTime);
       $prfTemp = ReadingsVal($device, "R-TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
+      
+      $prfTime = ReadingsVal($device, "R-P1_ENDTIME_$reading"."_$i", "") if (!$prfTime);
+      $prfTemp = ReadingsVal($device, "R-P1_TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
 
-      Log3 $me, 5, "$me(readDayProfile): $reading"."_$i $prfTime $prfTemp";
-
+      if ($prfTime eq "" or $prfTemp eq ""){
+        Log3 $me, 3, "$me(readDayProfile): unsupported readings";
+        return (\@times, \@temps);
+      }
+      else{
+        Log3 $me, 5, "$me(readDayProfile): $reading"."_$i $prfTime $prfTemp";
+      }
+      
       $prfTime = weekprofile_minutesToTime($prfTime);
 
       if ($lastTime ne "24:00"){
