@@ -352,6 +352,8 @@ sub HUEDevice_Define($$)
     $hash->{helper}{pct} = -1;
     $hash->{helper}{rgb} = "";
 
+    $hash->{helper}{battery} = -1;
+
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
