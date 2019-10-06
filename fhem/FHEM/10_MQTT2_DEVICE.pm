@@ -63,6 +63,8 @@ MQTT2_DEVICE_Define($$)
   my $name = shift @a;
   my $type = shift @a; # always MQTT2_DEVICE
   $hash->{CID} = shift(@a) if(@a);
+  my $ioname = (@a ? shift(@a) : undef);
+  $hash->{DEF} = ($hash->{CID} ? $hash->{CID} : "") if($hash->{DEF}); #rm ioname
 
   return "wrong syntax for $name: define <name> MQTT2_DEVICE [clientid]"
         if(int(@a));
@@ -79,7 +81,7 @@ MQTT2_DEVICE_Define($$)
     if(!$init_done && !$bridgeTimerStarted);
   $bridgeTimerStarted = 1;
 
-  AssignIoPort($hash);
+  AssignIoPort($hash, $ioname);
   return undef;
 }
 
@@ -88,7 +90,6 @@ sub
 MQTT2_DEVICE_Parse($$)
 {
   my ($iodev, $msg) = @_;
-  my $ioname = $iodev->{NAME};
   my %fnd;
 
   sub
@@ -237,7 +238,7 @@ MQTT2_DEVICE_Parse($$)
     if(!$cidArr || !int(@{$cidArr})) {
       my $devName = $newCid;
       $devName = makeDeviceName($devName);
-      return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid";
+      return "UNDEFINED MQTT2_$devName MQTT2_DEVICE $newCid ".$iodev->{NAME};
     }
     return "";
   }
