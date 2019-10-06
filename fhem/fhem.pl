@@ -2508,6 +2508,7 @@ CommandList($$)
     my @list = devspec2array($arg[0],$cl);
     if($arg[1]) {
       foreach my $sdev (@list) { # Show a Hash-Entry or Reading for each device
+        next if(!$defs{$sdev});
 
         my $first = 1;
         foreach  my $n (@arg[1..@arg-1]) {
@@ -2518,34 +2519,31 @@ CommandList($$)
             $n = $2;
           }    
 
-          if($defs{$sdev}) {
-            if(defined($defs{$sdev}{$n}) && (!$fType || $fType eq "i:")) {
-              my $val = $defs{$sdev}{$n};
-              if(ref($val) eq 'HASH') {
-                $val = ($val->{NAME} ? $val->{NAME} : # ???
-                        join(" ", map { "$_=$val->{$_}" } sort keys %{$val}));
-              }
-              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'',
-                        $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'', $val);
-
-            } elsif($defs{$sdev}{READINGS} &&
-                    defined($defs{$sdev}{READINGS}{$n})
-                    && (!$fType || $fType eq "r:")) {
-              $str .= sprintf("%-20s %s   %*s %s\n", $first?$sdev:'',
-                      $defs{$sdev}{READINGS}{$n}{TIME},
-                      $arg[2]?-15:0, $arg[2]?$n:'', 
-                      $defs{$sdev}{READINGS}{$n}{VAL});
-
-            } elsif($attr{$sdev} && 
-                    defined($attr{$sdev}{$n})
-                    && (!$fType || $fType eq "a:")) {
-              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'',
-                        $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'',
-                        $attr{$sdev}{$n});
-
+          if(defined($defs{$sdev}{$n}) && (!$fType || $fType eq "i:")) {
+            my $val = $defs{$sdev}{$n};
+            if(ref($val) eq 'HASH') {
+              $val = ($val->{NAME} ? $val->{NAME} : # ???
+                      join(" ", map { "$_=$val->{$_}" } sort keys %{$val}));
             }
+            $str .= sprintf("%-20s %*s   %*s %s\n", ($first++==1)?$sdev:'',
+                      $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'', $val);
+
+          } elsif($defs{$sdev}{READINGS} &&
+                  defined($defs{$sdev}{READINGS}{$n})
+                  && (!$fType || $fType eq "r:")) {
+            $str .= sprintf("%-20s %s   %*s %s\n", ($first++==1)?$sdev:'',
+                    $defs{$sdev}{READINGS}{$n}{TIME},
+                    $arg[2]?-15:0, $arg[2]?$n:'', 
+                    $defs{$sdev}{READINGS}{$n}{VAL});
+
+          } elsif($attr{$sdev} && 
+                  defined($attr{$sdev}{$n})
+                  && (!$fType || $fType eq "a:")) {
+            $str .= sprintf("%-20s %*s   %*s %s\n",($first++==1)?$sdev:'',
+                      $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'',
+                      $attr{$sdev}{$n});
+
           }
-          $first = 0;
         }
       }
 

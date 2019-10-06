@@ -996,7 +996,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="list"></a>
 <h3>list</h3>
 <ul>
-  <code>list [devspec] [value]</code><br>
+  <code>list [devspec] [value ...]</code><br>
   oder<br>
   <code>list {-r|-R} devspec</code><br>
   <br><br>
@@ -1004,11 +1004,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   &quot;at&quot;-Definitionen. Dies ist eines der wenigen Befehle, die im
   Normalfall eine Zeichenkette ausgeben.<br> Siehe den Abschnitt &uuml;ber <a
   href="#devspec">Ger&auml;te-Spezifikation</a> f&uuml;r Details der
-  &lt;devspec&gt;.<br>
+  &lt;devspec&gt;.<br><br>
   
-  <br> Wenn value angegeben ist, der von ( DEF, TYPE, usw) oder reading
-  (actuator, measured-temp) f&uuml;r alle Ger&auml;te die in devspec angegeben
-  sind.  <br><br> Beispiel:
+  Wenn &lt;value&gt; angegeben ist, dann wird dieses Wert (Internal, Reading
+  oder Attribut) ausgegeben, soweit es vorhanden ist. Die Werte k&ouml;nnen mit
+  einem Pr&auml;fix eingeschr&auml;nkt werden: i: f&uuml;r Internals, r:
+  f&uuml;r Readings und a: f&uuml;r Attribute.
+
+  <br><br> Beispiel:
   <pre><code>fhem&gt; list
 
   Type list <name> for detailed info.

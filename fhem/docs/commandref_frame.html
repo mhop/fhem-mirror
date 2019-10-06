@@ -941,7 +941,7 @@ The following local attributes are used by a wider range of devices:
 <a name="list"></a>
 <h3>list</h3>
 <ul>
-  <code>list [devspec] [value]</code><br>
+  <code>list [devspec] [value ...]</code><br>
   or<br>
   <code>list {-r|-R} devspec</code><br>
   <br><br>
@@ -951,13 +951,15 @@ The following local attributes are used by a wider range of devices:
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
   <br>
-  If value is specified, then output this property (like DEF, TYPE, etc) or
-  reading (actuator, measured-temp) for all devices from the devspec.
+  If &lt;value&gt; is specified, then output this property (internal, reading
+  or attribute) for all devices from the devspec.  &lt;value&gt; can be
+  restricted with prefix i: for internals, r: for readings and a: for
+  attributes.
   <br><br>
   Example:
-  <pre><code>  fhem> list
+  <pre><code>  fhem&gt; list
 
-  Type list <name> for detailed info.
+  Type list &lt;name&gt; for detailed info.
 
   Internal:
     global               (Internal)
@@ -988,7 +990,7 @@ The following local attributes are used by a wider range of devices:
   </code></pre>
   If specifying <code>name</code>, then a detailed status for <code>name</code>
   will be displayed, e.g.:
-  <pre><code>  fhem> list fl
+  <pre><code>  fhem&gt; list fl
 
   Internals:
     CODE       5102
