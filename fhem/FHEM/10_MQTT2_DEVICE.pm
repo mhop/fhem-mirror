@@ -134,7 +134,7 @@ MQTT2_DEVICE_Parse($$)
       if($code =~ m/^{.*}$/s) {
         $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
                  "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME},
-                 "%JSONMAP","\$defs{$dev}{JSONMAP}"));
+                 "%CID"=>$cid, "%JSONMAP","\$defs{$dev}{JSONMAP}"));
         my $ret = AnalyzePerlCommand(undef, $code);
         if($ret && ref $ret eq "HASH") {
           readingsBeginUpdate($hash);
