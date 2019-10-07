@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.2" => "06.10.2019  delete key/value pairs in SSCam_extractForTelegram and SSCam_sendEmailblocking, ".
+                           "change datacontainer of SNAPHASH(OLD) from %defs to %data ",
   "8.19.1" => "26.09.2019  set compatibility to 8.2.6 ",
   "8.19.0" => "21.09.2019  support attr \"hideAudio\" SSCamSTRM-device ",
   "8.18.2" => "19.09.2019  sample streams changed in comref, support of attr noLink in Streaming-Device ",
@@ -5500,9 +5502,9 @@ sub SSCam_camop_parse ($) {
 						my $i = 0;
 						my $sn = 0;
 
-                        if($hash->{HELPER}{".SNAPHASH"}) {
-                        	foreach my $key (sort(keys%{$hash->{HELPER}{".SNAPHASH"}})) {
-                                $hash->{HELPER}{".SNAPHASHOLD"}{$key} = delete($hash->{HELPER}{".SNAPHASH"}{$key});
+                        if($data{SSCam}{$name}{SNAPHASH}) {   
+                        	foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
+                                $data{SSCam}{$name}{SNAPHASHOLD}{$key} = delete($data{SSCam}{$name}{SNAPHASH});
 	                        }    
                         }
                             
@@ -5531,10 +5533,10 @@ sub SSCam_camop_parse ($) {
 							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
                         
                             # Snaphash erstellen 
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}     = $snapid;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}  = $createdTm;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}   = $fileName;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData}  = $imageData;
                             Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        													
                             
                             $sn += 1;
@@ -5545,12 +5547,12 @@ sub SSCam_camop_parse ($) {
                         my $ss  = $sn;
                         $sn     = 0;
                                                													
-                        if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
+                        if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}     = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}   = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
                         }
@@ -5566,9 +5568,9 @@ sub SSCam_camop_parse ($) {
                          
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
-                        if($hash->{HELPER}{".SNAPHASH"}) {
-                        	foreach my $key (sort(keys%{$hash->{HELPER}{".SNAPHASH"}})) {
-                                $hash->{HELPER}{".SNAPHASHOLD"}{$key} = delete($hash->{HELPER}{".SNAPHASH"}{$key});
+                        if($data{SSCam}{$name}{SNAPHASH}) {
+                        	foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
+                                $data{SSCam}{$name}{SNAPHASHOLD}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
 	                        }
                         }
                         
@@ -5591,11 +5593,11 @@ sub SSCam_camop_parse ($) {
                             }
                             
                             # Snaphash erstellen
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{snapid}     = $snapid;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{createdTm}  = $createdTm;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{fileName}   = $fileName;
-                            $hash->{HELPER}{".SNAPHASH"}{$sn}{imageData}  = $imageData;
-                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{snapid}, File => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{fileName}, Created => $hash->{HELPER}{\".SNAPHASH\"}{$sn}{createdTm}");
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}     = $snapid;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}  = $createdTm;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}   = $fileName;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData}  = $imageData;
+                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}, File => $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}, Created => $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}");
                             
                             $sn += 1;
                             $i += 1;
@@ -5604,12 +5606,12 @@ sub SSCam_camop_parse ($) {
                         my $sgn = AttrVal($name,"snapGalleryNumber",3);
                         my $ss  = $sn;
                         $sn     = 0; 
-                        if($hash->{HELPER}{".SNAPHASHOLD"} && $sgn > $ss) {
+                        if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{snapid}     = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{snapid};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{createdTm}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{createdTm};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{fileName}   = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{fileName};
-                                $hash->{HELPER}{".SNAPHASH"}{$kn}{imageData}  = delete $hash->{HELPER}{".SNAPHASHOLD"}{$sn}{imageData}; 
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}     = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}   = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
                         }
@@ -5621,7 +5623,7 @@ sub SSCam_camop_parse ($) {
                             for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
                                 asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");						
                             }
-                            delete($hash->{HELPER}{".SNAPHASH"});               # Snaphash Referenz löschen                            %allsnaps = ();
+                            delete($data{SSCam}{$name}{SNAPHASH});               # Snaphash Referenz löschen                            %allsnaps = ();
                             delete($hash->{HELPER}{CL});
                         }
                     }
@@ -7717,7 +7719,7 @@ sub SSCam_composegallery ($;$$$) {
   my ($name,$strmdev,$model,$ftui) = @_;
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};
-  my $allsnaps = $hash->{HELPER}{".SNAPHASH"};                                                # = %allsnaps
+  # my $allsnaps = $data{SSCam}{$name}{SNAPHASH};                                        
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", "");                                      # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");                                           # Systemsprache       
@@ -7809,10 +7811,10 @@ sub SSCam_composegallery ($;$$$) {
   $header .= $sgbnote;
   
   my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:"";    
-  my @as     = sort{$a<=>$b}keys %{$allsnaps};
+  my @as     = sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}};
   
   # Ausgabetabelle erstellen
-  my ($htmlCode,$ct);
+  my ($htmlCode);
   $htmlCode  = "<html>";
   $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= "<div class=\"makeTable wide\"; style=\"text-align:$hdrAlign\"> $header <br>";
@@ -7822,12 +7824,12 @@ sub SSCam_composegallery ($;$$$) {
   my $cell   = 1;
   
   foreach my $key (@as) {
-      $ct = $allsnaps->{$key}{createdTm};
+      # $ct = $data{SSCam}{$name}{SNAPHASH}{$key}{createdTm};
       my $idata = "";
       if(!$ftui) {
-          $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$allsnaps->{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
+          $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
 	  }
-      my $html = sprintf("<td>$ct<br> <img src=\"data:image/jpeg;base64,$allsnaps->{$key}{imageData}\" $gattr $idata> </td>" );
+      my $html = sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );
       $cell++;
 
       if ( $cell == $sgc+1 ) {
@@ -8311,17 +8313,17 @@ sub SSCam_extractForTelegram($$$) {
   my ($data,$fname,$ct);
   
   if($sdat) {
-      $ct     = $paref->{sdat}{$key}{createdTm};
-      my $img = $paref->{sdat}{$key}{".imageData"};
-      $fname  = SSCam_trim($paref->{sdat}{$key}{fileName});
+      $ct     = delete $paref->{sdat}{$key}{createdTm};
+      my $img = delete $paref->{sdat}{$key}{".imageData"};
+      $fname  = SSCam_trim(delete $paref->{sdat}{$key}{fileName});
       $data   = MIME::Base64::decode_base64($img); 
       Log3($name, 4, "$name - image data decoded for TelegramBot prepare");
   } 
   
   if($vdat) {
-      $ct    = $paref->{vdat}{$key}{createdTm};
-      $data  = $paref->{vdat}{$key}{".imageData"};
-      $fname = SSCam_trim($paref->{vdat}{$key}{fileName});
+      $ct    = delete $paref->{vdat}{$key}{createdTm};
+      $data  = delete $paref->{vdat}{$key}{".imageData"};
+      $fname = SSCam_trim(delete $paref->{vdat}{$key}{fileName});
   }
   
   $subject =~ s/\$FILE/$fname/g;
@@ -8823,9 +8825,9 @@ sub SSCam_sendEmailblocking($) {
       my ($ct,$img,$decoded);
       @as = sort{$a<=>$b}keys%{$sdat};
       foreach my $key (@as) {
-		  $ct      = $sdat->{$key}{createdTm};
-		  $img     = $sdat->{$key}{".imageData"};
-		  $fname   = $sdat->{$key}{fileName};
+		  $ct      = delete $sdat->{$key}{createdTm};
+		  $img     = delete $sdat->{$key}{".imageData"};
+		  $fname   = delete $sdat->{$key}{fileName};
 		  $fh      = '$fh'.$key;
 		  $decoded = MIME::Base64::decode_base64($img); 
 		  my $mh   = '';
@@ -8855,9 +8857,9 @@ sub SSCam_sendEmailblocking($) {
       my ($ct,$video);
       @as = sort{$a<=>$b}keys%{$vdat};
       foreach my $key (@as) {
-		  $ct      = $vdat->{$key}{createdTm};
-		  $video   = $vdat->{$key}{".imageData"};
-		  $fname   = $vdat->{$key}{fileName};
+		  $ct      = delete $vdat->{$key}{createdTm};
+		  $video   = delete $vdat->{$key}{".imageData"};
+		  $fname   = delete $vdat->{$key}{fileName};
 		  $fh      = '$fh'.$key;
 		  my $mh   = '';
 		  if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
