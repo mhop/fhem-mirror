@@ -5260,7 +5260,11 @@ sub delseqdoubl_DoParse($) {
          } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
                  ($i>=2 && $varo && $varu && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) ) {
              if ($edge =~ /negative/i && ($ooval > $oval)) {              
-                 push (@sel,$oor);                                  # negative Flanke -> der abfallende DS und desssen Vorgänger 
+                 push (@sel,$oor);                                  # negative Flanke -> der fallende DS und desssen Vorgänger 
+                 push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
+                 push (@sel,$nr);                                                     
+             } elsif ($edge =~ /positive/i && ($ooval < $oval)) {              
+                 push (@sel,$oor);                                  # positive Flanke -> der steigende DS und desssen Vorgänger 
                  push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
                  push (@sel,$nr);                                                     
              } else {
@@ -13128,19 +13132,29 @@ sub bdump {
                                        new operation starts  </li> <br>
 
   <a name="seqDoubletsVariance"></a>                                       
-  <li><b>seqDoubletsVariance </b> - accepted variance (+/-) for the command "set &lt;name&gt; delSeqDoublets". <br>
-                                    The value of this attribute describes the variance up to it consecutive numeric values (VALUE) of
-                                    datasets are handled as identical and should be deleted. "seqDoubletsVariance" is an absolut numerical value, 
-                                    which is used as a positive as well as a negative variance.
+  <li><b>seqDoubletsVariance  &lt;positive variance [negative variance] [EDGE=negative|positive]&gt; </b> <br> 
+                                    Accepted variance for the command "set &lt;name&gt; delSeqDoublets". <br>
+                                    The value of this attribute describes the variance up to consecutive numeric values (VALUE) of
+                                    datasets are handled as identical. If only one numeric value is declared, it is used as 
+                                    postive as well as negative variance and both form the "deletion corridor".
+                                    Optional a second numeric value for a negative variance, separated by blank,can be 
+                                    declared.
+                                    Always absolute, i.e. positive numeric values, have to be declared. <br>
+                                    If the supplement "EDGE=negative" is declared, values at a negative edge (e.g. when 
+                                    value is changed from  4.0 -&gt; 1.0) are not deleted although they are in the "deletion corridor".
+                                    Equivalent is valid with "EDGE=positive" for the positive edge (e.g. the change 
+                                    from 1.2 -&gt; 2.8).                                 
                                     <br><br>
 
                                     <ul>
 							        <b>Examples:</b> <br>
-								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014 </code> <br>
-								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45   </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
+								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
+                                    <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
+                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
 								    </ul>
 								    <br><br> 
-                                    </li>
+                                    </li>  
 
   <a name="showproctime"></a>
   <li><b>showproctime </b>    - if set, the reading "sql_processing_time" shows the required execution time (in seconds) 
@@ -15587,7 +15601,7 @@ sub bdump {
                                 </li> <br>
 
   <a name="seqDoubletsVariance"></a>								
-  <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative]&gt; </b> <br> 
+  <li><b>seqDoubletsVariance  &lt;positive Abweichung [negative Abweichung] [EDGE=negative|positive]&gt; </b> <br> 
                                     Akzeptierte Abweichung für das Kommando "set &lt;name&gt; delSeqDoublets". <br>
                                     Der Wert des Attributs beschreibt die Abweichung bis zu der aufeinanderfolgende numerische 
                                     Werte (VALUE) von Datensätzen als gleich angesehen werden sollen.
@@ -15597,8 +15611,9 @@ sub bdump {
                                     Leerzeichen, angegeben werden. 
                                     Es sind immer absolute, d.h. positive Zahlenwerte anzugeben. <br>
                                     Ist der Zusatz "EDGE=negative" angegeben, werden Werte an einer negativen Flanke 
-                                    (z.B. beim Wechel von 4.0 - 1.0) nicht gelöscht auch wenn sie sich im "Löschkorridor"
-                                    befinden.
+                                    (z.B. beim Wechel von 4.0 -&gt; 1.0) nicht gelöscht auch wenn sie sich im "Löschkorridor"
+                                    befinden. Entsprechendes gilt bei "EDGE=positive" für die positive Flanke (z.B. beim Wechel 
+                                    von 1.2 -&gt; 2.8).
                                     <br><br>
 
                                     <ul>
@@ -15606,6 +15621,7 @@ sub bdump {
 								    <code>attr &lt;name&gt; seqDoubletsVariance 0.0014  </code> <br>
 								    <code>attr &lt;name&gt; seqDoubletsVariance 1.45    </code> <br>
                                     <code>attr &lt;name&gt; seqDoubletsVariance 3.0 2.0 </code> <br>
+                                    <code>attr &lt;name&gt; seqDoubletsVariance 1.5 EDGE=negative </code> <br>
 								    </ul>
 								    <br><br>
                                     </li>                                    
