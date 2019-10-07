@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: enhanced configCheck, minor fix warning
  - feature: 93_DbRep: seqDoubletsVariance - separate specification of positive 
                       and negative variance possible, 
                       (Forum: 53584.msg959963.html#msg959963)

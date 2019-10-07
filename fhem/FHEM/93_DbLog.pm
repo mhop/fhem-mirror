@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
+                           "enhanced configCheck by insert mode check ",
   "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog",
   "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
   "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
@@ -3727,6 +3729,7 @@ sub DbLog_configcheck($) {
   ### Check Betriebsmodus
   #######################################################################
   my $mode = $hash->{MODE};
+  my $bi   = AttrVal($name, "bulkInsert", 0);
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
   
@@ -3745,7 +3748,20 @@ sub DbLog_configcheck($) {
 	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
 	  $rec .= "Please refer to commandref for further information about these attributes.";
   }
-  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+
+  $check .= "<u><b>Result of insert mode check</u></b><br><br>";
+  if(!$bi) {
+      $bi     = "Array";
+      $check .= "Insert mode of DbLog-device $name is: $bi <br>";
+      $rec    = "Setting attribute \"bulkInsert\" to \"1\" may result a higher write performance in most cases. ";
+      $rec   .= "Feel free to try this mode.";
+  } else {
+      $bi     = "Bulk";
+      $check .= "Insert mode of DbLog-device $name is: $bi <br>"; 
+      $rec    = "settings o.k.";   
+  }  
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
   
   ### Check Plot Erstellungsmodus
   #######################################################################
@@ -4485,6 +4501,7 @@ sub DbLog_addCacheLine($$$$$$$$) {
  	  my $VALUE 	 = $i_val;
  	  my $UNIT   	 = $i_unit;
 	  my $IGNORE     = 0;
+      my $CN         = " ";
 
  	  eval $value_fn;
 	  Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
