@@ -1014,6 +1014,7 @@ sub EventProcessingWindowRec($@) {
                     or $homemode eq 'gotosleep' )
                 and $shutters->getModeDown ne 'absent'
                 and $shutters->getModeDown ne 'off'
+                and $ascDev->getAutoShuttersControlEvening eq 'on'
               )
             {
                 $shutters->setLastDrive('window closed at night');
@@ -6659,7 +6660,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.32",
+  "version": "v0.6.33",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
