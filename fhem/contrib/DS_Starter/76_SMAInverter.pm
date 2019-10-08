@@ -1,7 +1,7 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $
+# $Id: 76_SMAInverter.pm 20080 2019-09-22 22:00:00Z DS_Starter $
 #################################################################################################################
-# 
+#
 #  Copyright notice
 #
 #  Published according Creative Commons : Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)
@@ -13,7 +13,7 @@
 #  - Waldmensch for various improvements
 #  - sbfspot (https://sbfspot.codeplex.com/)
 #  - rewritten by Thomas Schoedl (sct14675) with inputs from Volker, waldmensch and DS_Starter
-# 
+#
 #  Description:
 #  This is an FHEM-Module for SMA Inverters.
 #
@@ -32,7 +32,10 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.13.2" => "27.08.2019   ",
+  "2.14.0" => "08.10.2019  readings bltotal, bltoday included by 300P",
+  "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
+  "2.13.3" => "28.08.2019  commandref revised ",
+  "2.13.2" => "27.08.2019  fix WARNING: Use of uninitialized value \$_ in substitution (s///) at /opt/fhem//FHEM/Blocking.pm line 238 ",
   "2.13.1" => "22.08.2019  commandref revised ",
   "2.13.0" => "20.08.2019  support of Meta.pm ",
   "2.12.0" => "20.08.2019  set warning to log if SPOT_ETODAY, SPOT_ETOTAL was not delivered or successfully ".
@@ -87,9 +90,9 @@ our %SMAInverter_vNotesIntern = (
 # $inv_SPOT_ETOTAL                # Total yield
 # $inv_SPOT_PDC1                  # DC power input 1
 # $inv_SPOT_PDC2	              # DC power input 2
-# $inv_SPOT_PAC1                  # Power L1 
-# $inv_SPOT_PAC2                  # Power L2 
-# $inv_SPOT_PAC3                  # Power L3 
+# $inv_SPOT_PAC1                  # Power L1
+# $inv_SPOT_PAC2                  # Power L2
+# $inv_SPOT_PAC3                  # Power L3
 # $inv_PACMAX1                    # Nominal power in Ok Mode
 # $inv_PACMAX2                    # Nominal power in Warning Mode
 # $inv_PACMAX3                    # Nominal power in Fault Mode
@@ -118,6 +121,8 @@ our %SMAInverter_vNotesIntern = (
 # $inv_TEMP                       # Inverter temperature
 # $inv_GRIDRELAY                  # Grid Relay/Contactor Status
 # $inv_STATUS                     # Inverter Status
+# $inv_SPOT_BATTERYLOAD_TODAY     # Today Batteryload
+# $inv_SPOT_BATTERYLOAD_TOTAL     # Total Batteryload
 
 # Aufbau Wechselrichter Type-Hash
 my %SMAInverter_devtypes = (
@@ -246,6 +251,7 @@ my %SMAInverter_devtypes = (
 9345 => "STP5.0-3AV-40 (Sunny Tripower 5.0)",
 9346 => "STP6.0-3AV-40 (Sunny Tripower 6.0)",
 9347 => "STP8.0-3AV-40 (Sunny Tripower 8.0)",
+9348 => "STP10.0-3AV-40 (Sunny Tripower 10.0)",
 9356 => "SBS3.7-1VL-10 (Sunny Boy Storage 3.7)",
 9358 => "SBS5.0-10 (Sunny Boy Storage 5.0)",
 9366 => "STP3.0-3AV-40 (Sunny Tripower 3.0)",
@@ -289,7 +295,7 @@ sub SMAInverter_Initialize($) {
  $hash->{DefFn}     = "SMAInverter_Define";
  $hash->{UndefFn}   = "SMAInverter_Undef";
  $hash->{GetFn}     = "SMAInverter_Get";
- $hash->{AttrList}  = "interval " . 
+ $hash->{AttrList}  = "interval " .
                       "detail-level:0,1,2 " .
                       "disable:1,0 " .
                       "mode:manual,automatic ".
@@ -301,10 +307,11 @@ sub SMAInverter_Initialize($) {
                       "target-susyid " .
                       "target-serial " .
                       $readingFnAttributes;
+ 
  $hash->{AttrFn}    = "SMAInverter_Attr";
- 
+
  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };    # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
- 
+
 return;
 }
 
@@ -314,10 +321,10 @@ return;
 sub SMAInverter_Define($$) {
  my ($hash, $def) = @_;
  my @a = split("[ \t][ \t]*", $def);
- 
- return "Error: Perl module ".$MissModulSocket." is missing. 
+
+ return "Error: Perl module ".$MissModulSocket." is missing.
         Install it on Debian with: sudo apt-get install libio-socket-multicast-perl" if($MissModulSocket);
- return "Error: Perl module ".$MissModulDateTime." is missing. 
+ return "Error: Perl module ".$MissModulDateTime." is missing.
         Install it on Debian with: sudo apt-get install libdatetime-perl" if($MissModulDateTime);
 
  return "Wrong syntax: use define <name> SMAInverter <inv-userpwd> <inv-hostname/inv-ip > " if ((int(@a) < 4) and (int(@a) > 5));
@@ -327,7 +334,7 @@ sub SMAInverter_Define($$) {
  $hash->{INTERVAL}              = $hash->{HELPER}{INTERVAL} = AttrVal($name, "interval", 60);
  $hash->{HELPER}{FAULTEDCYCLES} = 0;
  delete($hash->{HELPER}{AVERAGEBUF}) if($hash->{HELPER}{AVERAGEBUF});
- 
+
  # protocol related defaults
  $hash->{HELPER}{MYSUSYID}              = 233;                   # random number, has to be different from any device in local network
  $hash->{HELPER}{MYSERIALNUMBER}        = 123321123;             # random number, has to be different from any device in local network
@@ -336,7 +343,7 @@ sub SMAInverter_Define($$) {
  $hash->{HELPER}{PKT_ID}                = 0x8001;                # Packet ID
  $hash->{HELPER}{MAXBYTES}              = 300;                   # constant MAXBYTES scalar 300
  $hash->{HELPER}{MODMETAABSENT}         = 1 if($modMetaAbsent);  # Modul Meta.pm nicht vorhanden
-  
+
  # Versionsinformationen setzen
  SMAInverter_setVersionInfo($hash);
 
@@ -355,7 +362,7 @@ sub SMAInverter_Define($$) {
      return "Argument:{$a[3]} not accepted as Host or IP. Read device specific help file.";
  }
 
- $hash->{PASS} = $Pass; 
+ $hash->{PASS} = $Pass;
  $hash->{HOST} = $Host;
 
  InternalTimer(gettimeofday()+5, "SMAInverter_GetData", $hash, 0);      # Start Hauptroutine
@@ -367,12 +374,11 @@ return undef;
 #                  SMAInverter Undefine
 ###############################################################
 sub SMAInverter_Undef($$) {
- my ($hash, $name) = @_;
- RemoveInternalTimer($hash); 
- BlockingKill($hash->{HELPER}{RUNNING_PID});
+  my ($hash, $name) = @_;
+  RemoveInternalTimer($hash);
+  BlockingKill($hash->{HELPER}{RUNNING_PID});
 return undef;
 }
-
 
 ###############################################################
 #                  SMAInverter Get
@@ -383,17 +389,17 @@ sub SMAInverter_Get($$) {
  my $name = shift @a;
  my $opt  = shift @a;
  my $timeout  = AttrVal($name, "timeout", 60);
-   
+
  my  $getlist = "Unknown argument $opt, choose one of ".
                 "data:noArg ";
-                   
+
  return "module is disabled" if(IsDisabled($name));
-  
+
  if ($opt eq "data") {
-     SMAInverter_GetData($hash); 
+     SMAInverter_GetData($hash);
  } else {
      return "$getlist";
- } 
+ }
 return undef;
 }
 
@@ -416,16 +422,16 @@ sub SMAInverter_Attr(@) {
         }
     InternalTimer(time+5, 'SMAInverter_GetData', $hash, 0);
     }
-	
+
     if ($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
         my $val   = ($do == 1 ?  "disabled" : "initialized");
-  
+
         readingsSingleUpdate($hash, "state", $val, 1);
-        
+
         if ($do == 0) {
             my $mode = AttrVal($name, "mode", "automatic");
             RemoveInternalTimer($hash);
@@ -438,7 +444,7 @@ sub SMAInverter_Attr(@) {
     if ($aName eq "detail-level") {
         delete $defs{$name}{READINGS};
     }
-    
+
     if ($aName eq "SBFSpotComp") {
         delete $defs{$name}{READINGS};
     }
@@ -453,10 +459,10 @@ sub SMAInverter_Attr(@) {
             $hash->{INTERVAL} = $hash->{HELPER}{INTERVAL} = 60;
         }
     }
-        
+
     if ($cmd eq "set" && $aName eq "offset") {
             if($aVal !~ /^\d+$/ || $aVal < 0 || $aVal > 7200) { return "The Value of $aName is not valid. Use value between 0 ... 7200 !";}
-    } 
+    }
 	if ($cmd eq "set" && $aName eq "timeout") {
         unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
     }
@@ -471,31 +477,31 @@ sub SMAInverter_GetData($) {
  my $name = $hash->{NAME};
  my $interval = AttrVal($name, "interval", 60);
  my $timeout  = AttrVal($name, "timeout", 60);
- 
+
  RemoveInternalTimer($hash, "SMAInverter_GetData");
- 
+
  if ($init_done != 1) {
      InternalTimer(gettimeofday()+5, "SMAInverter_GetData", $hash, 0);
 	 return;
  }
- 
+
  return if(IsDisabled($name));
- 
+
  if (exists($hash->{HELPER}{RUNNING_PID})) {
      Log3 ($name, 3, "SMAInverter $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} will be killed now to start a new BlockingCall");
      BlockingKill($hash->{HELPER}{RUNNING_PID});
  }
- 
+
  Log3 ($name, 4, "$name - ###############################################################");
  Log3 ($name, 4, "$name - ##########  Begin of new SMAInverter get data cycle  ##########");
  Log3 ($name, 4, "$name - ###############################################################");
  Log3 ($name, 4, "$name - timeout cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
- 
- # decide of operation   
+
+ # decide of operation
  if(AttrVal($name,"mode","automatic") eq "automatic") {
      # automatic operation mode
-	 InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);	 
- } 
+	 InternalTimer(gettimeofday()+$interval, "SMAInverter_GetData", $hash, 0);
+ }
 
 $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAInverter_getstatusDoParse", "$name", "SMAInverter_getstatusParseDone", $timeout, "SMAInverter_getstatusParseAborted", $hash);
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 4;
@@ -511,22 +517,24 @@ sub SMAInverter_getstatusDoParse($) {
  my $hash     = $defs{$name};
  my $interval = AttrVal($name, "interval", 60);
  my $sc       = AttrVal($name, "SBFSpotComp", 0);
- my ($sup_EnergyProduction,       
-     $sup_SpotDCPower, 
-     $sup_SpotACPower,            
-     $sup_MaxACPower,         
-     $sup_MaxACPower2,        
-     $sup_SpotACTotalPower,   
-     $sup_ChargeStatus,       
-     $sup_SpotDCVoltage,      
-     $sup_SpotACVoltage,          
-     $sup_BatteryInfo,            
-     $sup_SpotGridFrequency,      
-     $sup_TypeLabel,              
-     $sup_OperationTime,          
-     $sup_InverterTemperature,    
-     $sup_GridRelayStatus,        
+ my ($sup_EnergyProduction,
+     $sup_SpotDCPower,
+     $sup_SpotACPower,
+     $sup_MaxACPower,
+     $sup_MaxACPower2,
+     $sup_SpotACTotalPower,
+     $sup_ChargeStatus,
+     $sup_SpotDCVoltage,
+     $sup_SpotACVoltage,
+     $sup_BatteryInfo,
+     $sup_SpotGridFrequency,
+     $sup_TypeLabel,
+     $sup_OperationTime,
+     $sup_InverterTemperature,
+     $sup_GridRelayStatus,
+     $sup_SpotBatteryLoad,
      $sup_DeviceStatus);
+ 
  my ($inv_TYPE, $inv_CLASS,
 	 $inv_SPOT_ETODAY, $inv_SPOT_ETOTAL,
      $inv_susyid,
@@ -542,35 +550,37 @@ sub SMAInverter_getstatusDoParse($) {
      $inv_BAT_UDC, $inv_BAT_IDC,
      $inv_BAT_CYCLES,
      $inv_BAT_TEMP,
+     $inv_SPOT_BATTERYLOAD_TODAY, $inv_SPOT_BATTERYLOAD_TOTAL,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS,);
+
  my @row_array;
  my @array;
  my $avg = 0;
  my ($ist,$bst,$irt,$brt,$rt);
- 
+
  # Background-Startzeit
  $bst = [gettimeofday];
-        
+
  Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusDoParse");
- 
- # set dependency from surise/sunset used for inverter operation time 
+
+ # set dependency from surise/sunset used for inverter operation time
  my $offset = AttrVal($name,"offset",0);
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
- 
+
  my ($sunrise_h,$sunrise_m,$sunrise_s) = split(":",sunrise_abs('-'.$offset));
  my ($sunset_h,$sunset_m,$sunset_s)    = split(":",sunset_abs('+'.$offset));
- 
+
  my $oper_start = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunrise_h,minute=>$sunrise_m,second=>$sunrise_s,time_zone=>'local');
  my $oper_stop  = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunset_h,minute=>$sunset_m,second=>$sunset_s,time_zone=>'local');
  my $dt_now     = DateTime->now(time_zone=>'local');
- 
+
  Log3 $name, 4, "$name - current time: ".$dt_now->dmy('.')." ".$dt_now->hms;
  Log3 $name, 4, "$name - operation time begin: ".$oper_start->dmy('.')." ".$oper_start->hms;
  Log3 $name, 4, "$name - operation time end: ".$oper_stop->dmy('.')." ".$oper_stop->hms;
- 
+
  my $opertime_start = $oper_start->dmy('.')." ".$oper_start->hms;
  my $opertime_stop  = $oper_stop->dmy('.')." ".$oper_stop->hms;
- 
+
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
  if ($dt_now >= $oper_stop) {
      my $val = 0;
@@ -578,32 +588,41 @@ sub SMAInverter_getstatusDoParse($) {
      $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".etotal_yesterday", $val], 0);
  }
- 
+
+ # BATTERYLOAD_TOTAL speichern für BATTERYLOAD_TODAY-Berechnung wenn WR BATTERYLOAD_TODAY nicht liefert
+ if ($dt_now >= $oper_stop) {
+     my $val = 0;
+     $val = ReadingsNum($name, "bltotal", 0)*1000 if (exists $defs{$name}{READINGS}{bltotal});
+     $val = ReadingsNum($name, "SPOT_BATTERYLOAD_TOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_BATTERYLOAD_TOTAL});
+     BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".bltotal_yesterday", $val], 0);
+ }
+
  if (($oper_start <= $dt_now && $dt_now <= $oper_stop) || AttrVal($name,"suppressSleep",0)) {
      # normal operation or suppressed sleepmode
-	 
+
 	 # Abfrage Inverter Startzeit
      $ist = [gettimeofday];
- 
+
      # Get the current attributes
      my $detail_level  = AttrVal($name, "detail-level", 0);
- 
+
      # Aufbau Command-Array
      my @commands = ("sup_TypeLabel",                  # Check TypeLabel
                      "sup_EnergyProduction",           # Check EnergyProduction
-		    		 "sup_SpotDCPower",                # Check SpotDCPower
-			    	 "sup_SpotACPower",                # Check SpotACPower
-				     "sup_SpotACTotalPower",           # Check SpotACTotalPower
-				     "sup_ChargeStatus"                # Check BatteryChargeStatus
+                     "sup_SpotDCPower",                # Check SpotDCPower
+                     "sup_SpotACPower",                # Check SpotACPower
+                     "sup_SpotACTotalPower",           # Check SpotACTotalPower
+                     "sup_ChargeStatus"                # Check BatteryChargeStatus
 				     );
- 
+
      if($detail_level > 0) {
          # Detail Level 1 or 2 >> get voltage and current levels
 	     push(@commands, "sup_SpotDCVoltage");         # Check SpotDCVoltage
 	     push(@commands, "sup_SpotACVoltage");         # Check SpotACVoltage
 	     push(@commands, "sup_BatteryInfo");           # Check BatteryInfo
+         push(@commands, "sup_SpotBatteryLoad");       # Check Batteryload
      }
- 
+
      if($detail_level > 1) {
           # Detail Level 2 >> get all data
 	      push(@commands, "sup_SpotGridFrequency");     # Check SpotGridFrequency
@@ -612,97 +631,100 @@ sub SMAInverter_getstatusDoParse($) {
           push(@commands, "sup_MaxACPower");            # Check MaxACPower
           push(@commands, "sup_MaxACPower2");           # Check MaxACPower2
           push(@commands, "sup_GridRelayStatus");       # Check GridRelayStatus
-          push(@commands, "sup_DeviceStatus");	       # Check DeviceStatus 
+          push(@commands, "sup_DeviceStatus");	        # Check DeviceStatus
      }
 
      if(SMAInverter_SMAlogon($hash->{HOST}, $hash->{PASS}, $hash)) {
          Log3 $name, 5, "$name - Logged in now";
-	 
+
 	     foreach my $i(@commands) {
              if ($i eq "sup_TypeLabel") {
 		         ($sup_TypeLabel,$inv_TYPE,$inv_CLASS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x58000200, 0x00821E00, 0x008220FF);
-		     } 
+		     }
 			 elsif ($i eq "sup_EnergyProduction") {
 		         ($sup_EnergyProduction,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00260100, 0x002622FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_SpotDCPower") {
 		         ($sup_SpotDCPower,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00251E00, 0x00251EFF);
-		     } 
+		     }
 		     elsif ($i eq "sup_SpotACPower") {
 		         ($sup_SpotACPower,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464000, 0x004642FF);
-	         } 
+	         }
 		     elsif ($i eq "sup_SpotACTotalPower") {
 		         ($sup_SpotACTotalPower,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00263F00, 0x00263FFF);
-		     }    
+		     }
 		     elsif ($i eq "sup_ChargeStatus") {
 		         ($sup_ChargeStatus,$inv_ChargeStatus,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00295A00, 0x00295AFF);
-		     } 
+		     }
 		     elsif ($i eq "sup_SpotDCVoltage") {
 		         ($sup_SpotDCVoltage,$inv_SPOT_UDC1,$inv_SPOT_UDC2,$inv_SPOT_IDC1,$inv_SPOT_IDC2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x53800200, 0x00451F00, 0x004521FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_SpotACVoltage") {
 		         ($sup_SpotACVoltage,$inv_SPOT_UAC1,$inv_SPOT_UAC2,$inv_SPOT_UAC3,$inv_SPOT_IAC1,$inv_SPOT_IAC2,$inv_SPOT_IAC3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00464800, 0x004655FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_BatteryInfo") {
 		         ($sup_BatteryInfo,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00491E00, 0x00495DFF);
-		     } 
+		     }
 		     elsif ($i eq "sup_SpotGridFrequency") {
 		         ($sup_SpotGridFrequency,$inv_SPOT_FREQ,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00465700, 0x004657FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_OperationTime") {
 		         ($sup_OperationTime,$inv_SPOT_OPERTM,$inv_SPOT_FEEDTM,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00462E00, 0x00462FFF);
-		     } 
+		     }
 		     elsif ($i eq "sup_InverterTemperature") {
 		         ($sup_InverterTemperature,$inv_TEMP,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x52000200, 0x00237700, 0x002377FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_MaxACPower") {
 		         ($sup_MaxACPower,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00411E00, 0x004120FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_MaxACPower2") {
 		         ($sup_MaxACPower2,$inv_PACMAX1_2,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51000200, 0x00832A00, 0x00832AFF);
-		     }   
+		     }
 		     elsif ($i eq "sup_GridRelayStatus") {
 		         ($sup_GridRelayStatus,$inv_GRIDRELAY,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00416400, 0x004164FF);
-		     } 
+		     }
 		     elsif ($i eq "sup_DeviceStatus") {
 		         ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
-		     } 
-         }	 
-	 
+		     }
+		     elsif ($i eq "sup_SpotBatteryLoad") {
+		     	 ($sup_SpotBatteryLoad,$inv_SPOT_BATTERYLOAD_TODAY,$inv_SPOT_BATTERYLOAD_TOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00461F00, 0x00461FFF);
+		     }
+         }
+
          # nothing more to do, just log out
          SMAInverter_SMAlogout($hash,$hash->{HOST});
- 
+
          # Inverter Laufzeit ermitteln
          $irt = tv_interval($ist);
- 
+
 	     # Aufbau Ergebnis-Array
 	     push(@row_array, "modulstate normal"."\n");
 	     push(@row_array, "opertime_start ".$opertime_start."\n");
-	     push(@row_array, "opertime_stop ".$opertime_stop."\n");	 
-	 
-	     # Durchschnittswerteberechnung Energieerzeugung der letzten 5, 10, 15 Messungen 
-		 
+	     push(@row_array, "opertime_stop ".$opertime_stop."\n");
+
+	     # Durchschnittswerteberechnung Energieerzeugung der letzten 5, 10, 15 Messungen
+
 		 my ($sum05, $sum10, $sum15);
 	     my $cnt05  = int(300/$interval);          # Anzahl der Zyklen innerhalb 5 Minuten
          my $cnt10  = int(600/$interval);          # Anzahl der Zyklen innerhalb 10 Minuten
          my $cnt15  = int(900/$interval);		   # Anzahl der Zyklen innerhalb 15 Minuten = Summe aller Messzyklen
 		 my $cntsum = $cnt15+1;                    # Sicherheitszuschlag Summe Anzahl aller Zyklen
 		 my @averagebuf;
-	     if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS eq 8001) {	
+	     if ($sup_TypeLabel && $sup_EnergyProduction && $inv_CLASS eq 8001) {
 		     # only for this block because of warnings if values not set at restart
-             no warnings 'uninitialized'; 
+             no warnings 'uninitialized';
 	         if (!$hash->{HELPER}{AVERAGEBUF}) {
 		         for my $count (0..$cntsum) {
 			         # fill with new values
 					 $inv_SPOT_PACTOT = $inv_SPOT_PACTOT?$inv_SPOT_PACTOT:0;
-				     push(@averagebuf, $inv_SPOT_PACTOT);					 
+				     push(@averagebuf, $inv_SPOT_PACTOT);
 			     }
 		     } else {
 			     @averagebuf = split(/,/, $hash->{HELPER}{AVERAGEBUF})
 			 }
-	
-		     # rechtes Element aus average buffer löschen 
-		     pop(@averagebuf);			 
+
+		     # rechtes Element aus average buffer löschen
+		     pop(@averagebuf);
 		     # und links mit neuem Wert füllen
 		     unshift(@averagebuf, $inv_SPOT_PACTOT);
 		     $avg = join(',', @averagebuf);
@@ -726,21 +748,21 @@ sub SMAInverter_getstatusDoParse($) {
 				 }
 			     $k++;
 			 }
-			 
+
 		     my $AvP05 = int( $sum05 / ($cnt05+1) );
 		     my $AvP10 = int( $sum10 / ($cnt10+1) );
 		     my $AvP15 = int( $sum15 / ($cnt15+1) );
 	         Log3 $name, 5, "$name - Content of Averagebuffer:";
 		     Log3 $name, 5, "$name - $avg";
 		     Log3 $name, 5, "$name - avg_power_lastminutes_05 = $AvP05, avg_power_lastminutes_10 = $AvP10, avg_power_lastminutes_15 = $AvP15";
-		 
+
 		     push(@row_array, "avg_power_lastminutes_05 ".$AvP05."\n");   # Average Energy (last) 5 minutes
 	         push(@row_array, "avg_power_lastminutes_10 ".$AvP10."\n");   # Average Energy (last) 10 minutes
 	         push(@row_array, "avg_power_lastminutes_15 ".$AvP15."\n");   # Average Energy (last) 15 minutes
-			 
+
 			 use warnings;
-	     } 
-	 
+	     }
+
          if ($sc) {                                            # SBFSpot Kompatibilitätsmodus
              if($sup_EnergyProduction) {
 	             push(@row_array, "etotal ".($inv_SPOT_ETOTAL/1000)."\n");
@@ -748,32 +770,33 @@ sub SMAInverter_getstatusDoParse($) {
              }
              if($sup_SpotDCPower) {
 	             push(@row_array, "string_1_pdc ".sprintf("%.3f",$inv_SPOT_PDC1/1000)."\n");
-	             push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");		     
+	             push(@row_array, "string_2_pdc ".sprintf("%.3f",$inv_SPOT_PDC2/1000)."\n");
              }
              if($sup_SpotACPower) {
 	             push(@row_array, "phase_1_pac ".sprintf("%.3f",$inv_SPOT_PAC1/1000)."\n");
-	             push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n");	
-	             push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n");	
+	             push(@row_array, "phase_2_pac ".sprintf("%.3f",$inv_SPOT_PAC2/1000)."\n");
+	             push(@row_array, "phase_3_pac ".sprintf("%.3f",$inv_SPOT_PAC3/1000)."\n");
              }
              if($sup_SpotACTotalPower) {
-	             push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");	
-	             push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");		     
+	             push(@row_array, "total_pac ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
+	             push(@row_array, "state ".sprintf("%.3f",$inv_SPOT_PACTOT/1000)."\n");
              }
              if($sup_ChargeStatus) {
-	             push(@row_array, "chargestatus ".$inv_ChargeStatus."\n");		     
+	             push(@row_array, "chargestatus ".$inv_ChargeStatus."\n");
              }
+
              if($inv_CLASS && $inv_CLASS eq 8007 && defined($inv_SPOT_PACTOT)) {  # V2.10.1 28.04.2019
                  if($inv_SPOT_PACTOT < 0) {
 	                 push(@row_array, "power_out "."0"."\n");
 	                 push(@row_array, "power_in ".(-1 * $inv_SPOT_PACTOT)."\n");
                  } else {
 	                 push(@row_array, "power_out ".$inv_SPOT_PACTOT."\n");
-	                 push(@row_array, "power_in "."0"."\n");			     
+	                 push(@row_array, "power_in "."0"."\n");
                  }
              }
-		 	 
+
              if($detail_level > 0) {
-                 # For Detail Level 1 
+                 # For Detail Level 1
                  if($sup_SpotDCVoltage) {
 	                 push(@row_array, "string_1_udc ".sprintf("%.2f",$inv_SPOT_UDC1)."\n");
 	                 push(@row_array, "string_2_udc ".sprintf("%.2f",$inv_SPOT_UDC2)."\n");
@@ -792,8 +815,12 @@ sub SMAInverter_getstatusDoParse($) {
 	                 push(@row_array, "bat_udc ".$inv_BAT_UDC."\n");
 	                 push(@row_array, "bat_idc ".$inv_BAT_IDC."\n");
                  }
+                 if($sup_SpotBatteryLoad) {
+                     push(@row_array, "bltotal ".($inv_SPOT_BATTERYLOAD_TOTAL/1000)."\n");
+                     push(@row_array, "bltoday ".($inv_SPOT_BATTERYLOAD_TODAY/1000)."\n");
+                 }
              }
-         
+
              if($detail_level > 1) {
                  # For Detail Level 2
                  if($sup_BatteryInfo) {
@@ -831,8 +858,9 @@ sub SMAInverter_getstatusDoParse($) {
                  if($sup_DeviceStatus) {
 	                 push(@row_array, "device_status ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
-             } 
-         } else {     # kein SBFSpot Compatibility Mode
+             }
+         
+         } else {                                                         # kein SBFSpot Compatibility Mode
              if($sup_EnergyProduction) {
 	             push(@row_array, "SPOT_ETOTAL ".$inv_SPOT_ETOTAL."\n");
 	             push(@row_array, "SPOT_ETODAY ".$inv_SPOT_ETODAY."\n");
@@ -863,7 +891,7 @@ sub SMAInverter_getstatusDoParse($) {
                  }
              }
              if($detail_level > 0) {
-                 # For Detail Level 1 
+                 # For Detail Level 1
                  if($sup_SpotDCVoltage) {
 	                 push(@row_array, "SPOT_UDC1 ".$inv_SPOT_UDC1."\n");
 	                 push(@row_array, "SPOT_UDC2 ".$inv_SPOT_UDC2."\n");
@@ -882,8 +910,12 @@ sub SMAInverter_getstatusDoParse($) {
 	                 push(@row_array, "BAT_UDC ".$inv_BAT_UDC."\n");
 	                 push(@row_array, "BAT_IDC ".$inv_BAT_IDC."\n");
                  }
+                 if($sup_SpotBatteryLoad) {
+                     push(@row_array, "SPOT_BATTERYLOAD_TOTAL ".$inv_SPOT_BATTERYLOAD_TOTAL."\n");
+                     push(@row_array, "SPOT_BATTERYLOAD_TODAY ".$inv_SPOT_BATTERYLOAD_TODAY."\n");
+                 }
              }
-              
+
              if($detail_level > 1) {
                  # For Detail Level 2
                  if($sup_BatteryInfo) {
@@ -920,12 +952,12 @@ sub SMAInverter_getstatusDoParse($) {
                  if($sup_DeviceStatus) {
 	                 push(@row_array, "INV_STATUS ".SMAInverter_StatusText($inv_STATUS)."\n");
                  }
-             } 
+             }
          }
      } else {
          # Login failed/not possible
 	     push(@row_array, "state Login failed"."\n");
-	     push(@row_array, "modulstate login failed"."\n");	
+	     push(@row_array, "modulstate login failed"."\n");
      }
  } else {
      # sleepmode at current time and not suppressed
@@ -934,27 +966,27 @@ sub SMAInverter_getstatusDoParse($) {
 	 push(@row_array, "opertime_stop ".$opertime_stop."\n");
 	 push(@row_array, "state done"."\n");
  }
- 
+
  Log3 ($name, 5, "$name -> row_array before encoding:");
  foreach my $row (@row_array) {
 	 chomp $row;
      Log3 ($name, 5, "$name -> $row");
  }
- 
- # encoding result 
+
+ # encoding result
  my $rowlist = join('|', @row_array);
  $rowlist    = encode_base64($rowlist,"");
- 
+
  # Background-Laufzeit ermitteln
  $brt = tv_interval($bst);
 
  $rt = ($irt?$irt:'').",".$brt;
- 
+
  Log3 ($name, 4, "$name -> BlockingCall SMAInverter_getstatusDoParse finished");
- 
-return "$name|$rowlist|$avg|$rt"; 
+
+return "$name|$rowlist|$avg|$rt";
 }
- 
+
 ###############################################################
 #         Auswertung non-blocking Inverter Datenabruf
 ###############################################################
@@ -965,11 +997,11 @@ sub SMAInverter_getstatusParseDone ($) {
  my $hash                    = $defs{$name};
  my $rowlist                 = decode_base64($a[1]);
  $hash->{HELPER}{AVERAGEBUF} = $a[2] if($a[2]);
- my $rt                      = $a[3]; 
+ my $rt                      = $a[3];
  my ($irt,$brt)              = split(",", $rt);
- 
+
  Log3 ($name, 4, "$name -> Start BlockingCall SMAInverter_getstatusParseDone");
-  
+
  # proctime Readings löschen
  if(!AttrVal($name, "showproctime", undef)) {
      delete($defs{$name}{READINGS}{inverter_processing_time});
@@ -977,33 +1009,33 @@ sub SMAInverter_getstatusParseDone ($) {
  } else {
      delete($defs{$name}{READINGS}{inverter_processing_time}) if(!$irt);
  }
- 
+
  # Get current time
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
- $hash->{LASTUPDATE} = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;	
+ $hash->{LASTUPDATE} = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
 
  my @row_array = split("\\|", $rowlist);
- 
+
  Log3 ($name, 5, "$name -> row_array after decoding:");
  foreach my $row (@row_array) {
      chomp $row;
      Log3 ($name, 5, "$name -> $row");
  }
- 
- readingsBeginUpdate($hash); 
+
+ readingsBeginUpdate($hash);
  foreach my $row (@row_array) {
      chomp $row;
 	 my @a = split(" ", $row, 2);
      $hash->{MODEL} = $a[1] if($a[0] eq "device_type");
      readingsBulkUpdate($hash, $a[0], $a[1]);
  }
- readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));  
+ readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(AttrVal($name, "showproctime", undef));
  readingsBulkUpdate($hash, "inverter_processing_time", sprintf("%.4f",$irt)) if(AttrVal($name, "showproctime", undef) && $irt);
  readingsEndUpdate($hash, 1);
- 
+
  delete($hash->{HELPER}{RUNNING_PID});
  Log3 ($name, 4, "$name -> BlockingCall SMAInverter_getstatusParseDone finished");
- 
+
 return;
 }
 
@@ -1015,14 +1047,14 @@ sub SMAInverter_getstatusParseAborted(@) {
   my $name      = $hash->{NAME};
   my $discycles = $hash->{HELPER}{FAULTEDCYCLES};
   $cause = $cause?$cause:"Timeout: process terminated";
-  
+
   # count of timeouts since module start
   $discycles++;
   $hash->{HELPER}{FAULTEDCYCLES} = $discycles;
-  
+
   Log3 ($name, 1, "SMAInverter $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} $cause");
   readingsSingleUpdate($hash,"state",$cause, 1);
-  
+
   delete($hash->{HELPER}{RUNNING_PID});
 
 return;
@@ -1053,25 +1085,26 @@ sub SMAInverter_SMAcommand($$$$$) {
      $inv_BAT_UDC, $inv_BAT_IDC,
      $inv_BAT_CYCLES,
      $inv_BAT_TEMP,
+     $inv_SPOT_BATTERYLOAD_TODAY, $inv_SPOT_BATTERYLOAD_TOTAL,
      $inv_SPOT_FREQ, $inv_SPOT_OPERTM, $inv_SPOT_FEEDTM, $inv_TEMP, $inv_GRIDRELAY, $inv_STATUS);
  my $mysusyid = $hash->{HELPER}{MYSUSYID};
  my $myserialnumber = $hash->{HELPER}{MYSERIALNUMBER};
  my ($cmd, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size,$data_ID);
  my ($i, $temp);                          # Variables for loops and calculation
- 
- # Seriennummer und SuSyID des Ziel-WR setzen 
+
+ # Seriennummer und SuSyID des Ziel-WR setzen
  my $default_target_susyid = $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
- my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};   
+ my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};
  my $target_susyid = AttrVal($name, "target-susyid", $default_target_susyid);
  my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
 
  # Define own ID and target ID and packet ID
  $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
  $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
- 
+
  # Increasing Packet ID
- $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;	
+ $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;
  $spkt_ID = SMAInverter_ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
 
  $cmd_ID = SMAInverter_ByteOrderLong(sprintf("%08X",$command)) . SMAInverter_ByteOrderLong(sprintf("%08X",$first)) . SMAInverter_ByteOrderLong(sprintf("%08X",$last));
@@ -1080,8 +1113,8 @@ sub SMAInverter_SMAcommand($$$$$) {
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0000" . $myID . "0000" . "00000000" . $spkt_ID . $cmd_ID . "00000000";
 
  # flush after every write
- $| = 1; 
- 
+ $| = 1;
+
  # Create Socket and check if successful
  $socket = new IO::Socket::INET (PeerHost => $host, PeerPort => 9522, Proto => 'udp',); # open Socket
 
@@ -1107,7 +1140,7 @@ sub SMAInverter_SMAcommand($$$$$) {
      my $received = unpack("H*", $data);
      Log3 $name, 5, "$name - Received: $received";
  }
- 
+
  # Nothing received -> exit
  if (not defined $size) {
      Log3 $name, 1, "$name - Nothing received...";
@@ -1133,23 +1166,23 @@ sub SMAInverter_SMAcommand($$$$$) {
 		 return 0;
 	 }
  }
-	
+
  # All seems ok, data received
  $inv_susyid = unpack("v*", substr $data, 28, 2);
  $inv_serial = unpack("V*", substr $data, 30, 4);
  $socket->close();
- 
+
  if (AttrVal($name, "target-serial", undef)) {
      return 0 unless($target_serial eq $inv_serial);
  }
  if (AttrVal($name, "target-susyid", undef)) {
      return 0 unless($target_susyid eq $inv_susyid);
  }
-	
+
  # Check the data identifier
  $data_ID = unpack("v*", substr $data, 55, 2);
  Log3 $name, 5, "$name - Data identifier $data_ID";
-	
+
  if($data_ID eq 0x2601)	{
      if (length($data) >= 66) {
 		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
@@ -1169,14 +1202,46 @@ sub SMAInverter_SMAcommand($$$$$) {
              Log3 $name, 3, "$name - ETODAY calculated successfully !";
          } else {
              Log3 $name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !";
-             $inv_SPOT_ETODAY = 0;         
-         }        
+             $inv_SPOT_ETODAY = 0;
+         }
 	 }
 
 	 Log3 $name, 5, "$name - Data SPOT_ETOTAL=$inv_SPOT_ETOTAL and SPOT_ETODAY=$inv_SPOT_ETODAY";
 	 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
  }
-			
+
+####300?
+
+
+
+
+ if($data_ID eq 0x461F)	{
+     if (length($data) >= 66) {
+		 $inv_SPOT_BATTERYLOAD_TOTAL = unpack("V*", substr($data, 62, 4));
+	 } else {
+         Log3 $name, 3, "$name - WARNING - BATTERYLOAD_TOTAL wasn't deliverd ... set it to \"0\" !";
+         $inv_SPOT_ETOTAL = 0;
+	 }
+
+     if (length($data) >= 82) {
+		 $inv_SPOT_BATTERYLOAD_TODAY = unpack("V*", substr ($data, 78, 4));
+	 } else {
+         # BATTERYLOAD_TODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
+         Log3 $name, 3, "$name - BATTERYLOAD_TODAY wasn't delivered from inverter, try to calculate it ...";
+         my $bltotold = ReadingsNum($name, ".bltotal_yesterday", undef);
+         if(defined $bltotold && $inv_SPOT_BATTERYLOAD_TOTAL > $bltotold) {
+             $inv_SPOT_BATTERYLOAD_TODAY = $inv_SPOT_BATTERYLOAD_TOTAL - $bltotold;
+             Log3 $name, 3, "$name - BATTERYLOAD_TODAY calculated successfully !";
+         } else {
+             Log3 $name, 3, "$name - WARNING - unable to calculate BATTERYLOAD_TODAY ... set it to \"0\" !";
+             $inv_SPOT_BATTERYLOAD_TODAY = 0;
+         }
+	 }
+
+	 Log3 $name, 5, "$name - Data SPOT_BATTERYLOAD_TOTAL=$inv_SPOT_BATTERYLOAD_TOTAL and BATTERYLOAD_TODAY=$inv_SPOT_BATTERYLOAD_TODAY";
+	 return (1,$inv_SPOT_BATTERYLOAD_TODAY,$inv_SPOT_BATTERYLOAD_TOTAL,$inv_susyid,$inv_serial);
+ }
+
  if($data_ID eq 0x251E) {
      $inv_SPOT_PDC1 = unpack("V*", substr $data, 62, 4);
 	 if($size < 90) {$inv_SPOT_PDC2 = 0; } else {$inv_SPOT_PDC2 = unpack("V*", substr $data, 90, 4); } # catch short response, in case PDC2 not supported
@@ -1184,8 +1249,8 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 $inv_SPOT_PDC2 = ($inv_SPOT_PDC2 == 2147483648) ? 0 : $inv_SPOT_PDC2;
 	 Log3 $name, 5, "$name - Found Data SPOT_PDC1=$inv_SPOT_PDC1 and SPOT_PDC2=$inv_SPOT_PDC2";
 	 return (1,$inv_SPOT_PDC1,$inv_SPOT_PDC2,$inv_susyid,$inv_serial);
- } 
-		
+ }
+
  if($data_ID eq 0x4640) {
      $inv_SPOT_PAC1 = unpack("l*", substr $data, 62, 4);
 	 if($inv_SPOT_PAC1 eq -2147483648) {$inv_SPOT_PAC1 = 0; }	# Catch 0x80000000 as 0 value
@@ -1196,7 +1261,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 Log3 $name, 5, "$name - Found Data SPOT_PAC1=$inv_SPOT_PAC1 and SPOT_PAC2=$inv_SPOT_PAC2 and SPOT_PAC3=$inv_SPOT_PAC3";
 	 return (1,$inv_SPOT_PAC1,$inv_SPOT_PAC2,$inv_SPOT_PAC3,$inv_susyid,$inv_serial);
  }
-		
+
  if($data_ID eq 0x411E) {
      $inv_PACMAX1 = unpack("V*", substr $data, 62, 4);
 	 $inv_PACMAX2 = unpack("V*", substr $data, 90, 4);
@@ -1204,20 +1269,20 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 Log3 $name, 5, "$name - Found Data INV_PACMAX1=$inv_PACMAX1 and INV_PACMAX2=$inv_PACMAX2 and INV_PACMAX3=$inv_PACMAX3";
 	 return (1,$inv_PACMAX1,$inv_PACMAX2,$inv_PACMAX3,$inv_susyid,$inv_serial);
  }
-		
+
  if($data_ID eq 0x832A) {
      $inv_PACMAX1_2 = unpack("V*", substr $data, 62, 4);
 	 Log3 $name, 5, "$name - Found Data INV_PACMAX1_2=$inv_PACMAX1_2";
 	 return (1,$inv_PACMAX1_2,$inv_susyid,$inv_serial);
  }
-		
+
  if($data_ID eq 0x263F) {
      $inv_SPOT_PACTOT = unpack("l*", substr $data, 62, 4);
 	 if($inv_SPOT_PACTOT eq -2147483648) {$inv_SPOT_PACTOT = 0; }	# Catch 0x80000000 as 0 value
 	 Log3 $name, 5, "$name - Found Data SPOT_PACTOT=$inv_SPOT_PACTOT";
 	 return (1,$inv_SPOT_PACTOT,$inv_susyid,$inv_serial);
  }
-		
+
  if($data_ID eq 0x295A) {
      $inv_ChargeStatus = unpack("V*", substr $data, 62, 4);
 	 Log3 $name, 5, "$name - Found Data Battery Charge Status=$inv_ChargeStatus";
@@ -1230,7 +1295,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 if($size < 146) {
 		$inv_SPOT_UDC2 = 0;
 		$inv_SPOT_IDC1 = unpack("l*", substr $data, 90, 4);
-		$inv_SPOT_IDC2 = 0;	 
+		$inv_SPOT_IDC2 = 0;
 	 } else {
 		$inv_SPOT_UDC2 = unpack("l*", substr $data, 90, 4);
 		$inv_SPOT_IDC1 = unpack("l*", substr $data, 118, 4);
@@ -1263,9 +1328,9 @@ sub SMAInverter_SMAcommand($$$$$) {
 
  if($data_ID eq 0x491E) {
      $inv_BAT_CYCLES = unpack("V*", substr $data, 62, 4);
-	 $inv_BAT_TEMP = unpack("V*", substr $data, 90, 4) / 10; 
+	 $inv_BAT_TEMP = unpack("V*", substr $data, 90, 4) / 10;
 	 $inv_BAT_UDC = unpack("V*", substr $data, 118, 4) / 100;
-	 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4); 
+	 $inv_BAT_IDC = unpack("l*", substr $data, 146, 4);
 	 if($inv_BAT_IDC eq -2147483648) {$inv_BAT_IDC = 0; } else { $inv_BAT_IDC = $inv_BAT_IDC / 1000;} 	# Catch 0x80000000 as 0 value
 	 Log3 $name, 5, "$name - Found Data BAT_CYCLES=$inv_BAT_CYCLES and BAT_TEMP=$inv_BAT_TEMP and BAT_UDC=$inv_BAT_UDC and BAT_IDC=$inv_BAT_IDC";
 	 return (1,$inv_BAT_CYCLES,$inv_BAT_TEMP,$inv_BAT_UDC,$inv_BAT_IDC,$inv_susyid,$inv_serial);
@@ -1331,7 +1396,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 		 Log3 $name, 5, "$name - Found Data inv_STATUS=$inv_STATUS";
 		 return (1,$inv_STATUS,$inv_susyid,$inv_serial);
 	 }
-	
+
 return 0;
 }
 
@@ -1350,21 +1415,21 @@ sub SMAInverter_SMAlogon($$$) {
  my $pkt_ID              = $hash->{HELPER}{PKT_ID};
  my ($cmd, $timestmp, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size);
- 
- # Seriennummer und SuSyID des Ziel-WR setzen 
+
+ # Seriennummer und SuSyID des Ziel-WR setzen
  my $default_target_susyid = $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
- my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};   
+ my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};
  my $target_susyid = AttrVal($name, "target-susyid", $default_target_susyid);
  my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
 
  #Encode the password
- my $encpasswd = "888888888888888888888888"; # template for password	
+ my $encpasswd = "888888888888888888888888"; # template for password
  for my $index (0..length $pass )	     # encode password
  {
      if ( (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1))) < 256 ) {
 		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),0,2);
 	} else {
-		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);	
+		substr($encpasswd,($index*2),2) = substr(sprintf ("%lX", (hex(substr($encpasswd,($index*2),2)) + ord(substr($pass,$index,1)))),1,2);
 	}
  }
 
@@ -1384,7 +1449,7 @@ sub SMAInverter_SMAlogon($$$) {
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0001" . $myID . "0001" . "00000000" . $spkt_ID . $cmd_ID . $timestmp . "00000000" . $encpasswd . "00000000";
 
  # flush after every write
- $| = 1; 
+ $| = 1;
 
  # Create Socket and check if successful
  $socket = new IO::Socket::INET (PeerHost => $host, PeerPort => 9522, Proto => 'udp',); # open Socket
@@ -1400,7 +1465,7 @@ sub SMAInverter_SMAlogon($$$) {
  $socket->send($data);
  Log3 $name, 4, "$name - Send login to $host on Port 9522 with password $pass ";
  Log3 $name, 5, "$name - Send: $cmd ";
-	
+
  # Receive Data and do a first check regarding length
  eval {
      $socket->recv($data, $hash->{HELPER}{MAXBYTES});
@@ -1448,25 +1513,25 @@ sub SMAInverter_SMAlogon($$$) {
     }
  }
 
- # All seems ok, logged in! 
+ # All seems ok, logged in!
  my $inv_susyid = unpack("v*", substr $data, 28, 2);
  my $inv_serial = unpack("V*", substr $data, 30, 4);
  $socket->close();
- 
+
  if (AttrVal($name, "target-serial", undef)) {
      return 0 unless($inv_serial eq $target_serial);
  } else {
-     BlockingInformParent("SMAInverter_setAttrFromBlocking", [$name, "target-serial", $inv_serial], 0);   # Serial automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448          
+     BlockingInformParent("SMAInverter_setAttrFromBlocking", [$name, "target-serial", $inv_serial], 0);   # Serial automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448
  }
- 
+
  if (AttrVal($name, "target-susyid", undef)) {
      return 0 unless($inv_susyid eq $target_susyid);
  } else {
      BlockingInformParent("SMAInverter_setAttrFromBlocking", [$name, "target-susyid", $inv_susyid], 0);   # SuSyId automatisch setzen, Forum: https://forum.fhem.de/index.php/topic,56080.msg967448.html#msg967448
  }
- 
+
  Log3 $name, 4, "$name - logged in to inverter serial: $inv_serial, susyid: $inv_susyid";
- 
+
 return 1;
 }
 
@@ -1509,10 +1574,10 @@ sub SMAInverter_SMAlogout($$) {
  my $pkt_ID         = $hash->{HELPER}{PKT_ID};
  my ($cmd, $myID, $target_ID, $spkt_ID, $cmd_ID);
  my ($socket,$data,$size);
- 
- # Seriennummer und SuSyID des Ziel-WR setzen 
+
+ # Seriennummer und SuSyID des Ziel-WR setzen
  my $default_target_susyid = $hash->{HELPER}{DEFAULT_TARGET_SUSYID};
- my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};   
+ my $default_target_serial = $hash->{HELPER}{DEFAULT_TARGET_SERIAL};
  my $target_susyid = AttrVal($name, "target-susyid", $default_target_susyid);
  my $target_serial = AttrVal($name, "target-serial", $default_target_serial);
 
@@ -1520,9 +1585,9 @@ sub SMAInverter_SMAlogout($$) {
  $myID      = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$mysusyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$myserialnumber));
  $target_ID = SMAInverter_ByteOrderShort(substr(sprintf("%04X",$target_susyid),0,4)) . SMAInverter_ByteOrderLong(sprintf("%08X",$target_serial));
  # Increasing Packet ID
- $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;	
+ $hash->{HELPER}{PKT_ID} = $hash->{HELPER}{PKT_ID} + 1;
  $spkt_ID = SMAInverter_ByteOrderShort(sprintf("%04X",$hash->{HELPER}{PKT_ID}));
- 
+
  # Logout command
  $cmd_ID = "0E01FDFF" . "FFFFFFFF";  # Logout command
 
@@ -1530,7 +1595,7 @@ sub SMAInverter_SMAlogout($$) {
  $cmd = $cmdheader . $pktlength . $esignature . $target_ID . "0003" . $myID . "0003" . "00000000" . $spkt_ID . $cmd_ID . "00000000";
 
  # flush after every write
- $| = 1; 
+ $| = 1;
 
  # Create Socket and check if successful
  $socket = new IO::Socket::INET (PeerHost => $host, PeerPort => 9522, Proto => 'udp',); # open Socket
@@ -1546,14 +1611,14 @@ sub SMAInverter_SMAlogout($$) {
  $socket->send($data);
  Log3 $name, 4, "$name - Send logout to $host on Port 9522";
  Log3 $name, 5, "$name - Send: $cmd ";
- 
+
  $target_serial = ($target_serial eq $default_target_serial)?"any inverter":$target_serial;
  $target_susyid = ($target_susyid eq $default_target_susyid)?"any susyid":$target_susyid;
  Log3 $name, 4, "$name - logged out now from inverter serial: $target_serial, susyid: $target_susyid";
- 
- $socket->close();	
- 
-return 1;	
+
+ $socket->close();
+
+return 1;
 }
 
 ##########################################################################
@@ -1568,26 +1633,26 @@ sub SMAInverter_setVersionInfo($) {
   my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
-  
+
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
-		  $modules{$type}{META}{x_version} = $v; 
+		  $modules{$type}{META}{x_version} = $v;
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20042 2019-08-22 09:34:18Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
       }
   } else {
 	  # herkömmliche Modulstruktur
 	  $hash->{VERSION} = $v;
   }
-  
+
 return;
 }
 
@@ -1598,7 +1663,7 @@ sub SMAInverter_ByteOrderShort($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 2, 2) . substr($input, 0, 2);
- 
+
 return $output;
 }
 
@@ -1609,13 +1674,13 @@ sub SMAInverter_ByteOrderLong($) {
  my $input = $_[0];
  my $output = "";
  $output = substr($input, 6, 2) . substr($input, 4, 2) . substr($input, 2, 2) . substr($input, 0, 2);
- 
+
 return $output;
 }
 
 ##########################################################################
 #                        Texte for State
-# Parameter is the code, return value is the Text or if not known then 
+# Parameter is the code, return value is the Text or if not known then
 # the code as string
 ##########################################################################
 sub SMAInverter_StatusText($) {
@@ -1638,10 +1703,10 @@ return sprintf("%d", $code);
 ##########################################################################
 sub SMAInverter_devtype ($) {
   my ($code) = @_;
-  
+
   unless (exists($SMAInverter_devtypes{$code})) { return $code;}
   my $dev = $SMAInverter_devtypes{$code};
-  
+
 return ($dev);
 }
 
@@ -1651,7 +1716,7 @@ return ($dev);
 sub SMAInverter_classtype ($) {
   my ($code) = @_;
   my $class;
-  
+
   if(AttrVal("global", "language", "EN") eq "DE") {
       unless (exists($SMAInverter_classesDE{$code})) { return $code;}
       $class = $SMAInverter_classesDE{$code};
@@ -1659,7 +1724,7 @@ sub SMAInverter_classtype ($) {
       unless (exists($SMAInverter_classesEN{$code})) { return $code;}
       $class = $SMAInverter_classesEN{$code};
   }
-  
+
 return ($class);
 }
 
@@ -1682,7 +1747,7 @@ Questions and discussions about this module you can find in the FHEM-Forum link:
 <a href="https://forum.fhem.de/index.php/topic,56080.msg476525.html#msg476525">76_SMAInverter.pm - Abfrage von SMA Wechselrichter</a>.
 <br><br>
 
-<b>Requirements</b> 
+<b>Requirements</b>
 <br><br>
 This module requires:
 <ul>
@@ -1711,67 +1776,66 @@ This module requires:
 <b>Operation method</b>
 <ul>
 The module sends commands to the inverter and checks if they are supported by the inverter.<br>
-In case of a positive answer the data is collected and displayed in the readings according to the detail-level. <br>
-If more than one inverter is installed, set attributes "target-susyid" and "target-serial" with an appropriate value. <br><br>
+In case of a positive answer the data is collected and displayed in the readings according to the detail-level. <br><br>
 
 The normal operation time of the inverter is supposed from sunrise to sunset. In that time period the inverter will be polled.
-The time of sunrise and sunset will be calculated by functions of FHEM module 99_SUNRISE_EL.pm which is loaded automatically by default. 
-Therefore the global attribute "longitude" and "latitude" should be set to determine the position of the solar system 
+The time of sunrise and sunset will be calculated by functions of FHEM module 99_SUNRISE_EL.pm which is loaded automatically by default.
+Therefore the global attribute "longitude" and "latitude" should be set to determine the position of the solar system
 (see <a href="#SUNRISE_EL">Commandref SUNRISE_EL</a>). <br><br>
 
 By the attribute "suppressSleep" the sleep mode between sunset and sunrise can be suppressed. Using attribute "offset" you may prefer the sunrise and
 defer the sunset virtually. So the working period of the inverter will be extended. <br><br>
 
-In operating mode "automatic" the inverter will be requested periodically corresponding the preset attribute "interval". The operating mode can be 
+In operating mode "automatic" the inverter will be requested periodically corresponding the preset attribute "interval". The operating mode can be
 switched to "manual" to realize the retrieval manually (e.g. to synchronize the requst with a SMA energy meter by notify). <br><br>
 
-During inverter operating time the average energy production of the last 5, 10 and 15 minutes will be calculated and displayed in the readings  
-"avg_power_lastminutes_05", "avg_power_lastminutes_10" and "avg_power_lastminutes_15". <b>Note:</b> To permit a precise calculation, you should 
+During inverter operating time the average energy production of the last 5, 10 and 15 minutes will be calculated and displayed in the readings
+"avg_power_lastminutes_05", "avg_power_lastminutes_10" and "avg_power_lastminutes_15". <b>Note:</b> To permit a precise calculation, you should
 also set the real request interval into the attribute "interval" although you would use the "manual" operation mode ! <br><br>
 
 The retrieval of the inverter will be executed non-blocking. You can adjust the timeout value for this background process by attribute "timeout". <br>
 </ul>
 
-<b>Get</b> 
+<b>Get</b>
 <br>
 <ul>
 
   <li><b> get &lt;name&gt; data </b>
   <br><br>
 
-  The request of the inverter will be executed. Those possibility is especifically created for the "manual" operation 
+  The request of the inverter will be executed. Those possibility is especifically created for the "manual" operation
   mode (see attribute "mode").
   <br>
   </li>
-  
+
 <br>
 </ul>
 
 <b>Attributes</b>
 <ul>
-  
+
   <a name="detail-level"></a>
   <li><b>detail-level [0|1|2] </b><br>
     Defines the complexity of the generated readings. <br><br>
-    
-		<ul>   
-		<table>  
+
+		<ul>
+		<table>
 		<colgroup> <col width=10%> <col width=90%> </colgroup>
 		  <tr><td> 0  </td><td>- only Power and Energy </td></tr>
 		  <tr><td> 1  </td><td>- as 0, additional voltage and current </td></tr>
 		  <tr><td> 2  </td><td>- all values </td></tr>
 		</table>
-		</ul>     
-   
+		</ul>
+
   </li>
   <br>
-  
+
   <a name="disable"></a>
   <li><b>disable [1|0]</b><br>
     Deactivate/activate the module.
   </li>
   <br>
-  
+
   <a name="interval"></a>
   <li><b>interval </b><br>
     Request cycle in seconds. (default: 60)
@@ -1781,37 +1845,37 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
   <a name="mode"></a>
   <li><b>mode [automatic|manual] </b><br>
     The request mode of the inverter. (default: automatic) <br><br>
-    
-		<ul>   
-		<table>  
+
+		<ul>
+		<table>
 		<colgroup> <col width=10%> <col width=90%> </colgroup>
 		  <tr><td> automatic  </td><td>- the inverter will be polled regularly as defined by attribute "interval" </td></tr>
 		  <tr><td> manual     </td><td>- query only by command "get &lt;name&gt; data" </td></tr>
 		</table>
-		</ul>        
+		</ul>
 
   </li>
   <br>
-  
+
   <a name="offset"></a>
   <li><b>offset &lt;0 - 7200&gt; </b><br>
-    Time in seconds to forward the real sunrise respectively defer the real sunset.  
+    Time in seconds to forward the real sunrise respectively defer the real sunset.
     You will be able to extend the working period of the module.
   </li>
   <br>
-  
+
   <a name="SBFSpotComp"></a>
   <li><b>SBFSpotComp [1|0]</b><br>
     The reading names are created like the SBFSpot-style. (default: 0)
   </li>
   <br>
-  
+
   <a name="showproctime"></a>
   <li><b>showproctime [1|0]</b><br>
     Shows the processing time in background and the wasted time to retrieve inverter data. (default: 0)
   </li>
   <br>
-  
+
   <a name="suppressSleep"></a>
   <li><b>suppressSleep [1|0]</b><br>
     The sleep mode (after sunset and before sunrise) is deactivated and the inverter will be polled continuously. (default: 0)
@@ -1820,16 +1884,16 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 
   <a name="target-serial"></a>
   <li><b>target-serial </b><br>
-    In case of a Multigate the target serial number has to be defined. If more than one inverter is installed, 
+    In case of a Multigate the target serial number has to be defined. If more than one inverter is installed,
     you have to set the inverter serial number to assign the inverter to the device definition.
     If only one inverter available, the attribut is set automatically once the serial number of the inverter was detected.
     (default: 0xFFFFFFFF = means any serial number)
   </li>
   <br>
-  
+
   <a name="target-susyid"></a>
   <li><b>target-susyid </b><br>
-    In case of a Multigate the target SUSyID has to be defined. If more than one inverter is installed, 
+    In case of a Multigate the target SUSyID has to be defined. If more than one inverter is installed,
     you have to set the inverter-SUSyID to assign the inverter to the device definition.
     If only one inverter available, the attribut is set automatically once the SUSyID of the inverter was detected.
     (default: 0xFFFF = means any SUSyID)
@@ -1841,7 +1905,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
     Setup timeout of inverter data request in seconds. (default 60)
   </li>
   <br>
- 
+
 </ul>
 
 <b>Readings</b>
@@ -1850,6 +1914,9 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>BAT_IDC / bat_idc</b>                :  Battery Current </li>
 <li><b>BAT_TEMP / bat_temp</b>              :  Battery temperature </li>
 <li><b>BAT_UDC / bat_udc</b>                :  Battery Voltage </li>
+<li><b>ChargeStatus / chargestatus</b>      :  Battery Charge status </li>
+<li><b>SPOT_BATTERYLOAD_TODAY</b>           :  Battery Load Today </li>
+<li><b>SPOT_BATTERYLOAD_TOTAL</b>           :  Battery Load Total </li>
 <li><b>ChargeStatus / chargestatus</b>      :  Battery Charge status </li>
 <li><b>CLASS / device_class</b>             :  Inverter Class </li>
 <li><b>PACMAX1 / pac_max_phase_1</b>        :  Nominal power in Ok Mode </li>
@@ -1885,13 +1952,13 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>POWER_OUT / power_out</b>            :  Battery Discharging power </li>
 <li><b>INV_GRIDRELAY / gridrelay_status</b> :  Grid Relay/Contactor Status </li>
 <li><b>INV_STATUS / device_status</b>       :  Inverter Status </li>
-<li><b>opertime_start</b>                   :  Begin of iverter operating time corresponding the calculated time of sunrise with consideration of the  
+<li><b>opertime_start</b>                   :  Begin of iverter operating time corresponding the calculated time of sunrise with consideration of the
                                                attribute "offset" (if set) </li>
-<li><b>opertime_stop</b>                    :  End of iverter operating time corresponding the calculated time of sunrise with consideration of the  
+<li><b>opertime_stop</b>                    :  End of iverter operating time corresponding the calculated time of sunrise with consideration of the
                                                attribute "offset" (if set) </li>
 <li><b>modulstate</b>                       :  shows the current module state "normal" or "sleep" if the inverter won't be requested at the time. </li>
-<li><b>avg_power_lastminutes_05</b>         :  average power of the last 5 minutes. </li>	
-<li><b>avg_power_lastminutes_10</b>         :  average power of the last 10 minutes. </li>	
+<li><b>avg_power_lastminutes_05</b>         :  average power of the last 5 minutes. </li>
+<li><b>avg_power_lastminutes_10</b>         :  average power of the last 10 minutes. </li>
 <li><b>avg_power_lastminutes_15</b>         :  average power of the last 15 minutes. </li>
 <li><b>inverter_processing_time</b>         :  wasted time to retrieve the inverter data </li>
 <li><b>background_processing_time</b>       :  total wasted time by background process (BlockingCall) </li>
@@ -1914,7 +1981,7 @@ Fragen und Diskussionen rund um dieses Modul finden sie im FHEM-Forum unter:<br>
 <a href="https://forum.fhem.de/index.php/topic,56080.msg476525.html#msg476525">76_SMAInverter.pm - Abfrage von SMA Wechselrichter</a>.
 <br><br>
 
-<b>Voraussetzungen</b> 
+<b>Voraussetzungen</b>
 <br><br>
 Dieses Modul benötigt:
 <ul>
@@ -1941,9 +2008,7 @@ Dieses Modul benötigt:
 <b>Arbeitsweise</b>
 <ul>
 Das Modul schickt Befehle an den Wechselrichter und überprüft, ob diese unterstützt werden.<br>
-Bei einer positiven Antwort werden die Daten gesammelt und je nach Detail-Level in den Readings dargestellt. <br>
-Sind mehr als ein Wechselrichter installiert, sind die Attribute "target-susyid" und "target-serial" entsprechend zu setzen um die korrekte
-Funktion zu gewährleisten. <br><br>
+Bei einer positiven Antwort werden die Daten gesammelt und je nach Detail-Level in den Readings dargestellt. <br><br>
 
 Die normale Betriebszeit des Wechselrichters wird in der Zeit vom Sonnenaufgang bis Sonnenuntergang angenommen. In dieser Periode werden die Wechselrichterdaten
 abgefragt. Die Ermittlung von Sonnenaufgang / Sonnenuntergang wird über die Funktionen des FHEM-Moduls 99_SUNRISE_EL.pm vorgenommen. Zu diesem Zweck sollten die globalen
@@ -1952,25 +2017,25 @@ Attribute longitude und latitude gesetzt sein um den Standort der Anlage genau z
 Mit dem Attribut "suppressSleep" kann der Schlafmodus unterdrückt werden. Das Attribut "offset" dient dazu den effektiven Zeitpunkt des Sonnenaufgangs / Sonnenuntergangs
 um den Betrag "offset" vorzuziehen (Sonnenaufgang) bzw. zu verzögern (Sonnenuntergang) und somit die Abfrageperiode des Wechselrichters zu verlängern. <br><br>
 
-Im Betriebsmodus "automatic" wird der Wechselrichter entsprechend des eingestellten Attributs "interval" abgefragt. Der Betriebsmodus kann in "manual" 
+Im Betriebsmodus "automatic" wird der Wechselrichter entsprechend des eingestellten Attributs "interval" abgefragt. Der Betriebsmodus kann in "manual"
 umgestellt werden um eine manuelle Abfrage zu realisieren (z.B. Synchronisierung mit einem SMA Energymeter über ein Notify). <br><br>
 
-Während der Betriebszeit des Wechselrichters wird die durchschnittliche Energieerzeugung der letzten 5, 10, 15 Minuten berechnet und in den Readings 
-"avg_power_lastminutes_05", "avg_power_lastminutes_10" und "avg_power_lastminutes_15" ausgegeben. <b>Hinweis:</b> Um eine korrekte Berechnung zu 
+Während der Betriebszeit des Wechselrichters wird die durchschnittliche Energieerzeugung der letzten 5, 10, 15 Minuten berechnet und in den Readings
+"avg_power_lastminutes_05", "avg_power_lastminutes_10" und "avg_power_lastminutes_15" ausgegeben. <b>Hinweis:</b> Um eine korrekte Berechnung zu
 ermöglichen, sollte auch im Betriebsmodus "manual" das tatsächliche Abfrageinterval im Attribute "interval" hinterlegt werden ! <br><br>
 
 Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert für diesen Hintergrundprozess kann mit dem Attribut "timeout" eingestellt werden. <br>
 
 </ul>
 
-<b>Get</b> 
+<b>Get</b>
 <br>
 <ul>
-  
+
   <li><b> get &lt;name&gt; data </b>
   <br><br>
 
-  Die Datenabfrage des Wechselrichters wird ausgeführt. Diese Möglichkeit ist speziell für den Betriebsmodus "manual" 
+  Die Datenabfrage des Wechselrichters wird ausgeführt. Diese Möglichkeit ist speziell für den Betriebsmodus "manual"
   vorgesehen (siehe Attribut "mode").
   <br>
   </li>
@@ -1980,29 +2045,29 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <b>Attribute</b>
 <br<br>
 <ul>
-  
+
   <a name="detail-level"></a>
   <li><b>detail-level [0|1|2] </b><br>
     Legt den Umfang der ausgegebenen Readings fest. <br><br>
-    
-		<ul>   
-		<table>  
+
+		<ul>
+		<table>
 		<colgroup> <col width=10%> <col width=90%> </colgroup>
 		  <tr><td> 0  </td><td>- nur Leistung und Energie </td></tr>
 		  <tr><td> 1  </td><td>- wie 0, zusätzlich Strom und Spannung </td></tr>
 		  <tr><td> 2  </td><td>- alle Werte </td></tr>
 		</table>
-		</ul>     
-   
+		</ul>
+
   </li>
   <br>
-  
+
   <a name="disable"></a>
   <li><b>disable [1|0]</b><br>
     Deaktiviert/aktiviert das Modul.
   </li>
   <br>
-  
+
   <a name="interval"></a>
   <li><b>interval </b><br>
     Abfrageinterval in Sekunden. (default: 60)
@@ -2012,25 +2077,25 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
   <a name="mode"></a>
   <li><b>mode [automatic|manual] </b><br>
     Abfragemodus des Wechselrichters. (default: automatic) <br><br>
-    
-		<ul>   
-		<table>  
+
+		<ul>
+		<table>
 		<colgroup> <col width=10%> <col width=90%> </colgroup>
 		  <tr><td> automatic  </td><td>- die Wechselrichterwerte werden im eingestellten Interval abgefragt (Attribut "interval") </td></tr>
 		  <tr><td> manual     </td><td>- Abfrage nur mit "get &lt;name&gt; data" </td></tr>
 		</table>
-		</ul>        
+		</ul>
 
   </li>
   <br>
-  
+
   <a name="offset"></a>
   <li><b>offset &lt;0 - 7200&gt; </b><br>
-    Zeit in Sekunden, um die der reale Sonnenaufgang vorgezogen bzw. reale Sonnenuntergang verzögert wird. 
+    Zeit in Sekunden, um die der reale Sonnenaufgang vorgezogen bzw. reale Sonnenuntergang verzögert wird.
     Dadurch wird die effektive Aktivzeit des Moduls erweitert.
   </li>
   <br>
-  
+
   <a name="SBFSpotComp"></a>
   <li><b>SBFSpotComp [1|0]</b><br>
     Die Readingnamen werden kompatibel zu SBFSpot-Ausgaben erzeugt. (default: 0)
@@ -2042,7 +2107,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
     Zeigt die für den Hintergrundprozess und die Abfrage des Wechselrichter verbrauchte Zeit. (default: 0)
   </li>
   <br>
-  
+
   <a name="suppressSleep"></a>
   <li><b>suppressSleep [1|0]</b><br>
     Der Schlafmodus (nach Sonnenuntergang und vor Sonnenaufgang) wird ausgeschaltet und der WR abgefragt. (default: 0)
@@ -2053,17 +2118,17 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
   <li><b>target-serial </b><br>
     Im Falle eines Multigate muss die Ziel-Seriennummer definiert werden. Ist mehr als ein Wechselrichter installiert,
     muß die Wechselreichter-Seriennummer gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
-    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die 
+    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die
     Seriennummer des Wechselrichters erkannt wurde.
     (default: 0xFFFFFFFF = keine Einschränkung)
   </li>
   <br>
-  
+
   <a name="target-susyid"></a>
   <li><b>target-susyid </b><br>
     Im Falle eines Multigate muss die Ziel-SUSyID definiert werden. Ist mehr als ein Wechselrichter installiert,
     muß die Wechselreichter-SUSyID gesetzt werden um den Wechselrichter der Device-Definition eindeutig zuzuweisen.
-    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die 
+    Ist nur ein Wechselrichter vorhanden und das Attribut nicht gesetzt, wird es automatisch definiert sobald die
     SUSyID des Wechselrichters erkannt wurde.
     (default: 0xFFFF = keine Einschränkung)
   </li>
@@ -2084,6 +2149,8 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>BAT_TEMP / bat_temp</b>              :  Akku Temperatur </li>
 <li><b>BAT_UDC / bat_udc</b>                :  Akku Spannung </li>
 <li><b>ChargeStatus / chargestatus</b>      :  Akku Ladestand </li>
+<li><b>SPOT_BATTERYLOAD_TODAY</b>           :  Battery Load Today </li>
+<li><b>SPOT_BATTERYLOAD_TOTAL</b>           :  Battery Load Total </li>
 <li><b>CLASS / device_class</b>             :  Wechselrichter Klasse </li>
 <li><b>PACMAX1 / pac_max_phase_1</b>        :  Nominelle Leistung in Ok Mode </li>
 <li><b>PACMAX1_2 / pac_max_phase_1_2</b>    :  Maximale Leistung (für einige Wechselrichtertypen) </li>
@@ -2096,7 +2163,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_FREQ / grid_freq.</b>           :  Netz Frequenz </li>
 <li><b>SPOT_IAC1 / phase_1_iac</b>          :  Netz Strom phase L1 </li>
 <li><b>SPOT_IAC2 / phase_2_iac</b>          :  Netz Strom phase L2 </li>
-<li><b>SPOT_IAC3 / phase_3_iac</b>          :  Netz Strom phase L3 </li> 
+<li><b>SPOT_IAC3 / phase_3_iac</b>          :  Netz Strom phase L3 </li>
 <li><b>SPOT_IDC1 / string_1_idc</b>         :  DC Strom Eingang 1 </li>
 <li><b>SPOT_IDC2 / string_2_idc</b>         :  DC Strom Eingang 2 </li>
 <li><b>SPOT_OPERTM / operation_time</b>     :  Betriebsstunden </li>
@@ -2118,17 +2185,17 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>POWER_OUT / power_out</b>            :  Akku Entladeleistung </li>
 <li><b>INV_GRIDRELAY / gridrelay_status</b> :  Netz Relais Status </li>
 <li><b>INV_STATUS / device_status</b>       :  Wechselrichter Status </li>
-<li><b>opertime_start</b>                   :  Beginn Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenaufgangs mit Berücksichtigung des 
+<li><b>opertime_start</b>                   :  Beginn Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenaufgangs mit Berücksichtigung des
                                                Attributs "offset" (wenn gesetzt) </li>
-<li><b>opertime_stop</b>                    :  Ende Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenuntergangs mit Berücksichtigung des 
+<li><b>opertime_stop</b>                    :  Ende Aktivzeit des Wechselrichters entsprechend des ermittelten Sonnenuntergangs mit Berücksichtigung des
                                                Attributs "offset" (wenn gesetzt) </li>
 <li><b>modulstate</b>                       :  zeigt den aktuellen Modulstatus "normal" oder "sleep" falls der Wechselrichter nicht abgefragt wird. </li>
-<li><b>avg_power_lastminutes_05</b>         :  durchschnittlich erzeugte Leistung der letzten 5 Minuten. </li>	
-<li><b>avg_power_lastminutes_10</b>         :  durchschnittlich erzeugte Leistung der letzten 10 Minuten. </li>	
-<li><b>avg_power_lastminutes_15</b>         :  durchschnittlich erzeugte Leistung der letzten 15 Minuten. </li>	
+<li><b>avg_power_lastminutes_05</b>         :  durchschnittlich erzeugte Leistung der letzten 5 Minuten. </li>
+<li><b>avg_power_lastminutes_10</b>         :  durchschnittlich erzeugte Leistung der letzten 10 Minuten. </li>
+<li><b>avg_power_lastminutes_15</b>         :  durchschnittlich erzeugte Leistung der letzten 15 Minuten. </li>
 <li><b>inverter_processing_time</b>         :  verbrauchte Zeit um den Wechelrichter abzufragen. </li>
-<li><b>background_processing_time</b>       :  gesamte durch den Hintergrundprozess (BlockingCall) verbrauchte Zeit. </li>	
-							   
+<li><b>background_processing_time</b>       :  gesamte durch den Hintergrundprozess (BlockingCall) verbrauchte Zeit. </li>
+
 </ul>
 <br><br>
 
@@ -2167,12 +2234,12 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
         "perl": 5.014,
         "IO::Socket::INET": 0,
         "DateTime": 0,
-        "Time::HiRes": 0,   
-        "Blocking": 0, 
-        "Time::Local": 0         
+        "Time::HiRes": 0,
+        "Blocking": 0,
+        "Time::Local": 0
       },
       "recommends": {
-        "FHEM::Meta": 0        
+        "FHEM::Meta": 0
       },
       "suggests": {
       }
