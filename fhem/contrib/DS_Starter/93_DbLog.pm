@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $
+# $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,7 +30,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog",
+  "4.8.0"   => "08.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
+  "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
+                           "enhanced configCheck by insert mode check ",
+  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog ",
   "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
   "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
   "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
@@ -2144,7 +2147,7 @@ sub DbLog_execmemcache ($) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
 		  push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
 	  }  
-      delete $data{DbLog}{$name}{cache}{memcache};                                           # sicherheitshalber Memory freigeben: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      delete $data{DbLog}{$name}{cache}{memcache};            # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes, bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
@@ -3188,10 +3191,10 @@ sub DbLog_Get($@) {
   }
 
   if($outf =~ m/(all|array)/) {
-      $sqlspec{all}  = ",TYPE,EVENT,UNIT";
+      $sqlspec{all}      = ",TYPE,EVENT,UNIT";
       $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
   } else {
-      $sqlspec{all}  = "";
+      $sqlspec{all}      = "";
       $sqlspec{all_max}  = "";
   }
 
@@ -3214,68 +3217,83 @@ sub DbLog_Get($@) {
           $deltacalc = 1;
       }
 
-      my $stm;
-      my $stm2;
-      my $stmdelta;
-      $stm =  "SELECT
-                  MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
-                  MAX(DEVICE) AS DEVICE,
-                  MAX(READING) AS READING,
-                  $sqlspec{max_value}
-                  $sqlspec{all_max} ";
-
-      $stm .= "FROM $current " if($inf eq "current");
-      $stm .= "FROM $history " if($inf eq "history");
-
-      $stm .= "WHERE 1=1 ";
-    
-      $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-      $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-      $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-      $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-      $stmdelta = $stm;
-
-      $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
-      $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
-
-      $stm .= "UNION ALL ";
-
-      $stm2 =  "SELECT
-                  $sqlspec{get_timestamp},
-                  DEVICE,
-                  READING,
-                  VALUE
-                  $sqlspec{all} ";
-
-      $stm2 .= "FROM $current " if($inf eq "current");
-      $stm2 .= "FROM $history " if($inf eq "history");
-
-      $stm2 .= "WHERE 1=1 ";
-
-      $stm2 .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-      $stm2 .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-      $stm2 .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-      $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-      $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-      $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
-      $stm2 .= "ORDER BY TIMESTAMP";
-
+      my ($stm);
       if($deltacalc) {
-          $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-          $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
+          # delta-h und delta-d
+          $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
+		  
+		  $stm .= "(SELECT $sqlspec{get_timestamp} AS TIMESTAMP,
+                    DEVICE AS DEVICE,
+                    READING AS READING,
+                    VALUE AS VALUE ";
+				  
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
 
-          $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
-          $stmdelta .= "ORDER BY TIMESTAMP";
-          $stm .= $stmdelta;
+          $stm .= "WHERE 1=1 "; 
+		  
+          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+
+          $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP > $sqlspec{day_before} "; 
+                   
+          $stm .= "ORDER BY TIMESTAMP DESC LIMIT 1 ) AS Z 
+                   UNION ALL ";
+          
+          $stm .= "SELECT
+                   MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
+                   MAX(DEVICE) AS DEVICE,
+                   MAX(READING) AS READING,
+                   $sqlspec{max_value}
+                   $sqlspec{all_max} ";
+
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
+
+          $stm .= "WHERE 1=1 ";
+    
+          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "    if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+          
+          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
+
+          $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
+          $stm .= "ORDER BY TIMESTAMP";
+
       } else {
-          $stm = $stm2;
+          # kein delta
+          $stm =  "SELECT
+                      $sqlspec{get_timestamp},
+                      DEVICE,
+                      READING,
+                      VALUE
+                      $sqlspec{all} ";
+
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
+
+          $stm .= "WHERE 1=1 ";
+
+          $stm .= "AND DEVICE = '".$readings[$i]->[0]."' "     if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+
+          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
+          $stm .= "ORDER BY TIMESTAMP";
       }
 
-      Log3 ($name, 4, "$name - Processing Statement: $stm");
+      Log3 ($name, 4, "$name - Processing Statement:\n$stm");
 
       my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
       my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
@@ -3315,17 +3333,10 @@ sub DbLog_Get($@) {
               #evaluate
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
-              no warnings 'uninitialized';
               eval("$readings[$i]->[4]");
-              if($@) {
-                  Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";
-              } else {
-                  $sql_value     = $val;
-                  $sql_timestamp = $ts;
-              }
-              $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
-              Log3 ($name, 5, "$name - Result after Regex -> $ds");
-              use warnings;
+              $sql_value = $val;
+              $sql_timestamp = $ts;
+              if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
           }
 
           if($sql_timestamp lt $from && $deltacalc) {
@@ -3577,20 +3588,20 @@ sub DbLog_Get($@) {
       $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
       $retval .= "\n";
   
-  } # Ende for @readings-Schleife über alle Readinggs im get
+  }                                                                # Ende for @readings-Schleife über alle Readinggs im get
 
   # Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
       my $k = $j+1;
-      $data{"min$k"} = $min[$j];
-      $data{"max$k"} = $max[$j];
-      $data{"avg$k"} = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
-      $data{"sum$k"} = $sum[$j];
-      $data{"cnt$k"} = $cnt[$j];
-      $data{"currval$k"} = $lastv[$j];
+      $data{"min$k"}      = $min[$j];
+      $data{"max$k"}      = $max[$j];
+      $data{"avg$k"}      = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
+      $data{"sum$k"}      = $sum[$j];
+      $data{"cnt$k"}      = $cnt[$j];
+      $data{"currval$k"}  = $lastv[$j];
       $data{"currdate$k"} = $lastd[$j];
-      $data{"mindate$k"} = $mind[$j];
-      $data{"maxdate$k"} = $maxd[$j];
+      $data{"mindate$k"}  = $mind[$j];
+      $data{"maxdate$k"}  = $maxd[$j];
   }
 
   # cleanup (plotfork) connection
@@ -3734,6 +3745,7 @@ sub DbLog_configcheck($) {
   ### Check Betriebsmodus
   #######################################################################
   my $mode = $hash->{MODE};
+  my $bi   = AttrVal($name, "bulkInsert", 0);
   my $sfx = AttrVal("global", "language", "EN");
   $sfx = ($sfx eq "EN" ? "" : "_$sfx");
   
@@ -3752,7 +3764,20 @@ sub DbLog_configcheck($) {
 	  $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
 	  $rec .= "Please refer to commandref for further information about these attributes.";
   }
-  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
+
+  $check .= "<u><b>Result of insert mode check</u></b><br><br>";
+  if(!$bi) {
+      $bi     = "Array";
+      $check .= "Insert mode of DbLog-device $name is: $bi <br>";
+      $rec    = "Setting attribute \"bulkInsert\" to \"1\" may result a higher write performance in most cases. ";
+      $rec   .= "Feel free to try this mode.";
+  } else {
+      $bi     = "Bulk";
+      $check .= "Insert mode of DbLog-device $name is: $bi <br>"; 
+      $rec    = "settings o.k.";   
+  }  
+  $check .= "<b>Recommendation:</b> $rec <br><br>";
   
   ### Check Plot Erstellungsmodus
   #######################################################################
@@ -4492,6 +4517,7 @@ sub DbLog_addCacheLine($$$$$$$$) {
  	  my $VALUE 	 = $i_val;
  	  my $UNIT   	 = $i_unit;
 	  my $IGNORE     = 0;
+      my $CN         = " ";
 
  	  eval $value_fn;
 	  Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
@@ -5933,12 +5959,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20114 2019-09-06 11:21:03Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -6889,6 +6915,7 @@ attr SMA_Energymeter DbLogValueFn
   }
   if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
     $IGNORE=1;
+  }
 }
 	   </pre>
      </ul>
@@ -8248,6 +8275,7 @@ attr SMA_Energymeter DbLogValueFn
   }
   if ($READING =~ /Einspeisung_Wirkleistung_Zaehler/ && $VALUE < 2){
     $IGNORE=1;
+  }
 }
 	   </pre>
      </ul>
