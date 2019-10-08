@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 22_HOMEMODE:  added attribs HomeCMDbattery & HomeCMDbatteryNormal
+                          added new reading lastBatteryNormal
+                          added new placeholder %BATTERYNORMAL%
+ - bugfix:  22_HOMEMODE:  fixed batteryLow readings creation while adding
+                          sensors to HomeSensorsBattery
  - change:  93_DbLog: enhanced configCheck, minor fix warning
  - feature: 93_DbRep: seqDoubletsVariance - separate specification of positive 
                       and negative variance possible, 

@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.5.0";
+my $HOMEMODE_version = "1.5.1";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -464,7 +464,6 @@ sub HOMEMODE_Notify($$)
           readingsBulkUpdateIfChanged($hash,"batteryLow_ct",scalar @low);
           readingsBulkUpdateIfChanged($hash,"batteryLow_hr",HOMEMODE_makeHR($hash,1,@low));
           readingsBulkUpdateIfChanged($hash,"lastBatteryLow",$devname) if (grep(/^$devname$/,@low) && !grep(/^$devname$/,@lowOld));
-          push @commands,AttrVal($name,"HomeCMDbatteryLow","") if (AttrVal($name,"HomeCMDbatteryLow",undef) && grep(/^$devname$/,@low) && !grep(/^$devname$/,@lowOld));
         }
         else
         {
@@ -472,7 +471,11 @@ sub HOMEMODE_Notify($$)
           readingsBulkUpdateIfChanged($hash,"batteryLow_ct",scalar @low);
           readingsBulkUpdateIfChanged($hash,"batteryLow_hr","");
         }
+        readingsBulkUpdateIfChanged($hash,"lastBatteryNormal",$devname) if (!grep(/^$devname$/,@low) && grep(/^$devname$/,@lowOld));
         readingsEndUpdate($hash,1);
+        push @commands,AttrVal($name,"HomeCMDbattery","") if (AttrVal($name,"HomeCMDbattery",undef) && (grep(/^$devname$/,@low) || grep(/^$devname$/,@lowOld)));
+        push @commands,AttrVal($name,"HomeCMDbatteryLow","") if (AttrVal($name,"HomeCMDbatteryLow",undef) && grep(/^$devname$/,@low) && !grep(/^$devname$/,@lowOld));
+        push @commands,AttrVal($name,"HomeCMDbatteryNormal","") if (AttrVal($name,"HomeCMDbatteryNormal",undef) && !grep(/^$devname$/,@low) && grep(/^$devname$/,@lowOld));
       }
     }
   }
@@ -656,8 +659,13 @@ sub HOMEMODE_updateInternals($;$$)
         next unless (defined $val && $val =~ /^(ok|low|nok|\d{1,3})(%|\s%)?$/);
         push @sensors,$s;
         push @allMonitoredDevices,$s if (!grep /^$s$/,@allMonitoredDevices);
+        $hash->{SENSORSBATTERY} = join(",",sort @sensors) if (@sensors);
+        if (!grep(/^$s$/,split(/,/,ReadingsVal($name,"batteryLow",""))))
+        {
+          CommandTrigger(undef,"$s $read: ok");
+          CommandTrigger(undef,"$s $read: $val");
+        }
       }
-      $hash->{SENSORSBATTERY} = join(",",sort @sensors) if (@sensors);
     }
     my $weather = HOMEMODE_AttrCheck($hash,"HomeWeatherDevice");
     push @allMonitoredDevices,$weather if ($weather && !grep /^$weather$/,@allMonitoredDevices);
@@ -1324,7 +1332,9 @@ sub HOMEMODE_Attributes($)
   push @attribs,"HomeCMDanyoneElseAtHome:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-on:textField-long";
   push @attribs,"HomeCMDanyoneElseAtHome-off:textField-long";
+  push @attribs,"HomeCMDbattery:textField-long";
   push @attribs,"HomeCMDbatteryLow:textField-long";
+  push @attribs,"HomeCMDbatteryNormal:textField-long";
   push @attribs,"HomeCMDcontact:textField-long";
   push @attribs,"HomeCMDcontactClosed:textField-long";
   push @attribs,"HomeCMDcontactOpen:textField-long";
@@ -2056,7 +2066,7 @@ sub HOMEMODE_Attr(@)
     elsif ($attr_name =~ /^(HomeAdvancedUserAttr|HomeAutoPresence|HomePresenceDeviceType|HomeEvents(Holiday|Calendar)Devices|HomeSensorAirpressure|HomeSensorWindspeed|HomeSensorsBattery|HomeSensorsBatteryReading)$/)
     {
       CommandDeleteReading(undef,"$name event-.+") if ($attr_name =~ /^HomeEvents(Holiday|Calendar)Devices$/);
-      CommandDeleteReading(undef,"$name battery.*") if ($attr_name eq "HomeSensorsBattery");
+      CommandDeleteReading(undef,"$name battery.*|lastBatteryLow") if ($attr_name eq "HomeSensorsBattery");
       HOMEMODE_updateInternals($hash,1);
     }
     elsif ($attr_name =~ /^(HomeSensorsContact|HomeSensorsMotion)$/)
@@ -2190,6 +2200,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   my $uwzs = HOMEMODE_uwzTXT($hash,$uwzc,undef);
   my $uwzl = HOMEMODE_uwzTXT($hash,$uwzc,1);
   my $lowBat = HOMEMODE_name2alias(ReadingsVal($name,"lastBatteryLow",""));
+  my $normBat = HOMEMODE_name2alias(ReadingsVal($name,"lastBatteryNormal",""));
   my $lowBatAll = ReadingsVal($name,"batteryLow_hr","");
   my $lowBatCount = ReadingsVal($name,"batteryLow_ct",0);
   my $disabled = ReadingsVal($name,"devicesDisabled","");
@@ -2210,6 +2221,7 @@ sub HOMEMODE_replacePlaceholders($$;$)
   $cmd =~ s/%AEAH%/$aeah/g;
   $cmd =~ s/%ARRIVERS%/$arrivers/g;
   $cmd =~ s/%AUDIO%/$audio/g;
+  $cmd =~ s/%BATTERYNORMAL%/$normBat/g;
   $cmd =~ s/%BATTERYLOW%/$lowBat/g;
   $cmd =~ s/%BATTERYLOWALL%/$lowBatAll/g;
   $cmd =~ s/%BATTERYLOWCT%/$lowBatCount/g;
@@ -3868,8 +3880,16 @@ sub HOMEMODE_Details($$$)
       cmds to execute if any contact has been triggered (open/tilted/closed)
     </li>
     <li>
+      <b><i>HomeCMDbattery</i></b><br>
+      cmds to execute on any battery change of a battery sensor
+    </li>
+    <li>
       <b><i>HomeCMDbatteryLow</i></b><br>
       cmds to execute if any battery sensor has low battery
+    </li>
+    <li>
+      <b><i>HomeCMDbatteryNormal</i></b><br>
+      cmds to execute if any battery sensor returns to normal battery
     </li>
     <li>
       <b><i>HomeCMDcontactClosed</i></b><br>
@@ -4635,6 +4655,10 @@ sub HOMEMODE_Details($$$)
       last resident who went awoken
     </li>
     <li>
+      <b><i>lastBatteryNormal</i></b><br>
+      last sensor with normal battery
+    </li>
+    <li>
       <b><i>lastBatteryLow</i></b><br>
       last sensor with low battery
     </li>
@@ -4900,6 +4924,10 @@ sub HOMEMODE_Details($$$)
     <li>
       <b><i>%BATTERYLOWCT%</i></b><br>
       number of battery sensors which reported low battery currently
+    </li>
+    <li>
+      <b><i>%BATTERYNORMAL%</i></b><br>
+      alias (or name if alias is not set) of the last battery sensor which reported normal battery
     </li>
     <li>
       <b><i>%CONDITION%</i></b><br>
