@@ -410,7 +410,7 @@ MQTT2_DEVICE_Attr($$)
         if($par2 =~ m/^{.*}$/) {
           my $ret = perlSyntaxCheck($par2, 
                 ("%TOPIC"=>1, "%EVENT"=>"0 1 2 3 4 5 6 7 8 9",
-                 "%NAME"=>$dev,
+                 "%NAME"=>$dev, "%CID"=>"clientId",
                  "%DEVICETOPIC"=>$hash->{DEVICETOPIC},
                  "%JSONMAP"=>""));
           return $ret if($ret);
