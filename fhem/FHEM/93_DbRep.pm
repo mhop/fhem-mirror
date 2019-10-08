@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.28.1" => "09.10.2019  fix warnings line 5173 ",
   "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
   "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
   "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
@@ -5170,7 +5171,8 @@ sub delseqdoubl_DoParse($) {
      $varneg = $varpos if(!$varneg);
      $varneg = DbRep_trim($varneg);
  }
- Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: $varpos, negative variance: $varneg, EDGE: $edge");
+ Log3 ($name, 4, "DbRep $name - delSeqDoublets params -> positive variance: ".(defined $varpos?$varpos:"").", negative variance: ".(defined $varneg?$varneg:"").", EDGE: $edge");
+
  
  # Background-Startzeit
  my $bst = [gettimeofday];
