@@ -82,6 +82,7 @@ sub DoorBird_Initialize($)
 							   "SipNumber " .
 							   "ImageFileDir " .
 							   "AudioFileDir " .
+							   "VideoFileDir " .
 							   "EventReset " .
 							   "SessionIdSec:slider,0,10,600 " .
 							   "WaitForHistory " .
@@ -174,6 +175,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", 0);
 	  $hash->{helper}{AudioFileDir}						= AttrVal($name, "AudioFileDir", 0);
+	  $hash->{helper}{VideoFileDir}						= AttrVal($name, "VideoFileDir", 0);
 	  $hash->{helper}{EventReset}						= AttrVal($name, "EventReset", 5);
 	  $hash->{helper}{WaitForHistory}					= AttrVal($name, "WaitForHistory", 7);
 	@{$hash->{helper}{OpsModeList}}						= split(/ /, AttrVal($name, "OpsModeList", ""));
@@ -256,7 +258,7 @@ sub DoorBird_Attr(@)
 	my $name                   = $a[1];
 	my $hash                   = $defs{$name};
 
-	Log3 $name, 3, $name. " : DoorBird_Attr - Subfunction entered.";
+	Log3 $name, 5, $name. " : DoorBird_Attr - Subfunction entered.";
 	
 	### Check whether disable attribute has been provided
 	if ($a[2] eq "disable") {
@@ -443,6 +445,18 @@ sub DoorBird_Attr(@)
 			$hash->{helper}{AudioFileDir} = "";
 		}
 	}
+	### Check whether VideoFileSave attribute has been provided
+	elsif ($a[2] eq "VideoFileDir") {
+		### Check whether VideoFileSave is defined
+		if (defined($a[3])) {
+			### Set helper in hash
+			$hash->{helper}{VideoFileDir} = $a[3];
+		}
+		else {
+			### Set helper in hash
+			$hash->{helper}{VideoFileDir} = "";
+		}
+	}
 	### Check whether EventReset attribute has been provided
 	elsif ($a[2] eq "EventReset") {
 		### Remove Timer for Event Reset
@@ -603,6 +617,7 @@ sub DoorBird_Set($@)
 	my $name				= shift @a;
 	my $command				= shift @a;
 	my $option				= shift @a;
+	my $ErrorMessage		= "";
 	my $optionString;
 	my $AudioFileDir		=   $hash->{helper}{AudioFileDir};
 	my @RelayAdresses		= @{$hash->{helper}{RelayAdresses}};
@@ -631,7 +646,6 @@ sub DoorBird_Set($@)
 
 	### If the OpsModeList is not empty
 	if (${$hash->{helper}{OpsModeList}}[0] ne "") {
-		
 
 		### Log Entry for debugging purposes	
 		Log3 $name, 5, $name. " : DoorBird_Set - The OpsModeList is empty";
@@ -701,17 +715,26 @@ sub DoorBird_Set($@)
 				Log3 $name, 5, $name. " : DoorBird_Set - AudioFileDir                       : " . $AudioFileDir;
 
 				### Get content of subdirectory and eliminate the root directories "." and ".."
-				opendir(ReadOut,$AudioFileDir) || die $!;
-				my @AudioFileList = grep(/^([^.]+)./, readdir(ReadOut));
-				close ReadOut;
+				my @AudioFileList;
+				eval {
+					opendir(ReadOut,$AudioFileDir) or die "Could not open '$AudioFileDir' for reading";
+					@AudioFileList = grep(/^([^.]+)./, readdir(ReadOut));
+					close ReadOut;
+				};
+				### If error message appered
+				if ( $@ ) {
+					$ErrorMessage = $@;
+				}
+				### If no error message appeared and therefore directory exists
+				else {
+					### Log Entry for debugging purposes
+					Log3 $name, 5, $name. " : DoorBird_Set - AudioFileList                      : " . join(",", @AudioFileList);
 
-				### Log Entry for debugging purposes
-				Log3 $name, 5, $name. " : DoorBird_Set - AudioFileList                      : " . join(",", @AudioFileList);
-
-				### For each DoorBirdEvent, create setlist for the file path for the audio messages
-				$usage .= " " . $OpsModeReadingPrefix . "DoorbellAudio:Off,". join(",", @AudioFileList);
-				$usage .= " " . $OpsModeReadingPrefix . "MotionAudio:Off,". join(",", @AudioFileList);
-			   #$usage .= " " . $OpsModeReadingPrefix . "KeypadAudio:Off,"  . join(",", @AudioFileList);
+					### For each DoorBirdEvent, create setlist for the file path for the audio messages
+					$usage .= " " . $OpsModeReadingPrefix . "DoorbellAudio:Off,". join(",", @AudioFileList);
+					$usage .= " " . $OpsModeReadingPrefix . "MotionAudio:Off,". join(",", @AudioFileList);
+				   #$usage .= " " . $OpsModeReadingPrefix . "KeypadAudio:Off,"  . join(",", @AudioFileList);
+			   }
 			}
 		}
 	}
@@ -725,14 +748,18 @@ sub DoorBird_Set($@)
 	else {
 		# Do not add anything
 	}
-	
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name . " - DoorBord_Set - " . $ErrorMessage;
+	Log3 $name, 2, $name . " - DoorBord_Set - Could not open directory for audiofiles. See commandref for attribute \"AudioFileDir\"." if $ErrorMessage ne "";
 	### Return values
 	return $usage if $command eq '?';
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Set - usage                              : " . $usage;
-
-	######### Section for response on set-command #########
+	Log3 $name, 3, $name . " - DoorBord_Set - " . $ErrorMessage;
+	Log3 $name, 2, $name . " - DoorBord_Set - Could not open directory for audiofiles. See commandref for attribute \"AudioFileDir\"." ;
+	######### Section for response on set-command ##########################################################
 
 	### LIVE VIDEO REQUEST
 	if ($command eq "Live_Video") {
@@ -766,11 +793,11 @@ sub DoorBird_Set($@)
 		### Call Subroutine and hand back return value
 		return DoorBird_Transmit_Audio($hash, $option)	
 	}
-	### TEST
-	elsif ($command eq "Test") {
-		### Call Subroutine and hand back return value
-		return DoorBird_OpsModeExecute($hash, "doorbell")	
-	}
+#	### TEST
+#	elsif ($command eq "Test") {
+#		### Call Subroutine and hand back return value
+#		return "Not doing anything yet";
+#	}
 	### ADD OR CHANGE FAVORITE
 	### DELETE FAVORITE
 	### ADD OR UPDATE SCHEDULE ENTRY
@@ -798,12 +825,12 @@ sub DoorBird_OpsModeUpdate($) {
 	my $AudioFileDir	= $hash->{helper}{AudioFileDir};
 
 	### Log Entry for debugging purposes
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate ____________________________________________________________";
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - Size of OpsModeList      : " . @OpsModeList;
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - OpsModeActive            : " . $OpsModeActive;
-	Log3 $name, 3, $name. " : DoorBird_OpsModeUpdate - AudioFileDir             : " . $AudioFileDir;
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate ____________________________________________________________";
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeList              : " . Dumper(@{$hash->{helper}{OpsModeList}});
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeListBackup        : " . Dumper(@{$hash->{helper}{OpsModeListBackup}});
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - Size of OpsModeList      : " . @OpsModeList;
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - OpsModeActive            : " . $OpsModeActive;
+	Log3 $name, 5, $name. " : DoorBird_OpsModeUpdate - AudioFileDir             : " . $AudioFileDir;
 
 
 	### If the OpsModeList has not been deleted (is not empty) and the list has not been changed
