@@ -44,7 +44,7 @@ sub COE_Node_Initialize {
   $hash->{GetFn}       = "COE_Node_Get";
   $hash->{SetFn}       = "COE_Node_Set";
 
-  $hash->{AttrList} = "readingsConfig " . $readingFnAttributes;
+  $hash->{AttrList} = "readingsConfigAnalog readingsConfigDigital " . $readingFnAttributes;
   $hash->{Match} = "^.*";
 
   return undef;
@@ -112,40 +112,11 @@ sub COE_Node_HandleData {
   my ( $hash, $canNodeId, $canNodePartId, $bytes ) = @_;
   my $name = $hash->{NAME};
 
-  my $readings = AttrVal($name, 'readingsConfig', undef);
-  if (! defined $readings) {
-    Log3 $name, 0, "COE_Node ($name) - No config found. Please set readingsConfig accordingly.";
-    return undef;
-  }
-
-  Log3 $name, 4, "COE_Node ($name) - Config found: $readings";
-
-  # incoming data: 05011700f3000000000001010000  
-  # extract readings from config, so we know, how to assign each value to a reading
-  # readings are separated by space
-  # format: index=name
-  # example
-  # 1=T.Solar 2=T.Solar_RL
-  $hash->{helper}{mapping} = ();
-  my @readingsArray = split / /, $readings;
-  foreach my $readingsEntry (@readingsArray) {
-    Log3 $name, 5, "COE_Node ($name) - $readingsEntry";
-    
-    my @entry = split /=/, $readingsEntry;
-    $hash->{helper}{mapping}{$entry[0]} = makeReadingName($entry[1]);
-  }
-
-  if ($canNodeId != $hash->{helper}{CAN_NODE_ID}) {
-    Log3 $name, 0, "COE_Node ($name) - defined nodeId $hash->{canNodeId} != message-nodeId $canNodeId. Skipping message.";
-    return undef;
-  }
-
   readingsBeginUpdate($hash);
   if ( $canNodePartId > 0 ) {
     COE_Node_HandleAnalogValues($hash, $canNodePartId, $bytes);
   } else {
     COE_Node_HandleDigitalValues($hash, $canNodePartId, $bytes);
-#    Log3 $name, 3, "COE_Node ($name) - [$canNodeId][$canNodePartId][] digital value. skipping for now";    
   }
   readingsEndUpdate($hash, 1);
 
@@ -161,11 +132,39 @@ sub COE_Node_HandleAnalogValues {
   my $canNodeId = $hash->{helper}{CAN_NODE_ID};
   my $name = $hash->{NAME};
 
+  my $readings = AttrVal($name, 'readingsConfigAnalog', undef);
+  if (! defined $readings) {
+    Log3 $name, 0, "COE_Node ($name) - No config found. Please set readingsConfigAnalog accordingly.";
+    return undef;
+  }
+
+  Log3 $name, 4, "COE_Node ($name) - Config found: $readings";
+
+  # incoming data: 05011700f3000000000001010000  
+  # extract readings from config, so we know, how to assign each value to a reading
+  # readings are separated by space
+  # format: index=name
+  # example
+  # 1=T.Solar 2=T.Solar_RL
+  my @readingsArray = split / /, $readings;
+  my @readingsMapping;
+  foreach my $readingsEntry (@readingsArray) {
+    Log3 $name, 5, "COE_Node ($name) - $readingsEntry";
+    
+    my @entry = split /=/, $readingsEntry;
+    $readingsMapping[$entry[0]] = makeReadingName($entry[1]);
+  }
+
+  if ($canNodeId != $hash->{helper}{CAN_NODE_ID}) {
+    Log3 $name, 0, "COE_Node ($name) - defined nodeId $hash->{canNodeId} != message-nodeId $canNodeId. Skipping message.";
+    return undef;
+  }
+
   #iterate through data entries. 4 entries max per incoming UDP packet
   for (my $i=0; $i < 4; $i++) {
-    my $outputId = ($i+($canNodePartId-1)*4 +1);
+    my $outputId = ($i + ($canNodePartId-1) * 4 +1);
     my $entryId = $outputId;
-    my $existingConfig = exists $hash->{helper}{mapping}{$entryId};
+    my $existingConfig = exists $readingsMapping[$entryId];
     my $value = $values[$i];
     my $type = $types[$i];
 
@@ -181,12 +180,12 @@ sub COE_Node_HandleAnalogValues {
           $value = "0$value";
       }
 
-      my $reading = $hash->{helper}{mapping}{$entryId};
+      my $reading = $readingsMapping[$entryId];
       readingsBulkUpdateIfChanged( $hash, $reading, $value );
 
-      Log3 $name, 3, "COE_Node ($name) - [$canNodeId][$canNodePartId][$outputId][$entryId][type=$type][value=$value]  configured: $reading";
+      Log3 $name, 4, "COE_Node ($name) - [$canNodeId][$canNodePartId][$i][$entryId][type=$type][value=$value]  configured: $reading";
     } else {
-      Log3 $name, 3, "COE_Node ($name) - [$canNodeId][$canNodePartId][$outputId][$entryId][type=$type][value=$value]  $entryId not configured. Skipping.";
+      Log3 $name, 0, "COE_Node ($name) - [$canNodeId][$canNodePartId][$i][$entryId][type=$type][value=$value]  $entryId not configured. Skipping.";
     }
   }
 }
@@ -199,10 +198,33 @@ sub COE_Node_HandleDigitalValues {
   my $values = unpack 'b*', $bytes;
   my @bits = split //, $values;
 
-  for (my $i=0; $i < 16; $i++) {
-    my $reading = $hash->{helper}{mapping}{$i+1};
+  my $readings = AttrVal($name, 'readingsConfigDigital', undef);
+  if (! defined $readings) {
+    Log3 $name, 0, "COE_Node ($name) - No config found. Please set readingsConfigDigital accordingly.";
+    return undef;
+  }
+
+  Log3 $name, 4, "COE_Node ($name) - Config found: $readings";
+
+  my @readingsArray = split / /, $readings;
+  my @readingsMapping;
+  foreach my $readingsEntry (@readingsArray) {
+    Log3 $name, 5, "COE_Node ($name) - $readingsEntry";
+
+    my @entry = split /=/, $readingsEntry;
+    $readingsMapping[$entry[0]] = makeReadingName($entry[1]);
+  }
+
+  if ($canNodeId != $hash->{helper}{CAN_NODE_ID}) {
+    Log3 $name, 0, "COE_Node ($name) - defined nodeId $hash->{canNodeId} != message-nodeId $canNodeId. Skipping message.";
+    return undef;
+  }
+
+
+  for (my $i=0; $i < 32; $i++) {
+    my $reading = $readingsMapping[$i+1];
     readingsBulkUpdateIfChanged( $hash, $reading, $bits[$i] );
-    Log3 $name, 3, "COE_Node ($name) - [$canNodeId][$canNodePartId][".($i+1)."] = $bits[$i]";
+    Log3 $name, 4, "COE_Node ($name) - [$canNodeId][$canNodePartId][".($i+1)."] = $bits[$i]";
   }
 }
 
@@ -256,7 +278,8 @@ sub COE_Node_Set {
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li><code>readingsConfig {index=reading-name}</code><br>This maps received values to readings. eg <code>1=Flowrate_Solar 2=T.Solar_Backflow</code></li>
+    <li><a href="#readingsConfigAnalog">readingsConfigAnalog {index=reading-name}</a><br>This maps received analog values to readings. eg <code>1=Flowrate_Solar 2=T.Solar_Backflow</code></li>
+    <li><a href="#readingsConfigDigital">readingsConfigDigital {index=reading-name}</a><br>This maps received digital values to readings. eg <code>1=Pump_Solar_Power 2=Pump_Water_Power</code></li>
   </ul>
 
 =end html
@@ -285,7 +308,8 @@ sub COE_Node_Set {
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li><code>readingsConfig {index=reading-name}</code><br>Ordnet Werte einem Reading zu. zB <code>1=Durchfluss_Solar 2=T.Solar_Rücklauf</code></li>
+    <li><a href="#readingsConfigAnalog">readingsConfigAnalog {index=reading-name}</a><br>Ordnet analoge Werte einem Reading zu. zB  <code>1=Durchfluss_Solar 2=T.Solar_R&uuml;cklauf</code></li>
+    <li><a href="#readingsConfigDigital">readingsConfigDigital {index=reading-name}</a><br>Ordnet digitale Werte einem Reading zu. zB  <code>1=Solarpumpe_Status 2=Wasserpumpe_Status</code></li>
   </ul>
 
 =end html_DE
