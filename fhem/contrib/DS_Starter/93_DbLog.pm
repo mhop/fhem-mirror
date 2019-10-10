@@ -2147,7 +2147,7 @@ sub DbLog_execmemcache ($) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
 		  push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
 	  }  
-      delete $data{DbLog}{$name}{cache}{memcache};            # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes, bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      delete $data{DbLog}{$name}{cache}{memcache};            # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
@@ -3209,8 +3209,9 @@ sub DbLog_Get($@) {
       $lastd[$i] = "undef";
       $mind[$i]  = "undef";
       $maxd[$i]  = "undef";
-      $minval    =  (~0 >> 1);
-      $maxval    = -(~0 >> 1);
+      $minval    =  (~0 >> 1);                               # ist "9223372036854775807"
+      $maxval    = -(~0 >> 1);                               # ist "-9223372036854775807"
+Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
       $deltacalc = 0;
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
@@ -3403,7 +3404,7 @@ sub DbLog_Get($@) {
                       $retvaldummy = "";
                     
                       if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
-                          for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
+                          for (my $j = $lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
                               $hour       = $j;
                               $hour       = '0'.$j if $j<10;
@@ -3442,7 +3443,8 @@ sub DbLog_Get($@) {
                           }
                       }
                     
-                      $out_value = sprintf("%g", $maxval - $minval);
+                      $out_value = sprintf("%g", $maxval - $minval) if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
+         Log3 ($name, 1, "$name - Maxval result: $maxval , Minval result: $minval ");
                       $sum[$i]  += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
