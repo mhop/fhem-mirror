@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
   "8.19.2" => "06.10.2019  delete key/value pairs in SSCam_extractForTelegram and SSCam_sendEmailblocking, ".
                            "change datacontainer of SNAPHASH(OLD) from %defs to %data ",
   "8.19.1" => "26.09.2019  set compatibility to 8.2.6 ",
@@ -464,8 +465,8 @@ sub SSCam_Define($@) {
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 4) {
-        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> [Port]";
-        }
+      return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> [Port]";
+  }
         
   my $camname    = $a[2];
   my $serveraddr = $a[3];
@@ -5142,10 +5143,10 @@ sub SSCam_camop_parse ($) {
                 $hash->{HELPER}{TRANSACTION} = "fake_recsend";          # fake Transaction Device setzen
                 my $tac = SSCam_openOrgetTrans($hash);                  # Transaktion vorhandenen Code (fake_recsend)              
                 
-                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{$recid}       = $recid;
-                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm}    = $createdTm;
-				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}     = $fileName;
-				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{".imageData"} = $myjson;
+                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
+                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
+				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
+				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
 				Log3($name,4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
                 
                 # prüfen ob Recording als Email / Telegram versendet werden soll                
@@ -5158,7 +5159,6 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error",$err);
                 readingsEndUpdate($hash, 1);
        
-            
 			} elsif ($OpMode eq "SaveRec") {              
 
                 my $lrec = ReadingsVal("$name", "CamLastRec", "");
@@ -5441,7 +5441,7 @@ sub SSCam_camop_parse ($) {
                     ) {
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};         # aktuellster Snap zur Anzeige im StreamDev "lastsnap"
+                $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};                        # aktuellster Snap zur Anzeige im StreamDev "lastsnap"
         
                 my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
                 my ($k,$l) = (0,0);              
@@ -5526,17 +5526,17 @@ sub SSCam_camop_parse ($) {
 							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
 						    
                             # Schnappschuss Hash zum Versand wird erstellt
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}       = $snapid;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm}    = $createdTm;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}     = $fileName;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{".imageData"} = $imageData;
+							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
+							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
+							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
+							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
 							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
                         
                             # Snaphash erstellen 
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}     = $snapid;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}  = $createdTm;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}   = $fileName;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData}  = $imageData;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
+                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
                             Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        													
                             
                             $sn += 1;
@@ -5549,10 +5549,10 @@ sub SSCam_camop_parse ($) {
                                                													
                         if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}     = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}   = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
                         }
@@ -5608,10 +5608,10 @@ sub SSCam_camop_parse ($) {
                         $sn     = 0; 
                         if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
                             for my $kn ($ss..($sgn-1)) {
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}     = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}   = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
+                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
                                 $sn += 1;                            
                             }
                         }
@@ -5634,8 +5634,9 @@ sub SSCam_camop_parse ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);                
                 
-				delete($hash->{HELPER}{GETSNAPGALLERY});                        # Steuerbit getsnapgallery statt getsnapinfo				
-                delete $hash->{HELPER}{".SNAPHASHOLD"};
+				undef %snaps;
+				delete $hash->{HELPER}{GETSNAPGALLERY};                         # Steuerbit getsnapgallery 		
+                delete $data{SSCam}{$name}{SNAPHASHOLD};
                 SSCam_closeTrans($hash);                                        # Transaktion beenden
                 
 				########  fallabhängige Eventgenerierung  ########
@@ -7959,7 +7960,7 @@ sub SSCam_prepareSendData ($$;$) {
    my ($hash, $OpMode, $dat) = @_;
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});              # Alias der Kamera wenn gesetzt oder Originalname aus SVS
-   my ($ret,$sdat,$vdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
+   my ($ret,$vdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
       
    ### prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
    ### Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
@@ -7974,9 +7975,9 @@ sub SSCam_prepareSendData ($$;$) {
                if($key eq $name) {                                     # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
                     foreach my $pkey (keys%{$dat}) {
                         my $nkey = time()+int(rand(1000));
-                        $asref->{$nkey.$pkey}{createdTm}    = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                        $asref->{$nkey.$pkey}{".imageData"} = $dat->{$pkey}{".imageData"};  # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                        $asref->{$nkey.$pkey}{fileName}     = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
                     }
                     delete $hash->{HELPER}{CANSENDSNAP};               
                     delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
@@ -8040,13 +8041,12 @@ sub SSCam_prepareSendData ($$;$) {
        my %smtpmsg = ();
        $smtpmsg{$subjk} = "$subjt";
        $smtpmsg{$bodyk} = "$bodyt";
-       
-       $sdat = $dat;       
+           
        $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                       'part1txt'     => $smtpmsg{body}, 
                                       'part2type'    => 'image/jpeg',
                                       'smtpport'     => $sp,
-                                      'sdat'         => $sdat,
+                                      'sdat'         => $dat,
                                       'opmode'       => $OpMode,
                                       'smtpnousessl' => $nousessl,
                                       'sslfrominit'  => $sslfrominit,
@@ -8078,13 +8078,12 @@ sub SSCam_prepareSendData ($$;$) {
        my %smtpmsg = ();
        $smtpmsg{$subjk} = "$subjt";
        $smtpmsg{$bodyk} = "$bodyt";
-       
-       $vdat = $dat;        
+            
        $ret = SSCam_sendEmail($hash, {'subject'      => $smtpmsg{subject},   
                                       'part1txt'     => $smtpmsg{body}, 
                                       'part2type'    => 'video/mpeg',
                                       'smtpport'     => $sp,
-                                      'vdat'         => $vdat,
+                                      'vdat'         => $dat,
                                       'opmode'       => $OpMode,
                                       'smtpnousessl' => $nousessl,
                                       'sslfrominit'  => $sslfrominit,
@@ -8123,11 +8122,10 @@ sub SSCam_prepareSendData ($$;$) {
 	   $telemsg{$tbotk} = "$tbott" if($tbott);
 	   $telemsg{$peerk} = "$peert" if($peert);
        $telemsg{$subjk} = "$subjt" if($subjt);
-       
-       $sdat = $dat;  
+        
        $ret = SSCam_sendTelegram($hash, {'subject'      => $telemsg{subject},
                                          'part2type'    => 'image/jpeg',
-                                         'sdat'         => $sdat,
+                                         'sdat'         => $dat,
                                          'opmode'       => $OpMode,
                                          'tac'          => $tac, 
                                          'telebot'      => $telemsg{$tbotk}, 
@@ -8216,9 +8214,9 @@ sub SSCam_sendTelegram ($$) {
    foreach my $key (keys %SSCam_teleparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $SSCam_teleparams{$key}->{attr}, $SSCam_teleparams{$key}->{default}) 
                                                    if(exists $SSCam_teleparams{$key}->{attr}); 
-	   if($SSCam_teleparams{$key}->{set}) {       
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $extparamref->{$key} if(exists $extparamref->{$key});
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_teleparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_teleparams{$key}->{attr});
+	   if($SSCam_teleparams{$key}->{set}) {     
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_teleparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_teleparams{$key}->{attr});	   
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
 	   }
        Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /[sv]dat/);
        Log3($name, 4, "$name - param $key is set") if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
@@ -8296,7 +8294,8 @@ sub SSCam_sendTelegram ($$) {
   }
   
   use strict "refs";
-  
+  undef %SSCam_teleparams;
+  undef %{$extparamref};
 return;
 }
 
@@ -8314,7 +8313,7 @@ sub SSCam_extractForTelegram($$$) {
   
   if($sdat) {
       $ct     = delete $paref->{sdat}{$key}{createdTm};
-      my $img = delete $paref->{sdat}{$key}{".imageData"};
+      my $img = delete $paref->{sdat}{$key}{imageData};
       $fname  = SSCam_trim(delete $paref->{sdat}{$key}{fileName});
       $data   = MIME::Base64::decode_base64($img); 
       Log3($name, 4, "$name - image data decoded for TelegramBot prepare");
@@ -8322,7 +8321,7 @@ sub SSCam_extractForTelegram($$$) {
   
   if($vdat) {
       $ct    = delete $paref->{vdat}{$key}{createdTm};
-      $data  = delete $paref->{vdat}{$key}{".imageData"};
+      $data  = delete $paref->{vdat}{$key}{imageData};
       $fname = SSCam_trim(delete $paref->{vdat}{$key}{fileName});
   }
   
@@ -8721,9 +8720,9 @@ sub SSCam_sendEmail ($$) {
    foreach my $key (keys %SSCam_mailparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $SSCam_mailparams{$key}->{attr}, $SSCam_mailparams{$key}->{default}) 
                                                    if(exists $SSCam_mailparams{$key}->{attr}); 
-	   if($SSCam_mailparams{$key}->{set}) {       
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $extparamref->{$key} if (exists $extparamref->{$key});
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_mailparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_mailparams{$key}->{attr});
+	   if($SSCam_mailparams{$key}->{set}) { 
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_mailparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_mailparams{$key}->{attr});	   
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if (exists $extparamref->{$key});
 	   }
        Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/);
        Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
@@ -8747,6 +8746,8 @@ sub SSCam_sendEmail ($$) {
    $hash->{HELPER}{RUNNING_PID} = BlockingCall("SSCam_sendEmailblocking", $data{SSCam}{$name}{PARAMS}{$tac}, "SSCam_sendEmaildone", $timeout, "SSCam_sendEmailto", $hash);
    $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       
+   undef %SSCam_mailparams;
+   undef %{$extparamref};
 return;
 }
 
@@ -8754,30 +8755,30 @@ return;
 #                                 nichtblockierendes Send EMail
 ####################################################################################################
 sub SSCam_sendEmailblocking($) {
-  my ($paref)      = @_;
-  my $name         = $paref->{name};
-  my $cc           = $paref->{smtpCc};
-  my $from         = $paref->{smtpFrom};
-  my $part1type    = $paref->{part1type};
-  my $part1txt     = $paref->{part1txt};
-  my $part2type    = $paref->{part2type};
-  my $smtphost     = $paref->{smtphost};
-  my $smtpport     = $paref->{smtpport};
-  my $smtpsslport  = $paref->{smtpsslport};
-  my $smtpnousessl = $paref->{smtpnousessl};             # SSL Verschlüsselung soll NICHT genutzt werden
-  my $subject      = $paref->{subject};
-  my $to           = $paref->{smtpTo};
-  my $msgtext      = $paref->{msgtext}; 
-  my $smtpdebug    = $paref->{smtpdebug}; 
-  my $sdat         = $paref->{sdat};                     # Hash von Imagedaten base64 codiert
-  my $image        = $paref->{image};                    # Image, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
-  my $fname        = $paref->{fname};                    # Filename -> verwendet wenn $image ist gesetzt
-  my $lsnaptime    = $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
-  my $opmode       = $paref->{opmode};                   # aktueller Operation Mode
-  my $sslfb        = $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
-  my $sslfrominit  = $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
-  my $tac          = $paref->{tac};                      # übermittelter Transaktionscode der ausgewerteten Transaktion
-  my $vdat         = $paref->{vdat};                     # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
+  my ($paref)      = @_;                                        # der Referent wird in SSCam_cleanData gelöscht
+  my $name         = delete $paref->{name};
+  my $cc           = delete $paref->{smtpCc};
+  my $from         = delete $paref->{smtpFrom};
+  my $part1type    = delete $paref->{part1type};
+  my $part1txt     = delete $paref->{part1txt};
+  my $part2type    = delete $paref->{part2type};
+  my $smtphost     = delete $paref->{smtphost};
+  my $smtpport     = delete $paref->{smtpport};
+  my $smtpsslport  = delete $paref->{smtpsslport};
+  my $smtpnousessl = delete $paref->{smtpnousessl};             # SSL Verschlüsselung soll NICHT genutzt werden
+  my $subject      = delete $paref->{subject};
+  my $to           = delete $paref->{smtpTo};
+  my $msgtext      = delete $paref->{msgtext}; 
+  my $smtpdebug    = delete $paref->{smtpdebug}; 
+  my $sdat         = delete $paref->{sdat};                     # Hash von Imagedaten base64 codiert
+  my $image        = delete $paref->{image};                    # Image, wenn gesetzt muss 'part2type' auf 'image/jpeg' gesetzt sein
+  my $fname        = delete $paref->{fname};                    # Filename -> verwendet wenn $image ist gesetzt
+  my $lsnaptime    = delete $paref->{lsnaptime};                # Zeit des letzten Schnappschusses wenn gesetzt
+  my $opmode       = delete $paref->{opmode};                   # aktueller Operation Mode
+  my $sslfb        = delete $paref->{sslfb};                    # Flag für Verwendung altes Net::SMTP::SSL
+  my $sslfrominit  = delete $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
+  my $tac          = delete $paref->{tac};                      # übermittelter Transaktionscode der ausgewerteten Transaktion
+  my $vdat         = delete $paref->{vdat};                     # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
   
   my $hash   = $defs{$name};
   my $sslver = "";
@@ -8826,7 +8827,7 @@ sub SSCam_sendEmailblocking($) {
       @as = sort{$a<=>$b}keys%{$sdat};
       foreach my $key (@as) {
 		  $ct      = delete $sdat->{$key}{createdTm};
-		  $img     = delete $sdat->{$key}{".imageData"};
+		  $img     = delete $sdat->{$key}{imageData};
 		  $fname   = delete $sdat->{$key}{fileName};
 		  $fh      = '$fh'.$key;
 		  $decoded = MIME::Base64::decode_base64($img); 
@@ -8858,7 +8859,7 @@ sub SSCam_sendEmailblocking($) {
       @as = sort{$a<=>$b}keys%{$vdat};
       foreach my $key (@as) {
 		  $ct      = delete $vdat->{$key}{createdTm};
-		  $video   = delete $vdat->{$key}{".imageData"};
+		  $video   = delete $vdat->{$key}{imageData};
 		  $fname   = delete $vdat->{$key}{fileName};
 		  $fh      = '$fh'.$key;
 		  my $mh   = '';
@@ -9114,13 +9115,13 @@ sub SSCam_closeTrans ($) {
    my ($hash) = @_;
    my $name = $hash->{NAME};
    
-   return if(!defined $hash->{HELPER}{TRANSACTION});  
+   SSCam_cleanData($name);                                   # %data Hash bereinigen
+   return if(!defined $hash->{HELPER}{TRANSACTION}); 
+   
    my $tac = delete $hash->{HELPER}{TRANSACTION};            # Transaktion beenden   
    if (AttrVal($name,"debugactivetoken",0)) {
        Log3($name, 1, "$name - Transaction \"$tac\" closed");
    }
-   
-   SSCam_cleanData($name,$tac);                              # $data Hash bereinigen
    
 return;
 }
@@ -9129,9 +9130,11 @@ return;
 #                               $data Hash bereinigen
 ####################################################################################################
 sub SSCam_cleanData($;$) {
-  my ($name,$tac) = @_;
-  my $del = 0;
+  my ($name) = @_;
+  my $hash   = $defs{$name};
+  my $del    = 0;
   
+  my $tac = $hash->{HELPER}{TRANSACTION};   
   delete $data{SSCam}{RS};
   
   if($tac) {
@@ -9150,6 +9153,7 @@ sub SSCam_cleanData($;$) {
       if ($del && AttrVal($name,"debugactivetoken",0)) {
           Log3($name, 1, "$name - Data Hash (SENDRECS/SENDSNAPS/PARAMS) of Transaction \"$tac\" deleted");
       }
+  
   } else {
       delete $data{SSCam}{$name}{SENDRECS};
       delete $data{SSCam}{$name}{SENDSNAPS};
