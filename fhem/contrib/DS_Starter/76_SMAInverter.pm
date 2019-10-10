@@ -828,7 +828,7 @@ sub SMAInverter_getstatusDoParse($) {
 	                 push(@row_array, "bat_temp ".$inv_BAT_TEMP."\n");
                  }
                  if($sup_SpotGridFrequency) {
-	                 push(@row_array, "grid_freq. ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
+	                 push(@row_array, "grid_freq ".sprintf("%.2f",$inv_SPOT_FREQ)."\n");
                  }
                  if($sup_TypeLabel) {
 	                 push(@row_array, "device_type ".SMAInverter_devtype($inv_TYPE)."\n");
@@ -1927,7 +1927,7 @@ The retrieval of the inverter will be executed non-blocking. You can adjust the 
 <li><b>SPOT_ETODAY / etoday</b>             :  Today yield </li>
 <li><b>SPOT_ETOTAL / etotal</b>             :  Total yield </li>
 <li><b>SPOT_FEEDTM / feed-in_time</b>       :  Feed-in time </li>
-<li><b>SPOT_FREQ / grid_freq.</b>           :  Grid Frequency </li>
+<li><b>SPOT_FREQ / grid_freq </b>           :  Grid Frequency </li>
 <li><b>SPOT_IAC1 / phase_1_iac</b>          :  Grid current phase L1 </li>
 <li><b>SPOT_IAC2 / phase_2_iac</b>          :  Grid current phase L2 </li>
 <li><b>SPOT_IAC3 / phase_3_iac</b>          :  Grid current phase L3 </li>
@@ -2160,7 +2160,7 @@ Die Abfrage des Wechselrichters wird non-blocking ausgeführt. Der Timeoutwert f
 <li><b>SPOT_ETODAY / etoday</b>             :  Energie heute</li>
 <li><b>SPOT_ETOTAL / etotal</b>             :  Energie Insgesamt </li>
 <li><b>SPOT_FEEDTM / feed-in_time</b>       :  Einspeise-Stunden </li>
-<li><b>SPOT_FREQ / grid_freq.</b>           :  Netz Frequenz </li>
+<li><b>SPOT_FREQ / grid_freq </b>           :  Netz Frequenz </li>
 <li><b>SPOT_IAC1 / phase_1_iac</b>          :  Netz Strom phase L1 </li>
 <li><b>SPOT_IAC2 / phase_2_iac</b>          :  Netz Strom phase L2 </li>
 <li><b>SPOT_IAC3 / phase_3_iac</b>          :  Netz Strom phase L3 </li>
