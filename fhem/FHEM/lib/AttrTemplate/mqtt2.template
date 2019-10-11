@@ -901,6 +901,18 @@ attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "fals
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model shelly1
 
+name:shelly_announces
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+order:A_101
+desc:Allows central administration of all shelly firmware updates
+attr DEVICE setList\
+  update_fw_all:noArg {"shellies/command update_fw"}\
+  update_fw_device:textField {"shellies/$EVTPART1/command update_fw"}\
+  request_update_all:noArg {"shellies/command update"}\
+  request_update_device:textField {"shellies/$EVTPART1/command update"}\
+  request_announces:noArg {"shellies/command announce"}
+attr DEVICE readingList shellies/announce:.* { json2nameValue($EVENT, $CID."_") }
+
 # shellyplug using original firmware.
 name:shellyplug
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -950,8 +962,8 @@ desc:Example how to configure a single relay Shelly device offering energy meass
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate shelly1_w_energy_meassuring
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
-attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","total",0) },wash:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","wash",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
-attr DEVICE comment Adopt $limit in readingList to your needs to get appropriate loadState changes; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results.
+attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","relay_0_kWh",0) },wash:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","wash",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
+attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results or change the refference/the value "0.30" in userReadings "price".
 attr DEVICE model shelly1_w_energy_meassuring_washer_example
 
 # shelly2 using original firmware in roller mode.
@@ -1675,11 +1687,24 @@ order:X_02b
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
 deletereading -q DEVICE (?!associatedWith).*
-defmod DEVICE MQTT2_\DEVICE DEVCID
 attr DEVICE autocreate 0
 attr DEVICE readingList\
   BASE_ID/DEVNAME/CLIMAtoMQTT/bme:.* { json2nameValue($EVENT, 'BME_') }
 attr DEVICE stateFormat BME_tempc °C - BME_hum % - hpa hPa
 attr DEVICE userReadings hpa:BME_pa.* {ReadingsVal($name,"BME_pa",0)/100}
 attr DEVICE model OpenMQTTGateway_bme
+
+name:OpenMQTTGateway_ir
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
+order:X_02c
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE autocreate 0
+attr DEVICE readingList\
+  BASE_ID/DEVNAME/IRtoMQTT:.* { json2nameValue($EVENT) }
+attr DEVICE setList irsend:textField BASE_ID/DEVNAME/IRtoMQTT {"value":$EVTPART2,"protocol_name":"IR_$EVTPART1"}
+attr DEVCID comment irsend needs Infos about protocol and value (n decimal), so e.g."IR_NEC 1587664935" should be fine...
+attr DEVICE model OpenMQTTGateway_ir
 
