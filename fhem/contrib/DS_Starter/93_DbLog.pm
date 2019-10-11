@@ -3206,7 +3206,7 @@ sub DbLog_Get($@) {
       $sum[$i]   = 0;
       $cnt[$i]   = 0;
       $lastv[$i] = 0;
-      $lastd[$i] = "undef";
+      $lastd[$i] = "undef";                                          
       $mind[$i]  = "undef";
       $maxd[$i]  = "undef";
       $minval    =  (~0 >> 1);                               # ist "9223372036854775807"
@@ -3318,7 +3318,8 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
           my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
           Log3 ($name, 5, "$name - SQL-result -> $ds");
           use warnings;
-          
+Log3 ($name, 1, "$name - SQL-result -> $ds");
+$writeout = 0;          
           ############ Auswerten des 5. Parameters: Regexp ###################
           # die Regexep wird vor der Function ausgewertet und der Wert im Feld
           # Value angepasst.
@@ -3343,8 +3344,8 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
           if($sql_timestamp lt $from && $deltacalc) {
               if(Scalar::Util::looks_like_number($sql_value)) {
                   # nur setzen wenn numerisch
-                  $minval    = $sql_value if($sql_value < $minval);
-                  $maxval    = $sql_value if($sql_value > $maxval);
+                  $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );
+                  $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );
                   $lastv[$i] = $sql_value;
               }
           
@@ -3443,15 +3444,15 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
                           }
                       }
                     
-                      $out_value = sprintf("%g", $maxval - $minval) if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
-         Log3 ($name, 1, "$name - Maxval result: $maxval , Minval result: $minval ");
+                      $out_value = sprintf("%g", $maxval - $minval);
                       $sum[$i]  += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
                       # $minval =  (~0 >> 1);
                       $minval = $maxval;
                       # $maxval = -(~0 >> 1);
-                      $writeout = 1;
+                      $writeout = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
+ Log3 ($name, 1, "$name - delta-h - TS result: $out_tstamp , Maxval result: $maxval , Minval result: $minval , WRITEOUT: $writeout");                     
                        
                       Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
                   }
@@ -3474,15 +3475,15 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
                       # $minval =  (~0 >> 1);
                       $minval = $maxval;
                       # $maxval = -(~0 >> 1);
-                      $writeout = 1;
-                      
+                      $writeout = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
+Log3 ($name, 1, "$name - delta-d - TS result: $out_tstamp , Maxval result: $maxval , Minval result: $minval , WRITEOUT: $writeout");                       
                       Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
                   }
             
               } else {
                   $out_value  = $sql_value;
                   $out_tstamp = $sql_timestamp;
-                  $writeout   = 1;
+                  $writeout   = 1;                    
               }
 
               # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
