@@ -852,6 +852,7 @@ sub ZoneMinder_Ready {
   <br><br>
   <ul>
     <li><code>apiTimeout &lt;seconds&gt;</code><br>This defines the request timeout in seconds for calls to the ZoneMinder API (right now, only for the login)</li>
+    <li><code>apiVersion</code><br>If you use ZoneMinder 1.32, this must be set to 'post132'</li>
     <li><code>publicAddress &lt;address&gt;</code><br>This configures public accessibility of your LAN (eg your ddns address). Define a valid URL here, eg <code>https://my.own.domain:2344</code></li>
     <li><code>webConsoleContext &lt;path&gt;</code><br>If not set, this defaults to <code>/zm</code>. This is used for building the URL to the ZoneMinder web console.</li>
     <li><code>usePublicUrlForZmWeb</code><br>If a public address is defined, this setting will use the public address for connecting to ZoneMinder API, instead of trying to use the IP-address.</li>
