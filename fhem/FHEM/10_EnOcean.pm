@@ -778,7 +778,7 @@ EnOcean_Initialize($)
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
                       "observeRefDev pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
-                      "pidActorLimitLower pidActorLimitUpper pidCtrl:on,off pidDeltaTreshold pidFactor_D pidFactor_I " .
+                      "pidActorLimitLower pidActorLimitUpper pidActorTreshold pidCtrl:on,off pidDeltaTreshold pidFactor_D pidFactor_I " .
                       "pidFactor_P pidIPortionCallBeforeSetting pidSensorTimeout " .
                       "pollInterval postmasterID productID rampTime rcvRespAction ".
                       "releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no remoteCode remoteEEP remoteID remoteManufID " .
@@ -11578,7 +11578,6 @@ sub EnOcean_Parse($$)
       RemoveInternalTimer($hash->{helper}{timer}{alarm}) if (exists $hash->{helper}{timer}{alarm});
       @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
       InternalTimer(gettimeofday() + 4320, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
-#####
 
     } elsif ($st eq "multiFuncSensor.30") {
       # Sensor for Smoke, Air quality, Hygrothermal comfort, Temperature and Humidity
@@ -13590,7 +13589,7 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
-  } elsif ($attrName =~ m/^pidActorLimitLower|pidActorLimitUpper$/) {
+  } elsif ($attrName =~ m/^pidActorLimitLower|pidActorLimitUpper|pidActorTreshold$/) {
     if (!defined $attrVal) {
 
     } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 0 || $attrVal > 100) {
@@ -14599,15 +14598,15 @@ sub EnOcean_calcPID($) {
   my $DEBUG_Update    = AttrVal( $name, 'pidDebugUpdate',    '0' ) eq '1';
   my $DEBUG = $DEBUG_Sensor || $DEBUG_Actuation || $DEBUG_Calc || $DEBUG_Delta || $DEBUG_Update;
   my $actuation        = "";
-  my $actuationDone    = ReadingsVal( $name, 'setpointSet', ReadingsVal( $name, 'setpoint', ""));
-  my $actuationCalc    = ReadingsVal( $name, 'setpointCalc', "" );
+  my $actuationDone    = ReadingsVal($name,'setpointSet', ReadingsVal($name, 'setpoint', ""));
+  my $actuationCalc    = ReadingsVal($name, 'setpointCalc', "");
   my $actuationCalcOld = $actuationCalc;
   my $actorTimestamp =
     ( $hash->{helper}{actorTimestamp} )
     ? $hash->{helper}{actorTimestamp}
     : FmtDateTime( gettimeofday() - 3600 * 24 );
   my $desired = '';
-  my $sensorStr = ReadingsVal($name, 'temperature',"");
+  my $sensorStr = ReadingsVal($name, 'temperature', "");
   my $sensorValue = "";
   my $sensorTS = ReadingsTimestamp($name, 'temperature', undef);
   my $sensorIsAlive = 0;
@@ -14620,17 +14619,16 @@ sub EnOcean_calcPID($) {
   my $delta    = "";
   my $deltaGradient    = ( $hash->{helper}{deltaGradient} ) ? $hash->{helper}{deltaGradient} : 0;
   my $calcReq          = 0;
-  my $readingUpdateReq = '';
 
   # ---------------- check conditions
-  while (1)
-  {
+  while (1) {
     # --------------- retrive values from attributes
     my $wakeUpCycle = AttrVal($name, 'wakeUpCycle', ReadingsVal($name, 'wakeUpCycle', 300));
     my $pidCycle = $wakeUpCycle / 3;
     $pidCycle = 10 if ($pidCycle < 10);
     $hash->{helper}{actorInterval}  = 10;
-    $hash->{helper}{actorThreshold} = 0;
+    #$hash->{helper}{actorThreshold} = 0;
+    $hash->{helper}{actorThreshold} = AttrVal($name, 'pidActorTreshold',  1);
     $hash->{helper}{actorKeepAlive} = $pidCycle;
     $hash->{helper}{actorValueDecPlaces} = 0;
     $hash->{helper}{actorErrorAction} = AttrVal($name, 'pidActorErrorAction', 'freeze');
@@ -14710,8 +14708,7 @@ sub EnOcean_calcPID($) {
 
     #request for calculation
     # ---------------- calculation request
-    if ($calcReq)
-    {
+    if ($calcReq) {
       # reverse action requested
       my $workDelta = ( $hash->{helper}{reverseAction} == 1 ) ? -$delta : $delta;
       my $deltaOld = -$deltaOld if ( $hash->{helper}{reverseAction} == 1 );
@@ -14771,8 +14768,6 @@ sub EnOcean_calcPID($) {
       #  if ($DEBUG_Calc);
     }
 
-    $readingUpdateReq = 1;    # in each case update readings
-
     # ---------------- acutation request
     my $noTrouble = ( $desired ne "" && $sensorIsAlive );
 
@@ -14824,7 +14819,7 @@ sub EnOcean_calcPID($) {
     # upper or lower limit are exceeded
     my $rsLimit = $actuationDone ne "" && ( $actuationDone < $actorLimitLower || $actuationDone > $actorLimitUpper );
 
-    my $actuationByThreshold = ( ( $rsTS || $rsUp || $rsDown ) && $noTrouble );
+    my $actuationByThreshold = (( $rsTS || $rsUp || $rsDown) && $noTrouble);
     #PID20_Log $hash, 2, "A2 rsTS:$rsTS rsUp:$rsUp rsDown:$rsDown noTrouble:$noTrouble"
     #  if ($DEBUG_Actuation);
 
@@ -14859,64 +14854,40 @@ sub EnOcean_calcPID($) {
     #  if ($DEBUG_Actuation);
 
     # ................ perform output to actor
-    if ($actuationReq)
-    {
-      $readingUpdateReq = 1;         # update the readings
-
+    #if ($actuationReq) {
+    if ($cmd =~ m/^start|actuator$/) {
       # check calback for actuation
       my $actorCallBeforeSetting = AttrVal( $name, 'pidActorCallBeforeSetting', undef );
-      if ( defined($actorCallBeforeSetting) && exists &$actorCallBeforeSetting )
-      {
+      if (defined($actorCallBeforeSetting) && exists(&$actorCallBeforeSetting)) {
         #PID20_Log $hash, 5, 'start callback ' . $actorCallBeforeSetting . ' with actuation:' . $actuation;
         no strict "refs";
-        $actuation = &$actorCallBeforeSetting( $name, $actuation );
+        $actuation = &$actorCallBeforeSetting($name, $actuation);
         use strict "refs";
-        #PID20_Log $hash, 5, 'return value of ' . $actorCallBeforeSetting . ':' . $actuation;
+        #Log3($name, 5, 'return value of ' . $actorCallBeforeSetting . ': ' . $actuation;
       }
-
-      #build command for fhem
-      #PID20_Log $hash, 5,
-      #    "actor:"
-      #  . $hash->{helper}{actor}
-      #  . " actorCommand:"
-      #  . $hash->{helper}{actorCommand}
-      #  . " actuation:"
-      #  . $actuation;
-      #my $cmd = sprintf( "set %s %s %g", $hash->{helper}{actor}, $hash->{helper}{actorCommand}, $actuation );
-
-      # execute command
-      my $ret;
-      #$ret = fhem $cmd;
-
-      $setpoint = $actuation;
-      $actuationDone = $actuation;
 
       # note timestamp
       $hash->{helper}{actorTimestamp} = TimeNow();
-      my $retStr = "";
-      $retStr = " with return-value:" . $ret if ( defined($ret) && ( $ret ne '' ) );
-      #PID20_Log $hash, 3, "<$cmd> " . $retStr;
+      Log3($name, 5, "EnOcean $name EnOcean_calcPID Cmd: actuationReq");
     }
-  # my $updateAlive = ($actuation ne "")
-  #   && EnOcean_TimeDiff(ReadingsTimestamp($name, 'setpointSet', ReadingsTimestamp($name, 'setpoint', undef))) >= $hash->{helper}{updateInterval};
-  #   && EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
-  # my $updateReq = ( ( $actuationReq || $updateAlive ) && $actuation ne "" );
-  # PID20_Log $hash, 2, "U1 actReq:$actuationReq updateAlive:$updateAlive -->  updateReq:$updateReq" if ($DEBUG_Update);
 
-    # ---------------- update request
-    if ($readingUpdateReq) {
-      readingsBeginUpdate($hash);
-      #readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne "" );
-      #readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne "" );
-      readingsBulkUpdate( $hash, 'p_p', $pPortion ) if ( $pPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_d', $dPortion ) if ( $dPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_i', $iPortion ) if ( $iPortion ne "" );
-      readingsBulkUpdate( $hash, 'setpointSet', $actuationDone) if ($actuationDone ne "");
-      readingsBulkUpdate( $hash, 'setpointCalc', $actuationCalc) if ( $actuationCalc ne "" );
-      readingsBulkUpdate( $hash, 'delta', $delta ) if ( $delta ne "" );
-      readingsEndUpdate( $hash, 1 );
-      #PID20_Log $hash, 5, "readings updated";
+    readingsBeginUpdate($hash);
+    #readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne "" );
+    #readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne "" );
+    readingsBulkUpdate($hash, 'delta', $delta ) if ($delta ne "");
+    readingsBulkUpdate($hash, 'p_p', $pPortion) if ($pPortion ne "");
+    readingsBulkUpdate($hash, 'p_d', $dPortion) if ($dPortion ne "");
+    readingsBulkUpdate($hash, 'p_i', $iPortion) if ($iPortion ne "");
+    readingsBulkUpdate($hash, 'setpointCalc', $actuationCalc) if ($actuationCalc ne "");
+    if ($actuationByThreshold) {
+      readingsBulkUpdate($hash, 'setpointSet', $actuation)  if ($actuation ne "");
+      $setpoint = $actuation;
+      $actuationDone = $actuation;
+    } else {
+      readingsBulkUpdate($hash, 'setpointSet', $actuationDone) if ($actuationDone ne "");
+      $setpoint = $actuationDone;
     }
+    readingsEndUpdate( $hash, 1 );
 
     last;
   }    # end while
@@ -18399,7 +18370,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
          <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
          <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
-         <li><a href="#EnOcean_pidActorLimitUpper">pidActorLimitUpper</a></li>
+         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
          <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
          <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
          <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
@@ -18463,6 +18434,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
          <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
          <li><a href="#EnOcean_pidActorLimitUpper">pidActorLimitUpper</a></li>
+         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
          <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
          <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
          <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
@@ -18523,7 +18495,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidActorErrorAction">pidActorErrorAction</a></li>
          <li><a href="#EnOcean_pidActorErrorPos">pidActorErrorPos</a></li>
          <li><a href="#EnOcean_pidActorLimitLower">pidActorLimitLower</a></li>
-         <li><a href="#EnOcean_pidActorLimitUpper">pidActorLimitUpper</a></li>
+         <li><a href="#EnOcean_pidActorTreshold">pidActorTreshold</a></li>
          <li><a href="#EnOcean_pidCtrl">pidCtrl</a></li>
          <li><a href="#EnOcean_pidDeltaTreshold">pidDeltaTreshold</a></li>
          <li><a href="#EnOcean_pidFactor_P">pidFactor_P</a></li>
@@ -19912,6 +19884,10 @@ EnOcean_Delete($$)
     <li><a name="EnOcean_pidActorLimitUpper">pidActorLimitUpper</a> valvePos/%,
         [pidActorLimitUpper] = 0...100, 100 is default<br>
         upper limit for actor
+    </li>
+    <li><a name="EnOcean_pidActorTreshold">pidActorTreshold</a> valvePos/%,
+        [pidActorTreshold] = 1...100, 1 is default<br>
+        actor treshold
     </li>
     <li><a name="EnOcean_pidCtrl">pidCtrl</a> on|off,
         [pidCtrl] = on is default<br>
