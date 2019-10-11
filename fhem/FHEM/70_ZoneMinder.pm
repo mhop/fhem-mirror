@@ -53,7 +53,7 @@ sub ZoneMinder_Initialize {
   $hash->{WriteFn}   = "ZoneMinder_Write";
   $hash->{ReadyFn}   = "ZoneMinder_Ready";
 
-  $hash->{AttrList} = "apiTimeout usePublicUrlForZmWeb:0,1 loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
+  $hash->{AttrList} = "apiTimeout apiVersion:pre132,post132 usePublicUrlForZmWeb:0,1 loginInterval publicAddress webConsoleContext " . $readingFnAttributes;
   $hash->{MatchList} = { "1:ZM_Monitor" => "^.*" };
 
   Log3 '', 3, "ZoneMinder - Initialize done ...";
@@ -180,12 +180,7 @@ sub ZoneMinder_API_Login {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  my $username = urlEncode($hash->{helper}{ZM_USERNAME});
-  my $password = urlEncode($hash->{helper}{ZM_PASSWORD});
-
-  my $usePublicUrlForZmWeb = AttrVal($name, 'usePublicUrlForZmWeb', 0);
-  my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, $usePublicUrlForZmWeb);
-  my $loginUrl = "$zmWebUrl/index.php?username=$username&password=$password&action=login&view=console";
+  my $loginUrl = ZoneMinder_Get_API_Login_URL($hash);
   my $apiTimeout = AttrVal($name, 'apiTimeout', 5);
 
   Log3 $name, 4, "ZoneMinder ($name) - loginUrl: $loginUrl";
@@ -203,6 +198,28 @@ sub ZoneMinder_API_Login {
   return undef;
 }
 
+sub ZoneMinder_Get_API_Login_URL {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $apiVersion = AttrVal($name, 'apiVersion', 'pre132');
+  my $username = urlEncode($hash->{helper}{ZM_USERNAME});
+  my $password = urlEncode($hash->{helper}{ZM_PASSWORD});
+
+  my $result = '';
+  if ( $apiVersion eq 'pre132' ) {
+    my $usePublicUrlForZmWeb = AttrVal($name, 'usePublicUrlForZmWeb', 0);
+    my $zmWebUrl = ZoneMinder_getZmWebUrl($hash, $usePublicUrlForZmWeb);
+    
+    $result = "$zmWebUrl/index.php?username=$username&password=$password&action=login&view=console";
+  } elsif ( $apiVersion eq 'post132' ) {
+    my $zmApiUrl = ZoneMinder_getZmApiUrl($hash);
+    $result = "$zmApiUrl/host/login.json?user=$username&pass=$password";
+  }
+
+  return $result;
+}
+
 sub ZoneMinder_API_Login_Callback {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
@@ -216,26 +233,44 @@ sub ZoneMinder_API_Login_Callback {
     Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
     $hash->{APILoginError} = $err;
     $apiState = 'error';
-    
+
   } elsif($data ne "") {
-    if ($data =~ m/Invalid username or password/) {
+    if ( $data =~ m/Invalid username or password/ ) { #failed login
       $hash->{APILoginError} = "Invalid username or password.";
+    } elsif ( $data =~ m/"name":"User not found"/ ) { #1.30.x response when trying to login with 1.32.x approach
+      $hash->{APILoginError} = "User not found.";
       $apiState = 'login failed';
+      Log3 $name, 5, "Zoneminder ($name) - $data";
 
     } else {
       delete($defs{$name}{APILoginError});
       
       ZoneMinder_GetCookies($hash, $param->{httpheader});
 
+      my $apiVersion = AttrVal($name, 'apiVersion', 'pre132');
+
       my $isFirst = !$hash->{helper}{apiInitialized};
       if ($isFirst) {
         $hash->{helper}{apiInitialized} = 1;
         my $zmApiUrl = ZoneMinder_getZmApiUrl($hash);
-        ZoneMinder_SimpleGet($hash, "$zmApiUrl/host/getVersion.json", \&ZoneMinder_API_ReadHostInfo_Callback);
+
         ZoneMinder_SimpleGet($hash, "$zmApiUrl/configs.json", \&ZoneMinder_API_ReadConfig_Callback);
         ZoneMinder_API_getLoad($hash);
 
+        if ( $apiVersion eq 'pre132' ) {
+          ZoneMinder_SimpleGet($hash, "$zmApiUrl/host/getVersion.json", \&ZoneMinder_API_ReadHostInfo_Callback);
+        }
+
         $apiState = 'opened';
+      }
+
+      if ( $apiVersion eq 'post132' ) {
+        ZoneMinder_API_extractVersions($hash, $data);
+        
+        my $credentials = ZoneMinder_GetConfigValueByKey( $hash, $data, 'credentials' );
+        $credentials =~ s/auth=//;
+
+        readingsSingleUpdate($hash, 'authHash', $credentials, 1);
       }
     }
   }
@@ -286,21 +321,29 @@ sub ZoneMinder_API_ReadHostInfo_Callback {
     $hash->{ZM_VERSION} = 'error';
     $hash->{ZM_API_VERSION} = 'error';
   } elsif($data ne "") {
-      $data =~ s/\R//g;
-
-      my $zmVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'version');
-      if (not $zmVersion) {
-        $zmVersion = 'unknown';
-      }
-      $hash->{ZM_VERSION} = $zmVersion;
-      $hash->{model} = $zmVersion;
-
-      my $zmApiVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'apiversion');
-      if (not $zmApiVersion) {
-        $zmApiVersion = 'unknown';
-      }
-      $hash->{ZM_API_VERSION} = $zmApiVersion;
+	ZoneMinder_API_extractVersions( $hash, $data );
   }
+
+  return undef;
+}
+
+sub ZoneMinder_API_extractVersions {
+  my ($hash, $data) = @_;
+
+  $data =~ s/\R//g;
+
+  my $zmVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'version');
+  if (not $zmVersion) {
+	$zmVersion = 'unknown';
+  }
+  $hash->{ZM_VERSION} = $zmVersion;
+  $hash->{model} = $zmVersion;
+
+  my $zmApiVersion = ZoneMinder_GetConfigValueByKey($hash, $data, 'apiversion');
+  if (not $zmApiVersion) {
+	$zmApiVersion = 'unknown';
+  }
+  $hash->{ZM_API_VERSION} = $zmApiVersion;
 
   return undef;
 }
@@ -342,10 +385,17 @@ sub ZoneMinder_API_ReadConfig_Callback {
         $hash->{helper}{ZM_PATH_ZMS} = $zmPathZms;
       }
 
-      my $authHashSecret = ZoneMinder_GetConfigValueByName($hash, $data, 'ZM_AUTH_HASH_SECRET');
-      if ($authHashSecret) {
-        $hash->{helper}{ZM_AUTH_HASH_SECRET} = $authHashSecret;
-        ZoneMinder_calcAuthHash($hash);
+      my $apiVersion = AttrVal($name, 'apiVersion', 'pre132');
+
+      if ( $apiVersion eq 'pre132' ) { # in post132, this is delivered as part of the login-response
+        my $authHashSecretKey = '';
+
+        my $authHashSecret = ZoneMinder_GetConfigValueByName($hash, $data, 'ZM_AUTH_HASH_SECRET');
+        if ( $authHashSecret ) {
+          $hash->{helper}{ZM_AUTH_HASH_SECRET} = $authHashSecret;
+          ZoneMinder_calcAuthHash($hash);
+        }
+
       }
   }
 
@@ -366,7 +416,7 @@ sub ZoneMinder_GetConfigArrayByKey {
 
 sub ZoneMinder_GetConfigValueByName {
   my ($hash, $config, $key) = @_;
-  my $searchString = qr/"Name":"$key","Value":"/;
+  my $searchString = qr/"Name":\s*"$key",\s*"Value":\s*"/;
   return ZoneMinder_GetFromJson($hash, $config, $searchString, '"');
 }
 
@@ -403,7 +453,7 @@ sub ZoneMinder_API_UpdateMonitors_Callback {
   my $name = $hash->{NAME};
 
   $data =~ s/\R//g;
-  my @monitors = split(/\{"Monitor"\:\{/, $data);
+  my @monitors = split(/\{\s*"Monitor"\:\s*\{/, $data);
 
   foreach my $monitorData (@monitors) {
     my $monitorId = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Id');
@@ -436,7 +486,7 @@ sub ZoneMinder_API_CreateMonitors_Callback {
   my $name = $hash->{NAME};
 
   $data =~ s/\R//g;
-  my @monitors = split(/\{"Monitor"\:\{/, $data);
+  my @monitors = split(/\{\s*"Monitor"\:\s*\{/, $data);
 
   foreach my $monitorData (@monitors) {
     my $monitorId = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Id');
