@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
   "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
   "8.19.2" => "06.10.2019  delete key/value pairs in SSCam_extractForTelegram and SSCam_sendEmailblocking, ".
                            "change datacontainer of SNAPHASH(OLD) from %defs to %data ",
@@ -937,12 +938,10 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{TELERECMSG} = $teletxt;
       }
 
-      SSCam_camstartrec($hash);
+      SSCam_camstartrec("$name!_!$emtxt!_!$teletxt");
  
   } elsif ($opt eq "off" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?delete $hash->{HELPER}{SMTPRECMSG}:"";
-      my $teletxt = $hash->{HELPER}{TELERECMSG}?delete $hash->{HELPER}{TELERECMSG}:"";
 	  
       my $spec = join(" ",@a);
       if($spec =~ /STRM:/) {
@@ -950,7 +949,7 @@ sub SSCam_Set($@) {
           $hash->{HELPER}{INFORM} = $1;
       }
 	  
-      SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
+      SSCam_camstoprec($hash);
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
@@ -2062,8 +2061,7 @@ sub SSCam_initonboot ($) {
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
-         my ($emtxt,$teletxt) = ("","");
-         SSCam_camstoprec("$name!_!$emtxt!_!$teletxt");
+         SSCam_camstoprec($hash);
      }
          
      # Konfiguration der Synology Surveillance Station abrufen
@@ -2329,9 +2327,10 @@ return undef;
 #                          Kamera Aufnahme starten
 ###############################################################################
 sub SSCam_camstartrec ($) {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my ($str)                  = @_;
+	my ($name,$emtxt,$teletxt) = split("!_!",$str);
+	my $hash                   = $defs{$name};
+    my $camname                = $hash->{CAMNAME};
     my $errorcode;
     my $error;
     
@@ -2366,14 +2365,21 @@ sub SSCam_camstartrec ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aufnahme starten                         
-        $hash->{OPMODE} = "Start";
+        $hash->{OPMODE}               = "Start";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
-        
+		
+		if($emtxt || $teletxt) {
+            $hash->{HELPER}{CANSENDREC} = 1 if($emtxt);                  # Versand Aufnahme soll per Email erfolgen
+            $hash->{HELPER}{CANTELEREC} = 1 if($teletxt);                # Versand Aufnahme soll per TelegramBot erfolgen
+            $hash->{HELPER}{SMTPRECMSG} = $emtxt if($emtxt);             # Text für Email-Versand
+            $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
+        }   
+		
         SSCam_setActiveToken($hash);
         SSCam_getapisites($hash);
     
 	} else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstartrec", $hash);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstartrec",  "$name!_!$emtxt!_!$teletxt", 0);
     }
 }
 
@@ -2381,10 +2387,9 @@ sub SSCam_camstartrec ($) {
 #                           Kamera Aufnahme stoppen
 ###############################################################################
 sub SSCam_camstoprec ($) {
-    my ($str)                  = @_;
-	my ($name,$emtxt,$teletxt) = split("!_!",$str);
-	my $hash                   = $defs{$name};
-    my $camname                = $hash->{CAMNAME};
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
     my $errorcode;
     my $error;
     
@@ -2417,20 +2422,14 @@ sub SSCam_camstoprec ($) {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE} = "Stop";
+        $hash->{OPMODE}               = "Stop";
         $hash->{HELPER}{LOGINRETRIES} = 0;
-		if($emtxt || $teletxt) {
-            $hash->{HELPER}{CANSENDREC} = 1 if($emtxt);                  # Versand Aufnahme soll per Email erfolgen
-            $hash->{HELPER}{CANTELEREC} = 1 if($teletxt);                # Versand Aufnahme soll per TelegramBot erfolgen
-            $hash->{HELPER}{SMTPRECMSG} = $emtxt if($emtxt);             # Text für Email-Versand
-            $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
-        }
                
         SSCam_setActiveToken($hash);  
         SSCam_getapisites($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt", 0);
+        InternalTimer(gettimeofday()+0.3, "SSCam_camstoprec", $hash, 0);
     }
 }
 
@@ -5101,7 +5100,7 @@ sub SSCam_camop_parse ($) {
                     my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
                     my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
                     RemoveInternalTimer($hash, "SSCam_camstoprec");
-                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", "$name!_!$emtxt!_!$teletxt");
+                    InternalTimer(gettimeofday()+$rectime, "SSCam_camstoprec", $hash);
                 }      
                 
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
@@ -5143,13 +5142,16 @@ sub SSCam_camop_parse ($) {
                 $hash->{HELPER}{TRANSACTION} = "fake_recsend";          # fake Transaction Device setzen
                 my $tac = SSCam_openOrgetTrans($hash);                  # Transaktion vorhandenen Code (fake_recsend)              
                 
-                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
-                $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
-				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
-				$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
-				Log3($name,4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+                # Cache initialisieren
+				if($hash->{HELPER}{CANSENDREC}) {
+					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
+					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
+					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
+					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
+					Log3($name,4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+				}
                 
-                # prüfen ob Recording als Email / Telegram versendet werden soll                
+                # Recording als Email / Telegram versenden             
 				SSCam_prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
                 
                 SSCam_closeTrans ($hash);                               # Transaktion beenden
