@@ -253,6 +253,10 @@ sub FB_CALLLIST_Set($@)
         return $usage unless(defined($item));
         
         FB_CALLLIST_deleteItem($hash, $item->{index});
+        
+        FB_CALLLIST_createReadings($hash);
+        
+        FB_CALLLIST_saveList($hash);
     }
     else
     {
