@@ -3449,9 +3449,9 @@ $writeout = 0;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
                       # $minval =  (~0 >> 1);
-                      $minval = $maxval;
                       # $maxval = -(~0 >> 1);
                       $writeout = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
+                      $minval = $maxval;
  Log3 ($name, 1, "$name - delta-h - TS result: $out_tstamp , Maxval result: $maxval , Minval result: $minval , WRITEOUT: $writeout");                     
                        
                       Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
@@ -3473,9 +3473,9 @@ $writeout = 0;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
                       # $minval =  (~0 >> 1);
-                      $minval = $maxval;
                       # $maxval = -(~0 >> 1);
                       $writeout = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));
+                      $minval = $maxval;
 Log3 ($name, 1, "$name - delta-d - TS result: $out_tstamp , Maxval result: $maxval , Minval result: $minval , WRITEOUT: $writeout");                       
                       Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
                   }
