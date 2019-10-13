@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 20326 2019-10-07 05:32:25Z DS_Starter $
+# $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.5" => "13.10.2019  change FH to Data in SSCam_sendEmailblocking, save variables ",
   "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
   "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
   "8.19.2" => "06.10.2019  delete key/value pairs in SSCam_extractForTelegram and SSCam_sendEmailblocking, ".
@@ -8239,10 +8240,8 @@ sub SSCam_sendTelegram ($$) {
        return $ret;
    }
    
-   my $telebot            = $data{SSCam}{$name}{PARAMS}{$tac}{telebot};
-   my $peers              = $data{SSCam}{$name}{PARAMS}{$tac}{peers}; 
-   my $sdat               = $data{SSCam}{$name}{PARAMS}{$tac}{sdat};                     # Hash von Imagedaten base64 codiert
-   my $vdat               = $data{SSCam}{$name}{PARAMS}{$tac}{vdat};                     # Hashref der Videodaten   
+   my $telebot = $data{SSCam}{$name}{PARAMS}{$tac}{telebot};
+   my $peers   = $data{SSCam}{$name}{PARAMS}{$tac}{peers}; 
    
    if(!$defs{$telebot}) {
        $ret = "No TelegramBot device \"$telebot\" available";
@@ -8263,9 +8262,9 @@ sub SSCam_sendTelegram ($$) {
                                     
   no strict "refs";
   my ($msg,$subject,$MediaStream,$fname);
-  if($sdat) {
+  if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
-      my @as = sort{$b<=>$a}keys%{$sdat};
+      my @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
       foreach my $key (@as) {
            ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
 		   $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
@@ -8280,7 +8279,7 @@ sub SSCam_sendTelegram ($$) {
 	  }
   }
   
-  if($vdat) {
+  if($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
       ### Aufnahmen liegen in einem Hash-Ref in $vdat vor
       my $key = 0;
       ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
@@ -8311,14 +8310,15 @@ sub SSCam_extractForTelegram($$$) {
   my $MediaStream        = $paref->{MediaStream};
   my $sdat               = $paref->{sdat};                     # Hash von Imagedaten base64 codiert
   my $vdat               = $paref->{vdat};                     # Hashref der Videodaten   
-  my ($data,$fname,$ct);
+  my ($data,$fname,$ct,$img);
   
   if($sdat) {
       $ct     = delete $paref->{sdat}{$key}{createdTm};
-      my $img = delete $paref->{sdat}{$key}{imageData};
+      $img    = delete $paref->{sdat}{$key}{imageData};
       $fname  = SSCam_trim(delete $paref->{sdat}{$key}{fileName});
       $data   = MIME::Base64::decode_base64($img); 
       Log3($name, 4, "$name - image data decoded for TelegramBot prepare");
+      undef $img;
   } 
   
   if($vdat) {
@@ -8749,7 +8749,7 @@ sub SSCam_sendEmail ($$) {
    $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       
    undef %SSCam_mailparams;
-   undef %{$extparamref};
+   undef %$extparamref;
 return;
 }
 
@@ -8833,22 +8833,9 @@ sub SSCam_sendEmailblocking($) {
 		  $fname   = delete $sdat->{$key}{fileName};
 		  $fh      = '$fh'.$key;
 		  $decoded = MIME::Base64::decode_base64($img); 
-		  my $mh   = '';
-		  if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
-			  binmode $fh;
-			  print $fh $decoded;
-			  close $fh;
-			  open ($fh, '<', \$mh);
-			  Log3($name, 4, "$name - image data were saved into memory handle for smtp prepare");
-		  } else {
-			  $err = "Can't open memory handle: $!";
-			  Log3($name, 2, "$name - $err");
-			  $err = encode_base64($err,"");
-			  return "$name|$err|''";
-		  }
 		  $mailmsg->attach(
 			  Type        => $part2type,
-			  FH          => $fh,
+              Data        => $decoded,
 			  Filename    => $fname,
 			  Disposition => 'attachment',
 		  );
@@ -8863,23 +8850,9 @@ sub SSCam_sendEmailblocking($) {
 		  $ct      = delete $vdat->{$key}{createdTm};
 		  $video   = delete $vdat->{$key}{imageData};
 		  $fname   = delete $vdat->{$key}{fileName};
-		  $fh      = '$fh'.$key;
-		  my $mh   = '';
-		  if(open ($fh, '>', \$mh)) {            # in-memory IO Handle
-			  binmode $fh;
-			  print $fh $video;
-			  close $fh;
-			  open ($fh, '<', \$mh);
-			  Log3($name, 4, "$name - video data were saved into memory handle for smtp prepare");
-		  } else {
-			  $err = "Can't open memory handle: $!";
-			  Log3($name, 2, "$name - $err");
-			  $err = encode_base64($err,"");
-			  return "$name|$err|''";
-		  }
 		  $mailmsg->attach(
 			  Type        => $part2type,
-			  FH          => $fh,
+              Data        => $video,
 			  Filename    => $fname,
 			  Disposition => 'attachment',
 		  );
@@ -8997,13 +8970,6 @@ sub SSCam_sendEmailblocking($) {
   
   my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
-  
-  if($sdat || $vdat) {
-      # handles schließen
-      foreach my $key (@as) {
-          close '$fh'.$key;
-      }
-  }
   
   use strict "refs";
   
@@ -9142,15 +9108,12 @@ sub SSCam_cleanData($;$) {
   if($tac) {
       if($data{SSCam}{$name}{SENDRECS}{$tac}) {
           delete $data{SSCam}{$name}{SENDRECS}{$tac};
-          $del = 1;
       }
       if($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
           delete $data{SSCam}{$name}{SENDSNAPS}{$tac};
-          $del = 1;
       }
       if($data{SSCam}{$name}{PARAMS}{$tac}) {
           delete $data{SSCam}{$name}{PARAMS}{$tac};
-          $del = 1;
       }
       if ($del && AttrVal($name,"debugactivetoken",0)) {
           Log3($name, 1, "$name - Data Hash (SENDRECS/SENDSNAPS/PARAMS) of Transaction \"$tac\" deleted");
@@ -9193,12 +9156,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20326 2019-10-07 05:32:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20326 2019-10-07 05:32:25Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
