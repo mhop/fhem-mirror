@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "8.19.6" => "14.10.2019  optimize memory usage of SSCam_composegallery ",
   "8.19.5" => "13.10.2019  change FH to Data in SSCam_sendEmailblocking, save variables ",
   "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
   "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
@@ -7722,8 +7723,7 @@ return $ret;
 sub SSCam_composegallery ($;$$$) { 
   my ($name,$strmdev,$model,$ftui) = @_;
   my $hash     = $defs{$name};
-  my $camname  = $hash->{CAMNAME};
-  # my $allsnaps = $data{SSCam}{$name}{SNAPHASH};                                        
+  my $camname  = $hash->{CAMNAME};                                      
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", "");                                      # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");                                           # Systemsprache       
@@ -7815,7 +7815,6 @@ sub SSCam_composegallery ($;$$$) {
   $header .= $sgbnote;
   
   my $gattr  = (AttrVal($name,"snapGallerySize","Icon") eq "Full")?$ha:"";    
-  my @as     = sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}};
   
   # Ausgabetabelle erstellen
   my ($htmlCode);
@@ -7827,27 +7826,27 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= "<tr class=\"odd\">";
   my $cell   = 1;
   
-  foreach my $key (@as) {
-      # $ct = $data{SSCam}{$name}{SNAPHASH}{$key}{createdTm};
-      my $idata = "";
+  my $idata = "";
+  foreach my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
       if(!$ftui) {
           $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
 	  }
-      my $html = sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );
       $cell++;
 
       if ( $cell == $sgc+1 ) {
-        $htmlCode .= $html;
+        $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );;
         $htmlCode .= "</tr>";
         $htmlCode .= "<tr class=\"odd\">";
         $cell = 1;
       } else {
-        $htmlCode .= $html;
+        $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );;
       }
+      
+      $idata = "";
   }
 
   if ( $cell == 2 ) {
-    $htmlCode .= "<td> </td>";
+      $htmlCode .= "<td> </td>";
   }
   
   $htmlCode .= "</tr>";
@@ -7858,7 +7857,7 @@ sub SSCam_composegallery ($;$$$) {
       $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   }
   $htmlCode .= "</html>";
-
+  
 return $htmlCode;
 }
 
