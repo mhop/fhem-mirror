@@ -3216,6 +3216,8 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
+          Log3($name, 4, "DbLog $name -> deltacalc: hour") if($readings[$i]->[3] eq "delta-h");
+          Log3($name, 4, "DbLog $name -> deltacalc: day")  if($readings[$i]->[3] eq "delta-d");
       }
 
       my ($stm);
@@ -3243,8 +3245,11 @@ Log3 ($name, 1, "$name - Init Maxval: $maxval , Init Minval: $minval ");
           $stm .= "AND TIMESTAMP > $sqlspec{day_before} "; 
                    
           $stm .= "ORDER BY TIMESTAMP DESC LIMIT 1 ) AS Z 
-                   UNION ALL ";
-          
+                   UNION ALL " if($readings[$i]->[3] eq "delta-h");
+                   
+          $stm .= "ORDER BY TIMESTAMP) AS Z 
+                   UNION ALL " if($readings[$i]->[3] eq "delta-d");
+                          
           $stm .= "SELECT
                    MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
                    MAX(DEVICE) AS DEVICE,
@@ -3468,7 +3473,7 @@ $writeout = 0;
               
                   if("$tstamp{day}" ne "$lasttstamp{day}") {
                       # Aenderung des Tages, Berechne Delta
-                      $out_value = sprintf("%g", $maxval - $minval);
+                      $out_value = sprintf("%g", $maxval - $minval);            # %g - a floating-point number
                       $sum[$i] += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
