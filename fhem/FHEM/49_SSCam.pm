@@ -9107,12 +9107,15 @@ sub SSCam_cleanData($;$) {
   if($tac) {
       if($data{SSCam}{$name}{SENDRECS}{$tac}) {
           delete $data{SSCam}{$name}{SENDRECS}{$tac};
+          $del = 1;
       }
       if($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
           delete $data{SSCam}{$name}{SENDSNAPS}{$tac};
+          $del = 1;
       }
       if($data{SSCam}{$name}{PARAMS}{$tac}) {
           delete $data{SSCam}{$name}{PARAMS}{$tac};
+          $del = 1;
       }
       if ($del && AttrVal($name,"debugactivetoken",0)) {
           Log3($name, 1, "$name - Data Hash (SENDRECS/SENDSNAPS/PARAMS) of Transaction \"$tac\" deleted");
