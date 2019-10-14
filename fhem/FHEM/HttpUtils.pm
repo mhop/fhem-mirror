@@ -139,6 +139,21 @@ ip2str($)
 
 # https://mislove.org/teaching/cs4700/spring11/handouts/project1-primer.pdf
 my %HU_dnsCache;
+
+sub
+HttpUtils_dumpDnsCache()
+{
+  my @ret;
+  my $max = 0;
+  map { my $l=length($_); $max=$l if($l>$max) } keys %HU_dnsCache;
+  for my $hn (sort keys %HU_dnsCache) {
+    push @ret, sprintf("%*s   TS: %s   TTL: %5s   ADDR: %s", -$max, $hn, 
+      FmtDateTime($HU_dnsCache{$hn}{TS}), $HU_dnsCache{$hn}{TTL},
+      join(".", unpack("C*", $HU_dnsCache{$hn}{addr})));
+  }
+  return join("\n", @ret);
+}
+
 sub
 HttpUtils_dnsParse($$$)
 {
@@ -173,7 +188,7 @@ HttpUtils_dnsParse($$$)
   return "No A record found";
 }
 
-# { HttpUtils_gethostbyname({timeout=>4}, "google.com", 1,
+# { HttpUtils_gethostbyname({timeout=>4}, "fhem.de", 1,
 #   sub(){my($h,$e,$a)=@_;; Log 1, $e ? "ERR:$e": ("IP:".ip2str($a)) }) }
 sub
 HttpUtils_gethostbyname($$$$)
