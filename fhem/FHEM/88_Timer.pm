@@ -35,7 +35,7 @@ if ($language eq "DE") {
 } else {
 	@designations = ("Sunrise","Sunset","local time","","SR","SS");
 	$description_all = "all";     # using in RegEx
-	@names = ("No.","Year","Month","Day","Hour","Minute","Second","Device or label","Action","Mon","Tue","Wed","Thu","Fri","Sat","SSn","active","");
+	@names = ("No.","Year","Month","Day","Hour","Minute","Second","Device or label","Action","Mon","Tue","Wed","Thu","Fri","Sat","Sun","active","");
 }
 
 ##########################
@@ -44,6 +44,7 @@ sub Timer_Initialize($) {
 
 	$hash->{AttrFn}       = "Timer_Attr";
 	$hash->{AttrList}     = "disable:0,1 ".
+													"Offset_Horizon:REAL,CIVIL,NAUTIC,ASTRONOMIC ".
 													"Show_DeviceInfo:alias,comment ".
 													"Timer_preselection:on,off ".
 													"Table_Border_Cell:on,off ".
@@ -372,6 +373,7 @@ sub Timer_Get($$$@) {
 			}
 
 			for (my $i=0;$i<@attr_values;$i++) {                     # write new attr value
+				chomp ($attr_values[$i]);                            # Zeilenende entfernen
 				CommandAttr($hash,"$name $attr_values_names[$i] $attr_values[$i]");
 			}
 
@@ -393,7 +395,7 @@ sub Timer_Attr() {
 	my $typ = $hash->{TYPE};
 
 	if ($cmd eq "set" && $init_done == 1 ) {
-		Log3 $name, 3, "$name: Attr | set $attrName to $attrValue";
+		Log3 $name, 5, "$name: Attr | set $attrName to $attrValue";
 		if ($attrName eq "disable") {
 			if ($attrValue eq "1") {
 				readingsSingleUpdate($hash, "internalTimer" , "stop",1);
@@ -410,7 +412,7 @@ sub Timer_Attr() {
 	}
 
 	if ($cmd eq "del") {
-		Log3 $name, 3, "$name: Attr | Attributes $attrName deleted";
+		Log3 $name, 5, "$name: Attr | Attributes $attrName deleted";
 		if ($attrName eq "disable") {
 			Timer_Check($hash);
 		}
@@ -467,10 +469,10 @@ sub Timer_FW_Detail($$$$) {
 	my $Table_Size_TextBox = AttrVal($name,"Table_Size_TextBox",20);
 	my $Table_Style = AttrVal($name,"Table_Style","off");
 	my $Table_View_in_room = AttrVal($name,"Table_View_in_room","on");
-	my $style_background = "";
 	my $style_code1 = "";
 	my $style_code2 = "";
 	my $time = FmtDateTime(time());
+	my $horizon = AttrVal($name,"Offset_Horizon","REAL");
 	my $FW_room_dupl = $FW_room;
 	my @timer_nr;
 	my $cnt_max = scalar(@names);
@@ -526,8 +528,8 @@ sub Timer_FW_Detail($$$$) {
 	}
 	$style_code2 = "border:2px solid #00FF00;" if($Table_Border eq "on");
 
-	$html.= "<div style=\"text-align: center; font-size:medium; padding: 0px 0px 6px 0px;\">$designations[0]: ".sunrise_abs("REAL")." $designations[3]&nbsp;&nbsp;|&nbsp;&nbsp;$designations[1]: ".sunset_abs("REAL")." $designations[3]&nbsp;&nbsp;|&nbsp;&nbsp;$designations[2]: ".TimeNow()." $designations[3]</div>" if($Table_Header_with_time eq "on");
-	$html.= "<div id=\"table\"><table class=\"block wide\" cellspacing=\"0\" style=\"$style_code2\">";
+	$html.= "<div style=\"text-align: center; font-size:medium; padding: 0px 0px 6px 0px;\">$designations[0]: ".sunrise_abs($horizon)." $designations[3]&nbsp;&nbsp;|&nbsp;&nbsp;$designations[1]: ".sunset_abs($horizon)." $designations[3]&nbsp;&nbsp;|&nbsp;&nbsp;$designations[2]: ".TimeNow()." $designations[3]</div>" if($Table_Header_with_time eq "on");
+	$html.= "<div id=\"table\"><table class=\"block wide\" style=\"$style_code2\">";
 
 	#         Timer Jahr  Monat Tag   Stunde Minute Sekunde Gerät   Aktion Mo Di Mi Do Fr Sa So aktiv speichern
 	#         -------------------------------------------------------------------------------------------------
@@ -537,29 +539,26 @@ sub Timer_FW_Detail($$$$) {
 	# T 1 id: 20    21    22    23    24     25     26      27      28     29 30 31 32 33 34 35 36    37         ($id = timer_nr * 20 + $Spalte)
 	# T 2 id: 40    41    42    43    44     45     46      47      48     49 50 51 52 53 54 55 56    57         ($id = timer_nr * 20 + $Spalte)
 
-	## Überschriften
-	$html.= "<tr>";
+	## Ueberschrift
+	$html.= "<tr class=\"odd\">";
 	####
 	$style_code1 = "border:1px solid #D8D8D8;" if($Table_Border_Cell eq "on");
 	for(my $spalte = 0; $spalte <= $cnt_max - 1; $spalte++) {
-		$html.= "<td align=\"center\" width=70 style=\"$style_code1 Padding-top:3px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte >= 1 && $spalte <= 6);   ## definierte Breite bei Auswahllisten
-		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte > 6 && $spalte < $cnt_max);	## auto Breite
-		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; Padding-left:5px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte == 0);	## auto Breite
-		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; Padding-right:5px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte == $cnt_max - 1);	## auto Breite
+		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; Padding-left:5px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte == 0);							# Timer-Nummer - auto Breite
+		$html.= "<td align=\"center\" width=70 style=\"$style_code1 Padding-top:3px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte >= 1 && $spalte <= 6);				# Dropdown-Listen - definierte Breite
+		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte > 6 && $spalte < $cnt_max - 1);				# auto Breite
+		$html.= "<td align=\"center\" style=\"$style_code1 Padding-top:3px; Padding-right:5px; text-decoration:underline\">".$names[$spalte]."</td>" if ($spalte == $cnt_max - 1);	# Button save - auto Breite
 	}
 	$html.= "</tr>";
 
 	for(my $zeile = 0; $zeile < $Timers_Count; $zeile++) {
-		$style_background = "background-color:#F0F0D8;" if ($zeile % 2 == 0);
-		$style_background = "" if ($zeile % 2 != 0);
-		$html.= "<tr>";
+		$html.= sprintf("<tr class=\"%s\">", ($zeile & 1)?"odd":"even");
 		my $id = $timer_nr[$zeile] * 20; # id 20, 40, 60 ...
 		# Log3 $name, 3, "$name: Zeile $zeile, id $id, Start";
-
 		my @select_Value = split(",", ReadingsVal($name, "Timer_".$timer_nr[$zeile], "$description_all,$description_all,$description_all,$description_all,$description_all,00,Lampe,on,0,0,0,0,0,0,0,0,,"));
 		for(my $spalte = 1; $spalte <= $cnt_max; $spalte++) {
-			$style_code1 .= "Padding-bottom:5px; " if ($zeile == $Timers_Count - 1);
-			$html.= "<td align=\"center\" style=\"$style_code1 $style_background\">".sprintf("%02s", $timer_nr[$zeile])."</td>" if ($spalte == 1);	# Spalte Timer-Nummer
+			$style_code1 .= "Padding-bottom:5px; " if ($zeile == $Timers_Count - 1);	# letzte Zeile
+			$html.= "<td align=\"center\" style=\"$style_code1\">".sprintf("%02s", $timer_nr[$zeile])."</td>" if ($spalte == 1);	# Spalte Timer-Nummer
 			if ($spalte >=2 && $spalte <= 7) {	## DropDown-Listen fuer Jahr, Monat, Tag, Stunde, Minute, Sekunde
 				my $start = 0;																# Stunde, Minute, Sekunde
 				my $stop = 12;																# Monat
@@ -575,7 +574,7 @@ sub Timer_FW_Detail($$$$) {
 				$id++;
 
 				# Log3 $name, 3, "$name: Zeile $zeile, id $id, select";
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"><select id=\"".$id."\">";	# id need for java script
+				$html.= "<td align=\"center\" style=\"$style_code1\"><select id=\"".$id."\">";	# id need for java script
 				$html.= "<option>$description_all</option>" if ($spalte <= 6);     # Jahr, Monat, Tag, Stunde, Minute
 				if ($spalte == 5 || $spalte == 6) {                                # Stunde, Minute
 					$selected = $select_Value[$spalte-2] eq $designations[4] ? "selected=\"selected\"" : "";
@@ -595,33 +594,30 @@ sub Timer_FW_Detail($$$$) {
 				my $comment = "";
 				$comment = AttrVal($select_Value[$spalte-2],"alias","") if (AttrVal($name,"Show_DeviceInfo","") eq "alias");
 				$comment = AttrVal($select_Value[$spalte-2],"comment","") if (AttrVal($name,"Show_DeviceInfo","") eq "comment");
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"><input size=\"$Table_Size_TextBox\" type=\"text\" placeholder=\"Timer_".($zeile + 1)."\" id=\"".$id."\" value=\"".$select_Value[$spalte-2]."\"><br><small>$comment</small></td>";
+				$html.= "<td align=\"center\" style=\"$style_code1\"><input size=\"$Table_Size_TextBox\" type=\"text\" placeholder=\"Timer_".($zeile + 1)."\" id=\"".$id."\" value=\"".$select_Value[$spalte-2]."\"><br><small>$comment</small></td>";
 			}
 
 			if ($spalte == 9) {			## DropDown-Liste Aktion
 				$id ++;
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"><select id=\"".$id."\">";							# id need for java script
+				$html.= "<td align=\"center\" style=\"$style_code1\"><select id=\"".$id."\">";							# id need for java script
 				foreach (@action) {
 					$html.= "<option> $_ </option>" if ($select_Value[$spalte-2] ne $_);
 					$html.= "<option selected=\"selected\">".$select_Value[$spalte-2]."</option>" if ($select_Value[$spalte-2] eq $_);
 				}
 				$html.="</select></td>";
 			}
-
-			## Spalte Wochentage + aktiv
+		
+			if ($spalte > 9 && $spalte < $cnt_max) {	## Spalte Wochentage + aktiv
+				$id ++;
+				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"0\" onclick=\"Checkbox(".$id.")\"></td>" if ($select_Value[$spalte-2] eq "0");
+				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"1\" onclick=\"Checkbox(".$id.")\" checked></td>" if ($select_Value[$spalte-2] eq "1");
+			}
+			
+			if ($spalte == $cnt_max) {	## Button Speichern
+				$id ++;
+				$html.= "<td align=\"center\" style=\"$style_code1 Padding-right:5px\"> <INPUT type=\"reset\" onclick=\"pushed_savebutton(".$id.")\" value=\"&#128190;\"/></td>"; # &#128427; &#128190;
+			}
 			Log3 $name, 5, "$name: attr2html | Timer=".$timer_nr[$zeile]." ".$names[$spalte-1]."=".$select_Value[$spalte-2]." cnt_max=$cnt_max ($spalte)" if ($spalte > 1 && $spalte < $cnt_max);
-
-			## existierender Timer
-			if ($spalte > 9 && $spalte < $cnt_max) {
-				$id ++;
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"0\" onclick=\"Checkbox(".$id.")\"></td>" if ($select_Value[$spalte-2] eq "0");
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"1\" onclick=\"Checkbox(".$id.")\" checked></td>" if ($select_Value[$spalte-2] eq "1");
-			}
-			## Button Speichern
-			if ($spalte == $cnt_max) {
-				$id ++;
-				$html.= "<td align=\"center\" style=\"$style_code1 $style_background\"> <INPUT type=\"reset\" onclick=\"pushed_savebutton(".$id.")\" value=\"&#128190;\"/></td>"; # &#128427; &#128190;
-			}
 		}
 		$html.= "</tr>";			## Zeilenende
 	}
@@ -783,7 +779,7 @@ sub Timer_delFromUserattr($$) {
 
 	if (AttrVal($name, "userattr", undef) =~ /$deleteTimer/) {
 		delFromDevAttrList($name, $deleteTimer);
-		Log3 $name, 3, "$name: delete $deleteTimer from userattr Attributes";
+		Log3 $name, 5, "$name: delete $deleteTimer from userattr Attributes";
 	}
 }
 
@@ -797,8 +793,9 @@ sub Timer_Check($) {
 	my $intervall = 60;                                   # Intervall to start new InternalTimer (standard)
 	my $cnt_activ = 0;                                    # counter for activ timers
 	my ($seconds, $microseconds) = gettimeofday();
-	my @sunriseValues = split(":" , sunrise_abs("REAL"));	# Sonnenaufgang (06:34:24) splitted in array
-	my @sunsetValues = split(":" , sunset_abs("REAL"));		# Sonnenuntergang (19:34:24) splitted in array
+	my $horizon = AttrVal($name,"Offset_Horizon","REAL");
+	my @sunriseValues = split(":" , sunrise_abs($horizon));	# Sonnenaufgang (06:34:24) splitted in array
+	my @sunsetValues = split(":" , sunset_abs($horizon));		# Sonnenuntergang (19:34:24) splitted in array
 	my $state;;
 
 	Log3 $name, 5, "$name: Check is running, Sonnenaufgang $sunriseValues[0]:$sunriseValues[1]:$sunriseValues[2], Sonnenuntergang $sunsetValues[0]:$sunsetValues[1]:$sunsetValues[2]";
@@ -919,6 +916,13 @@ the timer uses the calculated sunset time at your location. <u><i>(For this calc
 	 <li>annually, define second + minute + hour + day + month and set the value (year) to <code>all</code></li>
 	 <li>sunrise, define second & define minute + hour with <code>SR</code> and set all other values ​​(day, month, year) to <code>all</code></li>
 	 <li>sunset, define second & define minute + hour with <code>SS</code> and set all other values ​​(day, month, year) to <code>all</code></li></ul>
+<br>
+Any interval circuits can be defined in which in the associated timer attribute e.g. the following Perl code is inserted:<br>
+<code>{if ($min % 5 == 0) {fhem("set FS10_6_11 toggle");}}</code><br>
+This timer would run every 5 minutes if the timer is configured to run in a minute as described.<br>
+The following variables for time and date are available:<br>
+<code>$sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd, $we, $twe</code><br>
+This makes it possible, for example, to have a timer run every Sunday at 15:30:00.
 <br><br>
 
 <b>Define</b><br>
@@ -968,11 +972,14 @@ the timer uses the calculated sunset time at your location. <u><i>(For this calc
 	<small><i>In the room <code> Unsorted </code> the table UI is always switched off!</i></small></li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Sets the input values ​​for a new timer to the current time. (on | off = default)</li><a name=" "></a></ul><br>
+	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
+	Different elevation angles are used to calculate sunrise and sunset times.<br>
+	(REAL = 0°, CIVIL = -6°, NAUTIC = -12°, ASTRONOMIC = -18°, default REAL)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Show_DeviceInfo">Show_DeviceInfo</a><br>
 	Shows the additional information (alias | comment, default off)</li><a name=" "></a></ul><br>
 	<br>
 
-<b><i>Generierte Readings</i></b><br>
+<b><i>Generated readings</i></b><br>
 	<ul><li>Timer_xx<br>
 	Memory values ​​of the individual timer</li><br>
 	<li>internalTimer<br>
@@ -1022,6 +1029,13 @@ stellen, so nutzt der Timer den errechnenten Zeitpunkt Sonnenuntergang an Ihrem 
 	 <li>j&auml;hrlich, Sekunde + Minute + Stunde + Tag + Monat definieren und den Wert (Jahr) auf <code>alle</code> setzen</li>
 	 <li>Sonnenaufgang, Sekunde definieren & Minute + Stunde definieren mit <code>SA</code> und alle anderen Werte (Tag, Monat, Jahr) auf <code>alle</code> setzen</li>
 	 <li>Sonnenuntergang, Sekunde definieren & Minute + Stunde definieren mit <code>SU</code> und alle anderen Werte (Tag, Monat, Jahr) auf <code>alle</code> setzen</li></ul>
+<br>
+Beliebige Intervallschaltungen k&ouml;nnen definiert werden, in dem im zugeh&ouml;rigen Timer-Attribut z.B. folgender Perl-Code eingef&uuml;gt wird:<br>
+<code>{if ($min % 5 == 0) {fhem("set FS10_6_11 toggle");}}</code><br>
+Dieser Timer w&uuml;rde dann aller 5 Minuten ausgef&uuml;hrt, wenn der Timer wie beschrieben auf min&uuml;tliches Ausf&uuml;hren konfiguriert ist.<br>
+Folgende Variablen f&uuml;r Zeit- und Datumsangaben stehen zur Verf&uuml;gung:<br>
+<code>$sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst, $week, $hms, $hm, $md, $ymd, $we, $twe</code><br>
+Damit ist es m&ouml;glich, einen Timer beispielsweise nur jeden Sonntag um 15:30:00 Uhr etwas ausf&uuml;hren zu lassen.
 <br><br>
 
 <b>Define</b><br>
@@ -1071,6 +1085,9 @@ stellen, so nutzt der Timer den errechnenten Zeitpunkt Sonnenuntergang an Ihrem 
 	<small><i>Im Raum <code>Unsorted</code> ist das Tabellen UI immer abgeschalten!</i></small></li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Setzt die Eingabewerte bei einem neuen Timer auf die aktuelle Zeit. (on | off, standard off)</li><a name=" "></a></ul><br>
+	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
+	F&uuml;r die Berechnung der Zeiten von Sonnenaufgang und Sonnenuntergang werden verschiedene H&ouml;henwinkel verwendet.<br>
+	(REAL = 0°, CIVIL = -6°, NAUTIC = -12°, ASTRONOMIC = -18°, Standard REAL)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Show_DeviceInfo">Show_DeviceInfo</a><br>
 	Blendet die Zusatzinformation ein. (alias | comment, standard off)</li><a name=" "></a></ul><br>
 	<br>
