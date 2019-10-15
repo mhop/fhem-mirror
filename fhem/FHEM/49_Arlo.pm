@@ -21,7 +21,7 @@ sub Arlo_Initialize($$) {
   $hash->{UndefFn}  = "Arlo_Undef";
   $hash->{GetFn}    = "Arlo_Get";
   $hash->{SetFn}    = "Arlo_Set";
-  $hash->{AttrList} = "disable:1 pingInterval updateInterval downloadDir downloadLink ssePollingInterval videoDownloadFix:0,1 ".$readingFnAttributes;  
+  $hash->{AttrList} = "disable:1 expiryTime pingInterval updateInterval downloadDir downloadLink ssePollingInterval videoDownloadFix:0,1 ".$readingFnAttributes;  
   $hash->{AttrFn}   = "Arlo_Attr";
 }
 
