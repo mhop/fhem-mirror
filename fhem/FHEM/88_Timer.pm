@@ -896,16 +896,16 @@ the timer uses the calculated sunset time at your location. <u><i>(For this calc
 <u>Programmable actions are currently:</u><br>
 <ul>
 	<li><code> on | off</code> - The states must be supported by the device</li>
-	<li><code>Def</code> - for a PERL code or a FHEM command * <br><br>
+	<li><code>Def</code> - for a PERL code or a FHEM command <font color="red">*</font color> <br><br>
 	<ul><u>example for Def:</u>
 	<li><code>{ Log 1, "Timer: now switch" }</code> (PERL code)</li>
-	<li><code>update</code> (FHEM command)</li></ul>
-	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-command)</li>
+	<li><code>update</code> (FHEM command)</li>
+	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-command)</li></ul>
 	</li>
 </ul>
 <br>
 
-<b>*</b> To do this, enter the code to be executed in the respective attribute. example: <code>Timer_03_set</code>
+<b><font color="red">*</font color></b> To do this, enter the code to be executed in the respective attribute. example: <code>Timer_03_set</code>
 
 <br><br>
 <u>Interval switching of the timer is only possible in the following variants:</u><br>
@@ -972,6 +972,9 @@ This makes it possible, for example, to have a timer run every Sunday at 15:30:0
 	<small><i>In the room <code> Unsorted </code> the table UI is always switched off!</i></small></li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Sets the input values ​​for a new timer to the current time. (on | off = default)</li><a name=" "></a></ul><br>
+	<ul><li><a name="Timer_xx_set">Timer_xx_set</a><br>
+	Location for the FHEM command or PERL code of the timer (xx has the numerical value of 01-99). WITHOUT this attribute, which <b> only appears if action <code> Def </code> is set </b>,
+	The module does not process FHEM command or PERL code from the user. <code><font color="red">*</font color> </code></li><a name=" "></a></ul><br>
 	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
 	Different elevation angles are used to calculate sunrise and sunset times.<br>
 	(REAL = 0°, CIVIL = -6°, NAUTIC = -12°, ASTRONOMIC = -18°, default REAL)</li><a name=" "></a></ul><br>
@@ -999,7 +1002,7 @@ This makes it possible, for example, to have a timer run every Sunday at 15:30:0
 <ul>
 Das Timer Modul ist eine programmierbare Schaltuhr.<br><br>
 Im Frontend k&ouml;nnen Sie neue Zeitpunkte und Aktionen definieren. Die kleinstm&ouml;gliche Definition einer Aktion ist ein 10 Sekunden Intervall.<br>
-Mittels der Dropdown Men&uuml;s k&ouml;nnen Sie die Einstellungen für den Zeitschaltpunkt vornehmen. Erst nach dem dr&uuml;cken auf den <code>Speichern</code> Knopf wird die Einstellung &uuml;bernommen.<br><br>
+Mittels der Dropdown Men&uuml;s k&ouml;nnen Sie die Einstellungen f&uuml;r den Zeitschaltpunkt vornehmen. Erst nach dem dr&uuml;cken auf den <code>Speichern</code> Knopf wird die Einstellung &uuml;bernommen.<br><br>
 In der DropDown-Liste stehen jeweils die Zahlenwerte f&uuml;r Jahr	/ Monat	/ Tag	/ Stunde / Minute / Sekunde zur Auswahl.<br>
 Zus&auml;tzlich k&ouml;nnen Sie in der Spalte Stunde und Minute die Auswahl <code>SA</code> und <code>SU</code> nutzen. Diese K&uuml;rzel stehen f&uuml;r den Zeitpunkt Sonnenaufgang und Sonnenuntergang.<br>
 Wenn sie Beispielsweise bei Minute <code>SU</code> ausw&auml;hlen, so haben Sie die Minuten des Sonnenuntergang als Wert gesetzt. Sobald Sie bei Stunde und Minute den Wert auf <code>SU</code>
@@ -1009,8 +1012,8 @@ stellen, so nutzt der Timer den errechnenten Zeitpunkt Sonnenuntergang an Ihrem 
 <u>Programmierbare Aktionen sind derzeit:</u><br>
 <ul>
 	<li><code> on | off</code> - Die Zust&auml;nde m&uuml;ssen von dem zu schaltenden Device unterst&uuml;tzt werden</li>
-	<li><code>Def</code> - für einen PERL-Code oder ein FHEM Kommando * <br><br>
-	<ul><u>Beispiele für Def:</u>
+	<li><code>Def</code> - f&uuml;r einen PERL-Code oder ein FHEM Kommando <font color="red">*</font color> <br><br>
+	<ul><u>Beispiele f&uuml;r Def:</u>
 	<li><code>{ Log 1, "Timer: schaltet jetzt" }</code> (PERL-Code)</li>
 	<li><code>update</code> (FHEM-Kommando)</li>
 	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-Kommando)</li></ul>
@@ -1018,7 +1021,7 @@ stellen, so nutzt der Timer den errechnenten Zeitpunkt Sonnenuntergang an Ihrem 
 </ul>
 <br>
 
-<b>*</b> Hierfür hinterlegen Sie den auszuf&uuml;hrenden Code in das jeweilige Attribut. Bsp.: <code>Timer_03_set</code>
+<b><font color="red">*</font color></b> Hierf&uuml;r hinterlegen Sie den auszuf&uuml;hrenden PERL-Code in das jeweilige Attribut. Bsp.: <code>Timer_03_set</code>
 
 <br><br>
 <u>Eine Intervallschaltung des Timer ist nur m&ouml;glich in folgenden Varianten:</u><br>
@@ -1075,9 +1078,9 @@ Damit ist es m&ouml;glich, einen Timer beispielsweise nur jeden Sonntag um 15:30
 	<ul><li><a name="Table_Border_Cell">Table_Border_Cell</a><br>
 	Blendet den Cellrahmen ein. (on | off, standard off)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Table_Header_with_time">Table_Header_with_time</a><br>
-	Blendet den Sonnenauf und Sonnenuntergang mit der lokalen Zeit über der Tabelle ein oder aus. (on | off, standard off)</li><a name=" "></a></ul><br>
+	Blendet den Sonnenauf und Sonnenuntergang mit der lokalen Zeit &uuml;ber der Tabelle ein oder aus. (on | off, standard off)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Table_Size_TextBox">Table_Size_TextBox</a><br>
-	Korrekturwert um die L&auml;nge der Textbox für die Ger&auml;tenamen / Bezeichung zu ver&auml;ndern. (standard 20)</li><a name=" "></a></ul><br>
+	Korrekturwert um die L&auml;nge der Textbox f&uuml;r die Ger&auml;tenamen / Bezeichung zu ver&auml;ndern. (standard 20)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Table_Style">Table_Style</a><br>
 	Schaltet den definierten Tabellen-Style ein. (on | off, standard off)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Table_View_in_room">Table_View_in_room</a><br>
@@ -1085,6 +1088,9 @@ Damit ist es m&ouml;glich, einen Timer beispielsweise nur jeden Sonntag um 15:30
 	<small><i>Im Raum <code>Unsorted</code> ist das Tabellen UI immer abgeschalten!</i></small></li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Setzt die Eingabewerte bei einem neuen Timer auf die aktuelle Zeit. (on | off, standard off)</li><a name=" "></a></ul><br>
+	<ul><li><a name="Timer_xx_set">Timer_xx_set</a><br>
+	Speicherort f&uuml;r das FHEM-Kommando oder den PERL-Code des Timers (xx hat den Zahlenwert von 01-99). OHNE dieses Attribut, welches <b>nur erscheint wenn die Aktion <code>Def</code> eingestellt </b> ist,
+	verarbeitet das Modul kein Kommando oder PERL-Code vom Benutzer. <code> <font color="red">*</font color> </code></li><a name=" "></a></ul><br>
 	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
 	F&uuml;r die Berechnung der Zeiten von Sonnenaufgang und Sonnenuntergang werden verschiedene H&ouml;henwinkel verwendet.<br>
 	(REAL = 0°, CIVIL = -6°, NAUTIC = -12°, ASTRONOMIC = -18°, Standard REAL)</li><a name=" "></a></ul><br>

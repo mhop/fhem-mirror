@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  88_Timer: commandref revised
  - change:  49_SSCam: internal code changed
  - change:  88_Timer: Remove line end when importing file of the saved timers
                       Background color of the table from CSS
