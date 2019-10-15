@@ -398,6 +398,11 @@ sub Arlo_PrepareRequest($$;$$$$) {
   $method = "GET" if (!defined($method));
   
   my $account = $modules{$MODULE}{defptr}{"account"};
+  
+  if ($account->{STATE} eq 'inactive') {
+    Arlo_Login($account);
+  }
+  
   my $name = $account->{NAME};
   my $cookies = $account->{helper}{cookies};
   my $token = $account->{helper}{token};
@@ -466,7 +471,8 @@ sub Arlo_DefaultCallback($$$) {
 			$logLevel = 5;
 		  } elsif ($data->{error} eq '1022' && $data->{reason} eq 'Access token is invalid') {
 			Log3 $name, 3, "Arlo access token was invalid. Reconnect to Arlo.";
-			if ($hash->{STATE} eq 'active') {
+			if ($account->{STATE} eq 'active') {
+			  $account->{RETRY} = 1;
               Arlo_Login($account);
             }
 			$logLevel = 5;
@@ -607,7 +613,7 @@ sub Arlo_SubscribeCallback($$$)  {
   my $response = Arlo_DefaultCallback($hash, $err, $jsonData);
   my $origin = $hash->{origin};
   if (defined($response) && $origin && ReadingsVal($origin->{NAME}, 'state', '') eq 'offline') {
-    readingsSingleUpdate($hash, 'state', 'online', 1);
+    readingsSingleUpdate($origin, 'state', 'online', 1);
     InternalTimer(gettimeofday() + 1, 'Arlo_UpdateBasestationReadings', $hash);
   }
 }
@@ -709,7 +715,35 @@ sub Arlo_SetModeReading($$) {
     }
     $modeName = $mode if (!defined($modeName) || $modeName eq '');
     readingsSingleUpdate($basestation, 'state', $modeName, 1);
+    Arlo_CheckExpiry($account, $modeName);
   }
+}
+
+sub Arlo_CheckExpiry($$) {
+  my ($account, $modeName) = @_;
+  my $expiryTime = AttrVal($account->{NAME}, 'expiryTime', 600);
+  if ($account->{STATE} eq 'active' && $expiryTime > 0) {
+    if ($modeName ne 'disarmed' && defined($account->{EXPIRY})) {
+      delete $account->{EXPIRY};
+    } elsif ($modeName eq 'disarmed' && Arlo_CheckBasestationsInactive()) {
+      $account->{EXPIRY} = gettimeofday() + $expiryTime;
+    }
+  } elsif ($account->{STATE} eq 'inactive' && $modeName ne 'disarmed') {
+    Arlo_Login($account);
+  }
+}
+
+sub Arlo_CheckBasestationsInactive() {
+  my %defptr = %{$modules{$MODULE}{defptr}};
+  foreach my $key (keys %defptr) {
+    if (substr($key, 0, 1) eq 'B') {
+      my $state = %defptr{$key}->{STATE};
+      if ($state ne 'disarmed' && $state ne 'offline') {
+        return \0;
+      }
+    }
+  }
+  return \1;
 }
 
 sub Arlo_BasestationArm($) {
@@ -966,7 +1000,8 @@ sub Arlo_Login($) {
     return;
   }
 
-  $hash->{STATE} = 'inactive';
+  $hash->{STATE} = 'login';
+  delete $hash->{EXPIRY};
   
   my $password = encode_base64($hash->{helper}{password}, '');
   my $input = {email => $hash->{helper}{username}, password => $password, EnvSource => 'prod', language => 'de'};
@@ -979,51 +1014,51 @@ sub Arlo_Login($) {
   my $resp = $ua->request($req);
   
   if ($resp->is_success) {
+    my $loginPhase = 'Authenticate';
     eval {
       my $respObj = decode_json $resp->decoded_content;
       if ($respObj->{meta}{code} == 200) {
+        $loginPhase = 'ValidateAccessToken';
         my $data = $respObj->{data};
         $hash->{helper}{token} = $data->{token};
         $hash->{helper}{userId} = $data->{userId};
-		my $validateData = $data->{authenticated};
-		my $authorization = encode_base64($data->{token}, '');
-		$header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $authorization];
-		$req = HTTP::Request->new('GET', 'https://ocapi-app.arlo.com/api/validateAccessToken?data='.$validateData, $header);
+        my $validateData = $data->{authenticated};
+        my $authorization = encode_base64($data->{token}, '');
+        $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $authorization];
+        $req = HTTP::Request->new('GET', 'https://ocapi-app.arlo.com/api/validateAccessToken?data='.$validateData, $header);
         $resp = $ua->request($req);
-		if ($resp->is_success) {
-		  $respObj = decode_json $resp->decoded_content;
+        if ($resp->is_success) {
+          $respObj = decode_json $resp->decoded_content;
           if ($respObj->{meta}{code} == 200) {
-		    $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $data->{token}];
-		    $req = HTTP::Request->new('GET', 'https://my.arlo.com/hmsweb/users/session/v2', $header);
+            $loginPhase = 'GetSession';
+            $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $data->{token}];
+            $req = HTTP::Request->new('GET', 'https://my.arlo.com/hmsweb/users/session/v2', $header);
             $resp = $ua->request($req);
-		    if ($resp->is_success) {
-		      $respObj = decode_json $resp->decoded_content;
+            if ($resp->is_success) {
+              $respObj = decode_json $resp->decoded_content;
               if ($respObj->{success}) {
-		        $cookie_jar->extract_cookies($resp);
-		        $hash->{helper}{cookies} = Arlo_GetCookies($cookie_jar);
-		        Log3 $name, 5, $hash->{helper}{cookies};
-		        $hash->{SSE_STATUS} = 200;
-		        delete $hash->{RETRY};
-		        $hash->{STATE} = 'active';
-		        Arlo_Request($hash, '/users/devices');
-		        Arlo_EventQueue($hash);
-		        Arlo_Ping($hash);
-		        if (!defined($hash->{MODES})) {
-		          InternalTimer(gettimeofday() + 5, "Arlo_ReadModes", $hash);
-		        }
-		        InternalTimer(gettimeofday() + 30, "Arlo_Poll", $hash);
-		        return;
-		      }
-			}
+                $cookie_jar->extract_cookies($resp);
+                $hash->{helper}{cookies} = Arlo_GetCookies($cookie_jar);
+                Log3 $name, 5, $hash->{helper}{cookies};
+                $hash->{SSE_STATUS} = 200;
+                delete $hash->{RETRY};
+                $hash->{STATE} = 'active';
+                Arlo_Request($hash, '/users/devices');
+                Arlo_EventQueue($hash);
+                Arlo_Ping($hash);
+                if (!defined($hash->{MODES})) {
+                  InternalTimer(gettimeofday() + 5, "Arlo_ReadModes", $hash);
+                }
+                InternalTimer(gettimeofday() + 30, "Arlo_Poll", $hash);
+                $loginPhase = '';
+              }
+            }
           }
-		}
-		Log3 $name, 2, 'Arlo ValidateAccessToken not successful: '.$resp->decoded_content;
-      } else {
-        Log3 $name, 2, 'Arlo Login not successful: '.$resp->decoded_content;
+        }
       }
     };
-    if ($@) {
-      Log3 $hash->{NAME}, 2, 'Invalid Arlo response for login request: '.$resp->decoded_content;
+    if ($@ || $loginPhase ne '') {
+      Log3 $name, 2, 'Invalid Arlo response for login request during phase '.$loginPhase.': '.$resp->decoded_content;
     }
   } else {
     my $status_line = $resp->status_line;
@@ -1042,7 +1077,10 @@ sub Arlo_Login($) {
 
 sub Arlo_Logout($) {
   my ($hash) = @_;
+  RemoveInternalTimer($hash);
+  delete $hash->{EXPIRY};
   Arlo_Request($hash, '/logout', 'PUT');
+  $hash->{STATE} = 'inactive';
 }  
 
 sub Arlo_GetCookies($) {
@@ -1116,21 +1154,35 @@ sub Arlo_EventPolling($) {
     $nfound = select($rout=$rin, undef, undef, 0.1);
   }
   Arlo_ProcessResponse($hash, $content) if ($content ne '');
-  if ($hash->{SSE_STATUS} == 299) {
-    $hash->{RETRY} = 1;
-    InternalTimer(gettimeofday() + 60, "Arlo_Login", $hash);
+  
+  my $expiry = $hash->{EXPIRY};
+  my $timeout = $hash->{RESPONSE_TIMEOUT};
+  my $sseStatus = $hash->{SSE_STATUS};
+
+  if (defined($expiry)) {
+     if ($expiry < gettimeofday() || $sseStatus == 299 || (defined($timeout) && $timeout < gettimeofday())) {
+      Log3 $name, 3, "Arlo set to inactive.";
+      HttpUtils_Close($con);
+      Arlo_Logout($hash);
+      return;
+    }
   } else {
-    my $timeout = $hash->{RESPONSE_TIMEOUT};
-    if (defined($timeout) && $timeout < gettimeofday()) {
-        $hash->{SSE_STATUS} = 0;
-        Log3 $name, 3, "Arlo connection timeout, try to restart event listener.";
-        HttpUtils_Close($con);
-        Arlo_EventQueue($hash);
+    if ($sseStatus == 299) {
+      $hash->{RETRY} = 1;
+      InternalTimer(gettimeofday() + 60, "Arlo_Login", $hash);
+      return;
     } else {
-      my $ssePollingInterval = AttrVal($name, 'ssePollingInterval', 2);
-      InternalTimer(gettimeofday() + $ssePollingInterval, "Arlo_EventPolling", $hash);
+      if (defined($timeout) && $timeout < gettimeofday()) {
+          $hash->{SSE_STATUS} = 0;
+          Log3 $name, 3, "Arlo connection timeout, try to restart event listener.";
+          HttpUtils_Close($con);
+          Arlo_EventQueue($hash);
+		  return;
+      }
     }
   }
+  my $ssePollingInterval = AttrVal($name, 'ssePollingInterval', 2);
+  InternalTimer(gettimeofday() + $ssePollingInterval, "Arlo_EventPolling", $hash);
 }
 
 
@@ -1176,7 +1228,7 @@ sub Arlo_ProcessResponse($$) {
         }
       } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' 
           && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir' && $check ne 'Stric' && $check ne 'Trans'
-          && $check ne 'Expec' && $check ne 'CF-RA') {
+          && $check ne 'Expec' && $check ne 'CF-RA' && $check ne 'CF-Ca') {
         Log3 $hash->{NAME}, 2, "Invalid Arlo event response: $line";
       }
     } 
@@ -1446,6 +1498,12 @@ sub Arlo_decrypt($) {
     <p>Subtype BASESTATION: Deactivates the periodic update of the readings from Arlo Cloud.</p>
   </ul> 
 
+  <p><a name="ArloExpiryTime"></a> <b>expiryTime</b></p>
+  <ul> 
+    <p>Subtype ACCOUNT: If all base stations have the status "disarmed" the connection to the cloud will be closed after this time. A new connection will be established if needed.
+	  Unit is seconds, default 600 (10 minutes). If you set the value to 0 the connection will not be closed.</p>
+  </ul> 
+
   <p><a name="ArloPingVideoDownloadFix"></a> <b>videoDownloadFix</b></p>
   <ul> 
     <p>Subtype ACCOUNT: Set this attribute to 1 if videos are not downloaded automatically. Normally the server sents a notification when there is a new video available but sometimes 
@@ -1599,6 +1657,12 @@ sub Arlo_decrypt($) {
   <ul> 
     <p>Subtype ACCOUNT: Deaktiviert die Verbindung zur Arlo-Cloud.</p>
     <p>Subtype BASESTATION: Deaktiviert die regelmäßige Abfrage der Readings aus der Arlo Cloud.</p>
+  </ul> 
+
+  <p><a name="ArloExpiryTime"></a> <b>expiryTime</b></p>
+  <ul> 
+    <p>Subtype ACCOUNT: Wenn alle Basisstation auf "disarmed" stehen, wird die Verbindung zur Cloud nach der hier angegebenen Zeit beendet. Bei einer Aktion mit einem Arlo-Gerät wird eine neue Verbindung aufgebaut.
+	  Angabe in Sekunden, Standard ist 600 (10 Minuten). Durch Angabe von 0 kann die Verbindung dauerhaft bestehen bleiben.</p>
   </ul> 
 
   <p><a name="ArloPingVideoDownloadFix"></a> <b>videoDownloadFix</b></p>
