@@ -5747,6 +5747,15 @@ sub EnOcean_Set($@)
     } elsif ($st eq "roomCtrlPanel.01") {
       # Room Control Panel
       # (D2-11-01 - D2-11-08)
+      # waitingCmds index
+      # 1 = setpointTemp
+      # 2 = setpointShiftMax
+      # 4 = fanSpeed
+      # 8 = occupancy
+      # 0x10 = window
+      # 0x20 = cooling
+      # 0x40 = heating
+      # 0x80 = setpointType
       $rorg = "D2";
       $updateState = 0;
       my $cooling = ReadingsVal($name, "colling", 'off');
@@ -5755,9 +5764,9 @@ sub EnOcean_Set($@)
       my $humidity = ReadingsVal($name, "humidity", 0);
       my $occupancy = ReadingsVal($name, "occupancy", 'unoccupied');
       my $setpointBase = ReadingsVal($name, "setpointBase", 20);
-      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointShift = ReadingsVal($name, "setpointShift", 0);
       my $setpointShiftMax = ReadingsVal($name, "setpointShiftMax", 10);
+      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointType = ReadingsVal($name, "setpointType", 'setpointShift');
       my $temperature = ReadingsVal($name, "temperature", 20);
       my $waitingCmds = ReadingsVal($name, "waitingCmds", 0);
@@ -11512,7 +11521,19 @@ sub EnOcean_Parse($$)
     } elsif ($st eq "roomCtrlPanel.01") {
       # Room Control Panel
       # (D2-11-01 - D2-11-08)
+      # waitingCmds index
+      # 1 = setpointTemp
+      # 2 = setpointShiftMax
+      # 4 = fanSpeed
+      # 8 = occupancy
+      # 0x10 = window
+      # 0x20 = cooling
+      # 0x40 = heating
+      # 0x80 = setpointType
+      my $fanSpeed = ReadingsVal($name, "fanSpeed", 'auto');
       my $msgType = hex(substr($data, 1, 1));
+      my $occupancy = ReadingsVal($name, "occupancy", 'unoccupied');
+      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointType = ReadingsVal($name, "setpointType", 'setpointShift');
       my $waitingCmds = ReadingsVal($name, "waitingCmds", 0);
       if (($waitingCmds & 0x80) == 0) {
@@ -11522,24 +11543,36 @@ sub EnOcean_Parse($$)
       if ($msgType == 2) {
         my $trigger = ($db[5] & 0x60) >> 5;
         my %trigger = (0 => 'heartbeat', 1 => 'sensor', 2 => 'input');
-        push @event, "3:trigger:" . $trigger{$trigger};
         my $temperature = sprintf "%0.1f", $db[4] / 255 * 40;
         push @event, "3:temperature:$temperature";
         my $humidity = sprintf "%d", $db[3] / 2.5;
         push @event, "3:humidity:$humidity";
-        my $setpointShiftMax = ($db[0] & 0xF0) >> 4;
-        push @event, "3:setpointShiftMax:$setpointShiftMax";
-        my $setpointShift = int(0.5 + $db[2] * $setpointShiftMax / 128 * 10) / 10 - $setpointShiftMax;
-        push @event, "3:setpointShift:" . sprintf "%0.1f", $setpointShift;
-        push @event, "3:setpointBase:$db[1]";
-        push @event, "3:setpointTemp:" . sprintf "%0.1f", ($db[1] + $setpointShift);
-        my %fanSpeed = (0 => 'auto', 1 => 'off', 2 => 1, 3 => 2, 4 => 3);
-        my $fanSpeed = ($db[0] & 0xE) >> 1;
-        push @event, "3:fanSpeed:" . $fanSpeed{$fanSpeed};
-        push @event, "3:occupancy:" . ($db[0] & 1 ? 'occupied' : 'unoccupied');
-        push @event, "3:state:T: $temperature H: $humidity SPT: " . ($db[1] + $setpointShift) . " F: " . $fanSpeed{$fanSpeed};
+        if ($trigger == 2) {
+          if (($waitingCmds & 3) == 0) {
+            my $setpointShiftMax = ($db[0] & 0xF0) >> 4;
+            push @event, "3:setpointShiftMax:$setpointShiftMax";
+            my $setpointShift = sprintf "%0.1f", (int(0.5 + $db[2] * $setpointShiftMax / 128 * 10) / 10 - $setpointShiftMax);
+            push @event, "3:setpointShift:$setpointShift";
+            my $setpointBase = $db[1];
+            push @event, "3:setpointBase:$setpointBase";
+            $setpointTemp = sprintf "%0.1f", ($db[1] + $setpointShift);
+            push @event, "3:setpointTemp:$setpointTemp";
+          }
+          if (($waitingCmds & 4) == 0) {
+            my %fanSpeed = (0 => 'auto', 1 => 'off', 2 => 1, 3 => 2, 4 => 3);
+            $fanSpeed = ($db[0] & 0xE) >> 1;
+            $fanSpeed = $fanSpeed{$fanSpeed};
+            push @event, "3:fanSpeed:$fanSpeed";
+          }
+          if (($waitingCmds & 8) == 0) {
+            $occupancy = $db[0] & 1 ? 'occupied' : 'unoccupied';
+            push @event, "3:occupancy:$occupancy";
+          }
+        }
+        push @event, "3:trigger:" . $trigger{$trigger};
+        push @event, "3:state:T: $temperature H: $humidity SPT: $setpointTemp F: $fanSpeed O: $occupancy";
       }
-      CommandDeleteReading(undef, "$name waitingCmds");
+      readingsDelete($hash, "waitingCmds");
 
     } elsif ($st eq "multiFuncSensor.00") {
       # people activity counter
@@ -21999,7 +22032,7 @@ EnOcean_Delete($$)
     <li>Room Control Panels (D2-11-01 - D2-11-08)<br>
         [Thermokon EasySens SR06 LCD-2T/-2T rh -4T/-4T rh]<br>
      <ul>
-       <li>T: t/&#176C H: rH/% SPT: t/&#176C F: auto|off|1|2|3</li>
+       <li>T: t/&#176C H: rH/% SPT: t/&#176C F: auto|off|1|2|3 O: occupied|unoccupied</li>
        <li>cooling: on|off</li>
        <li>fanSpeed: auto|off|1|2|3</li>
        <li>heating: on|off</li>
@@ -22013,7 +22046,7 @@ EnOcean_Delete($$)
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>trigger: heartbeat|sensor|input</li>
        <li>window: closed|open</li>
-       <li>state: T: t/&#176C H: rH/% SPT: t/&#176C F: auto|off|1|2|3</li>
+       <li>state: T: t/&#176C H: rH/% SPT: t/&#176C F: auto|off|1|2|3 O: occupied|unoccupied</li>
      </ul><br>
        The attr subType must be roomCtrlPanel.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired by Smart Ack,
