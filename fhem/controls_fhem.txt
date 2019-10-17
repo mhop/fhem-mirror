@@ -1,4 +1,4 @@
-REV 20369
+REV 20371
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -69,7 +69,7 @@ UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
 UPD 2019-01-23_07:45:02 30674 FHEM/10_EQ3BT.pm
-UPD 2019-10-12_07:45:02 981008 FHEM/10_EnOcean.pm
+UPD 2019-10-17_07:45:03 982039 FHEM/10_EnOcean.pm
 UPD 2019-07-29_07:45:02 20753 FHEM/10_FBDECT.pm
 UPD 2018-01-21_07:45:02 70159 FHEM/10_FRM.pm
 UPD 2019-07-05_07:45:02 14540 FHEM/10_FS10.pm
@@ -733,12 +733,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-10-16_07:45:07 4142197 docs/commandref.html
+UPD 2019-10-17_07:45:06 4142243 docs/commandref.html
 UPD 2019-10-16_07:45:09 2566905 docs/commandref_DE.html
 UPD 2019-10-07_07:45:03 79584 docs/commandref_frame.html
 UPD 2019-10-07_07:45:03 89372 docs/commandref_frame_DE.html
-UPD 2019-10-16_07:45:10 219450 docs/commandref_modular.html
-UPD 2019-10-16_07:45:11 230403 docs/commandref_modular_DE.html
+UPD 2019-10-17_07:45:10 219450 docs/commandref_modular.html
+UPD 2019-10-17_07:45:11 230403 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
