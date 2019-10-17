@@ -269,48 +269,57 @@ HttpUtils_gethostbyname($$$$)
   return $fn->($hash, "Cant create UDP socket:$!", undef) if(!$c);
 
   my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS", origHash=>$hash,
-             addr=>$dnsServer, callback=>$fn );
-  my %timerHash = ( hash=>\%dh, msg=>"DNS" );
+             addr=>$dnsServer, callback=>$fn, host=>$host, try6=>$try6 );
   my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
-  my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) .
+  $dh{qry} = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) .
                 $bhost . pack("Cnn", 0,$try6 ? 28:1,1);
-  my $ql = length($qry);
-  Log 5, "DNS QUERY ".unpack("H*", $qry);
+  $dh{ql} = length($dh{qry});
+  Log 5, "DNS QUERY ".unpack("H*", $dh{qry});
 
-  $dh{directReadFn} = sub() {                           # Parse the answer
-    RemoveInternalTimer(\%timerHash);
+  sub
+  directReadFn($) {                           # Parse the answer
+    my ($dh) = @_;
+    RemoveInternalTimer($dh);
+
     my $buf;
-    my $len = sysread($dh{conn},$buf,65536);
-    HttpUtils_Close(\%dh);
+    my $len = sysread($dh->{conn},$buf,65536);
+    HttpUtils_Close($dh);
     Log 5, "DNS ANSWER ".($len?$len:0).":".($buf ? unpack("H*", $buf):"N/A");
-    my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf,$ql,$try6);
-    return HttpUtils_gethostbyname($hash, $host, 0, $fn) if($err && $try6);
-    return $fn->($hash, "DNS: $err", undef) if($err);
-    Log 4, "DNS result for $host: ".ip2str($addr).", ttl:$ttl";
-    $HU_dnsCache{$host}{TS} = gettimeofday();
-    $HU_dnsCache{$host}{TTL} = $ttl;
-    $HU_dnsCache{$host}{addr} = $addr;
-    return $fn->($hash, undef, $addr);
-  };
+    my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf, $dh->{ql}, $dh->{try6});
+    return HttpUtils_gethostbyname($dh->{origHash},
+                                   $dh->{host}, 0, $dh->{callback})
+      if($err && $dh->{try6});
+    return $dh->{callback}->($dh->{origHash}, "DNS: $err", undef) if($err);
+    Log 4, "DNS result for $dh->{host}: ".ip2str($addr).", ttl:$ttl";
+    $HU_dnsCache{$dh->{host}}{TS} = gettimeofday();
+    $HU_dnsCache{$dh->{host}}{TTL} = $ttl;
+    $HU_dnsCache{$dh->{host}}{addr} = $addr;
+    return $dh->{callback}->($dh->{origHash}, undef, $addr);
+  }
+  $dh{directReadFn} = \&directReadFn;
   $selectlist{\%dh} = \%dh;
 
-  my $dnsQuery;
-  my $dnsTo = 0.25;
-  my $lSelectTs = $selectTimestamp;
-  $dnsQuery = sub()
+  $dh{dnsTo} = 0.25;
+  $dh{lSelectTs} = $selectTimestamp;
+  $dh{selectTimestamp} = $selectTimestamp;
+
+  sub
+  dnsQuery($)
   {
-    $dnsTo *= 2 if($lSelectTs != $selectTimestamp);
-    $lSelectTs = $selectTimestamp;
-    return HttpUtils_Err(\%timerHash) if($dnsTo > $hash->{timeout}/2);
-    my $ret = syswrite $dh{conn}, $qry;
-    if(!$ret || $ret != $ql) {
+    my ($dh) = @_;
+    $dh->{dnsTo} *= 2 if($dh->{lSelectTs} != $dh->{selectTimestamp});
+    $dh->{lSelectTs} = $dh->{selectTimestamp};
+    return HttpUtils_Err({ hash=>$dh, msg=>"DNS"})
+        if($dh->{dnsTo} > $dh->{origHash}->{timeout}/2);
+    my $ret = syswrite $dh->{conn}, $dh->{qry};
+    if(!$ret || $ret != $dh->{ql}) {
       my $err = $!;
-      HttpUtils_Close(\%dh);
-      return $fn->($hash, "DNS write error: $err", undef);
+      HttpUtils_Close($dh);
+      return $dh->{callback}->($dh->{origHash}, "DNS write error: $err", undef);
     }
-    InternalTimer(gettimeofday()+$dnsTo, $dnsQuery, \%timerHash);
-  };
-  $dnsQuery->();
+    InternalTimer(gettimeofday()+$dh->{dnsTo}, \&dnsQuery, $dh);
+  }
+  dnsQuery(\%dh);
 }
 
 
