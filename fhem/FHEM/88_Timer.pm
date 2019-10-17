@@ -6,7 +6,8 @@
 # https://github.com/fhem/Timer
 #
 # FHEM Forum: Automatisierung
-# https://forum.fhem.de/index.php/board,20.0.html | https://forum.fhem.de/index.php/topic,103848.msg976039.html#new
+# https://forum.fhem.de/index.php/board,20.0.html
+# https://forum.fhem.de/index.php/topic,103848.html | https://forum.fhem.de/index.php/topic,103986.0.html
 #
 # 2019 - HomeAuto_User & elektron-bbs
 #################################################################
@@ -21,7 +22,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 
-my @action = ("on","off","Def");
+my @action = ("on","off","DEF");
 my @names;
 my @designations;
 my $description_all;
@@ -147,20 +148,19 @@ sub Timer_Set($$$@) {
 
 	if ($cmd eq "sortTimer") {
 		my @timers_unsortet;
-												
 		my @userattr_values;
 		my @attr_values_names;
 		my $timer_nr_new;
 		my $array_diff = 0;             # difference, Timer can be sorted >= 1
 		my $array_diff_cnt1 = 0;        # need to check 1 + 1
 		my $array_diff_cnt2 = 0;        # need to check 1 + 1
-		
+
 		RemoveInternalTimer($hash, "Timer_Check");
 
 		foreach my $readingsName (sort keys %{$hash->{READINGS}}) {
 			if ($readingsName =~ /^Timer_(\d+)$/) {
 				my $value = ReadingsVal($name, $readingsName, 0);
-				$value =~ /^.*\d{2},(.*),(on|off|Def)/;
+				$value =~ /^.*\d{2},(.*),(on|off|DEF)/;
 				push(@timers_unsortet,$1.",".ReadingsVal($name, $readingsName, 0).",$readingsName");   # unsort Reading Wert in Array
 				$array_diff_cnt1++;
 				$array_diff_cnt2 = substr($readingsName,-2) * 1;
@@ -169,7 +169,6 @@ sub Timer_Set($$$@) {
 		}
 
 		my @timers_sort = sort @timers_unsortet;                              # Timer in neues Array sortieren
-										 
 
 		for (my $i=0; $i<scalar(@timers_unsortet); $i++) {
 			$array_diff++ if ($timers_unsortet[$i] ne $timers_sort[$i]);
@@ -182,7 +181,7 @@ sub Timer_Set($$$@) {
 
 		for (my $i=0; $i<scalar(@timers_sort); $i++) {
 			$timer_nr_new = sprintf("%02s",$i + 1);                             # neue Timer-Nummer
-			if ($timers_sort[$i] =~ /^.*\d{2},(.*),(Def),.*,(Timer_\d+)/) {     # filtre Def values - Perl Code (Def must in S2 - Timer nr old $3)
+			if ($timers_sort[$i] =~ /^.*\d{2},(.*),(DEF),.*,(Timer_\d+)/) {     # filtre DEF values - Perl Code (DEF must in S2 - Timer nr old $3)
 				Log3 $name, 4, "$name: Set | $cmd: ".$timers_sort[$i];
 				if (defined AttrVal($name, $3."_set", undef)) {
 					Log3 $name, 4, "$name: Set | $cmd: ".$3." remember values";
@@ -297,14 +296,16 @@ sub Timer_Get($$$@) {
 			RemoveInternalTimer($hash, "Timer_Check");
 
 			open (InputFile,"<./FHEM/lib/$name"."_conf.txt") || return "ERROR: No file $name"."_conf.txt found in ./FHEM/lib directory from FHEM!";
-			while (<InputFile>){
+			while (<InputFile>) {
 				$line++;
-				if ($_ =~ /^(.*),.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,.*,[0-1]$/) {
-					chomp ($_);                            # Zeilenende entfernen
-					push(@lines_readings,$_);              # lines in array
-					my @values = split(",",$_);            # split line in array to check
+				# Timer_04,alle,alle,alle,12,00,00,Update FHEM,Def,1,0,0,0,0,0,0,1
+				if ($_ =~ /^(.*),.*,.*,.*,.*,.*,.*,.*,(.*),.*,.*,.*,.*,.*,.*,.*,[0-1]$/) {
+					chomp ($_);                              # Zeilenende entfernen
+					$_ =~ s/,Def,/,DEF,/g if ($2 =~ /Def/);  # Compatibility modify Def to DEF
+					push(@lines_readings,$_);                # lines in array
+					my @values = split(",",$_);              # split line in array to check
 					#$error.= "- scalar arrray\n" if (scalar(@values) != 17);
-					push(@attr_values_names, $values[0]."_set") if($values[8] eq "Def");
+					push(@attr_values_names, $values[0]."_set") if($values[8] eq "DEF");
 					for (my $i=0;$i<@values;$i++) {
 						$error.= "- ".$values[0]." is no $name description" if ($i == 0 && $values[0] !~ /^Timer_\d{2}$/);
 						$error.= "- ".$values[1]." invalid value" if ($i == 1 && $values[1] !~ /^\d{4}$|^$description_all$/);
@@ -373,12 +374,12 @@ sub Timer_Get($$$@) {
 			}
 
 			for (my $i=0;$i<@attr_values;$i++) {                     # write new attr value
-				chomp ($attr_values[$i]);                            # Zeilenende entfernen
+				chomp ($attr_values[$i]);                              # Zeilenende entfernen
 				CommandAttr($hash,"$name $attr_values_names[$i] $attr_values[$i]");
 			}
 
 			readingsSingleUpdate($hash, "state" , "Timers loaded", 1);
-			FW_directNotify("FILTER=$name", "#FHEMWEB:WEB", "location.reload('true')", "");
+			FW_directNotify("FILTER=(room=)?$name", "#FHEMWEB:WEB", "location.reload('true')", "");
 			Timer_Check($hash);
 
 			return undef;
@@ -449,6 +450,17 @@ sub Timer_Notify($$) {
 
 	if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}) && $typ eq "Timer") {
 		Log3 $name, 5, "$name: Notify is running and starting $name";
+
+		### Compatibility Check Def to DEF ###
+		Log3 $name, 4, "$name: Notify Compatibility check";
+		foreach my $d (keys %{$hash->{READINGS}}) {
+			if ( $d =~ /^Timer_\d+$/ && ReadingsVal($name, $d, "") =~ /,Def,/ ) {
+				Log3 $name, 4, "$name: $d with ".ReadingsVal($name, $d, "")." must modify!";
+				my $ReadingsMod = ReadingsVal($name, $d, "");
+				$ReadingsMod =~ s/,Def,/,DEF,/g;
+				readingsSingleUpdate($hash, $d , $ReadingsMod, 0);
+			}
+		}
 		Timer_Check($hash);
 	}
 
@@ -606,13 +618,13 @@ sub Timer_FW_Detail($$$$) {
 				}
 				$html.="</select></td>";
 			}
-		
+
 			if ($spalte > 9 && $spalte < $cnt_max) {	## Spalte Wochentage + aktiv
 				$id ++;
 				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"0\" onclick=\"Checkbox(".$id.")\"></td>" if ($select_Value[$spalte-2] eq "0");
 				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"1\" onclick=\"Checkbox(".$id.")\" checked></td>" if ($select_Value[$spalte-2] eq "1");
 			}
-			
+
 			if ($spalte == $cnt_max) {	## Button Speichern
 				$id ++;
 				$html.= "<td align=\"center\" style=\"$style_code1 Padding-right:5px\"> <INPUT type=\"reset\" onclick=\"pushed_savebutton(".$id.")\" value=\"&#128190;\"/></td>"; # &#128427; &#128190;
@@ -655,6 +667,31 @@ sub Timer_FW_Detail($$$$) {
 		}
 		FW_cmd(FW_root+ \'?XHR=1"'.$FW_CSRF.'"&cmd={FW_pushed_savebutton("'.$name.'","\'+allVals+\'","'.$FW_room_dupl.'")}\');
 	}
+
+	/* Popup DEF - Zusammenbau */
+	function show_popup(button) {
+		FW_cmd(FW_root+\'?cmd={Timer_Popup("'.$name.'","\'+button+\'")}&XHR=1"'.$FW_CSRF.'"\', function(data){popup_return(data)});
+	}
+
+	/* Popup DEF - Aktionen */
+	function popup_return(txt) {
+		var div = $("<div id=\"popup_return\">");
+		$(div).html(txt);
+		$("body").append(div);
+		var oldPos = $("body").scrollTop();
+
+		$(div).dialog({
+			dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:false,
+			maxHeight:$(window).height()*0.95,
+			title: " infobox for user ",
+			buttons: [
+				{text:"close", click:function(){
+					$(this).dialog("close");
+					$(div).remove();
+					location.reload();
+				}}]
+		});
+	}
 	</script>';
 
 	return $html;
@@ -673,6 +710,7 @@ sub FW_pushed_savebutton {
 	my $FW_room_dupl = shift;
 	my $cnt_names = scalar(@selected_buttons);
 	my $devicefound = 0;                                    # to check device exists
+	my $reload = 0;
 
 	my $timestamp = TimeNow();                              # Time now -> 2016-02-16 19:34:24
 	my @timestamp_values = split(/-|\s|:/ , $timestamp);    # Time now splitted
@@ -725,16 +763,19 @@ sub FW_pushed_savebutton {
 	return "ERROR: The time is in the past. Please set a time in the future!" if ((time() - fhemTimeLocal($sec, $min, $hour, $mday, $month, $year)) > 0);
 	return "ERROR: The next switching point is too small!" if ((fhemTimeLocal($sec, $min, $hour, $mday, $month, $year) - time()) < 60);
 
-	readingsDelete($hash,"Timer_".sprintf("%02s", $timer)."_set") if ($selected_buttons[8] ne "Def" && ReadingsVal($name, "Timer_".sprintf("%02s", $timer)."_set", 0) ne "0");
+	readingsDelete($hash,"Timer_".sprintf("%02s", $timer)."_set") if ($selected_buttons[8] ne "DEF" && ReadingsVal($name, "Timer_".sprintf("%02s", $timer)."_set", 0) ne "0");
 
 	my $oldValue = ReadingsVal($name,"Timer_".sprintf("%02s", $selected_buttons[0]) ,0);
+	my $newValue = substr($selected_buttons,(index($selected_buttons,",") + 1));
+	$reload++ if ($oldValue ne $newValue && $FW_room_dupl);
+
 	my @Value_split = split(/,/ , $oldValue);
 	$oldValue = $Value_split[7];
-	my $newValue = substr($selected_buttons,(index($selected_buttons,",") + 1));
+
 	@Value_split = split(/,/ , $newValue);
 	$newValue = $Value_split[7];
 
-	if ($Value_split[6] eq "" && $Value_split[7] eq "Def") {                        # standard name, if no name set in Def option
+	if ($Value_split[6] eq "" && $Value_split[7] eq "DEF") {                        # standard name, if no name set in DEF option
 		my $replace = "Timer_".sprintf("%02s", $selected_buttons[0]);
 		$selected_buttons =~ s/,,/,$replace,/g;
 	}
@@ -744,17 +785,17 @@ sub FW_pushed_savebutton {
 
 	my $state = "Timer_".sprintf("%02s", $selected_buttons[0])." saved";
 	my $userattrName = "Timer_".sprintf("%02s", $selected_buttons[0])."_set:textField-long";
-	my $reload = 0;
+	my $popup = 0;
 
-	if (($oldValue eq "on" || $oldValue eq "off") && $newValue eq "Def") {
-		$state = "Timer_".sprintf("%02s", $selected_buttons[0])." is save and added to userattr";
+	if (($oldValue eq "on" || $oldValue eq "off") && $newValue eq "DEF") {
+		$state = "Timer_".sprintf("%02s", $selected_buttons[0])." is saved and revised userattr. Please set DEF in attribute Timer_".sprintf("%02s", $selected_buttons[0])."_set !";
 		addToDevAttrList($name,$userattrName);
 		addStructChange("modify", $name, "attr $name userattr");                     # note with question mark
-		$reload++;
+		$popup++;
 	}
 
-	if ($oldValue eq "Def" && ($newValue eq "on" || $newValue eq "off")) {
-		$state = "Timer_".sprintf("%02s", $selected_buttons[0])." is save and deleted from userattr";
+	if ($oldValue eq "DEF" && ($newValue eq "on" || $newValue eq "off")) {
+		$state = "Timer_".sprintf("%02s", $selected_buttons[0])." is saved and deleted from userattr";
 		Timer_delFromUserattr($hash,$userattrName) if (AttrVal($name, "userattr", undef));
 		addStructChange("modify", $name, "attr $name userattr");                     # note with question mark
 		$reload++;
@@ -763,12 +804,53 @@ sub FW_pushed_savebutton {
 	readingsBulkUpdate($hash, "state" , $state, 1);
 	readingsEndUpdate($hash, 1);
 
-	FW_directNotify("FILTER=room=$FW_room_dupl", "#FHEMWEB:WEB", "location.reload('true')", "") if ($FW_room_dupl);
-	FW_directNotify("FILTER=$name", "#FHEMWEB:WEB", "location.reload('true')", "") if ($reload != 0);    # need to view question mark
+	## popup user message ##
+	if ($popup != 0) {
+		FW_directNotify("FILTER=(room=)?$name", "#FHEMWEB:WEB", "show_popup(".$selected_buttons[0].")", "");
+		$reload = 0 if ($reload != 0); # reset, need to right running
+	}
+
+	## refresh site, need for userattr & right view checkboxes ##
+	FW_directNotify("FILTER=(room=)?$name", "#FHEMWEB:WEB", "location.reload('true')", "") if ($reload != 0);
 
 	Timer_Check($hash) if ($selected_buttons[16] eq "1" && ReadingsVal($name, "internalTimer", "stop") eq "stop");
 
 	return;
+}
+
+### separate popup for user ###
+sub Timer_Popup {
+	my $name = shift;
+	my $selected_button = shift;
+	$selected_button = sprintf("%02s", $selected_button);
+	my $ret = "";
+
+	Log3 $name, 5, "$name: Timer_Popup is running";
+
+	if ($language eq "DE") {
+		$ret.= "<p style=\"text-decoration-line: underline;\">Hinweis:</p>";
+		$ret.= "Das Attribut <code>userattr</code> wurde automatisch angepasst.<br>";
+		$ret.= "Um <code>DEF</code> zu definieren, geben Sie bitte das FHEM Kommando oder den PERL Code in das Attribut <code>Timer_$selected_button"."_set</code> ein.<br>";
+		$ret.= "<small><code>attr $name Timer_$selected_button"."_set \"DEF Code\"</code> (ohne \" \")</small><br><br>";
+		$ret.= "Die Eingabe entspricht der FHEM-Befehlszeile im Browser.<br>";
+		$ret.= "<p style=\"text-decoration-line: underline;\">DEF Beispiele:</p>";
+		$ret.= "&#8226; FHEM Kommando: <code>set TYPE=IT:FILTER=room=03_Stube.*:FILTER=state=on off</code><br>";
+		$ret.= "&#8226; PERL Code: <code>{ Log 1, \"$name: schaltet jetzt\" }</code><br><br>";
+		$ret.= "<i>Weitere Beispiele oder Intervallschaltungen finden Sie in der ger&auml;tespezifischen Hilfe.</i><br><br>";
+		$ret.= "Klicken Sie auf close, um fortzufahren.";
+	} else {
+		$ret.= "<p style=\"text-decoration-line: underline;\">Note:</p>";
+		$ret.= "The attribute <code>userattr</code> has been automatically revised.<br>";
+		$ret.= "To define <code>DEF</code>, please input the FHEM command or PERL code in attribute <code>Timer_$selected_button"."_set</code>.<br>";
+		$ret.= "<small><code>attr $name Timer_$selected_button"."_set \"DEF code\"</code> (without \" \")</small><br><br>";
+		$ret.= "The input is made equal to the FHEM command line in the browser.<br>";
+		$ret.= "<p style=\"text-decoration-line: underline;\">DEF examples:</p>";
+		$ret.= "&#8226; FHEM command: <code>set TYPE=IT:FILTER=room=03_Stube.*:FILTER=state=on off</code><br>";
+		$ret.= "&#8226; PERL code: <code>{ Log 1, \"$name: switch now\" }</code><br><br>";
+		$ret.= "<i>For more examples or interval switching please look into the Device specific help.</i><br><br>";
+		$ret.= "Click close to continue.";	
+	}
+	return $ret;
 }
 
 ### for delete Timer value from userattr ###
@@ -824,9 +906,9 @@ sub Timer_Check($) {
 				Log3 $name, 5, "$name: $d - set=$set intervall=$intervall dayOfWeek=$dayOfWeek column array=".(($dayOfWeek*1) + 7)." (".$values[($dayOfWeek*1) + 7].") $values[0]-$values[1]-$values[2] $values[3]:$values[4]:$values[5]";
 				if ($set == 1) {
 					Log3 $name, 4, "$name: $d - set $values[6] $values[7] ($dayOfWeek, $values[0]-$values[1]-$values[2] $values[3]:$values[4]:$values[5])";
-					CommandSet($hash, $values[6]." ".$values[7]) if ($values[7] ne "Def");
+					CommandSet($hash, $values[6]." ".$values[7]) if ($values[7] ne "DEF");
 					$state = "$d set $values[6] $values[7] accomplished";
-					if ($values[7] eq "Def") {
+					if ($values[7] eq "DEF") {
 						if (AttrVal($name, $d."_set", undef)) {
 							Log3 $name, 5, "$name: $d - exec at command: ".AttrVal($name, $d."_set", undef);
 							my $ret = AnalyzeCommandChain(undef, SemicolonEscape(AttrVal($name, $d."_set", undef)));
@@ -896,11 +978,12 @@ the timer uses the calculated sunset time at your location. <u><i>(For this calc
 <u>Programmable actions are currently:</u><br>
 <ul>
 	<li><code> on | off</code> - The states must be supported by the device</li>
-	<li><code>Def</code> - for a PERL code or a FHEM command <font color="red">*</font color> <br><br>
-	<ul><u>example for Def:</u>
+	<li><code>DEF</code> - for a PERL code or a FHEM command <font color="red">*</font color> <br><br>
+	<ul><u>example for DEF:</u>
 	<li><code>{ Log 1, "Timer: now switch" }</code> (PERL code)</li>
 	<li><code>update</code> (FHEM command)</li>
-	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-command)</li></ul>
+	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-command)</li>
+	<li><code>set TYPE=IT:FILTER=room=Stube.*:FILTER=state=on off</code> (FHEM-command)</li></ul>
 	</li>
 </ul>
 <br>
@@ -973,7 +1056,7 @@ This makes it possible, for example, to have a timer run every Sunday at 15:30:0
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Sets the input values ​​for a new timer to the current time. (on | off = default)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_xx_set">Timer_xx_set</a><br>
-	Location for the FHEM command or PERL code of the timer (xx has the numerical value of 01-99). WITHOUT this attribute, which <b> only appears if action <code> Def </code> is set </b>,
+	Location for the FHEM command or PERL code of the timer (xx has the numerical value of 01-99). WITHOUT this attribute, which <b> only appears if action <code> DEF </code> is set </b>,
 	The module does not process FHEM command or PERL code from the user. <code><font color="red">*</font color> </code></li><a name=" "></a></ul><br>
 	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
 	Different elevation angles are used to calculate sunrise and sunset times.<br>
@@ -1012,11 +1095,12 @@ stellen, so nutzt der Timer den errechnenten Zeitpunkt Sonnenuntergang an Ihrem 
 <u>Programmierbare Aktionen sind derzeit:</u><br>
 <ul>
 	<li><code> on | off</code> - Die Zust&auml;nde m&uuml;ssen von dem zu schaltenden Device unterst&uuml;tzt werden</li>
-	<li><code>Def</code> - f&uuml;r einen PERL-Code oder ein FHEM Kommando <font color="red">*</font color> <br><br>
-	<ul><u>Beispiele f&uuml;r Def:</u>
+	<li><code>DEF</code> - f&uuml;r einen PERL-Code oder ein FHEM Kommando <font color="red">*</font color> <br><br>
+	<ul><u>Beispiele f&uuml;r DEF:</u>
 	<li><code>{ Log 1, "Timer: schaltet jetzt" }</code> (PERL-Code)</li>
 	<li><code>update</code> (FHEM-Kommando)</li>
-	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-Kommando)</li></ul>
+	<li><code>trigger Timer state:ins Log geschrieben</code> (FHEM-Kommando)</li>
+	<li><code>set TYPE=IT:FILTER=room=Stube.*:FILTER=state=on off</code> (FHEM-Kommando)</li></ul>
 	</li>
 </ul>
 <br>
@@ -1089,7 +1173,7 @@ Damit ist es m&ouml;glich, einen Timer beispielsweise nur jeden Sonntag um 15:30
 	<ul><li><a name="Timer_preselection">Timer_preselection</a><br>
 	Setzt die Eingabewerte bei einem neuen Timer auf die aktuelle Zeit. (on | off, standard off)</li><a name=" "></a></ul><br>
 	<ul><li><a name="Timer_xx_set">Timer_xx_set</a><br>
-	Speicherort f&uuml;r das FHEM-Kommando oder den PERL-Code des Timers (xx hat den Zahlenwert von 01-99). OHNE dieses Attribut, welches <b>nur erscheint wenn die Aktion <code>Def</code> eingestellt </b> ist,
+	Speicherort f&uuml;r das FHEM-Kommando oder den PERL-Code des Timers (xx hat den Zahlenwert von 01-99). OHNE dieses Attribut, welches <b>nur erscheint wenn die Aktion <code> DEF </code> eingestellt </b> ist,
 	verarbeitet das Modul kein Kommando oder PERL-Code vom Benutzer. <code> <font color="red">*</font color> </code></li><a name=" "></a></ul><br>
 	<ul><li><a name="Offset_Horizon">Offset_Horizon</a><br>
 	F&uuml;r die Berechnung der Zeiten von Sonnenaufgang und Sonnenuntergang werden verschiedene H&ouml;henwinkel verwendet.<br>
