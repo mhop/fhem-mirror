@@ -445,7 +445,7 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE setList \
   sensitivity:low,medium,high BASE_TOPIC/DEV_ID/set {"sensitivity":"$EVTPART1"}
-attr DEVICE stateFormat Action: action X: angle_X Y: angle_Y Z: angle_Z
+attr DEVICE stateFormat Action: action X: angle_x Y: angle_y Z: angle_z
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_AlarmSensor
@@ -623,6 +623,19 @@ attr DEVICE stateFormat state\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE event-on-change-reading .*
 attr DEVICE model tasmota_rf
+
+# forum: https://forum.fhem.de/index.php/topic,104475.0.html
+name:tasmota_use_DS18x20_id
+desc:Use this in case you have multiple DS18x20 sensors attached to your tasmota device. Adds a readingList entry to extract 1wire ID's from JSON to keep temparature values bound to the ID.<br><a href="https://forum.fhem.de/index.php/topic,104475.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Sensor-Configuration#single-wire-sensor">See tasmota-Wiki for how to configure for multiple DS18x20 sensors</a>
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+order:A_01d2
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+attr DEVICE readingList \
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/RESULT:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
+  TELETOPIC/RESULT:.* { json2nameValue($EVENT) }
+farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries. 
+attr DEVICE model tasmota_use_DS18x20_id
 
 # tasmota 2ch as one FHEM device.
 name:tasmota_2ch_unified
