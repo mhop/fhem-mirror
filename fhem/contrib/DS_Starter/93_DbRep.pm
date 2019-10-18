@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 20328 2019-10-07 21:12:28Z DS_Starter $
+# $Id: 93_DbRep.pm 20336 2019-10-08 22:10:42Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.28.2" => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
   "8.28.1" => "09.10.2019  fix warnings line 5173 ",
   "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
   "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
@@ -5014,11 +5015,9 @@ sub deldoublets_DoParse($) {
  # SELECT TIMESTAMP, DEVICE, READING, VALUE, count(*) FROM history WHERE TIMESTAMP > '2018-11-01 00:00:00' GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1
  $table   = "history";
  $selspec = "TIMESTAMP,DEVICE,READING,VALUE,count(*)";
- $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";
- if($dbloghash->{MODEL} eq 'SQLITE') {
-     $addon = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";     # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
- }
-  
+ # $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";                        # 18.10.2019 / V 8.28.2
+ $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";       # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
+                                                                                                           # und Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007
  # SQL zusammenstellen für DB-Abfrage
  $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);
  eval{$sth = $dbh->prepare_cached($sql);};
@@ -10816,12 +10815,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20328 2019-10-07 21:12:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20336 2019-10-08 22:10:42Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20328 2019-10-07 21:12:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20336 2019-10-08 22:10:42Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
