@@ -35,6 +35,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.10.1" => "18.10.2019  set parentState initial in Define, Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136 ",
   "2.10.0" => "21.09.2019  new attribute hideAudio ",
   "2.9.0"  => "19.09.2019  new attribute noLink ",
   "2.8.0"  => "09.09.2019  new attribute hideButtons ",
@@ -129,7 +130,8 @@ sub SSCamSTRM_Define($$) {
   # Versionsinformationen setzen
   SSCamSTRM_setVersionInfo($hash);
   
-  readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
+  readingsSingleUpdate($hash,"state", "initialized", 1);            # Init für "state" 
+  readingsSingleUpdate($hash,"parentState", "initialized", 1);      # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   
 return undef;
 }

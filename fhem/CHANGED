@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  49_SSCamSTRM: set parentState initial in Define, 
+                          Forum: 45671.msg985136.html#msg985136
  - change:  88_Timer: added popup for user
                       rename Def to DEF for FHEM default (with comp. checker)
                       added more doc in commandref
