@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.28.2" => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
   "8.28.1" => "09.10.2019  fix warnings line 5173 ",
   "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
   "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
@@ -5011,14 +5012,11 @@ sub deldoublets_DoParse($) {
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
  # mehrfache Datensätze finden
- # SELECT TIMESTAMP, DEVICE, READING, VALUE, count(*) FROM history WHERE TIMESTAMP > '2018-11-01 00:00:00' GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1
  $table   = "history";
  $selspec = "TIMESTAMP,DEVICE,READING,VALUE,count(*)";
- $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";
- if($dbloghash->{MODEL} eq 'SQLITE') {
-     $addon = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";     # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
- }
-  
+ # $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE ASC HAVING count(*) > 1";                        # 18.10.2019 / V 8.28.2
+ $addon   = "GROUP BY TIMESTAMP, DEVICE, READING, VALUE HAVING count(*) > 1 ORDER BY TIMESTAMP ASC";       # Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489
+                                                                                                           # und Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007
  # SQL zusammenstellen für DB-Abfrage
  $sql = DbRep_createSelectSql($hash,$table,$selspec,$device,$reading,"?","?",$addon);
  eval{$sth = $dbh->prepare_cached($sql);};
