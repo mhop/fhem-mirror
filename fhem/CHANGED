@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 89_FULLY: New command set foreground
  - feature: 73_DoorBird: Videos on Events
  - change:  70_SolarEdgeAPI: new attributes to control interval, debug features
  - change:  93_DbRep: change SQL of delDoublets due to incompatible change of 

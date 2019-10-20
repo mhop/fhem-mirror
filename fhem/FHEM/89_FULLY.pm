@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.35
+#  89_FULLY.pm 1.40
 #
 #  $Id$
 #
@@ -37,7 +37,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.35";
+my $FULLY_VERSION = "1.40";
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -237,10 +237,10 @@ sub FULLY_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "brightness photo:noArg clearCache:noArg exit:noArg lock:noArg motionDetection:on,off ".
-		"off:noArg on:noArg on-for-timer playSound restart:noArg screenOffTimer screenSaver:start,stop ".
-		"screenSaverTimer screenSaverURL speak startURL stopSound:noArg unlock:noArg url ".
-		"volume";
+	my $options = "brightness photo:noArg clearCache:noArg exit:noArg foreground:noArg lock:noArg ".
+		"motionDetection:on,off off:noArg on:noArg on-for-timer playSound restart:noArg screenOffTimer ".
+		"screenSaver:start,stop screenSaverTimer screenSaverURL speak startURL stopSound:noArg ".
+		"unlock:noArg url volume";
 	
 	# Fully commands without argument
 	my %cmds = (
@@ -250,7 +250,8 @@ sub FULLY_Set ($@)
 		"restart" => "restartApp",
 		"on" => "screenOn", "off" => "screenOff",
 		"lock" => "enabledLockedMode", "unlock" => "disableLockedMode",
-		"stopSound" => "stopSound"
+		"stopSound" => "stopSound",
+		"foreground" => "toForeground"
 	);
 	
 	my @c = ();
@@ -416,7 +417,6 @@ sub FULLY_Get ($@)
 		}
 
 		$response = '';
-#		while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>([^<]+)</g) {
 		while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>(.*?)<\/td>/g) {
 			my ($in, $iv) = ($1, $2);
 			if ($iv =~ /^<a .*?>(.*?)<\/a>/) {
@@ -597,6 +597,7 @@ sub FULLY_ExecuteCB ($$$)
 			HttpUtils_NonblockingGet ($reqpar);
 		}
 		else {
+			readingsSingleUpdate ($hash, "execState", "error", 1);
 			Log3 $name, 2, "FULLY: [$name] Error during request. $err";
 		}
 	}
@@ -747,6 +748,7 @@ sub FULLY_UpdateReadings ($$)
 		my ($rn, $rv) = split ('=', $parval);
 		readingsBulkUpdate ($hash, $rn, $rv);
 	}
+	readingsBulkUpdate ($hash, "execState", "success");
 	readingsEndUpdate ($hash, 1);
 	
 	return $rc;	
@@ -825,6 +827,9 @@ sub FULLY_Ping ($$)
 		</li><br/>
 		<li><b>set &lt;name&gt; exit</b><br/>
 			Terminate Fully.
+		</li><br/>
+		<li><b>set &lt;name&gt; foreground</b><br/>
+			Bring fully app to foreground.
 		</li><br/>
 		<li><b>set &lt;name&gt; motionDetection { on | off }</b><br/>
 			Turn motion detection by camera on or off.
