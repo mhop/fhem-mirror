@@ -628,13 +628,13 @@ DUOFERN_Set($@)
   
   my $list =  join(" ", sort keys %sets);
   
-  if(exists $sets{"position:slider,0,1,100"} && $cmd =~ m/^\d+/) {
+  if(exists $sets{"position:slider,0,1,100"} && $cmd =~ m/^\d*$/) {
     $arg2 = $arg;
     $arg = $cmd;
     $cmd = "position";
   }
   
-  if(exists $sets{"level:slider,0,1,100"} && $cmd =~ m/^\d+/) {
+  if(exists $sets{"level:slider,0,1,100"} && $cmd =~ m/^\d*$/) {
     $arg2 = $arg;
     $arg = $cmd;
     $cmd = "level";
@@ -1439,7 +1439,16 @@ DUOFERN_Parse($$)
       readingsSingleUpdate($chnHash, "state", "MISSING ACK", 1);
     }
     Log3 $hash, 3, "DUOFERN error: $name MISSING ACK";
-                   
+  
+  #NACK, Aktor nicht initialisiert
+  } elsif ($msg =~ m/81010C55.{36}/) {
+    readingsSingleUpdate($hash, "state", "NOT INITIALIZED", 1);
+    foreach (grep (/^channel_/, keys%{$hash})){
+      my $chnHash = $defs{$hash->{$_}};
+      readingsSingleUpdate($chnHash, "state", "NOT INITIALIZED", 1);
+    }
+    Log3 $hash, 3, "DUOFERN error: $name NOT INITIALIZED; reopen DUOFERNSTICK";
+                     
   } else {
     Log3 $hash, 3, "DUOFERN unknown msg: $msg";
   }
