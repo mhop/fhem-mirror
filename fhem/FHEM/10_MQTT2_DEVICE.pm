@@ -415,7 +415,7 @@ MQTT2_DEVICE_Attr($$)
                  "%JSONMAP"=>""));
           return $ret if($ret);
         } else {
-          return "bad reading name $par2 ".
+          return "$dev: bad reading name $par2 ".
                         "(contains not A-Za-z/\\d_\\.- or is too long)"
               if(!goodReadingName($par2));
         }
