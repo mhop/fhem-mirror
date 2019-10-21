@@ -100,13 +100,15 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 #           If the new attributes are not set by the user, the default values
 #             are chosen so that behavior is same as in previous versions.
 #           Restart periodic timer during _Define instead of _Notify.
+#
+# 1.3.0     show SolarEdge logo to comply with requirement from API documentation
 #           
 ###############################################################################
 
 sub SolarEdgeAPI_SetVersion($)
 {
   my ($hash) = @_;
-  $hash->{VERSION} = "1.2.0";
+  $hash->{VERSION} = "1.3.0";
 }
 
 ###############################################################################
