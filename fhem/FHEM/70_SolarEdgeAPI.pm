@@ -132,6 +132,8 @@ sub SolarEdgeAPI_Initialize($)
                         "enableOverviewReadings:1,0 ".
                         "enableDebugReadings:1,0 ".
                         $readingFnAttributes;
+                        
+  $hash->{FW_detailFn} = "SolarEdgeAPI_fhemwebFn";
 }
 
 sub SolarEdgeAPI_Define($$)
@@ -978,6 +980,22 @@ sub SolarEdgeAPI_UpdateReadings($$$)
   readingsBulkUpdateIfChanged($hash, 'state', ((defined($hash->{actionQueue}) and (scalar(@{$hash->{actionQueue}}) == 0)) ? 'ready' : 'fetch data - '.scalar(@{$hash->{actionQueue}}).' paths in actionQueue'));
 
   readingsEndUpdate($hash, 1);
+}
+
+###############################################################################
+# show SolarEdge logo
+###############################################################################
+
+sub SolarEdgeAPI_fhemwebFn($$$)
+{
+  my ($FW_wname, $d, $room) = @_;
+  return << 'EOF'
+<br>
+<a href="https://www.solaredge.com">
+<img src="https://www.solaredge.com/sites/default/files/SolarEdge_logo_header_new.png">
+</a>
+<br>
+EOF
 }
 
 1;
