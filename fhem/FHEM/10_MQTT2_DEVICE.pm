@@ -189,7 +189,7 @@ MQTT2_DEVICE_Parse($$)
       my $cidArr = $modules{MQTT2_DEVICE}{defptr}{cid}{$newCid};
       return if(!$cidArr);
       my $add;
-      if($value =~ m/^{.*}$/s) {
+      if(length($value) < 10000 && $value =~ m/^{.*}$/s) {
         my $ret = json2nameValue($value);
         if(keys %{$ret}) {
           $topic =~ m,.*/([^/]+),;
