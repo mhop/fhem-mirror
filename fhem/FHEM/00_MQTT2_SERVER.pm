@@ -360,7 +360,7 @@ MQTT2_SERVER_Read($@)
       push @ret, ($qos > 1 ? 1 : 0);    # max qos supported is 1
     }
     # SUBACK
-    MQTT2_SERVER_out($hash, pack("CCnC*", 0x90, 3, $pid, @ret), $dump);
+    MQTT2_SERVER_out($hash, pack("CCnC*", 0x90, 3, $pid, maxNum(@ret)), $dump);
 
     if(!$hash->{answerScheduled}) {
       $hash->{answerScheduled} = 1;
