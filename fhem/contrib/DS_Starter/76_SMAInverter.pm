@@ -23,16 +23,16 @@ package main;
 
 use strict;
 use warnings;
-eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
-eval "use DateTime;1" or my $MissModulDateTime = "DateTime";
+eval "use IO::Socket::INET;1" or my $MissModulSocket   = "IO::Socket::INET";
+eval "use DateTime;1"         or my $MissModulDateTime = "DateTime";
 use Time::HiRes qw(gettimeofday tv_interval);
 use Blocking;
 use Time::Local;
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P",
+  "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
   "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
   "2.13.3" => "28.08.2019  commandref revised ",
   "2.13.2" => "27.08.2019  fix WARNING: Use of uninitialized value \$_ in substitution (s///) at /opt/fhem//FHEM/Blocking.pm line 238 ",
@@ -687,7 +687,7 @@ sub SMAInverter_getstatusDoParse($) {
 		         ($sup_DeviceStatus,$inv_STATUS,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x51800200, 0x00214800, 0x002148FF);
 		     }
 		     elsif ($i eq "sup_SpotBatteryLoad") {
-		     	 ($sup_SpotBatteryLoad,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00461F00, 0x00461FFF);
+		     	 ($sup_SpotBatteryLoad,$inv_BAT_LOADTODAY,$inv_BAT_LOADTOTAL,$inv_susyid,$inv_serial) = SMAInverter_SMAcommand($hash, $hash->{HOST}, 0x54000200, 0x00496700, 0x004967FF);
 		     }
          }
 
@@ -1210,12 +1210,7 @@ sub SMAInverter_SMAcommand($$$$$) {
 	 return (1,$inv_SPOT_ETODAY,$inv_SPOT_ETOTAL,$inv_susyid,$inv_serial);
  }
 
-####300?
-
-
-
-
- if($data_ID eq 0x461F)	{
+ if($data_ID eq 0x4967)	{
      if (length($data) >= 66) {
 		 $inv_BAT_LOADTOTAL = unpack("V*", substr($data, 62, 4));
 	 } else {

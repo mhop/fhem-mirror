@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  76_SMAInverter: readings bat_loadtotal / bat_loadtoday included,
+                            thanks to 300P
  - change:  70_SolarEdgeAPI: increment version number for previous change
  - change:  70_SolarEdgeAPI: show SolarEdge logo to comply with API requirements
  - update:  98_MSwitch: New Version 2.6a
