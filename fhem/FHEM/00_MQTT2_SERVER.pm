@@ -41,6 +41,7 @@ MQTT2_SERVER_Initialize($)
   my @attrList = qw(
     SSL:0,1
     autocreate:no,simple,complex
+    clientId
     disable:0,1
     disabledForIntervals
     keepaliveFactor
@@ -453,6 +454,7 @@ MQTT2_SERVER_doPublish($$$$;$)
     my $ac = AttrVal($serverName, "autocreate", "simple");
     $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
+    $cid = AttrVal($serverName, "clientId", $cid);
     Dispatch($server, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no"); 
     my $re = AttrVal($serverName, "rawEvents", undef);
     DoTrigger($server->{NAME}, "$tp:$val") if($re && $tp =~ m/$re/);
@@ -614,6 +616,15 @@ MQTT2_SERVER_ReadDebug($$)
   <a name="MQTT2_SERVERattr"></a>
   <b>Attributes</b>
   <ul>
+
+    <a name="clientId"></a>
+    <li>clientId &lt;name&gt;<br>
+      set the MQTT clientId for all connections, for setups with clients
+      creating a different MQTT-ID for each connection. The autocreate
+      capabilities are greatly reduced in this case, and setting it requires to
+      remove the clientId from all existing MQTT2_DEVICE readingList
+      attributes.
+      </li></br>
 
     <li><a href="#disable">disable</a><br>
         <a href="#disabledForIntervals">disabledForIntervals</a><br>
