@@ -382,7 +382,7 @@ FW_Read($$)
     # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
     if($op == 8) {
       # Close, Normal, empty mask. #104718
-      TcpServer_WriteBlocking($hash, pack("CCNn",0x88,0x82,0,1000));
+      TcpServer_WriteBlocking($hash, pack("CCn",0x88,0x2,1000));
       TcpServer_Close($hash, 1);
       return;
 
