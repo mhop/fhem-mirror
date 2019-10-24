@@ -88,7 +88,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.6a';
+my $version    = '2.61';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 60; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
@@ -1099,7 +1099,7 @@ sub MSwitch_Get($$@) {
     }
 
     if ( AttrVal( $name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" ) {
-        return "Unknown argument $opt, choose one of support_info:noArg restore_MSwitch_Data:this_Device,all_Devices";
+        return "Unknown argument $opt, choose one of Eventlog:timeline,clear support_info:noArg restore_MSwitch_Data:this_Device,all_Devices";
     }
 
     if ( ReadingsVal( $name, '.lock', 'undef' ) ne "undef" ) {
@@ -1268,7 +1268,7 @@ my %setlist;
             return "Unknown argument $cmd, choose one of active:noArg del_function_data:noArg inactive:noArg on off del_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg del_repeats:noArg change_renamed $setList $special";
         }
         elsif ( $devicemode eq "Dummy" ) {
-            return "Unknown argument $cmd, choose one of state $setList $special";
+            return "Unknown argument $cmd, choose one of state backup_MSwitch:all_devices $setList $special";
         }
         else {
             #full
@@ -2418,6 +2418,69 @@ sub MSwitch_Attr(@) {
         MSwitch_Clear_timer($hash);
         $hash->{NOTIFYDEV} = 'no_trigger';
         $hash->{MODEL}     = 'Dummy';
+		
+		
+		
+		fhem("deleteattr $name MSwitch_Include_Webcmds");
+		fhem("deleteattr $name MSwitch_Include_MSwitchcmds");
+		fhem("deleteattr $name MSwitch_Include_Devicecmds");
+		fhem("deleteattr $name MSwitch_Safemode");
+		
+		
+		#fhem("deleteattr $name MSwitch_Debug");
+		#fhem("deleteattr $name MSwitch_Eventhistory");
+		
+		#fhem("deleteattr $name MSwitch_Eventhistory");
+		fhem("deleteattr $name MSwitch_Expert");
+		fhem("deleteattr $name MSwitch_Extensions");
+		fhem("deleteattr $name MSwitch_Lock_Quickedit");
+		
+		fhem("deleteattr $name MSwitch_Delete_Delays");
+		
+		delete( $hash->{NOTIFYDEV} );
+		delete( $hash->{NTFY_ORDER} );
+		
+		#delete( $hash->{READINGS}{Bulkfrom} );
+        #delete( $hash->{READINGS}{Device_Affected} );
+        #delete( $hash->{READINGS}{Device_Affected_Details} );
+        delete( $hash->{READINGS}{Trigger_device} );
+		delete( $hash->{IncommingHandle} );
+		
+		
+		delete( $hash->{READINGS}{EVENT} );
+        delete( $hash->{READINGS}{EVTFULL} );
+        delete( $hash->{READINGS}{EVTPART1} );
+		delete( $hash->{READINGS}{EVTPART2} );
+		delete( $hash->{READINGS}{EVTPART3} );
+		
+		delete( $hash->{READINGS}{last_activation_by} );
+		delete( $hash->{READINGS}{last_event} );
+		delete( $hash->{READINGS}{last_exec_cmd} );
+		
+		
+
+		my $attrzerolist =
+        "  disable:0,1"
+      . "  MSwitch_Debug:0,1"
+	  . "  disabledForIntervals"
+      . "  stateFormat:textField-long"
+	  . "  MSwitch_Eventhistory:0,10"
+      . "  MSwitch_Help:0,1"
+      . "  MSwitch_Ignore_Types:textField-long "
+      . "  MSwitch_Extensions:0,1"
+      . "  MSwitch_Inforoom"
+      . "  MSwitch_DeleteCMDs:manually,automatic,nosave"
+      . "  MSwitch_Mode:Dummy"
+	  . "  MSwitch_Selftrigger_always:0,1"
+      . "  MSwitch_Event_Id_Distributor:textField-long "
+      . "  setList:textField-long "
+      . "  readingList:textField-long "
+      . "  textField-long ";
+	
+	setDevAttrList($name, $attrzerolist);
+		
+		
+		
     }
 
     if ( $aName eq 'MSwitch_Mode' && $aVal eq 'Notify' ) {
@@ -2568,7 +2631,7 @@ sub MSwitch_Notify($$) {
     my $startdelay = AttrVal( $ownName, 'MSwitch_Startdelay', $standartstartdelay );
     my $attrrandomnumber = AttrVal( $ownName, 'MSwitch_RandomNumber', '' );
 
-    return if ( $devicemode eq 'Dummy' );
+   # return if ( $devicemode eq 'Dummy' );
 	
 	if ( AttrVal( $ownName, "MSwitch_Selftrigger_always", 0 ) ne "1") 
 		{
@@ -3150,7 +3213,7 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                          "$ownName: anzahl gefundener Befehle -> " . $anzahl );
             MSwitch_LOG( $ownName, 6,
                          "$ownName: inhalt gefundener Befehle -> @cmdarray" );
-            $own_hash->{IncommingHandle} = 'fromnotify';
+            $own_hash->{IncommingHandle} = 'fromnotify' if  AttrVal( $ownName, 'MSwitch_Mode', 'Notify' ) ne "Dummy";
             $event =~ s/~/ /g;    #?
             if (     $devicemode eq "Notify"
                  and $activecount == 0 )
@@ -3431,7 +3494,7 @@ sub MSwitch_fhemwebFn($$$$) {
     my $cmdfrombase = "0";
     MSwitch_del_savedcmds($hash);
 
-    return if ( AttrVal( $Name, 'MSwitch_Mode', "Notify" ) eq 'Dummy' );
+ #   return if ( AttrVal( $Name, 'MSwitch_Mode', "Notify" ) eq 'Dummy' );
 
     if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '4' ) {
         $border = 1;
@@ -5000,7 +5063,10 @@ sub MSwitch_fhemwebFn($$$$) {
     }
 
     my $ret = '';
-    $ret .= "<p id=\"triggerdevice\">";
+	
+	
+# ACHTUNG bei Javaerror
+   # $ret .= "<p id=\"triggerdevice\">";
 ########################
     my $blocking = '';
     $blocking = $hash->{helper}{savemodeblock}{blocking}
@@ -5243,7 +5309,7 @@ sub MSwitch_fhemwebFn($$$$) {
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
 		 <td><center>&nbsp;<br>Device is inactive<br>&nbsp;<br>
-		 </td></tr></table><br>";
+		 </td></tr></table>";
 
     }
     elsif ( IsDisabled($Name) ) {
@@ -5251,7 +5317,7 @@ sub MSwitch_fhemwebFn($$$$) {
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
 		 <td><center>&nbsp;<br>Device is disabled, configuration avaible<br>&nbsp;<br>
-		 </td></tr></table><br>";
+		 </td></tr></table>";
 
     }
 
@@ -5290,10 +5356,23 @@ sub MSwitch_fhemwebFn($$$$) {
     }
 	####
 	
+	   if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" ) {
+         $displaynot = "style='display:none;'";
+        $inhalt     = "execute 'cmd1' at :";
+        $inhalt1    = "execute 'cmd2' at :";
+        $inhalt2    = $help . "execute 'cmd1'";
+        $inhalt3    = $help . "execute 'cmd2'";
+     }
 	
+	
+if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy" ){
 
  $ret .="<table border='$border' class='block wide' id='MSwitchWebTR' nm='$hash->{NAME}'>";
+}
+else{
+$ret .="<table border='$border' class='block wide' style ='visibility: collapse' id='MSwitchWebTR' nm='$hash->{NAME}'>";
 
+}
 
    $ret .= "<tr class=\"even\">";
     $ret .=
@@ -5343,6 +5422,8 @@ sub MSwitch_fhemwebFn($$$$) {
       . "' onClick=\"javascript:bigwindow(this.id);\" >";
 
     $ret = $ret . "</td></tr>";
+	
+	
 
 ###
 
@@ -5868,7 +5949,7 @@ $j1 .= "FW_cmd(FW_root+'?cmd=get $Name Eventlog timeline&XHR=1', function(data){
 
 
 
-#if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  ) {
+if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  ) {
     # triggerlock
     $j1 .= "
 	var triggerdetails = document.getElementById('MSwitchWebTRDT').innerHTML;
@@ -5907,7 +5988,7 @@ $j1 .= "FW_cmd(FW_root+'?cmd=get $Name Eventlog timeline&XHR=1', function(data){
 		}
 	}
 	";
-#}
+}
     #####################
     $j1 .= "
 	if (document.getElementById('trigon')){
@@ -8340,15 +8421,18 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
 		#MSwitch_LOG( "Debug", 0,"suche history $name $testarg" . __LINE__ );
 		
 		
-			if ( $testarg =~ '.*:h\d{1,3}' ) {
+			if ( $testarg =~ '.*:h\d{1,3}' ) 
+			{
+			
+			#MSwitch_LOG( "Debug", 0,"suche vor sub history $testarg" . __LINE__ );
 			# historyformatierung erkannt - auswerten über sub
 			# in der regex evtl auf zeilenende definieren
 			$newargarray[$count] = MSwitch_Checkcond_history( $args, $name );
 			
-		MSwitch_LOG( "Debug", 0,"suche history $testarg" . __LINE__ );
 		
-		next;
-		}
+			$count++;
+			next;
+			}
         $testarg =~ s/[0-9]+//gs;
         if ( $testarg eq '[:-:|]' || $testarg eq '[:-:]' ) {
             # timerformatierung erkannt - auswerten über sub
@@ -8368,6 +8452,10 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
     $count = 0;
     my $tmp;
     foreach my $args (@newargarray) {
+	
+	#MSwitch_LOG( "Debug", 0,"args: $args " . __LINE__ );
+	
+	
         $tmp = 'ARG' . $count;
         $condition =~ s/$tmp/$args/ig;
         $count++;
@@ -8557,7 +8645,7 @@ sub MSwitch_Checkcond_history($$) {
 	my $x=0;
 	my $log = $hash->{helper}{eventlog};
 
-
+#MSwitch_LOG( "Debug", 0,"suche sub history condition $condition" . __LINE__ );
 
 if ($hash->{helper}{history}{eventberechnung} ne "berechnet") # teste auf vorhandene berechnung
 {
@@ -8578,8 +8666,16 @@ my @historysplit   = split( /\:/, $condition );
 my $historynumber = $historysplit[1];
 #$historynumber =~ s/[0-9]+//gs;
 $historynumber =~ s/[a-z]+//gs;
-my $inhalt = $hash->{helper}{history}{event}{1}{$historysplit[0]};
+
+# den letzten inhalt ernittel ( anzahl im array )
+#MSwitch_LOG( "Debug", 0,"suche history number $historynumber" . __LINE__ );
+
+my $inhalt = $hash->{helper}{history}{event}{$historynumber}{$historysplit[0]}; #????
 $return ="'".$inhalt."'";
+
+#MSwitch_LOG( "Debug", 0,"suche sub history return $return" . __LINE__ );
+#MSwitch_LOG( "Debug", 0,"-------------------------" . __LINE__ );
+
 return $return;
 }
 ####################
@@ -8973,7 +9069,7 @@ sub MSwitch_Execute_Timer($) {
         return;
     }
 
-    $hash->{IncommingHandle} = 'fromtimer';
+    $hash->{IncommingHandle} = 'fromtimer' if  AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy";
     readingsSingleUpdate( $hash, "last_activation_by", 'timer', $showevents );
 
     if ( AttrVal( $Name, 'MSwitch_RandomNumber', '' ) ne '' ) {
@@ -10637,13 +10733,19 @@ sub MSwitch_Eventlog($$) {
 	if ($typ eq "timeline")
 	{
 		$out1= "Eventlog - Timeline<br>---------------------------------------------------------------------------------------------------<br>";
+		
+		my $y=(keys %{$log})-1;
+		
+		
+		
 		foreach $seq ( sort keys  %{$log} ) 
 		{
 			my $timestamp = FmtDateTime($seq);
 			$out1.="<input id =\"Checkbox-$x\"  name=\"Checkbox-$x\" type=\"checkbox\" value=\"test\" />";
-			$out1.=$timestamp." ".$hash->{helper}{eventlog}{$seq}."<br>";
+			$out1.=$timestamp." ".$hash->{helper}{eventlog}{$seq}." [EVENT/EVTPART1,2,3/EVTFULL:h$y]<br>";
 			$hash->{helper}{tmp}{keys}{$x} = $seq;
 			$x++;
+			$y--;
 		}
 	$out1.="<br><input type=\"button\" value=\"delete selected\" onclick=\" javascript: deletelog() \">";
 	$out1.="<input type='hidden' id='dellog' name='dellog' size='5'  value ='".$x."'>";
