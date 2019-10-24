@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 74_AMADDevice: add class support for openApp,
+                       fix bug then change attr remoteServer set Internal MODEL
  - change:  76_SMAInverter: readings bat_loadtotal / bat_loadtoday included,
                             thanks to 300P
  - change:  70_SolarEdgeAPI: increment version number for previous change

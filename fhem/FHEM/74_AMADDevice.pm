@@ -54,7 +54,7 @@ use FHEM::Meta;
 use Data::Dumper;    #only for Debugging
 use GPUtils qw(GP_Import GP_Export);
 
-require '73_AMADCommBridge.pm' unless ( defined( *{"main::AMADCommBridge_Initialize"} ) );
+main::LoadModule('AMADCommBridge');
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8);1" or $missingModul .= 'Encode ';
@@ -358,6 +358,7 @@ sub Attr(@) {
                     "AMADDevice ($name) - set remoteServer to other" );
             }
 
+            $hash->{MODEL}  = $attrVal;
             $hash->{DEF} =
               $hash->{HOST} . ' ' . $hash->{AMAD_ID} . ' ' . $attrVal;
         }
@@ -783,15 +784,15 @@ sub Set($$@) {
         my $openurl = join( ' ', @args );
         my $browser = AttrVal( $name, 'setOpenUrlBrowser',
             'com.android.chrome|com.google.android.apps.chrome.Main' );
-        my @browserapp = split( /\|/, $browser );
+        my ($bapp,$bappclass) = split( /\|/, $browser );
 
         $path .=
             'openURL?url='
           . $openurl
           . '&browserapp='
-          . $browserapp[0]
+          . $bapp
           . '&browserappclass='
-          . $browserapp[1];
+          . $bappclass;
         $method = 'POST';
     }
 
@@ -817,9 +818,17 @@ sub Set($$@) {
     }
 
     elsif ( lc $cmd eq 'openapp' ) {
-        my $app = join( ' ', @args );
+#         my $app = join( ' ', @args );
+        my ($app,$appclass) = split( /\|/, $args[0] );
 
-        $path .= 'openApp?app=' . $app;
+        $path .=
+            'openApp?app='
+          . $app;
+        $path .=
+            '&appclass='
+          . $appclass
+          if ( defined($appclass) );
+
         $method = 'POST';
     }
 
@@ -1435,7 +1444,7 @@ sub CreateChangeBtDeviceValue($$) {
   <a name="AMADDeviceattribut"></a>
   <b>Attribut</b>
   <ul>
-    <li>setAPSSID - set WLAN AccesPoint SSID to prevent WLAN sleeps (Automagic only)</li>
+    <li>setAPSSID - set WLAN AccesPoint SSID('s) to prevent WLAN sleeps (Automagic only), more than one ssid can comma seperate</li>
     <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
     <li>setTtsMsgSpeed - set speaking speed for TTS (For Automagic: Value between 0.5 - 4.0, 0.5 Step, default: 1.0)(For Tasker: Value between 1 - 10, 1 Step, default: 5)</li>
     <li>setTtsMsgLang - set speaking language for TTS, de or en (default is de)</li>
@@ -1633,7 +1642,7 @@ sub CreateChangeBtDeviceValue($$) {
     <li>setVolMax - setzt die maximale Volume Gr&uoml;e f&uuml;r den Slider</li>
     <li>setNotifyVolMax - setzt den maximalen Lautst&auml;rkewert für Benachrichtigungslautst&auml;rke f&uuml;r den Slider</li>
     <li>setRingSoundVolMax - setzt den maximalen Lautst&auml;rkewert für Klingellautst&auml;rke f&uuml;r den Slider</li>
-    <li>setAPSSID - setzt die AccessPoint SSID um ein WLAN sleep zu verhindern (nur Automagic)</li>
+    <li>setAPSSID - setzt die AccessPoint SSID('s) um ein WLAN sleep zu verhindern (nur Automagic), mehrere SSIDs k&ouml;nnen durch Komma getrennt angegeben werden.</li>
     <li>setTakePictureResolution - welche Kameraauflösung soll verwendet werden? (800x600,1024x768,1280x720,1600x1200,1920x1080)</li>
     <li>setTakePictureCamera - welche Kamera soll verwendet werden (Back,Front).</li>
     <br>
@@ -1680,7 +1689,7 @@ sub CreateChangeBtDeviceValue($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.4",
+  "version": "v4.4.7",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
