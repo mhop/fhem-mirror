@@ -474,8 +474,9 @@ sub ZoneMinder_UpdateMonitorAttributes {
   my $function = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Function');
   my $enabled = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Enabled');
   my $streamReplayBuffer = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'StreamReplayBuffer');
+  my $monitorType = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Type');
 
-  my $msg = "monitor:$monitorId|$function|$enabled|$streamReplayBuffer";
+  my $msg = "monitor:$monitorId|$function|$enabled|$streamReplayBuffer|$monitorType";
   
   my $dispatchResult = Dispatch($hash, $msg, undef);
 }

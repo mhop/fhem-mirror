@@ -392,11 +392,12 @@ sub ZM_Monitor_handleMonitorUpdate {
   my ( $io_hash, $message ) = @_;
 
   my $ioName = $io_hash->{NAME};
-  my @msgTokens = split(/\|/, $message); #$message = "$monitorId|$function|$enabled|$streamReplayBuffer";
+  my @msgTokens = split(/\|/, $message); #$message = "$monitorId|$function|$enabled|$streamReplayBuffer|$monitorType";
   my $zmMonitorId = $msgTokens[0];
   my $function = $msgTokens[1];
   my $enabled = $msgTokens[2];
   my $streamReplayBuffer = $msgTokens[3];
+  my $monitorType = $msgTokens[4];
   my $logDevAddress = $ioName.'_'.$zmMonitorId;
 
   if ( my $hash = $modules{ZM_Monitor}{defptr}{$logDevAddress} ) {
@@ -405,6 +406,8 @@ sub ZM_Monitor_handleMonitorUpdate {
     readingsBulkUpdateIfChanged($hash, 'motionDetectionEnabled', $enabled);
     my $bufferChanged = readingsBulkUpdateIfChanged($hash, 'streamReplayBuffer', $streamReplayBuffer);
     readingsEndUpdate($hash, 1);
+
+    $hash->{model} = $monitorType;
 
     ZM_Monitor_UpdateStreamUrls($hash);
 
