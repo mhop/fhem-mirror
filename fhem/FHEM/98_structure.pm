@@ -341,13 +341,12 @@ CommandAddStruct($)
   }
 
   foreach my $d (devspec2array($a[0])) {
-    $hash->{".memberHash"}{$d} = 1;
     $hash->{DEF} .= " $d";
+    CommandAttr($cl, "$d $hash->{ATTR} $hash->{NAME}");
   }
 
-  @a = ( "set", $hash->{NAME}, $hash->{ATTR}, $hash->{NAME} );
-  structure_Attr(@a);
-  delete $hash->{".cachedHelp"};
+  addStructChange("addstruct", $name, $param);
+  structure_setDevs($hash);
   return undef;
 }
 
@@ -369,14 +368,13 @@ CommandDelStruct($)
   }
 
   foreach my $d (devspec2array($a[0])) {
-    delete($hash->{".memberHash"}{$d});
     $hash->{DEF} =~ s/\b$d\b//g;
+    CommandDeleteAttr($cl, "$d $hash->{ATTR}");
   }
   $hash->{DEF} =~ s/  / /g;
 
-  @a = ( "del", $hash->{NAME}, $hash->{ATTR} );
-  structure_Attr(@a);
-  delete $hash->{".cachedHelp"};
+  addStructChange("delstruct", $name, $param);
+  structure_setDevs($hash);
   return undef;
 }
 
