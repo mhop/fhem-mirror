@@ -1,4 +1,4 @@
-REV 20407
+REV 20410
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -547,7 +547,7 @@ UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
 UPD 2019-02-19_07:45:03 23610 FHEM/98_serviced.pm
 UPD 2018-03-19_07:45:04 60215 FHEM/98_statistics.pm
-UPD 2019-09-30_07:45:03 32913 FHEM/98_structure.pm
+UPD 2019-10-27_07:45:03 32870 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
@@ -737,8 +737,8 @@ UPD 2019-10-26_07:45:07 4144029 docs/commandref.html
 UPD 2019-10-26_07:45:09 2567140 docs/commandref_DE.html
 UPD 2019-10-26_07:45:03 79589 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-10-26_07:45:10 219481 docs/commandref_modular.html
-UPD 2019-10-26_07:45:11 230437 docs/commandref_modular_DE.html
+UPD 2019-10-27_07:45:10 219481 docs/commandref_modular.html
+UPD 2019-10-27_07:45:11 230437 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
