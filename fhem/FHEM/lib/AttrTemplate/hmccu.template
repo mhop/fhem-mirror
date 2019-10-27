@@ -1,0 +1,54 @@
+######################################################################
+# $Id: hmccu.template 18592 2019-02-14 06:27:39Z Beta-User $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry:
+#   name: line,
+#   one optional filter: line
+#   zero or more par: lines
+#   FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+######################################################################
+
+######################################################################
+# Door or window sensor
+name:DoorWindowSensor
+filter:TYPE=HMCCUCHN|HMCCUDEV:FILTER=ccutype=HM-Sec-SCo|HM-Sec-SC|HM-Sec-SC-2|HMIP-SWDO|HmIP-SWDO-I
+par:channelNo;Channel number;{ InternalVal("DEVICE","TYPE","") eq "HMCCUDEV" ? "1." : "" }
+desc: Door/window sensor
+attr DEVICE ccureadingfilter STATE
+attr DEVICE devStateIcon closed:10px-kreis-gruen open:10px-kreis-rot
+attr DEVICE event-on-change-reading .*
+attr DEVICE genericDeviceType ContactSensor
+attr DEVICE hmstatevals ERROR!7:sabotage;SABOTAGE!1:sabotage
+attr DEVICE statedatapoint channelNoSTATE
+attr DEVICE substitute STATE!(0|false):closed,(1|true):open
+
+######################################################################
+# Window handle sensor
+name WindowHandleSensor
+filter:TYPE=HMCCUCHN|HMCCUDEV:FILTER=ccutype=HM-Sec-RHS|HM-Sec-RHS-2
+attr DEVICE ccureadingfilter STATE
+attr DEVICE hmstatevals ERROR!1:sabotage
+attr DEVICE statedatapoint channelNoSTATE
+attr DEVICE substitute STATE!0:closed,1:tilted,2:open;ERROR!0:no,1:sabotage
+
+######################################################################
+#  Power socket
+name PowerSocket
+filter:TYPE=HMCCUCHN|HMCCUDEV:FILTER=ccutype=HM-LC-Sw1-Pl-2|HM-LC-Sw1-Pl-DN-R1|HmIP-PS
+par:channelNo;Channel number;{ InternalVal("DEVICE","TYPE","") eq "HMCCUDEV" ? (InternalVal("DEVICE","ccuif","") eq "BidCos-RF" ? "1." : "3.") : "" }
+desc: Power socket BidCos
+attr DEVICE ccureadingfilter STATE
+attr DEVICE statedatapoint channelNoSTATE
+attr DEVICE controldatapoint channelNoSTATE
+attr DEVICE statevals on:true,off:false
+attr DEVICE substitute STATE!(1|true):on,(0|false):off
+attr DEVICE webCmd devstate
+attr DEVICE widgetOverride devstate:uzsuToggle,off,on
+
+
+

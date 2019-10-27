@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.008
+#  Version 4.3.009
 #
 #  (c) 2019 zap (zap01 <at> t-online <dot> de)
 #
@@ -41,7 +41,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "IODev ccucalculate ".
-		"ccuflags:multiple-strict,ackState,nochn0,trace ccureadingfilter ".
+		"ccuflags:multiple-strict,ackState,logCommand,nochn0,trace ccureadingfilter ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
 		"ccureadingname:textField-long ccuSetOnChange ".
 		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
@@ -228,11 +228,15 @@ sub HMCCUCHN_Set ($@)
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $statevals = AttrVal ($name, 'statevals', '');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 
 	my $result = '';
 	my $rc;
+
+	# Log commands
+	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a)) if ($ccuflags =~ /logCommand/); 
 
 	if ($opt eq 'datapoint') {
 		my $usage = "Usage: set $name datapoint {datapoint} {value} [...]";
@@ -255,9 +259,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, $usage) if (scalar (keys %dpval) < 1);
 
 		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, -14) if ($cd eq '');
@@ -270,9 +272,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
 			{ "001.$ccuif.$ccuaddr.$cd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
 		);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
@@ -287,9 +287,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
 			{ "001.$ccuif.$ccuaddr.$sd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
 		);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -324,9 +322,7 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
 			{ "001.$objname" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
 		);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'pct' || $opt eq 'up' || $opt eq 'down') {
 		return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
@@ -374,8 +370,7 @@ sub HMCCUCHN_Set ($@)
 			$rc = HMCCU_SetMultipleDatapoints ($hash, { "001.$objname" => $objvalue });
 		}
 		
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
 		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
@@ -400,9 +395,7 @@ sub HMCCUCHN_Set ($@)
 			"001.$ccuif.$ccuaddr.ON_TIME" => $timespec,
 			"002.$ccuif.$ccuaddr.$sd" => HMCCU_Substitute ("on", $statevals, 1, undef, '')
 		});
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'clear') {
 		my $rnexp = shift @$a;
@@ -418,10 +411,8 @@ sub HMCCUCHN_Set ($@)
 		if (defined ($par) && $par eq 'device') {
 			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		}
-		my ($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $ccuobj, "MASTER", $h);
-#		my $rc = HMCCU_RPCSetConfig ($hash, $ccuobj, $h);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		return HMCCU_SetState ($hash, "OK");
+		($rc, $result) = HMCCU_RPCRequest ($hash, "putParamset", $ccuobj, "MASTER", $h);
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'rpcparameter') {
 		return HMCCU_SetError ($hash, "Usage: set $name rpcparameter [MASTER|VALUES] {parameter}={value} [...]")
@@ -429,46 +420,42 @@ sub HMCCUCHN_Set ($@)
 		my $key = shift @$a;
 		$key = 'VALUES' if (!defined ($key));
 		
-		my $rc;
-		my $res;
-		
 		if ($key eq 'VALUES') {
-			($rc, $res) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h);
+			($rc, $result) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h);
 		}
 		elsif ($key eq 'MASTER') {
-			($rc, $res) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $key, $h);
+			($rc, $result) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $key, $h);
 		}
 		else {
 			return HMCCU_SetError ($hash, "Key must be MASTER or VALUES");
 		}
 		
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		return HMCCU_SetState ($hash, "OK");
+		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'defaults') {
-		my $rc = HMCCU_SetDefaults ($hash);
-		return HMCCU_SetError ($hash, "HMCCU: No default attributes found") if ($rc == 0);
-		return HMCCU_SetState ($hash, "OK");
+		$rc = HMCCU_SetDefaults ($hash);
+		return HMCCU_SetError ($hash, $rc == 0 ? "No default attributes found" : "OK");
 	}
 	else {
-		return "HMCCUCHN: Unknown argument $opt, choose one of $rocmds"
-			if ($hash->{statevals} eq 'readonly');
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of $rwcmds";
-		if ($hash->{statevals} ne '') {
-			my @cmdlist = split /\|/,$hash->{statevals};
-			shift @cmdlist;
-			$retmsg .= ':'.join(',',@cmdlist) if (scalar(@cmdlist) > 0);
-			foreach my $sv (@cmdlist) {
-				$retmsg .= ' '.$sv.':noArg';
-			}
-			$retmsg .= " toggle:noArg";
-			$retmsg .= " on-for-timer on-till"
-				if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "ON_TIME", 2));
-			$retmsg .= " pct up down"
-				if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "LEVEL", 2));
-		}
+		my $retmsg = "clear defaults:noArg";
+		if ($hash->{statevals} ne 'readonly') {
+			$retmsg .= " config control datapoint rpcparameter devstate";
 
-		return $retmsg;
+			if ($hash->{statevals} ne '') {
+				my @cmdlist = split /\|/,$hash->{statevals};
+				shift @cmdlist;
+				$retmsg .= ':'.join(',',@cmdlist) if (scalar(@cmdlist) > 0);
+				foreach my $sv (@cmdlist) {
+					$retmsg .= ' '.$sv.':noArg';
+				}
+				$retmsg .= " toggle:noArg";
+				$retmsg .= " on-for-timer on-till"
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "ON_TIME", 2));
+				$retmsg .= " pct up down"
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "LEVEL", 2));
+			}
+		}
+		return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
 	}
 }
 
@@ -500,10 +487,14 @@ sub HMCCUCHN_Get ($@)
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 
 	my $result = '';
 	my $rc;
+
+	# Log commands
+	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a)) if ($ccuflags =~ /logCommand/); 
 
 	if ($opt eq 'devstate') {
 		return HMCCU_SetError ($hash, -13) if ($sd eq '');
@@ -560,10 +551,9 @@ sub HMCCUCHN_Get ($@)
 		}
 		$par = '.*' if (!defined ($par));
 
-		my ($rc, $res) = HMCCU_RPCRequest ($hash, "getParamset", $ccuobj, "MASTER", undef, $par);
-#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $par);
-		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
-		return $ccureadings ? undef : $res;
+		($rc, $result) = HMCCU_RPCRequest ($hash, "getParamset", $ccuobj, "MASTER", undef, $par);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'configlist') {
 		my $ccuobj = $ccuaddr;
@@ -576,10 +566,9 @@ sub HMCCUCHN_Get ($@)
 		}
 		$par = '.*' if (!defined ($par));
 
-		my ($rc, $res) = HMCCU_RPCRequest ($hash, "listParamset", $ccuobj, "MASTER", undef, $par);
-#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "listParamset", $par);
-		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
-		return $res;
+		($rc, $result) = HMCCU_RPCRequest ($hash, "listParamset", $ccuobj, "MASTER", undef, $par);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+		return $result;
 	}
 	elsif ($opt eq 'configdesc') {
 		my $ccuobj = $ccuaddr;
@@ -588,14 +577,12 @@ sub HMCCUCHN_Get ($@)
 			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		}
 		
-		my ($rc, $res) = HMCCU_RPCRequest ($hash, "getParamsetDescription", $ccuobj, "MASTER", undef);
-#		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", undef);
-		return HMCCU_SetError ($hash, $rc, $res) if ($rc < 0);
-		return $res;
+		($rc, $result) = HMCCU_RPCRequest ($hash, "getParamsetDescription", $ccuobj, "MASTER", undef);
+		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+		return $result;
 	}
 	elsif ($opt eq 'defaults') {
-		$result = HMCCU_GetDefaults ($hash, 0);
-		return $result;
+		return HMCCU_GetDefaults ($hash, 0);
 	}
 	else {
 		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg defaults:noArg datapoint";
@@ -812,9 +799,10 @@ sub HMCCUCHN_Get ($@)
       	Example:<br/>
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
-      <li><b>ccuflags {nochn0, trace}</b><br/>
+      <li><b>ccuflags {ackState, logCommand, nochn0, trace}</b><br/>
       	Control behaviour of device:<br/>
       	ackState: Acknowledge command execution by setting STATE to error or success.<br/>
+      	logCommand: Write get and set commands to FHEM log with verbose level 3.<br/>
       	nochn0: Prevent update of status channel 0 datapoints / readings.<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>

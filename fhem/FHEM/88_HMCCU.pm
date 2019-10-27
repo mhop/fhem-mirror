@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.018
+#  Version 4.3.019
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.018';
+my $HMCCU_VERSION = '4.3.019';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -212,7 +212,7 @@ sub HMCCU_SetDefaults ($);
 
 # Status and logging functions
 sub HMCCU_Trace ($$$$);
-sub HMCCU_Log ($$$$);
+sub HMCCU_Log ($$$;$);
 sub HMCCU_LogError ($$$);
 sub HMCCU_SetError ($@);
 sub HMCCU_SetState ($@);
@@ -639,7 +639,8 @@ sub HMCCU_Attr ($@)
 # Return empty string on success or error message on error.
 ######################################################################
 
-sub HMCCU_AttrInterfacesPorts ($$$) {
+sub HMCCU_AttrInterfacesPorts ($$$)
+{
 	my ($hash, $attr, $attrval) = @_;
 	my $name = $hash->{NAME};
 	
@@ -1465,11 +1466,6 @@ sub HMCCU_Set ($@)
 		return HMCCU_SetError ($hash, $result) if ($result < 0);
 		return HMCCU_SetState ($hash, "OK");
 	}
-# 	elsif ($opt eq 'test') {
-# 		my $backend = shift @$a;
-# 		my $url = defined ($backend) ? HMCCU_BuildURL ($hash, $backend) : '';
-# 		return "URL=$url";
-# 	}
 	elsif ($opt eq 'initialize') {
 		return HMCCU_SetError ($hash, "State of CCU must be unreachable")
 			if ($hash->{ccustate} ne 'unreachable');
@@ -1508,51 +1504,60 @@ sub HMCCU_Set ($@)
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'datapoint') {
-		$usage = "set $name $opt FHEM-Device[.Channel].Datapoint=Value [...]";
-		return HMCCU_SetError ($hash, $usage) if (scalar (keys %$h) < 1);
+		$usage = "set $name $opt DevSpec [Channel].Datapoint=Value [...]\n";
+		my $devSpec = shift @$a;
+		
+		return HMCCU_SetError ($hash, $usage) if (scalar (keys %$h) < 1 || !defined($devSpec));
 
 		my $cmd = 1;
 		my %dpValues;
+		
+		my @devList = devspec2array ($devSpec);
+		return HMCCU_SetError ($hash, "No FHEM device matching $devSpec in command set datapoint")
+			if (scalar (@devList) == 0);
 		
 		foreach my $dptSpec (keys %$h) {
 			my $adr;
 			my $chn;
 			my $dpt;
-			my ($devName, $t1, $t2) = split (/\./, $dptSpec);
+			my ($t1, $t2) = split (/\./, $dptSpec);
 			
-			return HMCCU_SetError ($hash, "FHEM device $devName not defined")
-				if (!exists ($defs{$devName}));
-				
-			my $dh = $defs{$devName};
-			my $ccuif = $dh->{ccuif};
-			
-			if ($dh->{TYPE} eq 'HMCCUCHN') {
-				return HMCCU_SetError ($hash, "Channel number not allowed for FHEM device $devName")
-					if (defined ($t2));
-				($adr, $chn) = HMCCU_SplitChnAddr ($dh->{ccuaddr});
-				$dpt = $t1;			
-			}
-			elsif ($dh->{TYPE} eq 'HMCCUDEV') {
-				return HMCCU_SetError ($hash, "Missing channel number for device $devName")
-					if (!defined ($t2));
-				return HMCCU_SetError ($hash, "Invalid channel number specified for device $devName")
-					if ($t1 !~ /^[0-9]+$/ || $t1 > $dh->{channels});
-				$adr = $dh->{ccuaddr};
-				$chn = $t1;
-				$dpt = $t2;
-			}
-			else {
-				return HMCCU_SetError ($hash, "FHEM device $devName has illegal type");
-			}
+			foreach my $devName (@devList) {
+				my $dh = $defs{$devName};
+				my $ccuif = $dh->{ccuif};
 
-			return HMCCU_SetError ($hash, "Invalid datapoint $dpt specified for device $devName")
-				if (!HMCCU_IsValidDatapoint ($dh, $dh->{ccutype}, $chn, $dpt, 2));
-				
-			my $statevals = AttrVal ($dh->{NAME}, 'statevals', '');
+				if ($dh->{TYPE} eq 'HMCCUCHN') {
+					if (defined ($t2)) {
+						HMCCU_Log ($hash, 3, "Ignored channel in set datapoint for device $devName");
+						$dpt = $t2;
+					}
+					else {
+						$dpt = $t1;
+					}
+					($adr, $chn) = HMCCU_SplitChnAddr ($dh->{ccuaddr});
+				}
+				elsif ($dh->{TYPE} eq 'HMCCUDEV') {
+					return HMCCU_SetError ($hash, "Missing channel number for device $devName")
+						if (!defined ($t2));
+					return HMCCU_SetError ($hash, "Invalid channel number specified for device $devName")
+						if ($t1 !~ /^[0-9]+$/ || $t1 > $dh->{channels});
+					$adr = $dh->{ccuaddr};
+					$chn = $t1;
+					$dpt = $t2;
+				}
+				else {
+					return HMCCU_SetError ($hash, "FHEM device $devName has illegal type");
+				}
 
-			my $no = sprintf ("%03d", $cmd);
-			$dpValues{"$no.$ccuif.$devName:$chn.$dpt"} = HMCCU_Substitute ($h->{$dptSpec}, $statevals, 1, undef, '');
-			$cmd++;
+				return HMCCU_SetError ($hash, "Invalid datapoint $dpt specified for device $devName")
+					if (!HMCCU_IsValidDatapoint ($dh, $dh->{ccutype}, $chn, $dpt, 2));
+				
+				my $statevals = AttrVal ($dh->{NAME}, 'statevals', '');
+
+				my $no = sprintf ("%03d", $cmd);
+				$dpValues{"$no.$ccuif.$devName:$chn.$dpt"} = HMCCU_Substitute ($h->{$dptSpec}, $statevals, 1, undef, '');
+				$cmd++;
+			}
 		}
 		
 		my $rc = HMCCU_SetMultipleDatapoints ($hash, \%dpValues);
@@ -2590,9 +2595,10 @@ sub HMCCU_Trace ($$$$)
 # Log message and return parameter rc.
 ######################################################################
 
-sub HMCCU_Log ($$$$)
+sub HMCCU_Log ($$$;$)
 {
 	my ($hash, $level, $msg, $rc) = @_;
+	$rc = 0 if (!defined($rc));
 	my $name = "n/a";
 	my $type = "n/a";
 	$name = $hash->{NAME} if (exists ($hash->{NAME}));
@@ -2618,9 +2624,10 @@ sub HMCCU_LogError ($$$)
 
 ######################################################################
 # Set error state and write log file message
-# Parameter text can be an error code (integer < 0) or an error text.
+# Parameter text can be an error code (integer <= 0) or an error text.
+# If text is 0 or 'OK' call HMCCU_SetState which returns undef.
+# Otherwise error message is returned.
 # Parameter addinfo is optional.
-# Return error message.
 ######################################################################
 
 sub HMCCU_SetError ($@)
@@ -2653,19 +2660,23 @@ sub HMCCU_SetError ($@)
 	   -21 => 'Device disabled'
 	);
 
-	$msg = exists ($errlist{$text}) ? $errlist{$text} : $text;
-	$msg = $type.": ".$name." ". $msg;
-	if (defined ($addinfo) && $addinfo ne '') {
-		$msg .= ". $addinfo";
+	if ($text ne 'OK' && $text ne '0') {
+		$msg = exists ($errlist{$text}) ? $errlist{$text} : $text;
+		$msg = $type.": ".$name." ". $msg;
+		if (defined ($addinfo) && $addinfo ne '') {
+			$msg .= ". $addinfo";
+		}
+		HMCCU_Log ($hash, 1, $msg, undef);
+		return HMCCU_SetState ($hash, "Error", $msg);
 	}
-
-	HMCCU_Log ($hash, 1, $msg, undef);
-
-	return HMCCU_SetState ($hash, "Error", $msg);
+	else {
+		return HMCCU_SetState ($hash, "OK");
+	}
 }
 
 ######################################################################
 # Set state of device if attribute ccuflags = ackState
+# Return undef or $retval
 ######################################################################
 
 sub HMCCU_SetState ($@)
@@ -2932,19 +2943,18 @@ sub HMCCU_UpdateClients ($$$$$$)
 	my ($hash, $devexp, $ccuget, $fromccu, $ifname, $nonBlock) = @_;
 	my $fhname = $hash->{NAME};
 	my $c = 0;
+	my $dc = 0;
 	my $filter = "ccudevstate=active";
 	$filter .= ",ccuif=$ifname" if (defined ($ifname));
 	$ccuget = AttrVal ($fhname, 'ccuget', 'Value') if ($ccuget eq 'Attr');
 	my $list = '';
 
-	HMCCU_Log ($hash, 2, "Updating devices for filter $filter", 0);
-	
 	if ($fromccu) {
 		foreach my $name (sort keys %{$hash->{hmccu}{adr}}) {
 			next if ($name !~ /$devexp/ || !($hash->{hmccu}{adr}{$name}{valid}));
 
-			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, $filter);
-			
+			my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef, $filter);	
+			$dc += scalar(@devlist);
 			foreach my $d (@devlist) {
 				my $ch = $defs{$d};
 				next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
@@ -2958,8 +2968,7 @@ sub HMCCU_UpdateClients ($$$$$$)
 	}
 	else {
 		my @devlist = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", $devexp, $filter);
-		Log3 $fhname, 2, "HMCCU: Found ".scalar(@devlist)." client devices matching $devexp";
-		
+		$dc = scalar(@devlist);
 		foreach my $d (@devlist) {
 			my $ch = $defs{$d};
 			next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}) || $ch->{ccuif} eq 'fhem');			
@@ -2970,6 +2979,9 @@ sub HMCCU_UpdateClients ($$$$$$)
 			$c++;
 		}
 	}
+
+	return HMCCU_Log ($hash, 2, "HMCCU: Found no devices to update", 0) if ($c == 0);
+	HMCCU_Log ($hash, 2, "Updating $c of $dc client devices matching devexp=$devexp filter=$filter");
 	
 	if (HMCCU_IsFlag ($fhname, 'nonBlocking') || $nonBlock) {
 		HMCCU_HMScriptExt ($hash, '!GetDatapointsByDevice', { list => $list, ccuget => $ccuget },
@@ -6140,7 +6152,7 @@ sub HMCCU_ReadRPCQueue ($)
 }
 
 ######################################################################
-# Execute Homematic command on CCU.
+# Execute Homematic command on CCU (blocking).
 # If parameter mode is 1 an empty string is a valid result.
 # Return undef on error.
 ######################################################################
@@ -6162,7 +6174,6 @@ sub HMCCU_HMCommand ($$$)
 	$param->{sslargs} = { SSL_verify_mode => 0 };
 	my ($err, $response) = HttpUtils_BlockingGet ($param);
 	
-#	my $response = GetFileFromURL ($url, $ccureqtimeout, $cmd);
 	if ($err eq '') {
 		$value = $response;
 		$value =~ s/<xml>(.*)<\/xml>//;
@@ -6184,7 +6195,7 @@ sub HMCCU_HMCommand ($$$)
 }
 
 ######################################################################
-# Execute Homematic command on CCU without waiting for response.
+# Execute Homematic command on CCU (non blocking).
 ######################################################################
 
 sub HMCCU_HMCommandNB ($$$)
@@ -6251,9 +6262,6 @@ sub HMCCU_HMScriptExt ($$$$$)
 	my $host = $hash->{host};
 
 	my $ccureqtimeout = AttrVal ($hash->{NAME}, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
-#	if (!defined ($nonBlocking)) {
-#		$nonBlocking = HMCCU_IsFlag ($name, 'nonBlocking') ? 1 : 0;
-#	}
 
 	if ($hmscript =~ /^!(.*)$/) {
 		# Internal script
@@ -6300,6 +6308,8 @@ sub HMCCU_HMScriptExt ($$$$$)
 				$HMCCU_SCRIPTS->{$scrname}{syntax};
 		}
 	}
+	
+	HMCCU_Trace ($hash, 2, "HMScriptEx", $code);
 	
 	# Execute script on CCU
 	my $url = HMCCU_BuildURL ($hash, 'rega');
@@ -6535,19 +6545,17 @@ sub HMCCU_SetMultipleDatapoints ($$) {
 		}
 	}
 	
-	# Execute command (non blocking)
 	if ($ccuFlags =~ /nonBlocking/) {
+		# Execute command (non blocking)
 		HMCCU_HMCommandNB ($clHash, $cmd, undef);
 		return 0;
 	}
-
-	# Execute command (blocking)
-	my $response = HMCCU_HMCommand ($clHash, $cmd, 1);
-	return -2 if (!defined ($response));
-	
-	# Datapoint verification ???
-	
-	return 0;
+	else {
+		# Execute command (blocking)
+		my $response = HMCCU_HMCommand ($clHash, $cmd, 1);
+		return defined ($response) ? 0 : -2;
+		# Datapoint verification ???
+	}
 }
 
 ######################################################################
@@ -8520,9 +8528,10 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
 		<li><b>set &lt;name&gt; cleardefaults</b><br/>
 			Clear default attributes imported from file.
 		</li><br/>
-		<li><b>set &lt;name&gt; datapoint &lt;FHEM-Device&gt;[.&lt;channel-number&gt;].&lt;datapoint&gt;=&ltvalue&gt;</b><br/>
+		<li><b>set &lt;name&gt; datapoint &lt;FHEM-DevSpec&gt; [&lt;channel-number&gt;].&lt;datapoint&gt;=&ltvalue&gt;</b><br/>
 			Set datapoint values on multiple devices. If <i>FHEM-Device</i> is of type HMCCUDEV
-			a <i>channel-number</i> must be specified.
+			a <i>channel-number</i> must be specified. The channel number is ignored for devices of
+			type HMCCUCHN.
 		</li><br/>
 		<li><b>set &lt;name&gt; defaults</b><br/>
 		   Set default attributes for I/O device.

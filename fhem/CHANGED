@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  88_HMCCU: Minor changes
  - change:  71_ZM_Monitor: now writing internal 'model'
  - feature: 74_AMADDevice: add class support for openApp,
                        fix bug then change attr remoteServer set Internal MODEL
