@@ -155,8 +155,6 @@ sub Timer_Set($$$@) {
 		my $array_diff_cnt1 = 0;        # need to check 1 + 1
 		my $array_diff_cnt2 = 0;        # need to check 1 + 1
 
-		RemoveInternalTimer($hash, "Timer_Check");
-
 		foreach my $readingsName (sort keys %{$hash->{READINGS}}) {
 			if ($readingsName =~ /^Timer_(\d+)$/) {
 				my $value = ReadingsVal($name, $readingsName, 0);
@@ -173,6 +171,8 @@ sub Timer_Set($$$@) {
 		for (my $i=0; $i<scalar(@timers_unsortet); $i++) {
 			$array_diff++ if ($timers_unsortet[$i] ne $timers_sort[$i]);
 		}
+
+		RemoveInternalTimer($hash, "Timer_Check") if ($array_diff != 0);
 		return "cancellation! No sorting necessary." if ($array_diff == 0);   # check, need action continues
 
 		for (my $i=0; $i<scalar(@timers_sort); $i++) {
@@ -668,7 +668,7 @@ sub Timer_FW_Detail($$$$) {
 		FW_cmd(FW_root+ \'?XHR=1"'.$FW_CSRF.'"&cmd={FW_pushed_savebutton("'.$name.'","\'+allVals+\'","'.$FW_room_dupl.'")}\');
 	}
 
-	/* Popup DEF - Zusammenbau */
+	/* Popup DEF - Zusammenbau (PERL -> Rueckgabe -> Javascript) */
 	function show_popup(button) {
 		FW_cmd(FW_root+\'?cmd={Timer_Popup("'.$name.'","\'+button+\'")}&XHR=1"'.$FW_CSRF.'"\', function(data){popup_return(data)});
 	}
@@ -804,7 +804,7 @@ sub FW_pushed_savebutton {
 	readingsBulkUpdate($hash, "state" , $state, 1);
 	readingsEndUpdate($hash, 1);
 
-	## popup user message ##
+	## popup user message (jump to javascript) ##
 	if ($popup != 0) {
 		FW_directNotify("FILTER=(room=)?$name", "#FHEMWEB:WEB", "show_popup(".$selected_buttons[0].")", "");
 		$reload = 0 if ($reload != 0); # reset, need to right running
@@ -818,7 +818,7 @@ sub FW_pushed_savebutton {
 	return;
 }
 
-### separate popup for user ###
+### Popup DEF - Zusammenbau (Rueckgabe -> Javascript) ###
 sub Timer_Popup {
 	my $name = shift;
 	my $selected_button = shift;
@@ -881,7 +881,7 @@ sub Timer_Check($) {
 	my $state;;
 
 	Log3 $name, 5, "$name: Check is running, Sonnenaufgang $sunriseValues[0]:$sunriseValues[1]:$sunriseValues[2], Sonnenuntergang $sunsetValues[0]:$sunsetValues[1]:$sunsetValues[2]";
-	Log3 $name, 5, "$name: Check is running, drift $microseconds microSeconds";
+	Log3 $name, 4, "$name: Check is running, drift $microseconds microSeconds";
 
 	foreach my $d (keys %{$hash->{READINGS}}) {
 		if ($d =~ /^Timer_\d+$/) {
