@@ -430,7 +430,7 @@ my %ra = (
   "list"    => { Fn=>"CommandList",
             Hlp=>"[-r] [devspec] [value],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
-            Hlp=>"device <type-dependent-options>","modify the definition" },
+            Hlp=>"device <type-dependent-options>,modify the definition" },
   "quit"    => { Fn=>"CommandQuit",
             ClientFilter => "telnet",
             Hlp=>",end the client session" },
@@ -468,7 +468,7 @@ my %ra = (
             Hlp => "[<fileName>|all|check|checktime|force] ".
                                       "[http://.../controlfile],update FHEM" },
   "updatefhem" => { ReplacedBy => "update" },
-  "usb"     => { ModuleName => "autocreate" },
+  "usb"     => { ModuleName => "autocreate" }
 );
 
 ###################################################
