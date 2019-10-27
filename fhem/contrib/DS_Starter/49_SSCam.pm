@@ -5590,7 +5590,8 @@ sub SSCam_camop_parse ($) {
                                 }
                             }
                         } else {
-                            for(SSCam_cache($name, "c_getkeys")) {              # alle vorkommenden Serial Numbers
+                            for(SSCam_cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
                                 $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
                                 push @as,$_ if($_=~/^(\d+)$/);
                             } 
@@ -5732,7 +5733,8 @@ sub SSCam_camop_parse ($) {
                                 }
                             }
                         } else {
-                            for(SSCam_cache($name, "c_getkeys")) {              # alle vorkommenden Serial Numbers
+                            for(SSCam_cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
                                 $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
                                 push @as,$_ if($_=~/^(\d+)$/);
                             }                            
@@ -8066,7 +8068,8 @@ sub SSCam_composegallery ($;$$$) {
       }
   } else {
       my @as;
-      for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+      for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+         next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
          $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
          push @as,$_ if($_=~/^(\d+)$/);
       }      
@@ -8243,7 +8246,8 @@ sub SSCam_prepareSendData ($$;$) {
                     } else {
                         # alle Serial Numbers "{$sn}" der Transaktion ermitteln
                         # Muster: {SENDSNAPS}{2222}{0}{imageData} 
-                        for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+                        for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+                            next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
                             $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
                             push @as,$_ if($_=~/^(\d+)$/);
                         }      
@@ -8596,7 +8600,8 @@ sub SSCam_sendTelegram ($$) {
       } else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDSNAPS}{2222}{0}{imageData} 
-          for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
               push @as,$_ if($_=~/^(\d+)$/);
           }      
@@ -8643,7 +8648,8 @@ sub SSCam_sendTelegram ($$) {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDRECS}{fake_recsend}{0}{imageData} 
 
-          for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
               push @as,$_ if($_=~/^(\d+)$/);
           }
@@ -9240,7 +9246,8 @@ sub SSCam_sendEmailblocking($) {
       } else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDSNAPS}{2222}{0}{imageData}  
-          for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{(SENDSNAPS|RS)\}\{.*\}\{(\d+)\}\{.*\}/$2/;
               push @as,$_ if($_=~/^(\d+)$/);
           }           
@@ -9289,7 +9296,8 @@ sub SSCam_sendEmailblocking($) {
       } else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDRECS}{fake_recsend}{0}{imageData} 
-          for(SSCam_cache($name, "c_getkeys")) {                                                # alle vorkommenden Serial Numbers
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
               push @as,$_ if($_=~/^(\d+)$/);
           }           
@@ -13115,7 +13123,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   
   <a name="cacheServerParam"></a>
   <li><b>cacheServerParam</b><br> 
-    Angabe der Verbindungsparameter zu einem zenralen Datencache. <br><br>
+    Angabe der Verbindungsparameter zu einem zentralen Datencache. <br><br>
 
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
