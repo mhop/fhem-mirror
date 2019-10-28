@@ -674,13 +674,13 @@ sub nextTime {
       @times= sort @times;
   }
 
-#   main::Debug "Calendar: " . $self->asFull();
-#   main::Debug "Calendar: Start " . main::FmtDateTime($self->{start});
-#   main::Debug "Calendar: End   " . main::FmtDateTime($self->{end});
-#   main::Debug "Calendar: Alarm " . main::FmtDateTime($self->{alarm}) if($self->{alarm});
-#   main::Debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
-#   main::Debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
-#   main::Debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
+#   #main::Debug "Calendar: " . $self->asFull();
+#   #main::Debug "Calendar: Start " . main::FmtDateTime($self->{start});
+#   #main::Debug "Calendar: End   " . main::FmtDateTime($self->{end});
+#   #main::Debug "Calendar: Alarm " . main::FmtDateTime($self->{alarm}) if($self->{alarm});
+#   #main::Debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
+#   #main::Debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
+#   #main::Debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
 
   if(@times) {
     return $times[0];
@@ -728,7 +728,7 @@ sub getNextMonthlyDateByDay($$$);
 sub new($$) {
   my $class= shift;
   my ($type)= @_;
-  #main::Debug "new ICal::Entry $type";
+  ##main::Debug "new ICal::Entry $type";
   my $self= {};
   bless $self, $class;
   $self->{type}= $type;
@@ -936,7 +936,7 @@ sub addproperty($$) {
   # contentline        = name *(";" param ) ":" value CRLF [Page 13]
   # example:
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
-  #main::Debug "line=\'$line\'";
+  ##main::Debug "line=\'$line\'";
   # for DTSTART, DTEND there are several variants:
   #    DTSTART;TZID=Europe/Berlin:20140205T183600
   #  * DTSTART;TZID="(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna":20140904T180000
@@ -951,7 +951,7 @@ sub addproperty($$) {
     return;
   }
   return unless($key);
-  #main::Debug "addproperty for key $key";
+  ##main::Debug "addproperty for key $key";
 
   # ignore some properties
   # commented out: it is faster to add the property than to do the check
@@ -959,12 +959,12 @@ sub addproperty($$) {
   return if(substr($key,0,2) eq "^X-");
 
   if(($key eq "RDATE") or ($key eq "EXDATE")) {
-        #main::Debug "addproperty for dates";
+        ##main::Debug "addproperty for dates";
         # handle multiple properties
         my @values;
         @values= @{$self->values($key)} if($self->hasKey($key));
-        push @values, $parameter;
-        #main::Debug "addproperty pushed parameter $parameter to key $key";
+        push @values, split(',',$parameter);
+        ##main::Debug "addproperty pushed parameter $parameter to key $key";
         $self->{properties}{$key}= {
             multiple => 1,
             VALUES => \@values,
@@ -988,15 +988,15 @@ sub parse($$) {
   # We thus go for the the DOS/Windows/Unix/Mac classic variants.
   # Suggested reading:
   # http://stackoverflow.com/questions/3219014/what-is-a-cross-platform-regex-for-removal-of-line-breaks
-  my @ical= split /(?>\r\n|[\r\n])/, $ics;
+  my @ical= defined($ics) ? split /(?>\r\n|[\r\n])/, $ics : [];
   return $self->parseSub(0, \@ical);
 }
 
 sub parseSub($$$) {
   my ($self,$ln,$icalref)= @_;
   my $len= scalar @$icalref;
-  #main::Debug "lines= $len";
-  #main::Debug "ENTER @ $ln";
+  ##main::Debug "lines= $len";
+  ##main::Debug "ENTER @ $ln";
   while($ln< $len) {
     my $line= $$icalref[$ln];
     $ln++;
@@ -1007,7 +1007,7 @@ sub parseSub($$$) {
       $line.= substr($line1,1);
       $ln++;
     };
-    #main::Debug "$ln: $line";
+    ##main::Debug "$ln: $line";
     next if($line eq ""); # ignore empty line
     last if(substr($line,0,4) eq "END:");
     if(substr($line,0,6) eq "BEGIN:") {
@@ -1019,7 +1019,7 @@ sub parseSub($$$) {
       $self->addproperty($line);
     }
   }
-  #main::Debug "BACK";
+  ##main::Debug "BACK";
   return $ln;
 }
 
@@ -1087,20 +1087,20 @@ sub createEvent($) {
 sub tm($$) {
   my ($self, $t)= @_;
   return undef if(!$t);
-  #main::Debug "convert >$t<";
+  ##main::Debug "convert >$t<";
   my ($year,$month,$day)= (substr($t,0,4), substr($t,4,2),substr($t,6,2));
   if(length($t)>8) {
       my ($hour,$minute,$second)= (substr($t,9,2), substr($t,11,2),substr($t,13,2));
       my $z;
       $z= substr($t,15,1) if(length($t) == 16);
-      #main::Debug "$day.$month.$year $hour:$minute:$second $z";
+      ##main::Debug "$day.$month.$year $hour:$minute:$second $z";
       if($z) {
         return main::fhemTimeGm($second,$minute,$hour,$day,$month-1,$year-1900);
       } else {
         return main::fhemTimeLocal($second,$minute,$hour,$day,$month-1,$year-1900);
       }
   } else {
-      #main::Debug "$day.$month.$year";
+      ##main::Debug "$day.$month.$year";
       return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
   }
 }
@@ -1213,11 +1213,9 @@ sub plusNSeconds($$$) {
 sub plusNMonths($$) {
   my ($tm, $n)= @_;
   my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  #main::Debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
   $month+= $n;
   $year+= int($month / 12);
   $month %= 12;
-  #main::Debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
   return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
 }
 
@@ -1302,8 +1300,6 @@ sub getNextMonthlyDateByDay($$$) {
 
 		$lNewTime = plusNSeconds( $lLastOfNextMonth, -24*60*60*$lDaysToAddOrSub, 1);
 	}
-	#main::Debug "lByDay = $lByDay, lByDayLength = $lByDayLength, lDay = $lDay, lDayInterval = $lDayInterval, lDayOfWeek = $lDayOfWeek, lFirstOfNextMonth = $lFirstOfNextMonth, lNextYear = $lNextYear, lNextMonth = $lNextMonth";
-	#main::Debug main::FmtDateTime($lNewTime);
 
 	return $lNewTime;
 }
@@ -1343,6 +1339,19 @@ sub createSingleEvent($$$$) {
     } elsif($self->hasKey("DURATION")) {
         my $duration= $self->d($self->value("DURATION"));
         $event->{end}= $nextstart + $duration;
+    } else {
+
+      # Page 53ge 53
+      # For cases where a "VEVENT" calendar component
+      # specifies a "DTSTART" property with a DATE value type but no
+      # "DTEND" nor "DURATION" property, the event's duration is taken to
+      # be one day.  For cases where a "VEVENT" calendar component
+      # specifies a "DTSTART" property with a DATE-TIME value type but no
+      # "DTEND" property, the event ends on the same calendar date and
+      # time of day specified by the "DTSTART" property.
+      #
+      # https://forum.fhem.de/index.php?topic=75308
+        $event->{end}= $nextstart + 86400;
     }
     $self->makeEventDetails($event);
     $self->makeEventAlarms($event);
@@ -1389,10 +1398,15 @@ sub excludeByReference($$$) {
   if($self->hasReferences()) {
       foreach my $id (@{$self->references()}) {
           my $vevent= $veventsref->{$id};
-          my $recurrenceid= $vevent->value("RECURRENCE-ID");
-          my $originalstart= $vevent->tm($recurrenceid);
+          # saving the originalstart speeds up processing on repeated checks
+          my $originalstart= $vevent->{originalstart};
+          if(!defined($originalstart)) {
+            my $recurrenceid= $vevent->value("RECURRENCE-ID");
+            $originalstart= $vevent->tm($recurrenceid);
+            $vevent->{originalstart}= $originalstart;
+          }
           if($originalstart == $event->start()) {
-              $event->setNote("RECURRENCE-ID: $recurrenceid");
+              #$event->setNote("RECURRENCE-ID: $recurrenceid");
               $self->addSkippedEvent($event);
               $skip++;
               last;
@@ -1466,8 +1480,9 @@ sub addOrSkipSeriesEvent($$$$$$) {
 
 }
 
-sub createEvents($$$%) {
-  my ($self, $t0, $onCreateEvent, %vevents)= @_; # t0 is today (for limits)
+sub createEvents($$$$$$%) {
+  my ($self, $name, $t0, $onCreateEvent,
+    $cutoffLowerBound, $cutoffUpperBound, %vevents)= @_; # t0 is today (for limits)
 
   $self->clearEvents();
   $self->clearSkippedEvents();
@@ -1483,7 +1498,7 @@ sub createEvents($$$%) {
         my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH WKST);
         foreach my $k (keys %r) {
             if(not($k ~~ @keywords)) {
-                main::Log3 undef, 2, "Calendar: keyword $k in RRULE $rrule is not supported";
+                main::Log3 $name, 3, "Calendar $name: keyword $k in RRULE $rrule is not supported";
             } else {
                 #main::Debug "keyword $k in RRULE $rrule has value $r{$k}";
             }
@@ -1495,6 +1510,7 @@ sub createEvents($$$%) {
         # According to RFC, interval defaults to 1
         my $interval = exists($r{"INTERVAL"}) ? $r{"INTERVAL"} : 1;
         my $until = exists($r{"UNTIL"}) ? $self->tm($r{"UNTIL"}) : 99999999999999999;
+        $until= $cutoffUpperBound if($cutoffUpperBound && ($until> $cutoffUpperBound));
         my $count = exists($r{"COUNT"}) ? $r{"COUNT"} : 999999;
         my $bymonthday = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
         my $byday = exists($r{"BYDAY"}) ? $r{"BYDAY"} : "";
@@ -1512,7 +1528,8 @@ sub createEvents($$$%) {
         #
         if($self->hasKey('RDATE')) {
             foreach my $rdate (@{$self->values("RDATE")}) {
-                my $event= $self->createSingleEvent($self->tm($rdate), $onCreateEvent);
+                my $tr= $self->tm($rdate);
+                my $event= $self->createSingleEvent($tr, $onCreateEvent);
                 my $skip= 0;
                 if($self->hasKey('EXDATE')) {
                     foreach my $exdate (@{$self->values("EXDATE")}) {
@@ -1688,7 +1705,7 @@ sub Calendar_Initialize($) {
                       "removevcalendar:0,1 " .
                       "ignoreCancelled:0,1 ".
                       "SSLVerify:0,1 ".
-                      "cutoffOlderThan hideOlderThan hideLaterThan ".
+                      "cutoffOlderThan cutoffLaterThan hideOlderThan hideLaterThan ".
                       "onCreateEvent quirks ".
                       "defaultFormat defaultTimeFormat ".
                       $readingFnAttributes;
@@ -2426,7 +2443,7 @@ sub filter_uid($$) {
 sub filter_reading($$) {
     my ($event, $param)= @_;
     my @uids= @{$param};
-    #foreach my $u (@uids) { main::Debug "UID $u"; }
+    #foreach my $u (@uids) { #main::Debug "UID $u"; }
     my $uid= $event->uid();
     #main::Debug "SUCHE $uid";
     #main::Debug "GREP: " . grep(/^$uid$/, @uids);
@@ -2651,6 +2668,7 @@ sub Calendar_ProcessUpdate($$$) {
   if($errmsg or !defined($ics) or ("$ics" eq "") ) {
     Log3 $hash, 1, "Calendar $name: retrieved no or empty data";
     readingsSingleUpdate($hash, "state", "error (no or empty data)", 1);
+    $hash->{".fhem"}{t}= $t;
     Calendar_CheckAndRearm($hash);
   } else {
     $hash->{".fhem"}{iCalendar}= $ics; # the plain text iCalendar
@@ -2761,7 +2779,7 @@ sub Calendar_PollChild($) {
 
 sub Calendar_ParseICS($) {
 
-  #main::Debug "Calendar $name: parsing data";
+  #main::Debug "Calendar: parsing data";
   my ($ics)= @_;
   my ($error, $state)= (undef, "");
 
@@ -2887,28 +2905,39 @@ sub Calendar_UpdateCalendar($$) {
   }
 
     # start of time window for cutoff
+    my $cutoffLowerBound= 0;
     my $cutoffOlderThan = AttrVal($name, "cutoffOlderThan", undef);
-    my $cutoffT= 0;
-    my $cutoff;
     if(defined($cutoffOlderThan)) {
+        my $cutoffT= 0;
         ($error, $cutoffT)= Calendar_GetSecondsFromTimeSpec($cutoffOlderThan);
         if($error) {
-            Log3 $hash, 2, "$name: attribute cutoffOlderThan: $error";
-        };
-        $cutoff= $t- $cutoffT;
+          Log3 $hash, 2, "$name: attribute cutoffOlderThan: $error";
+        } else {
+          $cutoffLowerBound= $t- $cutoffT;
+        }
     }
-
+    # end of time window for cutoff
+    my $cutoffUpperBound= 0;
+    my $cutoffLaterThan = AttrVal($name, "cutoffLaterThan", undef);
+    if(defined($cutoffLaterThan)) {
+        my $cutoffT= 0;
+        ($error, $cutoffT)= Calendar_GetSecondsFromTimeSpec($cutoffLaterThan);
+        if($error) {
+          Log3 $hash, 2, "$name: attribute cutoffLaterThan: $error";
+        } else {
+          $cutoffUpperBound= $t+ $cutoffT;
+        }
+    }
 
   foreach my $v (grep { $_->{type} eq "VEVENT" } @{$root->{entries}}) {
 
-        # totally skip outdated calendar entries
-        if($cutoffOlderThan) {
+        # totally skip old calendar entries
+        if($cutoffLowerBound) {
           if(!$v->isRecurring()) {
             # non recurring event
             next if(
-              defined($cutoffOlderThan) &&
               $v->hasKey("DTEND") &&
-              $v->tm($v->value("DTEND")) < $cutoff
+              $v->tm($v->value("DTEND")) < $cutoffLowerBound
               );
           } else {
             # recurring event, inspect
@@ -2916,9 +2945,17 @@ sub Calendar_UpdateCalendar($$) {
             my @rrparts= split(";", $rrule);
             my %r= map { split("=", $_); } @rrparts;
             if(exists($r{"UNTIL"})) {
-              next if($v->tm($r{"UNTIL"}) < $cutoff)
+              next if($v->tm($r{"UNTIL"}) < $cutoffLowerBound)
+              #main::Debug "UNTIL exists with " . $v->tm($r{"UNTIL"}) . " <=> $cutoffLowerBound";
             }
           }
+        }
+        # totally skip distant future calendar entries
+        if($cutoffUpperBound) {
+          next if(
+            $v->hasKey("DTSTART") &&
+            $v->tm($v->value("DTSTART")) > $cutoffUpperBound
+            );
         }
 
 	      #main::Debug "Merging " . $v->asString();
@@ -3049,7 +3086,8 @@ sub Calendar_UpdateCalendar($$) {
         my $onCreateEvent= AttrVal($name, "onCreateEvent", undef);
         if($v->hasChanged() or !$v->numEvents()) {
             #main::Debug "createEvents";
-            $v->createEvents($t, $onCreateEvent, %vevents);
+            $v->createEvents($name, $t, $onCreateEvent,
+              $cutoffLowerBound, $cutoffUpperBound, %vevents);
         }
 
   }
@@ -3158,7 +3196,7 @@ sub Calendar_CheckTimes($$) {
 
 
     #foreach my $event (@allevents) {
-    #    main::Debug $event->asFull();
+    #    #main::Debug $event->asFull();
     #}
 
 
@@ -3654,10 +3692,11 @@ sub CalendarEventsAsHtml($;$) {
         <p>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
-        This attribute cuts off all calendar events that ended a timespan cutoffOlderThan
-        before the last update of the calendar. The purpose of setting this attribute is to save memory.
-        Such calendar events cannot be accessed at all from FHEM. Calendar events are not cut off if
-        they are recurring with no end of series (UNTIL) or if they have no end time (DTEND).
+        <code>cutoffLaterThan &lt;timespec&gt;</code><br>
+        These attributes cut off all calendar events that end a timespan cutoffOlderThan
+        before or a timespan cutoffLaterThan after the last update of the calendar.
+        The purpose of setting this attribute is to save memory and processing time.
+        Such calendar events cannot be accessed at all from FHEM.
     </li><p>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
@@ -3686,6 +3725,8 @@ sub CalendarEventsAsHtml($;$) {
         <ul>
           <li><code>ignoreDtStamp</code>: if present, a modified DTSTAMP attribute of a calendar event
           does not signify that the calendar event was modified.</li>
+          <li><code>noWildcards</code>: if present, wildcards in the calendar's
+          URL will not be expanded.</li>
         </ul>
     </li><p>
 
@@ -4282,11 +4323,13 @@ sub CalendarEventsAsHtml($;$) {
         <p>
 
     <li><code>cutoffOlderThan &lt;timespec&gt;</code><br>
-        Dieses Attribut schneidet alle Termine weg, die eine Zeitspanne <code>cutoffOlderThan</code>
-        vor der letzten Aktualisierung des Kalenders endeten. Der Zweck dieses Attributs ist es Speicher zu
+        <code>cutoffLaterThan &lt;timespec&gt;</code><br>
+        Diese Attribut schneidem alle Termine weg, die eine Zeitspanne <code>cutoffOlderThan</code>
+        vor bzw. <code>cutoffLaterThan</code> nach der letzten Aktualisierung des Kalenders enden.
+        Der Zweck dieses Attributs ist
+        es Speicher und Verarbeitungszeit zu
         sparen. Auf solche Termine kann gar nicht mehr aus FHEM heraus zugegriffen
-        werden. Serientermine ohne Ende (UNTIL) und
-        Termine ohne Endezeitpunkt (DTEND) werden nicht weggeschnitten.
+        werden.
     </li><p>
 
     <li><code>onCreateEvent &lt;perl-code&gt;</code><br>
@@ -4318,6 +4361,8 @@ sub CalendarEventsAsHtml($;$) {
           <li><code>ignoreDtStamp</code>: wenn gesetzt, dann zeigt
           ein ver&auml;ndertes DTSTAMP Attribut eines Termins nicht an, dass;
           der Termin ver&auml;ndert wurde.</li>
+          <li><code>noWildcards</code>: wenn gesetzt, werden Wildcards in der
+            URL des Kalenders nicht ersetzt.</li>
         </ul>
     </li><p>
 

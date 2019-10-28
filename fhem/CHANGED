@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  57_Calendar: new attribute, cutoffLaterThan; events without 
+                DURATION and DTEND last 1 day; several fixes (see
+                https://forum.fhem.de/index.php/topic,104587.msg985270.html);
+                speed gain for parsing calendars with certain types of series
  - bugfix:  88_Timer: fixed stop internalTimer if no value to sort (sortTimer)
  - change:  88_HMCCU: Minor changes
  - change:  71_ZM_Monitor: now writing internal 'model'
