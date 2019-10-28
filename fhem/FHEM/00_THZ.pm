@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 01/2019
-my $thzversion = "0.181";  #   
+# by immi 10/2019
+my $thzversion = "0.182";  #   
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -441,7 +441,7 @@ my %sets439539common = (
   "p50SummerModeHysteresis"		=> {cmd2=>"0A05A2", argMin => "0.5", argMax =>    "5",	type =>"5temp",  unit =>" K"},		#Hysteresis for summer mode !! 
   "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1",  argMax =>   "24",	type =>"1clean",  unit =>""},
-  "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
+  "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "288",	type =>"1clean",  unit =>""},
   "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "0",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "0",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
   "p58SuppressTempCaptPumpStart" => {cmd2=>"0A0611", argMin =>  "0",  argMax =>  "120",	type =>"1clean",  unit =>" s"},
@@ -2365,8 +2365,6 @@ sub THZ_backup_readings($){
       <ul><code>
       attr Mythz firmware 2.06 <br>
       </code></ul>
-     <br>
-    <br>
       <ul><code>
       attr Mythz firmware 5.39 <br>
       </code></ul>
@@ -2375,7 +2373,7 @@ sub THZ_backup_readings($){
      <br>
      A backup function has been implemented
      <ul><code>
-     get Mythz zBackupParameters implemented
+     get Mythz zBackupParameters 
      </code></ul> 
     The command saves all pXXX in a backupfile with a special text format.
     All (or some) parameters can be easily restored with one copy&paste from the backupfile in a telnet fhem session.
@@ -2447,6 +2445,32 @@ sub THZ_backup_readings($){
 </ul>
  
 =end html_DE
+
+=for :application/json;q=META.json 00_THZ.pm
+{
+  "author": [
+    "immi"
+  ],
+  "x_fhem_maintainer": [
+    "immiimmi"
+  ],
+  "keywords": [
+    "THZ",
+    "Tecalor",
+    "LWZ",
+    "Stieben Eltron",
+    "303/403/403/404/504",
+    "Waermepumpe",
+    "Heatpump",
+    "cloudfree",
+    "openapi",
+    "heizungssteuerung"
+  ]
+}
+=end :application/json;q=META.json
+
+
 =cut
+
 
 
