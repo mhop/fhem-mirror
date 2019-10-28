@@ -31,7 +31,8 @@ defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
   (tele|cmnd)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
-  (ESPClient_[^/]+)[/].*:.* "$1"
+  (ESPClient_[^/]+)[/].*:.* "$1"\
+  valetudo[/]([^/]+)[/].*:.* "$1"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -1782,3 +1783,29 @@ attr DEVICE setList irsend:textField BASE_ID/DEVNAME/IRtoMQTT {"value":$EVTPART2
 attr DEVCID comment irsend needs Infos about protocol and value (n decimal), so e.g."IR_NEC 1587664935" should be fine...
 attr DEVICE model OpenMQTTGateway_ir
 
+name:roborock
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*valetudo[/].*
+desc:use this to control a rooted Xiamoni Vacuum / Roborock. For further details visit https://github.com/Hypfer/Valetudo<br><br>NOTE: Initial version, not yet fully tested, just build according to https://forum.fhem.de/index.php/topic,104804.0.html<br>
+order:X_03
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]valetudo[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,valetudo[/]([^/]+)[/].*:, ? $1 : undef }
+deletereading -q DEVICE (?!associatedWith).*
+defmod DEVICE MQTT2_DEVICE DEVNAME
+attr DEVICE icon vacuum_top
+attr DEVICE readingList homeassistant/vacuum/valetudo_DEVNAME/config:.* { json2nameValue($EVENT) }\
+  BASE_ID/DEVNAME/state:.* { json2nameValue($EVENT) }\
+  BASE_ID/DEVNAME/attributes:.* { json2nameValue($EVENT) }\
+  BASE_ID/DEVNAME/map_data:.* {valetudo2svg("map_data",$EVENT,"www/images/valetudo_map.svg")}
+attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
+  charge:noArg BASE_ID/DEVNAME/command return_to_base\
+  stop:noArg BASE_ID/DEVNAME/command stop\
+  spot:noArg BASE_ID/DEVNAME/command clean_spot\
+  pause:noArg BASE_ID/DEVNAME/command pause\
+  locate:noArg BASE_ID/DEVNAME/command locate\
+  fan_power:min,medium,high,max,mop BASE_ID/DEVNAME/set_fan_speed $EVTPART1\
+  zone BASE_ID/DEVNAME/send_command zoned_cleanup $EVTPART1\
+  goto BASE_ID/DEVNAME/send_command go_to $EVTPART1
+attr DEVICE setStateList charge locate pause stop start
+attr DEVCID comment For code "valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
+farewell:template has been applied successfully. For map generation you'll need additional code to myUtils, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a> for details.
+attr DEVICE model roborock
