@@ -2901,13 +2901,13 @@ sub DOIF_SetTimer {
 
   if ($second <= $sec_today and !$rel or defined ($next_day) and !$rel and $second < 86400 and !$align) {
     $next_time+=86400;
-    ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($next_time);
-    if ($isdst_now != $isdst) {
-      if ($isdst_now == 1) {
-        $next_time+=3600 if ($isdst == 0);
-      } else {
-        $next_time-=3600 if ($second>=3*3600 or $second <= $sec_today and $second<2*3600);
-      }
+  }
+  ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($next_time);
+  if ($isdst_now != $isdst) {
+    if ($isdst_now == 1) {
+      $next_time+=3600 if ($isdst == 0);
+    } else {
+      $next_time-=3600 if ($second>=3*3600 or $second <= $sec_today and $second<2*3600);
     }
   }
   if (defined ($hash->{intervalfunc}{$nr})) {
