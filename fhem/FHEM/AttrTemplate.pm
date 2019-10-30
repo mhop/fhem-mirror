@@ -229,8 +229,11 @@ AttrTemplate_Set($$@)
             $("#FW_okDialog").parent().find(".ui-dialog-buttonpane button")
             .unbind("click").click(function(){
               var val = encodeURIComponent($("#FW_okDialog input").val());
-              FW_cmd(FW_root+"?cmd="+val+"&XHR=1",
-                     function(){ location.reload() } );
+              FW_cmd(FW_root+"?cmd="+val+"&XHR=1", function(resp){
+                if(resp)
+                  return FW_okDialog("<pre>"+resp+"</pre>");
+                location.reload()
+              });
               $("#FW_okDialog").remove();
             })}, 100);
          </script>
