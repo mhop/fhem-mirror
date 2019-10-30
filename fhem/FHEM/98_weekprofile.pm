@@ -595,11 +595,22 @@ sub weekprofile_updateReadings($)
     #$idx++;
   #}
   
+  my $topic_list="";
   splice(@{$hash->{TOPICS}});
   foreach my $prf (@{$hash->{PROFILES}}) {
     if ( !grep( /^$prf->{TOPIC}$/, @{$hash->{TOPICS}}) ) {
-      push @{$hash->{TOPICS}}, $prf->{TOPIC};
+      push @{$hash->{TOPICS}}, $prf->{TOPIC};      
+      if (length($topic_list) > 0){
+        $topic_list = $topic_list . ':' . $prf->{TOPIC};
+      } else {
+        $topic_list = $prf->{TOPIC};
+      }
     }
+  }
+
+  my $useTopics = AttrVal($hash->{NAME},"useTopics",0);
+  if ($useTopics) {
+    readingsBulkUpdate($hash,"topics",$topic_list);
   }
   readingsEndUpdate($hash, 1);
 }
@@ -1558,6 +1569,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>profile_count<br>
       Count of all profiles including references.
     </li>
+    <li>topics<br>
+      List of topic names with ':' as delimiter
+    </li>
   </ul>
   
   <a name="weekprofileattr"></a>
@@ -1726,6 +1740,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
     <li>profile_count<br>
       Anzahl aller Profile mit Referenzen.
+    </li>
+    <li>topics<br>
+      Liste von Topicnamen getrennt durch ':'
     </li>
   </ul>
   
