@@ -933,33 +933,33 @@ HUEDevice_Set($@)
     if( $hash->{helper}->{devtype} eq 'G' ) {
       $list .= " savescene deletescene";
     }
+  }
 
-    if( my $scenes = $hash->{IODev}{helper}{scenes} ) {
-      local *containsOneOfMyLights = sub($) {
-        return 1 if( !defined($hash->{helper}{lights}) );
+  if( my $scenes = $hash->{IODev}{helper}{scenes} ) {
+    local *containsOneOfMyLights = sub($) {
+      return 1 if( !defined($hash->{helper}{lights}) );
 
-        my( $lights ) = @_;
+      my( $lights ) = @_;
 
-        foreach my $light (@{$lights}) {
-          return 1 if( defined($hash->{helper}{lights}{$light}) );
-        }
-        return 0;
-      };
-      my %count;
-      map { $count{$scenes->{$_}{name}}++ } keys %{$scenes};
-      $list .= " scene:". join(",", sort grep { defined } map { if( !containsOneOfMyLights($scenes->{$_}{lights}) ) {
-                                                                  undef;
-                                                                } else {
-                                                                  my $scene = $scenes->{$_}{name};
-                                                                  if( $count{$scene} > 1 ) {
-                                                                    $scene .= " [id=$_]";
-                                                                   }
-                                                                  $scene =~ s/ /#/g; $scene;
-                                                                }
-                                                              } keys %{$scenes} );
-    } else {
-      $list .= " scene";
-    }
+      foreach my $light (@{$lights}) {
+        return 1 if( defined($hash->{helper}{lights}{$light}) );
+      }
+      return 0;
+    };
+    my %count;
+    map { $count{$scenes->{$_}{name}}++ } keys %{$scenes};
+    $list .= " scene:". join(",", sort grep { defined } map { if( !containsOneOfMyLights($scenes->{$_}{lights}) ) {
+                                                                undef;
+                                                              } else {
+                                                                my $scene = $scenes->{$_}{name};
+                                                                if( $count{$scene} > 1 ) {
+                                                                  $scene .= " [id=$_]";
+                                                                 }
+                                                                $scene =~ s/ /#/g; $scene;
+                                                              }
+                                                            } keys %{$scenes} );
+  } else {
+    $list .= " scene";
   }
 
   return SetExtensions($hash, $list, $name, @aa);
