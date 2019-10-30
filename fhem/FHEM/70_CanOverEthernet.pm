@@ -72,9 +72,11 @@ sub CanOverEthernet_Define($$) {
 
   my $portno = 5441;
   my $conn = IO::Socket::INET->new(Proto=>"udp",LocalPort=>$portno);
-  
-  Log3 $name, 0, "CanOverEthernet ($name) - ERROR: Unable to open port 5441 for reading."
-    unless defined ($conn);
+
+  if ( ! defined $conn ) {  
+    Log3 $name, 0, "CanOverEthernet ($name) - ERROR: Unable to open port 5441 for reading. Maybe it's opened by another process already?";
+    return undef;
+  }
  
   $hash->{FD}    = $conn->fileno();
   $hash->{CD}    = $conn;
