@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_CanOverEthernet: sendDataDigital crash fixed
  - bugfix:  70_CanOverEthernet: module crashed when UDP port was occupied
  - feature: 98_weekprofile: add reading topics - a list of topic names
  - change:  57_Calendar: new attribute, cutoffLaterThan; events without 

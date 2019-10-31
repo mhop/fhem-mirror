@@ -265,8 +265,8 @@ sub CanOverEthernet_sendDataDigital {
   my $digiVals = '';
   for (my $idx=0; $idx < 32; $idx++) {
 
-    if(defined($values[0][$idx])) {
-      $digiVals = $digiVals . ($values[0][$idx] == '1' ? "\001" : "\000");
+    if(defined($values[$idx])) {
+      $digiVals = $digiVals . ($values[$idx] == '1' ? "\001" : "\000");
     } else {
       $digiVals = $digiVals . "\000";
     }
