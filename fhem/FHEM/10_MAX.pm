@@ -220,7 +220,10 @@ MAX_ParseWeekProfile(@) {
       $hours[$j] = ($time_prof[$j] / 60 % 24);
       $minutes[$j] = ($time_prof[$j]%60);
       #if 00:00 reached, last point in profile was found
-      last if(int($hours[$j])==0 && int($minutes[$j])==0 );
+      if (int($hours[$j]) == 0 && int($minutes[$j]) == 0) {
+        $hours[$j] = 24;
+        last;
+      }
     }
     my $time_prof_str = "00:00";
     my $temp_prof_str;
@@ -502,12 +505,12 @@ MAX_Set($@)
         }
         my ($hour, $min);
         if($j + 1 == @controlpoints) {
-          $hour = 0; $min = 0;
+          $hour = 24; $min = 0;
         } else {
           ($hour, $min) = ($controlpoints[$j+1] =~ /^(\d{1,2}):(\d{1,2})$/);
         }
         my $temperature = $controlpoints[$j];
-        return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 23 || $min > 59);
+        return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 24 || $min > 59 || ($hour == 24 && $min > 0));
         return "Invalid temperature (Must be one of: off|on|5|5.5|6|6.5..30)" if(!validTemperature($temperature));
         $temperature = MAX_ParseTemperature($temperature); #replace "on" and "off" by their values
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
