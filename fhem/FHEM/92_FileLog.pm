@@ -54,6 +54,7 @@ FileLog_Initialize($)
     logtype
     mseclog:1,0
     nrarchive
+    outputFormat
     reformatFn 
   );
   use warnings 'qw';
@@ -196,6 +197,7 @@ FileLog_Log($$)
   my $fh;
   my $switched;
   my $written = 0;
+  my $fmt = AttrVal($ln, "outputFormat", undef);
 
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
@@ -211,7 +213,12 @@ FileLog_Log($$)
       }
       $fh = $log->{FH};
       $s =~ s/\n/ /g;
-      print $fh "$t $n $s\n";
+      if($fmt) {
+        my ($TIMESTAMP,$NAME,$EVENT) = ($t, $n, $s);
+        print $fh eval $fmt;
+      } else {
+        print $fh "$t $n $s\n";
+      }
       $written++;
     }
   }
@@ -254,6 +261,13 @@ FileLog_Attr(@)
   if($a[0] eq "set" && $a[2] eq "disable") {
     $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
   }
+
+  if($a[0] eq "set" && $a[2] eq "outputFormat") {
+    my ($TIMESTAMP,$EVENT,$NAME) = ("2000-01-01_01:01:01","test","test");
+    eval $a[3];
+    return $@ if($@);
+  }
+
   $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
   return if(!$do);
 
@@ -1355,8 +1369,15 @@ FileLog_regexpFn($$)
 
     <li><a href="#mseclog">mseclog</a></li><br>
 
+    <a name="outputFormat"></a>
+    <li>outputFormat &lt;perlCode&gt;<br>
+      If set, the result of the evaluated perlCode will be written to the file.
+      Default is "$TIMESTAMP $NAME $EVENT\n".<br>
+      Note: only this format ist compatible with the SVG Editor
+      </li><br>
+
     <a name="reformatFn"></a>
-    <li>reformatFn<br>
+    <li>reformatFn &lt;perlFunctionName&gt;<br>
       used to convert "foreign" logfiles for the SVG Module, contains the
       name(!) of a function, which will be called with a "raw" line from the
       original file, and has to return a line in "FileLog" format.<br>
@@ -1682,8 +1703,15 @@ FileLog_regexpFn($$)
 
     <li><a href="#mseclog">mseclog</a></li><br>
 
+    <a name="outputFormat"></a>
+    <li>outputFormat &lt;perlCode&gt;<br>
+      Falls gesetzt, ist die Ausgabezeile das Ergebnis der Auswertung.
+      Voreinstellung ist "$TIMESTAMP $NAME $EVENT\n".<br>
+      Achtung: nur dieses Format ist kompatibel mit dem SVG-Editor.
+      </li><br>
+
     <a name="reformatFn"></a>
-    <li>reformatFn<br>
+    <li>reformatFn &lt;perlFunktionsName&gt;<br>
       wird verwendet, um "fremde" Dateien f&uuml;r die SVG-Anzeige ins
       FileLog-Format zu konvertieren. Es enth&auml;lt nur den Namen einer
       Funktion, der mit der urspr&uuml;nglichen Zeile aufgerufen wird.  Z.Bsp.
