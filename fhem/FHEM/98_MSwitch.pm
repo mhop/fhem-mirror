@@ -3932,6 +3932,13 @@ sub MSwitch_fhemwebFn($$$$) {
     }
 	
     my $notype = AttrVal( $Name, 'MSwitch_Ignore_Types', "" );
+	
+	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy"  
+	&&  AttrVal( $Name, "MSwitch_Selftrigger_always", 0 ) eq "0" ) 
+	{
+	$notype = ".*";
+	}
+	
     my @found_devices;
     my $setpattern  = "";
     my $setpattern1 = "";
