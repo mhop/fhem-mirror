@@ -5402,15 +5402,14 @@ sub MSwitch_fhemwebFn($$$$) {
 	
 	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy" )
 	{
-	 $ret .="<tabe border='$border' class='block wide' id='MSwitchWebTR' nm='$hash->{NAME}'>";
+	 $ret .="<table border='$border' class='block wide' id='MSwitchWebTR' nm='$hash->{NAME}'>";
 	}
 	else
 	{
 	$ret .="<table border='$border' class='block wide' style ='visibility: collapse' id='MSwitchWebTR' nm='$hash->{NAME}'>";
 	}
    $ret .= "<tr class=\"even\">";
-    $ret .=
-"<td colspan=\"3\" id =\"savetrigger\">trigger  device/time:&nbsp;&nbsp;&nbsp;";
+    $ret .="<td colspan=\"3\" id =\"savetrigger\">trigger  device/time:&nbsp;&nbsp;&nbsp;";
     $ret .= "</td></tr><tr class=\"even\">
 	<td></td>
 	<td></td>
