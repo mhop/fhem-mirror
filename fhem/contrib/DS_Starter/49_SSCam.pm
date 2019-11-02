@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
   "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
   "8.23.0" => "26.10.2019  new attribute \"debugCachetime\" ",
   "8.22.0" => "23.10.2019  implement CacheCache driver for CHI ",
@@ -5668,6 +5669,10 @@ sub SSCam_camop_parse ($) {
                             
                             $sn += 1;
 							$i  += 1;
+                            
+                            undef $imageData;
+                            undef $fileName;
+                            undef $createdTm;
 						}
                         
                         my $sgn = AttrVal($name,"snapGalleryNumber",3);
@@ -5793,6 +5798,10 @@ sub SSCam_camop_parse ($) {
                             
                             $sn += 1;
                             $i  += 1;
+                            
+                            undef $imageData;
+                            undef $fileName;
+                            undef $createdTm;
                         }
                         
                         my $sgn = AttrVal($name,"snapGalleryNumber",3);
@@ -7944,7 +7953,8 @@ sub SSCam_composegallery ($;$$$) {
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", "");                                      # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");                                           # Systemsprache       
-  my $limit    = $hash->{HELPER}{SNAPLIMIT};                                                  # abgerufene Anzahl Snaps
+  # my $limit    = $hash->{HELPER}{SNAPLIMIT};                                                  # abgerufene Anzahl Snaps
+  my $limit    = AttrVal($name,"snapGalleryNumber",3);                                        # abgerufene Anzahl Snaps
   my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale Anzahl Snaps
   $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
   $ftui        = ($ftui && $ftui eq "ftui")?1:0;
@@ -8076,7 +8086,7 @@ sub SSCam_composegallery ($;$$$) {
       my %seen;
       my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
       foreach my $key (@unique) {
-          next if $key >= $limit;  
+          #next if $key >= $limit;
           $imgdat = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
           $imgTm  = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
           if(!$ftui) {
