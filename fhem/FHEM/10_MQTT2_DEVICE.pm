@@ -7,6 +7,8 @@ use warnings;
 use SetExtensions;
 
 my $bridgeTimerStarted;
+my $subscrCheckTimerStarted;
+sub zigbee2mqtt_devStateIcon255($;$$);
 
 sub
 MQTT2_DEVICE_Initialize($)
@@ -82,7 +84,31 @@ MQTT2_DEVICE_Define($$)
   $bridgeTimerStarted = 1;
 
   AssignIoPort($hash, $ioname);
+
+  if($init_done) {
+    MQTT2_DEVICE_checkSubscr();
+  } elsif(!$subscrCheckTimerStarted) {
+    $subscrCheckTimerStarted = 1;
+    InternalTimer(time()+60, "MQTT2_DEVICE_checkSubscr", undef, 0);
+  }
   return undef;
+}
+
+# Set the subscriptions reading from the corresponding MQTT2_SERVER connection
+sub
+MQTT2_DEVICE_checkSubscr()
+{
+  $subscrCheckTimerStarted = 0;
+  my %conn;
+  for my $c (devspec2array("TYPE=MQTT2_SERVER")) {
+    if($defs{$c} && $defs{$c}{cid} && $defs{$c}{subscriptions}) {
+      $conn{$defs{$c}{cid}} = join(" ", sort keys %{$defs{$c}{subscriptions}});
+    }
+  }
+  for my $dev (devspec2array("TYPE=MQTT2_DEVICE")) {
+    next if(!$defs{$dev}{CID} || !$conn{$defs{$dev}{CID}});
+    readingsSingleUpdate($defs{$dev},"subscriptions",$conn{$defs{$dev}{CID}},0);
+  }
 }
 
 #############################
