@@ -30,9 +30,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.8.0"   => "14.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
   "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
                            "enhanced configCheck by insert mode check ",
-  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog",
+  "4.7.4"   => "03.10.2019 bugfix test of TIMESTAMP got from DbLogValueFn or valueFn in DbLog_Log and DbLog_AddLog ",
   "4.7.3"   => "02.10.2019 improved log out entries of DbLog_Get for SVG ",
   "4.7.2"   => "28.09.2019 change cache from %defs to %data ",
   "4.7.1"   => "10.09.2019 release the memcache memory: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ in asynchron mode: https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/ ",
@@ -2146,7 +2147,7 @@ sub DbLog_execmemcache ($) {
           Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
 		  push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
 	  }  
-      undef $data{DbLog}{$name}{cache}{memcache};                                           # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes, bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      delete $data{DbLog}{$name}{cache}{memcache};            # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
 	  my $rowlist = join('§', @row_array);
 	  $rowlist = encode_base64($rowlist,"");
@@ -3087,14 +3088,14 @@ sub DbLog_Get($@) {
   my @readings = ();
   my (%sqlspec, %from_datetime, %to_datetime);
 
-  #uebergebenen Timestamp anpassen
-  #moegliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
-  $from =~ s/_/\ /g;
-  $to   =~ s/_/\ /g;
+  # uebergebenen Timestamp anpassen
+  # moegliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
+  $from          =~ s/_/\ /g;
+  $to            =~ s/_/\ /g;
   %from_datetime = DbLog_explode_datetime($from, DbLog_explode_datetime("2000-01-01 00:00:00", ()));
   %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", ()));
-  $from = $from_datetime{datetime};
-  $to = $to_datetime{datetime};
+  $from          = $from_datetime{datetime};
+  $to            = $to_datetime{datetime};
   
   if($to =~ /(\d{4})-(\d{2})-(\d{2}) 23:59:59/) {
      # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
@@ -3114,11 +3115,11 @@ sub DbLog_Get($@) {
   # Ausgangspunkt ist z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
   for(my $i = 0; $i < int(@a); $i++) {
       @fld = split(":", $a[$i], 5);
-      $readings[$i][0] = $fld[0]; # Device
-      $readings[$i][1] = $fld[1]; # Reading
-      $readings[$i][2] = $fld[2]; # Default
-      $readings[$i][3] = $fld[3]; # function
-      $readings[$i][4] = $fld[4]; # regexp
+      $readings[$i][0] = $fld[0];         # Device
+      $readings[$i][1] = $fld[1];         # Reading
+      $readings[$i][2] = $fld[2];         # Default
+      $readings[$i][3] = $fld[3];         # function
+      $readings[$i][4] = $fld[4];         # regexp
 
       $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0);   # falls Reading nicht gefuellt setze Joker
   }
@@ -3129,7 +3130,6 @@ sub DbLog_Get($@) {
   Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
   
   my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
-  # $hash->{PID} != $$ -> create new connection for plotfork
   if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
       $dbh = DbLog_ConnectNewDBH($hash);
 	  return "Can't connect to database." if(!$dbh);
@@ -3190,10 +3190,10 @@ sub DbLog_Get($@) {
   }
 
   if($outf =~ m/(all|array)/) {
-      $sqlspec{all}  = ",TYPE,EVENT,UNIT";
+      $sqlspec{all}      = ",TYPE,EVENT,UNIT";
       $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
   } else {
-      $sqlspec{all}  = "";
+      $sqlspec{all}      = "";
       $sqlspec{all_max}  = "";
   }
 
@@ -3205,79 +3205,99 @@ sub DbLog_Get($@) {
       $sum[$i]   = 0;
       $cnt[$i]   = 0;
       $lastv[$i] = 0;
-      $lastd[$i] = "undef";
+      $lastd[$i] = "undef";                                          
       $mind[$i]  = "undef";
       $maxd[$i]  = "undef";
-      $minval    =  (~0 >> 1);
-      $maxval    = -(~0 >> 1);
+      $minval    =  (~0 >> 1);                               # ist "9223372036854775807"
+      $maxval    = -(~0 >> 1);                               # ist "-9223372036854775807"
       $deltacalc = 0;
 
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           $deltacalc = 1;
+          Log3($name, 4, "DbLog $name -> deltacalc: hour") if($readings[$i]->[3] eq "delta-h");   # geändert V4.8.0 / 14.10.2019
+          Log3($name, 4, "DbLog $name -> deltacalc: day")  if($readings[$i]->[3] eq "delta-d");   # geändert V4.8.0 / 14.10.2019
       }
 
-      my $stm;
-      my $stm2;
-      my $stmdelta;
-      $stm =  "SELECT
-                  MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
-                  MAX(DEVICE) AS DEVICE,
-                  MAX(READING) AS READING,
-                  $sqlspec{max_value}
-                  $sqlspec{all_max} ";
-
-      $stm .= "FROM $current " if($inf eq "current");
-      $stm .= "FROM $history " if($inf eq "history");
-
-      $stm .= "WHERE 1=1 ";
-    
-      $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-      $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-      $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-      $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-      $stmdelta = $stm;
-
-      $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
-      $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
-
-      $stm .= "UNION ALL ";
-
-      $stm2 =  "SELECT
-                  $sqlspec{get_timestamp},
-                  DEVICE,
-                  READING,
-                  VALUE
-                  $sqlspec{all} ";
-
-      $stm2 .= "FROM $current " if($inf eq "current");
-      $stm2 .= "FROM $history " if($inf eq "history");
-
-      $stm2 .= "WHERE 1=1 ";
-
-      $stm2 .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-      $stm2 .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-      $stm2 .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-      $stm2 .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-      $stm2 .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-      $stm2 .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
-      $stm2 .= "ORDER BY TIMESTAMP";
-
+      my ($stm);
       if($deltacalc) {
-          $stmdelta .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-          $stmdelta .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";     # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
+          # delta-h und delta-d , geändert V4.8.0 / 14.10.2019
+          $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
+		  
+		  $stm .= "(SELECT $sqlspec{get_timestamp} AS TIMESTAMP,
+                    DEVICE AS DEVICE,
+                    READING AS READING,
+                    VALUE AS VALUE ";
+				  
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
 
-          $stmdelta .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
-          $stmdelta .= "ORDER BY TIMESTAMP";
-          $stm .= $stmdelta;
+          $stm .= "WHERE 1=1 "; 
+		  
+          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+
+          $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP > $sqlspec{day_before} "; 
+                   
+          $stm .= "ORDER BY TIMESTAMP DESC LIMIT 1 ) AS Z 
+                   UNION ALL " if($readings[$i]->[3] eq "delta-h");
+                   
+          $stm .= "ORDER BY TIMESTAMP) AS Z 
+                   UNION ALL " if($readings[$i]->[3] eq "delta-d");
+                          
+          $stm .= "SELECT
+                   MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
+                   MAX(DEVICE) AS DEVICE,
+                   MAX(READING) AS READING,
+                   $sqlspec{max_value}
+                   $sqlspec{all_max} ";
+
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
+
+          $stm .= "WHERE 1=1 ";
+    
+          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "    if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+          
+          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640    
+
+          $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
+          $stm .= "ORDER BY TIMESTAMP";
+
       } else {
-          $stm = $stm2;
+          # kein deltacalc
+          $stm =  "SELECT
+                      $sqlspec{get_timestamp},
+                      DEVICE,
+                      READING,
+                      VALUE
+                      $sqlspec{all} ";
+
+          $stm .= "FROM $current " if($inf eq "current");
+          $stm .= "FROM $history " if($inf eq "history");
+
+          $stm .= "WHERE 1=1 ";
+
+          $stm .= "AND DEVICE = '".$readings[$i]->[0]."' "     if ($readings[$i]->[0] !~ m(\%));
+          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
+
+          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
+          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
+
+          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640            
+          $stm .= "ORDER BY TIMESTAMP";
       }
 
-      Log3 ($name, 4, "$name - Processing Statement: $stm");
+      Log3 ($name, 4, "$name - Processing Statement:\n$stm");
 
       my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
       my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
@@ -3293,15 +3313,16 @@ sub DbLog_Get($@) {
           $retval .= "=====================================================\n";
       }
     
-      ################################
-      #        Select Auswertung      
-      ################################    
+      ####################################################################################
+      #                              Select Auswertung      
+      ####################################################################################
       while($sth->fetch()) {
-          no warnings 'uninitialized';
-          my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";
-          Log3 ($name, 5, "$name - SQL-result -> $ds");
-          use warnings;
-          
+          no warnings 'uninitialized';                                                            # geändert V4.8.0 / 14.10.2019
+          my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
+          Log3 ($name, 5, "$name - SQL-result -> $ds");                                           # geändert V4.8.0 / 14.10.2019
+          use warnings;                                                                           # geändert V4.8.0 / 14.10.2019      
+          $writeout = 0;                                                                          # eingefügt V4.8.0 / 14.10.2019
+
           ############ Auswerten des 5. Parameters: Regexp ###################
           # die Regexep wird vor der Function ausgewertet und der Wert im Feld
           # Value angepasst.
@@ -3326,8 +3347,8 @@ sub DbLog_Get($@) {
           if($sql_timestamp lt $from && $deltacalc) {
               if(Scalar::Util::looks_like_number($sql_value)) {
                   # nur setzen wenn numerisch
-                  $minval    = $sql_value if($sql_value < $minval);
-                  $maxval    = $sql_value if($sql_value > $maxval);
+                  $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019      
+                  $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019      
                   $lastv[$i] = $sql_value;
               }
           
@@ -3387,7 +3408,7 @@ sub DbLog_Get($@) {
                       $retvaldummy = "";
                     
                       if(($tstamp{hour}-$lasttstamp{hour}) > 1) {
-                          for (my $j=$lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
+                          for (my $j = $lasttstamp{hour}+1; $j < $tstamp{hour}; $j++) {
                               $out_value  = "0";
                               $hour       = $j;
                               $hour       = '0'.$j if $j<10;
@@ -3420,7 +3441,7 @@ sub DbLog_Get($@) {
                               } elsif ($outf =~ m/(array)/) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
                               } else {
-                                  $out_tstamp =~ s/\ /_/g;                        # needed by generating plots
+                                  $out_tstamp =~ s/\ /_/g;                               # needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
                           }
@@ -3430,15 +3451,12 @@ sub DbLog_Get($@) {
                       $sum[$i]  += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-                      # $minval =  (~0 >> 1);
-                      $minval = $maxval;
-                      # $maxval = -(~0 >> 1);
-                      $writeout = 1;
-                       
-                      Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                      $writeout   = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));   # geändert V4.8.0 / 14.10.2019      
+                      $minval     = $maxval;               
+                      Log3 ($name, 5, "$name - Output delta-h -> TS: $tstamp{hour}, LASTTS: $lasttstamp{hour}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
             
-              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {      # Berechnung eines Tageswertes
+              } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {          # Berechnung eines Tages-Deltas
                   %tstamp = DbLog_explode_datetime($sql_timestamp, ());
                 
                   if($lastd[$i] eq "undef") {
@@ -3448,23 +3466,20 @@ sub DbLog_Get($@) {
                   }
               
                   if("$tstamp{day}" ne "$lasttstamp{day}") {
-                      # Aenderung des Tages, Berechne Delta
-                      $out_value = sprintf("%g", $maxval - $minval);
+                      # Aenderung des Tages, berechne Delta
+                      $out_value = sprintf("%g", $maxval - $minval);                      # %g - a floating-point number
                       $sum[$i] += $out_value;
                       $cnt[$i]++;
                       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-                      # $minval =  (~0 >> 1);
-                      $minval = $maxval;
-                      # $maxval = -(~0 >> 1);
-                      $writeout = 1;
-                      
-                      Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value");
+                      $writeout   = 1 if($minval != (~0 >> 1) && $maxval != -(~0 >> 1));  # geändert V4.8.0 / 14.10.2019      
+                      $minval     = $maxval;
+                      Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
             
               } else {
                   $out_value  = $sql_value;
                   $out_tstamp = $sql_timestamp;
-                  $writeout   = 1;
+                  $writeout   = 1;  
               }
 
               # Wenn Attr SuppressUndef gesetzt ist, dann ausfiltern aller undef-Werte
@@ -3532,9 +3547,10 @@ sub DbLog_Get($@) {
               }
               $lastd[$i] = $sql_timestamp;
           }
-      }                                                                   # while fetchrow Ende 
+      }                                                                   ##### while fetchrow Ende ##### 
 
       ######## den letzten Abschlusssatz rausschreiben ##########
+      
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
           if($lastd[$i] eq "undef") {
               $out_value  = "0";
@@ -3542,7 +3558,7 @@ sub DbLog_Get($@) {
               $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           } else {
               %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-              $out_value = sprintf("%g", $maxval - $minval);
+              $out_value  = sprintf("%g", $maxval - $minval);
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
           }  
@@ -3556,8 +3572,10 @@ sub DbLog_Get($@) {
           
           } else {
              $out_tstamp =~ s/\ /_/g; #needed by generating plots
-             $retval .= "$out_tstamp $out_value\n";
+             $retval    .= "$out_tstamp $out_value\n";
           }
+          
+          Log3 ($name, 5, "$name - Output last DS -> OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: implicit ");
       }
       
       # Datentrenner setzen
