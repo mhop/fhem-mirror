@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
   "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
   "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
   "8.23.0" => "26.10.2019  new attribute \"debugCachetime\" ",
@@ -5517,7 +5518,16 @@ sub SSCam_camop_parse ($) {
                 my ($cache,@as,$g);
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};                        # aktuellster Snap zur Anzeige im StreamDev "lastsnap"
+                
+                # aktuellsten Snap zur Anzeige im StreamDev "lastsnap" speichern
+                # $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};
+                $cache = SSCam_cache($name, "c_init");                               # Cache initialisieren  
+                Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                if(!$cache || $cache eq "internal" ) {
+                    $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
+                } else {
+                    SSCam_cache($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});                           
+                }                
         
                 my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
                 my ($k,$l) = (0,0);              
@@ -7598,7 +7608,15 @@ sub SSCam_StreamDev($$$;$) {
       }      
   
   } elsif ($fmt =~ /lastsnap/) { 
-      $link     = $hash->{HELPER}{".LASTSNAP"};
+      # $link     = $hash->{HELPER}{".LASTSNAP"};
+      my $cache = SSCam_cache($camname, "c_init");                               # Cache initialisieren  
+      Log3($camname, 1, "$camname - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+      if(!$cache || $cache eq "internal" ) {
+          $link = $data{SSCam}{$camname}{LASTSNAP};
+      } else {
+          $link = SSCam_cache($camname, "c_read", "{LASTSNAP}");                           
+      }
+      
       my $gattr = (AttrVal($camname,"snapGallerySize","Icon") eq "Full")?$ha:""; 
       if($link) {
           if(!$ftui) {
