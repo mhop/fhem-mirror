@@ -60,6 +60,8 @@ use strict;
 use warnings;
 use POSIX;
 
+use SetExtensions;
+
 # Version #######################################################
 
 my $preconf     = "";
@@ -87,7 +89,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.62';
+my $version    = '2.63';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 60; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
@@ -1116,6 +1118,11 @@ sub MSwitch_Set($@) {
     my $ic = 'leer';
     $ic = $hash->{IncommingHandle} if ( $hash->{IncommingHandle} );
     my $showevents = AttrVal( $name, "MSwitch_generate_Events", 1 );
+	    my $devicemode = AttrVal( $name, 'MSwitch_Mode',          'Notify' );
+    my $delaymode  = AttrVal( $name, 'MSwitch_Delete_Delays', '0' );
+	
+###################################################################################	
+
 # verry special commands readingactivated (
     my $special = '';
     my $cs = ReadingsVal( $name, '.sysconf', 'undef' );
@@ -1163,16 +1170,17 @@ sub MSwitch_Set($@) {
 		MSwitch_Check_Event( $hash, "MSwitch_self:".$cmd.":".$args[0] ) if defined $setlist{$cmd};
 	}
 
-############
 
 my %setlist;
+
     if ( !defined $args[0] ) { $args[0] = ''; }
+	
     my $setList = AttrVal( $name, "setList", " " );
     $setList =~ s/\n/ /g;
-    my $devicemode = AttrVal( $name, 'MSwitch_Mode',          'Notify' );
-    my $delaymode  = AttrVal( $name, 'MSwitch_Delete_Delays', '0' );
+
     if ( !exists( $sets{$cmd} ) ) 
 	{
+	
         my @cList;
         # Overwrite %sets with setList
         my $atts = AttrVal( $name, 'setList', "" );
@@ -1201,7 +1209,7 @@ my %setlist;
 
         if ( ReadingsVal( $name, '.change', '' ) ne '' ) 
 		{
-            return "Unknown argument $cmd, choose one of ";
+            return "Unknown argument $cmd, choose one of " if ($name eq "test");
         }
 
 # bearbeite setlist und readinglist
@@ -1224,12 +1232,29 @@ my %setlist;
                 }
                 return;
 			}
+			
 ##############################
 # dummy state setzen und exit
          if ( $devicemode eq "Dummy" ) 
 			{
+			
+				if ($cmd eq "on" || $cmd eq "off")
+				{
                 readingsSingleUpdate( $hash, "state", $cmd . " @args", 1 );
                 return;
+				}
+				else
+				{
+					if ( AttrVal( $name, 'useSetExtensions', "0" ) eq '1' )
+						{
+						return SetExtensions($hash, $setList, $name, $cmd, @args);
+						}
+					else
+						{
+						return;
+						}
+				
+				}
             }
             #AUFRUF DEBUGFUNKTIONEN
             if ( AttrVal( $name, 'MSwitch_Debug', "0" ) eq '4' ) 
@@ -1250,14 +1275,25 @@ my %setlist;
         }
         elsif ( $devicemode eq "Dummy" ) 
 		{
-            return "Unknown argument $cmd, choose one of reset_device:noArg state backup_MSwitch:all_devices $setList $special";
-        }
+		
+		if ( AttrVal( $name, 'useSetExtensions', "0" ) eq '1' )
+			{
+				return SetExtensions($hash, $setList, $name, $cmd, @args);
+			}
+			else
+			{
+			    return "Unknown argument $cmd, choose one of reset_device:noArg state backup_MSwitch:all_devices $setList $special";
+			}
+
+	   }
         else 
 		{
             #full
             return "Unknown argument $cmd, choose one of reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
         }
     }
+	
+
 
     if ((( $cmd eq 'on' ) || ( $cmd eq 'off' ) )&& ( $args[0] ne '' )&& ( $ic ne 'fromnotify' ))
     {
@@ -2033,13 +2069,18 @@ my %setlist;
     my @testdetailsstandart =( 'no_action', 'no_action', '', '', 'nein', 'nein', 0, 0, '', '' );
     ##################################
 
+######################################################################
+
+
+
     #neu ausführung on/off
     if ( $cmd eq "off" || $cmd eq "on" ) 
 	{
+
 	 if ( $devicemode eq "Dummy"  &&  AttrVal( $name, "MSwitch_Selftrigger_always", 0 ) eq "0" ) 
 			{
-				readingsSingleUpdate( $hash, "state", $cmd, 1 );
-                return;
+					readingsSingleUpdate( $hash, "state", $cmd, 1 );
+					return;
             }
 			  
 		if ( $devicemode eq "Dummy"  )
@@ -2055,6 +2096,10 @@ my %setlist;
 					return;
 					}
 			}
+			
+###################################################			
+			
+			
         ### neu
         if ( $delaymode eq '1' ) 
 		{
@@ -2663,6 +2708,7 @@ sub MSwitch_Attr(@) {
       . "  MSwitch_DeleteCMDs:manually,automatic,nosave"
       . "  MSwitch_Mode:Dummy"
 	  . "  MSwitch_Selftrigger_always:0,1"
+	  . "  useSetExtensions:0,1"
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
