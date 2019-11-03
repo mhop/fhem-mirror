@@ -2626,13 +2626,11 @@ plotAsPng(@)
       enclosed in "" or {}. value will be evaluated as a perl expression, if it
       is enclosed in {}.
       <br>
-      In the .gplot file &lt;key&gt; is replaced with the corresponding value,
-      the evaluation of {} takes place <i>after</i> the input file is
-      processed, so $data{min1} etc can be used.
-      <br>
-      %key% will be repaced <i>before</i> the input file is processed, this
-      expression can be used to replace parameters for the input processing.
-    </li><br>
+      In the .gplot file &lt;key&gt; and %key% will be replaced with the
+      corresponding value. The evaluation of &lt;key&gt; takes place after the
+      input file is processed, so e.g. $data{min1} can be used in the title.
+      %key% will be repaced before the input file is processed, this expression
+      can be used to replace parameters for the input processing.  </li><br>
 
     <li><a href="#plotsize">plotsize</a></li><br>
     <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
@@ -2865,14 +2863,11 @@ plotAsPng(@)
       enthalten, falls es in "" oder {} eingeschlossen ist. Wert wird als
       perl-Ausdruck ausgewertet, falls es in {} eingeschlossen ist.
       <br>
-      In der .gplot Datei werden &lt;Name&gt; Zeichenketten durch den
-      zugehoerigen Wert ersetzt, die Auswertung von {} Ausdr&uuml;cken erfolgt
-      <i>nach</i> dem die Daten ausgewertet wurden, d.h. man kann hier
-      $data{min1},etc verwenden.
-      <br>
-      Bei %Name% erfolgt die Ersetzung <i>vor</i> der Datenauswertung, das kann
-      man verwenden, um Parameter f&uuml;r die Auswertung zu ersetzen.
-    </li><br>
+      In der .gplot Datei wird &lt;Name&gt; und %Name% durch den
+      zugeh&ouml;rigen Wert ersetzt, wobei &lt;Name&gt; nach der Extraktion der
+      Logdaten ersetzt wird, damit man auf Werte wie $data{min1} zugreifen
+      kann, und %Name% davor, damit man die Regeln in der .gplot Datei f&uuml;r
+      die Extraktion anpassen kann.</li><br>
 
     <li><a href="#plotsize">plotsize</a></li><br>
     <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
