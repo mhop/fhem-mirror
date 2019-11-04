@@ -42,10 +42,10 @@ MQTT2_SERVER_Initialize($)
     SSL:0,1
     autocreate:no,simple,complex
     clientId
-    disable:0,1
+    disable:1,0
     disabledForIntervals
     keepaliveFactor
-    rePublish
+    rePublish:1,0
     rawEvents
     sslVersion
     sslCertPrefix
