@@ -670,7 +670,7 @@ sub ExecGatttool_Run($) {
 
             my $grepGatttool;
             my $gatttoolCmdlineStaticEscaped =
-              CometBlueBTLE_CmdlinePreventGrepFalsePositive(
+              BTLE_CmdlinePreventGrepFalsePositive(
                 "gatttool -i $hci -b $mac");
 
             $grepGatttool = qx(ps ax| grep -E \'$gatttoolCmdlineStaticEscaped\')
@@ -1334,7 +1334,7 @@ sub CreateDevicenameHEX($) {
     return $devicenameHex;
 }
 
-sub CometBlueBTLE_CmdlinePreventGrepFalsePositive($) {
+sub BTLE_CmdlinePreventGrepFalsePositive($) {
 
 # https://stackoverflow.com/questions/9375711/more-elegant-ps-aux-grep-v-grep
 # Given abysmal (since external-command-based) performance in the first place, we'd better
