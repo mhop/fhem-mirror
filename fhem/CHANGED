@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 74_XiaomiBTLESens: code implementation for ClearGrassSens
  - bugfix:  73_AutoShuttersControl: fix window close fn then Mode_Up off
  - change:  93_DbLog: change SQL-Statement for SVG delta-h and delta-d plots, 
                       Forum: 65860.msg982171.html#msg982171
