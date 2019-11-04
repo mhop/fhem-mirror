@@ -966,6 +966,7 @@ attr DEVICE readingList \
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $light = ReadingsVal($name,"state","off");; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a>" }
 deletereading -q DEVICE (?!associatedWith).*
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly1
 
 name:shelly_announces
@@ -978,6 +979,7 @@ attr DEVICE setList\
   request_update_all:noArg {"shellies/command update"}\
   request_update_device:textField {"shellies/$EVTPART1/command update"}\
   request_announces:noArg {"shellies/command announce"}
+set DEVICE request_announces
 attr DEVICE readingList shellies/announce:.* { json2nameValue($EVENT, $CID."_") }
 
 # shellyplug using original firmware.
@@ -1020,6 +1022,7 @@ attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true
 attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs.
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly1_w_energy_meassuring
 
 name:shelly1_w_energy_meassuring_washer_example
@@ -1061,6 +1064,7 @@ attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_
 attr DEVICE stateFormat pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close stop
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly2_roller
 
 # shelly25 using original firmware in roller mode.
@@ -1105,6 +1109,7 @@ online\
 state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly25_roller_invert_0
 
 name:shelly25_roller_invert_1
@@ -1147,6 +1152,7 @@ online\
 state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly25_roller_invert_1
 
 # shelly2 using original firmware.
@@ -1328,6 +1334,7 @@ attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVEN
 attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:pct:ct:rgb
 attr DEVICE genericDeviceType light
+set DEVICE x_mqttcom announce
 attr DEVICE model shellybulb
 
 # shellyht using original firmware
@@ -1341,6 +1348,7 @@ attr DEVICE setList \
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
+set DEVICE x_mqttcom announce
 attr DEVICE model shellyht
 
 #shelly2rgbw
@@ -1363,7 +1371,8 @@ attr DEVICE setList\
   gain_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","gain":"$EVTPART1"}\
   rgb_on:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"color\",\"gain\":\"100\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
   effect:select,0,1,2,3 shellies/DEVNAME/color/0/set {"effect":"$EVTPART1"}\
-  update:noArg shellies/DEVNAME/command update_fw
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}\
@@ -1373,6 +1382,7 @@ attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly2rgbw_color
 
 #contributed by user sledge
@@ -1397,6 +1407,7 @@ attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
 attr DEVICE webCmd on:off:brightness
+set DEVICE x_mqttcom announce
 attr DEVICE model shelly2rgbw_4w_split
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE autocreate 0
@@ -1725,7 +1736,8 @@ attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":$EVTPART1}\
   BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"black-list":[$EVTPART1]}\
-  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}
+  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}\
+  deleteReadings:noArg {fhem "deletereading $NAME .*"}
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
 
@@ -1805,7 +1817,9 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   locate:noArg BASE_ID/DEVNAME/command locate\
   fan_power:min,medium,high,max,mop BASE_ID/DEVNAME/set_fan_speed $EVTPART1\
   zone BASE_ID/DEVNAME/custom_command {"command":"zoned_cleanup","zone_ids":["$EVTPART1"]}\
-  goto BASE_ID/DEVNAME/custom_command {"command":"go_to","spot_id":["$EVTPART1"]}
+  goto BASE_ID/DEVNAME/custom_command {"command":"go_to","spot_id":"$EVTPART1"}\
+  load_map BASE_ID/DEVNAME/custom_command {"command":"load_map","name":"$EVTPART1"}\
+  store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
 attr DEVCID comment For code "valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
 farewell:template has been applied successfully. For map generation you'll need additional code to myUtils, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a> for details.
