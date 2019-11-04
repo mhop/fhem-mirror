@@ -391,7 +391,7 @@ structure_Set($@)
   # see Forum # 28623 for .cachedHelp
   if(@list > 1 && $list[1] eq "?") {
     return $hash->{".cachedHelp"} if($hash->{".cachedHelp"});
-  } elsif(IsDisabled($me)) {
+  } elsif(IsDisabled($me) =~ m/1|2/) {
     return undef;
   }
 
