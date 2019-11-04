@@ -1007,13 +1007,11 @@ sub EventProcessingWindowRec($@) {
                 }
             }
             elsif (
-                    $shutters->getModeUp ne 'absent'
-                and $shutters->getModeUp ne 'off'
+                    $shutters->getModeDown ne 'absent'
+                and $shutters->getModeDown ne 'off'
                 and (  not $shutters->getIsDay
                     or $homemode eq 'asleep'
                     or $homemode eq 'gotosleep' )
-                and $shutters->getModeDown ne 'absent'
-                and $shutters->getModeDown ne 'off'
                 and $ascDev->getAutoShuttersControlEvening eq 'on'
               )
             {
@@ -6660,7 +6658,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.6.33",
+  "version": "v0.6.34",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
