@@ -513,6 +513,25 @@ sub MSwitch_summary($) {
     $ret =~ s/#dp /:/g;
     return $ret;
 }
+#################################
+sub MSwitch_check_init($) {
+    my ($hash) = @_;
+    my $Name = $hash->{NAME};
+	Log3( $Name, 0, "start checkinit !" );#LOG
+    my $oldtrigger = ReadingsVal( $Name, 'Trigger_device', 'undef' );
+	#Log3( $Name, 0, "start checkinit ! oldtrigger: ".$oldtrigger );#LOG
+	#Log3( $Name, 0, "start checkinit ! NOTIFYDEF ".$hash->{NOTIFYDEV} );#LOG
+	#if ( $oldtrigger ne 'undef' && $hash->{NOTIFYDEV} ne $oldtrigger) 
+	if ( $oldtrigger ne 'undef') 
+	{
+        $hash->{NOTIFYDEV} = $oldtrigger;
+        readingsSingleUpdate( $hash, "Trigger_device", $oldtrigger, 0 );
+    }
+	#else{
+	#$hash->{NOTIFYDEV} = 'no_trigger';
+	#}
+}
+
 
 ####################
 sub MSwitch_LoadHelper($) {
@@ -522,6 +541,9 @@ sub MSwitch_LoadHelper($) {
     my $devhash    = undef;
     my $cdev       = '';
     my $ctrigg     = '';
+	
+	#Log3( $Name, 0, "start Loadhelper $Name  !" );#LOG
+	
     if ( $hash->{INIT} eq "def" ) 
 	{
         return;
@@ -542,7 +564,7 @@ sub MSwitch_LoadHelper($) {
         }
         if ( defined $devhash ) 
 		{
-            $hash->{NOTIFYDEV} = $cdev; # stand aug global ... änderung auf ...
+            $hash->{NOTIFYDEV} = $cdev; # stand auf global ... änderung auf ...
             if ( defined $cdev && $cdev ne '' ) 
 			{
                 readingsSingleUpdate( $hash, "Trigger_device", $cdev, 0 );
@@ -633,6 +655,7 @@ LOOP22:
         $attr{$Name}{MSwitch_Lock_Quickedit}      = '1';
         $attr{$Name}{MSwitch_Extensions}          = '0';
         $attr{$Name}{MSwitch_Mode}                = $startmode;
+		fhem("attr $Name room MSwitch_Devices") ;
     }
 
 # NEU; ZUVOR IN SET
@@ -703,11 +726,17 @@ sub MSwitch_Define($$) {
         $hash->{INIT} = 'fhem.save';
     }
 
-    if ( $init_done && !defined( $hash->{OLDDEF} ) ) 
-	{
-        my $timecond = gettimeofday() + 2;
-        InternalTimer( $timecond, "MSwitch_LoadHelper", $hash );
-    }
+Log3( $name, 0, "start checkinitdone ".$init_done );#LOG
+
+
+     if ( $init_done && !defined( $hash->{OLDDEF} ) ) 
+	  #if ( $init_done ) 
+	 {
+	 ## prüfe NOTIFYDEF
+	 #Log3( $name, 0, "start checkinitdone wird ausgeführt ".$init_done );#LOG
+        my $timecond = gettimeofday() + 5;
+        InternalTimer( $timecond, "MSwitch_check_init", $hash );
+     }
     return;
 }
 ####################
@@ -1110,6 +1139,15 @@ sub MSwitch_AsyncOutput ($) {
 sub MSwitch_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
     MSwitch_LOG( $name, 5, "$name Set $cmd, @args " . __LINE__ );
+
+	#if ( ReadingsVal( $name, '.First_init', 'undef' ) ne 'done' ) 
+	#{
+	# unvollständige daten ergänzen
+	#Log3( $name, 0, "starte helper aus set " );#LOG
+	#Log3( $name, 0, "starte helper aus set " );#LOG
+	#MSwitch_LoadHelper($hash);
+	#}
+	
 #lösche saveddevicecmd 
     MSwitch_del_savedcmds($hash);
     return "" if ( IsDisabled($name) && ( $cmd eq 'on' || $cmd eq 'off' ) );# Return without any further action if the module is disabled
@@ -2644,7 +2682,7 @@ sub MSwitch_Attr(@) {
         unlink("./log/MSwitch_debug_$name.log");
     }
 
-    if ( $aName eq 'MSwitch_Debug' && $aVal eq '2' || $aVal eq '3' ) 
+    if ( defined $aVal  && ($aName eq 'MSwitch_Debug' && ($aVal eq '2' || $aVal eq '3' ))) 
 	{
         MSwitch_clearlog($hash);
     }
@@ -2792,6 +2830,13 @@ sub MSwitch_Notify($$) {
     my $ownName = $own_hash->{NAME};    # own name / hash
     my $devName;
     $devName = $dev_hash->{NAME};
+	
+	if ( ReadingsVal( $ownName, '.First_init', 'undef' ) ne 'done' ) 
+		{
+		# events blocken wenn datensatz unvollständig
+		return;
+		}
+	
     # lösche saveddevicecmd #
     MSwitch_del_savedcmds($own_hash);
 
