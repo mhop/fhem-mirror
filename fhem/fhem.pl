@@ -5203,7 +5203,7 @@ json2nameValue($;$$)
     return (undef, $in);
   }
 
-  $in = $1 if($in =~ m/^{(.*)}$/s);
+  $in = $1 if($in =~ m/^\s*{(.*)}\s*$/s);
 
   my $err;
   while($in =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
