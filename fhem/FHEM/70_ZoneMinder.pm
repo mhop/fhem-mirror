@@ -434,7 +434,7 @@ sub ZoneMinder_GetFromJson {
     my $poma = $`;
     $searchLength = length($ma);
   } else {
-    Log3 $name, 1, "ZoneMinder ($name) - $searchString NOT found. Please report, this is a problem.";
+    Log3 $name, 4, "ZoneMinder ($name) - $searchString NOT found in $config.";
     return;
   }
 
@@ -457,7 +457,8 @@ sub ZoneMinder_API_UpdateMonitors_Callback {
 
   foreach my $monitorData (@monitors) {
     my $monitorId = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Id');
-
+    
+    next if ! defined $monitorId;
     if ( $monitorId =~ /^[0-9]+$/ ) {
       ZoneMinder_UpdateMonitorAttributes($hash, $monitorData, $monitorId);
     } else {
@@ -492,6 +493,7 @@ sub ZoneMinder_API_CreateMonitors_Callback {
   foreach my $monitorData (@monitors) {
     my $monitorId = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Id');
 
+    next if ! defined $monitorId;    
     if ( $monitorId =~ /^[0-9]+$/ ) {
       my $dispatchResult = Dispatch($hash, "createMonitor:$monitorId", undef);
     }
@@ -633,6 +635,9 @@ sub ZoneMinder_API_QueryEventDetails_Callback {
   $data =~ s/\R//g;
 
   my $zmMonitorId = ZoneMinder_GetConfigValueByKey($hash, $data, 'MonitorId');
+  if ( ! defined $zmMonitorId ) {
+    return undef;
+  }
   my $zmEventId = ZoneMinder_GetConfigValueByKey($hash, $data, 'Id');
   my $zmNotes = ZoneMinder_GetConfigValueByKey($hash, $data, 'Notes');
 
