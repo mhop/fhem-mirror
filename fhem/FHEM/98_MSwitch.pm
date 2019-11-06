@@ -3678,6 +3678,15 @@ sub MSwitch_fhemwebFn($$$$) {
 
 # lösche saveddevicecmd #
 
+if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' ) 
+	{
+	MSwitch_LoadHelper($hash);
+	}
+
+
+
+
+
     my $cmdfrombase = "0";
     MSwitch_del_savedcmds($hash);
 
