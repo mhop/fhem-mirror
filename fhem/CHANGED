@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - update:  70_CanOverEthernet: fixed uninitialized value warning
  - update:  71_ZM_Monitor: improved writing of model internal
  - bugfix:  70_ZoneMinder: fixed uninitialized value warnings
  - feature: 74_XiaomiBTLESens: code implementation for ClearGrassSens

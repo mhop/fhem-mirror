@@ -231,9 +231,15 @@ sub CanOverEthernet_sendDataAnalog {
     my @pageVals;
     my @pageTypes;
     for ( my $valIndex=0; $valIndex < 4; $valIndex++ ) {
-      Log3 $name, 4, "CanOverEthernet ($name) - value $valIndex = $values[$pageIndex][$valIndex] type=$types[$pageIndex][$valIndex]";
       my $val = $values[$pageIndex][$valIndex];
       my $type = $types[$pageIndex][$valIndex];
+
+      if ( ! defined $val || ! defined $type ) {
+        Log3 $name, 4, "CanOverEthernet ($name) - page $pageIndex value $valIndex has no type or no value set. Skipping.";
+        next;
+      }
+
+      Log3 $name, 4, "CanOverEthernet ($name) - value $valIndex = $values[$pageIndex][$valIndex] type=$types[$pageIndex][$valIndex]";
       $pageVals[$valIndex] = CanOverEthernet_getValue( $name, $val );
       $pageTypes[$valIndex] = ( defined $type ? $type : 0);
     }
