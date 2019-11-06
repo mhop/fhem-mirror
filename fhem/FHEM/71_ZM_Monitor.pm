@@ -425,11 +425,12 @@ sub ZM_Monitor_handleMonitorCreation {
   my ( $io_hash, $message ) = @_;
 
   my $ioName = $io_hash->{NAME};
-  my @msgTokens = split(/\|/, $message); #$message = "$monitorId";
+  my @msgTokens = split(/\|/, $message); #$message = "$monitorId|$monitorType";
   my $zmMonitorId = $msgTokens[0];
   my $logDevAddress = $ioName.'_'.$zmMonitorId;
 
   if ( my $hash = $modules{ZM_Monitor}{defptr}{$logDevAddress} ) {
+    $hash->{model} = $msgTokens[1];
     return $hash->{NAME};
   } else {
     my $autocreate = "UNDEFINED ZM_Monitor_$logDevAddress ZM_Monitor $zmMonitorId";

@@ -262,6 +262,7 @@ sub ZoneMinder_API_Login_Callback {
         }
 
         $apiState = 'opened';
+        ZoneMinder_SimpleGet($hash, "$zmApiUrl/monitors.json", \&ZoneMinder_API_UpdateMonitors_Callback);
       }
 
       if ( $apiVersion eq 'post132' ) {
@@ -495,7 +496,8 @@ sub ZoneMinder_API_CreateMonitors_Callback {
 
     next if ! defined $monitorId;    
     if ( $monitorId =~ /^[0-9]+$/ ) {
-      my $dispatchResult = Dispatch($hash, "createMonitor:$monitorId", undef);
+      my $monitorType = ZoneMinder_GetConfigValueByKey($hash, $monitorData, 'Type');
+      my $dispatchResult = Dispatch($hash, "createMonitor:$monitorId|$monitorType", undef);
     }
   }
   my $zmApiUrl = ZoneMinder_getZmApiUrl($hash);
