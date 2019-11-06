@@ -621,9 +621,10 @@ MQTT2_DEVICE_nlData($)
   # Needed for the image links
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
   $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
+            my $ieeeAddr = $1;
             my $img = $2;
             $img =~ s+[/: ]+-+g; # Forum #91394: supported-devices.js
-            $img{$1} = "$img.jpg";
+            $img{$ieeeAddr} = "$img.jpg";
           @xeg;
 
   # Name translation
