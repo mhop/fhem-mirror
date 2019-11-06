@@ -9792,12 +9792,23 @@ sub SSCam_cache ($$;$$) {
       
       if($type eq "file") {
           # This is a filecache using Cache::Cache.  
-          # https://metacpan.org/pod/Cache::Cache  
-          if(!(-R $path) || !(-W $path)) {
-              Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache: ".$!);
+          # https://metacpan.org/pod/Cache::Cache 
+          my $pr = (split('/',reverse($path),2))[1];
+          $pr    = reverse($pr);                  
+          if(!(-R $pr) || !(-W $pr)) {                                # root-erzeichnis testen
+              Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache in dir \"$pr\": ".$!);
               delete $hash->{HELPER}{CACHEKEY}; 
               return 0;
-          }           
+          }
+          if(!(-d $path)) {                                           # Zielverzeichnis anlegen wenn nicht vorhanden
+              my $success = mkdir($path,0775);
+              if(!$success) {
+                  Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache path \"$path\": ".$!);
+                  delete $hash->{HELPER}{CACHEKEY}; 
+                  return 0;             
+              }
+          }
+          
           $cache = CHI->new( driver       => 'CacheCache',
                              on_set_error => 'warn',
                              on_get_error => 'warn',
