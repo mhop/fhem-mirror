@@ -43,11 +43,25 @@ use Time::HiRes;
 use HttpUtils;
 use Blocking;                                                     # für EMail-Versand
 use Encode;
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                                                    
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+
+# Cache 
+eval "use CHI;1;" or my $SScamMMCHI                     = "CHI";                 # cpanm CHI
+eval "use CHI::Driver::Redis;1;" or my $SScamMMCHIRedis = "CHI::Driver::Redis";  # cpanm CHI::Driver::Redis
+eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";        # cpanm Cache::Cache
+                                                    
 # no if $] >= 5.017011, warnings => 'experimental';
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
+  "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
+  "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
+  "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
+  "8.23.0" => "26.10.2019  new attribute \"debugCachetime\" ",
+  "8.22.0" => "23.10.2019  implement CacheCache driver for CHI ",
+  "8.21.0" => "20.10.2019  implement Redis driver for CHI ",
+  "8.20.0" => "19.10.2019  implement caching with CHI, implement {SENDCOUNT} ",
   "8.19.6" => "14.10.2019  optimize memory usage of SSCam_composegallery ",
   "8.19.5" => "13.10.2019  change FH to Data in SSCam_sendEmailblocking, save variables ",
   "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
@@ -59,7 +73,7 @@ our %SSCam_vNotesIntern = (
   "8.18.2" => "19.09.2019  sample streams changed in comref, support of attr noLink in Streaming-Device ",
   "8.18.1" => "18.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610 ",
   "8.18.0" => "13.09.2019  change usage of own hashes to central %data hash, release unnecessary allocated memory ",
-  "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPHASHOLD ",
+  "8.17.0" => "12.09.2019  fix warnings, support hide buttons in streaming device, change handle delete SNAPOLDHASH ",
   "8.16.3" => "13.08.2019  commandref revised ",
   "8.16.2" => "17.07.2019  change function SSCam_ptzpanel using css stylesheet ",
   "8.16.1" => "16.07.2019  fix warnings ",
@@ -173,6 +187,11 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "9.0.0"  => "06.10.2019 To store image and recording data used by streaming devices or for transmission by email and telegram, ".
+                          "several cache types can be used now. So in-memory caches are available or file- and Redis-cache support ".
+                          "is intergated. In both latter cases the FHEM-process RAM is released. All transmission processes ".
+                          "(send image/recording data by email and telegram) are optimized for less memory footprint. ".
+                          "Please see also the new cache-attributes \"cacheType\", \"cacheServerParam\" and \"debugCachetime\". ",
   "8.19.0" => "21.09.2019 A new attribute \"hideAudio\" in Streaming devices is supportet. Use this attribute to hide the ".
                           "audio control panel in Streaming device. ",
   "8.18.2" => "19.09.2019 SSCam supports the new attribute \"noLink\" in streaming devices ",
@@ -407,46 +426,48 @@ sub SSCam_Initialize($) {
  $hash->{FW_detailFn}       = "SSCam_FWdetailFn";
  $hash->{FW_deviceOverview} = 1;
  
- $hash->{AttrList} =
-         "disable:1,0 ".
-         "genericStrmHtmlTag ".
-         "hlsNetScript:1,0 ".
-         "hlsStrmObject ".
-         "httptimeout ".
-         "htmlattr ".
-         "livestreamprefix ".
-		 "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
-         "videofolderMap ".
-         "pollcaminfoall ".
-		 "smtpCc ".
-		 "smtpDebug:1,0 ".
-		 "smtpFrom ".
-		 "smtpHost ".
-         "smtpPort ".
-         "smtpSSLPort ".
-		 "smtpTo ".
-		 "smtpNoUseSSL:1,0 ".
-         "snapEmailTxt ".
-         "snapTelegramTxt ".
-		 "snapGalleryBoost:0,1 ".
-		 "snapGallerySize:Icon,Full ".
-		 "snapGalleryNumber:$SSCAM_snum ".
-		 "snapGalleryColumns ".
-		 "snapGalleryHtmlAttr ".
-         "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
-         "pollnologging:1,0 ".
-         "debugactivetoken:1,0 ".
-         "recEmailTxt ".
-         "recTelegramTxt ".
-         "rectime ".
-         "recextend:1,0 ".
-         "noQuotesForSID:1,0 ".
-         "session:SurveillanceStation,DSM ".
-         "showPassInLog:1,0 ".
-         "showStmInfoFull:1,0 ".
-         "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx ".
-         "webCmd ".
-         $readingFnAttributes;   
+ $hash->{AttrList} = "disable:1,0 ".
+                     "debugactivetoken:1,0 ".
+                     "debugCachetime:1,0 ".
+                     "genericStrmHtmlTag ".
+                     "hlsNetScript:1,0 ".
+                     "hlsStrmObject ".
+                     "httptimeout ".
+                     "htmlattr ".
+                     "livestreamprefix ".
+                     "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
+                     "pollcaminfoall ".
+                     "recEmailTxt ".
+                     "recTelegramTxt ".
+                     "rectime ".
+                     "recextend:1,0 ".
+                     "smtpCc ".
+                     "smtpDebug:1,0 ".
+                     "smtpFrom ".
+                     "smtpHost ".
+                     "smtpPort ".
+                     "smtpSSLPort ".
+                     "smtpTo ".
+                     "smtpNoUseSSL:1,0 ".
+                     "snapEmailTxt ".
+                     "snapTelegramTxt ".
+                     "snapGalleryBoost:0,1 ".
+                     "snapGallerySize:Icon,Full ".
+                     "snapGalleryNumber:$SSCAM_snum ".
+                     "snapGalleryColumns ".
+                     "snapGalleryHtmlAttr ".
+                     "snapReadingRotate:0,1,2,3,4,5,6,7,8,9,10 ".
+                     "cacheServerParam ".
+                     "cacheType:file,internal,mem,rawmem,redis ".
+                     "pollnologging:1,0 ".
+                     "noQuotesForSID:1,0 ".
+                     "session:SurveillanceStation,DSM ".
+                     "showPassInLog:1,0 ".
+                     "showStmInfoFull:1,0 ".
+                     "simu_SVSversion:7.2-xxxx,7.1-xxxx,8.0.0-xxxx,8.1.5-xxxx,8.2.0-xxxx ".
+                     "videofolderMap ".
+                     "webCmd ".
+                     $readingFnAttributes;   
          
  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
@@ -560,7 +581,6 @@ sub SSCam_Undef($$) {
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash);
-  delete $data{SSCam}{$name};
    
 return undef;
 }
@@ -577,8 +597,14 @@ sub SSCam_DelayedShutdown($) {
   my $name   = $hash->{NAME};
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
-  $hash->{HELPER}{ACTIVE} = "on";                              # keine weiteren Aktionen erlauben
+  $hash->{HELPER}{ACTIVE} = "on";                                      # keine weiteren Aktionen erlauben
   SSCam_logout($hash);
+  
+  if($hash->{HELPER}{CACHEKEY}) {
+      SSCam_cache($name, "c_destroy"); 
+  } 
+  
+  delete $data{SSCam}{$name};                                          # internen cache löschen
 
 return 1;
 }
@@ -615,7 +641,7 @@ return undef;
 sub SSCam_Attr($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
-    my ($do,$val);
+    my ($do,$val,$cache);
       
     # $cmd can be "del" or "set"
     # $name is device name
@@ -668,6 +694,41 @@ sub SSCam_Attr($$$$) {
         readingsSingleUpdate($hash, "PollState", "Inactive", 1) if($do == 1);
         readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1 && SSCam_IsModelCam($hash));
     }
+    
+    if($aName =~ m/cacheType/) {
+        my $type = AttrVal($name,"cacheType","internal");
+        if($cmd eq "set") {
+            if($aVal ne "internal") {
+                if($SScamMMCHI) {
+		            return "Perl cache module ".$SScamMMCHI." is missing. You need to install it with the FHEM Installer for example.";
+	            }
+                if($aVal eq "redis") {
+                    if($SScamMMCHIRedis) {
+                        return "Perl cache module ".$SScamMMCHIRedis." is missing. You need to install it with the FHEM Installer for example.";
+                    }
+                    if(!AttrVal($name,"cacheServerParam","")) {
+                        return "For cacheType \"$aVal\" you must set first attribute \"cacheServerParam\" for Redis server connection: <Redis-server address>:<Redis-server port>";
+                    }
+                }   
+                if($aVal eq "file") {
+                    if($SScamMMCacheCache) {
+                        return "Perl cache module ".$SScamMMCacheCache." is missing. You need to install it with the FHEM Installer for example.";
+                    }
+                }                 
+            }
+            if ($aVal ne $type) {
+                if($hash->{HELPER}{CACHEKEY}) {
+                    SSCam_cache($name, "c_destroy");                               # CHI-Cache löschen/entfernen    
+                } else {
+                    delete $data{SSCam}{$name};                                    # internen Cache löschen
+                }              
+            }        
+        } else {
+            if($hash->{HELPER}{CACHEKEY}) {
+                SSCam_cache($name, "c_destroy");                                   # CHI-Cache löschen/entfernen    
+            }        
+        }        
+    } 
     
     if ($aName eq "showStmInfoFull") {
         if($cmd eq "set") {
@@ -791,6 +852,13 @@ sub SSCam_Attr($$$$) {
         }
         if($aName =~ m/pollcaminfoall/) {
             return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
+        }
+        if($aName =~ m/cacheServerParam/) {
+            return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /^(.*:\d+|unix:.+)$/);
+            my $type = AttrVal($name,"cacheType","internal");
+            if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
+                SSCam_cache($name, "c_destroy");
+            }
         }        
     }
 
@@ -5141,20 +5209,32 @@ sub SSCam_camop_parse ($) {
                 my $fileName  = (split("/",$lrec))[1];
                 my $sn        = 0;
                 
-                $hash->{HELPER}{TRANSACTION} = "fake_recsend";          # fake Transaction Device setzen
-                my $tac = SSCam_openOrgetTrans($hash);                  # Transaktion vorhandenen Code (fake_recsend)              
+                my $tac = SSCam_openOrgetTrans($hash);                    # Transaktion starten             
                 
-                # Cache initialisieren
-				if($hash->{HELPER}{CANSENDREC}) {
-					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
-					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
-					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
-					$data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
-					Log3($name,4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+                my $cache;
+				if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC}) {
+                    $cache = SSCam_cache($name, "c_init");                # Cache initialisieren  
+                    Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
+                    if(!$cache || $cache eq "internal" ) {
+                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
+                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
+                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
+                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
+                    } else {
+                        SSCam_cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{recid}"     ,$recid);
+                        SSCam_cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{createdTm}" ,$createdTm);
+                        SSCam_cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{fileName}"  ,$fileName); 
+                        SSCam_cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{imageData}" ,$myjson);                         
+                    }
+					Log3($name, 4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
 				}
                 
-                # Recording als Email / Telegram versenden             
-				SSCam_prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
+                # Recording als Email / Telegram versenden 
+                if(!$cache || $cache eq "internal" ) {                
+				    SSCam_prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
+                } else {
+                    SSCam_prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
+                }
                 
                 SSCam_closeTrans ($hash);                               # Transaktion beenden
                         
@@ -5410,7 +5490,7 @@ sub SSCam_camop_parse ($) {
                 my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
                 my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
                 if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with transaction-ID: $tac done");
+                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
                 }
                 $ncount--;                                                           # wird vermindert je Snap
                 my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
@@ -5427,7 +5507,7 @@ sub SSCam_camop_parse ($) {
                 # Anzahl und Size für Schnappschußabruf bestimmen
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
                 if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with transaction-ID: $tac");
+                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
                 }
 
                 if(!$hash->{HELPER}{TRANSACTION}) {                  
@@ -5439,13 +5519,20 @@ sub SSCam_camop_parse ($) {
                 InternalTimer(gettimeofday()+0.6, "SSCam_getsnapinfo", "$name:$slim:$ssize:$tac", 0);
                 return;
             
-			} elsif ($OpMode eq "getsnapinfo" || 
-                     $OpMode eq "getsnapgallery" || 
-                     ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/)
-                    ) {
+			} elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/)) {
+                my ($cache,@as,$g);
 				
 	            Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};                        # aktuellster Snap zur Anzeige im StreamDev "lastsnap"
+                
+                # aktuellsten Snap zur Anzeige im StreamDev "lastsnap" speichern
+                # $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};
+                $cache = SSCam_cache($name, "c_init");                               # Cache initialisieren  
+                Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                if(!$cache || $cache eq "internal" ) {
+                    $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
+                } else {
+                    SSCam_cache($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});                           
+                }                
         
                 my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
                 my ($k,$l) = (0,0);              
@@ -5472,7 +5559,6 @@ sub SSCam_camop_parse ($) {
                     }   
                 }
                 
-                my @as;
                 my $rotnum = AttrVal($name,"snapReadingRotate",0);
                 my $o      = ReadingsVal($name,"LastSnapId","n.a."); 
                 if($rotnum && "$o" ne "$snaps{0}{snapid}") {
@@ -5490,6 +5576,7 @@ sub SSCam_camop_parse ($) {
                 }
 					
 				#####  ein Schnapschuss soll als liveView angezeigt werden  #####
+                #################################################################
 				Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.") 
 				   if(exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/ && !exists($data->{'data'}{'data'}[0]{imageData}));
 			    
@@ -5499,17 +5586,47 @@ sub SSCam_camop_parse ($) {
 				}
 
 				#####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
+                ####################################################################################
                 my $tac = SSCam_openOrgetTrans($hash);       # Transaktion vorhandenen Code holen
+                
                 if($OpMode eq "getsnapgallery") {
 				    if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
 					    # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
-						my $i = 0;
+						my $i  = 0;
 						my $sn = 0;
 
-                        if($data{SSCam}{$name}{SNAPHASH}) {   
-                        	foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
-                                $data{SSCam}{$name}{SNAPHASHOLD}{$key} = delete($data{SSCam}{$name}{SNAPHASH});
-	                        }    
+                        # bestehende Schnappschußdaten im Cache auf OLD schreiben und löschen #
+                        #######################################################################
+                        $cache = SSCam_cache($name, "c_init");           # Cache initialisieren  
+                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                        if(!$cache || $cache eq "internal" ) {
+                            if($data{SSCam}{$name}{SNAPHASH}) {
+                                foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
+                                    $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
+                                }
+                            }
+                        } else {
+                            for(SSCam_cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
+                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+                                push @as,$_ if($_=~/^(\d+)$/);
+                            } 
+                            my %seen;
+                            my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;
+                            foreach my $key (@unique) {
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{snapid}");          
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{snapid}"    , $g) if(defined $g);    
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{snapid}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{createdTm}" , $g) if(defined $g); 
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{createdTm}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{fileName}");                               
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{fileName}"  , $g) if(defined $g);  
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{fileName}");  
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{imageData}" , $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{imageData}");                                                     
+                            }
                         }
                             
 						while ($data->{'data'}{'data'}[$i]) {
@@ -5527,55 +5644,136 @@ sub SSCam_camop_parse ($) {
                                 $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
                             }
 							my $fileName  = $data->{data}{data}[$i]{fileName};
-							my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
+							my $imageData = $data->{data}{data}[$i]{imageData};                      # Image data of snapshot in base64 format 
 						    
                             # Schnappschuss Hash zum Versand wird erstellt
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
-							$data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
-							Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
-                        
-                            # Snaphash erstellen 
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
+                            ##############################################
+                            if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP}) {
+                                $cache = SSCam_cache($name, "c_init");                               # Cache initialisieren  
+                                Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                                if(!$cache || $cache eq "internal" ) {
+                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
+                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
+                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
+                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
+                                } else {
+                                    SSCam_cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{snapid}"    ,$snapid);
+                                    SSCam_cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{createdTm}" ,$createdTm);
+                                    SSCam_cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{fileName}"  ,$fileName); 
+                                    SSCam_cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);                             
+                                }
+                                Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
+                            }
+                            
+                            # Snaphash erstellen für Galerie
+                            ################################
+                            $cache = SSCam_cache($name, "c_init");           # Cache initialisieren  
+                            Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                            if(!$cache || $cache eq "internal" ) {
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
+                            } else {
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}"    ,$snapid);
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}" ,$createdTm);
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}"  ,$fileName);  
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}" ,$imageData);                                
+                            }
                             Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                        													
                             
                             $sn += 1;
-							$i += 1;
+							$i  += 1;
+                            
+                            undef $imageData;
+                            undef $fileName;
+                            undef $createdTm;
 						}
                         
                         my $sgn = AttrVal($name,"snapGalleryNumber",3);
                         my $ss  = $sn;
                         $sn     = 0;
-                                               													
-                        if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
-                            for my $kn ($ss..($sgn-1)) {
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
-                                $sn += 1;                            
+                                               													         
+                        $cache = SSCam_cache($name, "c_init");           # Cache initialisieren  
+                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                        if(!$cache || $cache eq "internal" ) {
+                            if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {                        
+                                for my $kn ($ss..($sgn-1)) {
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData}; 
+                                    $sn += 1;                            
+                                }
                             }
+                        } else {
+                            for my $kn ($ss..($sgn-1)) {
+                                # next if $kn >= $hash->{HELPER}{SNAPLIMIT};                                                  
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{snapid}");                       
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{snapid}", $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{createdTm}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{fileName}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{fileName}", $g) if(defined $g);  
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{imageData}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{imageData}",$g) if(defined $g);                                    
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}");
+                                $sn += 1;                            
+                            }                            
                         }
                         
-					    # prüfen ob Schnappschuß versendet werden soll
-				        SSCam_prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDSNAPS}{$tac});
+					    # Schnappschüsse als Email / Telegram versenden
+                        ###############################################
+                        if(!$cache || $cache eq "internal" ) { 
+				            SSCam_prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDSNAPS}{$tac});
+                        } else {
+                            SSCam_prepareSendData ($hash, $OpMode, "{SENDSNAPS}{$tac}");
+                        }
 						
 					} else {
                         # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
-                        # werden (Attr snapGalleryBoost=0)
-                        my $i = 0;
+                        # werden (Attr snapGalleryBoost=0) => kein Versand !!
+                        #################################################################################################
+                        my $i  = 0;
                         my $sn = 0;
                          
                         $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
                         
-                        if($data{SSCam}{$name}{SNAPHASH}) {
-                        	foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
-                                $data{SSCam}{$name}{SNAPHASHOLD}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
-	                        }
+                        # bestehende Schnappschußdaten in OLD schieben und löschen #
+                        ############################################################
+                        $cache = SSCam_cache($name, "c_init");             # Cache initialisieren  
+                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                        if(!$cache || $cache eq "internal" ) {
+                            if($data{SSCam}{$name}{SNAPHASH}) {
+                                foreach my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
+                                    $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
+                                }
+                            }
+                        } else {
+                            for(SSCam_cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
+                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+                                push @as,$_ if($_=~/^(\d+)$/);
+                            }                            
+                            my %seen;
+                            my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;
+                            foreach my $key (@unique) {
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{snapid}");          
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{snapid}"    , $g) if(defined $g);    
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{snapid}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{createdTm}" , $g) if(defined $g); 
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{createdTm}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{fileName}");                               
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{fileName}"  , $g) if(defined $g);  
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{fileName}");  
+                                $g = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
+                                SSCam_cache($name, "c_write", "{SNAPOLDHASH}{$key}{imageData}" , $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPHASH}{$key}{imageData}");                                                      
+                            }
                         }
                         
                         while ($data->{'data'}{'data'}[$i]) {
@@ -5596,28 +5794,64 @@ sub SSCam_camop_parse ($) {
                                 $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
                             }
                             
-                            # Snaphash erstellen
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}     = $snapid;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}  = $createdTm;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}   = $fileName;
-                            $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData}  = $imageData;
-                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}, File => $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}, Created => $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm}");
+                            # Snaphash erstellen für Galerie #
+                            ##################################
+                            $cache = SSCam_cache($name, "c_init");               # Cache initialisieren  
+                            Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                            if(!$cache || $cache eq "internal" ) {
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
+                                $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
+                            } else {
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}"    ,$snapid);
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}" ,$createdTm);
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}"  ,$fileName);  
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}" ,$imageData);                                
+                            }
+                            Log3($name, 4, "$name - Snap '$sn' added to gallery hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
                             
                             $sn += 1;
-                            $i += 1;
+                            $i  += 1;
+                            
+                            undef $imageData;
+                            undef $fileName;
+                            undef $createdTm;
                         }
                         
                         my $sgn = AttrVal($name,"snapGalleryNumber",3);
                         my $ss  = $sn;
                         $sn     = 0; 
-                        if($data{SSCam}{$name}{SNAPHASHOLD} && $sgn > $ss) {
-                            for my $kn ($ss..($sgn-1)) {
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{snapid};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{createdTm};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{fileName};
-                                $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPHASHOLD}{$sn}{imageData}; 
-                                $sn += 1;                            
+                        
+                        $cache = SSCam_cache($name, "c_init");           # Cache initialisieren  
+                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+                        if(!$cache || $cache eq "internal" ) {
+                            if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {                        
+                                for my $kn ($ss..($sgn-1)) {
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
+                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData}; 
+                                    $sn += 1;                            
+                                }
                             }
+                        } else {                            
+                            for my $kn ($ss..($sgn-1)) {
+                                # next if $kn >= $hash->{HELPER}{SNAPLIMIT};                                                  
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{snapid}");                       
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{snapid}", $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{createdTm}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{fileName}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{fileName}", $g) if(defined $g);  
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}");
+                                $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{imageData}");
+                                SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{imageData}",$g) if(defined $g);                                    
+                                SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}");
+                                $sn += 1;                            
+                            }                            
                         }
                         
                         # Direktausgabe Snaphash wenn nicht gepollt wird
@@ -5639,8 +5873,9 @@ sub SSCam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);                
                 
 				undef %snaps;
+                undef $g;
 				delete $hash->{HELPER}{GETSNAPGALLERY};                         # Steuerbit getsnapgallery 		
-                delete $data{SSCam}{$name}{SNAPHASHOLD};
+                delete $data{SSCam}{$name}{SNAPOLDHASH};
                 SSCam_closeTrans($hash);                                        # Transaktion beenden
                 
 				########  fallabhängige Eventgenerierung  ########
@@ -6376,6 +6611,7 @@ sub SSCam_camop_parse ($) {
                 readingsEndUpdate($hash, 1);
                      
                 Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
+                
             }
             
        } else {
@@ -6393,11 +6629,16 @@ sub SSCam_camop_parse ($) {
 			
 		    if ($errorcode =~ /105/) {
 			   Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
+               undef $data;
+               undef $myjson;
 		       return SSCam_login($hash,'SSCam_getapisites');
 		    }
        
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
        }
+                
+       undef $data;
+       undef $myjson;
    }
   
   # Token freigeben   
@@ -7372,7 +7613,15 @@ sub SSCam_StreamDev($$$;$) {
       }      
   
   } elsif ($fmt =~ /lastsnap/) { 
-      $link     = $hash->{HELPER}{".LASTSNAP"};
+      # $link     = $hash->{HELPER}{".LASTSNAP"};
+      my $cache = SSCam_cache($camname, "c_init");                               # Cache initialisieren  
+      Log3($camname, 1, "$camname - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+      if(!$cache || $cache eq "internal" ) {
+          $link = $data{SSCam}{$camname}{LASTSNAP};
+      } else {
+          $link = SSCam_cache($camname, "c_read", "{LASTSNAP}");                           
+      }
+      
       my $gattr = (AttrVal($camname,"snapGallerySize","Icon") eq "Full")?$ha:""; 
       if($link) {
           if(!$ftui) {
@@ -7666,6 +7915,8 @@ sub SSCam_StreamDev($$$;$) {
   $ret .= '</tbody>';
   $ret .= '</table>';
   Log3($strmdev, 4, "$strmdev - Link called: $link") if($link);
+  
+  undef $link;
 
 return $ret;
 }
@@ -7727,7 +7978,8 @@ sub SSCam_composegallery ($;$$$) {
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
   my $lss      = ReadingsVal($name, "LastSnapTime", "");                                      # Zeitpunkt neueste Aufnahme
   my $lang     = AttrVal("global","language","EN");                                           # Systemsprache       
-  my $limit    = $hash->{HELPER}{SNAPLIMIT};                                                  # abgerufene Anzahl Snaps
+  # my $limit    = $hash->{HELPER}{SNAPLIMIT};                                                  # abgerufene Anzahl Snaps
+  my $limit    = AttrVal($name,"snapGalleryNumber",3);                                        # abgerufene Anzahl Snaps
   my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale Anzahl Snaps
   $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
   $ftui        = ($ftui && $ftui eq "ftui")?1:0;
@@ -7738,6 +7990,7 @@ sub SSCam_composegallery ($;$$$) {
 				 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
   $lupt =~ s/ / \/ /;
   my ($alias,$dlink,$hb) = ("","","");
+  my ($cache,$imgdat,$imgTm);
   
   # Kontext des SSCamSTRM-Devices speichern für SSCam_refresh
   $hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
@@ -7824,25 +8077,58 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
-  my $cell   = 1;
   
+  my $cell  = 1;
   my $idata = "";
-  foreach my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
-      if(!$ftui) {
-          $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
-	  }
-      $cell++;
 
-      if ( $cell == $sgc+1 ) {
-        $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );;
-        $htmlCode .= "</tr>";
-        $htmlCode .= "<tr class=\"odd\">";
-        $cell = 1;
-      } else {
-        $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );;
+  $cache = SSCam_cache($name, "c_init");                                                    # Cache initialisieren  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+  if(!$cache || $cache eq "internal" ) {
+      foreach my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
+          if(!$ftui) {
+              $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
+          }
+          $cell++;
+
+          if ( $cell == $sgc+1 ) {
+            $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );
+            $htmlCode .= "</tr>";
+            $htmlCode .= "<tr class=\"odd\">";
+            $cell = 1;
+          } else {
+            $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );
+          }
+          
+          $idata = "";
       }
-      
-      $idata = "";
+  } else {
+      my @as;
+      for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+         next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
+         $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+         push @as,$_ if($_=~/^(\d+)$/);
+      }      
+      my %seen;
+      my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
+      foreach my $key (@unique) {
+          $imgdat = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
+          $imgTm  = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
+          if(!$ftui) {
+              $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$imgdat $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
+          }
+          $cell++;
+
+          if ( $cell == $sgc+1 ) {
+            $htmlCode .= sprintf("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$imgdat\" $gattr $idata> </td>" );
+            $htmlCode .= "</tr>";
+            $htmlCode .= "<tr class=\"odd\">";
+            $cell = 1;
+          } else {
+            $htmlCode .= sprintf("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$imgdat\" $gattr $idata> </td>" );
+          }
+          
+          $idata = "";
+      }  
   }
 
   if ( $cell == 2 ) {
@@ -7857,6 +8143,10 @@ sub SSCam_composegallery ($;$$$) {
       $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
   }
   $htmlCode .= "</html>";
+  
+  undef $imgdat;
+  undef $imgTm;
+  undef $idata;
   
 return $htmlCode;
 }
@@ -7962,26 +8252,52 @@ sub SSCam_prepareSendData ($$;$) {
    my ($hash, $OpMode, $dat) = @_;
    my $name   = $hash->{NAME};
    my $calias = AttrVal($name,"alias",$hash->{CAMNAME});              # Alias der Kamera wenn gesetzt oder Originalname aus SVS
+   my $type   = AttrVal($name,"cacheType","internal");
    my ($ret,$vdat,$fname,$snapid,$lsnaptime,$tac) = ('','','','','','');
+   my @as;
       
-   ### prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
-   ### Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
+   # prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
+   # Bilddaten jeder Kamera werden nach Erstellung dem zentralen Schnappshußhash hinzugefügt
+   # Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
    my $asref;
    my @allsvs = devspec2array("TYPE=SSCam:FILTER=MODEL=SVS");
    foreach (@allsvs) {
-       next if(!AttrVal($_, "snapEmailTxt", ""));                      # Schnappschüsse senden NICHT durch SVS ausgelöst -> Snaps der Cams NICHT gemeinsam versenden
-       my $svshash = $defs{$_};
+       my $svshash = $defs{$_} if($defs{$_});
+       next if(!$svshash || !AttrVal($_, "snapEmailTxt", "") || !$svshash->{HELPER}{CANSENDSNAP});  # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
        if($svshash->{HELPER}{ALLSNAPREF}) { 
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
+           $asref = $svshash->{HELPER}{ALLSNAPREF};                                          # Hashreferenz zum summarischen Snaphash
            foreach my $key (keys%{$asref}) {
-               if($key eq $name) {                                     # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
-                    foreach my $pkey (keys%{$dat}) {
-                        my $nkey = time()+int(rand(1000));
-                        $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                        $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                        $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                    }
-                    delete $hash->{HELPER}{CANSENDSNAP};               
+               if($key eq $name) {                                                           # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
+                    my ($pkey,$nkey);
+                    if($type eq "internal") {
+                        foreach $pkey (keys%{$dat}) {
+                            $nkey = time()+int(rand(1000));
+                            $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                        }
+                    } else {
+                        # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+                        # Muster: {SENDSNAPS}{2222}{0}{imageData} 
+                        for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+                            next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
+                            $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
+                            push @as,$_ if($_=~/^(\d+)$/);
+                        }      
+                        my %seen;
+                        my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
+
+                        foreach $pkey (@unique) {
+                            next if(!SSCam_cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
+                            $nkey = time()+int(rand(1000));
+                            $asref->{$nkey.$pkey}{createdTm} = SSCam_cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{imageData} = SSCam_cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{fileName}  = SSCam_cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                        }               
+                    }                    
+                    delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
                     delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
                }
            }
@@ -7994,12 +8310,26 @@ sub SSCam_prepareSendData ($$;$) {
        
            delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
            $hash   = $svshash;                                         # Hash durch SVS-Hash ersetzt
-           $name   = $svshash->{NAME};                                 # Name des auslösenden SVS-Devices wird eingesetzt                                        
-           delete $data{SSCam}{RS};
-           foreach my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
-               $data{SSCam}{RS}{$key} = delete $asref->{$key};                                         
-           }   
-           $dat    = $data{SSCam}{RS};                                 # Referenz zum summarischen Hash einsetzen
+           $name   = $svshash->{NAME};                                 # Name des auslösenden SVS-Devices wird eingesetzt  
+           Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
+           
+           my $cache = SSCam_cache($name, "c_init");                   # Cache initialisieren (im SVS Device)
+           if(!$cache || $cache eq "internal" ) {
+               delete $data{SSCam}{RS};           
+               foreach my $key (keys%{$asref}) {                       # Referenz zum summarischen Hash einsetzen        
+                   $data{SSCam}{RS}{$key} = delete $asref->{$key};                     
+               }    
+               $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
+           } else {
+               SSCam_cache($name, "c_clear"); 
+               foreach my $key (keys%{$asref}) {
+                   SSCam_cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
+                   SSCam_cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
+                   SSCam_cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
+               }
+               $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
+           }
+           
            $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
            $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
            last;                                                       # Schleife verlassen und mit Senden weiter
@@ -8019,11 +8349,17 @@ sub SSCam_prepareSendData ($$;$) {
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
-   $tac = $hash->{HELPER}{TRANSACTION};               # Code der laufenden Transaktion
+   $tac = $hash->{HELPER}{TRANSACTION};                               # Code der laufenden Transaktion
+   
+   $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                          # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
+                                                                      # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe SSCam_closeTrans)
+   Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
    
    ### Schnappschüsse als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
    if($OpMode =~ /^getsnap/ && $hash->{HELPER}{CANSENDSNAP}) {     
        delete $hash->{HELPER}{CANSENDSNAP};
+       $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        my $mt = delete $hash->{HELPER}{SMTPMSG};
        $mt    =~ s/['"]//g;   
        
@@ -8056,11 +8392,14 @@ sub SSCam_prepareSendData ($$;$) {
                                       'tac'          => $tac,                                  
                                      }
                              );
+       readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
    
    ### Aufnahmen als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
    if($OpMode =~ /^GetRec/ && $hash->{HELPER}{CANSENDREC}) {     
        delete $hash->{HELPER}{CANSENDREC};
+       $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
        $mt     =~ s/['"]//g;   
        
@@ -8093,6 +8432,7 @@ sub SSCam_prepareSendData ($$;$) {
                                       'tac'          => $tac,                                      
                                      }
                              );
+       readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
 
    ### Schnappschüsse mit Telegram versenden
@@ -8100,6 +8440,8 @@ sub SSCam_prepareSendData ($$;$) {
        # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELESNAP};
+       $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        my $mt = delete $hash->{HELPER}{TELEMSG};
        $mt    =~ s/['"]//g;
              
@@ -8134,7 +8476,8 @@ sub SSCam_prepareSendData ($$;$) {
                                          'peers'        => $telemsg{$peerk},                                      
                                          'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                         }
-                                );                   
+                                );
+       readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                
    }
 
    ### Aufnahmen mit Telegram versenden
@@ -8142,6 +8485,8 @@ sub SSCam_prepareSendData ($$;$) {
        # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELEREC};
+       $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        my $mt = delete $hash->{HELPER}{TELERECMSG};
        $mt    =~ s/['"]//g;
              
@@ -8176,8 +8521,11 @@ sub SSCam_prepareSendData ($$;$) {
                                          'tac'          => $tac,                                         
                                          'MediaStream'  => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                         }
-                                );                   
+                                ); 
+       readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                  
    }
+   
+   SSCam_closeTrans($hash) if($hash->{HELPER}{TRANSACTION} eq "multiple_snapsend");     # Transaction Sammelversand (SVS) schließen, Daten bereinigen 
    
 return;
 }
@@ -8188,7 +8536,8 @@ return;
 sub SSCam_sendTelegram ($$) { 
    my ($hash, $extparamref) = @_;
    my $name = $hash->{NAME};
-   my $ret;
+   my $type = AttrVal($name,"cacheType","internal");
+   my ($ret,$cache);
    
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###      start send snapshot by TelegramBot         "); 
@@ -8220,8 +8569,10 @@ sub SSCam_sendTelegram ($$) {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_teleparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_teleparams{$key}->{attr});	   
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
 	   }
+       no warnings 'uninitialized'; 
        Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /[sv]dat/);
        Log3($name, 4, "$name - param $key is set") if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
+       use warnings;
    }
    
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
@@ -8257,45 +8608,86 @@ sub SSCam_sendTelegram ($$) {
            Log3($name, 2, "$name - $ret");
            return;       
        }
-   }   
+   }
+
+   if(!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
+       $ret = "no video or image data existing for send process by TelegramBot \"$telebot\" ";
+       readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+       Log3($name, 2, "$name - $ret");
+       return;   
+   } 
                                     
   no strict "refs";
-  my ($msg,$subject,$MediaStream,$fname);
-  if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {
-      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
-      my @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
+  my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
+  
+  $cache = SSCam_cache($name, "c_init");                                                     # Cache initialisieren        
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+  
+  if(!$cache || $cache eq "internal" ) {
+      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
+      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
+      }
       foreach my $key (@as) {
            ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-		   $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-		   if($ret) {
-			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-			   Log3($name, 2, "$name - ERROR: $ret");
-		   } else {
-			   $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-			   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-			   Log3($name, 3, "$name - $ret");
-		   }
-	  }
-  }
-  
-  if($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
-      ### Aufnahmen liegen in einem Hash-Ref in $vdat vor
-      my $key = 0;
-      ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-      $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-	  if($ret) {
-	      readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-	      Log3($name, 2, "$name - ERROR: $ret");
-      } else {
-          $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-          readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-	      Log3($name, 3, "$name - $ret");
-	  }
+           $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           if($ret) {
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 2, "$name - ERROR: $ret");
+           } else {
+               $ret = "Telegram message transaction \"$tac\" successfully sent to \"$peers\" by \"$telebot\" ";
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 3, "$name - $ret");
+           }
+      }
+      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+      
+  } else {
+      # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
+      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+          # Muster: {SENDSNAPS}{2222}{0}{imageData}
+          for(SSCam_cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
+              push @as,$_ if($_=~/^(\d+)$/);
+          }
+          @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
+      
+      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+          # Muster: {SENDRECS}{305}{0}{imageData} 
+          for(SSCam_cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
+              push @as,$_ if($_=~/^(\d+)$/);
+          }
+          @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys          
+      }
+      
+      foreach my $key (@unique) {
+           ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           if($ret) {
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 2, "$name - ERROR: $ret");
+           } else {
+               $ret = "Telegram message transaction \"$tac\" successfully sent to \"$peers\" by \"$telebot\" ";
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 3, "$name - $ret");
+           }
+      }      
+      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
   }
   
   use strict "refs";
   undef %SSCam_teleparams;
   undef %{$extparamref};
+  undef $msg;
+  
 return;
 }
 
@@ -8307,23 +8699,42 @@ sub SSCam_extractForTelegram($$$) {
   my $hash               = $defs{$name};
   my $subject            = $paref->{subject};
   my $MediaStream        = $paref->{MediaStream};
-  my $sdat               = $paref->{sdat};                     # Hash von Imagedaten base64 codiert
-  my $vdat               = $paref->{vdat};                     # Hashref der Videodaten   
-  my ($data,$fname,$ct,$img);
+  my $sdat               = $paref->{sdat};                           # Hash von Imagedaten base64 codiert
+  my $vdat               = $paref->{vdat};                           # Hashref der Videodaten   
+  my ($data,$fname,$ct,$img,$cache);
   
   if($sdat) {
-      $ct     = delete $paref->{sdat}{$key}{createdTm};
-      $img    = delete $paref->{sdat}{$key}{imageData};
-      $fname  = SSCam_trim(delete $paref->{sdat}{$key}{fileName});
-      $data   = MIME::Base64::decode_base64($img); 
-      Log3($name, 4, "$name - image data decoded for TelegramBot prepare");
-      undef $img;
+      $cache = SSCam_cache($name, "c_init");              # Cache initialisieren        
+      if(!$cache || $cache eq "internal" ) {
+          $ct     = delete $paref->{sdat}{$key}{createdTm};
+          $img    = delete $paref->{sdat}{$key}{imageData};
+          $fname  = SSCam_trim(delete $paref->{sdat}{$key}{fileName});
+          $data   = MIME::Base64::decode_base64($img); 
+          Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for TelegramBot prepare");
+          undef $img;
+          
+      } else {
+          $ct    = SSCam_cache($name, "c_read", "$sdat"."{$key}{createdTm}");
+          $img   = SSCam_cache($name, "c_read", "$sdat"."{$key}{imageData}");
+          $fname = SSCam_trim( SSCam_cache($name, "c_read", "$sdat"."{$key}{fileName}") );
+          $data  = MIME::Base64::decode_base64($img); 
+          Log3($name, 4, "$name - Image data sequence [$key] decoded from CHI-Cache for TelegramBot prepare");          
+      }
   } 
   
   if($vdat) {
-      $ct    = delete $paref->{vdat}{$key}{createdTm};
-      $data  = delete $paref->{vdat}{$key}{imageData};
-      $fname = SSCam_trim(delete $paref->{vdat}{$key}{fileName});
+      $cache = SSCam_cache($name, "c_init");              # Cache initialisieren        
+      if(!$cache || $cache eq "internal" ) {
+          $ct    = delete $paref->{vdat}{$key}{createdTm};
+          $data  = delete $paref->{vdat}{$key}{imageData};
+          $fname = SSCam_trim(delete $paref->{vdat}{$key}{fileName});
+          Log3($name, 4, "$name - Video data sequence [$key] got from internal Cache for TelegramBot prepare");
+      } else {
+          $ct    = SSCam_cache($name, "c_read", "$vdat"."{$key}{createdTm}");  
+          $data  = SSCam_cache($name, "c_read", "$vdat"."{$key}{imageData}");
+          $fname = SSCam_trim( SSCam_cache($name, "c_read", "$vdat"."{$key}{fileName}") );      
+          Log3($name, 4, "$name - Video data sequence [$key] got from CHI-Cache for TelegramBot prepare");          
+      }
   }
   
   $subject =~ s/\$FILE/$fname/g;
@@ -8402,12 +8813,12 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
   $hash->{sentMsgOptions} = $options;
   
   # init param hash
-  $hash->{HU_DO_PARAMS}->{hash}   = $hash;
+  # $hash->{HU_DO_PARAMS}->{hash}   = $hash;
   $hash->{HU_DO_PARAMS}->{header} = $SSCam_TBotHeader;
-  delete( $hash->{HU_DO_PARAMS}->{args} );
-  delete( $hash->{HU_DO_PARAMS}->{boundary} );
+  delete $hash->{HU_DO_PARAMS}{args};
+  delete $hash->{HU_DO_PARAMS}{boundary};
+  delete $hash->{HU_DO_PARAMS}{data};
 
-  
   my $timeout = AttrVal($name,'cmdTimeout',30);
   $hash->{HU_DO_PARAMS}->{timeout}  = $timeout;
   $hash->{HU_DO_PARAMS}->{loglevel} = 4;
@@ -8538,6 +8949,8 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
       Log3($camname, 4, "$camname - SSCam_TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
       HttpUtils_NonblockingGet($hash->{HU_DO_PARAMS});
   }
+  
+  undef $msg;
   
 return $ret;
 }
@@ -8721,10 +9134,10 @@ sub SSCam_sendEmail ($$) {
    foreach my $key (keys %SSCam_mailparams) {
        $data{SSCam}{$name}{PARAMS}{$tac}{$key} = AttrVal($name, $SSCam_mailparams{$key}->{attr}, $SSCam_mailparams{$key}->{default}) 
                                                    if(exists $SSCam_mailparams{$key}->{attr}); 
-	   if($SSCam_mailparams{$key}->{set}) { 
+       if($SSCam_mailparams{$key}->{set}) { 
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $SSCam_mailparams{$key}->{default} if (!$extparamref->{$key} && !$SSCam_mailparams{$key}->{attr});	   
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if (exists $extparamref->{$key});
-	   }
+       }
        Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/);
        Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
@@ -8780,10 +9193,10 @@ sub SSCam_sendEmailblocking($) {
   my $sslfrominit  = delete $paref->{sslfrominit};              # SSL soll sofort ! aufgebaut werden
   my $tac          = delete $paref->{tac};                      # übermittelter Transaktionscode der ausgewerteten Transaktion
   my $vdat         = delete $paref->{vdat};                     # Videodaten, wenn gesetzt muss 'part2type' auf 'video/mpeg' gesetzt sein
-  
+     
   my $hash   = $defs{$name};
   my $sslver = "";
-  my ($err,$fh,$smtp,@as);
+  my ($err,$smtp,@as,$cache);
   
   # Credentials abrufen
   my ($success, $username, $password) = SSCam_getcredentials($hash,0,"smtp");
@@ -8823,38 +9236,104 @@ sub SSCam_sendEmailblocking($) {
   
   no strict "refs";
   if($sdat) {
-      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor und werden dekodiert in ein "in-memory IO" gespeichert (snap)
+      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my ($ct,$img,$decoded);
-      @as = sort{$a<=>$b}keys%{$sdat};
-      foreach my $key (@as) {
-		  $ct      = delete $sdat->{$key}{createdTm};
-		  $img     = delete $sdat->{$key}{imageData};
-		  $fname   = delete $sdat->{$key}{fileName};
-		  $fh      = '$fh'.$key;
-		  $decoded = MIME::Base64::decode_base64($img); 
-		  $mailmsg->attach(
-			  Type        => $part2type,
-              Data        => $decoded,
-			  Filename    => $fname,
-			  Disposition => 'attachment',
-		  );
+      $cache = SSCam_cache($name, "c_init");              # Cache initialisieren        
+      if(!$cache || $cache eq "internal" ) {
+          @as = sort{$a<=>$b}keys%{$sdat};
+          foreach my $key (@as) {
+              $ct      = delete $sdat->{$key}{createdTm};
+              $img     = delete $sdat->{$key}{imageData};
+              $fname   = delete $sdat->{$key}{fileName};
+              $decoded = MIME::Base64::decode_base64($img); 
+              $mailmsg->attach(
+                  Type        => $part2type,
+                  Data        => $decoded,
+                  Filename    => $fname,
+                  Disposition => 'attachment',
+              );
+              Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for Email attachment") if($decoded); 
+          }
+          BlockingInformParent("SSCam_subaddFromBlocking", [$name, "-", $tac], 0);
+          
+      } else {
+          # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+          # Muster: {SENDSNAPS|RS}{2222|multiple_snapsend}{0|1572995404.125580}{imageData}  
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{.*\}\{.*\}/;
+              $_ =~ s/\{(SENDSNAPS|RS)\}\{(.*)\}\{(\d+|\d+.\d+)\}\{.*\}/$3/;
+              next if $2 ne $tac;
+              push @as,$_ if($_=~/^(\d+|\d+.\d+)$/);
+          }           
+          my %seen;
+          my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
+
+          # attach mail
+          foreach my $key (@unique) {
+              next if(!SSCam_cache($name, "c_isvalidkey", "$sdat"."{$key}{imageData}")); 
+              $ct      = SSCam_cache($name, "c_read", "$sdat"."{$key}{createdTm}");
+              $img     = SSCam_cache($name, "c_read", "$sdat"."{$key}{imageData}");
+              $fname   = SSCam_cache($name, "c_read", "$sdat"."{$key}{fileName}");
+              $decoded = MIME::Base64::decode_base64($img); 
+              $mailmsg->attach(
+                  Type        => $part2type,
+                  Data        => $decoded,
+                  Filename    => $fname,
+                  Disposition => 'attachment',
+              );
+              Log3($name, 4, "$name - Image data sequence [$key] decoded from CHI-Cache for Email attachment"); 
+          }
+          BlockingInformParent("SSCam_subaddFromBlocking", [$name, "-", $tac], 0);
       }
   }
   
   if($vdat) {
-      ### Videodaten (mp4) wurden geliefert und werden in ein "in-memory IO" gespeichert
+      ### Videodaten (mp4) wurden geliefert
       my ($ct,$video);
-      @as = sort{$a<=>$b}keys%{$vdat};
-      foreach my $key (@as) {
-		  $ct      = delete $vdat->{$key}{createdTm};
-		  $video   = delete $vdat->{$key}{imageData};
-		  $fname   = delete $vdat->{$key}{fileName};
-		  $mailmsg->attach(
-			  Type        => $part2type,
-              Data        => $video,
-			  Filename    => $fname,
-			  Disposition => 'attachment',
-		  );
+      $cache = SSCam_cache($name, "c_init");              # Cache initialisieren        
+      if(!$cache || $cache eq "internal" ) {
+          @as = sort{$a<=>$b}keys%{$vdat};
+          foreach my $key (@as) {
+              $ct      = delete $vdat->{$key}{createdTm};
+              $video   = delete $vdat->{$key}{imageData};
+              $fname   = delete $vdat->{$key}{fileName};
+              $mailmsg->attach(
+                  Type        => $part2type,
+                  Data        => $video,
+                  Filename    => $fname,
+                  Disposition => 'attachment',
+              );
+              Log3($name, 4, "$name - Video data sequence [$key] decoded from internal Cache for Email attachment"); 
+          } 
+          BlockingInformParent("SSCam_subaddFromBlocking", [$name, "-", $tac], 0);          
+          
+      } else {
+          # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+          # Muster: {SENDRECS}{305}{0}{imageData} 
+          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
+              push @as,$_ if($_=~/^(\d+)$/);
+          }           
+          my %seen;          
+          my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
+          
+          # attach mail
+          foreach my $key (@unique) {
+              next if(!SSCam_cache($name, "c_isvalidkey", "$vdat"."{$key}{imageData}")); 
+              $ct      = SSCam_cache($name, "c_read", "$vdat"."{$key}{createdTm}");
+              $video   = SSCam_cache($name, "c_read", "$vdat"."{$key}{imageData}");   
+              $fname   = SSCam_cache($name, "c_read", "$vdat"."{$key}{fileName}"); 
+              $mailmsg->attach(
+                  Type        => $part2type,
+                  Data        => $video,
+                  Filename    => $fname,
+                  Disposition => 'attachment',
+              );
+              Log3($name, 4, "$name - Video data sequence [$key] decoded from CHI-Cache for Email attachment"); 
+          }
+          BlockingInformParent("SSCam_subaddFromBlocking", [$name, "-", $tac], 0);     
       }
   }
   
@@ -9080,15 +9559,14 @@ return $tac;
 #############################################################################################
 sub SSCam_closeTrans ($) { 
    my ($hash) = @_;
-   my $name = $hash->{NAME};
+   my $name   = $hash->{NAME};
    
-   SSCam_cleanData($name);                                   # %data Hash bereinigen
-   return if(!defined $hash->{HELPER}{TRANSACTION}); 
-   
-   my $tac = delete $hash->{HELPER}{TRANSACTION};            # Transaktion beenden   
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Transaction \"$tac\" closed");
-   }
+   my $tac = delete $hash->{HELPER}{TRANSACTION};            # diese Transaktion beenden
+   $tac    = $tac?$tac:"";
+   SSCam_cleanData("$name:$tac");                            # %data Hash & Cache bereinigen
+   return if(!$tac); 
+      
+   Log3($name, 1, "$name - Transaction \"$tac\" closed") if(AttrVal($name,"debugactivetoken",0));
    
 return;
 }
@@ -9097,38 +9575,93 @@ return;
 #                               $data Hash bereinigen
 ####################################################################################################
 sub SSCam_cleanData($;$) {
-  my ($name) = @_;
+  my ($str)            = @_;
+  my ($name,$tac) = split(":",$str);
   my $hash   = $defs{$name};
   my $del    = 0;
   
-  my $tac = $hash->{HELPER}{TRANSACTION};   
-  delete $data{SSCam}{RS};
+  RemoveInternalTimer($hash, "SSCam_cleanData"); 
   
-  if($tac) {
-      if($data{SSCam}{$name}{SENDRECS}{$tac}) {
-          delete $data{SSCam}{$name}{SENDRECS}{$tac};
-          $del = 1;
-      }
-      if($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
-          delete $data{SSCam}{$name}{SENDSNAPS}{$tac};
-          $del = 1;
-      }
-      if($data{SSCam}{$name}{PARAMS}{$tac}) {
-          delete $data{SSCam}{$name}{PARAMS}{$tac};
-          $del = 1;
-      }
-      if ($del && AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 1, "$name - Data Hash (SENDRECS/SENDSNAPS/PARAMS) of Transaction \"$tac\" deleted");
-      }
+  if($data{SSCam}{$name}{SENDCOUNT}{$tac} && $data{SSCam}{$name}{SENDCOUNT}{$tac} > 0) {     # Cacheinhalt erst löschen wenn Sendezähler 0
+      InternalTimer(gettimeofday()+1, "SSCam_cleanData", "$name:$tac", 0);
+      return;
+  } 
   
+  if(AttrVal($name,"cacheType","internal") eq "internal") {
+      # internes Caching
+      if($tac) {
+          if($data{SSCam}{RS}{$tac}) {
+              delete $data{SSCam}{RS}{$tac};
+              $del = 1;
+          }
+          if($data{SSCam}{$name}{SENDRECS}{$tac}) {
+              delete $data{SSCam}{$name}{SENDRECS}{$tac};
+              $del = 1;
+          }
+          if($data{SSCam}{$name}{SENDSNAPS}{$tac}) {
+              delete $data{SSCam}{$name}{SENDSNAPS}{$tac};
+              $del = 1;
+          }
+          if($data{SSCam}{$name}{PARAMS}{$tac}) {
+              delete $data{SSCam}{$name}{PARAMS}{$tac};
+              $del = 1;
+          }
+          if ($del && AttrVal($name,"debugactivetoken",0)) {
+              Log3($name, 1, "$name - Data of Transaction \"$tac\" deleted");
+          }
+      
+      } else {
+          delete $data{SSCam}{RS};
+          delete $data{SSCam}{$name}{SENDRECS};
+          delete $data{SSCam}{$name}{SENDSNAPS};
+          delete $data{SSCam}{$name}{PARAMS};
+          if (AttrVal($name,"debugactivetoken",0)) {
+              Log3($name, 1, "$name - Data of internal Cache removed");
+          }      
+      }
+      
   } else {
-      delete $data{SSCam}{$name}{SENDRECS};
-      delete $data{SSCam}{$name}{SENDSNAPS};
-      delete $data{SSCam}{$name}{PARAMS};
-      if (AttrVal($name,"debugactivetoken",0)) {
-          Log3($name, 1, "$name - Data Hash (SENDRECS/SENDSNAPS/PARAMS) deleted");
-      }      
+      # Caching mit CHI
+      my @as = SSCam_cache($name, "c_getkeys");
+      if($tac) {
+          foreach my $k (@as) {
+              if ($k =~ /$tac/) {
+                  SSCam_cache($name, "c_remove", $k);
+                  $del = 1;
+              }
+          }
+          if ($del && AttrVal($name,"debugactivetoken",0)) {
+              Log3($name, 1, "$name - Data of Transaction \"$tac\" removed");
+          }
+      
+      } else {
+          SSCam_cache($name, "c_clear");
+          if (AttrVal($name,"debugactivetoken",0)) {
+              Log3($name, 1, "$name - Data of CHI-Cache removed");
+          }          
+      }
   }
+
+return;
+}
+
+#############################################################################################
+#         {SENDCOUNT} aus BlockingCall heraus um 1 subtrahieren/addieren
+#         $tac = <Transaktionskennung>
+#############################################################################################
+sub SSCam_subaddFromBlocking($$$) {
+  my ($name,$op,$tac) = @_;
+  my $hash            = $defs{$name};
+  
+  if($op eq "-") {
+      $data{SSCam}{$name}{SENDCOUNT}{$tac}--;
+  }
+  
+  if($op eq "+") {
+      $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+  }
+  
+  Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
 
 return;
 }
@@ -9137,9 +9670,259 @@ return;
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 #############################################################################################
 sub SSCam_trim ($) {
- my $str = shift;
- $str =~ s/^\s+|\s+$//g;
+  my $str = shift;
+  $str =~ s/^\s+|\s+$//g;
+
 return ($str);
+}
+
+#############################################################################################
+#             Cache Handling  
+#             SSCam_cache ($name, <opcode> [, <Key>, <data>])
+#             return 1 = ok , return 0 = nok
+#############################################################################################
+sub SSCam_cache ($$;$$) {
+  my ($name,$op,$key,$dat) = @_;
+  my $hash           = $defs{$name};
+  my $type           = AttrVal($name,"cacheType","internal");
+  my ($server,$port) = split(":",AttrVal($name,"cacheServerParam",""));
+  my $path           = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSSCam";       # Dir für FileCache
+  my $fuuid          = $hash->{FUUID};
+  my ($cache,$r,$bst,$brt);
+  
+  $bst = [gettimeofday];
+
+  ### Cache Initialisierung ###
+  ############################# 
+  if($op eq "c_init") {
+      if ($type eq "internal") {
+          Log3($name, 4, "$name - internal Cache mechanism is used ");
+          return $type;
+      }  
+      
+	  if($SScamMMCHI) {
+		  Log3($name, 1, "$name - Perl cache module ".$SScamMMCHI." is missing. You need to install it with the FHEM Installer for example.");
+		  return 0;
+	  }
+	  if($type eq "redis" && $SScamMMCHIRedis) {
+		  Log3($name, 1, "$name - Perl cache module ".$SScamMMCHIRedis." is missing. You need to install it with the FHEM Installer for example.");
+		  return 0;
+	  }
+	  if($type eq "filecache" && $SScamMMCacheCache) {
+		  Log3($name, 1, "$name - Perl cache module ".$SScamMMCacheCache." is missing. You need to install it with the FHEM Installer for example.");
+		  return 0;
+	  }
+      
+      if ($hash->{HELPER}{CACHEKEY}) {
+          Log3($name, 4, "$name - Cache \"$type\" is already initialized ");
+          return $type;
+      }
+	  
+      if($type eq "mem") {
+          # This cache driver stores data on a per-process basis. This is the fastest of the cache implementations, 
+          # but data can not be shared between processes. Data will remain in the cache until cleared, expired, 
+          # or the process dies.
+          # https://metacpan.org/pod/CHI::Driver::Memory          
+          $cache = CHI->new( driver       => 'Memory', 
+                             on_set_error => 'warn',
+                             on_get_error => 'warn',
+                             namespace    => $fuuid,                             
+                             global       => 0 
+                           );
+      }
+	  
+      if($type eq "rawmem") {
+          # This is a subclass of CHI::Driver::Memory that stores references to data structures directly instead 
+		  # of serializing / deserializing. This makes the cache faster at getting and setting complex data structures, 
+		  # but unlike most drivers, modifications to the original data structure will affect the data structure stored 
+          # in the cache.   
+          # https://metacpan.org/pod/CHI::Driver::RawMemory
+          $cache = CHI->new( driver       => 'RawMemory',
+                             on_set_error => 'warn',
+                             on_get_error => 'warn', 
+                             namespace    => $fuuid,                             
+                             global       => 0 
+                           );
+      }
+      
+      if($type eq "redis") {
+          # A CHI driver that uses Redis to store the data. Care has been taken to not have this module fail in fiery 
+          # ways if the cache is unavailable. It is my hope that if it is failing and the cache is not required for your work, 
+          # you can ignore its warnings.
+          # https://metacpan.org/pod/CHI::Driver::Redis
+          if(!$server || !$port) {
+              Log3($name, 1, "$name - ERROR in cache Redis definition. Please provide Redis server parameter in form <Redis-server address>:<Redis-server port> ");
+              return 0;
+          }
+          my $cto = 0.5;
+          my $rto = 0.5;
+          my $wto = 0.5;
+          my %Redispars = ( cnx_timeout   => $cto,
+                            read_timeout  => $rto,
+                            write_timeout => $wto
+                          );
+                          
+          # Redis Construktor for Test Redis server connection (CHI doesn't do it) 
+          delete $hash->{HELPER}{REDISKEY};          
+          $r = eval { Redis->new( server      => "$server:$port", 
+                                  cnx_timeout => $cto,
+                                  debug       => 0
+                                ); 
+                    };
+          if ( my $error = $@ ) {
+              # Muster: Could not connect to Redis server at 192.168.2.10:6379: Connection refused at ./FHEM/49_SSCam.pm line 9546.
+              $error = (split("at ./FHEM",$error))[0];
+              Log3($name, 1, "$name - ERROR - $error");
+              return 0;
+          } else {
+              $hash->{HELPER}{REDISKEY} = $r;
+          }
+           
+          # create CHI Redis constructor           
+          $cache = CHI->new( driver        => 'Redis',
+                             namespace     => $fuuid,
+                             server        => "$server:$port",
+                             on_set_error  => 'warn',
+                             on_get_error  => 'warn',
+                             redis_options => \%Redispars,
+                             debug         => 0
+                           );
+      }
+      
+      if($type eq "file") {
+          # This is a filecache using Cache::Cache.  
+          # https://metacpan.org/pod/Cache::Cache 
+          my $pr = (split('/',reverse($path),2))[1];
+          $pr    = reverse($pr);                  
+          if(!(-R $pr) || !(-W $pr)) {                                # root-erzeichnis testen
+              Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache in dir \"$pr\": ".$!);
+              delete $hash->{HELPER}{CACHEKEY}; 
+              return 0;
+          }
+          if(!(-d $path)) {                                           # Zielverzeichnis anlegen wenn nicht vorhanden
+              my $success = mkdir($path,0775);
+              if(!$success) {
+                  Log3($name, 1, "$name - ERROR - cannot create \"$type\" Cache path \"$path\": ".$!);
+                  delete $hash->{HELPER}{CACHEKEY}; 
+                  return 0;             
+              }
+          }
+          
+          $cache = CHI->new( driver       => 'CacheCache',
+                             on_set_error => 'warn',
+                             on_get_error => 'warn',
+                             cc_class     => 'Cache::FileCache',
+                             cc_options   => { cache_root => $path,
+                                               namespace  => $fuuid
+                                             },
+                           );
+      }
+
+      if ($cache && $cache =~ /CHI::Driver::Role::Universal/) {
+          Log3($name, 3, "$name - Cache \"$type\" namespace \"$fuuid\" initialized");
+          $hash->{HELPER}{CACHEKEY} = $cache;
+          $brt = tv_interval($bst);
+          Log3($name, 1, "$name - Cache time to create \"$type\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+		  return $type;
+      } else {
+          Log3($name, 3, "$name - no cache \"$type\" available.");
+      }
+	  return 0;
+  }
+  
+  ### Test Operationen ###
+  ######################## 
+  
+  if($hash->{HELPER}{CACHEKEY}) {
+      $cache = $hash->{HELPER}{CACHEKEY};
+  } else {
+	  return 0;
+  }
+  
+  if($type eq "redis") {
+      # Test ob Redis Serververbindung möglich
+      my $rc = $hash->{HELPER}{REDISKEY};
+      if ($rc) {
+          eval { $r = $rc->ping };                    
+          if (!$r || $r ne "PONG") {                    # Verbindungskeys löschen -> Neugenerierung mit "c_init"                   
+              Log3($name, 1, "$name - ERROR - connection to Redis server not possible. May be no route to host or port is wrong.");
+              delete $hash->{HELPER}{REDISKEY};
+              delete $hash->{HELPER}{CACHEKEY}; 
+              return 0;          
+          }
+      } else {
+          Log3($name, 1, "$name - ERROR - no constructor for Redis server is created");
+          return 0;
+      }
+  }
+  
+  if($type eq "file" && (!(-R $path) || !(-W $path))) {
+      Log3($name, 1, "$name - ERROR - cannot handle \"$type\" Cache: ".$!);
+      delete $hash->{HELPER}{CACHEKEY}; 
+      return 0;
+  } 
+  
+  ### Cache Operationen ###
+  #########################
+  
+  # in Cache schreiben
+  if($op eq "c_write") {
+      if (!defined $dat) {
+	      Log3($name, 1, "$name - ERROR - No data for Cache with key: $key ");
+	  }
+      if($key) {
+          $cache->set($key,$dat);
+          $brt = tv_interval($bst);
+          Log3($name, 1, "$name - Cache time write key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+		  return 1;
+      } else {
+          Log3($name, 1, "$name - ERROR - no key for \"$type\" cache !");
+      }
+  }
+  
+  # aus Cache lesen
+  if($op eq "c_read") {
+      my $g = $cache->get($key);
+      $brt = tv_interval($bst);
+      Log3($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));      
+      return $g;
+  }
+  
+  # einen Key entfernen
+  if($op eq "c_remove") {
+      $cache->remove($key);
+      $brt = tv_interval($bst);
+      Log3($name, 1, "$name - Cache time remove key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));  
+      Log3($name, 4, "$name - Cache key \"$key\" removed ");
+      return 1;	  
+  }
+  
+  # alle Einträge aus Cache (Namespace) entfernen
+  if($op eq "c_clear") {
+      $cache->clear();
+      Log3($name, 4, "$name - All entries removed from \"$type\" cache ");     
+      return 1;	  
+  }
+  
+  # alle Keys aus Cache zurück liefern
+  if($op eq "c_getkeys") {
+      return $cache->get_keys;
+  }
+  
+  # einen Key im Cache prüfen 
+  if($op eq "c_isvalidkey") {
+      return $cache->is_valid($key);
+  }
+  
+  # Cache entfernen
+  if($op eq "c_destroy") {
+      $cache->clear();
+	  delete $hash->{HELPER}{CACHEKEY};
+	  Log3($name, 3, "$name - Cache \"$type\" destroyed "); 
+      return 1;	  
+  }
+  
+return 0;
 }
 
 #############################################################################################
@@ -9346,6 +10129,7 @@ return;
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
        <li>save the last recording of camera locally </li>
+       <li>Selection of several cache types for image data storage (attribute cacheType) </li>
     </ul>
    </ul>
    <br>
@@ -9376,17 +10160,25 @@ return;
     
     Overview which Perl-modules SSCam is using: <br><br>
     
-    JSON            <br>
-    Data::Dumper    <br>                  
-    MIME::Base64    <br>
-    Time::HiRes     <br>
-    Encode          <br>
-    HttpUtils       (FHEM-module) <br>
-	BlockingCall    (FHEM-module) <br>
-	Net::SMTP       (if integrated send Email is used) <br>
-	MIME::Lite      (if integrated send Email is used) 
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                                </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                                </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                                </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                                </td></tr>
+    <tr><td>Encode              </td><td>                                                </td></tr>
+    <tr><td>POSIX               </td><td>                                                </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Meta                </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Net::SMTP           </td><td>(if integrated image data transmission is used) </td></tr>
+    <tr><td>MIME::Lite          </td><td>(if integrated image data transmission is used) </td></tr>
+    <tr><td>CHI                 </td><td>(if Cache is used)                              </td></tr>
+    <tr><td>CHI::Driver::Redis  </td><td>(if Cache is used)                              </td></tr>
+    <tr><td>Cache::Cache        </td><td>(if Cache is used)                              </td></tr>
+    </table> 
     
-	<br><br>
+	<br>
     
     The PTZ panel (only PTZ cameras) in SSCam use its own icons. 
     Thereby the system find the icons, in FHEMWEB device the attribute "iconPath" has to be completed by "sscam" 
@@ -10547,16 +11339,57 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 <a name="SSCamattr"></a>
 <b>Attributes</b>
   <br><br>
+  <ul>
+  <ul>
   
-  <ul>
-  <ul>
+  <a name="cacheServerParam"></a>
+  <li><b>cacheServerParam</b><br> 
+    Specification of connection parameters to a central data cache. <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>redis    </b> </td><td>: if network connection is used: &lt;IP-address&gt;:&lt;port&gt; / if Unix-Socket is used: &lt;unix&gt;:&lt;/path/to/socket&gt; </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
+  <a name="cacheType"></a>
+  <li><b>cacheType</b><br>
+    Defines the used Cache for storage of snapshots, recordings und other mass data.  
+    (Default: internal). <br>
+    Maybe further perl modules have to be installed, e.g. with help of the <a href="http://fhem.de/commandref.html#Installer">FHEM Installer</a>. <br>
+    The data are saved in "Namespaces" to permit the usage of central Caches (e.g. redis). <br>
+    The cahe types "file" and "redis" are convenient if the data shouldn't be hold in the RAM of the FHEM-Server. 
+    For the usage of Redis at first a the Redis Key-Value Store has to be provide, e.g. in a Docker image on the
+    Synology Diskstation (<a href="https://hub.docker.com/_/redis">redis</a>). <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>internal </b> </td><td>: use the module internal storage (Default) </td></tr>
+     <tr><td> <b>mem      </b> </td><td>: very fast Cache, copy data into the RAM </td></tr>
+     <tr><td> <b>rawmem   </b> </td><td>: fastest Cache for complex data, stores references into the RAM </td></tr>
+     <tr><td> <b>file     </b> </td><td>: create and use a file structure in subdirectory "FhemUtils" </td></tr>
+     <tr><td> <b>redis    </b> </td><td>: use a external Redis Key-Value Store over TCP/IP or Unix-Socket. Please see also attribute "cacheServerParam". </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
   <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
-    if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li><br>
+    If set, the state of active token will be logged - only for debugging, don't use it in normal operation ! 
+  </li><br>
+  
+  <a name="debugCachetime"></a>
+  <li><b>debugCachetime</b><br> 
+    Shows the consumed time of cache operations. 
+  </li><br>
   
   <a name="disable"></a>
   <li><b>disable</b><br>
-    deactivates the device definition </li><br>
+    deactivates the device definition 
+  </li><br>
     
   <a name="genericStrmHtmlTag"></a>
   <li><b>genericStrmHtmlTag</b><br>
@@ -11110,6 +11943,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
 	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
       <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
+      <li>Auswahl unterschiedlicher Cache-Typen zur Bilddatenspeicherung (Attribut cacheType) </li>
      </ul> 
     </ul>
     <br>
@@ -11147,17 +11981,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         
     Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
     
-    JSON            <br>
-    Data::Dumper    <br>                  
-    MIME::Base64    <br>
-    Time::HiRes     <br>
-    Encode          <br>
-    HttpUtils       (FHEM-Modul) <br>
-	BlockingCall    (FHEM-Modul) <br>
-	Net::SMTP       (wenn Email-Versand verwendet) <br>
-	MIME::Lite      (wenn Email-Versand verwendet)
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                   </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                   </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                   </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                   </td></tr>
+    <tr><td>Encode              </td><td>                                   </td></tr>
+    <tr><td>POSIX               </td><td>                                   </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Meta                </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Net::SMTP           </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
+    <tr><td>MIME::Lite          </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
+    <tr><td>CHI                 </td><td>(wenn Cache verwendet)             </td></tr>
+    <tr><td>CHI::Driver::Redis  </td><td>(wenn Cache verwendet)             </td></tr>
+    <tr><td>Cache::Cache        </td><td>(wenn Cache verwendet)             </td></tr>
+    </table>
     
-    <br><br>
+    <br>
 	
     Das PTZ-Paneel (nur PTZ Kameras) in SSCam benutzt einen eigenen Satz Icons. 
     Damit das System sie findet, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
@@ -12360,13 +13202,53 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 <a name="SSCamattr"></a>
 <b>Attribute</b>
   <br><br>
+  <ul>
+  <ul>
   
-  <ul>
-  <ul>
+  <a name="cacheServerParam"></a>
+  <li><b>cacheServerParam</b><br> 
+    Angabe der Verbindungsparameter zu einem zentralen Datencache. <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>redis    </b> </td><td>: bei Netzwerkverbindung: &lt;IP-Adresse&gt;:&lt;Port&gt; / bei Unix-Socket: &lt;unix&gt;:&lt;/path/zum/socket&gt; </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
+  <a name="cacheType"></a>
+  <li><b>cacheType</b><br> 
+    Legt den zu verwendenden Cache für die Speicherung von Schnappschüssen, Aufnahmen und anderen Massendaten fest. 
+    (Default: internal). <br>
+    Es müssen eventuell weitere Module installiert werden, z.B. mit Hilfe des <a href="http://fhem.de/commandref.html#Installer">FHEM Installers</a>. <br>
+    Die Daten werden in "Namespaces" gespeichert um die Nutzung zentraler Caches (redis) zu ermöglichen. <br>
+    Die Cache Typen "file" und "redis" bieten sich an, wenn die Daten nicht im RAM des FHEM-Servers gehalten werden sollen. 
+    Für die Verwendung von Redis ist zunächst ein Redis Key-Value Store bereitzustellen, z.B. in einem Docker-Image auf
+    der Synology Diskstation (<a href="https://hub.docker.com/_/redis">redis</a>). <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>internal </b> </td><td>: verwendet modulinterne Speicherung (Default) </td></tr>
+     <tr><td> <b>mem      </b> </td><td>: sehr schneller Cache, kopiert Daten in den RAM </td></tr>
+     <tr><td> <b>rawmem   </b> </td><td>: schnellster Cache bei komplexen Daten, speichert Referenzen im RAM </td></tr>
+     <tr><td> <b>file     </b> </td><td>: erstellt und verwendet eine Verzeichnisstruktur im Directory "FhemUtils" </td></tr>
+     <tr><td> <b>redis    </b> </td><td>: Verwendet einen externen Redis Key-Value Store per TCP oder Unix-Socket. Siehe dazu Attribut "cacheServerParam". </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
   <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br> 
-    wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
-    normalen Betrieb benutzen ! </li><br>
+    Wenn gesetzt, wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
+    normalen Betrieb benutzen ! 
+  </li><br>
+  
+  <a name="debugCachetime"></a>
+  <li><b>debugCachetime</b><br> 
+    Zeigt die verbrauchte Zeit für Cache-Operationen an. 
+  </li><br>
   
   <a name="disable"></a>
   <li><b>disable</b><br>
@@ -12938,7 +13820,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         "Encode": 0        
       },
       "recommends": {
-        "FHEM::Meta": 0
+        "FHEM::Meta": 0,
+		"CHI": 0,
+        "CHI::Driver::Redis": 0,
+        "Cache::Cache": 0
       },
       "suggests": {
       }
