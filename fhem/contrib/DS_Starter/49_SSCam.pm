@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
   "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
   "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
   "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
@@ -186,6 +187,11 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "9.0.0"  => "06.10.2019 To store image and recording data used by streaming devices or for transmission by email and telegram, ".
+                          "several cache types can be used now. So in-memory caches are available or file- and Redis-cache support ".
+                          "is intergated. In both latter cases the FHEM-process RAM is released. All transmission processes ".
+                          "(send image/recording data by email and telegram) are optimized for less memory footprint. ".
+                          "Please see also the new cache-attributes \"cacheType\", \"cacheServerParam\" and \"debugCachetime\". ",
   "8.19.0" => "21.09.2019 A new attribute \"hideAudio\" in Streaming devices is supportet. Use this attribute to hide the ".
                           "audio control panel in Streaming device. ",
   "8.18.2" => "19.09.2019 SSCam supports the new attribute \"noLink\" in streaming devices ",
@@ -5203,12 +5209,11 @@ sub SSCam_camop_parse ($) {
                 my $fileName  = (split("/",$lrec))[1];
                 my $sn        = 0;
                 
-                $hash->{HELPER}{TRANSACTION} = "fake_recsend";          # fake Transaction Device setzen
-                my $tac = SSCam_openOrgetTrans($hash);                  # Transaktion vorhandenen Code (fake_recsend)              
+                my $tac = SSCam_openOrgetTrans($hash);                    # Transaktion starten             
                 
                 my $cache;
 				if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC}) {
-                    $cache = SSCam_cache($name, "c_init");              # Cache initialisieren  
+                    $cache = SSCam_cache($name, "c_init");                # Cache initialisieren  
                     Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
                     if(!$cache || $cache eq "internal" ) {
                         $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
@@ -5485,7 +5490,7 @@ sub SSCam_camop_parse ($) {
                 my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
                 my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
                 if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with transaction-ID: $tac done");
+                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
                 }
                 $ncount--;                                                           # wird vermindert je Snap
                 my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
@@ -5502,7 +5507,7 @@ sub SSCam_camop_parse ($) {
                 # Anzahl und Size für Schnappschußabruf bestimmen
                 my ($slim,$ssize) = SSCam_snaplimsize($hash);
                 if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with transaction-ID: $tac");
+                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
                 }
 
                 if(!$hash->{HELPER}{TRANSACTION}) {                  
@@ -7910,6 +7915,8 @@ sub SSCam_StreamDev($$$;$) {
   $ret .= '</tbody>';
   $ret .= '</table>';
   Log3($strmdev, 4, "$strmdev - Link called: $link") if($link);
+  
+  undef $link;
 
 return $ret;
 }
@@ -8070,11 +8077,11 @@ sub SSCam_composegallery ($;$$$) {
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
   $htmlCode .= "<tr class=\"odd\">";
-  my $cell   = 1;
   
+  my $cell  = 1;
   my $idata = "";
 
-  $cache = SSCam_cache($name, "c_init");           # Cache initialisieren  
+  $cache = SSCam_cache($name, "c_init");                                                    # Cache initialisieren  
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
   if(!$cache || $cache eq "internal" ) {
       foreach my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
@@ -8104,7 +8111,6 @@ sub SSCam_composegallery ($;$$$) {
       my %seen;
       my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
       foreach my $key (@unique) {
-          #next if $key >= $limit;
           $imgdat = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
           $imgTm  = SSCam_cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
           if(!$ftui) {
@@ -8531,7 +8537,7 @@ sub SSCam_sendTelegram ($$) {
    my ($hash, $extparamref) = @_;
    my $name = $hash->{NAME};
    my $type = AttrVal($name,"cacheType","internal");
-   my $ret;
+   my ($ret,$cache);
    
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###      start send snapshot by TelegramBot         "); 
@@ -8602,108 +8608,85 @@ sub SSCam_sendTelegram ($$) {
            Log3($name, 2, "$name - $ret");
            return;       
        }
-   }   
+   }
+
+   if(!$data{SSCam}{$name}{PARAMS}{$tac}{sdat} && !$data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
+       $ret = "no video or image data existing for send process by TelegramBot \"$telebot\" ";
+       readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+       Log3($name, 2, "$name - $ret");
+       return;   
+   } 
                                     
   no strict "refs";
-  my ($msg,$subject,$MediaStream,$fname,@as);
-  if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {
-      ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
-      if($type eq "internal") {
-          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
-          foreach my $key (@as) {
-               ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-               $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-               if($ret) {
-                   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                   Log3($name, 2, "$name - ERROR: $ret");
-               } else {
-                   $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-                   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                   Log3($name, 3, "$name - $ret");
-               }
-          }
-          $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-          Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-          
-      } else {
-          # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-          # Muster: {SENDSNAPS}{2222}{0}{imageData} 
-          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
-              push @as,$_ if($_=~/^(\d+)$/);
-          }      
-          my %seen;
-          my @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
-
-          foreach my $key (@unique) {
-               ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-               $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-               if($ret) {
-                   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                   Log3($name, 2, "$name - ERROR: $ret");
-               } else {
-                   $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-                   readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                   Log3($name, 3, "$name - $ret");
-               }
-          }      
-          $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-          Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-      }
-  }
+  my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
   
-  if($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {
-      ### Aufnahmen liegen in einem Hash-Ref in $vdat vor
-      if($type eq "internal") {
+  $cache = SSCam_cache($name, "c_init");                                                     # Cache initialisieren        
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
+  
+  if(!$cache || $cache eq "internal" ) {
+      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+          @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
+      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
-          foreach my $key (@as) {
-              ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-              $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-              if($ret) {
-                  readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                  Log3($name, 2, "$name - ERROR: $ret");
-              } else {
-                  $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-                  readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                  Log3($name, 3, "$name - $ret");
-              }
-          }
-          $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-          Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-          
-      } else {
-          # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-          # Muster: {SENDRECS}{fake_recsend}{0}{imageData} 
-
-          for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
+      }
+      foreach my $key (@as) {
+           ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           if($ret) {
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 2, "$name - ERROR: $ret");
+           } else {
+               $ret = "Telegram message transaction \"$tac\" successfully sent to \"$peers\" by \"$telebot\" ";
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 3, "$name - $ret");
+           }
+      }
+      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+      
+  } else {
+      # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
+      if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
+          # Muster: {SENDSNAPS}{2222}{0}{imageData}
+          for(SSCam_cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/);
           }
-          my %seen;
-          my @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
-
-          foreach my $key (@unique) {
-              ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-              $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
-              if($ret) {
-                  readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                  Log3($name, 2, "$name - ERROR: $ret");
-              } else {
-                  $ret = "Telegram message successfully sent to \"$peers\" by \"$telebot\" ";
-                  readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
-                  Log3($name, 3, "$name - $ret");
-              }
+          @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
+      
+      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+          # Muster: {SENDRECS}{305}{0}{imageData} 
+          for(SSCam_cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
+              push @as,$_ if($_=~/^(\d+)$/);
           }
-          $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;       
-          Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));          
+          @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys          
       }
+      
+      foreach my $key (@unique) {
+           ($msg,$subject,$MediaStream,$fname) = SSCam_extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           $ret = SSCam_TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           if($ret) {
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 2, "$name - ERROR: $ret");
+           } else {
+               $ret = "Telegram message transaction \"$tac\" successfully sent to \"$peers\" by \"$telebot\" ";
+               readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
+               Log3($name, 3, "$name - $ret");
+           }
+      }      
+      $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
   }
   
   use strict "refs";
   undef %SSCam_teleparams;
   undef %{$extparamref};
+  undef $msg;
   
 return;
 }
@@ -8830,12 +8813,12 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
   $hash->{sentMsgOptions} = $options;
   
   # init param hash
-  $hash->{HU_DO_PARAMS}->{hash}   = $hash;
+  # $hash->{HU_DO_PARAMS}->{hash}   = $hash;
   $hash->{HU_DO_PARAMS}->{header} = $SSCam_TBotHeader;
-  delete( $hash->{HU_DO_PARAMS}->{args} );
-  delete( $hash->{HU_DO_PARAMS}->{boundary} );
+  delete $hash->{HU_DO_PARAMS}{args};
+  delete $hash->{HU_DO_PARAMS}{boundary};
+  delete $hash->{HU_DO_PARAMS}{data};
 
-  
   my $timeout = AttrVal($name,'cmdTimeout',30);
   $hash->{HU_DO_PARAMS}->{timeout}  = $timeout;
   $hash->{HU_DO_PARAMS}->{loglevel} = 4;
@@ -8966,6 +8949,8 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
       Log3($camname, 4, "$camname - SSCam_TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
       HttpUtils_NonblockingGet($hash->{HU_DO_PARAMS});
   }
+  
+  undef $msg;
   
 return $ret;
 }
@@ -9273,11 +9258,12 @@ sub SSCam_sendEmailblocking($) {
           
       } else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-          # Muster: {SENDSNAPS}{2222}{0}{imageData}  
+          # Muster: {SENDSNAPS|RS}{2222|multiple_snapsend}{0|1572995404.125580}{imageData}  
           for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{(SENDSNAPS|RS)\}\{.*\}\{(\d+)\}\{.*\}/$2/;
-              push @as,$_ if($_=~/^(\d+)$/);
+              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{.*\}\{.*\}/;
+              $_ =~ s/\{(SENDSNAPS|RS)\}\{(.*)\}\{(\d+|\d+.\d+)\}\{.*\}/$3/;
+              next if $2 ne $tac;
+              push @as,$_ if($_=~/^(\d+|\d+.\d+)$/);
           }           
           my %seen;
           my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
@@ -9323,10 +9309,11 @@ sub SSCam_sendEmailblocking($) {
           
       } else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-          # Muster: {SENDRECS}{fake_recsend}{0}{imageData} 
+          # Muster: {SENDRECS}{305}{0}{imageData} 
           for(SSCam_cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDRECS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/);
           }           
           my %seen;          
@@ -10132,6 +10119,7 @@ return;
        <li>Creation of a readingsGroup device to display an overview of all defined SSCam devices (createReadingsGroup) </li>
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
        <li>save the last recording of camera locally </li>
+       <li>Selection of several cache types for image data storage (attribute cacheType) </li>
     </ul>
    </ul>
    <br>
@@ -10162,17 +10150,25 @@ return;
     
     Overview which Perl-modules SSCam is using: <br><br>
     
-    JSON            <br>
-    Data::Dumper    <br>                  
-    MIME::Base64    <br>
-    Time::HiRes     <br>
-    Encode          <br>
-    HttpUtils       (FHEM-module) <br>
-	BlockingCall    (FHEM-module) <br>
-	Net::SMTP       (if integrated send Email is used) <br>
-	MIME::Lite      (if integrated send Email is used) 
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                                </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                                </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                                </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                                </td></tr>
+    <tr><td>Encode              </td><td>                                                </td></tr>
+    <tr><td>POSIX               </td><td>                                                </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Meta                </td><td>(FHEM-module)                                   </td></tr>
+    <tr><td>Net::SMTP           </td><td>(if integrated image data transmission is used) </td></tr>
+    <tr><td>MIME::Lite          </td><td>(if integrated image data transmission is used) </td></tr>
+    <tr><td>CHI                 </td><td>(if Cache is used)                              </td></tr>
+    <tr><td>CHI::Driver::Redis  </td><td>(if Cache is used)                              </td></tr>
+    <tr><td>Cache::Cache        </td><td>(if Cache is used)                              </td></tr>
+    </table> 
     
-	<br><br>
+	<br>
     
     The PTZ panel (only PTZ cameras) in SSCam use its own icons. 
     Thereby the system find the icons, in FHEMWEB device the attribute "iconPath" has to be completed by "sscam" 
@@ -11333,16 +11329,57 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 <a name="SSCamattr"></a>
 <b>Attributes</b>
   <br><br>
+  <ul>
+  <ul>
   
-  <ul>
-  <ul>
+  <a name="cacheServerParam"></a>
+  <li><b>cacheServerParam</b><br> 
+    Specification of connection parameters to a central data cache. <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>redis    </b> </td><td>: if network connection is used: &lt;IP-address&gt;:&lt;port&gt; / if Unix-Socket is used: &lt;unix&gt;:&lt;/path/to/socket&gt; </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
+  <a name="cacheType"></a>
+  <li><b>cacheType</b><br>
+    Defines the used Cache for storage of snapshots, recordings und other mass data.  
+    (Default: internal). <br>
+    Maybe further perl modules have to be installed, e.g. with help of the <a href="http://fhem.de/commandref.html#Installer">FHEM Installer</a>. <br>
+    The data are saved in "Namespaces" to permit the usage of central Caches (e.g. redis). <br>
+    The cahe types "file" and "redis" are convenient if the data shouldn't be hold in the RAM of the FHEM-Server. 
+    For the usage of Redis at first a the Redis Key-Value Store has to be provide, e.g. in a Docker image on the
+    Synology Diskstation (<a href="https://hub.docker.com/_/redis">redis</a>). <br><br>
+
+    <table>  
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+     <tr><td> <b>internal </b> </td><td>: use the module internal storage (Default) </td></tr>
+     <tr><td> <b>mem      </b> </td><td>: very fast Cache, copy data into the RAM </td></tr>
+     <tr><td> <b>rawmem   </b> </td><td>: fastest Cache for complex data, stores references into the RAM </td></tr>
+     <tr><td> <b>file     </b> </td><td>: create and use a file structure in subdirectory "FhemUtils" </td></tr>
+     <tr><td> <b>redis    </b> </td><td>: use a external Redis Key-Value Store over TCP/IP or Unix-Socket. Please see also attribute "cacheServerParam". </td></tr>
+    </table>
+    
+    <br>
+  </li><br> 
+  
   <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br>
-    if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li><br>
+    If set, the state of active token will be logged - only for debugging, don't use it in normal operation ! 
+  </li><br>
+  
+  <a name="debugCachetime"></a>
+  <li><b>debugCachetime</b><br> 
+    Shows the consumed time of cache operations. 
+  </li><br>
   
   <a name="disable"></a>
   <li><b>disable</b><br>
-    deactivates the device definition </li><br>
+    deactivates the device definition 
+  </li><br>
     
   <a name="genericStrmHtmlTag"></a>
   <li><b>genericStrmHtmlTag</b><br>
@@ -11896,6 +11933,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <li>Erzeugung einer readingsGroup zur Anzeige aller definierten SSCam-Devices (createReadingsGroup) </li>
 	  <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
       <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
+      <li>Auswahl unterschiedlicher Cache-Typen zur Bilddatenspeicherung (Attribut cacheType) </li>
      </ul> 
     </ul>
     <br>
@@ -11933,17 +11971,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         
     Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
     
-    JSON            <br>
-    Data::Dumper    <br>                  
-    MIME::Base64    <br>
-    Time::HiRes     <br>
-    Encode          <br>
-    HttpUtils       (FHEM-Modul) <br>
-	BlockingCall    (FHEM-Modul) <br>
-	Net::SMTP       (wenn Email-Versand verwendet) <br>
-	MIME::Lite      (wenn Email-Versand verwendet)
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                   </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                   </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                   </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                   </td></tr>
+    <tr><td>Encode              </td><td>                                   </td></tr>
+    <tr><td>POSIX               </td><td>                                   </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Meta                </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Net::SMTP           </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
+    <tr><td>MIME::Lite          </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
+    <tr><td>CHI                 </td><td>(wenn Cache verwendet)             </td></tr>
+    <tr><td>CHI::Driver::Redis  </td><td>(wenn Cache verwendet)             </td></tr>
+    <tr><td>Cache::Cache        </td><td>(wenn Cache verwendet)             </td></tr>
+    </table>
     
-    <br><br>
+    <br>
 	
     Das PTZ-Paneel (nur PTZ Kameras) in SSCam benutzt einen eigenen Satz Icons. 
     Damit das System sie findet, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
@@ -13157,19 +13203,19 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
     <colgroup> <col width=10%> <col width=90%> </colgroup>
      <tr><td> <b>redis    </b> </td><td>: bei Netzwerkverbindung: &lt;IP-Adresse&gt;:&lt;Port&gt; / bei Unix-Socket: &lt;unix&gt;:&lt;/path/zum/socket&gt; </td></tr>
     </table>
-    <br>
     
+    <br>
   </li><br> 
   
   <a name="cacheType"></a>
   <li><b>cacheType</b><br> 
     Legt den zu verwendenden Cache für die Speicherung von Schnappschüssen, Aufnahmen und anderen Massendaten fest. 
     (Default: internal). <br>
-    Es müssen eventuell weitere Module installiert werden, z.B. einfach mit dem FHEM Installer (http://fhem.de/commandref.html#Installer). <br>
+    Es müssen eventuell weitere Module installiert werden, z.B. mit Hilfe des <a href="http://fhem.de/commandref.html#Installer">FHEM Installers</a>. <br>
     Die Daten werden in "Namespaces" gespeichert um die Nutzung zentraler Caches (redis) zu ermöglichen. <br>
     Die Cache Typen "file" und "redis" bieten sich an, wenn die Daten nicht im RAM des FHEM-Servers gehalten werden sollen. 
     Für die Verwendung von Redis ist zunächst ein Redis Key-Value Store bereitzustellen, z.B. in einem Docker-Image auf
-    der Synology Diskstation (https://hub.docker.com/_/redis). <br><br>
+    der Synology Diskstation (<a href="https://hub.docker.com/_/redis">redis</a>). <br><br>
 
     <table>  
     <colgroup> <col width=10%> <col width=90%> </colgroup>
@@ -13179,13 +13225,13 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
      <tr><td> <b>file     </b> </td><td>: erstellt und verwendet eine Verzeichnisstruktur im Directory "FhemUtils" </td></tr>
      <tr><td> <b>redis    </b> </td><td>: Verwendet einen externen Redis Key-Value Store per TCP oder Unix-Socket. Siehe dazu Attribut "cacheServerParam". </td></tr>
     </table>
-    <br>
     
+    <br>
   </li><br> 
   
   <a name="debugactivetoken"></a>
   <li><b>debugactivetoken</b><br> 
-    wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
+    Wenn gesetzt, wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im 
     normalen Betrieb benutzen ! 
   </li><br>
   
