@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 73_AutoShuttersControl: add event RegEx true false to WinRec Fn
  - feature: 49_SSCam: add possible usage of several cache types, e.g. file-
                       memory- and Redis-Cache, to store images/recordings for
                       streaming devices and email/telebot transmissions.
