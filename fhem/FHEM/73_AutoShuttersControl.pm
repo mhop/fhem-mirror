@@ -950,10 +950,10 @@ sub EventProcessingWindowRec($@) {
 
         #### Hardware Lock der Rollläden
         $shutters->setHardLockOut('off')
-          if (  $match =~ /[Cc]lose/
+          if (  $match =~ /[Cc]lose|true/
             and $shutters->getShuttersPlace eq 'terrace' );
         $shutters->setHardLockOut('on')
-          if (  $match =~ /[Oo]pen/
+          if (  $match =~ /[Oo]pen|false/
             and $shutters->getShuttersPlace eq 'terrace' );
 
         ASC_Debug( 'EventProcessingWindowRec: '
@@ -3629,7 +3629,7 @@ sub CheckIfShuttersWindowRecOpen($) {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
-    if ( $shutters->getWinStatus =~ /[Oo]pen/ )    # CK: covers: open|opened
+    if ( $shutters->getWinStatus =~ /[Oo]pen|false/ )    # CK: covers: open|opened
     {
         return 2;
     }
@@ -3638,7 +3638,7 @@ sub CheckIfShuttersWindowRecOpen($) {
     {
         return 1;
     }
-    elsif ( $shutters->getWinStatus =~ /[Cc]lose/ ) {
+    elsif ( $shutters->getWinStatus =~ /[Cc]lose|true/ ) {
         return 0;
     }                                                 # CK: covers: close|closed
 }
