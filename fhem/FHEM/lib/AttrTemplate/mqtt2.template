@@ -316,11 +316,11 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 order:L_06
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
-attr DEVICE stateFormat contact
 attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
 #attr DEVICE genericDeviceType contact
 attr DEVICE eventMap true:close false:open
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_ContactSensor
 
@@ -401,8 +401,9 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 order:L_10
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
-attr DEVICE stateFormat Leak: water_leak
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE stateFormat Leak: state
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap water_leak:state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Water_Leak_Sensor
 
