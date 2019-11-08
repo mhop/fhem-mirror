@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.29.0" => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
   "8.28.2" => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
   "8.28.1" => "09.10.2019  fix warnings line 5173 ",
   "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
@@ -1281,16 +1282,16 @@ sub DbRep_Attr($$$$) {
                 return " The Value of $aName is out of range - $l[0]";
             }
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
-            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeDiffToNow})   if ($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeOlderThan})   if ($attr{$name}{timeOlderThan});
             return undef;
         }
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
             my ($a,$b,$c) = split('_',$aVal);
             if ($a =~ /^current$|^previous$/ && $b =~ /^hour$|^day$|^week$|^month$|^year$/ && $c =~ /^begin$|^end$/) {
-                delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
-                delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+                delete($attr{$name}{timeDiffToNow})  if ($attr{$name}{timeDiffToNow});
+                delete($attr{$name}{timeOlderThan})  if ($attr{$name}{timeOlderThan});
                 delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
                 return undef;
             }
@@ -1306,8 +1307,8 @@ sub DbRep_Attr($$$$) {
                 my @l = split (/at/, $@);
                 return " The Value of $aName is out of range - $l[0]";
             }
-            delete($attr{$name}{timeDiffToNow}) if ($attr{$name}{timeDiffToNow});
-            delete($attr{$name}{timeOlderThan}) if ($attr{$name}{timeOlderThan});
+            delete($attr{$name}{timeDiffToNow})  if ($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeOlderThan})  if ($attr{$name}{timeOlderThan});
             delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
         }
 		if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
@@ -1320,15 +1321,15 @@ sub DbRep_Attr($$$$) {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
 			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
+            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeYearPeriod})  if ($attr{$name}{timeYearPeriod});
         } 
 		if ($aName eq "timeOlderThan") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
 			    { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
             delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end}) if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
+            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeYearPeriod})  if ($attr{$name}{timeYearPeriod});
         }
 		if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
             unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";}
@@ -1918,8 +1919,8 @@ sub DbRep_createTimeArray($$$) {
  my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
  $tsbegin = AttrVal($name, "timestamp_begin", $mints);
  $tsbegin = DbRep_formatpicker($tsbegin);
- $tsend = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
- $tsend = DbRep_formatpicker($tsend);
+ $tsend   = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+ $tsend   = DbRep_formatpicker($tsend);
  
  if ( my $tap = AttrVal($name, "timeYearPeriod", undef)) {
      # a  b   c  d
@@ -2158,42 +2159,56 @@ sub DbRep_createTimeArray($$$) {
  my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($tsbegin =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
  # extrahieren der Einzelwerte von Datum/Zeit Ende 
  my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-        	 
-
- #  relative Auswertungszeit Beginn berücksichtigen  # Umwandeln in Epochesekunden Beginn
- my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
- my ($timeolderthan,$timedifftonow) = DbRep_normRelTime($hash);
  
+ # relative Zeit normieren  
+ my ($timeolderthan,$timedifftonow,$fdopt) = DbRep_normRelTime($hash);
+ 
+ ### relative Auswertungszeit Beginn berücksichtigen, Umwandeln in Epochesekunden Beginn ###
+ my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  if($timedifftonow) {
      $epoch_seconds_begin = time() - $timedifftonow;
      Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: $timedifftonow sec"); 
  } elsif ($timeolderthan) {
-     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
+     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";                   # Timestamp des 1. Datensatzes verwenden falls ermittelt
      $mints =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
      $epoch_seconds_begin = timelocal($6, $5, $4, $3, $2-1, $1-1900);
  }
- 
+
+ if($fdopt) {                                                                                           # FullDay Option ist gesetzt
+     my $tbs = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
+     $tbs    =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_begin = timelocal(00, 00, 00, $3, $2-1, $1-1900);	 
+ }
  my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
- Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin") if($opt !~ /tableCurrentPurge/);   
- Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string") if($opt !~ /tableCurrentPurge/);  
  
+ if($opt !~ /tableCurrentPurge/) {
+     Log3 ($name, 5, "DbRep $name - Timestamp begin epocheseconds: $epoch_seconds_begin");   
+     Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: $tsbegin_string");
+ } 
+ ###########################################################################################
 
- #  relative Auswertungszeit Ende berücksichtigen  # Umwandeln in Epochesekunden Endezeit
- my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900); 
- 
- $epoch_seconds_end = $timeolderthan ? (time() - $timeolderthan) : $epoch_seconds_end;
-
- #$epoch_seconds_end = AttrVal($name, "timeOlderThan", undef) ? 
- #                          (time() - AttrVal($name, "timeOlderThan", undef)) : $epoch_seconds_end;
+ ### relative Auswertungszeit Ende berücksichtigen, Umwandeln in Epochesekunden Endezeit ###
+ my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+ if($timeolderthan) {
+     $epoch_seconds_end = time() - $timeolderthan;
+ }
  Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: $timeolderthan sec") if(AttrVal($name, "timeOlderThan", undef)); 
  
+ if($fdopt) {                                                                                           # FullDay Option ist gesetzt
+     my $tes = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+     $tes    =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_end = timelocal(59, 59, 23, $3, $2-1, $1-1900);	 
+ }
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
  
- Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end") if($opt !~ /tableCurrentPurge/); 
- Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string") if($opt !~ /tableCurrentPurge/); 
-
+ if($opt !~ /tableCurrentPurge/) {
+     Log3 ($name, 5, "DbRep $name - Timestamp end epocheseconds: $epoch_seconds_end"); 
+     Log3 ($name, 4, "DbRep $name - Timestamp end human readable: $tsend_string");
+ } 
+ ###########################################################################################
 
  #  Erstellung Wertehash für Aggregationen
+ 
  my $runtime = $epoch_seconds_begin;                                    # Schleifenlaufzeit auf Beginn der Zeitselektion setzen
  my $runtime_string;                                                    # Datum/Zeit im SQL-Format für Readingname Teilstring
  my $runtime_string_first;                                              # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
@@ -2217,7 +2232,7 @@ sub DbRep_createTimeArray($$$) {
  $wdadd = 172800 if($wd eq "Sa");                                       # wenn Start am "Sa" dann nächste Grenze +2 Tage
  $wdadd = 86400  if($wd eq "So");                                       # wenn Start am "So" dann nächste Grenze +1 Tage
              
- Log3 ($name, 5, "DbRep $name - weekday of start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
+ Log3 ($name, 5, "DbRep $name - weekday start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
  
  my $aggsec;
  if ($aggregation eq "hour") {
@@ -9548,13 +9563,15 @@ return;
 # liefert die Attribute timeOlderThan, timeDiffToNow als Sekunden normiert zurück
 ####################################################################################################
 sub DbRep_normRelTime($) {
- my ($hash) = @_;
- my $name = $hash->{NAME};
- my $tdtn = AttrVal($name, "timeDiffToNow", undef);
- my $toth = AttrVal($name, "timeOlderThan", undef);
+ my ($hash)   = @_;
+ my $name     = $hash->{NAME};
+ my $tdtn     = AttrVal($name, "timeDiffToNow", undef);
+ my $toth     = AttrVal($name, "timeOlderThan", undef);
+ my $fdopt    = 0;                                                    # FullDay Option 
+ my ($y,$d,$h,$m,$s,$aval);
   
  if($tdtn && $tdtn =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
-     my ($y,$d,$h,$m,$s);
+     $aval = $tdtn;
 	 if($tdtn =~ /.*y:(([\d]+.[\d]+)|[\d]+).*/) {
 	     $y =  $tdtn;
 	     $y =~ s/.*y:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
@@ -9577,7 +9594,7 @@ sub DbRep_normRelTime($) {
 	 }
      
 	 no warnings 'uninitialized'; 
-	 Log3($name, 4, "DbRep $name - timeDiffToNow - year: $y, day: $d, hour: $h, min: $m, sec: $s ");
+	 Log3($name, 4, "DbRep $name - timeDiffToNow - year: $y, day: $d, hour: $h, min: $m, sec: $s");
 	 use warnings;
      $y = $y?($y*365*86400):0;
      $d = $d?($d*86400):0;      
@@ -9585,12 +9602,13 @@ sub DbRep_normRelTime($) {
      $m = $m?($m*60):0;
      $s = $s?$s:0;
 
-     $tdtn = $y + $d + $h + $m + $s + 1;  # one security second for correct create TimeArray
-     $tdtn = DbRep_corrRelTime($name,$tdtn,1);
+     $tdtn  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
+     $tdtn  = DbRep_corrRelTime($name,$tdtn,1);
+	 $fdopt = ($aval =~ /.*FullDay.*$/ && $tdtn >= 86400)?1:0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
  
  if($toth && $toth =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
-     my ($y,$d,$h,$m,$s);
+     $aval = $toth;
 	 if($toth =~ /.*y:(([\d]+.[\d]+)|[\d]+).*/) {
 	     $y =  $toth;
 	     $y =~ s/.*y:(([\d]+.[\d]+)|[\d]+).*/$1/e; 
@@ -9613,7 +9631,7 @@ sub DbRep_normRelTime($) {
 	 }
 
 	 no warnings 'uninitialized'; 
-	 Log3($name, 4, "DbRep $name - timeOlderThan - year: $y, day: $d, hour: $h, min: $m, sec: $s ");
+	 Log3($name, 4, "DbRep $name - timeOlderThan - year: $y, day: $d, hour: $h, min: $m, sec: $s");
 	 use warnings;
      $y = $y?($y*365*86400):0;
      $d = $d?($d*86400):0;            
@@ -9621,10 +9639,13 @@ sub DbRep_normRelTime($) {
      $m = $m?($m*60):0;
      $s = $s?$s:0;
 
-     $toth = $y + $d + $h + $m + $s + 1;  # one security second for correct create TimeArray
-     $toth = DbRep_corrRelTime($name,$toth,0);
+     $toth  = $y + $d + $h + $m + $s + 1;                             # one security second for correct create TimeArray
+     $toth  = DbRep_corrRelTime($name,$toth,0);
+	 $fdopt = ($aval =~ /.*FullDay.*$/ && $toth >= 86400)?1:0;        # ist FullDay Option gesetzt UND Zeitdiff >= 1 Tag ?
  }
-return ($toth,$tdtn);
+ Log3($name, 4, "DbRep $name - FullDay option: $fdopt");
+ 
+return ($toth,$tdtn,$fdopt);
 }
 
 ####################################################################################################
@@ -9651,7 +9672,7 @@ sub DbRep_corrRelTime($$$) {
      my $tsend = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      ($dsec,$dmin,$dhour,$dmday,$dmon,$dyear,$dwday,$dyday,undef)   = localtime($tsend);     # Timestamp Selektionsstartzeit
  }
- $year += 1900;                                                      # aktuelles Jahr
+ $year  += 1900;                                                     # aktuelles Jahr
  $dyear += 1900;                                                     # Startjahr der Selektion
  $cyear += 1900;                                                     # aktuelles Jahr
  if($tdtn) {                                                         
@@ -15847,15 +15868,16 @@ sub bdump {
   
   <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
-                                gesetzt (z.b. werden die letzten 24 Stunden in die Selektion eingehen wenn das Attribut auf "86400" gesetzt 
-								wurde). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt.   
+                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
+                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
+                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).						
                                 <br><br>
 								
                                 <ul>
-							    <b>Eingabeformat Beispiel:</b> <br>
-								<code>attr &lt;name&gt; timeDiffToNow 86400</code> <br>
+							    <b>Eingabeformat Beispiele:</b> <br>
+								<code>attr &lt;name&gt; timeDiffToNow 86400 </code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
-								<code>attr &lt;name&gt; timeDiffToNow d:2 h:3 m:2 s:10</code> <br>
+								<code>attr &lt;name&gt; timeDiffToNow d:2 h:3 m:2 s:10 </code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 2 Tage 3 Stunden 2 Minuten 10 Sekunden" gesetzt <br>							
 								<code>attr &lt;name&gt; timeDiffToNow m:600</code> <br> 
                                 # die Startzeit wird auf "aktuelle Zeit - 600 Minuten" gesetzt <br>
@@ -15865,6 +15887,8 @@ sub bdump {
                                 # die Startzeit wird auf "aktuelle Zeit - 1 Jahr und 2,5 Stunden" gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
+								<code>attr &lt;name&gt; timeDiffToNow d:8 FullDay </code> <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
 								</ul>
 								<br>
                                 
@@ -15876,13 +15900,14 @@ sub bdump {
   <a name="timeOlderThan"></a> 								
   <li><b>timeOlderThan </b>   - das <b>Selektionsende</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;"</b> 
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
-								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt, werden alle
-								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
-								dynamisch zum Ausführungszeitpunkt. 
+								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt. Die Timestampermittlung erfolgt 
+								dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
+                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
+                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).
                                 <br><br>
 
                                 <ul>
-							    <b>Eingabeformat Beispiel:</b> <br>
+							    <b>Eingabeformat Beispiele:</b> <br>
 								<code>attr &lt;name&gt; timeOlderThan 86400</code> <br>
                                 # das Selektionsende wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
 								<code>attr &lt;name&gt; timeOlderThan d:2 h:3 m:2 s:10</code> <br>
@@ -15895,6 +15920,9 @@ sub bdump {
                                 # das Selektionsende wird auf "aktuelle Zeit - 1 Jahr und 2,5 Stunden" gesetzt <br>
 								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
                                 # das Selektionsende wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
+								<code>attr &lt;name&gt; timeOlderThan d:8 FullDay </code> <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
+
 								</ul>
 								<br>
                                 
