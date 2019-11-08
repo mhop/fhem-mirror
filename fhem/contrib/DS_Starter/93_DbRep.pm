@@ -15868,8 +15868,7 @@ sub bdump {
   
   <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
-                                gesetzt (z.b. werden die letzten 24 Stunden in die Selektion eingehen wenn das Attribut auf "86400" gesetzt 
-								wurde). Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
+                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
                                 "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
                                 (wirkt nur wenn Zeitdifferenz >= 1 Tag).						
                                 <br><br>
@@ -15901,8 +15900,7 @@ sub bdump {
   <a name="timeOlderThan"></a> 								
   <li><b>timeOlderThan </b>   - das <b>Selektionsende</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeOlderThan&gt;"</b> 
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
-								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt (z.b. wenn auf 86400 gesetzt, werden alle
-								Datensätze die älter als ein Tag sind berücksichtigt). Die Timestampermittlung erfolgt 
+								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt. Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
                                 "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
                                 (wirkt nur wenn Zeitdifferenz >= 1 Tag).
