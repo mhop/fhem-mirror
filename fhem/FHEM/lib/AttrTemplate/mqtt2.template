@@ -1737,7 +1737,7 @@ attr DEVICE setList\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":$EVTPART1}\
   BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"black-list":[$EVTPART1]}\
   BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}\
-  deleteReadings:noArg {fhem "deletereading $NAME .*"}
+  deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
 

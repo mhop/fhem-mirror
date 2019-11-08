@@ -69,7 +69,7 @@ attr DEVICE model clever_tanken_multi_station
 name:DWD_weather_warnings
 filter:TYPE=HTTPMOD
 desc: Get weather warnings from DWD.<br>Define a HTTPMOD device like <br>defmod Wetterwarner HTTPMOD https://www.dwd.de/DWD/warnungen/warnapp/json/warnings.json 0 <br>Change region to your needs <br><a href="https://forum.fhem.de/index.php/topic,45176.msg906203.html#msg906203">Source: Forum</a>
-order:200000
+order:A_02c
 par:REGIONCODE;Get region code from https://www.dwd.de/DE/leistungen/opendata/help/warnungen/cap_warncellids_csv.csv?__blob=publicationFile&v=3;{ undef }
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE enableControlSet 1
@@ -84,7 +84,7 @@ attr DEVICE model DWD_weather_warnings
 name:pegelonline
 filter:TYPE=HTTPMOD
 desc: Get water level infor for german rivers from www.pegelonline.wsv.de.<br>Define a HTTPMOD device like <br>defmod Pegelstaende HTTPMOD https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/070b1eb4-3872-4e07-b2e5-e25fd9251b93/W/currentmeasurement.json 3600<br>Change station argument to your needs <br><a href="https://wiki.fhem.de/wiki/Flusspegel">Source: Wiki</a><br><a href="https://forum.fhem.de/index.php/topic,97560.msg908176.html#msg908176">Source: Forum</a>
-order:200001
+order:A_02d
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE enableControlSet 1
 attr DEVICE extractAllJSON 1
@@ -94,12 +94,13 @@ attr DEVICE sortby 1
 attr DEVICE stateFormat {sprintf("%.0f",ReadingsVal("DEVICE","value",0))}
 attr DEVICE timeout 5
 attr DEVICE room WHICHROOM
-attr DEVICE model A_02d_pegelonline
+attr DEVICE model pegelonline
 
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080; enhanced by JoeALLb: https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164
-name:A_02m_ORF_weather
+name:ORF_weather
 filter:TYPE=HTTPMOD
 desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD none 1800 <br>You will be asked to provide a MAINURL like https://wetter.orf.at/steiermark/ and a stationname like grazuniversitaet<br><a href="https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164">Source: Enhanced version in FHEM Forum</a>
+order:A_02m
 par:MAINURL;First part of the URL. Example: https://wetter.orf.at/steiermark/;{ AttrVal("DEVICE","get02URL","") =~ m,(https://wetter.orf.at/[^/]+[/]).*, ? $1 : undef }
 par:STATIONNAME;Name of the respective weather station as written in the last part of the URL. Examples: grazuniversitaet or innerestadt;{ AttrVal("DEVICE","get01URL","") =~ m,https://wetter.orf.at/[^/]+[/]([^/]+)[/], ? $1 : undef }
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
@@ -124,12 +125,13 @@ attr DEVICE get02URL MAINURL
 attr DEVICE reading01Regex (?s)Temperatur.*?.*?>.*?(?<temperature>[\d,]+)&thinsp.*?Taupunkt.*?.*?>.*?(?<taupunkt>[\d,]+)&thinsp.*?Wind.*?>\n\s*(?<wind>[^<]+)\s<abbr.*?Windspitzen.*?>\n\s*(?<windspitzen>[^<]+)\s<abbr.*?Luftdruck.*?>\n\s*(?<luftdruck>[^<]+)\s<abbr.*?Luftfeuchtigkeit.*?>\n\s*(?<humidity>[^<]+)\s<abbr.*?Sonnenschein.*?>\n\s*(?<sonne>[^<]+)\s<abbr.*?Niederschlag.*?>\n\s*(?<rain>[^<\n]+).*?</p.*?(?<messwerte>Messwerte[^<\n]+)
 attr DEVICE room WHICHROOM
 attr DEVICE stateFormat W: wind, H: humidity%rH, T: temperature°C
-attr DEVICE model A_02m_ORF_weather
+attr DEVICE model ORF_weather
 
 #Geschwindigkeitsüberwachung, Forum: https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805
-name:A_03a_blitzer
+name:blitzer
 filter:TYPE=HTTPMOD
 desc: Get info about local velocity controls.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD https://cdn2.atudo.net/api/1.0/vl.php?type=0,1,2,3,4,5,6&box=52.xxxxxx,8.xxxxxx,53.xxxxxx,9.xxxxxx 0 <br>Change city to your needs <br><a href="https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805">Source: Forum</a>
+order:A_03a
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr getData getHeader1 getHeader2 getURL reading01DeleteIfUnmatched reading01JSON reading01Name reading01Regex reading02Name reading02RegOpt reading02Regex reading03JSON reading03Name readingEncode requestHeader1 requestHeader2 setParseResponse:0,1
 attr DEVICE enableControlSet 1
@@ -138,13 +140,14 @@ attr DEVICE getHeader1 Content-Type: application/json
 attr DEVICE getHeader2 Accept: */*
 attr DEVICE readingEncode utf8
 attr DEVICE room WHICHROOM
-attr DEVICE model A_03a_blitzer
+attr DEVICE model blitzer
 
 
 #homebridge-videodoorbell, Forum: https://forum.fhem.de/index.php/topic,94291.msg870289.html#msg870289
-name:A_02c_homebridge_videodoorbell
+name:homebridge_videodoorbell
 filter:TYPE=HTTPMOD
 desc: Controll your homebridge-videodoorbell.<br>Define a HTTPMOD device like <br>define Video_Doorbell HTTPMOD none 0 <br><a href="https://forum.fhem.de/index.php/topic,94291.msg870289.html#msg870289">Source: Forum</a>
+order:A_02c
 par:IP_PORT;Enter IP:Port as configured in your doorbell, like 123.456.7.8:5005;{undef }
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE get01Name klingel2homekitget
@@ -161,12 +164,13 @@ attr DEVICE set01Header04 Accept: */*
 attr DEVICE set01Header06 Content-Type: application/x-www-form-urlencoded
 attr DEVICE set01NoArg 1
 attr DEVICE room WHICHROOM
-attr DEVICE model A_02c_homebridge_videodoorbell
+attr DEVICE model homebridge_videodoorbell
 
 # Pihole Statistics, Website: https://wolf-u.li/5987/einbindung-der-pihole-statistiken-in-fhem/
-name:A_02e_pihole_statistics
+name:pihole_statistics
 filter:TYPE=HTTPMOD
 desc: Get Statistics from your pihole instance.<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD http://192.168.133.7/admin/api.php 300<br />Change IP to your needs<br /><a href="https://wolf-u.li/5987/einbindung-der-pihole-statistiken-in-fhem/">Source: Website</a>
+order:A_02e
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr getURL
 attr DEVICE extractAllJSON 1
@@ -174,12 +178,13 @@ attr DEVICE getURL http://dns/admin/api.php
 attr DEVICE stateFormat DNS Anfragen: dns_queries_today<br>Geblockte Seiten: ads_blocked_today (ads_blocked_today_formatted %)
 attr DEVICE userReadings ads_blocked_today_formatted {round(ReadingsNum($name,"ads_percentage_today",0),0)}
 attr DEVICE room WHICHROOM
-attr DEVICE model A_02e_pihole_statistics
+attr DEVICE model pihole_statistics
 
 # Pharmacy Emergency Service Germany, Forum: https://forum.fhem.de/index.php?topic=87234.0
-name:A_02f_pharmacy_emergency_service_germany
+name:pharmacy_emergency_service_germany
 filter:TYPE=HTTPMOD
 desc: Gets the current emergency service of a pharmacy closeby your postal code<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD http://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=1337 0<br />Change the postalcode (1337 in this example) to yours<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html>Source: Forum</a><br />Hint: The emergency service changes every day at 09:00 CET, thus create a AT like this to update the DEVICE timely:<br />defmod UPDATE_EMERGENCY_SERVICE at *09:15:00 set EMERGENCY_HTTPMOD_DEVICE reread
+order:A_02f
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr get01Encode get01JSON get01Name get02ExtractAllJSON:0,1 getURL reading01Encode reading01JSON reading01Name reading02JSON reading02Name reading03JSON reading03Name reading04JSON reading04Name reading05JSON reading05Name reading06JSON reading06Name reading07JSON reading07Name reading07OExpr reading08JSON reading08Name reading08OExpr reading09JSON reading09Name reading10JSON reading10Name reading11JSON reading11Name readingEncode requestHeader requestHeader1 requestHeader2 requestHeader3 requestHeader4 requestHeader5 requestHeader6 requestHeader7
 attr DEVICE reading01Encode UTF-8
@@ -218,7 +223,7 @@ attr DEVICE showBody 0
 attr DEVICE stateFormat Name, Telefon, Strasse in Plz Ort
 attr DEVICE timeout 60
 attr DEVICE room WHICHROOM
-attr DEVICE model A_02f_pharmacy_emergency_service_germany
+attr DEVICE model pharmacy_emergency_service_germany
 
 #################################
 #HP Printers
@@ -226,9 +231,10 @@ attr DEVICE model A_02f_pharmacy_emergency_service_germany
 # Forum: https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683
 #
 # Printer config
-name:B_01a_hp_printer_config
+name:hp_printer_config
 filter:TYPE=HTTPMOD
 desc: Get configuration of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+order:B_01a
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict
 attr DEVICE httpVersion 1.1
@@ -245,12 +251,13 @@ attr DEVICE reading05XPath-Strict //dd:AvailableMemory/text()
 attr DEVICE stateFormat Modell: Model SN: Serial_Number
 attr DEVICE userReadings Memory_Usage {100-(ReadingsNum("DEVICE","Available_Memory","")/2.56)}
 attr DEVICE room WHICHROOM
-attr DEVICE model B_01a_hp_printer_config
+attr DEVICE model hp_printer_config
 
 # Printer cartridge states
-name:B_01a_hp_printer_cartridge_status
+name:hp_printer_cartridge_status
 filter:TYPE=HTTPMOD
 desc: Get cartridge states of your HP printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ConsumableConfigDyn.xml 3600 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+order:B_01a1
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict$
 attr DEVICE httpVersion 1.1
@@ -272,12 +279,13 @@ attr DEVICE reading08Name BlackCatridgeModel
 attr DEVICE reading08XPath-Strict //ccdyn:ConsumableInfo[5]/dd:ConsumableSelectibilityNumber/text()
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE room WHICHROOM
-attr DEVICE model B_01a_hp_printer_cartridge_status
+attr DEVICE model hp_printer_cartridge_status
 
 # Printer statistics
-name:B_01a_hp_printer_statistics
+name:hp_printer_statistics
 filter:TYPE=HTTPMOD
 desc: Gets various statistics from your HP printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductUsageDyn.xml 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+order:B_01a2
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath-Strict reading09Name reading09XPath-Strict reading10Name reading10XPath-Strict reading11Name reading11XPath-Strict reading20Name reading20XPath-Strict reading30Name reading30XPath-Strict reading40Name reading40XPath-Strict reading41Name reading41XPath-Strict reading50Name reading50XPath-Strict reading51Name reading51XPath-Strict
 attr DEVICE httpVersion 1.1
@@ -321,12 +329,13 @@ attr DEVICE reading51Name InkBlackPercentRemaining
 attr DEVICE reading51XPath-Strict //pudyn:Consumable[dd:MarkerColor='Black']/dd:ConsumableRawPercentageLevelRemaining/text()
 attr DEVICE stateFormat Total: Printer_Pages_Total Monochrome: Printer_Pages_Monochrome Color: Printer_Pages_Color
 attr DEVICE room WHICHROOM
-attr DEVICE model B_01a_hp_printer_statistics
+attr DEVICE model hp_printer_statistics
 
 # Printer status
-name:B_01a_hp_printer_status
+name:hp_printer_status
 filter:TYPE=HTTPMOD
 desc: Get status of your hp printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.5.43/DevMgmt/ProductStatusDyn.xml 60 <br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+order:B_01a3
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01XPath-Strict
 attr DEVICE httpVersion 1.1
@@ -334,7 +343,7 @@ attr DEVICE reading01Name Status
 attr DEVICE reading01XPath-Strict //psdyn:LocString[@lang='de']/text()
 attr DEVICE stateFormat Status
 attr DEVICE room WHICHROOM
-attr DEVICE model B_01a_hp_printer_status
+attr DEVICE model hp_printer_status
 
 
 #################################
@@ -343,9 +352,10 @@ attr DEVICE model B_01a_hp_printer_status
 # Forum: https://forum.fhem.de/index.php/topic,90601.msg872234.html#msg872234
 
 # Printer cartridge states
-name:B_01b_epson_printer_cartridge_status
+name:epson_printer_cartridge_status
 filter:TYPE=HTTPMOD
 desc: Get cartridge states of your Epson printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.188.25/PRESENTATION/HTML/TOP/PRTINFO.HTML 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,90601.msg874683.html#msg874683">Source: Forum</a>
+order:B_01b
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE reading01Name Yellow
 attr DEVICE reading01Regex Ink_Y.*?='([\d]+)'
@@ -357,7 +367,7 @@ attr DEVICE reading04Name Black
 attr DEVICE reading04Regex Ink_B.*?='([\d]+)'
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE room WHICHROOM
-attr DEVICE model B_01b_epson_printer_cartridge_status
+attr DEVICE model epson_printer_cartridge_status
 
 #################################
 #Brother Printers
@@ -365,9 +375,10 @@ attr DEVICE model B_01b_epson_printer_cartridge_status
 # Forum: https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461
 
 # Printer cartridge states
-name:B_01c_brother_printer_cartridge_status
+name:brother_printer_cartridge_status
 filter:TYPE=HTTPMOD
 desc: Get cartridge states of your Brother printer.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.178.6/general/information.html 3600<br>Change IP to your needs <br><a href="https://forum.fhem.de/index.php/topic,97483.msg908461.html#msg908461">Source: Forum</a><br>Tested with MFC-9142CDN, should work with DCP-9015 CDW DCP-9020 HL-3140 CW HL-3150 CDN HL-3170 MFC-9130 MFC-9140 MFC-9330 MFC-9340
+order:B_01c
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex reading04Name reading04Regex
 attr DEVICE httpVersion 1.1
@@ -384,15 +395,16 @@ attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE reading05Name Status
 attr DEVICE reading05RegOpt gm
 attr DEVICE reading05Regex <th>1<\/th><td>(.*?)<
-attr DEVICE model B_01c_brother_printer_cartridge_status
+attr DEVICE model brother_printer_cartridge_status
 
 #################################
 #Brother Scanners
 
 # Brother ADS Scanners
-name:B_02a_brother_scanner_ads_status
+name:brother_scanner_ads_status
 filter:TYPE=HTTPMOD
 desc: Get status of your Brother scanner.<br>Define a HTTPMOD device like <br>defmod DEVICE HTTPMOD http://192.168.133.7/ft/gen_maintenance 3600<br>Change IP to your needs <br><a href="https://wolf-u.li/6005/darstellung-der-statistiken-des-brother-ads-1700w-in-fhem/">Source: Website</a>.<br />Tested to work with ADS-1700W, possibly others.
+order:B_02a
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict reading07Name reading07XPath-Strict reading08Name reading08XPath reading08XPath-Strict reading09Name reading09XPath-Strict reading10Name reading10XPath-Strict reading11Name reading11XPath-Strict reading12Name reading12XPath-Strict
 attr DEVICE httpVersion 1.1
@@ -422,13 +434,14 @@ attr DEVICE reading12Name PaperJams
 attr DEVICE reading12XPath-Strict //PaperJams/text()
 attr DEVICE stateFormat Pages: ScannedPagesTotal Modell: Model SN: Serial_Number
 attr DEVICE room WHICHROOM
-attr DEVICE model B_02a_brother_scanner_ads_status
+attr DEVICE model brother_scanner_ads_status
 
 #################################
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
-name:C_01a_resol_solar
+name:resol_solar
 filter:TYPE=HTTPMOD
 desc: Get data from your RESOL solar installation<br>Define a HTTPMOD device like <br>define Solar HTTPMOD http://192.178.002.112/dl2/live/data 300 <br><a href="https://forum.fhem.de/index.php/topic,86678.0.html">Source: Forum</a>
+order:C_01a
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr reading01Name reading01Regex reading02Name reading02Regex reading03Name reading03Regex reading04Name reading04Regex reading05Name reading05Regex reading06Name reading06Regex timeout
 attr DEVICE group A_Energy
@@ -447,7 +460,7 @@ attr DEVICE reading06Regex Betriebsstunden Relais 1[^0-9]+([0-9\.]+)
 attr DEVICE room WHICHROOM
 attr DEVICE stateFormat Dachtemperatur: Temperatur_Sensor1 Drehzahl Pumpe: Drehzahl_Pumpe Laufzeit Heute: Tageslaufzeit
 attr DEVICE timeout 5ercent="([\d\.]+)
-attr DEVICE model C_01a_resol_solar
+attr DEVICE model resol_solar
 
 #################################
 #Show updates for CUL_HM devices, Forum: https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144
@@ -455,9 +468,9 @@ name:CUL_HM_firmware_update_downloader
 filter:TYPE=HTTPMOD
 desc: Check eQ3 homepage for available new firmware files; provides also links for direct downloads<br>Define a HTTPMOD device like <br>define eq3 HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800<br><a href="https://https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144">Source: Forum</a><br><a href="https://wiki.fhem.de/wiki/HomeMatic_Firmware_Update#Basis-Definitionen_f.C3.BCr_Device_eq3">Wiki</a>
 order:X_01a
-par:WHICHROOM;Actual room of the device; {AttrVal("DEVICE","room","CUL_HM" )} 
+par:WHICHROOM;Actual room of the device; {AttrVal("DEVICE","room","CUL_HM" )}
 defmod DEVICE HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800
-attr DEVICE userattr enableControlSet event-on-change-reading event-on-update-reading reading01AutoNumLen reading01Format reading01Name reading01RegOpt reading01RegOpt:s,i,g reading01Regex readingMaxAge readingMaxAgeReplacementMode readingMaxAgeReplacementMode:text,expression,delete readingMaxAgeReplacementMode:text,reading,internal,expression,delete requestData.* showError showMatched stateFormat userReadings webCmd
+attr DEVICE userattr reading01AutoNumLen reading01Format reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02OExpr reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete
 attr DEVICE alignTime 00:45
 attr DEVICE enableControlSet 1
 attr DEVICE event-on-change-reading .*
@@ -501,22 +514,21 @@ attr DEVICE stateFormat {   my $ret ="";;\
         my ($dev,$md,$ofw,$idx_fw,$nfw,$date) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\sfw_(\d+\.\d+)\s=>\sfw(\d\d)_([\d\.]+)\s\|\s([^\)]+)\)$/;;\
         my $fw_link = ReadingsVal($name,"fw_link-".$idx_fw,"???");;\
         my $cl_link = ReadingsVal($name,"changeLog_link-".$idx_fw,"???");;\
-        $ret .= '| <b><a href="/fhem?detail='.$dev.'">';;\
+        $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
         $ret .= sprintf("%-23s",$dev);;\
-        $ret .= '</a> | ';;\
+        $ret .= '</b></a> | ';;\
         $ret .= '<b'.(($md eq "?")?' title="missing attribute model => set device in teach mode to receive missing data" style="color:yellow"':' style="color:lightgray"').'>';;\
         $ret .= sprintf("%-23s",$md);;\
         $ret .= '</b> | ';;\
         $ret .= '<b'.(($ofw eq "0.0")?' title="missing attribute firmware => set device in teach mode to receive missing data" style="color:yellow"':' style="color:lightgray"').'>';;\
         $ret .= sprintf("%6s",$ofw);;\
         $ret .= '</b> | ';;\
-        $ret .= '<a title="download firmware file" href="'.$fw_link.'">';;\
-        $ret .= '<b style="color:red">';;\
+        $ret .= '<a title="download firmware file" href="'.$fw_link.'"><b style="color:red">';;\
         $ret .= sprintf("%6s",$nfw);;\
-        $ret .= '</b></a> | <b>';;\
-        $ret .= '<a title="open changeLog file" href="'.$cl_link.'"><b style="color:red">' if($cl_link ne "none");;\
+        $ret .= '</b></a> | ';;\
+        $ret .= (($cl_link ne "none")?'<a title="open changeLog file" href="'.$cl_link.'"><b style="color:black">':'<b style="color:lightgray">');;\
         $ret .= sprintf("%-10s",$date);;\
-        $ret .= '</b></a>' if($cl_link ne "none");;\
+        $ret .= (($cl_link ne "none")?'</b></a>':'</b>');;\
         $ret .= " |<br>";;\
       }\
     }\
