@@ -35,6 +35,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 our %SSCamSTRM_vNotesIntern = (
+  "2.10.2" => "08.11.2019  undef \$link in SSCamSTRM_FwFn / SSCamSTRM_AsHtml to save memory ",
   "2.10.1" => "18.10.2019  set parentState initial in Define, Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136 ",
   "2.10.0" => "21.09.2019  new attribute hideAudio ",
   "2.9.0"  => "19.09.2019  new attribute noLink ",
@@ -299,6 +300,8 @@ sub SSCamSTRM_FwFn($;$$$) {
       InternalTimer(gettimeofday()+$al, "SSCamSTRM_refresh", $hash, 0);
       Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
+  
+  undef $link;
 
 return $ret;
 }
@@ -387,6 +390,7 @@ sub SSCamSTRM_AsHtml($;$) {
   }
   
   $ret .= "</html>";
+  undef $link;
   
 return $ret;
 }
