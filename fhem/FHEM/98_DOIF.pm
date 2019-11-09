@@ -1,5 +1,5 @@
 #############################################
-# $Id$
+# $Id: 98_DOIF.pm v0.1$
 #
 # This file is part of fhem.
 #
@@ -2177,26 +2177,16 @@ sub CheckRegexpDoIf
       @idlist=($id eq "") ? (keys %{$hash->{Regex}{$type}{$dev}}):($id);
       foreach my $id (@idlist) {
         foreach my $i (keys %{$hash->{Regex}{$type}{$dev}{$id}}) {
-          #$event=($type eq "cond") ? "c".($id+1) : $id;
+          $nameExp="";
+          $notifyExp="";
           if ($hash->{Regex}{$type}{$dev}{$id}{$i} =~ /([^\:]*):(.*)/) {
             $nameExp=$1;
             $notifyExp=$2;
           } else {
             $nameExp=$hash->{Regex}{$type}{$dev}{$id}{$i};
           }
-          $nameExp="" if (!$nameExp);
-          $notifyExp="" if (!$notifyExp);
           if ($nameExp eq "" or $device =~ /$nameExp/) {
-            my $events="";
-            if ($eventa) {
-              $events=join(",",@{$eventa});
-            }
             if ($notifyExp eq "") {
-              if ($readingupdate==1) {
-                #readingsSingleUpdate ($hash, "matched_regex_$id",$events,0);
-              } elsif ($readingupdate==2) {
-                #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$events);
-              }
               return $i;
             }
             if (defined $eventa and defined $eventas) {
