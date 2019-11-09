@@ -57,6 +57,8 @@ PRESENCE_Initialize($)
                         "absenceTimeout ".
                         "presenceTimeout ".
                         "powerCmd ".
+                        "retryInterval ".
+                        "retryCount ".
                         $readingFnAttributes;
 
     $hash->{AttrRenameMap} = { "ping_count" => "pingCount",
@@ -558,7 +560,12 @@ PRESENCE_Attr(@)
             return "not a valid time frame value. See commandref for the correct syntax.";
         }
     }
-
+    elsif($a[0] eq "set" and $a[2] =~ /^(retryInterval|retryCount)$/)
+    {
+        return $a[2]." must be a valid positive integer number" if($a[3] !~ /^\d+$/);
+        return $a[2]." is not applicable for mode '".$hash->{MODE}."'" if($hash->{MODE} =~ /^(event|lan-bluetooth)$/);
+    }
+    
     return undef;
 }
 
