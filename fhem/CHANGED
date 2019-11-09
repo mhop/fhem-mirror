@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: commandref revised
  - feature: 93_DbRep: add option FullDay for timeDiffToNow and timeOlderThan, 
                       Forum: topic,53584.msg991139.html#msg991139
  - change:  49_SSCamSTRM: minor internal code change

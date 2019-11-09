@@ -13395,8 +13395,10 @@ sub bdump {
 
   <a name="timeDiffToNow"></a>  
   <li><b>timeDiffToNow </b>   - the <b>begin time </b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
-                                &lt;timeDiffToNow&gt;"</b> dynamically (e.g. if set to 86400, the last 24 hours are considered by data 
-								selection). The time period will be calculated dynamically at execution time.     
+                                &lt;timeDiffToNow&gt;"</b> dynamically. The time period will be calculated dynamically at 
+                                execution time. Optional can with the additional entry "FullDay" the selection start time 
+                                and the selection end time be expanded to the begin / end of the involved days
+                                (take only effect if adjusted time difference is >= 1 day).   
                                 <br><br> 
 
                                 <ul>
@@ -13413,6 +13415,8 @@ sub bdump {
                                 # the start time is set to "current time - 1 year and 2,5 hours" <br>
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # the start time is set to "current time - 1.5 years" <br>
+                                <code>attr &lt;name&gt; timeDiffToNow d:8 FullDay </code> <br>
+                                # the start time is set to "current time - 8 days", the selection time period is expanded to the begin / end of the involved days <br>
 								</ul>
 								<br>
                                 
@@ -13424,9 +13428,10 @@ sub bdump {
   <a name="timeOlderThan"></a>
   <li><b>timeOlderThan </b>   - the <b>end time</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
                                 &lt;timeOlderThan&gt;"</b> dynamically. Always the datasets up to timestamp 
-								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
-								86400, all datasets older than one day are considered). The time period will be calculated dynamically at 
-								execution time. 
+								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered. The time period will be calculated dynamically at 
+								execution time. Optional can with the additional entry "FullDay" the selection start time 
+                                and the selection end time be expanded to the begin / end of the involved days
+                                (take only effect if adjusted time difference is >= 1 day).
                                 <br><br> 
                                 
                                 <ul>
@@ -13443,6 +13448,9 @@ sub bdump {
                                 # the selection end time is set to "current time - 1 year and 2,5 hours" <br>
 								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
                                 # the selection end time is set to "current time - 1.5 years" <br>
+                                <code>attr &lt;name&gt; timeOlderThan d:8 FullDay </code> <br>
+                                # the end time is set to "current time - 8 days", the selection time period is expanded to the begin / end of the involved days <br>
+
 								</ul>
 								<br>
                                 
@@ -15868,9 +15876,9 @@ sub bdump {
   
   <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
-                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
-                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
-                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).						
+                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit 
+                                der Zusatzangabe "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende der 
+                                jeweiligen Selektionstage erweitert werden (wirkt nur wenn eingestellte Zeitdifferenz ist >= 1 Tag).
                                 <br><br>
 								
                                 <ul>
@@ -15888,7 +15896,7 @@ sub bdump {
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow d:8 FullDay </code> <br>
-                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende der beteiligten Tage erweitert  <br>
 								</ul>
 								<br>
                                 
@@ -15902,8 +15910,8 @@ sub bdump {
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
 								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt. Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
-                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
-                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).
+                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende der jeweiligen 
+                                Selektionstage erweitert werden (wirkt nur wenn eingestellte Zeitdifferenz ist >= 1 Tag).
                                 <br><br>
 
                                 <ul>
@@ -15921,7 +15929,7 @@ sub bdump {
 								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
                                 # das Selektionsende wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								<code>attr &lt;name&gt; timeOlderThan d:8 FullDay </code> <br>
-                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende der beteiligten Tage erweitert  <br>
 
 								</ul>
 								<br>
