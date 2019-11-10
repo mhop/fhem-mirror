@@ -8279,7 +8279,7 @@ attr SMA_Energymeter DbLogValueFn
 	  in das Logging eingeschlossen statt ausgeschlossen werden koennen. <br>
       Ist MinIntervall angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der Wert 
       des Readings sich nicht verändert hat. 
-      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht nicht geloggt, wenn sich der 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
       Wert des Readings verändert hat. <br>
       Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
       werden. <br><br>
@@ -8383,7 +8383,7 @@ attr SMA_Energymeter DbLogValueFn
       Mit diesem Attribut wird ein Standard Minimum Intervall für <a href="http://fhem.de/commandref_DE.html#devspec">devspec</a> festgelegt.
       Ist defaultMinInterval angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der 
 	  Wert des Readings sich nicht verändert hat. 
-      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht nicht geloggt, wenn sich der 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
       Wert des Readings verändert hat. <br>
       Eventuell im Quelldevice angegebene Spezifikationen DbLogExclude / DbLogInclude haben Vorrag und werden durch 
 	  defaultMinInterval <b>nicht</b> überschrieben. <br>
