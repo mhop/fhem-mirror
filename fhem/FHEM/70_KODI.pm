@@ -114,7 +114,7 @@ sub KODI_Initialize($$)
   $hash->{ReadyFn}  = "KODI_Ready";
   $hash->{UndefFn}  = "KODI_Undefine";
   $hash->{AttrFn}   = "KODI_Attr";
-  $hash->{AttrList} = "compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:0,1 jsonResponseReading:0,1 " . $readingFnAttributes;
+  $hash->{AttrList} = "compatibilityMode:kodi,plex offMode:quit,hibernate,shutdown,suspend updateInterval disable:0,1 jsonResponseReading:0,1 pvrEnabled:0,1 " . $readingFnAttributes;
 
   $data{RC_makenotify}{XBMC} = "KODI_RCmakenotify";
   $data{RC_layout}{KODI_RClayout}  = "KODI_RClayout";
@@ -1476,19 +1476,50 @@ sub KODI_PlayerCommand($$$)
   return KODI_Call($hash,$req,1);
 }
 
+sub KODI_IsPvrEnabled($)
+{
+  my ($hash) = @_;
+  return AttrVal($hash->{NAME}, 'pvrEnabled', 1);
+}
+
+sub KODI_PvrGetProperties($) 
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3($name, 4, "$name: KODI_PvrGetProperties");
+
+  return undef if not KODI_IsPvrEnabled($hash);
+  
+  my $obj  = {
+    "method" => "PVR.GetProperties",
+    "params" => { 
+      "properties" => ["available","recording","scanning"]
+    }
+  };
+  return KODI_Call($hash,$obj,1);
+}
+
 sub KODI_PvrUpdateChannels($)
 {
   my ($hash) = @_;
+  
+  return undef if not KODI_IsPvrEnabled($hash);
+
+
   fhem("deletereading $hash->{NAME} channel_.*", 1);
   fhem("deletereading $hash->{NAME} channelgroup_.*", 1);
   
   KODI_PvrGetChannelGroups($hash, "tv");
   KODI_PvrGetChannelGroups($hash, "radio");
+  
+  return undef;
 }
 
 sub KODI_PvrGetChannelGroups($$) 
 {
   my ($hash,$type) = @_;
+
+  return undef if not KODI_IsPvrEnabled($hash);
 
   my $id = KODI_CreateId($hash);
   my $req = {
@@ -1502,6 +1533,8 @@ sub KODI_PvrGetChannelGroups($$)
 sub KODI_PvrGetChannels($$) 
 {
   my ($hash,$channelGroupId) = @_;
+
+  return undef if not KODI_IsPvrEnabled($hash);
 
   my $id = KODI_CreateId($hash);
   my $req = {
@@ -1956,6 +1989,8 @@ sub KODI_HTTP_Request($$@)
   <li>jsonResponseReading<br/>
       When enabled then every received JSON message from Kodi will be saved into the reading <i>jsonResponse</i> so the last received message is always available.
       Also an event is triggered upon each update.</li>
+  <li>pvrEnabled<br/>
+      Defaults to 1. Disable to indicate that PVR is not available on your Kodi device. Basically meant to avoid error messages when trying to access PVR functions.</li>
   </ul>
 </ul>
 
