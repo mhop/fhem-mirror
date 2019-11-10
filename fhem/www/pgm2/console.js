@@ -60,13 +60,22 @@ consUpdate(evt)
   if(new_content == undefined || new_content.length == 0)
     return;
   log("Console Rcvd: "+new_content);
-  // replace space with nbsp to preserve formatting
+
+  // Extract the FHEM-Log, to avoid escaping its formatting (Forum #104842)
+  var logContent = "";
   var rTab = {'<':'&lt;', '>':'&gt;',' ':'&nbsp;'};
+  new_content = new_content.replace(/(<div class='fhemlog'>)(.*?)(<\/div>)/g,
+  function(all, div1, msg, div2) {
+    logContent += div1+msg.replace(/[<> ]/g, function(a){return rTab[a]})+div2;
+    return "";
+  });
+
+  // replace space with nbsp to preserve formatting
   var isTa = $("#console").is("textarea"); // 102773
   new_content = new_content.replace(/(.*)<br>[\r\n]/g, function(all,p1) {
     return p1.replace(/[<> ]/g, function(a){return rTab[a]})+(isTa?"\n":"<br>");
   });
-  $("#console").append(new_content);
+  $("#console").append(logContent+new_content);
     
   if(mustScroll)
     $("#console").scrollTop($("#console")[0].scrollHeight);
