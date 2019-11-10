@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $
+# $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.0"   => "09.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ",
   "4.8.0"   => "14.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
   "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
                            "enhanced configCheck by insert mode check ",
@@ -254,6 +255,7 @@ sub DbLog_Initialize($) {
                                "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
                                "DbLogType:Current,History,Current/History,SampleFill/History ".
                                "dbSchema ".
+                               "defaultMinInterval:textField-long ".
                                "disable:1,0 ".
 							   "excludeDevs ".
 							   "expimpdir ".
@@ -1292,7 +1294,7 @@ sub DbLog_Log($$) {
   my $ts_0               = TimeNow();                                    # timestamp in SQL format YYYY-MM-DD hh:mm:ss
   my $now                = gettimeofday();                               # get timestamp in seconds since epoch
   my $DbLogExclude       = AttrVal($dev_name, "DbLogExclude", undef);
-  my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude",undef);
+  my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude", undef);
   my $DbLogValueFn       = AttrVal($dev_name, "DbLogValueFn","");
   my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");
   my $value_fn           = AttrVal( $name, "valueFn", "" );  
@@ -1369,14 +1371,15 @@ sub DbLog_Log($$) {
 		      Log3 $name, 5, "DbLog $name -> DbLogExclude of \"$dev_name\": $DbLogExclude" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"} && $DbLogExclude);
 		      Log3 $name, 5, "DbLog $name -> DbLogInclude of \"$dev_name\": $DbLogInclude" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"} && $DbLogInclude);
               
-              #Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
-              #entsprechend unterschiedlich vorbelegt sein.
-              #keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
+              # Je nach DBLogSelectionMode muss das vorgegebene Ergebnis der Include-, bzw. Exclude-Pruefung
+              # entsprechend unterschiedlich vorbelegt sein.
+              # keine Readings loggen die in DbLogExclude explizit ausgeschlossen sind
               my $DoIt = 0;
+              
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
           
 		      if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {
-                  # Bsp: "(temperature|humidity):300,battery:3600"
+                  # Bsp: "(temperature|humidity):300,battery:3600:force"
                   my @v1 = split(/,/, $DbLogExclude);
               
 			      for (my $i=0; $i<int(@v1); $i++) {
@@ -1399,8 +1402,8 @@ sub DbLog_Log($$) {
                   }
               }
         
-		      #Hier ggf. zusätzlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
-              #Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
+		      # Hier ggf. zusätzlich noch dbLogInclude pruefen, falls bereits durch DbLogExclude ausgeschlossen
+              # Im Endeffekt genau die gleiche Pruefung, wie fuer DBLogExclude, lediglich mit umgegkehrtem Ergebnis.
               if($DoIt == 0) {
                   if($DbLogInclude && ($DbLogSelectionMode =~ m/Include/)) {
                       my @v1 = split(/,/, $DbLogInclude);
@@ -1426,6 +1429,9 @@ sub DbLog_Log($$) {
                   }
               }
               next if($DoIt == 0);
+              
+              # check auf defaultMinInterval
+              $DoIt = DbLog_checkDefMinInt($name,$dev_name,$now,$reading,$value);
 		
 	    	  if ($DoIt) {
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
@@ -1561,7 +1567,73 @@ sub DbLog_Log($$) {
   if($net && AttrVal($name, "showNotifyTime", undef)) {
       readingsSingleUpdate($hash, "notify_processing_time", sprintf("%.4f",$net), 1);
   }
+  
 return;
+}
+
+#################################################################################################
+#
+# check zentrale Angabe von defaultMinInterval für alle Devices/Readings
+# (kein Überschreiben spezifischer Angaben von DbLogExclude / DbLogInclude in den Quelldevices)
+#
+#################################################################################################
+sub DbLog_checkDefMinInt ($$$$$){
+  my ($name,$dev_name,$now,$reading,$value) = @_;
+  my $force;
+  my $DoIt = 1;
+  
+  my $defminint = AttrVal($name, "defaultMinInterval", undef);
+  return $DoIt if(!$defminint);                                           # Attribut "defaultMinInterval" nicht im DbLog gesetzt -> kein ToDo
+  
+  my $DbLogExclude = AttrVal($dev_name, "DbLogExclude", undef);
+  my $DbLogInclude = AttrVal($dev_name, "DbLogInclude", undef);
+  $defminint =~ s/[\s\n]/,/g;
+  my @adef   = split(/,/, $defminint);
+  
+  my $inex = ($DbLogExclude?$DbLogExclude.",":"").($DbLogInclude?$DbLogInclude:"");
+  
+  if($inex) {                                                             # Quelldevice hat DbLogExclude und/oder DbLogInclude gesetzt
+      my @ie = split(/,/, $inex);
+      for (my $k=0; $k<int(@ie); $k++) {
+          # Bsp. für das auszuwertende Element
+          # "(temperature|humidity):300,force"
+          my @rif = split(/:/, $ie[$k]);
+          
+          if($reading =~ m,^$rif[0]$,) {                                  # aktuelles Reading matcht auf Regexp
+              return $DoIt;                                               # Reading wurde bereits geprüft -> kein Überschreiben durch $defminint
+          }
+      }
+  }
+  
+  for (my $l=0; $l<int(@adef); $l++) {
+      my @adefelem = split("::", $adef[$l]);
+      # Bsp. für ein defaulMInInterval Element: 
+      # device:interval[:force]
+      my @dvs = devspec2array($adefelem[0]);
+	  if(@dvs) {
+          foreach (@dvs) {
+              if($dev_name =~ m,^$_$,) {                                               # aktuelles Device matcht auf Regexp
+                  # device,reading wird gegen "defaultMinInterval" geprüft 
+                  # "defaultMinInterval" gilt für alle Readings des devices
+                  my $lt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{TIME};
+                  my $lv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$name}{VALUE};
+                  $lt    = 0  if(!$lt);         
+                  $lv    = "" if(!defined $lv);                                        # Forum: #100344
+                  $force = ($adefelem[2] && $adefelem[2] =~ /force/i)?1:0;             # Forum: #97148
+                  
+                  if(($now-$lt < $adefelem[1]) && ($lv eq $value || $force)) {
+                      # innerhalb defaultMinInterval und LastValue=Value oder force-Option
+                      # Log3 ($name, 1, "DbLog $name - defaulMInInterval - device \"$dev_name\", reading \"$reading\" inside of $adefelem[1] seconds (force: $force) -> don't log it !");
+                      $DoIt = 0;
+                      return $DoIt;
+                  } 
+              }
+          }
+      }
+  }
+  # Log3 ($name, 1, "DbLog $name - defaulMInInterval - compare of \"$dev_name\", reading \"$reading\" successful -> log it !");
+  
+return $DoIt;
 }
 
 #################################################################################################
@@ -5961,12 +6033,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20329 2019-10-07 22:34:08Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -8295,6 +8367,35 @@ attr SMA_Energymeter DbLogValueFn
       Dieses Attribut ist setzbar für die Datenbanken MySQL/MariaDB und PostgreSQL. Die Tabellennamen (current/history) werden 
       durch das angegebene Datenbankschema ergänzt. Das Attribut ist ein advanced Feature und nomalerweise nicht nötig zu setzen.
       <br>
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
+    <a name="defaultMinInterval"></a>
+    <li><b>defaultMinInterval</b>
+    <ul>
+      <code>
+      attr &lt;device&gt; defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ...
+      </code><br>
+      
+      Mit diesem Attribut wird ein Standard Minimum Intervall für <a href="http://fhem.de/commandref_DE.html#devspec">devspec</a> festgelegt.
+      Ist defaultMinInterval angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der 
+	  Wert des Readings sich nicht verändert hat. 
+      Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht nicht geloggt, wenn sich der 
+      Wert des Readings verändert hat. <br>
+      Eventuell im Quelldevice angegebene Spezifikationen DbLogExclude / DbLogInclude haben Vorrag und werden durch 
+	  defaultMinInterval <b>nicht</b> überschrieben. <br>
+      Die Eingabe kann mehrzeilig erfolgen. <br><br>
+
+	  <b>Beispiele</b> <br>
+      <code>attr dblog defaultMinInterval .*::120::force </code> <br>
+	  # Events aller Devices werden nur geloggt, wenn 120 Sekunden zum letzten Logeintrag vergangen sind ist (Reading spezifisch) <br> 
+      <code>attr dblog defaultMinInterval (Weather|SMA)::300 </code> <br>
+	  # Events der Devices "Weather" und "SMA" werden nur geloggt wenn 300 Sekunden zum letzten Logeintrag vergangen sind (Reading spezifisch) und sich der Wert nicht geändert hat. <br> 
+      <code>attr dblog defaultMinInterval TYPE=CUL_HM::600::force </code> <br>
+	  # Events aller Devices des Typs "CUL_HM" werden nur geloggt, wenn 600 Sekunden zum letzten Logeintrag vergangen sind ist (Reading spezifisch)
     </ul>
     </li>
   </ul>
