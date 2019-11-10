@@ -553,6 +553,8 @@ FB_CALLMONITOR_Read($)
             delete($hash->{helper}{TEMP}{$array[2]});
         } 
     }
+    
+    $hash->{PARTIAL} = $buffer;
 }
 
 #####################################
