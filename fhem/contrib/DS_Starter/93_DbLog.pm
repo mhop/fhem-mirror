@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.9.0"   => "09.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ",
+  "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
+                           "Forum: https://forum.fhem.de/index.php/topic,65860.msg972352.html#msg972352 ",
   "4.8.0"   => "14.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
   "4.7.5"   => "07.10.2019 fix warning \"error valueFn: Global symbol \$CN requires ...\" in DbLog_addCacheLine ".
                            "enhanced configCheck by insert mode check ",
@@ -1608,7 +1609,7 @@ sub DbLog_checkDefMinInt ($$$$$){
   for (my $l=0; $l<int(@adef); $l++) {
       my @adefelem = split("::", $adef[$l]);
       # Bsp. für ein defaulMInInterval Element: 
-      # device:interval[:force]
+      # device::interval[::force]
       my @dvs = devspec2array($adefelem[0]);
 	  if(@dvs) {
           foreach (@dvs) {
@@ -7013,6 +7014,35 @@ attr SMA_Energymeter DbLogValueFn
   <br>
   
   <ul>
+    <a name="defaultMinInterval"></a>
+    <li><b>defaultMinInterval</b>
+    <ul>
+      <code>
+      attr &lt;device&gt; defaultMinInterval &lt;devspec&gt;::&lt;MinInterval&gt;[::force],[&lt;devspec&gt;::&lt;MinInterval&gt;[::force]] ...
+      </code><br>
+      
+      With this attribute a default minimum interval for <a href="http://fhem.de/commandref.html#devspec">devspec</a> is defined.
+      If a defaultMinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
+      lastvalue is equal. <br>
+      If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
+      equal the last one and the defined interval is not reached. <br>
+      Potential set DbLogExclude / DbLogInclude specifications in source devices are having priority over defaultMinInterval
+      and are <b>not</b> overwritten by this attribute. <br>
+      This attribute can be specified as multiline input. <br><br>
+
+	  <b>Examples</b> <br>
+      <code>attr dblog defaultMinInterval .*::120::force </code> <br>
+	  # Events of all devices are logged only in case of 120 seconds are elapsed to the last log entry (reading specific) independent of a possible value change. <br> 
+      <code>attr dblog defaultMinInterval (Weather|SMA)::300 </code> <br>
+	  # Events of devices "Weather" and "SMA" are logged only in case of 300 seconds are elapsed to the last log entry (reading specific) and the value is equal to the last logged value. <br> 
+      <code>attr dblog defaultMinInterval TYPE=CUL_HM::600::force </code> <br>
+	  # Events of all devices of Type "CUL_HM" are logged only in case of 600 seconds are elapsed to the last log entry (reading specific) independent of a possible value change.
+    </ul>
+    </li>
+  </ul>
+  <br>
+  
+  <ul>
     <a name="disable"></a>
     <li><b>disable</b>
     <ul>
@@ -8382,7 +8412,7 @@ attr SMA_Energymeter DbLogValueFn
       
       Mit diesem Attribut wird ein Standard Minimum Intervall für <a href="http://fhem.de/commandref_DE.html#devspec">devspec</a> festgelegt.
       Ist defaultMinInterval angegeben, wird der Logeintrag nicht geloggt, wenn das Intervall noch nicht erreicht <b>und</b> der 
-	  Wert des Readings sich nicht verändert hat. 
+	  Wert des Readings sich <b>nicht</b> verändert hat. <br>
       Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
       Wert des Readings verändert hat. <br>
       Eventuell im Quelldevice angegebene Spezifikationen DbLogExclude / DbLogInclude haben Vorrag und werden durch 
@@ -8391,11 +8421,11 @@ attr SMA_Energymeter DbLogValueFn
 
 	  <b>Beispiele</b> <br>
       <code>attr dblog defaultMinInterval .*::120::force </code> <br>
-	  # Events aller Devices werden nur geloggt, wenn 120 Sekunden zum letzten Logeintrag vergangen sind ist (Reading spezifisch) <br> 
+	  # Events aller Devices werden nur geloggt, wenn 120 Sekunden zum letzten Logeintrag vergangen sind ist (Reading spezifisch) unabhängig von einer eventuellen Änderung des Wertes. <br> 
       <code>attr dblog defaultMinInterval (Weather|SMA)::300 </code> <br>
 	  # Events der Devices "Weather" und "SMA" werden nur geloggt wenn 300 Sekunden zum letzten Logeintrag vergangen sind (Reading spezifisch) und sich der Wert nicht geändert hat. <br> 
       <code>attr dblog defaultMinInterval TYPE=CUL_HM::600::force </code> <br>
-	  # Events aller Devices des Typs "CUL_HM" werden nur geloggt, wenn 600 Sekunden zum letzten Logeintrag vergangen sind ist (Reading spezifisch)
+	  # Events aller Devices des Typs "CUL_HM" werden nur geloggt, wenn 600 Sekunden zum letzten Logeintrag vergangen sind (Reading spezifisch) unabhängig von einer eventuellen Änderung des Wertes.
     </ul>
     </li>
   </ul>
