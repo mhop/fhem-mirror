@@ -2716,7 +2716,7 @@ sub MSwitch_Attr(@) {
 		fhem("deleteattr $name MSwitch_Include_MSwitchcmds");
 		fhem("deleteattr $name MSwitch_Include_Devicecmds");
 		fhem("deleteattr $name MSwitch_Safemode");
-		fhem("deleteattr $name MSwitch_Expert");
+		#fhem("deleteattr $name MSwitch_Expert");
 		fhem("deleteattr $name MSwitch_Extensions");
 		fhem("deleteattr $name MSwitch_Lock_Quickedit");
 		fhem("deleteattr $name MSwitch_Delete_Delays");
@@ -2737,6 +2737,7 @@ sub MSwitch_Attr(@) {
         "  disable:0,1"
       . "  MSwitch_Debug:0,1"
 	  . "  disabledForIntervals"
+	  . "  MSwitch_Expert:0,1"
       . "  stateFormat:textField-long"
 	  . "  MSwitch_Eventhistory:0,10"
       . "  MSwitch_Help:0,1"
