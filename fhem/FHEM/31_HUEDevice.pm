@@ -267,6 +267,51 @@ HUEDevice_summaryFn($$$$)
   return HUEDevice_devStateIcon($hash);
 }
 
+sub
+HUEDevice_IODevChanged($$$)
+{
+  my ($hash,$old,$new) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+  my $name = $hash->{NAME};
+
+  if( $hash->{TYPE} ne 'HUEDevice' ) {
+    Log3 $name, 1, "$name: can't change IODev for TYPE $hash->{TYPE}";
+    return undef;
+  }
+
+  $old = AttrVal($name, "IODev", undef) if( !$old );
+
+  my $code = $hash->{ID};
+  $code = $old ."-". $code if( $old );
+
+  delete $modules{HUEDevice}{defptr}{$code};
+
+  AssignIoPort($hash,$new);
+  if( defined($hash->{IODev}) ) {
+    Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+  } else {
+    Log3 $name, 1, "$name: no I/O device";
+  }
+  $new = $hash->{IODev}->{NAME} if( defined($hash->{IODev}) );
+
+  $code = $hash->{ID};
+  $code = $new ."-". $code if( $new );
+  $modules{HUEDevice}{defptr}{$code} = $hash;
+
+  if( $old ) {
+    if( $new ) {
+      $hash->{DEF} =~ s/IODev=$old/IODev=$new/;
+    } else {
+      $hash->{DEF} =~ s/IODev=$old//;
+    }
+  } elsif( $new ) {
+    $hash->{DEF} .= " IODev=$new"
+  }
+  $hash->{DEF} =~ s/  / /g;
+
+  return $new;
+}
+
 sub HUEDevice_Define($$)
 {
   my ($hash, $def) = @_;
@@ -305,13 +350,7 @@ sub HUEDevice_Define($$)
 
   $hash->{ID} = $hash->{helper}->{devtype}.$id;
 
-  AssignIoPort($hash,$iodev) if( !$hash->{IODev} );
-  if(defined($hash->{IODev})) {
-    Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
-  } else {
-    Log3 $name, 1, "$name: no I/O device";
-  }
-  $iodev = $hash->{IODev}->{NAME} if( defined($hash->{IODev}) );
+  $iodev = HUEDevice_IODevChanged( $hash, undef, $iodev ) if( !$hash->{IODev} );
 
   my $code = $hash->{ID};
   $code = $iodev ."-". $code if( defined($iodev) );
@@ -403,7 +442,7 @@ sub HUEDevice_Undefine($$)
   RemoveInternalTimer($hash);
 
   my $code = $hash->{ID};
-  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}->{NAME}) );
+  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
 
   delete($modules{HUEDevice}{defptr}{$code});
 
@@ -443,7 +482,7 @@ HUEDevice_SetParam($$@)
     } elsif($cmd eq 'down' ) {
       $cmd = 'pct';
       $value = 0;
-  
+
     } if($cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
       $cmd = "off";
       $value = $value2;

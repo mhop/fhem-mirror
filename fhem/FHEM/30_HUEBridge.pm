@@ -31,6 +31,7 @@ sub HUEBridge_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
+  $hash->{RenameFn} = "HUEBridge_Rename";
   $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
@@ -255,6 +256,18 @@ HUEBridge_Define($$)
   }
 
   return undef;
+}
+sub
+HUEBridge_Rename($$$)
+{
+  my ($new,$old) = @_;
+
+  foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+    next if( !$chash->{IODev} );
+    next if( $chash->{IODev}{NAME} ne $new );
+
+    HUEDevice_IODevChanged($chash, $old, $new);
+  }
 }
 sub
 HUEBridge_Notify($$)

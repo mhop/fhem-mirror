@@ -51,7 +51,7 @@ LIGHTIFY_Initialize($)
   $hash->{Clients}  = ":HUEDevice:";
 
   $hash->{DefFn}    = "LIGHTIFY_Define";
-  $hash->{NOTIFYDEV} = "global";
+  $hash->{RenameFn} = "LIGHTIFY_Rename";
   $hash->{NotifyFn} = "LIGHTIFY_Notify";
   $hash->{UndefFn}  = "LIGHTIFY_Undefine";
   $hash->{SetFn}    = "LIGHTIFY_Set";
@@ -80,6 +80,8 @@ LIGHTIFY_Define($$)
 
   $hash->{INTERVAL} = 60;
 
+  $hash->{NOTIFYDEV} = "global";
+
   if( $init_done ) {
     LIGHTIFY_Disconnect($hash);
     LIGHTIFY_Connect($hash);
@@ -91,7 +93,18 @@ LIGHTIFY_Define($$)
 
   return undef;
 }
-
+sub
+LIGHTIFY_Rename($$$)
+{
+  my ($new,$old) = @_;
+ 
+  foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+    next if( !$chash->{IODev} );
+    next if( $chash->{IODev}{NAME} ne $new );
+ 
+    HUEDevice_IODevChanged($chash, $old, $new);
+  }
+}
 sub
 LIGHTIFY_Notify($$)
 {

@@ -35,6 +35,7 @@ tradfri_Initialize($)
   $hash->{WriteFn}  = "tradfri_Write";
 
   $hash->{DefFn}    = "tradfri_Define";
+  $hash->{RenameFn} = "tradfri_Rename";
   $hash->{NotifyFn} = "tradfri_Notify";
   $hash->{UndefFn}  = "tradfri_Undefine";
   $hash->{DelayedShutdownFn} = "tradfri_DelayedShutdown";
@@ -106,7 +107,18 @@ tradfri_Define($$)
 
   return undef;
 }
-
+sub
+tradfri_Rename($$$)
+{
+  my ($new,$old) = @_;
+ 
+  foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+    next if( !$chash->{IODev} );
+    next if( $chash->{IODev}{NAME} ne $new );
+ 
+    HUEDevice_IODevChanged($chash, $old, $new);
+  }
+}
 sub
 tradfri_Notify($$)
 {
