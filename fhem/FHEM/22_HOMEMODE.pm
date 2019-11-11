@@ -16,7 +16,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw{%attr %defs %modules $FW_CSRF};
 
-my $HOMEMODE_version = "1.5.1";
+my $HOMEMODE_version = "1.5.2";
 my $HOMEMODE_Daytimes = "05:00|morning 10:00|day 14:00|afternoon 18:00|evening 23:00|night";
 my $HOMEMODE_Seasons = "03.01|spring 06.01|summer 09.01|autumn 12.01|winter";
 my $HOMEMODE_UserModes = "gotosleep,awoken,asleep";
@@ -2355,7 +2355,7 @@ sub HOMEMODE_serializeCMD($@)
     }
     $cmd = join(" ",@newcmd);
     Log3 $name,5,"$name: cmdnew: $cmd";
-    push @newcmds,SemicolonEscape($cmd);
+    push @newcmds,SemicolonEscape($cmd) if ($cmd !~ /^[\t\s]*$/);
   }
   my $cmd = join(";",@newcmds);
   $cmd =~ s/\}\s{0,1};\s{0,1}\{/\};;\{/g;
@@ -2510,7 +2510,7 @@ sub HOMEMODE_execCMDs($$;$)
     Log3 $name,3,"$name: error in command: $cmd";
     readingsSingleUpdate($hash,"lastCMDerror","error: >$err< in CMD: $cmd",1);
   }
-  Log3 $name,4,"executed CMDs: $cmd";
+  Log3 $name,4,"$name: executed CMDs: $cmd";
   return;
 }
 
@@ -3474,11 +3474,11 @@ sub HOMEMODE_setIP($)
       push @commands,AttrVal($name,"HomeCMDpublic-ip-change","") if (AttrVal($name,"HomeCMDpublic-ip-change",undef));
       HOMEMODE_execCMDs($hash,HOMEMODE_serializeCMD($hash,@commands)) if (@commands);
     }
-    if (AttrNum($name,"HomePublicIpCheckInterval",0))
-    {
-      my $timer = gettimeofday() + 60 * AttrNum($name,"HomePublicIpCheckInterval",0);
-      $hash->{".IP_TRIGGERTIME_NEXT"} = $timer;
-    }
+  }
+  if (AttrNum($name,"HomePublicIpCheckInterval",0))
+  {
+    my $timer = gettimeofday() + 60 * AttrNum($name,"HomePublicIpCheckInterval",0);
+    $hash->{".IP_TRIGGERTIME_NEXT"} = $timer;
   }
 }
 
