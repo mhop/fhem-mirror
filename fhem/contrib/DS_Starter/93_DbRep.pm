@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 20379 2019-10-18 20:49:04Z DS_Starter $
+# $Id: 93_DbRep.pm 20481 2019-11-09 07:14:24Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,65 +58,66 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.29.0" => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan ",
-  "8.28.2" => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
-  "8.28.1" => "09.10.2019  fix warnings line 5173 ",
-  "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
-  "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
-  "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
-  "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
-  "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                           "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
-  "8.25.0" => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                           "sub DbRep_modAssociatedWith changed ",
-  "8.24.0" => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
-  "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
-  "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
-  "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
-  "8.21.2" => "14.08.2019  commandRef revised ",
-  "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
-  "8.21.0" => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
-  "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
-  "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
-                           "command, \"repository\" added in Meta.json ",
-  "8.19.1" => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
-  "8.19.0" => "04.04.2019  explain is possible in sqlCmd ",
-  "8.18.0" => "01.04.2019  new aggregation year ",
-  "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
-  "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
-  "8.17.0" => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
-  "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
-  "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
-  "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
-  "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
-  "8.13.0" => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
-  "8.12.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
-  "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
-  "8.11.1" => "25.01.2019  fix sort of versionNotes ",
-  "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
-  "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
-  "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
-  "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
-  "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
-  "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
-  "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
-  "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
-  "8.9.0"  => "07.11.2018  command delDoublets added ",
-  "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
-  "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
-  "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
-  "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
-                           "versionNotes changed to support en/de, get dbValue as textfield-long ",
-  "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
-  "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"  => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
-  "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
-  "8.2.0"  => "05.10.2018  direct help for attributes ",
-  "8.1.0"  => "02.10.2018  new get versionNotes command ",
-  "8.0.1"  => "20.09.2018  DbRep_getInitData improved",
-  "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "8.29.1"  => "11.11.2019  commandref revised, implement central \$today variable ",
+  "8.29.0"  => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
+  "8.28.2"  => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
+  "8.28.1"  => "09.10.2019  fix warnings line 5173 ",
+  "8.28.0"  => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
+  "8.27.2"  => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
+  "8.27.1"  => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
+  "8.27.0"  => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
+  "8.26.0"  => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                            "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
+  "8.25.0"  => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                            "sub DbRep_modAssociatedWith changed ",
+  "8.24.0"  => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
+  "8.23.1"  => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
+  "8.23.0"  => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
+  "8.22.0"  => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
+  "8.21.2"  => "14.08.2019  commandRef revised ",
+  "8.21.1"  => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
+  "8.21.0"  => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
+  "8.20.1"  => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
+  "8.20.0"  => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
+                            "command, \"repository\" added in Meta.json ",
+  "8.19.1"  => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
+  "8.19.0"  => "04.04.2019  explain is possible in sqlCmd ",
+  "8.18.0"  => "01.04.2019  new aggregation year ",
+  "8.17.2"  => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
+  "8.17.1"  => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
+  "8.17.0"  => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
+  "8.16.0"  => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
+  "8.15.0"  => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
+  "8.14.1"  => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
+  "8.14.0"  => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
+  "8.13.0"  => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.12.0"  => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
+  "8.11.2"  => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
+  "8.11.1"  => "25.01.2019  fix sort of versionNotes ",
+  "8.11.0"  => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
+  "8.10.1"  => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
+  "8.10.0"  => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
+  "8.9.10"  => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
+  "8.9.9"   => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
+  "8.9.8"   => "27.11.2018  minor fix in deviceRename, commandref revised ",
+  "8.9.7"   => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
+  "8.9.6"   => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
+  "8.9.5"   => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
+  "8.9.0"   => "07.11.2018  command delDoublets added ",
+  "8.8.0"   => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
+  "8.7.0"   => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
+  "8.6.0"   => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"   => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
+  "8.4.0"   => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
+                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
+  "8.3.0"   => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
+  "8.2.3"   => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
+  "8.2.2"   => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
+  "8.2.1"   => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
+  "8.2.0"   => "05.10.2018  direct help for attributes ",
+  "8.1.0"   => "02.10.2018  new get versionNotes command ",
+  "8.0.1"   => "20.09.2018  DbRep_getInitData improved",
+  "8.0.0"   => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
   "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
@@ -146,68 +147,70 @@ our %DbRep_vNotesIntern = (
   "7.12.0"  => "16.02.2018  compression of dumpfile, restore of compressed files possible ",
   "7.11.0"  => "12.02.2018  new command 'repairSQLite' to repair a corrupted SQLite database ",
   "7.10.0"  => "10.02.2018  bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"  => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"  => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"  => "04.02.2018  new command 'eraseReadings' ", 
-  "7.7.1"  => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"  => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"  => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.6.0"  => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
-  "7.5.5"  => "25.01.2018  minor change in delSeqDoublets ",
-  "7.5.4"  => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
-  "7.5.3"  => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.5.2"  => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
-  "7.5.1"  => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
-  "7.5.0"  => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
-  "7.4.1"  => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"  => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"  => "08.01.2018  fix syntax error for perl < 5.20 ",
-  "7.3.0"  => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
-  "7.2.1"  => "04.01.2018  bugfix month out of range that causes fhem crash ",
-  "1.0.0"  => "19.05.2016  Initial"
+  "7.9.0"   => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"   => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"   => "04.02.2018  new command 'eraseReadings' ", 
+  "7.7.1"   => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"   => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"   => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.6.0"   => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
+  "7.5.5"   => "25.01.2018  minor change in delSeqDoublets ",
+  "7.5.4"   => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
+  "7.5.3"   => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.5.2"   => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
+  "7.5.1"   => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
+  "7.5.0"   => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
+  "7.4.1"   => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"   => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"   => "08.01.2018  fix syntax error for perl < 5.20 ",
+  "7.3.0"   => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
+  "7.2.1"   => "04.01.2018  bugfix month out of range that causes fhem crash ",
+  "1.0.0"   => "19.05.2016  Initial"
 );
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
-  "8.25.0" => "29.08.2019 If a list of devices in attribute \"device\" contains a SQL wildcard (\%), this wildcard is now "
-                          ."dissolved into separate devices if they are still existing in your FHEM configuration. "
-                          ."Please see <a href=\"https://forum.fhem.de/index.php/topic,101756.0.html\">this Forum Thread</a> "
-                          ."for further information. ",
-  "8.24.0" => "24.08.2019 Devices which are specified in attribute \"device\" are marked as \"Associated With\" if they are "
-                          ."still existing in your FHEM configuration. At least fhem.pl 20069 2019-08-27 08:36:02 is needed. ",
-  "8.22.0" => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
-                          "the value displayed from the VALUE database field before create the appropriate reading. ",
-  "8.21.0" => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
-  "8.20.0" => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
-              "needed for DbLog and/or DbRep operation.",
-  "8.19.0" => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
-  "8.18.0" => "01.04.2019 New aggregation type \"year\" ",
-  "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
-              "before running a SQL-statement with sqlCmd command.",
-  "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
-  "8.15.0" => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
-  "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
-  "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082 ",
-  "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
-  "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
-              ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
-              ."first task. ",
-  "8.7.0"  => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
-              ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
-              ." 'valueFilter' generally applied to database field 'VALUE' ",
-  "8.6.0"  => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"  => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
-  "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
-                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
-                          "Function \"get dbValue\" opens an editor window ",
-  "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
-                          "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
-                          "and timeDiffToNow can be calculated dynamically ",
-  "8.2.2"  => "07.10.2018 fix don't get the real min timestamp in rare cases ",
-  "8.2.0"  => "05.10.2018 direct help for attributes ",
-  "8.1.0"  => "01.10.2018 new get versionNotes command ",
-  "8.0.0"  => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "8.29.0"  => "08.11.2019 add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
+  "8.28.0"  => "30.09.2019 seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
+  "8.25.0"  => "29.08.2019 If a list of devices in attribute \"device\" contains a SQL wildcard (\%), this wildcard is now "
+                           ."dissolved into separate devices if they are still existing in your FHEM configuration. "
+                           ."Please see <a href=\"https://forum.fhem.de/index.php/topic,101756.0.html\">this Forum Thread</a> "
+                           ."for further information. ",
+  "8.24.0"  => "24.08.2019 Devices which are specified in attribute \"device\" are marked as \"Associated With\" if they are "
+                           ."still existing in your FHEM configuration. At least fhem.pl 20069 2019-08-27 08:36:02 is needed. ",
+  "8.22.0"  => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
+                           "the value displayed from the VALUE database field before create the appropriate reading. ",
+  "8.21.0"  => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
+  "8.20.0"  => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
+                           "needed for DbLog and/or DbRep operation.",
+  "8.19.0"  => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
+  "8.18.0"  => "01.04.2019 New aggregation type \"year\" ",
+  "8.17.0"  => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
+                           "before running a SQL-statement with sqlCmd command.",
+  "8.16.0"  => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
+  "8.15.0"  => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
+  "8.13.0"  => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.11.0"  => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
+  "8.10.0"  => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082 ",
+  "8.9.0"   => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
+  "8.8.0"   => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
+                           ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
+                           ."first task. ",
+  "8.7.0"   => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
+                           ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
+                           ." 'valueFilter' generally applied to database field 'VALUE' ",
+  "8.6.0"   => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"   => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
+  "8.4.0"   => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
+                           "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
+                           "Function \"get dbValue\" opens an editor window ",
+  "8.3.0"   => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
+                           "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
+                           "and timeDiffToNow can be calculated dynamically ",
+  "8.2.2"   => "07.10.2018 fix don't get the real min timestamp in rare cases ",
+  "8.2.0"   => "05.10.2018 direct help for attributes ",
+  "8.1.0"   => "01.10.2018 new get versionNotes command ",
+  "8.0.0"   => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018 deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018 attribute 'valueFilter' to filter datasets in fetchrows ",
   "7.18.2"  => "02.08.2018 fix in fetchrow function (forum:#89886), fix highlighting ",
@@ -225,32 +228,32 @@ our %DbRep_vNotesExtern = (
   "7.12.0"  => "16.02.2018 compression of dumpfile, restore of compressed files possible ",
   "7.11.0"  => "12.02.2018 new command 'repairSQLite' to repair a corrupted SQLite database ",
   "7.10.0"  => "10.02.2018 bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"  => "09.02.2018 new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"  => "04.02.2018 bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"  => "04.02.2018 new command 'eraseReadings' ", 
-  "7.7.1"  => "03.02.2018 minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"  => "29.01.2018 attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"  => "27.01.2018 new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.5.3"  => "23.01.2018 new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.4.1"  => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"  => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"  => "08.01.2018 fix syntax error for perl < 5.20 ",
-  "7.3.0"  => "07.01.2018 charfilter avoid control characters in datasets to exportToFile / importFromFile, changed to use aggregation for split selects in timeslices by exportToFile (avoid heavy memory consumption) ",
-  "7.1.0"  => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
-  "6.4.1"  => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
-  "6.4.0"  => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
-  "6.1.0"  => "29.11.2017 new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
-  "6.0.0"  => "18.11.2017 FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
-  "5.6.4"  => "05.10.2017 abortFn's adapted to use abortArg (Forum:77472) ",
-  "5.6.3"  => "01.10.2017 fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
-  "5.6.0"  => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
-  "5.4.0"  => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
-  "5.3.1"  => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
-  "5.3.0"  => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
-  "5.0.6"  => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
-  "5.0.3"  => "07.06.2017 mysql_DoDumpServerSide added ",
-  "5.0.1"  => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
-  "5.0.0"  => "04.06.2017 MySQL Dump nonblocking added ",
+  "7.9.0"   => "09.02.2018 new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"   => "04.02.2018 bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"   => "04.02.2018 new command 'eraseReadings' ", 
+  "7.7.1"   => "03.02.2018 minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"   => "29.01.2018 attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"   => "27.01.2018 new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.5.3"   => "23.01.2018 new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.4.1"   => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"   => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"   => "08.01.2018 fix syntax error for perl < 5.20 ",
+  "7.3.0"   => "07.01.2018 charfilter avoid control characters in datasets to exportToFile / importFromFile, changed to use aggregation for split selects in timeslices by exportToFile (avoid heavy memory consumption) ",
+  "7.1.0"   => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
+  "6.4.1"   => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
+  "6.4.0"   => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
+  "6.1.0"   => "29.11.2017 new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
+  "6.0.0"   => "18.11.2017 FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
+  "5.6.4"   => "05.10.2017 abortFn's adapted to use abortArg (Forum:77472) ",
+  "5.6.3"   => "01.10.2017 fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
+  "5.6.0"   => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
+  "5.4.0"   => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
+  "5.3.1"   => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
+  "5.3.0"   => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.0.6"   => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.0.3"   => "07.06.2017 mysql_DoDumpServerSide added ",
+  "5.0.1"   => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
+  "5.0.0"   => "04.06.2017 MySQL Dump nonblocking added ",
   "4.16.1"  => "22.05.2017 encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z ",
   "4.14.1"  => "16.05.2017 limitation of fetchrows result datasets to 1000 by attr limit ",
   "4.14.0"  => "15.05.2017 UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined, new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, ReadingsSingleUpdateValue, commandref revised ",
@@ -259,46 +262,46 @@ our %DbRep_vNotesExtern = (
   "4.12.0"  => "31.03.2017 support of primary key for insert functions ",
   "4.11.3"  => "26.03.2017 usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
   "4.11.0"  => "18.02.2017 added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
-  "4.9.0"  => "23.12.2016 function readingRename added ",
-  "4.8.6"  => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
-  "4.8.5"  => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
-  "4.7.6"  => "07.12.2016 DbRep version as internal, check if perl module DBI is installed ",
-  "4.7.4"  => "28.11.2016 sub DbRep_calcount changed due to Forum #msg529312 ",
-  "4.7.3"  => "20.11.2016 new diffValue function made suitable to SQLite ",
-  "4.6.0"  => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
-  "4.5.1"  => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
-  "4.2.0"  => "10.10.2016 allow SQL-Wildcards in attr reading & attr device ",
-  "4.1.3"  => "09.10.2016 bugfix delEntries running on SQLite ",
+  "4.9.0"   => "23.12.2016 function readingRename added ",
+  "4.8.6"   => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
+  "4.8.5"   => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
+  "4.7.6"   => "07.12.2016 DbRep version as internal, check if perl module DBI is installed ",
+  "4.7.4"   => "28.11.2016 sub DbRep_calcount changed due to Forum #msg529312 ",
+  "4.7.3"   => "20.11.2016 new diffValue function made suitable to SQLite ",
+  "4.6.0"   => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
+  "4.5.1"   => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
+  "4.2.0"   => "10.10.2016 allow SQL-Wildcards in attr reading & attr device ",
+  "4.1.3"   => "09.10.2016 bugfix delEntries running on SQLite ",
   "3.13.0"  => "03.10.2016 added deviceRename to rename devices in database, new Internal DATABASE ",
   "3.12.0"  => "02.10.2016 function minValue added ",
   "3.11.1"  => "30.09.2016 bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00' ",
-  "3.9.0"  => "26.09.2016 new function importFromFile to import data from file (CSV format) ",
-  "3.8.0"  => "16.09.2016 new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
-  "3.7.2"  => "04.09.2016 problem in diffValue fixed if if no value was selected ",
-  "3.7.1"  => "31.08.2016 Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
-  "3.7.0"  => "30.08.2016 exportToFile added exports data to file (CSV format) ",
-  "3.5.0"  => "18.08.2016 new attribute timeOlderThan ",
-  "3.4.4"  => "12.08.2016 current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestamp attribute ",
-  "3.4.0"  => "03.08.2016 function 'insert' added ",
-  "3.3.1"  => "15.07.2016 function 'diffValue' changed, write '-' if no value ",
-  "3.3.0"  => "12.07.2016 function 'diffValue' added ",
-  "3.1.1"  => "10.07.2016 state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
-  "3.1.0"  => "09.07.2016 new Attr 'timeDiffToNow' and change subs according to that ",
-  "3.0.0"  => "04.07.2016 no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
-  "2.9.8"  => "01.07.2016 changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
-  "2.9.5"  => "30.06.2016 format of readingnames changed again (substitute ':' with '-' in time) ",
-  "2.9.4"  => "30.06.2016 change readingmap to readingNameMap, prove of unsupported characters added ",
-  "2.9.3"  => "27.06.2016 format of readingnames changed avoiding some problems after restart and splitting ",
-  "2.9.0"  => "25.06.2016 attributes showproctime, timeout added ",
-  "2.8.0"  => "24.06.2016 function averageValue changed to nonblocking function ",
-  "2.7.0"  => "23.06.2016 changed function countEntries to nonblocking ",
-  "2.6.2"  => "21.06.2016 aggregation week corrected ",
-  "2.6.1"  => "20.06.2016 routine maxval_ParseDone corrected ",
-  "2.6.0"  => "31.05.2016 maxValue changed to nonblocking function ",
-  "2.4.0"  => "29.05.2016 changed to nonblocking function for sumValue ",
-  "2.0.0"  => "24.05.2016 added nonblocking function for fetchrow ",
-  "1.2.0"  => "21.05.2016 function and attribute for delEntries added ",
-  "1.0.0"  => "19.05.2016 Initial"
+  "3.9.0"   => "26.09.2016 new function importFromFile to import data from file (CSV format) ",
+  "3.8.0"   => "16.09.2016 new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
+  "3.7.2"   => "04.09.2016 problem in diffValue fixed if if no value was selected ",
+  "3.7.1"   => "31.08.2016 Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
+  "3.7.0"   => "30.08.2016 exportToFile added exports data to file (CSV format) ",
+  "3.5.0"   => "18.08.2016 new attribute timeOlderThan ",
+  "3.4.4"   => "12.08.2016 current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestamp attribute ",
+  "3.4.0"   => "03.08.2016 function 'insert' added ",
+  "3.3.1"   => "15.07.2016 function 'diffValue' changed, write '-' if no value ",
+  "3.3.0"   => "12.07.2016 function 'diffValue' added ",
+  "3.1.1"   => "10.07.2016 state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
+  "3.1.0"   => "09.07.2016 new Attr 'timeDiffToNow' and change subs according to that ",
+  "3.0.0"   => "04.07.2016 no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
+  "2.9.8"   => "01.07.2016 changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
+  "2.9.5"   => "30.06.2016 format of readingnames changed again (substitute ':' with '-' in time) ",
+  "2.9.4"   => "30.06.2016 change readingmap to readingNameMap, prove of unsupported characters added ",
+  "2.9.3"   => "27.06.2016 format of readingnames changed avoiding some problems after restart and splitting ",
+  "2.9.0"   => "25.06.2016 attributes showproctime, timeout added ",
+  "2.8.0"   => "24.06.2016 function averageValue changed to nonblocking function ",
+  "2.7.0"   => "23.06.2016 changed function countEntries to nonblocking ",
+  "2.6.2"   => "21.06.2016 aggregation week corrected ",
+  "2.6.1"   => "20.06.2016 routine maxval_ParseDone corrected ",
+  "2.6.0"   => "31.05.2016 maxValue changed to nonblocking function ",
+  "2.4.0"   => "29.05.2016 changed to nonblocking function for sumValue ",
+  "2.0.0"   => "24.05.2016 added nonblocking function for fetchrow ",
+  "1.2.0"   => "21.05.2016 function and attribute for delEntries added ",
+  "1.0.0"   => "19.05.2016 Initial"
 );
 
 # Hint Hash en
@@ -323,8 +326,10 @@ our %DbRep_vHintsExt_de = (
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
 
+# foreward declaration
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
+our $today;                          # zentral von FHEM bereitgestellt (z.B. 2019-11-11)
 
 # Standard Feldbreiten falls noch nicht getInitData ausgeführt
 my %dbrep_col = ("DEVICE"  => 64,
@@ -2232,7 +2237,7 @@ sub DbRep_createTimeArray($$$) {
  $wdadd = 172800 if($wd eq "Sa");                                       # wenn Start am "Sa" dann nächste Grenze +2 Tage
  $wdadd = 86400  if($wd eq "So");                                       # wenn Start am "So" dann nächste Grenze +1 Tage
              
- Log3 ($name, 5, "DbRep $name - weekday of start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
+ Log3 ($name, 5, "DbRep $name - weekday start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
  
  my $aggsec;
  if ($aggregation eq "hour") {
@@ -10835,12 +10840,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20379 2019-10-18 20:49:04Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20481 2019-11-09 07:14:24Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20379 2019-10-18 20:49:04Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20481 2019-11-09 07:14:24Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11237,7 +11242,8 @@ return;
   
   <b>Examples: </b><br>
   my $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} <br>
+  attr &lt;name&gt; userReadings todayPowerIn {DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)} 
   <br><br>
   
   The command syntax for the FHEM command is: <br><br>
@@ -13395,8 +13401,10 @@ sub bdump {
 
   <a name="timeDiffToNow"></a>  
   <li><b>timeDiffToNow </b>   - the <b>begin time </b> of data selection will be set to the timestamp <b>"&lt;current time&gt; - 
-                                &lt;timeDiffToNow&gt;"</b> dynamically (e.g. if set to 86400, the last 24 hours are considered by data 
-								selection). The time period will be calculated dynamically at execution time.     
+                                &lt;timeDiffToNow&gt;"</b> dynamically. The time period will be calculated dynamically at 
+                                execution time. Optional can with the additional entry "FullDay" the selection start time 
+                                and the selection end time be expanded to the begin / end of the involved days
+                                (take only effect if adjusted time difference is >= 1 day).   
                                 <br><br> 
 
                                 <ul>
@@ -13413,6 +13421,8 @@ sub bdump {
                                 # the start time is set to "current time - 1 year and 2,5 hours" <br>
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # the start time is set to "current time - 1.5 years" <br>
+                                <code>attr &lt;name&gt; timeDiffToNow d:8 FullDay </code> <br>
+                                # the start time is set to "current time - 8 days", the selection time period is expanded to the begin / end of the involved days <br>
 								</ul>
 								<br>
                                 
@@ -13424,9 +13434,10 @@ sub bdump {
   <a name="timeOlderThan"></a>
   <li><b>timeOlderThan </b>   - the <b>end time</b> of data selection will be set to the timestamp <b>"&lt;aktuelle Zeit&gt; - 
                                 &lt;timeOlderThan&gt;"</b> dynamically. Always the datasets up to timestamp 
-								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered (e.g. if set to 
-								86400, all datasets older than one day are considered). The time period will be calculated dynamically at 
-								execution time. 
+								"&lt;current time&gt; - &lt;timeOlderThan&gt;" will be considered. The time period will be calculated dynamically at 
+								execution time. Optional can with the additional entry "FullDay" the selection start time 
+                                and the selection end time be expanded to the begin / end of the involved days
+                                (take only effect if adjusted time difference is >= 1 day).
                                 <br><br> 
                                 
                                 <ul>
@@ -13443,6 +13454,9 @@ sub bdump {
                                 # the selection end time is set to "current time - 1 year and 2,5 hours" <br>
 								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
                                 # the selection end time is set to "current time - 1.5 years" <br>
+                                <code>attr &lt;name&gt; timeOlderThan d:8 FullDay </code> <br>
+                                # the end time is set to "current time - 8 days", the selection time period is expanded to the begin / end of the involved days <br>
+
 								</ul>
 								<br>
                                 
@@ -13679,7 +13693,8 @@ sub bdump {
   
   <b>Beispiele: </b><br>
   $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} <br>
+  attr &lt;name&gt; userReadings todayPowerIn {DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)} 
   <br><br>
   
   Die Befehlssyntax als FHEM Kommando ist: <br><br>
@@ -15868,13 +15883,13 @@ sub bdump {
   
   <a name="timeDiffToNow"></a> 
   <li><b>timeDiffToNow </b>   - der <b>Selektionsbeginn</b> wird auf den Zeitpunkt <b>"&lt;aktuelle Zeit&gt; - &lt;timeDiffToNow&gt;"</b> 
-                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
-                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
-                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).						
+                                gesetzt. Die Timestampermittlung erfolgt dynamisch zum Ausführungszeitpunkt. Optional kann mit 
+                                der Zusatzangabe "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende der 
+                                jeweiligen Selektionstage erweitert werden (wirkt nur wenn eingestellte Zeitdifferenz ist >= 1 Tag).
                                 <br><br>
 								
                                 <ul>
-							    <b>Eingabeformat Beispiel:</b> <br>
+							    <b>Eingabeformat Beispiele:</b> <br>
 								<code>attr &lt;name&gt; timeDiffToNow 86400 </code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow d:2 h:3 m:2 s:10 </code> <br>
@@ -15888,7 +15903,7 @@ sub bdump {
 								<code>attr &lt;name&gt; timeDiffToNow y:1.5</code> <br>
                                 # die Startzeit wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								<code>attr &lt;name&gt; timeDiffToNow d:8 FullDay </code> <br>
-                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
+                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende der beteiligten Tage erweitert  <br>
 								</ul>
 								<br>
                                 
@@ -15902,12 +15917,12 @@ sub bdump {
                                 gesetzt. Dadurch werden alle Datensätze bis zu dem Zeitpunkt "&lt;aktuelle 
 								Zeit&gt; - &lt;timeOlderThan&gt;" berücksichtigt. Die Timestampermittlung erfolgt 
 								dynamisch zum Ausführungszeitpunkt. Optional kann mit der Zusatzangabe 
-                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende des jeweiligen Tages erweitert werden
-                                (wirkt nur wenn Zeitdifferenz >= 1 Tag).
+                                "FullDay" der Selektionsbeginn und das Selektionsende auf Beginn / Ende der jeweiligen 
+                                Selektionstage erweitert werden (wirkt nur wenn eingestellte Zeitdifferenz ist >= 1 Tag).
                                 <br><br>
 
                                 <ul>
-							    <b>Eingabeformat Beispiel:</b> <br>
+							    <b>Eingabeformat Beispiele:</b> <br>
 								<code>attr &lt;name&gt; timeOlderThan 86400</code> <br>
                                 # das Selektionsende wird auf "aktuelle Zeit - 86400 Sekunden" gesetzt <br>
 								<code>attr &lt;name&gt; timeOlderThan d:2 h:3 m:2 s:10</code> <br>
@@ -15921,7 +15936,7 @@ sub bdump {
 								<code>attr &lt;name&gt; timeOlderThan y:1.5</code> <br>
                                 # das Selektionsende wird auf "aktuelle Zeit - 1,5 Jahre gesetzt <br>
 								<code>attr &lt;name&gt; timeOlderThan d:8 FullDay </code> <br>
-                                # die Startzeit wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende des jeweiligen Tages erweitert  <br>
+                                # das Selektionsende wird auf "aktuelle Zeit - 8 Tage gesetzt, der Selektionszeitraum wird auf Beginn / Ende der beteiligten Tage erweitert  <br>
 
 								</ul>
 								<br>
