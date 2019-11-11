@@ -9,6 +9,8 @@ use SetExtensions;
 my $bridgeTimerStarted;
 my $subscrCheckTimerStarted;
 sub zigbee2mqtt_devStateIcon255($;$$);
+use vars qw($FW_ME);
+use vars qw($FW_userAgent);
 
 sub
 MQTT2_DEVICE_Initialize($)
@@ -631,10 +633,10 @@ MQTT2_DEVICE_nlData($)
   for my $n (devspec2array("TYPE=MQTT2_DEVICE")) {
     my $cid = $defs{$n}{CID};
     if($cid) {
-      $cid =~ s/zigbee_//;
+      $cid =~ s/zigbee\d*_//;
       $n2n{$cid} = $n;
     }
-    if(AttrVal($n, "readingList","") =~ m,zigbee2mqtt/(.*):,) {
+    if(AttrVal($n, "readingList","") =~ m,zigbee\d*mqtt/(.*):,) {
       $n2n{$1} = $n;
     }
   }
