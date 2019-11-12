@@ -1597,10 +1597,10 @@ sub DbLog_checkDefMinInt ($$$$$){
       my @ie = split(/,/, $inex);
       for (my $k=0; $k<int(@ie); $k++) {
           # Bsp. für das auszuwertende Element
-          # "(temperature|humidity):300,force"
+          # "(temperature|humidity):300:force"
           my @rif = split(/:/, $ie[$k]);
           
-          if($reading =~ m,^$rif[0]$,) {                                  # aktuelles Reading matcht auf Regexp
+          if($reading =~ m,^$rif[0]$, && $rif[1]) {                       # aktuelles Reading matcht auf Regexp und minInterval ist angegeben
               return $DoIt;                                               # Reading wurde bereits geprüft -> kein Überschreiben durch $defminint
           }
       }
