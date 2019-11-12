@@ -3278,12 +3278,13 @@ DOIF_Attr(@)
     
     if (!$cmd) {
       $cmd="";
+      $defs{$hash->{NAME}}{DEF}="##";
     } else {
       $cmd =~ s/(##.*\n)|(##.*$)/ /g;
       $cmd =~ s/\$SELF/$hash->{NAME}/g;
     }
-    
-    if ($cmd eq "" or $cmd =~ /^ *\(/) {
+
+    if ($cmd =~ /^\s*(\(|$)/) {
       $hash->{MODEL}="FHEM";  
       ($msg,$err)=CmdDoIf($hash,$cmd);
     } else {
