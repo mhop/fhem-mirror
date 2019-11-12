@@ -25,7 +25,7 @@ par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
 par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
-par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
 defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \

@@ -167,8 +167,9 @@ sub WeekdayTimer_Undef($$) {
 sub WeekdayTimer_Define($$) {
   my ($hash, $def) = @_;
   WeekdayTimer_InitHelper($hash);
-
-  my  @a = split("[ \t]+", $def);
+  #$def =~ s/[\s\\\n]+/ /gm;
+  #$def =~ s/^([^ ])/ $1/gm;
+  my  @a = split("[ \t\\\n]+", $def);
 
   return "Usage: define <name> $hash->{TYPE} <device> <language> <switching times> <condition|command>"
      if(@a < 4);
@@ -197,7 +198,7 @@ sub WeekdayTimer_Define($$) {
 sub WeekdayTimer_Start($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my @a = split("[ \t]+", $hash->{DEF});
+  my @a = split("[ \t\\\n]+", $hash->{DEF});
   #my  @a = split("[ \t]+", $def);
  
   #my $type     = shift @a;
