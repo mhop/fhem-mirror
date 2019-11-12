@@ -1838,20 +1838,9 @@ sub ONKYO_AVR_Read2($$$) {
 
             # Model
             $reading = "model";
-            if (
-                defined( $hash->{helper}{receiver}{device}{$reading} )
-                && ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                    || $hash->{READINGS}{$reading}{VAL} ne
-                    $hash->{helper}{receiver}{device}{$reading} )
-              )
+            if ( defined( $hash->{helper}{receiver}{device}{$reading} ))
             {
-                if ( !exists( $attr{$name}{model} )
-                    || $attr{$name}{model} ne
-                    $hash->{helper}{receiver}{device}{$reading} )
-                {
-                    readingsBulkUpdate( $hash, $reading, 
-                      $hash->{helper}{receiver}{device}{$reading} );
-                }
+                $hash->{model} = $hash->{helper}{receiver}{device}{$reading};
             }
 
             # Firmware version
