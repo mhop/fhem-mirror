@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
   "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
                            "Forum: https://forum.fhem.de/index.php/topic,65860.msg972352.html#msg972352 ",
   "4.8.0"   => "14.10.2019 change SQL-Statement for delta-h, delta-d (SVG getter) ",
@@ -1722,9 +1723,9 @@ sub DbLog_Push(@) {
 	  push(@event, "$a[3]");  
 	  push(@reading, "$a[4]"); 
 	  push(@value, "$a[5]"); 
-	  push(@unit, "$a[6]"); 
+	  push(@unit, "$a[6]");
 	  Log3 $hash->{NAME}, 4, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]"
-							 if($vb4show);
+							 if($vb4show);      
   }	  
   use warnings;
  
@@ -1756,6 +1757,9 @@ sub DbLog_Push(@) {
               $a[3] =~ s/'/''/g;                      # escape ' with ''
               $a[5] =~ s/'/''/g;                      # escape ' with ''
               $a[6] =~ s/'/''/g;                      # escape ' with ''
+              $a[3] =~ s/\\/\\\\/g;                   # escape \ with \\
+              $a[5] =~ s/\\/\\\\/g;                   # escape \ with \\
+              $a[6] =~ s/\\/\\\\/g;                   # escape \ with \\
               $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
           }	  
           use warnings;
@@ -2348,8 +2352,8 @@ sub DbLog_PushAsync(@) {
       push(@event, "$a[3]");  
       push(@reading, "$a[4]"); 
       push(@value, "$a[5]"); 
-      push(@unit, "$a[6]"); 
-      Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
+      push(@unit, "$a[6]");
+      Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";      
   }	  
   use warnings; 
 	
@@ -2380,6 +2384,9 @@ sub DbLog_PushAsync(@) {
               $a[3] =~ s/'/''/g;                      # escape ' with ''
               $a[5] =~ s/'/''/g;                      # escape ' with ''
               $a[6] =~ s/'/''/g;                      # escape ' with ''
+              $a[3] =~ s/\\/\\\\/g;                   # escape \ with \\
+              $a[5] =~ s/\\/\\\\/g;                   # escape \ with \\
+              $a[6] =~ s/\\/\\\\/g;                   # escape \ with \\
               $sqlins .= "('$a[0]','$a[1]','$a[2]','$a[3]','$a[4]','$a[5]','$a[6]'),";
           }	  
           use warnings;
