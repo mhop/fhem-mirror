@@ -1,4 +1,4 @@
-REV 20498
+REV 20504
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -472,7 +472,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2019-11-10_07:45:02 281032 FHEM/98_DOIF.pm
+UPD 2019-11-13_07:45:03 281057 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -489,7 +489,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2018-08-31_07:45:03 4884 FHEM/98_JsonList2.pm
-UPD 2019-11-12_07:45:02 392145 FHEM/98_MSwitch.pm
+UPD 2019-11-13_07:45:03 392144 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
 UPD 2019-09-18_07:45:02 232404 FHEM/98_Modbus.pm
@@ -511,7 +511,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2019-02-13_07:45:03 20746 FHEM/98_WOL.pm
-UPD 2019-10-29_07:45:02 56320 FHEM/98_WeekdayTimer.pm
+UPD 2019-11-13_07:45:03 56385 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -634,9 +634,9 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2019-11-09_07:45:04 36105 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2019-11-13_07:45:02 44885 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-11-09_07:45:04 121688 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-11-13_07:45:03 121697 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -738,8 +738,8 @@ UPD 2019-11-11_07:45:06 4149076 docs/commandref.html
 UPD 2019-11-10_07:45:08 2571613 docs/commandref_DE.html
 UPD 2019-10-28_07:45:02 79589 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-11-12_07:45:10 219536 docs/commandref_modular.html
-UPD 2019-11-12_07:45:11 230492 docs/commandref_modular_DE.html
+UPD 2019-11-13_07:45:10 219536 docs/commandref_modular.html
+UPD 2019-11-13_07:45:11 230492 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
