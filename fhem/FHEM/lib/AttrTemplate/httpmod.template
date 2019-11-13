@@ -564,3 +564,176 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 }
 attr DEVICE webCmd reread
 attr DEVICE model CUL_HM_firmware_update_downloader
+
+#Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg992348.html#msg992348
+name:tasmota_firmware_updates
+filter:TYPE=HTTPMOD
+desc: Check Tasmota homepage for available new firmware files<br>Define a HTTPMOD device like <br>define tasmotaupdates HTTPMOD https://github.com/arendst/Tasmota/releases/latest 86400<a href="https://forum.fhem.de/index.php/topic,97694.msg992308.html#msg992308">Source: Forum</a>.
+order:X_01e
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+attr DEVICE userattr reading01Name reading01Regex reading02Name reading02OExpr reading02Regex
+attr DEVICE enableControlSet 1
+attr DEVICE event-on-change-reading .*
+attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
+attr DEVICE handleRedirects 1
+attr DEVICE reading01Name latestVersion
+attr DEVICE reading01Regex <h2>Changelog</h2>[\w\W]*?<p>Version (\d*.\d*.\d*)\s\d*</p>
+attr DEVICE reading02Name latestDate
+attr DEVICE reading02OExpr $val =~ m/^(.{4})(.{2})(.{2})$/ ;; "$3.$2.$1"
+attr DEVICE reading02Regex <h2>Changelog</h2>[\w\W]*?<p>Version \d*.\d*.\d*\s(\d*)</p>
+attr DEVICE showError 1
+attr DEVICE showMatched 1
+attr DEVICE stateFormat {   my $ret ="";;\
+    my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
+    $ret .= '<div style="text-align:left">';;\
+    $ret .= 'last <a title="versions" href="'.InternalVal($name,"MainURL","unknown").'">tasmota</a>-check => '.$lastCheck;;\
+    $ret .= '<br><br><pre>';;\
+    $ret .= "| device                           | current |   new   |  released  |<br>";;\
+    $ret .= "---------------------------------------------------------------------<br>";;\
+    my $check = ReadingsVal($name,"updatableDevices","error => no or wrong data from server!");;\
+    if($check eq "no updates needed!") {\
+      $ret .= '| <b style="color:green">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } elsif($check eq "error => no or wrong data from server!") {\
+      $ret .= '| <b style="color:red">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } else {\
+      my @devices = split(',',$check);;\
+      foreach my $devStr (@devices) {\
+        my ($dev,$old,$new,$date) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\s([^\s]+)\s\|\s([^\)]+)\)$/;;\
+        $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
+        $ret .= sprintf("%-32s",$dev);;\
+        $ret .= '</b></a> | ';;\
+        $ret .= '<b style="color:lightgray">';;\
+        $ret .= sprintf("%7s",$old);;\
+        $ret .= '</b> | ';;\
+        $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
+        $ret .= '<b style="color:red">';;\
+        $ret .= sprintf("%7s",$new);;\
+        $ret .= '</b></a> | ';;\
+        $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
+        $ret .= '<b style="color:black">';;\
+        $ret .= sprintf("%-10s",$date);;\
+        $ret .= '</b></a>';;\
+        $ret .= " |<br>";;\
+      }\
+    }\
+    $ret .= '</pre></div>';;\
+  return $ret;;\
+}
+attr DEVICE timestamp-on-change-reading .*
+attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
+  my $ret = "";;\
+  if (ReadingsVal($name,"MATCHED_READINGS","") eq "") {\
+    $ret = "error => no or wrong data from server!";;\
+  } else {\
+    my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
+    my $DATE = ReadingsVal($name,"latestDate","unknown");;\
+    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version=.*\\(.*sonoff\\)")) {\
+      my $version = ReadingsVal($dev,"INFO1_Version","unknown");;\
+      $version =~ m/([0-9.]*).*/;;\
+      $version = $1;;\
+      if($version ne $VERSION) {\
+        $ret .= "," if($ret ne "");;\
+        $ret .= $dev." (".$version." | ".$VERSION." | ".$DATE.")";;\
+      }\
+    }\
+  }\
+  return ($ret eq "")?"no updates needed!":$ret;;\
+}
+attr DEVICE webCmd reread
+attr DEVICE room WHICHROOM
+attr DEVICE model tasmota_firmware_updates
+
+#Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg992432.html#msg992432
+name:ESPEasy_firmware_updates
+filter:TYPE=HTTPMOD
+desc: Check letscontrollit homepage for available new firmware files<br>Define a HTTPMOD device like <br>define ESPEasy_updates HTTPMOD https://github.com/letscontrolit/ESPEasy/releases 86400<a href="https://forum.fhem.de/index.php/topic,97694.msg992432.html#msg992432">Source: Forum</a>.
+order:X_01f
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+attr DEVICE userattr reading01Name reading01Regex
+attr DEVICE enableControlSet 1
+attr DEVICE event-on-change-reading .*
+attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
+attr DEVICE handleRedirects 1
+attr DEVICE reading01Name latestVersion
+attr DEVICE reading01Regex Release mega-([\d]{8})
+attr DEVICE showError 1
+attr DEVICE showMatched 1
+attr DEVICE stateFormat {   my $ret ="";;\
+    my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
+    $ret .= '<div style="text-align:left;;">';;\
+    $ret .= 'last <a href="https://github.com/letscontrolit/ESPEasy" title="ESPEasy" rel="noopener noreferrer" target="_blank">ESPEasy</a> version check => '.$lastCheck;;\
+    $ret .= '<br /><br /><pre>';;\
+    $ret .= "| device                                       | current  |   new    | <br />";;\
+    $ret .= "---------------------------------------------------------------------- <br />";;\
+    my $check = ReadingsVal($name,"updatableDevices","error => no or wrong data from server!");;\
+    if($check eq "no updates needed!") {\
+      $ret .= '| <b style="color:green">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } elsif($check eq "error => no or wrong data from server!") {\
+      $ret .= '| <b style="color:red">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } else {\
+      my @devices = split(',',$check);;\
+      foreach my $devStr (@devices) {\
+        my ($dev,$old,$new) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\s([^\)]+)\)$/;;\
+        $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
+        $ret .= sprintf("%-44s",$dev);;\
+        $ret .= '</b></a> | ';;\
+        $ret .= '<b style="color:lightgray;;">';;\
+		$ret .= '<a href="https://github.com/letscontrolit/ESPEasy/releases/tag/mega-'.$old.'" title="ESPEasy Release mega-'.$old.'" rel="noopener noreferrer" target="_blank">';;\
+        $ret .= sprintf("%7s",$old);;\
+        $ret .= '</a></b> | ';;\
+        $ret .= '<a href="https://github.com/letscontrolit/ESPEasy/releases/tag/mega-'.$new.'" title="ESPEasy Release mega-'.$new.'" rel="noopener noreferrer" target="_blank">';;\
+        $ret .= '<b style="color:red;;">';;\
+        $ret .= sprintf("%7s",$new);;\
+        $ret .= '</b></a> |<br />';;\
+      }\
+    }\
+    $ret .= '</pre></div>';;\
+  return $ret;;\
+}
+attr DEVICE timestamp-on-change-reading .*
+attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
+  my $ret = "";;\
+  if (ReadingsVal($name,"MATCHED_READINGS","") eq "") {\
+    $ret = "error => no or wrong data from server!";;\
+  } else {\
+    my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
+    foreach my $dev (devspec2array("TYPE=ESPEasy:FILTER=HOST!=bridge")) {\
+      my $version = InternalVal($dev,"ESP_BUILD_GIT","unknown");;\
+      $version =~ m/([\d]{8})/;;\
+      $version = $1;;\
+      if($version ne $VERSION) {\
+        $ret .= "," if($ret ne "");;\
+        $ret .= $dev." (".$version." | ".$VERSION.")";;\
+      }\
+    }\
+  }\
+  return ($ret eq "")?"no updates needed!":$ret;;\
+}
+attr DEVICE webCmd reread
+attr DEVICE room WHICHROOM
+attr DEVICE model ESPEasy_firmware_updates
+
+#Contributed by yersinia, see 
+name:dnscrypt-proxy_updates
+filter:TYPE=HTTPMOD
+desc: Show updates for <a href="https://dnscrypt.info/">DNSCRYPT.</a><br>Define a HTTPMOD device like <br>defmod dnscrypt_proxy_version HTTPMOD https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest 86400<br><a href="https://forum.fhem.de/index.php/topic,97694.msg992002.html#msg992002">Source: Forum</a>
+order:X_01x
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+attr DEVICE userattr userattr pihole_version
+attr DEVICE extractAllJSON 1
+attr DEVICE extractAllJSONFilter tag_name
+attr DEVICE stateFormat {"<p align=\"left\">".ReadingsTimestamp($name,'tag_name','')."<br />Online: <a href=\"https://github.com/DNSCrypt/dnscrypt-proxy/blob/master/ChangeLog\"\
+title=\"ChangeLog\" rel=\"noopener noreferrer\" target=\"_blank\"><b>".ReadingsVal($name,'tag_name','')."</b></a><br />\
+pihole: <b>".AttrVal($name,'pihole_version','')."</b></p>"}
+attr DEVICE pihole_version 2.0.31
+attr DEVICE room WHICHROOM
+attr DEVICE enableControlSet 1
+attr DEVICE model dnscrypt-proxy_updates
