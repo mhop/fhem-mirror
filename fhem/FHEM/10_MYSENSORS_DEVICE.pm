@@ -662,7 +662,7 @@ sub onPresentationMessage($$) {
           $idStr =~ s/[^A-Za-z\d_\.-]+/_/g;
         }
         if (defined $hash->{sets}->{"$typeStr$idStr"}) {
-          next unless $hash->{getCommentReadings} eq "2";
+          next unless (defined ($hash->{getCommentReadings}) && $hash->{getCommentReadings} eq "2");
         }
         if ($hash->{IODev}->{'inclusion-mode'}) {
           my @values = ();
@@ -709,11 +709,14 @@ sub onRequestMessage($$) {
     eval {
       my ($readingname,$val) = rawToMappedReading($hash, $msg->{subType}, $msg->{childId}, $msg->{payload});
       $hash->{nowSleeping} = 0 if $hash->{nowSleeping};
+      my $value = ReadingsVal($hash->{NAME},$readingname,$val);
+      my ($type,$childId,$mappedValue) = mappedReadingToRaw($hash,$readingname,$value);
+      $value = $mappedValue;
       sendClientMessage($hash,
         childId => $msg->{childId},
         cmd => C_SET,
         subType => $msg->{subType},
-        payload => ReadingsVal($hash->{NAME},$readingname,$val)
+        payload => $value
       );
     };
     Log3 ($hash->{NAME}, 4, "MYSENSORS_DEVICE $hash->{NAME}: ignoring C_REQ-message ".GP_Catch($@)) if $@;
@@ -919,7 +922,7 @@ sub onInternalMessage($$) {
         last;
     };
     $type == I_PRE_SLEEP_NOTIFICATION and do {
-        #$hash->{$typeStr} = $msg->{payload};
+        $hash->{preSleep} = $msg->{payload}//500;
         refreshInternalMySTimer($hash,"Asleep");
         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
         MYSENSORS::Timer($hash);
@@ -927,7 +930,7 @@ sub onInternalMessage($$) {
         last;
     };
     $type == I_POST_SLEEP_NOTIFICATION and do {
-        #$hash->{$typeStr} = $msg->{payload};
+        #$hash->{preSleep} = $msg->{payload}//500;
         readingsSingleUpdate($hash,"sleepState","awake",1);
         $hash->{nowSleeping} = 0;
         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
@@ -1116,7 +1119,9 @@ sub refreshInternalMySTimer($$) {
       Log3 $name, 5, "$name: Ack timeout timer set at $nextTrigger";
     } elsif ($calltype eq "Asleep") {
       RemoveInternalTimer($hash,"MYSENSORS::DEVICE::timeoutAwake");
-      my $nextTrigger = main::gettimeofday() + 0.3;  
+      my $postsleeptime=($hash->{preSleep} - 200)/1000;
+      $postsleeptime=0 if $postsleeptime < 0;
+      my $nextTrigger = main::gettimeofday() + $postsleeptime;  
       InternalTimer($nextTrigger, "MYSENSORS::DEVICE::timeoutAwake",$hash);
       Log3 $name, 5, "$name: Awake timeout timer set at $nextTrigger";
     }
@@ -1171,7 +1176,7 @@ sub sendRetainedMessages($) {
 <h3>MYSENSORS_DEVICE</h3>
 <ul>
     <p>represents a mysensors sensor attached to a mysensor-node</p>
-    <p>requires a <a href="#MYSENSOR">MYSENSOR</a>-device as IODev</p>
+    <p>requires a <a href="#MYSENSORS">MYSENSORS</a>-device as IODev</p>
     <a name="MYSENSORS_DEVICE define"></a>
     <p><b>Define</b></p>
     <ul>
