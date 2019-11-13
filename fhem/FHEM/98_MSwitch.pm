@@ -2425,7 +2425,7 @@ sub MSwitch_Cmd(@) {
              && $devicedetails{ $device . '_repeattime' } > 0 )
         {
             my $i;
-            for ( $i = 0 ;$i <= $devicedetails{ $device . '_repeatcount' };$i++ )
+            for ( $i = 1 ;$i <= $devicedetails{ $device . '_repeatcount' };$i++ )
             {
                 my $msg = $cmds . "|" . $Name;
                 if ( $toggle ne '' ) 
@@ -7254,7 +7254,7 @@ sub MSwitch_Exec_Notif($$$$$) {
                          && $devicedetails{ $device . '_repeattime' } > 0 )
                     {
                         my $i;
-                        for ( $i = 0 ;
+                        for ( $i = 1;
                               $i <= $devicedetails{ $device . '_repeatcount' } ;
                               $i++ )
                         {
@@ -7623,7 +7623,7 @@ sub MSwitch_Restartcmd($) {
              && $devicedetails{ $device . '_repeattime' } > 0 )
         {
             my $i;
-            for ( $i = 0 ;
+            for ( $i = 1 ;
                   $i <= $devicedetails{ $device . '_repeatcount' } ;
                   $i++ )
             {
