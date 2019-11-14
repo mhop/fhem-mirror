@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.3";
+my $version = "1.2.4";
 
 my $srandUsed;
 
@@ -322,18 +322,18 @@ sub todoist_UpdateTask($$$) {
       Log3 $name,5, "$name: hash: ".Dumper($hash);
       
       ## complete a task
-      if ($type eq "complete") {
+      #if ($type eq "complete") {
 
         # variables for the commands parameter
-        $tType = "item_complete";
-        %args = (
-          ids => '['.$taskId.']',
-        );
-        Log3 $name,5, "$name: Args: ".Dumper(%args);
-        $method="POST";
-      }
+       # $tType = "item_complete";
+       # %args = (
+       #   ids => '['.$taskId.']',
+       # );
+       # Log3 $name,5, "$name: Args: ".Dumper(%args);
+       # $method="POST";
+      #}
       ## close a task
-      elsif ($type eq "close") {
+      if ($type eq "close" || $type eq "complete") {
 
         # variables for the commands parameter
         $tType = "item_close";
