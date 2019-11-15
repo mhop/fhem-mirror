@@ -1,4 +1,4 @@
-REV 20507
+REV 20510
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -551,7 +551,7 @@ UPD 2019-11-05_07:45:02 32880 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
-UPD 2019-09-21_07:45:02 86430 FHEM/98_todoist.pm
+UPD 2019-11-15_07:45:03 86458 FHEM/98_todoist.pm
 UPD 2019-07-31_07:45:02 22674 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
@@ -636,7 +636,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2019-11-13_07:45:02 44885 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-11-13_07:45:03 121697 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-11-15_07:45:03 126716 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -738,8 +738,8 @@ UPD 2019-11-14_07:45:07 4149078 docs/commandref.html
 UPD 2019-11-10_07:45:08 2571613 docs/commandref_DE.html
 UPD 2019-10-28_07:45:02 79589 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-11-14_07:45:10 219536 docs/commandref_modular.html
-UPD 2019-11-14_07:45:11 230492 docs/commandref_modular_DE.html
+UPD 2019-11-15_07:45:10 219536 docs/commandref_modular.html
+UPD 2019-11-15_07:45:11 230492 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
