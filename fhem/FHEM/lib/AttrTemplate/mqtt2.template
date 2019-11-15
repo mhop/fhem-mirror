@@ -33,7 +33,8 @@ attr DEVCID bridgeRegexp \
   shellies[/]([^/]+)[/].*:.* "$1"\
   (ESPClient_[^/]+)[/].*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
-  [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"
+  [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
+  wallpanel[/]([^/]+)[/].*:.* "$1"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -94,6 +95,25 @@ attr DEVICE setList\
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_bridge
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
+
+#A pure router device, e.g. a CC2531 flashed with router firmware
+#Contributed by aperoap, https://forum.fhem.de/index.php/topic,94494.msg992467.html#msg992467
+name:zigbee2mqtt_router_only_device
+desc: For zigbee2mqtt pure router devices, e.g. a CC2531 flashed with router firmware. To get information on device going offline, set "availability_timeout" to a reasonable value in zigbee2mqtt's configuration.yaml.
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+order:L_02a1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","mqtt_device") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon online:rc_GREEN offline:rc_RED
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }\
+  BASE_TOPIC/DEV_ID/availability:.* availability
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE stateFormat availability
+attr DEVICE comment To get also information on device going offline, set "availability_timeout" to a reasonable value in configuration.yaml.
+farewell:template has been applied successfully. Please check configuration.yaml to get regular updates on availability.
+attr DEVICE model zigbee2mqtt_router_only_device
 
 # A dimmable light connected via zigbee2mqtt
 name:zigbee2mqtt_light_dimmer
@@ -917,6 +937,36 @@ attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","POWE
 attr DEVICE stateFormat POWER1
 attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
 attr DEVICE model tasmota_rgb_led_controller
+
+#source post: https://forum.fhem.de/index.php/topic,105364.0.html
+name:tasmota_dimmer_led_controller
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Tasmota dimmable LED controller, suitable for devices using the "Tuya MCU Module".<br>See instructions in  https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer and <a href="https://forum.fhem.de/index.php/topic,105364.msg992975.html#msg992975">Forum Thread</a>
+order:A_05b
+set DEVICE attrTemplate tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+attr DEVICE icon ICON
+attr DEVICE setList\
+  off:noArg CMNDTOPIC/POWER1 0\
+  on:noArg CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2\
+  Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  STATTOPIC/POWER:.* POWER\
+  STATTOPIC/POWER1:.* POWER1\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE autocreate 0
+attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
+attr DEVICE stateFormat POWER1
+attr DEVICE webCmd Dimmer
+attr DEVICE model tasmota_dimmer_led_controller
 
 name:tasmota_set_lowercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1825,3 +1875,30 @@ attr DEVICE setStateList charge locate pause stop start
 attr DEVCID comment For code "valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
 farewell:template has been applied successfully. For map generation you'll need additional code to myUtils, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a> for details.
 attr DEVICE model roborock
+
+# source: https://forum.fhem.de/index.php/topic,105222.0.html
+name:wallpanel_app
+filter:TYPE=MQTT2_DEVICE
+desc:For use with Android-App WallPanel (https://thanksmister.com/wallpanel-android/)<br>NOTE: Experimental, please provide feedback!
+order:X_15
+par:DEVNAME;name of this wallpanel;{ AttrVal("DEVICE","readingList","") =~ m,wallpanel/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+attr DEVICE icon ICON
+attr DEVICE event-on-change-reading .*
+attr DEVICE jsonMap MOTION_value:motion FACE_value:face
+attr DEVICE readingList wallpanel/DEVNAME/state:.* { json2nameValue($EVENT) }\
+  wallpanel/DEVNAME/sensor/battery:.* { json2nameValue($EVENT) }\
+  wallpanel/DEVNAME/sensor/motion:.* { json2nameValue($EVENT, 'MOTION_', $JSONMAP) }\
+  wallpanel/DEVNAME/sensor/face:.* { json2nameValue($EVENT, 'FACE_', $JSONMAP) }
+attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$EVTPART1');;"}\
+  audio:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
+  brightness:colorpicker,BRI,0,1,255 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}\
+  camera:noArg wallpanel/DEVNAME/command {"$EVTPART0": "true"}\
+  clearCache:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
+  google:noArg wallpanel/DEVNAME/command {"url": "https://www.google.com"}\
+  relaunch:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
+  reload:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
+  speak:textField {"wallpanel/DEVNAME/command {'$EVTPART0': '".substr($EVENT,5)."'}"}\
+  url:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
+  volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}\
+  wake:true,false wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}
