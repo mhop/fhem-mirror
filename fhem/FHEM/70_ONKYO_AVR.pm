@@ -38,7 +38,6 @@ sub ONKYO_AVR_Initialize($) {
       volumeMax:slider,0,1,100
       inputs
       disable:0,1
-      model
       wakeupCmd:textField
       connectionCheck:off,30,45,60,75,90,105,120
       timeout:1,2,3,4,5
@@ -157,6 +156,7 @@ sub ONKYO_AVR_Define($$$) {
             }
         );
     }
+
 
     return undef;
 }
@@ -1422,6 +1422,8 @@ sub ONKYO_AVR_Read($) {
             ONKYO_AVR_Read2( $hash, $name, "ISCP$el" );
         }
     }
+
+    readingsDelete( $hash, 'model' );
 
     return;
 }
