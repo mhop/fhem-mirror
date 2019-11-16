@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbLog: new attribute defaultMinInterval,
+                      Forum: topic,65860.msg972352.html#msg972352
  - feature: 73_AutoShuttersControl: new version 0.8, meany new features
  - change:  70_ONKYO_AVR: trying to improve reporting of model
  - feature: 31_HUEDevice: handle IODev rename
