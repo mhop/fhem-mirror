@@ -50,7 +50,7 @@ use DBI::Const::GetInfoType;
 use Blocking;
 use Color;                           # colorpicker Widget
 use Time::Local;
-use Encode qw(encode_utf8);
+use Encode;
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 # no if $] >= 5.018000, warnings => 'experimental';
@@ -58,7 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.29.1"  => "11.11.2019  commandref revised, implement central \$today variable ",
+  "8.30.0"  => "14.11.2019  new command set adminCredentials and get storedCredentials, attribute useAdminCredentials ",
+  "8.29.1"  => "11.11.2019  commandref revised ",
   "8.29.0"  => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
   "8.28.2"  => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
   "8.28.1"  => "09.10.2019  fix warnings line 5173 ",
@@ -329,7 +330,6 @@ our %DbRep_vHintsExt_de = (
 # foreward declaration
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
-our $today;                          # zentral von FHEM bereitgestellt (z.B. 2019-11-11)
 
 # Standard Feldbreiten falls noch nicht getInitData ausgeführt
 my %dbrep_col = ("DEVICE"  => 64,
@@ -343,6 +343,7 @@ sub DbRep_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
  $hash->{UndefFn}      = "DbRep_Undef";
+ $hash->{DeleteFn}     = "DbRep_Delete";
  $hash->{ShutdownFn}   = "DbRep_Shutdown"; 
  $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
@@ -404,6 +405,7 @@ sub DbRep_Initialize($) {
                        "timeDiffToNow ".
                        "timeOlderThan ".
                        "timeout ".
+                       "useAdminCredentials:1,0 ".
 					   "userExitFn ".
                        "valueFilter ".
                        $readingFnAttributes;
@@ -536,6 +538,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel !~ /SQLITE/)?"adminCredentials ":"").
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
@@ -544,11 +547,11 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"dumpSQLite:noArg ":"").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"repairSQLite ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"dumpMySQL:clientSide,serverSide ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"dumpSQLite:noArg ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"repairSQLite ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"optimizeTables:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/)?"vacuum:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"restoreMySQL:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"restoreSQLite:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
@@ -718,6 +721,17 @@ sub DbRep_Set($@) {
        return undef;
   }
   
+  if ($opt eq "adminCredentials" && $hash->{ROLE} ne "Agent") {
+      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
+      my $success = DbRep_setcredentials($hash,"adminCredentials",$prop,$prop1);
+	  
+	  if($success) {
+		  return "Username and password for database root access saved successfully";
+	  } else {
+		  return "Error while saving username / password - see logfile for details";
+	  }		
+  }
+  
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
@@ -874,7 +888,7 @@ sub DbRep_Set($@) {
           $sqlcmd = $prop;
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
-              DbRep_setCmdFile($name."_sqlCmdList","",$hash);         # Löschen der sql History Liste im DbRep-Keyfile
+              DbRep_setCmdFile($name."_sqlCmdList","",$hash);                        # Löschen der sql History Liste im DbRep-Keyfile
               return "SQL command historylist of $name deleted.";
           }
       }
@@ -950,6 +964,7 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
+                (($hash->{ROLE} ne "Agent" && $dbmodel !~ /SQLITE/)?"storedCredentials:noArg ":"").
                 "dbValue:textField-long ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
@@ -1012,7 +1027,31 @@ sub DbRep_Get($@) {
       my ($err,$ret) = DbRep_dbValue($name,$sqlcmd);
       return $err?$err:$ret;
   
-  } elsif ($opt =~ /versionNotes/) {
+  } elsif ($opt eq "storedCredentials") {
+        # Credentials abrufen
+        my $atxt;
+        my $username   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
+        my $dblogname  = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
+        my $password   = $attr{"sec$dblogname"}{secret};
+        my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+        if($success) {
+            $atxt = "Username: $admusername, Password: $admpassword\n";
+        } else {
+            $atxt = "Credentials of $name couldn't be read - make sure you've set it with \"set $name adminCredentials username password\"";        
+        }
+        
+        return "Stored Credentials for database default access:\n".
+               "===============================================\n".
+               "Username: $username, Password: $password\n".
+               "\n".
+               "\n".              
+               "Stored Credentials for database admin access:\n".
+               "=============================================\n".
+               $atxt.
+               "\n"
+               ;
+                
+    } elsif ($opt =~ /versionNotes/) {
 	  my $header  = "<b>Module release information</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
 	  my %hs;
@@ -1145,6 +1184,7 @@ sub DbRep_Attr($$$$) {
                          timestamp_end
                          timeDiffToNow
                          timeOlderThan
+                         useAdminCredentials
 						 sqlResultFormat
                          );
     
@@ -1353,6 +1393,13 @@ sub DbRep_Attr($$$$) {
 		if ($aName eq "ftpUseSSL") {
             delete($attr{$name}{ftpUse});
         }
+        
+        if ($aName eq "useAdminCredentials" && $aVal) {
+            my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+            unless ($success) {return "The credentials of a database admin user couldn't be read. ".
+                                      "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before. ";}
+        }
+        
 		if ($aName eq "reading" || $aName eq "device") {
             if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
                 my $attrname = uc($aName);
@@ -1455,6 +1502,27 @@ sub DbRep_Undef($$) {
  BlockingKill($hash->{HELPER}{RUNNING_REPAIR}) if (exists($hash->{HELPER}{RUNNING_REPAIR}));
 
  DbRep_delread($hash,1);
+    
+return undef;
+}
+
+###################################################################################
+# Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
+# X_Undef aufgerufen um offene Verbindungen zu schließen, 
+# anschließend wird die Funktion X_Delete aufgerufen. 
+# Funktion: Aufräumen von dauerhaften Daten, welche durch das 
+# Modul evtl. für dieses Gerät spezifisch erstellt worden sind. 
+# Es geht hier also eher darum, alle Spuren sowohl im laufenden 
+# FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
+# Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
+###################################################################################
+sub DbRep_Delete($$) {
+    my ($hash, $arg) = @_;
+    my $name = $hash->{NAME};
+    
+    # gespeicherte Credentials löschen
+    my $index = $hash->{TYPE}."_".$name."_adminCredentials";
+    setKeyValue($index, undef);
     
 return undef;
 }
@@ -1657,6 +1725,49 @@ sub DbRep_getInitDataAborted(@) {
   
   delete($hash->{HELPER}{RUNNING_PID});
 return;
+}
+
+######################################################################################
+#                       Connect zur Datenbank herstellen
+######################################################################################
+sub DbRep_dbConnect($$) {
+  my ($name,$uac) = @_;
+  my $hash        = $defs{$name};
+  my $dbconn      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbconn};
+  my $dbuser      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
+  my $dblogname   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
+  my $dbmodel     = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{MODEL};
+  my $dbpassword  = $attr{"sec$dblogname"}{secret};
+  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  $uac            = AttrVal($name, "useAdminCredentials", $uac);
+  my ($dbh,$err);
+  
+  if($uac) {
+      my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+      if($success) {
+          $dbuser     = $admusername;
+          $dbpassword = $admpassword;
+      } else {
+          $err = encode_base64("Can't use admin credentials for database access, see logfile !","");
+          return ($err,"");
+      }
+  }
+  
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
+                                                                    RaiseError => 1, 
+                                                                    AutoCommit => 1, 
+                                                                    AutoInactiveDestroy => 1,
+                                                                    mysql_enable_utf8 => $utf8
+                                                                  } ); };
+  
+  if ($@) {
+      $err = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - ERROR: $@");
+  }
+  
+  Log3 ($name, 4, "DbRep $name - database user for operation: $dbuser") if($dbuser); 
+
+return ($err,$dbh);
 }
 
 ################################################################################################################
@@ -5846,19 +5957,13 @@ sub sqlCmd_DoParse($) {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
-  my ($err,@pms);
+  my ($err,$dbh,@pms);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
 
-  my $dbh;
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- 
-  if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$opt|$cmd|''|''|$err";
-  }
+  ($err,$dbh) = DbRep_dbConnect($name,0);
+  return "$name|''|$opt|$cmd|''|''|$err" if ($err);
        
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
@@ -6038,7 +6143,6 @@ sub sqlCmd_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "sqlResultNumRows", $nrows);
   
   # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
-  # my $hl      = $hash->{HELPER}{SQLHIST};
   my @sqlhist = split(",",$hash->{HELPER}{SQLHIST});
   $cmd =~ s/\s+/&nbsp;/g; 
   $cmd =~ s/,/&#65292;/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
@@ -6404,14 +6508,9 @@ sub DbRep_Index($) {
     
   # Background-Startzeit
   my $bst = [gettimeofday];
-	
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- 
-  if ($@) {
-      $err = encode_base64($@,"");
-      Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
-      return "$name|''|''|$err";
-  }
+  
+  ($err,$dbh) = DbRep_dbConnect($name,0);
+  return "$name|''|''|$err" if ($err);
   
   my ($cmd,$idx) = split("_",$cmdidx,2);
   
@@ -9965,6 +10064,78 @@ sub DbRep_byteOutput ($) {
 return $ret;
 }
 
+######################################################################################
+#                            Username / Paßwort speichern
+#   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
+######################################################################################
+sub DbRep_setcredentials ($$@) {
+    my ($hash, $cre, @credentials) = @_;
+    my $name                       = $hash->{NAME};
+    my ($success, $credstr, $index, $retcode,$username,$passwd);
+    my (@key,$len,$i);
+    
+    $credstr = encode_base64(join(':', @credentials));
+    
+    # Beginn Scramble-Routine
+    @key     = qw(1 3 4 5 6 3 2 1 9);
+    $len     = scalar @key;  
+    $i       = 0;  
+    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+    # End Scramble-Routine    
+       
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$cre;
+    $retcode = setKeyValue($index, $credstr);
+    
+    if ($retcode) { 
+        Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
+        $success = 0;
+    } else {
+        ($success, $username, $passwd) = DbRep_getcredentials($hash,$cre);
+    }
+
+return ($success);
+}
+
+######################################################################################
+#                             Username / Paßwort abrufen
+#   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
+######################################################################################
+sub DbRep_getcredentials ($$) {
+    my ($hash, $cre) = @_;
+    my $name         = $hash->{NAME};
+    my ($success, $username, $passwd, $index, $retcode, $credstr);
+    my (@key,$len,$i);
+    
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$cre;
+    ($retcode, $credstr) = getKeyValue($index);
+    
+    if ($retcode) {
+        Log3($name, 2, "DbRep $name - Unable to read password from file: $retcode");
+        $success = 0;
+    }  
+        
+    if($credstr) {
+        # Beginn Descramble-Routine
+        @key     = qw(1 3 4 5 6 3 2 1 9); 
+        $len     = scalar @key;  
+        $i       = 0;  
+        $credstr = join "",  
+        map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;   
+        # Ende Descramble-Routine
+        
+        ($username, $passwd) = split(":",decode_base64($credstr));
+    
+        Log3($name, 4, "DbRep $name - $cre successfully read from file");
+    
+    } else {
+        Log3($name, 2, "DbRep $name - ERROR - $cre not set. Use \"set $name adminCredentials\" first.");
+    }
+
+    $success = (defined($passwd))?1:0;
+
+return ($success, $username, $passwd);        
+}
+
 ####################################################################################################
 #                      Schreibroutine in DbRep Keyvalue-File
 ####################################################################################################
@@ -10007,7 +10178,7 @@ sub DbRep_createCmdFile ($) {
                ForceType  => "file",
               };
   my @new;
-  push(@new, "# This file is auto generated from 93_DbRep.",
+  push(@new, "# This file is auto generated from 93_DbRep.pm",
              "# Please do not modify, move or delete it.",
              "");
 
@@ -11241,10 +11412,18 @@ return;
   <br><br>
   
   <b>Examples: </b><br>
-  my $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} <br>
-  attr &lt;name&gt; userReadings todayPowerIn {DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)} 
-  <br><br>
+  <pre>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00","");
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} 
+  attr &lt;name&gt; userReadings todayPowerIn 
+    {  
+       my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+       $month++; 
+       $year+=1900;
+       my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
+       DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)
+    } 
+  </pre>
   
   The command syntax for the FHEM command is: <br><br>
   
@@ -12064,8 +12243,19 @@ return;
 	                           </ul>
 	                           <br>
                                
+                               For a better overview the relevant attributes for this operation are listed here: <br><br>
+
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=42%> <col width=58%> </colgroup>
+                                   <tr><td> <b>useAdminCredentials</b>        </td><td>: use privileged user for the operation </td></tr>
+                                 </table>
+	                           </ul>
+	                           <br>
+	                           <br>
+                               
                                <b>Note:</b> <br>
-                               The used database user needs the ALTER and INDEX privilege. <br>
+                               The used database user needs the ALTER, CREATE and INDEX privilege. <br>
                                    
                                </li> <br>
                                  
@@ -12385,15 +12575,15 @@ return;
 								 </li><br>
 
 	<li><b> sqlCmd </b>        - Execute an arbitrary user specific command. <br>
-                                 If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
-								 "allowDeletion" has to be set for security reason. <br>
+                                 If the command contains a operation to delete data, the attribute <a href="#allowDeletion">'allowDeletion'</a> 
+								 has to be set for security reason. <br>
                                  The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
                                  respectively "aggregation". <br>
                                  This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
                                  @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
-                                 <a href="#DbRepattr">attribute</a> "sqlCmdVars" can be set. <br>                                 
-								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
+                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                 
+								 If the attribute <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
 								 
@@ -12458,6 +12648,7 @@ return;
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
                                       <tr><td> <b>sqlCmdVars</b>          </td><td>: set SQL session variable or PRAGMA before execute the SQL statement</td></tr>
+                                      <tr><td> <b>useAdminCredentials</b> </td><td>: use privileged user for the operation </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -13692,10 +13883,18 @@ sub bdump {
   <br><br>
   
   <b>Beispiele: </b><br>
-  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} <br>
-  attr &lt;name&gt; userReadings todayPowerIn {DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)} 
-  <br><br>
+  <pre>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00","");
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} 
+  attr &lt;name&gt; userReadings todayPowerIn 
+    {  
+       my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+       $month++; 
+       $year+=1900;
+       my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
+       DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)
+    } 
+  </pre>
   
   Die Befehlssyntax als FHEM Kommando ist: <br><br>
     
@@ -13785,6 +13984,15 @@ sub bdump {
  <br><br>
  
  <ul><ul>
+ 
+    <li><b> adminCredentials &lt;User&gt; &lt;Passwort&gt; </b>          
+	                           - Speichert einen User / Passwort für den privilegierten bzw. administrativen 
+                               Datenbankzugriff. Er wird bei Datenbankoperationen benötigt, die mit einem privilegierten User 
+                               ausgeführt werden müssen. Siehe auch Attribut <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
+                               (nicht bei Rolle Agent sowie Datenbank SQLite)
+                               
+                               </li> <br>
+                               
     <li><b> averageValue [display | writeToDB]</b> 
                                  - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den 
                                  gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
@@ -14498,8 +14706,8 @@ sub bdump {
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
 								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
-								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem 
-								 <a href="#limit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
+								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem Attribut
+								 <a href="#limit">'limit'</a> begrenzt. Bei Bedarf kann dieses Attribut 
 								 geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
 								 </li> <br> 
@@ -14522,8 +14730,18 @@ sub bdump {
 	                           </ul>
 	                           <br>
                                
+                               Die für diese Funktion relevanten Attribute sind: <br><br>
+                               
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=39%> <col width=61%> </colgroup>
+                                   <tr><td> <b>useAdminCredentials</b>        </td><td>: benutzt einen privilegierten User für die Operation </td></tr>
+                                 </table>
+	                           </ul>
+	                           <br>
+                               
                                <b>Hinweis:</b> <br>
-                               Der verwendete Datenbank-Nutzer benötigt das ALTER und INDEX Privileg. <br>
+                               Der verwendete Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
                                    
                                </li> <br>								 
        
@@ -14935,9 +15153,9 @@ sub bdump {
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
                                       <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung des SQL-Statements </td></tr>
+                                      <tr><td> <b>useAdminCredentials</b> </td><td>: benutzt einen privilegierten User für die Operation </td></tr>
                                    </table>
 	                               </ul>
-	                               <br>
 	                               <br>  
                                  
 								 <b>Hinweis:</b> <br>
@@ -15229,6 +15447,10 @@ return $ret;
                             </li>     
                             <br><br>
                          
+    <li><b> storedCredentials </b> - Listet die im Device gespeicherten User / Passworte für den Datenbankzugriff auf. <br>
+                                   (nicht bei Rolle Agent sowie Datenbank SQLite)
+                                    </li>     
+                                    <br><br>
 								 
     <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
                             ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
@@ -15949,6 +16171,13 @@ sub bdump {
   <a name="timeout"></a> 								
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
                                 (Default: 86400) </li> <br>
+                                
+  <a name="useAdminCredentials"></a> 								
+  <li><b>useAdminCredentials </b>         
+                                - Wenn gesetzt, wird ein zuvor mit "set &lt;Name&gt; adminCredentials" gespeicherter User
+                                  für bestimmte Datenbankoperationen verwendet. <br>
+                                  (nicht bei Rolle Agent sowie Datenbank SQLite)
+                                  </li> <br>
 
   <a name="userExitFn"></a> 								
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
