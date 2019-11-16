@@ -85,10 +85,12 @@
 #   2019-08-10  fix parsing of levels at devVerbose >= 25
 #   2019-08-12  fix documentation of keepalive attributes, add parsing of RSSI, 
 #               add missing attributes if they don't match the running device config
+#   2019-1ß-13  fix a bug where calc counters are not created when readingPulsesPerKWh$pinName is specified instead of readingPulsesPerKWh$pin
 #
 #
 # ideas / todo:
 #
+#   - optimize configureDevice (not set attributes / defaults dont match running config -> check all attrs ...)
 #   - max time for interpolation as attribute
 #   - detect level threasholds automatically for analog input, track drift
 #
@@ -110,7 +112,7 @@ use strict;
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
 
-my $ArduCounter_Version = '6.18 - 12.8.2019';
+my $ArduCounter_Version = '6.19 - 13.10.2019';
 
 
 my %ArduCounter_sets = (  
@@ -1311,7 +1313,7 @@ sub ArduCounter_HandleCounters($$$$$$$$)
     my $rlname    = AduCounter_AttrVal($hash, "long$pinName", "readingNameLongCount$pinName", "readingNameLongCount$pin");
     my $riname    = AduCounter_AttrVal($hash, "interpolatedLong$pinName", "readingNameInterpolatedCount$pinName", "readingNameInterpolatedCount$pin");
     my $rccname   = AduCounter_AttrVal($hash, "calcCounter$pinName", "readingNameCalcCount$pinName", "readingNameCalcCount$pin");
-    my $ppk       = AduCounter_AttrVal($hash, 0, "readingPulsesPerKWh$pin", "pulsesPerKWh");
+    my $ppk       = AduCounter_AttrVal($hash, 0, "readingPulsesPerKWh$pin", "readingPulsesPerKWh$pinName", "pulsesPerKWh");
     my $lName     = ArduCounter_LogPinDesc($hash, $pin);
     
     my $longCount = ReadingsVal($name, $rlname, 0);             # alter long count Wert
