@@ -939,9 +939,9 @@ attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
 attr DEVICE model tasmota_rgb_led_controller
 
 #source post: https://forum.fhem.de/index.php/topic,105364.0.html
-name:tasmota_dimmer_led_controller
+name:tasmota_TuyaMCU_dimmer
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Tasmota dimmable LED controller, suitable for devices using the "Tuya MCU Module".<br>See instructions in  https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer and <a href="https://forum.fhem.de/index.php/topic,105364.msg992975.html#msg992975">Forum Thread</a>
+desc:Tasmota controller, suitable for devices using the "Tuya MCU Module" to control a dimmer.<br>See instructions in  https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer and <a href="https://forum.fhem.de/index.php/topic,105364.msg992975.html#msg992975">Forum Thread</a>
 order:A_05b
 set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -966,7 +966,9 @@ attr DEVICE autocreate 0
 attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
 attr DEVICE stateFormat POWER1
 attr DEVICE webCmd Dimmer
-attr DEVICE model tasmota_dimmer_led_controller
+attr DEVICE comment After applying the template, the device to be controlled needs further configuration. For the necessary steps see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
+farewell:template has been applied successfully. Now it's recommended to do some configruation, see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
+attr DEVICE model tasmota_TuyaMCU_dimmer
 
 name:tasmota_set_lowercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1882,7 +1884,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:For use with Android-App WallPanel (https://thanksmister.com/wallpanel-android/)<br>NOTE: Experimental, please provide feedback!
 order:X_15
 par:DEVNAME;name of this wallpanel;{ AttrVal("DEVICE","readingList","") =~ m,wallpanel/([^/]+)/, ? $1 : undef }
-par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","kindle") }
 attr DEVICE icon ICON
 attr DEVICE event-on-change-reading .*
 attr DEVICE jsonMap MOTION_value:motion FACE_value:face
@@ -1898,7 +1900,11 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
   google:noArg wallpanel/DEVNAME/command {"url": "https://www.google.com"}\
   relaunch:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
   reload:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
+  screenoff:noArg wallpanel/mywallpanel/command {"wake": false}\
+  screenon:select,60,600,3600,86400 wallpanel/wz_tablet/command {"wake": true, "wakeTime": $EVTPART1}\
   speak:textField {"wallpanel/DEVNAME/command {'$EVTPART0': '".substr($EVENT,5)."'}"}\
   url:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
-  volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}\
-  wake:true,false wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}
+  volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}
+attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
+farewell:template has been applied successfully. For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
+attr DEVICE model wallpanel_app
