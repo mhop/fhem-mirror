@@ -1118,7 +1118,7 @@ sub MSwitch_Get($$@) {
 
     if ( AttrVal( $name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" ) 
 	{
-        return "Unknown argument $opt, choose one of Eventlog:timeline,clear support_info:noArg restore_MSwitch_Data:this_Device,all_Devices";
+        return "Unknown argument $opt, choose one of Eventlog:timeline,clear support_info:noArg restore_MSwitch_Data:this_Device,all_Devices active_timer:show,delete";
     }
 
     if ( ReadingsVal( $name, '.lock', 'undef' ) ne "undef" ) 
@@ -1320,7 +1320,7 @@ my %setlist;
 			}
 			else
 			{
-			    return "Unknown argument $cmd, choose one of reset_device:noArg state backup_MSwitch:all_devices $setList $special";
+			    return "Unknown argument $cmd, choose one of exec_cmd_1 exec_cmd_2 reset_device:noArg state backup_MSwitch:all_devices $setList $special";
 			}
 
 	   }
@@ -2745,12 +2745,14 @@ sub MSwitch_Attr(@) {
       . "  MSwitch_Extensions:0,1"
       . "  MSwitch_Inforoom"
       . "  MSwitch_DeleteCMDs:manually,automatic,nosave"
-      . "  MSwitch_Mode:Dummy"
+      . "  MSwitch_Mode:Full,Notify,Toggle,Dummy"
 	  . "  MSwitch_Selftrigger_always:0,1"
 	  . "  useSetExtensions:0,1"
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
+	  . "  MSwitch_Develop_Affected:textField-long"	  
+	  . "  MSwitch_Develop_Trigger:textField-long"
       . "  textField-long ";
 	
 	setDevAttrList($name, $attrzerolist);
@@ -7515,7 +7517,7 @@ sub MSwitch_Restartcmd($) {
     my $hash      = $modules{MSwitch}{defptr}{$name};
     my $showevents = AttrVal( $name, "MSwitch_generate_Events", 1 );
     return "" if ( IsDisabled($name) );
-    return if ( AttrVal( $name, 'MSwitch_Mode', "Notify" ) eq 'Dummy' );
+    #return if ( AttrVal( $name, 'MSwitch_Mode', "Notify" ) eq 'Dummy' );
     $hash->{eventsave} = 'unsaved';
     MSwitch_LOG( $name, 6, "----------------------------------------" );
     MSwitch_LOG( $name, 6, "$name: aufruf restartcmd -> " . $incomming );
