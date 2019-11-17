@@ -74,8 +74,8 @@ sub weekprofile_minutesToTime($)
 {
   my ($minutes) = @_;
   
-  my $hours = $minutes / 60;
-  $minutes = $minutes - $hours * 60;
+  my $hours = $minutes / 60.0;
+  $minutes = $minutes - $hours * 60.0;
 
   if (length($hours) eq 1){
     $hours = "0$hours";
