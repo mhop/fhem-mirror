@@ -1163,14 +1163,18 @@ HUEDevice_Get($@)
     return HUEDevice_devStateIcon($hash);
   }
 
-  my $subtype = $attr{$name}{subType};
 
   my $list;
-  $list .= "rgb:noArg RGB:noArg devStateIcon:noArg " if( $hash->{helper}->{devtype} ne 'S' );
-  $list = 'devStateIcon:noArg ' if( $subtype eq 'blind' );
-  if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
-    $list .= "startup:noArg ";
+  $list .= "rgb:noArg RGB:noArg devStateIcon:noArg" if( $hash->{helper}->{devtype} ne 'S' );
+
+  if( my $subtype = $attr{$name}{subType} ) {
+    $list = ' devStateIcon:noArg' if( $subtype eq 'blind' );
   }
+
+  if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
+    $list .= " startup:noArg";
+  }
+
   return "Unknown argument $cmd, choose one of $list";
 }
 
