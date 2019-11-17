@@ -813,7 +813,7 @@ sub KODI_ProcessResponse($$)
         Log3($name, 4, "$name: KODI_ProcessResponse: received channelgroups information");
         readingsBeginUpdate($hash);
         foreach my $cg (@{$obj->{result}->{channelgroups}}) {
-            my $cgid = $cg->{channelgroupid};
+            my $cgid =  sprintf("%03d", $cg->{channelgroupid});
             readingsBulkUpdate($hash, "channelgroup_${cgid}_type", $cg->{channeltype});
             readingsBulkUpdate($hash, "channelgroup_${cgid}_label", $cg->{label});
             
@@ -826,7 +826,7 @@ sub KODI_ProcessResponse($$)
         readingsBeginUpdate($hash);
         foreach my $c (@{$obj->{result}->{channels}}) {
             my $cid = $c->{channelid};
-            readingsBulkUpdate($hash, "channel_${cid}", $c->{label});
+            readingsBulkUpdate($hash, "channel_" . sprintf("%03d", $cid), $c->{label});
         }
         readingsEndUpdate($hash, 1);
       }
