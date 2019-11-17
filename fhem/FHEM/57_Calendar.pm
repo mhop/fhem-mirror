@@ -2034,7 +2034,7 @@ sub Calendar_Get($@) {
             my ($from,$to);
             if (lc($1) eq 'today') {
               $from  = Calendar_GetSecondsFromMidnight();
-              $to    = DAYSECONDS - $from;
+              $to    = DAYSECONDS - $from - 1;
               $from *= -1;
             } else {
               $from  = DAYSECONDS - Calendar_GetSecondsFromMidnight();
