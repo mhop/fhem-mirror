@@ -963,6 +963,8 @@ HUEDevice_Set($@)
 
   if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
     $list .= " alert:none,select,lselect";
+    $list .= ",breathe,okay,channelchange,finish,stop" if( $hash->{IODev}{modelid} eq 'deCONZ' );
+
     $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
 
     $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
@@ -1235,7 +1237,8 @@ HUEDevice_GetUpdate($)
   }
 
   HUEDevice_Parse($hash,$result);
-  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID}) if( $hash->{IODev}{TYPE} eq 'HUEBridge' );
+  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID}) if( $hash->{IODev} && ( $hash->{IODev}{TYPE} eq 'HUEBridge'
+                                                                              || $hash->{IODev}{TYPE} eq 'tradfri' ) );
 }
 
 sub
@@ -1376,7 +1379,7 @@ HUEDevice_Parse($$)
 
     if( defined($hash->{helper}->{update}) ) {
       delete $hash->{helper}->{update};
-      fhem( "set $hash->{IODev}{NAME} statusRequest" );
+      fhem( "set $hash->{IODev}{NAME} statusRequest" ) if( $hash->{IODev} );
       return undef;
     }
 
