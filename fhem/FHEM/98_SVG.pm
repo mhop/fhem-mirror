@@ -745,7 +745,7 @@ SVG_readgplotfile($$$)
 
   my $specval = AttrVal($wl, "plotfunction", undef);
 
-  my $plotReplace = AttrVal($wl, "plotReplace", undef);
+  my $plotReplace = AttrVal($wl, "plotReplace", $FW_webArgs{plotReplace});
   my $pr;
   (undef, $pr) = parseParams($plotReplace,"\\s"," ") if($plotReplace);
   my $prSubst = sub($)
@@ -838,7 +838,7 @@ SVG_substcfg($$$$$$)
   my $gplot_script = join("", @{$cfg});
   $gplot_script .=  $plot if(!$splitret);
 
-  my $plotReplace = AttrVal($wl, "plotReplace", undef);
+  my $plotReplace = AttrVal($wl, "plotReplace", $FW_webArgs{plotReplace});
   if($plotReplace) {
     my ($list, $pr) = parseParams($plotReplace, "\\s"," ");
     for my $k (keys %$pr) {

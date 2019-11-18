@@ -570,6 +570,7 @@ FileLog_logWrapper($)
     FW_pO "<td>";
     my $logtype = $defs{$d}{NAME};
     my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+    $wl .= "&plotReplace=$FW_webArgs{plotReplace}" if($FW_webArgs{plotReplace});
     my $arg = "$FW_ME/SVG_showLog&dev=$logtype&logdev=$d".
                 "&gplotfile=$type&logfile=$file$wl";
     if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
