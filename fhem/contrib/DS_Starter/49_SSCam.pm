@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $
+# $Id: 49_SSCam.pm 20469 2019-11-06 22:58:20Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.4"  => "18.11.2019  fix FHEM crash when sending data by telegramBot, Forum: https://forum.fhem.de/index.php/topic,105486.0.html ",
   "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
   "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
   "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
@@ -8813,7 +8814,7 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
   $hash->{sentMsgOptions} = $options;
   
   # init param hash
-  # $hash->{HU_DO_PARAMS}->{hash}   = $hash;
+  $hash->{HU_DO_PARAMS}->{hash}   = $hash;
   $hash->{HU_DO_PARAMS}->{header} = $SSCam_TBotHeader;
   delete $hash->{HU_DO_PARAMS}{args};
   delete $hash->{HU_DO_PARAMS}{boundary};
@@ -9580,8 +9581,7 @@ sub SSCam_cleanData($;$) {
   my $hash   = $defs{$name};
   my $del    = 0;
   
-  RemoveInternalTimer($hash, "SSCam_cleanData");
-  #my $tac = $hash->{HELPER}{TRANSACTION}; 
+  RemoveInternalTimer($hash, "SSCam_cleanData"); 
   
   if($data{SSCam}{$name}{SENDCOUNT}{$tac} && $data{SSCam}{$name}{SENDCOUNT}{$tac} > 0) {     # Cacheinhalt erst löschen wenn Sendezähler 0
       InternalTimer(gettimeofday()+1, "SSCam_cleanData", "$name:$tac", 0);
@@ -9942,12 +9942,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20469 2019-11-06 22:58:20Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20353 2019-10-12 05:50:49Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20469 2019-11-06 22:58:20Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden

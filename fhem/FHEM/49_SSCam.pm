@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.4"  => "18.11.2019  fix FHEM crash when sending data by telegramBot, Forum: https://forum.fhem.de/index.php/topic,105486.0.html ",
   "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
   "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
   "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
@@ -8813,7 +8814,7 @@ sub SSCam_TBotSendIt($$$$$$$;$$$) {
   $hash->{sentMsgOptions} = $options;
   
   # init param hash
-  # $hash->{HU_DO_PARAMS}->{hash}   = $hash;
+  $hash->{HU_DO_PARAMS}->{hash}   = $hash;
   $hash->{HU_DO_PARAMS}->{header} = $SSCam_TBotHeader;
   delete $hash->{HU_DO_PARAMS}{args};
   delete $hash->{HU_DO_PARAMS}{boundary};

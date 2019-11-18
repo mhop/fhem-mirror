@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  49_SSCam: FHEM crash when sending data by telegramBot Forum:#105486
  - bugfix:  98_WeekTimer: fixed deletion of delayed timers (#104272)
  - bugfix:  73_AutoShuttersControl: fix brightness morning drive in with
                roommate condition
