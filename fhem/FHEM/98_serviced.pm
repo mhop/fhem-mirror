@@ -16,7 +16,7 @@ use Blocking;
 use Time::HiRes;
 use vars qw{%defs};
 
-my $servicedVersion = "1.2.4";
+my $servicedVersion = "1.2.5";
 
 sub serviced_shutdownwait($);
 
@@ -149,7 +149,7 @@ sub serviced_Set($@)
     if ($cmd eq "start" && ReadingsVal($name,"state","") =~ /^running|starting|failed$/);
   my $service = $hash->{SERVICENAME};
   my $login = AttrVal($name,"serviceLogin","");
-  my $sudo = AttrNum($name,"serviceSudo",1) || $login !~ /^root@/ ? "sudo " : "";
+  my $sudo = AttrNum($name,"serviceSudo",1) && $login !~ /^root@/ ? "sudo " : "";
   my $line = AttrVal($name,"serviceStatusLine",3);
   my $com;
   $com .= "ssh $login '" if ($login);
