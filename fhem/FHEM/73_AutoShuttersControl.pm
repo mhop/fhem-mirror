@@ -1831,26 +1831,23 @@ sub EventProcessingBrightness($@) {
                 or $shutters->getModeUp eq 'always'
               )
             {
-                ## Setzt den PrivacyDown Modus für die Sichtschutzfahrt auf den Status 0
-                ##  1 bedeutet das PrivacyDown Timer aktiviert wurde, 2 beudet das er im privacyDown ist
-                ##  also das Rollo in privacyDown Position steht und VOR der endgültigen Nachfahrt
-        #                 $shutters->setPrivacyUpStatus(0)
-        #                   if ( not defined( $shutters->getPrivacyUpStatus ) );
+                my $roommatestatus = $shutters->getRoommatesStatus;
 
                 if (
-                    (
-                           $shutters->getRoommatesStatus eq 'home'
-                        or $shutters->getRoommatesStatus eq 'awoken'
-                        or $shutters->getRoommatesStatus eq 'absent'
-                        or $shutters->getRoommatesStatus eq 'gone'
-                        or $shutters->getRoommatesStatus eq 'none'
+                       $roommatestatus eq 'home'
+                    or $roommatestatus eq 'awoken'
+                    or $roommatestatus eq 'absent'
+                    or $roommatestatus eq 'gone'
+                    or $roommatestatus eq 'none'
+                    and (
+                        $ascDev->getSelfDefense eq 'off'
+                        or ( $ascDev->getSelfDefense eq 'on'
+                            and CheckIfShuttersWindowRecOpen($shuttersDev) ==
+                            0 )
+                        or (    $ascDev->getSelfDefense eq 'on'
+                            and CheckIfShuttersWindowRecOpen($shuttersDev) != 0
+                            and $ascDev->getResidentsStatus eq 'home' )
                     )
-                    and $ascDev->getSelfDefense eq 'off'
-                    or ( $ascDev->getSelfDefense eq 'on'
-                        and CheckIfShuttersWindowRecOpen($shuttersDev) == 0 )
-                    or (    $ascDev->getSelfDefense eq 'on'
-                        and CheckIfShuttersWindowRecOpen($shuttersDev) != 0
-                        and $ascDev->getResidentsStatus eq 'home' )
                   )
                 {
 
@@ -1872,7 +1869,7 @@ sub EventProcessingBrightness($@) {
 
                         ASC_Debug( 'EventProcessingBrightness: '
                               . $shutters->getShuttersDev
-                              . ' - Verarbeitung für Sunset Privacy Down. Roommatestatus korrekt zum fahren. Fahrbefehl wird an die Funktion FnShuttersCommandSet gesendet. Grund des fahrens: '
+                              . ' - Verarbeitung für Sunrise Privacy Down. Roommatestatus korrekt zum fahren. Fahrbefehl wird an die Funktion FnShuttersCommandSet gesendet. Grund des fahrens: '
                               . $shutters->getLastDrive );
 
                         CreateSunRiseSetShuttersTimer( $hash, $shuttersDev );
@@ -7779,7 +7776,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.1",
+  "version": "v0.8.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

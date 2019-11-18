@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix brightness morning drive in with
+               roommate condition
  - bugfix:  98_weekprofile: time calculation with float
  - bugfix:  98_weekprofile: HM-TC-IT-WM-W-EU with CCU
  - feature: 70_KODI: pad channel and channelgroup readings with zeros to 
