@@ -538,7 +538,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
-                (($hash->{ROLE} ne "Agent" && $dbmodel !~ /SQLITE/)?"adminCredentials ":"").
+                (($dbmodel =~ /MYSQL/)?"adminCredentials ":"").
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
@@ -964,7 +964,7 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
-                (($hash->{ROLE} ne "Agent" && $dbmodel !~ /SQLITE/)?"storedCredentials:noArg ":"").
+                (($dbmodel =~ /MYSQL/)?"storedCredentials:noArg ":"").
                 "dbValue:textField-long ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
@@ -1184,7 +1184,6 @@ sub DbRep_Attr($$$$) {
                          timestamp_end
                          timeDiffToNow
                          timeOlderThan
-                         useAdminCredentials
 						 sqlResultFormat
                          );
     
@@ -1594,19 +1593,19 @@ sub DbRep_getInitData($) {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
+  my $database   = $hash->{DATABASE};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $mintsdef   = "1970-01-01 01:00:00";
   my $idxstate   = "";
-  my ($dbh,$sql,$err,$mints);
+  my ($dbh,$sth,$sql,$err,$mints);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
- 
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 }); };
-  if ($@) {
-      $err = encode_base64($@,"");
-      Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|''|$err";
+  
+  ($err,$dbh) = DbRep_dbConnect($name,0);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|''|$err";
   }
  
   # SQL-Startzeit
@@ -1641,6 +1640,34 @@ sub DbRep_getInitData($) {
           }
       }
   }
+  
+  # effektive Userrechte in MYSQL ermitteln
+  my ($grants,@uniq);  
+  if($dbmodel =~ /MYSQL/) {
+      eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); $sth->execute();};
+      if($@) {
+          Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
+      } else {
+          my $row = "";
+          while (my @line = $sth->fetchrow_array()) {
+              foreach (@line) {
+                  next if($_!~/(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
+                  $row .= "," if($row); 
+                  $row .= (split(" ON ",(split("GRANT ",$_,2))[1],2))[0];                 
+              }
+          }
+          $sth->finish;
+          my %seen = ();
+          my @g = split(/,(\s?)/,$row);
+          foreach (@g) {
+              next if(!$_ || $_=~/^\s+$/);
+              $seen{$_}++;
+          }
+          @uniq   = keys %seen;
+          $grants = join(",",@uniq);
+          Log3 ($name, 4, "DbRep $name - all grants: $grants");
+      }
+  }
  
   $dbh->disconnect;
  
@@ -1649,6 +1676,7 @@ sub DbRep_getInitData($) {
  
   $mints    = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
   $idxstate = encode_base64($idxstate,"");
+  $grants   = encode_base64($grants,"") if($grants);
  
   # Background-Laufzeit ermitteln
   my $brt = tv_interval($bst);
@@ -1657,7 +1685,7 @@ sub DbRep_getInitData($) {
   no warnings 'uninitialized';
   Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: ".sprintf("%.4f",$brt)." seconds");
  
-return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate";
+return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
 }
 
 ####################################################################################################
@@ -1676,6 +1704,7 @@ sub DbRep_getInitDataDone($) {
   my $prop           = $a[5];
   my $fret           = \&{$a[6]} if($a[6]);
   my $idxstate       = $a[7]?decode_base64($a[7]):"";
+  my $grants         = $a[8]?decode_base64($a[8]):"";
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
   
@@ -1699,7 +1728,8 @@ sub DbRep_getInitDataDone($) {
       
       Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
       
-      $hash->{HELPER}{MINTS} = $mints;
+      $hash->{HELPER}{MINTS}  = $mints;
+      $hash->{HELPER}{GRANTS} = $grants if($grants);
   }
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -1739,7 +1769,7 @@ sub DbRep_dbConnect($$) {
   my $dbmodel     = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{MODEL};
   my $dbpassword  = $attr{"sec$dblogname"}{secret};
   my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  $uac            = AttrVal($name, "useAdminCredentials", $uac);
+  $uac            = $uac?$uac:AttrVal($name, "useAdminCredentials", 0);
   my ($dbh,$err);
   
   if($uac) {
@@ -1748,8 +1778,9 @@ sub DbRep_dbConnect($$) {
           $dbuser     = $admusername;
           $dbpassword = $admpassword;
       } else {
-          $err = encode_base64("Can't use admin credentials for database access, see logfile !","");
-          return ($err,"");
+          $err = "Can't use admin credentials for database access, see logfile !";
+          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database access, but can't use it");
+		  return $err;
       }
   }
   
@@ -1761,7 +1792,7 @@ sub DbRep_dbConnect($$) {
                                                                   } ); };
   
   if ($@) {
-      $err = encode_base64($@,"");
+      $err = $@;
       Log3 ($name, 2, "DbRep $name - ERROR: $@");
   }
   
@@ -1858,7 +1889,7 @@ sub DbRep_Main($$;$) {
      return;
  }
  
-  if ($opt =~ /index/) {	
+ if ($opt =~ /index/) {	
      if (exists($hash->{HELPER}{RUNNING_INDEX})) {
          Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_INDEX}{pid} will be killed now to start a new index operation");
          BlockingKill($hash->{HELPER}{RUNNING_INDEX});
@@ -5963,7 +5994,10 @@ sub sqlCmd_DoParse($) {
   my $bst = [gettimeofday];
 
   ($err,$dbh) = DbRep_dbConnect($name,0);
-  return "$name|''|$opt|$cmd|''|''|$err" if ($err);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|$opt|$cmd|''|''|$err";
+  }
        
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
@@ -6499,18 +6533,37 @@ sub DbRep_Index($) {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
+  my $grants     = $hash->{HELPER}{GRANTS};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my ($dbh,$err,$sth,$rows,@six);
   my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
+  my $p          = 0;
 	
   Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
     
   # Background-Startzeit
   my $bst = [gettimeofday];
   
-  ($err,$dbh) = DbRep_dbConnect($name,0);
-  return "$name|''|''|$err" if ($err);
+  # Rechte Check MYSQL
+  if($cmdidx ne "list_all") {
+      if($dbmodel =~ /MYSQL/ && $grants && $grants ne "ALL PRIVILEGES") {
+          # Rechte INDEX und ALTER benötigt
+          my $i = index($grants,"INDEX");
+          my $a = index($grants,"ALTER");
+          if($i==-1 || $a==-1) {
+              $p = 1;
+          }
+      } elsif (!$grants) {
+          $p = 1;
+      }
+  }
+  
+  ($err,$dbh) = DbRep_dbConnect($name,$p);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|''|$err";
+  }
   
   my ($cmd,$idx) = split("_",$cmdidx,2);
   
@@ -11512,6 +11565,15 @@ return;
  <br><br>
  
  <ul><ul>
+ 
+     <li><b> adminCredentials &lt;User&gt; &lt;Passwort&gt; </b>          
+	                           - Save a user / password for the privileged respectively administrative database access. 
+                               The user is required for database operations which has to be executed by a privileged user. 
+                               Please see also attribute <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
+                               (only valid if database type is MYSQL)
+                               
+                               </li> <br>
+ 
     <li><b> averageValue [display | writeToDB]</b> 
                                  - calculates the average value of database column "VALUE" between period given by 
                                  timestamp-<a href="#DbRepattr">attributes</a> which are set. 
@@ -12923,7 +12985,7 @@ return $ret;
                                 </li>     
                                 <br><br>                                     
 
-    <li><b> procinfo </b> - reports the existing database processes in a summary table (only MySQL). <br>
+    <li><b> procinfo </b> - Reports the existing database processes in a summary table (only MySQL). <br>
 	                        Typically only the own processes of the connection user (set in DbLog configuration file) will be
 							reported. If all precesses have to be reported, the global "PROCESS" right has to be granted to the 
 							user. <br>
@@ -12933,9 +12995,14 @@ return $ret;
 							Further informations can be found
                             <a href=https://mariadb.com/kb/en/mariadb/show-processlist/>there</a>. <br>
                             </li>     
-                            <br><br>								 
+                            <br><br>	
 
-    <li><b> svrinfo </b> -  common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
+    <li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
+                                   (only valid if database type is MYSQL)
+                                   </li>     
+                                   <br><br>                            
+
+    <li><b> svrinfo </b> -  Common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
                             on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
                             the desired values. Further detailed informations of items meaning are explained                             
                             <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>there</a>. <br>
@@ -12949,7 +13016,7 @@ return $ret;
                                  <br><br>
                                  </ul>                                                      
                                  
-    <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
+    <li><b> tableinfo </b> -  Access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
 	                          All available tables in the connected database will be selected by default. 
                               Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited to tables you want to show. 
 							  Further detailed informations of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
@@ -12961,7 +13028,7 @@ return $ret;
                                  # Only informations related to tables "current" and "history" are going to be created
                                  </li> 
                                  <br><br>
-                                 </ul>                                                                                   
+                                 </ul>                                                                            
   
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
                               Shows realease informations and/or hints about the module. It contains only main release 
@@ -13659,6 +13726,13 @@ sub bdump {
   <a name="timeout"></a>
   <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
 
+  <a name="useAdminCredentials"></a> 								
+  <li><b>useAdminCredentials </b>         
+                                - If set, a before with "set &lt;aame&gt; adminCredentials" saved privileged user is used
+                                  for particular database operations. <br>
+                                  (only valid if database type is MYSQL)
+                                  </li> <br>
+                                  
   <a name="userExitFn"></a>
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
                                To activate the interfaace at first you should implement the subroutine which will be 
@@ -13989,7 +14063,7 @@ sub bdump {
 	                           - Speichert einen User / Passwort für den privilegierten bzw. administrativen 
                                Datenbankzugriff. Er wird bei Datenbankoperationen benötigt, die mit einem privilegierten User 
                                ausgeführt werden müssen. Siehe auch Attribut <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
-                               (nicht bei Rolle Agent sowie Datenbank SQLite)
+                               (nur gültig bei Datenbanktyp MYSQL)
                                
                                </li> <br>
                                
@@ -15448,9 +15522,9 @@ return $ret;
                             <br><br>
                          
     <li><b> storedCredentials </b> - Listet die im Device gespeicherten User / Passworte für den Datenbankzugriff auf. <br>
-                                   (nicht bei Rolle Agent sowie Datenbank SQLite)
-                                    </li>     
-                                    <br><br>
+                                   (nur gültig bei Datenbanktyp MYSQL)
+                                   </li>     
+                                   <br><br>
 								 
     <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
                             ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
@@ -16174,9 +16248,9 @@ sub bdump {
                                 
   <a name="useAdminCredentials"></a> 								
   <li><b>useAdminCredentials </b>         
-                                - Wenn gesetzt, wird ein zuvor mit "set &lt;Name&gt; adminCredentials" gespeicherter User
-                                  für bestimmte Datenbankoperationen verwendet. <br>
-                                  (nicht bei Rolle Agent sowie Datenbank SQLite)
+                                - Wenn gesetzt, wird ein zuvor mit "set &lt;Name&gt; adminCredentials" gespeicherter 
+                                  privilegierter User für bestimmte Datenbankoperationen verwendet. <br>
+                                  (nur gültig für Datenbanktyp MYSQL)
                                   </li> <br>
 
   <a name="userExitFn"></a> 								
