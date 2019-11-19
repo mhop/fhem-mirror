@@ -932,7 +932,7 @@ FW_answerCall($)
   # FHEMWEB extensions (FLOORPLOAN, SVG_WriteGplot, etc)
   my $FW_contentFunc;
   if(defined($data{FWEXT})) {
-    foreach my $k (sort keys %{$data{FWEXT}}) {
+    foreach my $k (reverse sort keys %{$data{FWEXT}}) {
       my $h = $data{FWEXT}{$k};
       next if($arg !~ m/^$k/);
       $FW_contentFunc = $h->{CONTENTFUNC};
