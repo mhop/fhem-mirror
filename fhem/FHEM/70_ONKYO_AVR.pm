@@ -75,6 +75,7 @@ sub ONKYO_AVR_Define($$$) {
     my $infix = "ONKYO_AVR";
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Define()";
+    delete $attr{$name}{model};
 
     eval { require XML::Simple; };
     return "Please install Perl XML::Simple to use module ONKYO_AVR"
