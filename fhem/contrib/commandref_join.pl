@@ -178,7 +178,12 @@ generateModuleCommandref($$;$$)
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
-          $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
+          if($l =~ m/<$tag ([^>]+)>/i) {
+            my $attr = $1;
+            print "*** $lang $mod line $line: $tag with attributes (apart ".
+                "from class) is not allowed\n" if($attr !~ m/class="[^"]*"/);
+          }
+          $tagcount{$tag} +=()= ($l =~ /<$tag( [^>]+)?>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
           if($tagcount{$tag} < 0) {
             print "*** $lang $fPath: negative tagcount for $tag, line $line\n"
