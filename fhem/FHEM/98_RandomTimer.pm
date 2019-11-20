@@ -41,6 +41,7 @@ sub RandomTimer_Attr($$$);
 sub RandomTimer_addDays ($$);
 sub RandomTimer_device_switch ($);
 sub RandomTimer_device_toggle ($);
+sub RandomTimer_disableDown($);
 sub RandomTimer_down($);
 sub RandomTimer_Exec($);
 sub RandomTimer_getSecsToNextAbschaltTest($);
@@ -64,7 +65,7 @@ sub RandomTimer_Initialize($) {
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{AttrFn}    = "RandomTimer_Attr";
-  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond ".
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd ".
                        "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 ".
                        $readingFnAttributes;
 }
@@ -203,12 +204,26 @@ sub RandomTimer_device_toggle ($) {
     }
 }
 
+sub RandomTimer_disableDown($) {
+   my ($hash) = @_;
+   my $disableCondCmd = AttrVal($hash->{NAME}, "disableCondCmd", 0);
+   
+   if ($disableCondCmd ne "none") {
+     Log3 $hash, 4, "[".$hash->{NAME}."]"." setting requested disableCondCmd on $hash->{DEVICE}: ";
+     $hash->{COMMAND} = AttrVal($hash->{NAME}, "disableCondCmd", 0) eq "onCmd" ? "on" : "off";
+     RandomTimer_device_switch($hash);
+   } else {
+     Log3 $hash, 4, "[".$hash->{NAME}."]"." no action requested on $hash->{DEVICE}: ";
+   }
+}
+
 sub RandomTimer_down($) {
    my ($hash) = @_;
-
+   Log3 $hash, 4, "[".$hash->{NAME}."]"." setting requested keepDeviceAlive on $hash->{DEVICE}: ";
    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
    RandomTimer_device_switch($hash);
 }
+
 
 sub RandomTimer_Exec($) {
    my ($myHash) = @_;
@@ -226,16 +241,16 @@ sub RandomTimer_Exec($) {
    if ($active) {
       # wenn temporär ausgeschaltet
       if ($disabled) {
-       Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
+        Log3 $hash, 3, "[".$hash->{NAME}."]"." disabled before stop-time , ending RandomTimer on $hash->{DEVICE}: "
           . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
           . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
-        RandomTimer_down($hash);
+        RandomTimer_disableDown($hash);
         RandomTimer_setActive($hash,0);
         RandomTimer_setState ($hash);
       }
       # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
       if ($stopTimeReached) {
-         Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
+         Log3 $hash, 3, "[".$hash->{NAME}."]"." stop-time reached, ending RandomTimer on $hash->{DEVICE}: "
             . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
             . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
          RandomTimer_down($hash);
@@ -614,11 +629,21 @@ sub RandomTimer_GetHashIndirekt ($$) {
       <br>
       <li>
         <code>keepDeviceAlive</code><br>
-        The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached. The <b>keepDeviceAlive</b> attribute  changes the behavior. If set, the device status is not changed when the stoptime is reached.<br>
+        The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached. The <b>keepDeviceAlive</b> attribute changes the behavior. If set, the device status is not changed when the stoptime is reached.<br>
         <br>
         <b>Examples</b>
         <ul>
           <li><code>attr ZufallsTimerZ keepDeviceAlive</code></li>
+        </ul>
+      </li>
+	  <br>
+	  <li>
+        <code>disableCondCmd</code><br>
+        In case the disable condition becomes true while a RandomTimer is already <b>running</b>, by default the same action is executed as when stoptime is reached (see keepDeviceAlive attribute). Setting the <b>disableCondCmd</b> attribute changes this as follows: "none" will lead to no action, "offCmd" means "use off command", "onCmd" will lead to execution of the "on command". Delete the attribute to get back to default behaviour.<br>
+		<br>
+        <b>Examples</b>
+        <ul>
+          <li><code>attr ZufallsTimerZ disableCondCmd offCmd</code></li>
         </ul>
       </li>
       <br>

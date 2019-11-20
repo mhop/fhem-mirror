@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_RandomTimer: add option to change behavior
+               when disable cond. ends (forum #14010, msg. 970714) 
  - change:  70_ONKYO_AVR: deleting attribute 'model'
  - bugfix:  98_weekprofile: time calculation for HM
  - bugfix:  49_SSCam: FHEM crash when sending data by telegramBot Forum:#105486
