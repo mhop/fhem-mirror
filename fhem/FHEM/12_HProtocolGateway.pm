@@ -4,7 +4,7 @@
 #	12_HProtocolGateway.pm
 #
 #	Copyright: Stephan Eisler
-#	Email: fhem.dev@hausautomatisierung.co
+#	Email: stephan@eisler.de 
 #
 #	This file is part of fhem.
 #
