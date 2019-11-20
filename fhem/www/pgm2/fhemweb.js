@@ -349,6 +349,8 @@ FW_getHelp(dev, fn)
   if(FW_helpData)
     return fn(FW_helpData);
   FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
+    if(data.match(/^<html>No help found/)) // for our german only friends
+      return FW_getHelp(dev+" DE", fn);
     FW_helpData = data;
     return fn(FW_helpData);
   });
