@@ -27,7 +27,7 @@ FHEM/00_HMUARTLGW.pm         mgernoth             HomeMatic
 FHEM/00_HXB.pm               neubert              Sonstige Systeme
 FHEM/00_KM271.pm             physikus             Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         Sonstiges
-FHEM/00_MAXLAN.pm            rudolfkoenig/orphan  MAX
+FHEM/00_MAXLAN.pm            Wzut		  MAX
 FHEM/00_MQTT.pm              hexenmeister         MQTT
 FHEM/00_MQTT2_CLIENT.pm      rudolfkoenig         MQTT
 FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
@@ -66,7 +66,7 @@ FHEM/10_IT.pm                dancer0705/bjoernh   InterTechno
 FHEM/10_Itach_IR             ulimaass             Sonstige Systeme
 FHEM/10_KNX.pm               andi291              KNX/EIB
 FHEM/10_KOPP_FC.pm           raspii               Sonstige Systeme
-FHEM/10_MAX.pm               rudolfkoenig/orphan  MAX
+FHEM/10_MAX.pm               Wzut		  MAX
 FHEM/10_MQTT2_DEVICE.pm      rudolfkoenig         MQTT
 FHEM/10_MQTT_BRIDGE          hexenmeister         MQTT
 FHEM/10_MQTT_DEVICE          hexenmeister         MQTT
@@ -92,7 +92,7 @@ FHEM/12_HMS.pm               rudolfkoenig         SlowRF
 FHEM/12_HProtocolGateway.pm  eisler               Sonstige Systeme
 FHEM/12_HProtocolTank.pm     eisler               Sonstige Systeme
 FHEM/13_KS300.pm             rudolfkoenig         SlowRF
-FHEM/14_CUL_MAX.pm           rudolfkoenig/orphan  MAX
+FHEM/14_CUL_MAX.pm           Wzut		  MAX
 FHEM/14_CUL_REDIRECT.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         SlowRF
@@ -552,7 +552,7 @@ FHEM/HMCCUConf.pm            zap                  HomeMatic
 FHEM/HMConfig.pm             martinp876           HomeMatic
 FHEM/HOMESTATEtk.pm          loredo               Automatisierung
 FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
-FHEM/MaxCommon.pm            rudolfkoenig/orphan  MAX
+FHEM/MaxCommon.pm            Wzut		  MAX
 FHEM/Meta.pm                 loredo               FHEM Development
 FHEM/msgSchema.pm            loredo               Automatisierung
 FHEM/ONKYOdb.pm              delmar               Multimedia
