@@ -169,6 +169,7 @@
 #   2019-11-11  modified precompilation of regexes to better support regex options
 #   2019-11-17  remove unused function, reformat
 #   2019-11-19  little bug fixes
+#   2019-11-20  precompilation of preProcessRegex removed - needs more testing before a release
 #
 #
 
@@ -240,7 +241,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.17 - 19.11.2019';
+my $HTTPMOD_Version = '3.5.18 - 20.11.2019';
 
 #
 # FHEM module intitialisation
@@ -598,9 +599,9 @@ sub HTTPMOD_PrecompileRegexAttr($$$)
     my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
     $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PrecompileRegexAttr for $aName $aVal created warning: @_"; };
     if ($regopt) {
-        eval "\$hash->{CompiledRegexes}{\$aName} = qr/$aVal/$regopt";	# some options need to be compiled in - special syntax needed -> better formulate options as part of regex ...
+        eval "\$hash->{CompiledRegexes}{\$aName} = qr/$aVal/$regopt";   # some options need to be compiled in - special syntax needed -> better formulate options as part of regex ...
     } else {
-        eval {$hash->{CompiledRegexes}{$aName} = qr/$aVal/};			# no options - use easy way.
+        eval {$hash->{CompiledRegexes}{$aName} = qr/$aVal/};            # no options - use easy way.
     }
     $SIG{__WARN__} = $oldSig;
     if (!$@) {
@@ -1854,6 +1855,7 @@ sub HTTPMOD_GetRegex($$$$$)
     my $regDecode  = AttrVal($name, 'regexDecode', "");
     my $regCompile = AttrVal($name, 'regexCompile', 1);
 
+    #Log3 $name, 5, "$name: Look for Regex $context$num$type";
     # first look for attribute with the full num in it
     if ($num && defined ($attr{$name}{$context . $num . $type})) {      # specific regex attr exists
         return $attr{$name}{$context . $num . $type} if (!$regCompile);
@@ -2771,9 +2773,8 @@ sub HTTPMOD_Read($$$)
         Log3 $name, 4, "$name: Read is decoding the buffer as $bodyDecode ";
     }
 
-
-    #my $ppr = AttrVal($name, "preProcessRegex", "");
-    my $ppr = HTTPMOD_GetRegex($name, "", "", "preProcessRegex", "");
+    my $ppr = AttrVal($name, "preProcessRegex", "");
+    #my $ppr = HTTPMOD_GetRegex($name, "", "", "preProcessRegex", "");      # klappt so einfach nicht -> intensiveres debugging wegen s// nötig
     if ($ppr) {
             my $pprexp = '$body=~' . $ppr; 
             my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
