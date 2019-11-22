@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.0.5"  => "22.11.2019  commandref revised ",
   "9.0.4"  => "18.11.2019  fix FHEM crash when sending data by telegramBot, Forum: https://forum.fhem.de/index.php/topic,105486.0.html ",
   "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
   "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
@@ -11236,19 +11237,27 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>   
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
-                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+      <tr><td> <b>snapEmailTxt</b>                     </td><td>- <b>Activates the Email shipping of snapshots.</b> This attribute has the format: <br>
+                                                                   <ul>
+																   <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code>
+																   </ul>
                                                                   The placeholder $CAM, $DATE and $TIME can be used. <br> 
 																  Optionally you can specify the "snapEmailTxt:"-tag when trigger a snapshot with the "snap"-command.
                                                                   In this case the Email shipping is activated one-time for the snapshot or the tag-text 
                                                                   is used instead of the text defined in the "snapEmailTxt"-attribute. </td></tr>
-      <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
-                                                                  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code><br> 
+      <tr><td> </td><td> </td></tr>
+	  <tr><td> </td><td> </td></tr>
+	  <tr><td> <b>recEmailTxt</b>                      </td><td>- <b>Activates the Email shipping of recordings.</b> This attribute has the format: <br>
+                                                                  <ul>
+																  <code>subject => &lt;subject text&gt;, body => &lt;message text&gt; </code>
+																  </ul>
                                                                   The placeholder $CAM, $DATE and $TIME can be used. <br> 
                                                                   Optionally you can specify the "recEmailTxt:"-tag when start recording with the "on"-command.
                                                                   In this case the Email shipping is activated one-time for the started recording or the tag-text 
                                                                   is used instead of the text defined in the "recEmailTxt"-attribute. </td></tr>
-      <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
+      <tr><td> </td><td> </td></tr>
+	  <tr><td> </td><td> </td></tr>
+	  <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname of outgoing Email server (e.g. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Return address (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Receiving address(es) (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpPort</b>     </td><td>- (optional) Port of outgoing Email server (default: 25) </td></tr>
@@ -13082,7 +13091,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Die Credentials für den Zugang zum Email-Server müssen mit dem Befehl <b>"set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt;"</b>
   hinterlegt werden. Der Verbindungsaufbau zum Postausgangsserver erfolgt initial unverschüsselt und wechselt zu einer verschlüsselten
   Verbindung wenn SSL zur Verfügung steht. In diesem Fall erfolgt auch die Übermittlung von User/Password verschlüsselt.
-  Ist das Attribut "smtpSSLPort" definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt. 
+  Ist das Attribut <a href="#smtpSSLPort">smtpSSLPort</a> definiert, erfolgt der Verbindungsaufbau zum Email-Server sofort verschlüsselt. 
   <br><br>
   
   Optionale Attribute sind gekennzeichnet: <br><br>
@@ -13090,7 +13099,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <ul>   
     <table>  
     <colgroup> <col width=12%> <col width=88%> </colgroup>
-      <tr><td style="vertical-align:top"> <b>snapEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Schnappschüssen</b>. 
+      <tr><td> <b>snapEmailTxt</b>                       </td><td>- <b>Aktiviert den Email-Versand von Schnappschüssen</b>. 
                                                                   Das Attribut hat das Format: <br>
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
@@ -13099,8 +13108,9 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
 																  Der Email-Versand des letzten Schnappschusses wird einmalig aktiviert falls der "snapEmailTxt:"-Tag 
 																  beim "snap"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
 																  Attribut "snapEmailTxt" verwendet. </td></tr>
-      
-      <tr><td style="vertical-align:top"> <b>recEmailTxt</b> <td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
+      <tr><td> </td><td> </td></tr>
+	  <tr><td> </td><td> </td></tr>
+      <tr><td> <b>recEmailTxt</b>                        </td><td>- <b>Aktiviert den Email-Versand von Aufnahmen</b>. 
                                                                   Das Attribut hat das Format: <br>
                                                                   <ul>
                                                                   <code>subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;</code><br>
@@ -13109,7 +13119,8 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
                                                                   Der Email-Versand der letzten Aufnahme wird einamlig aktiviert falls der "recEmailTxt:"-Tag beim 
                                                                   "on"-Kommando verwendet wird bzw. der in diesem Tag definierte Text statt des Textes im 
 																  Attribut "recEmailTxt" verwendet. </td></tr>
-																  
+	  <tr><td> </td><td> </td></tr>
+      <tr><td> </td><td> </td></tr>	  
       <tr><td>                            <b>smtpHost</b>     </td><td>- Hostname oder IP-Adresse des Postausgangsservers (z.B. securesmtp.t-online.de) </td></tr>
       <tr><td>                            <b>smtpFrom</b>     </td><td>- Absenderadresse (&lt;name&gt@&lt;domain&gt) </td></tr>
       <tr><td>                            <b>smtpTo</b>       </td><td>- Empfängeradresse(n) (&lt;name&gt@&lt;domain&gt) </td></tr>
@@ -13143,13 +13154,13 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <a name="SSCamPolling"></a>
   <b>Polling der Kamera/SVS-Eigenschaften:</b><br><br>
   <ul>
-  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert &gt; 10 gesetzt wird. <br>
-  Per Default ist das Attribut "pollcaminfoall" nicht gesetzt und das automatische Polling nicht aktiv. <br>
+  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> mit einem Wert &gt; 10 gesetzt wird. <br>
+  Per Default ist das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> nicht gesetzt und das automatische Polling nicht aktiv. <br>
   Der Wert dieses Attributes legt das Intervall der Abfrage in Sekunden fest. Ist das Attribut nicht gesetzt oder &lt; 10 wird kein automatisches Polling <br>
   gestartet bzw. gestoppt wenn vorher der Wert &gt; 10 gesetzt war. <br><br>
 
-  Das Attribut "pollcaminfoall" wird durch einen Watchdog-Timer überwacht. Änderungen des Attributwertes werden alle 90 Sekunden ausgewertet und entsprechend umgesetzt. <br>
-  Eine Änderung des Pollingstatus / Pollingintervalls wird im FHEM-Logfile protokolliert. Diese Protokollierung kann durch Setzen des Attributes "pollnologging=1" abgeschaltet werden.<br>
+  Das Attribut <a href="#pollcaminfoall">pollcaminfoall</a> wird durch einen Watchdog-Timer überwacht. Änderungen des Attributwertes werden alle 90 Sekunden ausgewertet und entsprechend umgesetzt. <br>
+  Eine Änderung des Pollingstatus / Pollingintervalls wird im FHEM-Logfile protokolliert. Diese Protokollierung kann durch Setzen des Attributes <a href="#pollnologging">pollnologging=1</a> abgeschaltet werden.<br>
   Dadurch kann ein unnötiges Anwachsen des Logs vermieden werden. Ab verbose=4 wird allerdings trotz gesetzten "pollnologging"-Attribut ein Log des Pollings <br>
   zu Analysezwecken aktiviert. <br><br>
 
@@ -13170,7 +13181,7 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   Wird Polling eingesetzt, sollte das Intervall nur so kurz wie benötigt eingestellt werden da die ermittelten Werte überwiegend statisch sind. <br>
   Das eingestellte Intervall sollte nicht kleiner sein als die Summe aller HTTP-Verarbeitungszeiten.
   Pro Pollingaufruf und Kamera werden ca. 10 - 20 Http-Calls gegen die Surveillance Station abgesetzt.<br><br>
-  Bei einem eingestellten HTTP-Timeout (siehe <a href="#SSCamattr">Attribut</a>) "httptimeout") von 4 Sekunden kann die theoretische Verarbeitungszeit nicht höher als 80 Sekunden betragen. <br>
+  Bei einem eingestellten HTTP-Timeout (siehe <a href="#httptimeout">httptimeout</a>) von 4 Sekunden kann die theoretische Verarbeitungszeit nicht höher als 80 Sekunden betragen. <br>
   In dem Beispiel sollte man das Pollingintervall mit einem Sicherheitszuschlag auf nicht weniger 160 Sekunden setzen. <br>
   Ein praktikabler Richtwert könnte zwischen 600 - 1800 (s) liegen. <br>
 
