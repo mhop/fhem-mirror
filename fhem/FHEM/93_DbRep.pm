@@ -13740,8 +13740,8 @@ sub bdump {
                                   
   <a name="userExitFn"></a>
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
-                               To activate the interfaace at first you should implement the subroutine which will be 
-                               called by the interface in your 99_myUtls.pm as shown in by the example:     <br>
+                               To activate the interfaace, at first you should implement the subroutine which will be 
+                               called by the interface in your 99_myUtils.pm as shown by the example:     <br>
 
 		<pre>
         sub UserFunction {
@@ -13766,10 +13766,11 @@ sub bdump {
 							   </ul>
 							   <br>
 							   
-							   The interface works generally without and independent from Events.
-							   If the attribute is set, after every reading generation the Regex will be evaluated.
-							   If the evaluation was "true", set subroutine will be called. 
-							   For further processing following parameters will be forwarded to the function: <br><br>
+							   The interface works generally <b>without and independent</b> from events.
+							   If the attribute is set, <b>after</b> every reading creation in the device the Regex will be 
+                               evaluated.
+							   If the evaluation is <b>true</b>, the subroutine will be called. 
+							   For further processing the following parameters are forwarded to the function: <br><br>
                                
 							   <ul>
                                <li>$name - the name of the DbRep-Device </li>
@@ -16267,7 +16268,7 @@ sub bdump {
   <a name="userExitFn"></a> 								
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
                                 Um die Schnittstelle zu aktivieren, wird zunächst die aufzurufende Subroutine in 
-							    99_myUtls.pm nach folgendem Muster erstellt:     <br>
+							    99_myUtils.pm nach folgendem Muster erstellt:     <br>
 
 		<pre>
         sub UserFunction {
@@ -16293,9 +16294,9 @@ sub bdump {
 							   </ul>
 							   <br>
 							   
-							   Grundsätzlich arbeitet die Schnittstelle OHNE Eventgenerierung bzw. benötigt zur Funktion keinen
-							   Event. Sofern das Attribut gesetzt ist, erfolgt Die Regexprüfung NACH der Erstellung eines
-							   Readings. Ist die Prüfung WAHR, wird die angegebene Funktion aufgerufen. 
+							   Grundsätzlich arbeitet die Schnittstelle <b>ohne</b> Eventgenerierung bzw. benötigt zur Funktion keinen
+							   Event. Sofern das Attribut gesetzt ist, erfolgt Die Regexprüfung <b>nach</b> der Erstellung jedes
+							   Readings im Device. Ist die Prüfung <b>wahr</b>, wird die angegebene Funktion aufgerufen. 
 							   Zur Weiterverarbeitung werden der aufgerufenenen Funktion folgende Variablen übergeben: <br><br>
                                
 							   <ul>
