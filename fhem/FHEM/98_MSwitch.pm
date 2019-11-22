@@ -89,7 +89,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.63';
+my $version    = '2.7';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 60; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
@@ -230,6 +230,7 @@ sub MSwitch_Initialize($) {
     $hash->{AttrList} =
         "  disable:0,1"
       . "  disabledForIntervals"
+	  . "  MSwitch_Language:EN,DE"
       . "  stateFormat:textField-long"
       . "  MSwitch_Comments:0,1"
       . "  MSwitch_Read_Log:0,1"
@@ -265,8 +266,14 @@ sub MSwitch_Initialize($) {
       . "  readingList:textField-long "
       . "  MSwitch_Eventhistory:0,1,2,3,4,5,10,20,30,40,50,60,70,80,90,100,150,200"
       . "  textField-long "
-      . $readingFnAttributes;
+
+	  . $readingFnAttributes;
     $hash->{FW_addDetailToSummary} = 0;
+	
+	
+	
+	#. "  MSwitch_Develop_Affected:textField-long"	  
+	#. "  MSwitch_Develop_Trigger:textField-long"
 }
 ####################
 sub MSwitch_Rename($) {
@@ -726,7 +733,7 @@ sub MSwitch_Define($$) {
         $hash->{INIT} = 'fhem.save';
     }
 
-Log3( $name, 0, "start checkinitdone ".$init_done );#LOG
+#Log3( $name, 5, "start checkinitdone ".$init_done );#LOG
 
 
      if ( $init_done && !defined( $hash->{OLDDEF} ) ) 
@@ -1320,14 +1327,14 @@ my %setlist;
 			}
 			else
 			{
-			    return "Unknown argument $cmd, choose one of exec_cmd_1 exec_cmd_2 reset_device:noArg state backup_MSwitch:all_devices $setList $special";
+			    return "Unknown argument $cmd, choose one of del_repeats:noArg del_delays:noArg exec_cmd_1 exec_cmd_2 reset_device:noArg state backup_MSwitch:all_devices $setList $special";
 			}
 
 	   }
         else 
 		{
             #full
-            return "Unknown argument $cmd, choose one of reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
+            return "Unknown argument $cmd, choose one of del_repeats:noArg reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
         }
     }
 	
@@ -2657,7 +2664,8 @@ sub MSwitch_Attr(@) {
 
     if ( $cmd eq 'set' && $aName eq 'disable' && $aVal == 0 )
 	{
-        delete( $hash->{READINGS}{Safemode} );
+         delete( $hash->{helper}{savemodeblock} );
+         delete( $hash->{READINGS}{Safemode} );
         MSwitch_Createtimer($hash);
 		
 		if ( ReadingsVal( $name, 'Trigger_device', 'no_trigger' ) ne 'no_trigger' 
@@ -2735,6 +2743,7 @@ sub MSwitch_Attr(@) {
 	
 		my $attrzerolist =
         "  disable:0,1"
+	  . "  MSwitch_Language:EN,DE"
       . "  MSwitch_Debug:0,1"
 	  . "  disabledForIntervals"
 	  . "  MSwitch_Expert:0,1"
@@ -2751,11 +2760,13 @@ sub MSwitch_Attr(@) {
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
-	  . "  MSwitch_Develop_Affected:textField-long"	  
-	  . "  MSwitch_Develop_Trigger:textField-long"
       . "  textField-long ";
 	
 	setDevAttrList($name, $attrzerolist);
+	
+	
+	#. "  MSwitch_Develop_Affected:textField-long"	  
+	#. "  MSwitch_Develop_Trigger:textField-long"
     }
 
     if ( $aName eq 'MSwitch_Mode' && $aVal eq 'Notify' ) 
@@ -3679,6 +3690,78 @@ sub MSwitch_fhemwebFn($$$$) {
     my $j1       = '';
     my $border   = 0;
 
+	my $ver = ReadingsVal( $Name, '.V_Check', '' );
+
+
+
+
+
+
+####################  TEXTSPRACHE
+my $LOOPTEXT;
+my $ATERROR;
+my $PROTOKOLL2;
+my $PROTOKOLL3;
+my $CLEARLOG;
+my $WRONGSPEC1;
+my $WRONGSPEC2;
+my $HELPNEEDED;
+my $WRONGCONFIG;
+my $VERSIONCONFLICT;
+my $INACTIVE;
+my $OFFLINE;
+my $NOCONDITION;
+my $MSDISTRIBUTORTEXT;
+my $MSDISTRIBUTOREVENT; 
+
+if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+			{
+			
+			$MSDISTRIBUTORTEXT="Evenz zu ID Verteilung (einstellung über Attribut)";
+			$MSDISTRIBUTOREVENT="eingehendes EventEvent"; 
+			$LOOPTEXT= "ACHTUNG: Der Safemodus hat eine Endlosschleife erkannt, welche zum Fhemabsturz führen könnte.<br>Dieses Device wurde automatisch deaktiviert ( ATTR 'disable') !<br>&nbsp;";
+			$ATERROR="AT-Kommandos können nicht ausgeführt werden !";
+			$PROTOKOLL2="Das Device befindet sich im Debug 2 Mode. Es werden keine Befehle ausgeführt, sondern nur protokolliert.";
+			$PROTOKOLL3="Das Device befindet sich im Debug 3 Mode. Alle Aktionen werden protokolliert.";
+			$CLEARLOG="lösche Log";
+			$WRONGSPEC1="Format HH:MM<br>HH muss kleiner 24 sein<br>MM muss < 60 sein<br>Timer werden nicht ausgeführt";
+			$WRONGSPEC2="Format HH:MM<br>HH muss < 24 sein<br>MM muss < 60 sein<br>Bedingung gilt immer als FALSCH";
+			$HELPNEEDED="Eingriff erforderlich !";
+			$WRONGCONFIG="Einspielen des Configfiles nicht möglich !<br>falsche Versionsnummer:";
+			$VERSIONCONFLICT="Versionskonflikt erkannt!<br>Das Device führt derzeit keine Aktionen aus. Bitte ein Update des Devices vornehmen.<br>Erwartete Strukturversionsnummer: $vupdate<br>Vorhandene Strukturversionsnummer: $ver ";
+			$INACTIVE="Device ist nicht aktiv";
+			$OFFLINE="Device ist abgeschaltet, Konfiguration ist möglich";
+			$NOCONDITION="Es ist keine Bedingung definiert, das Kommando wird immer ausgeführt";
+			}
+			else
+			{
+			$MSDISTRIBUTORTEXT="Event to ID distributor (Settings via attribute)";
+			$MSDISTRIBUTOREVENT="incommming Event:"; 
+			$LOOPTEXT= "ATTENTION: The safe mode has detected an endless loop, which could lead to a crash.<br> This device has been deactivated automatically ( ATTR 'disable') !<br>&nbsp;";
+			$ATERROR="AT commands can not be executed!";
+			$PROTOKOLL2="The device is in Debug 2 mode, no commands are executed, only logged.";
+			$PROTOKOLL3="The device is in debug 3 mode. All actions are logged.";
+			$CLEARLOG="clear log";
+			$WRONGSPEC1="Format HH: MM <br> HH must be less than 24 <br> MM must be <60 <br> Timers are not executed";
+			$WRONGSPEC2="Format HH: MM <br> HH must be <24 <br> MM must be <60 <br> Condition is always considered FALSE";
+			$HELPNEEDED="Intervention required !";
+			$WRONGCONFIG="Importing the Configfile not possible! <br> wrong version number:";
+			$VERSIONCONFLICT="Version conflict detected! <br> The device is currently not executing any actions. Please update the device. <br> Expected Structure Version Number: $vupdate <br> Existing Structure Version Number: $ver";
+			$INACTIVE="Device is inactive";
+			$OFFLINE="Device is disabled, configuration avaible";
+			$NOCONDITION="No condition is defined, the command is always executed";
+			}
+
+
+####################
+
+
+
+
+
+
+
+
 # lösche saveddevicecmd #
 
 if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' ) 
@@ -4144,7 +4227,7 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         $triggerdevices .="<option $selectedtrigger value=\"$name\">$name (a:$devicealias t:$deviceTYPE)</option>";
 # filter auf argumente on oder off ;
         if ( $name eq '' ) { next LOOP9; }
-        my $cs = "set $name ?";
+
 # abfrage und auswertung befehlssatz
         if ( $MSwitchIncludeDevicecmds eq '1' and $hash->{INIT} ne "define" ) {
             if ( exists $hash->{helper}{devicecmds1}{$name}
@@ -4154,8 +4237,8 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $errors      = $hash->{helper}{devicecmds1}{$name};
             }
             else {
-
-                $errors = AnalyzeCommandChain( undef, $cs );
+                #$errors = AnalyzeCommandChain( undef, $cs );
+				$errors = getAllSets($name);	
                 if ( $savecmds ne "nosave" ) {
                     $hash->{helper}{devicecmds1}{$name} = $errors;
                     $hash->{helper}{last_devicecmd_save} = time;
@@ -4167,17 +4250,21 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
             $errors = '';
         }
 
-        if ( !defined $errors ) { $errors = '' }
-        my @tmparg = split( /of /, $errors );
-        if ( !defined $tmparg[1] ) { $tmparg[1] = "" }
-        if ( $tmparg[1] ne '' ) 
-		{
-            $errors = $tmparg[1];
-        }
-        else 
-		{
-            $errors = '';
-        }
+        if ( !defined $errors ) 
+		{ 
+		$errors = ''; 
+		}
+
+		# my @tmparg = split( /of /, $errors );
+        # if ( !defined $tmparg[1] ) { $tmparg[1] = "" }
+        # if ( $tmparg[1] ne '' ) 
+		# {
+            # $errors = $tmparg[1];
+        # }
+        # else 
+		# {
+            # $errors = '';
+        # }
 
         $errors = '|' . $errors;
         $errors =~ s/\| //g;
@@ -4271,13 +4358,326 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 
 ####################
 # #devices details
+# steuerdatei
+ my $controlhtml;
+ $controlhtml ="
+<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
+
+<!-- 
+info: festlegung einer zellenhöhe
+MS-cellhigh=30;
+-->
+
+<!-- 
+start:textersetzung:ger
+Set->Schaltbefehl
+condition:->Schaltbedingung
+execute and exit if applies->Abbruch nach Ausführung
+Repeats:->Befehlswiederholungen:
+Repeatdelay in sec:->Wiederholungsverzögerung in Sekunden:
+delay with Cond-check immediately and delayed:->Verzögerung mit Bedingungsprüfung sofort und vor Ausführung:
+delay with Cond-check immediately only:->Verzögerung mit Bedingungsprüfung sofort:
+delay with Cond-check delayed only:->Verzögerung mit Bedingungsprüfung vor Ausführung:
+at with Cond-check immediately and delayed:->Ausführungszeit mit Bedingungsprüfung sofort und vor Ausführung:
+at with Cond-check immediately only:->Ausführungszeit mit Bedingungsprüfung sofort:
+at with Cond-check delayed only->Ausführungszeit mit Bedingungsprüfung vor Ausführung:
+check condition->prüfe Bedingung
+with->mit
+modify Actions->Befehle speichern
+device actions sortby:->Sortierung:
+add action for->zusätzliche Aktion für
+delete this action for->lösche diese Aktion für
+priority:->Priorität:
+show:->Anzeigereihenfolge
+end:textersetzung:ger
+-->
+
+
+<!-- 
+start:textersetzung:eng
+end:textersetzung:eng
+-->
+
+<!--
+MS-cellhighstandart
+MS-cellhighexpert
+MS-cellhighdebug
+MS-IDSATZ
+MS-NAMESATZMS-ACTIONSATZ
+MS-SET1
+MS-SET2
+MS-COND1
+MS-COND2
+MS-EXEC1
+MS-EXEC2
+MS-DELAYset1
+MS-DELAYset2
+MS-REPEATset
+MS-COMMENTset
+MS-HELPpriority
+MS-HELPonoff
+MS-HELPcondition
+MS-HELPexit
+MS-HELPtimer
+MS-HELPrepeats
+MS-HELPexeccmd
+MS-HELPdelay
+--> 
+ 
+<!-- start htmlcode -->
+<table border='0' class='block wide' id='MSwitchWebTR' nm='test1' cellpadding='4' style='border-spacing:0px;'>
+	<tr>
+		<td style='height: MS-cellhighstandart;width: 100%;' colspan='3'>
+		<table style='width: 100%'>
+			<tr>
+				<td>MS-NAMESATZ</td>
+				<td align=right>MS-HELPpriority&nbsp;MS-IDSATZ</td>
+			</tr>
+		</table>
+		</td>
+	</tr>
+	<tr>
+		<td colspan='3'>MS-COMMENTset</td>
+	</tr>
+	<tr>
+		<td rowspan='6'>CMD&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+		<td colspan='2'></td>
+	</tr>
+	<tr>
+		<td>MS-HELPonoff</td>
+		<td style='height: MS-cellhighstandart;width: 100%;'>MS-SET1</td>
+	</tr>
+	<tr>
+		<td>MS-HELPcondition</td>
+		<td style='height: MS-cellhighstandart;width: 100%'>MS-COND1</td>
+	</tr>
+	<tr>
+		<td></td>
+		<td style='height: MS-cellhighdebug;width: 100%'>MS-CONDCHECK1</td>
+	</tr>
+	<tr>
+		<td>MS-HELPexeccmd</td>
+		<td style='height: MS-cellhighexpert;width: 100%'>MS-EXEC1</td>
+	</tr>
+	<tr>
+		<td>MS-HELPdelay</td>
+		<td style='height: MS-cellhighexpert;width: 100%'>MS-DELAYset1</td>
+	</tr>
+	<tr>
+		<td rowspan='7'>CMD&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+		<td colspan='2'><hr noshade='noshade' style='height: 1px'></td>
+	</tr>
+	<tr>
+		<td>MS-HELPonoff</td>
+		<td style='height: MS-cellhighstandart;width: 100%'>MS-SET2</td>
+	</tr>
+	<tr>
+		<td>MS-HELPcondition</td>
+		<td style='height: MS-cellhighstandart;width: 100%'>MS-COND2</td>
+	</tr>
+	<tr>
+		<td></td>
+		<td style='height: MS-cellhighdebug;width: 100%'>MS-CONDCHECK2</td>
+	</tr>
+	<tr>
+		<td>MS-HELPexeccmd</td>
+		<td style='height: MS-cellhighexpert;width: 100%'>MS-EXEC2</td>
+	</tr>
+	<tr>
+		<td>MS-HELPdelay</td>
+		<td style='height: MS-cellhighexpert;width: 100%;'>MS-DELAYset2</td>
+	</tr>
+	<tr>
+		<td colspan='2'></td>
+	</tr>
+	<tr>
+		<td style='height: MS-cellhighexpert;'colspan='3'>MS-HELPrepeats&nbsp;MS-REPEATset</td>
+	</tr>
+	<tr>
+		<td style='height: MS-cellhighstandart;'colspan='3'>&nbsp;MS-ACTIONSATZ</td>
+	</tr>
+</table>
+<br>
+";
+  
+ 
+  my $controlhtmlalternativ="
+<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
+
+<!-- 
+info: festlegung einer zelleknöhe
+MS-cellhigh=30;
+-->
+
+<!-- 
+start:textersetzung:ger
+Set->&nbsp;Schaltbefehl
+condition:->Schaltbedingung
+execute and exit if applies->Abbruch nach Ausführung
+Repeats:->Befehlswiederholungen:
+Repeatdelay in sec:->Wiederholungsverzögerung in Sekunden:
+delay with Cond-check immediately and delayed:->Verzögerung mit Bedingungsprüfung sofort und vor Ausführung:
+delay with Cond-check immediately only:->Verzögerung mit Bedingungsprüfung sofort:
+delay with Cond-check delayed only:->Verzögerung mit Bedingungsprüfung vor Ausführung:
+at with Cond-check immediately and delayed:->Ausführungszeit mit Bedingungsprüfung sofort und vor Ausführung:
+at with Cond-check immediately only:->Ausführungszeit mit Bedingungsprüfung sofort:
+at with Cond-check delayed only->Ausführungszeit mit Bedingungsprüfung vor Ausführung:
+check condition->prüfe Bedinhgung
+\\(hh:mm:ss\\)-> 
+end:textersetzung:ger
+-->
+
+<!-- 
+start:textersetzung:eng
+end:textersetzung:eng
+-->
+
+
+
+<!--
+MS-cellhighstandart
+MS-cellhighexpert
+MS-cellhighdebug
+MS-IDSATZ
+MS-NAMESATZMS-ACTIONSATZ
+MS-SET1
+MS-SET2
+MS-COND1
+MS-COND2
+MS-EXEC1
+MS-EXEC2
+MS-DELAYset1
+MS-DELAYset2
+MS-REPEATset
+MS-COMMENTset
+MS-HELPpriority
+MS-HELPonoff
+MS-HELPcondition
+MS-HELPexit
+MS-HELPtimer
+MS-HELPrepeats
+MS-HELPexeccmd
+MS-HELPdelay
+--> 
+
+<!-- start htmlcode -->
+<table border='0' class='block wide' id='MSwitchWebTR'cellpadding='4' style='border-spacing:0px;'>
+    <tr class='even'>
+		<td colspan='4'><center>MS-COMMENTset</td>
+	</tr>
+	<tr class='even'>
+        <td style='border-bottom:1px solid #000;'></td>
+		<td style='border-bottom:1px solid #000;width: 50%'>MS-NAMESATZ</td>
+		<td style='border-bottom:1px solid #000;'>&nbsp;</td>
+		<td align=right style='border-bottom:1px solid #000; width: 50%'>MS-HELPpriority MS-IDSATZ</td>
+	</tr>
+	<tr class='even'>
+        <td style='border-bottom:1px solid #000;'></td>
+		<td style='border-bottom:1px solid #000;'>CMD 1</td>
+		<td style='border-left:1px solid #000;border-bottom:1px solid #000;'>&nbsp;</td>
+		<td style='border-bottom:1px solid #000;'>CMD 2</td>
+	</tr>
+        <tr class='even'>
+		<td></td>
+        <td></td>
+		<td style='border-left:1px solid #000;'>&nbsp;</td>
+		<td></td>
+	</tr>
+	<tr class='even'>
+        <td>MS-HELPonoff</td>
+		<td>MS-SET1</td>
+		<td style='border-left:1px solid #000;'>&nbsp;</td>
+		<td>MS-SET2</td>
+	</tr>
+	<tr class='even'>
+        <td>MS-HELPcondition</td>
+		<td>&nbsp;MS-COND1</td>
+		<td style='border-left:1px solid #000;'>&nbsp;</td>
+		<td>&nbsp;MS-COND2</td>
+	</tr>
+        <tr class='even'>
+        <td></td>
+		<td>MS-CONDCHECK1</td>
+		<td style='border-left:1px solid #000;'></td>
+		<td>MS-CONDCHECK1</td>
+	</tr>
+	<tr class='even'>
+        <td>MS-HELPexit</td>
+		<td>MS-EXEC1</td>
+		<td style='border-left:1px solid #000;'></td>
+		<td>MS-EXEC2</td>
+	</tr>
+	<tr class='even'>
+        <td>MS-HELPtimer</td>
+		<td>MS-DELAYset1</td>
+		<td style='border-left:1px solid #000;'>&nbsp;</td>
+		<td>MS-DELAYset2</td>
+	</tr>
+	<tr class='even'>
+        <td style='border-bottom:1px solid #000;'></td>
+		<td style='border-bottom:1px solid #000; width: 50%'></td>
+		<td style='border-left:1px solid #000;border-bottom:1px solid #000;'>&nbsp;</td>
+		<td style='border-bottom:1px solid #000; width: 50%'></td>
+	</tr>
+
+	<tr class='even'>
+		<td colspan='4'><center>MS-HELPrepeats MS-REPEATset</td>
+	</tr>
+	<tr class='even'>
+		<td colspan='4'></td>
+	</tr>
+	<tr class='even'>
+		<td colspan='4'><center>MS-ACTIONSATZ</td>
+	</tr>
+</table><br>
+";
+
+  $controlhtml = AttrVal( $Name, 'MSwitch_Develop_Affected', $controlhtml ) ; 
+  #### extrakt ersetzung
+  my $extrakt = $controlhtml;
+
+  $extrakt =~ s/\n/#/g;
+  
+  my $extrakthtml = $extrakt;
+  
+# umstellen auf globales attribut !!!!!!
+ if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+  $extrakt =~m/start:textersetzung:ger(.*)end:textersetzung:ger/ ;
+  $extrakt = $1;
+  }
+  else
+  {
+  $extrakt =~m/start:textersetzung:eng(.*)end:textersetzung:eng/ ;
+  $extrakt = $1;
+  }
+  
+  my @translate;
+  if(defined $extrakt)
+  {
+  $extrakt =~ s/^.//;
+  $extrakt =~ s/.$//;
+  @translate = split(/#/,$extrakt);
+  }
+
+	$controlhtml =~m/MS-cellhigh=(.*);/ ;
+	my $cellhight =$1."px";
+	my $cellhightexpert =$1."px";
+	my $cellhightdebug =$1."px";
+
+
+#<!-- start htmlcode -->
+$extrakthtml =~m/<!-- start htmlcode -->(.*)/ ;
+$controlhtml=$1;
+$controlhtml=~ s/#/\n/g;
+ #MSwitch_LOG( $Name, 0, "HTML " . $controlhtml );
+
+
 # detailsatz in scalar laden
-# my @devicedatails = split(/:/,ReadingsVal($Name, '.Device_Affected_Details', '')); #inhalt decice und cmds # durch komma getrennt
-    my %savedetails = MSwitch_makeCmdHash($Name);
+   my %savedetails = MSwitch_makeCmdHash($Name);
     my $detailhtml  = "";
     my @affecteddevices =
     split( /,/, ReadingsVal( $Name, '.Device_Affected', 'no_device' ) );
-
 #####################################
     MSwitch_LOG( $Name, 5, "$Name:  ->  @affecteddevices" );
     if (    AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' && ReadingsVal( $Name, '.sortby', 'none' ) eq 'priority' )
@@ -4299,17 +4699,64 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 	{
 	$affecteddevices[0] = 'no_device';
 	}
+   
+  
+    my $sortierung ="";
+	my $modify="";
+	my $IDsatz="";
+	my $NAMEsatz="";
+	my $ACTIONsatz="";
+	my $SET1="";
+	my $SET2="";
+	my $COND1set1="";
+	
+	my $COND1check1="";
+	my $COND2check2="";	
+		
+	my $COND1set2="";
+	my $EXECset1="";
+	my $EXECset2="";
+	my $DELAYset1="";
+	my $DELAYset2="";
+	my $REPEATset="";
+	my $COMMENTset="";
+	
+	my $HELPpriority ="";
+	my $HELPonoff ="";
+	my $HELPcondition ="";
+	my $HELPexit="";
+	my $HELPtimer="";
+	my $HELPrepeats="";
+	my $HELPexeccmd="";
+	my $HELPdelay="";
+
+	if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
+	{
+	$HELPpriority = "<input name='info' type='button' value='?' onclick=\"javascript: info('priority')\">";
+	$HELPonoff = "<input name='info' type='button' value='?' onclick=\"javascript: info('onoff')\">";
+	$HELPcondition = "<input name='info' type='button' value='?' onclick=\"javascript: info('condition')\">";
+	$HELPexit="<input name='info' type='button' value='?' onclick=\"javascript: info('exit')\">";
+	$HELPtimer="<input name='info' type='button' value='?' onclick=\"javascript: info('timer')\">";
+	$HELPrepeats="<input name='info' type='button' value='?' onclick=\"javascript: info('repeats')\">";
+	$HELPexeccmd="<input name='info' type='button' value='?' onclick=\"javascript: info('execcmd')\">";
+	$HELPdelay="<input name='info' type='button' value='?' onclick=\"javascript: info('timer')\">";
+	}
+	
+
+	
     if ( $affecteddevices[0] ne 'no_device' ) 
 	{
-        $detailhtml ="<table border='$border' class='block wide' id='MSwitchDetails' nm='MSwitch'>";
+	#######################   sortierungsblock 
+        $sortierung ="";
         if ( $hash->{INIT} ne 'define' ) 
 		{
-            $detailhtml .= "<tr class='even' >
-		<td class='even' colspan='5'>device actions sortby:
-		<input type='hidden' id='affected' name='affected' size='40'  value ='"
-              . ReadingsVal( $Name, '.Device_Affected', 'no_device' ) . "'>";
+            $sortierung .= "
+			device actions sortby:
+			<input type='hidden' id='affected' name='affected' size='40'  value ='"
+            . ReadingsVal( $Name, '.Device_Affected', 'no_device' ) . "'>";
 
             my $select = ReadingsVal( $Name, '.sortby', 'none' );
+			
             if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) ne '1'&& $select eq 'priority' )
             {
                 $select = 'none';
@@ -4322,23 +4769,47 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
             $nonef     = 'selected="selected"' if $select eq 'none';
             $priorityf = 'selected="selected"' if $select eq 'priority';
             $showf     = 'selected="selected"' if $select eq 'show';
-            $detailhtml .= '
-		<select name="sort" id="sort" onchange="changesort()" >
-		<option value="none" ' . $nonef . '>None</option>';
+			
+			$sortierung .= '<select name="sort" id="sort" onchange="changesort()" ><option value="none" ' . $nonef . '>None</option>';
+			
             if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' )
 			{
-                $detailhtml .=
-                    '<option value="priority" '
-                  . $priorityf
-                  . '>Field Priority</option>';
+                $sortierung .='
+                <option value="priority" '
+                . $priorityf
+                . '>Field Priority</option>';
             }
-            $detailhtml .=
-              '<option value="show" ' . $showf . '>Field Show</option>';
-            $detailhtml .= "<br>&nbsp;</td></tr>";    #start
+			$sortierung .='<option value="show" ' . $showf . '>Field Show</option>';
         }
+#################################	
+
+
+	$modify = "<table width = '100%' border='0' class='block wide' id='MSwitchDetails' cellpadding='4' style='border-spacing:0px;' nm='MSwitch'>
+			<tr class='even'><td>
+			<input type='button' id='aw_det' value='modify Actions' >&nbsp;$sortierung
+			</td></tr></table>
+			";
+		
+	
+##########################
+# $detailhtml .= $sortierung;
+##########################
+
+	#my $detailhtmlold;
+
+
         my $alert;
         foreach (@affecteddevices) 
 		{
+		
+			$IDsatz="";
+			$ACTIONsatz="";
+			$COND1set1="";
+			$COND1set2="";
+			$EXECset1="";
+			$EXECset2="";
+			$COMMENTset="";
+		
             my $nopoint = $_;
             $nopoint =~ s/\./point/g;
             $alert = '';
@@ -4422,7 +4893,6 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			{
                 my $key = '';
                 $key = $aktdevice . "_timeon";
-
                 #$savedetails{$key} = '000000';   #change
                 $savedetails{$key} = '00:00:00';
             }
@@ -4431,7 +4901,6 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			{
                 my $key = '';
                 $key = $aktdevice . "_timeoff";
-
                 #$savedetails{$key} = '000000';  #change
                 $savedetails{$key} = '00:00:00';
             }
@@ -4518,28 +4987,18 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 
             if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' ) 
 			{
-                $detailhtml = $detailhtml . "
-				<tr class='odd'>
-				<td colspan='4' class='even' style=\"width: 100%\">";
-                $detailhtml = $detailhtml
-                  . "$zusatz $devicenamet $realname&nbsp&nbsp;&nbsp;$dalias $alert
-				</td>";
+				$NAMEsatz =	"$zusatz $devicenamet $realname&nbsp&nbsp;&nbsp;$dalias $alert";	
 
 ###################### priority
+
                 my $aktfolge = $reihenfolgehtml;
                 my $newname  = "reihe" . $nopoint;
                 my $tochange ="<option value='$savedetails{ $aktdevice . '_priority' }'>$savedetails{ $aktdevice . '_priority' }</option>";
                 my $change ="<option selected value='$savedetails{ $aktdevice . '_priority' }'>$savedetails{ $aktdevice . '_priority' }</option>";
                 $aktfolge =~ s/reihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-                $detailhtml = $detailhtml . "<td nowrap style='text-align: right;' class='even'>";
-
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-				{
-                    $detailhtml = $detailhtml
-                      . "<input name='info' type='button' value='?' onclick=\"javascript: info('priority')\">&nbsp;";
-                }
-                $detailhtml = $detailhtml . "priority: " . $aktfolge . "&nbsp;";
+				
+				$IDsatz="priority: " . $aktfolge . "&nbsp;";
 
                 # ende
                 # show
@@ -4551,8 +5010,9 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $change ="<option selected value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 $aktfolge =~ s/showreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-                $detailhtml = $detailhtml . "show: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );
 
+				$IDsatz.="show: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );
+####
 # ID
                 $aktfolge = $idfolgehtml;
                 $newname  = "idreihe" . $nopoint;
@@ -4560,27 +5020,25 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $change ="<option selected value='$savedetails{ $aktdevice . '_id' }'>$savedetails{ $aktdevice . '_id' }</option>";
                 $aktfolge =~ s/idreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-                $detailhtml = $detailhtml . "ID: " . $aktfolge;
-                $detailhtml = $detailhtml . "</td>";
+	
+				$IDsatz.="ID: " . $aktfolge;			
+
                 # ende
             }
             else
 			{
-                $detailhtml = $detailhtml . "<tr class='odd'><td colspan='4' class='even'>";
-                $detailhtml = $detailhtml. "$zusatz $devicenamet $realname&nbsp&nbsp;&nbsp;$dalias $alert</td>";
-
+				$NAMEsatz="$zusatz $devicenamet $realname&nbsp&nbsp;&nbsp;$dalias $alert";
                 my $aktfolge = $showfolgehtml;
                 my $newname  = "showreihe" . $nopoint;
                 my $tochange ="<option value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 my $change ="<option selected value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 $aktfolge =~ s/showreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-                $detailhtml = $detailhtml . "<td nowrap style='text-align: right;' class='even'>";
-                $detailhtml = $detailhtml . "show : " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );
-                $detailhtml = $detailhtml . "</td>";
+				
+				$IDsatz.= "show : " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );					
+				
             }
-            $detailhtml = $detailhtml . "</tr>";
-
+ 
 ##### bis hier ok hier ist nach überschrift
 ##### kommentare
             my $noschow = "style=\"display:none\"";
@@ -4589,117 +5047,96 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $noschow = '';
             }
 
-            $detailhtml = $detailhtml . "<tr class='odd' $noschow>
-			<td style='vertical-align:middle' colspan='5' class='col1'>
-			<textarea class=\"devdetails\" cols='100' rows='1' id='cmdcomment"
-              . $_
-              . "1' name='cmdcomment"
-              . $nopoint . "'>"
-              . $savedetails{ $aktdevice . '_comment' }
-              . "</textarea>
-			</td>
-			</tr>";
-            $detailhtml = $detailhtml . "<tr class=''>";
-            my $rephide = "style='display:none;'";
-            my $rows    = 7;
-            if ( $hash->{INIT} eq 'define' )
-			{
-                $rows = 2;
-            }
+#kommentar
+			if ( AttrVal( $Name, 'MSwitch_Comments', "0" ) eq '1' ) 
+						{		
+						my @a=split(/\n/,$savedetails{ $aktdevice . '_comment' });
+						my $lines = @a;
+						$lines =1 if $lines == 0;
+						
+							$COMMENTset		=	  "<textarea rows=\"$lines\" style=\"width:97%;\" class=\"devdetails\"  id='cmdcomment"
+						  . $_
+						  . "1' name='cmdcomment"
+						  . $nopoint . "'>"
+						  . $savedetails{ $aktdevice . '_comment' }
+						  . "</textarea>";
+						  }
+			  
+			  
+            # my $rephide = "style='display:none;'";
+            # my $rows    = 7;
+            # if ( $hash->{INIT} eq 'define' )
+			# {
+                # $rows = 2;
+            # }
 
-            if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' )
-			{
-                $rephide = '';
-                $rows    = 8;    #8
-            }
-            $detailhtml = $detailhtml . "<td rowspan='$rows'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
-            $detailhtml = $detailhtml . "</td>";
+            # if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' )
+			# {
+                # $rephide = '';
+                # $rows    = 8;    #8
+            # }
+
             if ( $devicenamet ne 'FreeCmd' ) 
 			{
-                # nict freecmd
-                $detailhtml = $detailhtml . "
-				<tr class='col1'>
-				<td nowrap class='col1' style='text-align: left;'>
-				<table border='0'><tr>
-				<td nowrap class='col1' style='text-align: left;'>
-				<br>";
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' )
-				{
-                    $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('onoff')\">&nbsp;";
-                }
-                $detailhtml = $detailhtml . "MSwitch 'cmd1': 
-				Set <select class=\"devdetails2\" id='"
-                  . $_
-                  . "_on' name='cmdon"
-                  . $nopoint
-                  . "' onchange=\"javascript: activate(document.getElementById('"
-                  . $_
-                  . "_on').value,'"
-                  . $_
-                  . "_on_sel','"
-                  . $cmdsatz{$devicenamet}
-                  . "','cmdonopt"
-                  . $_
-                  . "1')\" >
-				<option value='no_action'>no_action</option>";
-                $detailhtml = $detailhtml . $option1html;
-                $detailhtml = $detailhtml . "
-				</select>
-				<td nowrap valign=bottom id='" . $_ . "_on_sel'>&nbsp;</td>
-				</tr></table>
-				<td nowrap>
-				</td>
-				<td  class='col2' style=\"width: 100%\">&nbsp;<br><input type='$hidden' id='cmdseton"
-                  . $_
-                  . "' name='cmdseton"
-                  . $nopoint
-                  . "' size='20'  value ='"
-                  . $cmdsatz{$devicenamet} . "'>
-				<input type='$hidden' id='cmdonopt"
-                  . $_
-                  . "1' name='cmdonopt"
-                  . $nopoint
-                  . "' size='20'  value ='"
-                  . $savedetails{ $aktdevice . '_onarg' }
-                  . "'>&nbsp;&nbsp;&nbsp;";
+            # nicht freecmd
+		
+			$SET1 =	"<table border ='0'><tr><td>
+			Set <select class=\"devdetails2\" id='"
+					  . $_
+					  . "_on' name='cmdon"
+					  . $nopoint
+					  . "' onchange=\"javascript: activate(document.getElementById('"
+					  . $_
+					  . "_on').value,'"
+					  . $_
+					  . "_on_sel','"
+					  . $cmdsatz{$devicenamet}
+					  . "','cmdonopt"
+					  . $_
+					  . "1')\" >
+					<option value='no_action'>no_action</option>".$option1html."</select>
+					</td>
+					<td><input type='$hidden' id='cmdseton"
+					  . $_
+					  . "' name='cmdseton"
+					  . $nopoint
+					  . "' size='10'  value ='"
+					  . $cmdsatz{$devicenamet} . "'>
+					<input type='$hidden' id='cmdonopt"
+					  . $_
+					  . "1' name='cmdonopt"
+					  . $nopoint
+					  . "' size='10'  value ='"
+					  . $savedetails{ $aktdevice . '_onarg' }
+					  . "'>
+					  </td><td nowrap id='" . $_ . "_on_sel'>
+					  </td></tr></table>
+					  ";
+				  
             }
             else 
 			{
                 # freecmd
                 $savedetails{ $aktdevice . '_onarg' } =~ s/'/&#039/g;
-                $detailhtml = $detailhtml . "
-				<tr class='col2'>
-				<td class='col2' nowrap style='text-align: left;vertical-align: middle;'>
-				<table><tr>
-				<td>";
 
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-				{
-                    $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('onoff')\">&nbsp;";
-                }
-
-                $detailhtml = $detailhtml . "MSwitch 'cmd1' :</td>
-				<td><textarea class=\"devdetails\" cols='50' rows='3' id='cmdonopt"
-					  . $_ . "1' name='cmdonopt" . $nopoint . "'
-				>" . $savedetails{ $aktdevice . '_onarg' } . "</textarea>
-				</td>
-				</tr>
-				</table>
-				</td>";
-                $detailhtml = $detailhtml . "<td  style='text-align: left;' class='col2' nowrap id='" . $_
-                  . "_on_sel'></td>
-				<td nowrap><input type='$hidden' id='"
-                  . $_
-                  . "_on' name='cmdon"
-                  . $nopoint
-                  . "' size='20'  value ='cmd'></td>
-			<td  class='col2' style=\"width: 100%\">&nbsp;<br><input type='$hidden' id='cmdseton"
-                  . $_
-                  . "' name='cmdseton"
-                  . $nopoint
-                  . "' size='20'  value ='cmd'></td>";
-            }
-            $detailhtml = $detailhtml . "<td></td></tr>";
+				$SET1 =	"<textarea class=\"devdetails\" cols='50' rows='3' id='cmdonopt"
+				. $_ . "1' name='cmdonopt" . $nopoint . "'
+				>" . $savedetails{ $aktdevice . '_onarg' } . "</textarea>";
+				"<input type='$hidden' id='"
+                . $_
+                . "_on' name='cmdon"
+                . $nopoint
+                . "' size='20'  value ='cmd'>
+				<input type='$hidden' id='cmdseton"
+                . $_
+                . "' name='cmdseton"
+                . $nopoint
+                . "' size='20'  value ='cmd'>
+				<span  style='text-align: left;' class='col2' nowrap id='" . $_
+                . "_on_sel'>	</span>			  ";
+			}
+           
+	
 ########################
 ## block off #$devicename
 
@@ -4707,20 +5144,8 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			{
                 if ( $devicenamet ne 'FreeCmd' ) 
 				{
-                    $detailhtml = $detailhtml . "		
-					<tr class='col1'>
-					<td  class='col1' nowrap style='text-align: left;'>
-					<table><tr>
-					<td  class='col1' nowrap style='text-align: left;'>
-					";
-
-                    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-					{
-                        $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('onoff')\">&nbsp;";
-                    }
-
-                    $detailhtml = $detailhtml . "MSwitch 'cmd2':
-				Set <select class=\"devdetails2\" id='"
+					$SET2=	 "<table border ='0'><tr><td>
+						Set <select class=\"devdetails2\" id='"
                       . $_
                       . "_off' name='cmdoff"
                       . $nopoint
@@ -4733,188 +5158,122 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                       . "','cmdoffopt"
                       . $_
                       . "1')\" >
-				<option value='no_action'>no_action</option>";
-                    $detailhtml = $detailhtml
-                      . $option2html;  #achtung tausch $_ devicenamet oben unten
-                    $detailhtml = $detailhtml . "
-				</select>
-				</td>
-				<td  class='col2' nowrap id='" . $_ . "_off_sel' >&nbsp;</td>
-				</tr></table>
-				</td>
-				<td></td>
-				
-				<td  class='col2' nowrap>
+				<option value='no_action'>no_action</option>".$option2html."</select>
+				</td><td>
 				<input type='$hidden' id='cmdsetoff"
                       . $_
                       . "' name='cmdsetoff"
                       . $nopoint
-                      . "' size='20'  value ='"
+                      . "' size='10'  value ='"
                       . $cmdsatz{$devicenamet} . "'>
 				<input type='$hidden'   id='cmdoffopt"
                       . $_
                       . "1' name='cmdoffopt"
                       . $nopoint
-                      . "' size='20' value ='"
+                      . "' size='10' value ='"
                       . $savedetails{ $aktdevice . '_offarg' }
-                      . "'>&nbsp;&nbsp;&nbsp;";
+					  . "'>
+                      </td><td nowrap id='" . $_ . "_off_sel' >
+					  </td></tr></table>
+					  ";
+	  
                 }
                 else 
 				{
                     $savedetails{ $aktdevice . '_offarg' } =~ s/'/&#039/g;
-                    $detailhtml = $detailhtml . "		
-				<tr class='col1'>
-				<td  class='col1' nowrap style='text-align: left;'>
-				
-				<table><tr>
-				<td>";
 
-                    # even
-                    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-					{
-                        $detailhtml = $detailhtml
-                          . "<input name='info' type='button' value='?' onclick=\"javascript: info('onoff')\">&nbsp;";
-                    }
-                    $detailhtml = $detailhtml . "MSwitch 'cmd2' :</td>
-				<td><textarea class=\"devdetails\" cols='50' rows='3' id='cmdoffopt"
-                      . $_ . "1' name='cmdoffopt" . $_ . "'
-			>" . $savedetails{ $aktdevice . '_offarg' } . "</textarea>
-			</td>
-				</tr></table>
-				</td>
-				<td style='text-align: left;' class='col1' nowrap id='" . $_
-                      . "_off_sel' ></td>
-				<td><input type='$hidden' id='"
-                      . $_
-                      . "_off' name='cmdoff"
-                      . $_
-                      . "' size='20'  value ='cmd'></td>
-				<td  class='col2' nowrap>
-				<input type='$hidden' id='cmdsetoff"
-                      . $_
-                      . "' name='cmdsetoff"
-                      . $_
-                      . "' size='20'  value ='cmd'>";
-                }
-                $detailhtml = $detailhtml . "</td><td></td></tr>";
-            }
-            else 
-			{ 
-			$detailhtml = $detailhtml . "</td><td>ffff</td></tr>"; }
-            $detailhtml = $detailhtml . "	
-			<tr class='col1'>
-			<td  class='col1' colspan='4' nowrap style='text-align: left;'>";
+					$SET2=	"<textarea class=\"devdetails\" cols='50' rows='3' id='cmdoffopt"
+							. $_ . "1' name='cmdoffopt" . $_ . "'
+							>" . $savedetails{ $aktdevice . '_offarg' } . "</textarea>
+							<span style='text-align: left;' class='col1' nowrap id='" . $_. "_off_sel' ></span>
+							<input type='$hidden' id='"
+							. $_
+							. "_off' name='cmdoff"
+							. $_
+							. "' size='20'  value ='cmd'></td>
+							<td  class='col2' nowrap>
+							<input type='$hidden' id='cmdsetoff"
+							. $_
+							. "' name='cmdsetoff"
+							. $_
+							. "' size='20'  value ='cmd'>";			  	  
+                }  
+			}
+        else 
+		{ 
+			#nothing
+		}
 
-            if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-			{
-                $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('condition')\">&nbsp;";
-            }
-
-            $detailhtml = $detailhtml
-              . "'cmd1' condition: <input class=\"devdetails\" type='text' id='conditionon"
-              . $_
-              . "' name='conditionon"
-              . $nopoint
-              . "' size='55' value ='"
-              . $savedetails{ $aktdevice . '_conditionon' }
-              . "' onClick=\"javascript:bigwindow(this.id);\">&nbsp;&nbsp;&nbsp;";
+		$COND1set1= "condition: <input class=\"devdetails\" type='text' id='conditionon"
+					  . $_
+					  . "' name='conditionon"
+					  . $nopoint
+					  . "' size='55' value ='"
+					  . $savedetails{ $aktdevice . '_conditionon' }
+					  . "' onClick=\"javascript:bigwindow(this.id);\">";
 
             my $exit1 = '';
             $exit1 = 'checked' if $savedetails{ $aktdevice . '_exit1' } eq '1';
 
             if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' ) 
 			{
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-				{
-                    $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('exit')\">&nbsp;";
-                }
-
-                $detailhtml =
-                    $detailhtml
-                  . "<input type=\"checkbox\" $exit1 name='exit1"
-                  . $nopoint
-                  . "' /> execute and exit if applies";
+				$EXECset1="<input type=\"checkbox\" $exit1 name='exit1". $nopoint. "' /> execute and exit if applies";			    
             }
             else 
-			{
-                $detailhtml =
-                    $detailhtml
-                  . "<input hidden type=\"checkbox\" $exit1 name='exit1"
-                  . $nopoint . "' /> ";
+			{  
+				$EXECset1.="<input hidden type=\"checkbox\" $exit1 name='exit1". $nopoint . "' /> ";
             }
 
             if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
 			{
-                $detailhtml =
-                    $detailhtml
-                  . "<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionon"
-                  . $_
-                  . "',document.querySelector('#checkon"
-                  . $_
-                  . "').value)\"> with \$EVENT=<select id = \"checkon"
-                  . $_
-                  . "\" name=\"checkon"
-                  . $_ . "\">"
-                  . $optiongeneral
-                  . "</select>";
+$COND1check1="<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionon"
+							  . $_
+							  . "',document.querySelector('#checkon"
+							  . $_
+							  . "').value)\"> with \$EVENT=<select id = \"checkon"
+							  . $_
+							  . "\" name=\"checkon"
+							  . $_ . "\">"
+							  . $optiongeneral
+							  . "</select>";				    
             }
 #alltriggers
-            $detailhtml = $detailhtml . "</td></tr>";
+ 
             if ( $hash->{INIT} ne 'define' ) 
 			{
 
-                $detailhtml = $detailhtml . "<tr class='col1'>
-			<td  class='col1' colspan='4' nowrap style='text-align: left;'>";
-
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' )
-				{
-                    $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('condition')\">&nbsp;";
-                }
-
-                $detailhtml =
-                    $detailhtml
-                  . "'cmd2' condition: <input class=\"devdetails\" type='text' id='conditionoff"
+				$COND1set2.="condition: <input class=\"devdetails\" type='text' id='conditionoff"
                   . $_
                   . "' name='conditionoff"
                   . $nopoint
                   . "' size='55' value ='"
                   . $savedetails{ $aktdevice . '_conditionoff' }
-                  . "' onClick=\"javascript:bigwindow(this.id);\">&nbsp;&nbsp;&nbsp;";
+                  . "' onClick=\"javascript:bigwindow(this.id);\">";
+
 
                 my $exit2 = '';
-                $exit2 = 'checked'
-                  if $savedetails{ $aktdevice . '_exit2' } eq '1';
+                $exit2 = 'checked' if $savedetails{ $aktdevice . '_exit2' } eq '1';
                 if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' )
-				{
-                    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-					{
-                        $detailhtml = $detailhtml . "<input name='info' type='button' value='?' onclick=\"javascript: info('exit')\">&nbsp;";
-                    }
-                    $detailhtml = $detailhtml
-                      . "<input type=\"checkbox\" $exit2 name='exit2"
-                      . $nopoint
-                      . "' /> execute and exit if applies";
+				{  
+				$EXECset2="<input type=\"checkbox\" $exit2 name='exit2". $nopoint . "' /> execute and exit if applies";				  	  
                 }
                 else 
 				{
-                    $detailhtml =  $detailhtml
-                      . "<input hidden type=\"checkbox\" $exit2 name='exit1"
-                      . $nopoint . "' /> ";
+				$EXECset2.="<input hidden type=\"checkbox\" $exit2 name='exit1". $nopoint . "' /> ";	  
                 }
 
                 if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' )
-				{
-                    $detailhtml = $detailhtml
-                      . "<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionoff"
-                      . $_
-                      . "',document.querySelector('#checkoff"
-                      . $_
-                      . "').value)\"> with \$EVENT=<select id = \"checkoff"
-                      . $_
-                      . "\" name=\"checkoff"
-                      . $_ . "\">"
-                      . $optiongeneral
-                      . "</select>";
+				{  
+				$COND2check2="<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionoff"
+									  . $_
+									  . "',document.querySelector('#checkoff"
+									  . $_
+									  . "').value)\"> with \$EVENT=<select id = \"checkoff"
+									  . $_
+									  . "\" name=\"checkoff"
+									  . $_ . "\">"
+									  . $optiongeneral
+									  . "</select>";					    
                 }
 
                 #### zeitrechner
@@ -4972,19 +5331,8 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                     $timestron = "[random]";
                 }
 
-                $detailhtml = $detailhtml . "</td></tr><tr class='col1'>
-			<td  class='col1' colspan='4' nowrap style='text-align: left;'>";
-
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' )
-				{
-                    $detailhtml = $detailhtml
-                      . "<input name='info' type='button' value='?' onclick=\"javascript: info('timer')\">&nbsp;";
-                }
-
-                $detailhtml =
-                    $detailhtml
-                  . "'cmd1'&nbsp;<select id = '' name='onatdelay"
-                  . $nopoint . "'>";
+				$DELAYset1=	"<select id = '' name='onatdelay". $nopoint . "'>";			
+				
                 my $se11    = '';
                 my $sel2    = '';
                 my $sel3    = '';
@@ -5006,41 +5354,31 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $sel6 = 'selected'
                   if ( $savedetails{ $aktdevice . '_delayaton' } eq "at2" );
 
-                $detailhtml = $detailhtml
-                  . "<option $se11 value='delay1'>delay with Cond-check immediately and delayed: +</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel2 value='delay0'>delay with Cond-check immediately only: +</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel5 value='delay2'>delay with Cond-check delayed only: +</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
 
-                $detailhtml =
-                    $detailhtml
-                  . "</select><input type='text' class=\"devdetails\" id='timeseton"
+				# $DELAYset1 .=	"<option $se11 value='delay1'>delay with Cond-check immediately and delayed: +</option>";
+				# $DELAYset1 .= "<option $sel2 value='delay0'>delay with Cond-check immediately only: +</option>";
+				# $DELAYset1 .= "<option $sel5 value='delay2'>delay with Cond-check delayed only: +</option>";
+				# $DELAYset1 .= "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
+				# $DELAYset1 .="<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
+				# $DELAYset1 .= "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
+				# $DELAYset1 .= "	</select><input type='text' class=\"devdetails\" id='timeseton"
+				
+				
+				$DELAYset1 .=	"<option $se11 value='delay1'>delay with Cond-check immediately and delayed:</option>";
+				$DELAYset1 .= "<option $sel2 value='delay0'>delay with Cond-check immediately only:</option>";
+				$DELAYset1 .= "<option $sel5 value='delay2'>delay with Cond-check delayed only:</option>";
+				$DELAYset1 .= "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
+				$DELAYset1 .="<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
+				$DELAYset1 .= "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
+				$DELAYset1 .= "	</select><input type='text' class=\"devdetails\" id='timeseton"
                   . $_
                   . "' name='timeseton"
                   . $nopoint
-                  . "' size='30' value ='"
+                  . "' size='8' value ='"
                   . $timestron
-                  . "'> (hh:mm:ss)</td></tr>";
-                $detailhtml = $detailhtml . "
-			<tr class='col1'>
-			<td  class='col2' colspan='4' nowrap style='text-align: left;'>";
+                  . "'> (hh:mm:ss)";		  
 
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-				{
-                    $detailhtml = $detailhtml
-                      . "<input name='info' type='button' value='?' onclick=\"javascript: info('timer')\">&nbsp;";
-                }
-
-                $detailhtml = $detailhtml
-                  . "'cmd2'&nbsp;<select id = '' name='offatdelay"
-                  . $nopoint . "'>";
+				$DELAYset2 = "<select id = '' name='offatdelay". $nopoint . "'>";
 
                 $se11    = '';
                 $sel2    = '';
@@ -5057,82 +5395,142 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
                 $sel3 = 'selected' if ( $savedetails{ $aktdevice . '_delayatoff' } eq "at1" );
                 $sel6 = 'selected' if ( $savedetails{ $aktdevice . '_delayatoff' } eq "at2" );
 
-                $detailhtml = $detailhtml
-                  . "<option $se11 value='delay1'>delay with Cond-check immediately and delayed: +</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel2 value='delay0'>delay with Cond-check immediately only: +</option>";
-
-                $detailhtml = $detailhtml
-                  . "<option $sel5 value='delay2'>delay with Cond-check delayed only: +</option>";
-
-                $detailhtml = $detailhtml
-                  . "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
-                $detailhtml = $detailhtml
-                  . "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
-
-                $detailhtml =
-                    $detailhtml
-                  . "</select><input type='text' class=\"devdetails\" id='timesetoff"
+				# $DELAYset2 .= "<option $se11 value='delay1'>delay with Cond-check immediately and delayed: +</option>";
+				# $DELAYset2 .= "<option $sel2 value='delay0'>delay with Cond-check immediately only: +</option>";
+				# $DELAYset2 .= "<option $sel5 value='delay2'>delay with Cond-check delayed only: +</option>";
+				# $DELAYset2 .= "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
+				# $DELAYset2 .= "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
+				# $DELAYset2 .= "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
+				# $DELAYset2 .= "</select><input type='text' class=\"devdetails\" id='timesetoff"
+				
+				
+			    $DELAYset2 .= "<option $se11 value='delay1'>delay with Cond-check immediately and delayed:</option>";
+				$DELAYset2 .= "<option $sel2 value='delay0'>delay with Cond-check immediately only:</option>";
+				$DELAYset2 .= "<option $sel5 value='delay2'>delay with Cond-check delayed only:</option>";
+				$DELAYset2 .= "<option $sel4 value='at0'>at with Cond-check immediately and delayed:</option>";
+				$DELAYset2 .= "<option $sel3 value='at1'>at with Cond-check immediately only:</option>";
+				$DELAYset2 .= "<option $sel6 value='at0'>at with Cond-check delayed only:</option>";
+				$DELAYset2 .= "</select><input type='text' class=\"devdetails\" id='timesetoff"
                   . $nopoint
                   . "' name='timesetoff"
                   . $nopoint
-                  . "' size='30' value ='"
+                  . "' size='8' value ='"
                   . $timestroff
-                  . "'> (hh:mm:ss)&nbsp;&nbsp;&nbsp;";
+                  . "'> (hh:mm:ss)";
 
-                $detailhtml = $detailhtml . "</td></tr>";
 
-                #############################################################################
-                $detailhtml = $detailhtml . "<tr $rephide class='col1'>
-			<td  class='col1' colspan='4' style='text-align: left;'>";
-
-                if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-				{
-                    $detailhtml = $detailhtml
-                      . "<input name='info' type='button' value='?' onclick=\"javascript: info('repeats')\">&nbsp;";
-                }
-
-                $detailhtml = $detailhtml . "Repeats: 
-			<input type='text' id='repeatcount' name='repeatcount"
+			if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '1' )
+			{				  
+			$REPEATset =	"Repeats: <input type='text' id='repeatcount' name='repeatcount"
                   . $nopoint
                   . "' size='10' value ='"
                   . $savedetails{ $aktdevice . '_repeatcount' } . "'>
-			&nbsp;&nbsp;&nbsp;
-			Repeatdelay in sec:
-			<input type='text' id='repeattime' name='repeattime"
+					&nbsp;&nbsp;&nbsp;
+					Repeatdelay in sec:
+					<input type='text' id='repeattime' name='repeattime"
                   . $nopoint
                   . "' size='10' value ='"
-                  . $savedetails{ $aktdevice . '_repeattime' } . "'>
-			</td></tr>";
-                $detailhtml = $detailhtml . "<tr $rephide class='even'>
-			<td  class='col1' colspan='5' style='text-align: left;'>
-			<br>
-			</td></tr>";
-                $detailhtml = $detailhtml . "<tr class='col1'>
-			<td  class='col1' colspan='5' style='text-align: left;'>";
+                  . $savedetails{ $aktdevice . '_repeattime' } . "'>";
+				  
+				  
+				  
+			}				  
+				  
 
-                if ( $devicenumber == 1 )
+            if ( $devicenumber == 1 )
 				{
-                    $detailhtml = $detailhtml
-                      . "&nbsp;<br><input name='info' class=\"randomidclass\" id=\"add_action1_"
-                      . rand(1000000)
-                      . "\" type='button' value='add action for $add' onclick=\"javascript: addevice('$add')\">";
+				$ACTIONsatz =	"<input name='info' class=\"randomidclass\" id=\"add_action1_". rand(1000000). "\" type='button' value='add action for $add' onclick=\"javascript: addevice('$add')\">";				  	  	  
                 }
-                $detailhtml = $detailhtml
-                  . "<input name='info' id=\"del_action1_"
-                  . rand(1000000)
-                  . "\" class=\"randomidclass\" type='button' value='delete this action for $add' onclick=\"javascript: deletedevice('$_')\">";
-                $detailhtml = $detailhtml . "<br>&nbsp;</td></tr>";
 
+			$ACTIONsatz .=	"&nbsp;<input name='info' id=\"del_action1_". rand(1000000). "\" class=\"randomidclass\" type='button' value='delete this action for $add' onclick=\"javascript: deletedevice('$_')\">";				
             }
             else 
 			{ 
 			#nothimg
 			}
+			
+######################################## neu ##############################################
+		my $controlhtmldevice = $controlhtml;
+		
+		
+	
+		
+		
+		
+		# ersetzung in steuerdatei
+		# MS-IDSATZ ... $IDsatz
+		$controlhtmldevice =~ s/MS-IDSATZ/$IDsatz/g;
+		# MS-NAMESATZ ... $NAMEsatz
+		$controlhtmldevice =~ s/MS-NAMESATZ/$NAMEsatz/g;
+		# MS-ACTIONSATZ ... $ACTIONsatz
+		$controlhtmldevice =~ s/MS-ACTIONSATZ/$ACTIONsatz/g;
+		# MS-SET1 ... $SET1
+		$controlhtmldevice =~ s/MS-SET1/$SET1/g;
+		$controlhtmldevice =~ s/MS-SET2/$SET2/g;
+		# MS-COND ... $COND1set
+		$controlhtmldevice =~ s/MS-COND1/$COND1set1/g;
+		$controlhtmldevice =~ s/MS-COND2/$COND1set2/g;
+		# MS-EXEC ... $EXECset1
+		$controlhtmldevice =~ s/MS-EXEC1/$EXECset1/g;
+		$controlhtmldevice =~ s/MS-EXEC2/$EXECset2/g;
+		# MS-DELAY1 ... $DELAYset1
+		$controlhtmldevice =~ s/MS-DELAYset1/$DELAYset1/g;
+		$controlhtmldevice =~ s/MS-DELAYset2/$DELAYset2/g;
+		# MS-REPEATset  $REPEATset
+		$controlhtmldevice =~ s/MS-REPEATset/$REPEATset/g;
+		#$COMMENTsatz	$MSComment 
+		$controlhtmldevice =~ s/MS-COMMENTset/$COMMENTset/g;
+		
+		$controlhtmldevice =~ s/MS-CONDCHECK1/$COND1check1/g;
+		$controlhtmldevice =~ s/MS-CONDCHECK2/$COND2check2/g;
+		#####
+		#zellenhöhe
+		
+		if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) eq '0' )
+			{
+			$cellhightexpert ="0px";
+			}
+		 if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) ne '1' )
+			{
+			$cellhightdebug="0px";
+			}
+		
+		
+		$controlhtmldevice =~ s/MS-cellhighstandart/$cellhight/g;
+		$controlhtmldevice =~ s/MS-cellhighexpert/$cellhightexpert/g;
+		$controlhtmldevice =~ s/MS-cellhighdebug/$cellhightdebug/g;
+		#$controlhtmldevice =~ s/MS-CONDCHECK2/$COND2check2/g;
+	#MS-cellhigh
+#MS-cellhighexpert
+#MS-cellhighdebug	
+		
+		
+		#HELPcondition
+		if ( AttrVal( $Name, 'MSwitch_Expert', "0" ) ne '1' ) 
+			{
+			$HELPexit="";
+			$HELPrepeats="";
+			$HELPexeccmd="";
+			}
+		$controlhtmldevice =~ s/MS-HELPpriority/$HELPpriority/g;
+		$controlhtmldevice =~ s/MS-HELPonoff/$HELPonoff/g;
+		$controlhtmldevice =~ s/MS-HELPcondition/$HELPcondition/g;
+		$controlhtmldevice =~ s/MS-HELPexit/$HELPexit/g;
+		$controlhtmldevice =~ s/MS-HELPtimer/$HELPtimer/g;
+		$controlhtmldevice =~ s/MS-HELPrepeats/$HELPrepeats/g;
+		$controlhtmldevice =~ s/MS-HELPexeccmd/$HELPexeccmd/g;
+		$controlhtmldevice =~ s/MS-HELPdelay/$HELPdelay/g;
 
-#middle
+# textersetzung 
+foreach (@translate)
+{
+my($wert1,$wert2) = split (/->/,$_);
+$controlhtmldevice =~ s/$wert1/$wert2/g;
+}
+	$detailhtml.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>".
+		$controlhtmldevice.
+		"</div>";
+		#####
 # javazeile für übergabe erzeugen
             $javaform = $javaform . "
 			devices += \$(\"[name=devicename$nopoint]\").val();
@@ -5177,14 +5575,23 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			devices += \$(\"[name=showreihe$nopoint]\").val();
 			devices += '#[DN]';
 			";
-        }
 
-####################
-        $detailhtml = $detailhtml;
-        $detailhtml = $detailhtml . "<tr class='even'><td colspan='5'><left>
-		<input type='button' id='aw_det' value='modify Actions' >
-		</td></tr></table>";    #end
+		}
+
+
+
+# textersetzung modify
+foreach (@translate)
+{
+my($wert1,$wert2) = split (/->/,$_);
+$modify =~ s/$wert1/$wert2/g;
+}
+
+$detailhtml .= $modify;
+    
     }
+# ende kommandofelder	
+	
 
 ####################
     my $triggercondition = ReadingsVal( $Name, '.Trigger_condition', '' );
@@ -5223,27 +5630,39 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 ########################
     my $blocking = '';
     $blocking = $hash->{helper}{savemodeblock}{blocking} if ( defined $hash->{helper}{savemodeblock}{blocking} );
-    if ( $blocking eq 'on' ) 
+   
+   
+   
+   
+   
+
+
+# endlosschleife
+   if ( $blocking eq 'on' ) 
 	{
         $ret .= "<table border='$border' class='block wide' id=''>
 		<tr class='even'>
-		<td><center>&nbsp;<br>ACHTUNG: Der Safemodus hat eine Endlosschleife erkannt, welche zum Fhemabsturz führen könnte.<br>Dieses Device wurde automatisch deaktiviert ( ATTR 'disable') !<br>&nbsp;
-		</td></tr></table><br>&nbsp;<br>
+		<td><center>&nbsp;<br>$LOOPTEXT"; 		
+		$ret .= "</td></tr></table><br>
 		";
     }
+######################
 
+# AT fehler
     my $errortest = "";
     $errortest = $hash->{helper}{error} if ( defined $hash->{helper}{error} );
-
     if ( $errortest ne "" )
 	{
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
-		 <td><center>&nbsp;<br>AT-Kommandos können nicht ausgeführt werden !<br>"
+		 <td><center>&nbsp;<br>$ATERROR<br>"
           . $errortest . "<br>&nbsp;
 		 </td></tr></table><br>&nbsp;<br>
 		 ";
     }
+
+
+# debugmode
 
     if (    AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '2'
          || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' )
@@ -5256,11 +5675,8 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         }
         close(BACKUPDATEI);
         my $text = "";
-        $text ="Das Device befindet sich im Debug 2 Mode. Es werden keine Befehle ausgeführt, sondern nur protokolliert."
-          if AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '2';
-
-        $text ="Das Device befindet sich im Debug 3 Mode. Alle Aktionen werden protokolliert."
-          if AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3';
+		$text =$PROTOKOLL2 if AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '2';
+		$text =$PROTOKOLL3 if AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3';  
 
         $ret .= "<table border='$border' class='block wide' id=''>
 			 <tr class='even'>
@@ -5270,13 +5686,16 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
           . $Zeilen . "</textarea>
 			  <br>&nbsp;<br>
 			<input type=\"button\" id=\"\"
-			value=\"clear log\" onClick=\"clearlog();\"> 
+			value=\"$CLEARLOG\" onClick=\"clearlog();\"> 
 			 <br>&nbsp;<br>
 			 </td></tr></table><br>
 			 <br>
 			 ";
     }
+	
+	
 # einblendung wrong timespec
+
     if ( defined $hash->{helper}{wrongtimespec} and $hash->{helper}{wrongtimespec} ne "" )
     {
         $ret .= "
@@ -5285,10 +5704,12 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 		<td colspan ='3'><center><br>&nbsp;";
         $ret .= $hash->{helper}{wrongtimespec};
         $ret .=
-"<br>use HH:MM<br>HH must be < 24<br>MM must be < 60<br>Timer werden nicht ausgeführt<br>";
+"<br>$WRONGSPEC1<br>";
         $ret .= "<br>&nbsp;</td></tr></table><br>
-		<br>
+		
 		 ";
+		 
+	#	 use HH:MM<br>HH must be < 24<br>MM must be < 60<br>Timer werden nicht ausgeführt
     }
     if ( defined $hash->{helper}{wrongtimespeccond}
          and $hash->{helper}{wrongtimespeccond} ne "" )
@@ -5299,10 +5720,11 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 		<td colspan ='3'><center><br>&nbsp;";
         $ret .= $hash->{helper}{wrongtimespeccond};
         $ret .=
-"<br>use HH:MM<br>HH must be < 24<br>MM must be < 60<br>Bedingung gilt immer als FALSCH<br>";
+"<br>$WRONGSPEC2<br>";
         $ret .= "<br>&nbsp;</td></tr></table><br>
-		<br>
+		
 		 ";
+		 #use HH:MM<br>HH must be < 24<br>MM must be < 60<br>Bedingung gilt immer als FALSCH
     }
 
     # einblendung info
@@ -5313,9 +5735,14 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 		<td colspan ='3'><center><br>&nbsp;";
         $ret .= ReadingsVal( $Name, '.info', '' );
         $ret .= "<br>&nbsp;</td></tr></table><br>
-		<br>
+		
 		 ";
     }
+
+
+
+
+
 
     # anpassung durch configeinspielung
     if ( ReadingsVal( $Name, '.change', 'undef' ) ne "undef" ) {
@@ -5371,11 +5798,11 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
             $out .= "</tr>";
             $count++;
         }
-
+#################################################
         $ret .= "
 		<table border='$border' class='block wide' id=''>
 		<tr class='even'>
-		<td colspan ='3'><center>&nbsp;<br>Eingriff erforderlich !<br>&nbsp;";
+		<td colspan ='3'><center>&nbsp;<br>$HELPNEEDED<br>&nbsp;";
         $ret .= ReadingsVal( $Name, '.change_info', '' );
         $ret .= "</td></tr>" . $out . "
 		<tr class='even'>
@@ -5384,9 +5811,9 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 		value=\"save changes\" onClick=\"changedevices();\"> 
 		<br>&nbsp;<br>
 		</td></tr></table><br>
-		<br>
+		
 		 ";
-
+###################################################
         $j1 = "<script type=\"text/javascript\">{";
         $j1 .=
 "var t=\$(\"#MSwitchWebTR\"), ip=\$(t).attr(\"ip\"), ts=\$(t).attr(\"ts\");
@@ -5412,33 +5839,36 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         return "$ret" . "$j1";
     }
 
+###########################################
     if ( ReadingsVal( $Name, '.wrong_version', 'undef' ) ne "undef" ) 
 	{
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
-		 <td><center>&nbsp;<br>Einspielen des Configfiles nicht möglich !<br>falsche Versionsnummer: "
+		 <td><center>&nbsp;<br>$WRONGCONFIG"
           . ReadingsVal( $Name, '.wrong_version', '' )
           . "<br>geforderte Versionsnummer $vupdate<br>&nbsp;
 		</td></tr></table><br>
-		<br>
+		
 		 ";
         fhem("deletereading $Name .wrong_version");
+		
     }
+#############################################
+
 
     if ( ReadingsVal( $Name, '.V_Check', $vupdate ) ne $vupdate ) 
 	{
-        my $ver = ReadingsVal( $Name, '.V_Check', '' );
+        
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
-		 <td><center>&nbsp;<br>Versionskonflikt erkannt!<br>Das Device führt derzeit keine Aktionen aus. Bitte ein Update des Devices vornehmen.<br>Erwartete Strukturversionsnummer: $vupdate<br>Vorhandene Strukturversionsnummer: $ver <br>&nbsp;<br>
+		 <td><center>&nbsp;<br>$VERSIONCONFLICT<br>&nbsp;<br>
 		<input type=\"button\" id=\"\"
 		value=\"try update to $vupdate\" onClick=\"vupdate();\"> 
 		<br>&nbsp;<br>
 		</td></tr></table><br>
 		<br>
 		 ";
-
-        $j1 = "<script type=\"text/javascript\">{";
+ $j1 = "<script type=\"text/javascript\">{";
         $j1 .=
 "var t=\$(\"#MSwitchWebTR\"), ip=\$(t).attr(\"ip\"), ts=\$(t).attr(\"ts\");
 	FW_replaceWidget(\"[name=aw_ts]\", \"aw_ts\", [\"time\"], \"12:00\");
@@ -5452,200 +5882,448 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         $j1 .= "}</script>";
         return "$ret" . "$j1";
     }
+	
+#########################################
 
     if ( ReadingsVal( $Name, 'state', 'undef' ) eq "inactive" ) 
 	{
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
-		 <td><center>&nbsp;<br>Device is inactive<br>&nbsp;<br>
+		 <td><center>&nbsp;<br>$INACTIVE<br>&nbsp;<br>
 		 </td></tr></table>";
     }
     elsif ( IsDisabled($Name) )
 	{
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
-		 <td><center>&nbsp;<br>Device is disabled, configuration avaible<br>&nbsp;<br>
+		 <td><center>&nbsp;<br>$OFFLINE<br>&nbsp;<br>
 		 </td></tr></table><br>";
     }
 ####################
 
-    my $inhalt      = "execute 'cmd1' only at :";
-    my $inhalt1     = "execute 'cmd2' only at :";
-    my $inhalt6     = "execute 'cmd1+cmd2' only at :";
-    my $inhalt2     = "execute 'cmd1' only";
-    my $inhalt3     = "execute 'cmd2' only";
-    my $inhalt4     = "switch MSwitch on + execute 'cmd1' at :";
-    my $inhalt5     = "switch $Name on + execute 'cmd1'";
+
+
+# trigger start 
+
+my $triggerhtml ="
+<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
+<!-- 
+info: festlegung einer zelleknöhe
+MS-cellhigh=30;
+-->
+<!--
+start:textersetzung:ger
+trigger device/time->Auslösendes Gerät und/oder Zeit
+trigger device->Auslösendes Gerät
+trigger time->Auslösezeit
+modify Trigger Device->Trigger speichern
+switch MSwitch on and execute CMD1 at->MSwitch an und CMD1 ausführen
+switch MSwitch off and execute CMD2 at->MSwitch aus und CMD2 ausführen
+execute CMD1 only->nur CMD1 ausführen
+execute CMD2 only->nur CMD2 ausführen
+execute CMD1 and CMD2 only->nur CMD1 und CMD2 ausführen
+Trigger Device Global Whitelist->Beschränkung GLOBAL Auslöser
+Trigger condition->Auslösebedingung
+time&events->für Events und Zeit
+events only->nur für Events
+check condition->prüfe Bedingung
+end:textersetzung:ger
+-->
+<!--
+start:textersetzung:eng
+end:textersetzung:eng
+-->
+<!--
+MS-HIDEDUMMY
+MS-TRIGGER
+MS-WHITELIST
+MS-ONAND1
+MS-ONAND2
+MS-EXEC1
+MS-EXEC2
+MS-EXECALL
+MS-CONDITION
+MS-HELPtime
+MS-HELPdevice
+MS-HELPtime
+MS-HELPdevice
+MS-HELPwhitelist
+MS-HELPexecdmd
+MS-HELPcond
+--> 
+<table MS-HIDEDUMMY border='0' cellpadding='4' class='block wide' style='border-spacing:0px;'>
+	<tr class='even'>
+		<td colspan='4'>trigger device/time</td>
+	</tr>
+	<tr class='even'>
+		<td>MS-HELPdevice</td>
+		<td>trigger device</td>
+		<td>&nbsp;</td>
+		<td>MS-TRIGGER</td>
+	</tr>
+	<tr MS-HIDEWHITELIST class='even'>
+		<td>MS-HELPwhitelist</td>
+		<td>Trigger Device Global Whitelist</td>
+		<td>&nbsp;</td>
+		<td>MS-WHITELIST</td>
+	</tr>
+	<tr MS-HIDEFULL class='even'>
+		<td>MS-HELPtime</td>
+		<td></td>
+		<td>switch MSwitch on and execute CMD1 at</td>
+		<td>MS-ONAND1</td>
+	</tr>
+	<tr MS-HIDEFULL class='even'>
+		<td>MS-HELPexecdmd</td>
+		<td>&nbsp;</td>
+		<td>switch MSwitch off and execute CMD2 at</td>
+		<td>MS-ONAND2</td>
+	</tr>
+	<tr class='even'>
+		<td>&nbsp;</td>
+		<td>trigger time</td>
+		<td>execute CMD1 only</td>
+		<td>MS-EXEC1</td>
+	</tr>
+	<tr class='even'>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>execute CMD2 only</td>
+		<td>MS-EXEC2</td>
+	</tr>
+	<tr class='even'>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>execute CMD1 and CMD2 only</td>
+		<td>MS-EXECALL</td>
+	</tr>
+	<tr class='even'>
+		<td>MS-HELPcond</td>
+		<td>MS-CONDTEXT</td>
+		<td>&nbsp;</td>
+		<td>MS-CONDITION MS-CHECKCONDITION</td>
+	</tr>
+
+
+	<tr class='even'>
+		<td colspan ='4'>MS-modify</td>
+	</tr>
+</table>
+";
+
+$triggerhtml = AttrVal( $Name, 'MSwitch_Develop_Trigger', $triggerhtml ) ; 
+
+my $extrakt1 = $triggerhtml;
+$extrakt1 =~ s/\n/#/g;
+
+
+ if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+  $extrakt1 =~m/start:textersetzung:ger(.*)end:textersetzung:ger/ ;
+  $extrakt1 = $1;
+  }
+  else
+  {
+  $extrakt1 =~m/start:textersetzung:eng(.*)end:textersetzung:eng/ ;
+  $extrakt1 = $1;
+  }
+  
+@translate;
+  if(defined $extrakt1)
+  {
+  $extrakt1 =~ s/^.//;
+  $extrakt1 =~ s/.$//;
+  @translate = split(/#/,$extrakt1);
+  }
+  
+
+
+my $MSHELPexeccmd="";
+my $MSHEPLtrigger="";
+my $MSHEPLwhitelist="";
+my $MSHEPtime="";
+my $MSHELPcond="";
+my $MStrigger="";
+my $MSwhitelist="";
+my $MSmodify="";
+my $MScondition="";
+my $MSonand1="";
+my $MSonand2="";
+my $MSexec1="";
+my $MSexec2="";
+my $MSexec12="";
+my $MSconditiontext="";
+my $MShidefull="";
+my $MSHidedummy="";
+my $MSHidewhitelist="id='triggerwhitelist'";
+my $MScheckcondition="";
+
+   # my $inhalt2     = "execute 'cmd1' only";
+   # my $inhalt3     = "execute 'cmd2' only";
+    my $inhalt5     = "switch $Name on and execute cmd1";
     my $displaynot  = '';
     my $displayntog = '';
     my $help        = "";
-    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' )
-	{
-        $help ="<input name='info' type='button' value='?' onclick=\"javascript: info('execcmd')\">&nbsp;";
-    }
+    my $visible = 'visible';
 
     if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Notify" )
 	{
+		$MShidefull="style='display:none;'";
         $displaynot = "style='display:none;'";
-        $inhalt     = "execute 'cmd1' at :";
-        $inhalt1    = "execute 'cmd2' at :";
-        $inhalt2    = $help . "execute 'cmd1'";
-        $inhalt3    = $help . "execute 'cmd2'";
+   #     $inhalt2    = $help . "execute 'cmd1'";
+   #     $inhalt3    = $help . "execute 'cmd2'";
     }
+
 
     if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Toggle" )
 	{
         $displayntog = "style='display:none;'";
-        $inhalt4     = "toggle $Name + execute 'cmd1/cmd2' at :";
-        $inhalt5     = "toggle $Name + execute 'cmd1/cmd2'";
+        $inhalt5     = "toggle $Name and execute cmd1/cmd2";	
     }
 
-	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" )
-	{
-         $displaynot = "style='display:none;'";
-        $inhalt     = "execute 'cmd1' at :";
-        $inhalt1    = "execute 'cmd2' at :";
-        $inhalt2    = $help . "execute 'cmd1'";
-        $inhalt3    = $help . "execute 'cmd2'";
-    }
+	# if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" )
+	# {
+        # $inhalt2    = $help . "execute 'cmd1'";
+        # $inhalt3    = $help . "execute 'cmd2'";
+    # }
 	
 	
 	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy" )
 	{
-	 $ret .="<table border='$border' class='block wide' id='MSwitchWebTR' nm='$hash->{NAME}'>";
+	$MSHidedummy="";
 	}
 	else
 	{
-	$ret .="<table border='$border' class='block wide' style ='visibility: collapse' id='MSwitchWebTR' nm='$hash->{NAME}'>";
+	$MSHidedummy="style ='visibility: collapse'";
 	}
-   $ret .= "<tr class=\"even\">";
-    $ret .="<td colspan=\"3\" id =\"savetrigger\">trigger  device/time:&nbsp;&nbsp;&nbsp;";
-    $ret .= "</td></tr><tr class=\"even\">
-	<td></td>
-	<td></td>
-	<td></td>
-	</tr>
-	<tr class=\"even\">
-	<td>";
-    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-	{
-        $ret = $ret. "<input name='info' type='button' value='?' onclick=\"javascript: info('trigger')\">&nbsp;";
-    }
 
-    $ret .= "Trigger device: </td>
-	<td  colspan =\"2\">
-	<select id =\"trigdev\" name=\"trigdev\">" . $triggerdevices . "</select>
-	</td>
-	</tr>";
-    my $visible = 'visible';
+	$MStrigger=	"<select id =\"trigdev\" name=\"trigdev\">" . $triggerdevices . "</select>";
+	
     if ( $globalon ne 'on' )
 	{
-        $visible = 'collapse';
+		$MSHidewhitelist="id='triggerwhitelist' style ='visibility: collapse'";
     }
 
-    my $visible1 = 'visible';
-    if ( $globalon1 ne 'on' ) 
-	{
-        $visible1 = 'collapse';
-    }
 
-    $ret =$ret
-      . "<tr class=\"even\"  id='triggerwhitelist' style=\"visibility:"
-      . $visible . ";\" >
-	<td nowrap>";
-
-    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-	{
-        $ret = $ret. "<input name='info' type='button' value='?' onclick=\"javascript: info('whitelist')\">&nbsp;";
-    }
-    $ret = $ret . "Trigger Device Global Whitelist: 
-	</td>
-	<td></td>
-	<td><input type='text' id ='triggerwhite' name='triggerwhitelist' size='60' value ='"
+	$MSwhitelist="<input type='text' id ='triggerwhite' name='triggerwhitelist' size='35' value ='"
       . ReadingsVal( $Name, '.Trigger_Whitelist', '' )
       . "' onClick=\"javascript:bigwindow(this.id);\" >";
 
-    $ret = $ret . "</td></tr>";
-    $ret = $ret . "
-	<tr class=\"even\">
-	<td>";
-
-    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-	{
-        $ret = $ret. "<input name='info' type='button' value='?' onclick=\"javascript: info('trigger')\">&nbsp;";
-    }
-
-    $ret = $ret . "Trigger time: </td>
-	<td></td>
-	<td></td>
-	</tr>
-	<tr " . $displaynot . " class=\"even\">
-	<td></td>
-	<td>" . $inhalt4 . "</td>
-	<td><input type='text' id='timeon' name='timeon' size='60'  value ='"
-      . $timeon . "'></td>
-	</tr><tr " . $displaynot . $displayntog . " class=\"even\">
-	<td></td>
-	<td>switch MSwitch off + execute 'cmd2' at :</td>
-	<td><input type='text' id='timeoff' name='timeoff' size='60'  value ='"
-      . $timeoff . "'></td>
-	</tr><tr " . $displayntog . "class=\"even\">
-	<td></td>
-	<td>" . $inhalt . "</td>
-	<td><input type='text' id='timeononly' name='timeononly' size='60'  value ='"
-      . $timeononly . "'></td>
-	</tr>";
+	
+	$MSonand1="<input type='text' id='timeon' name='timeon' size='35'  value ='"
+      . $timeon . "'>";
+	$MSonand2="<input type='text' id='timeoff' name='timeoff' size='35'  value ='"
+      . $timeoff . "'>";	
+	$MSexec1="<input type='text' id='timeononly' name='timeononly' size='35'  value ='"
+      . $timeononly . "'>";	
 
     if ( $hash->{INIT} ne 'define' ) 
 	{
-        $ret .= "<tr " . $displayntog . "class=\"even\">
-	<td></td>
-	<td>" . $inhalt1 . "</td>
-	<td><input type='text' id='timeoffonly' name='timeoffonly' size='60'  value ='"
-          . $timeoffonly . "'></td> 
-	</tr>";
-
-        $ret .= "<tr " . $displayntog . "class=\"even\">
-	<td></td>
-	<td>" . $inhalt6 . "</td>
-	<td><input type='text' id='timeoffonly' name='timeoffonly' size='60'  value ='"
-          . $timeonoffonly . "'></td> 
-	</tr>";
+		$MSexec2="<input type='text' id='timeoffonly' name='timeoffonly' size='35'  value ='"
+          . $timeoffonly . "'>"	;
+	
+		$MSexec12="<input type='text' id='timeoffonly' name='timeoffonly' size='35'  value ='"
+		. $timeonoffonly . "'>"	
     }
-
-    my $triggerinhalt = "Trigger condition (events only): ";
+    
+	$MSconditiontext="Trigger condition (events only)";
 
     if ( AttrVal( $Name, 'MSwitch_Condition_Time', "0" ) eq '1' ) 
 	{
-        $triggerinhalt = "Trigger condition (time&events): ";
+		$MSconditiontext = "Trigger condition (time&events)";
     }
-    $ret = $ret . "<tr class=\"even\">
-	<td>";
-    if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-	{
-        $ret = $ret .="<input name='info' type='button' value='?' onclick=\"javascript: info('triggercondition')\">&nbsp;";
-    }
-
-    $ret = $ret . $triggerinhalt . "</td>
-	<td></td>
-	<td><input type='text' id='triggercondition' name='triggercondition' size='60' value ='"
-      . $triggercondition . "' onClick=\"javascript:bigwindow(this.id);\" >";
 
     if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
 	{
-        $ret = $ret. " <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition','$Name:trigger:conditiontest')\">";
-    }
+	$MScheckcondition =" <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition','$Name:trigger:conditiontest')\">";
+	}
+   
+	$MScondition= "<input type='text' id='triggercondition' name='triggercondition' size='35' value ='"
+    . $triggercondition . "' onClick=\"javascript:bigwindow(this.id);\" >";
 
-    $ret = $ret . "</td></tr>";
-    $ret = $ret . "<tr class=\"even\">
-	<td colspan=\"3\"><left>
-	<input type=\"button\" id=\"aw_trig\" value=\"modify Trigger Device\"$disable>
-	</td>
-	</tr>
-	</table></p>";
-	#}
+	
+	if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
+	{
+	$MSHEPLtrigger="<input name='info' type='button' value='?' onclick=\"javascript: info('trigger')\">";
+    $MSHEPLwhitelist="<input name='info' type='button' value='?' onclick=\"javascript: info('whitelist')\">";
+	$MSHEPLtrigger="<input name='info' type='button' value='?' onclick=\"javascript: info('trigger')\">";
+	$help ="<input name='info' type='button' value='?' onclick=\"javascript: info('execcmd')\">&nbsp;";
+	$MSHELPcond="<input name='info' type='button' value='?' onclick=\"javascript: info('triggercondition')\">";
+	}
+
+	$MSmodify = "<input type=\"button\" id=\"aw_trig\" value=\"modify Trigger Device\"$disable>";
+	
+	$triggerhtml =~ s/MS-HELPexecdmd/$MSHELPexeccmd/g;
+	$triggerhtml =~ s/MS-HELPdevice/$MSHEPLtrigger/g;
+	$triggerhtml =~ s/MS-HELPwhitelist/$MSHEPLwhitelist/g;
+	$triggerhtml =~ s/MS-HELPtime/$MSHEPLtrigger/g;
+	$triggerhtml =~ s/MS-HELPcond/$MSHELPcond/g;
+	$triggerhtml =~ s/MS-modify/$MSmodify/g;
+	$triggerhtml =~ s/MS-TRIGGER/$MStrigger/g;
+	$triggerhtml =~ s/MS-WHITELIST/$MSwhitelist/g;
+	$triggerhtml =~ s/MS-CONDITION/$MScondition/g;
+	$triggerhtml =~ s/MS-ONAND1/$MSonand1/g;
+	$triggerhtml =~ s/MS-ONAND2/$MSonand2/g;
+	$triggerhtml =~ s/MS-EXEC1/$MSexec1/g;
+	$triggerhtml =~ s/MS-EXEC2/$MSexec2/g;
+	$triggerhtml =~ s/MS-EXECALL/$MSexec12/g;
+	$triggerhtml =~ s/MS-CONDTEXT/$MSconditiontext/g;
+	$triggerhtml =~ s/MS-HIDEFULL/$MShidefull/g;
+	$triggerhtml =~ s/MS-HIDEDUMMY/$MSHidedummy/g;
+	$triggerhtml =~ s/MS-HIDEWHITELIST/$MSHidewhitelist/g;
+	$triggerhtml =~ s/MS-CHECKCONDITION/$MScheckcondition/g;
+	
+	foreach (@translate)
+		{
+		my($wert1,$wert2) = split (/->/,$_);
+		$triggerhtml =~ s/$wert1/$wert2/g;
+		}
+
+	$ret.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>"
+	.$triggerhtml.
+	"</div><br>";
+	
+	
+	
+	
+	# trigger ende
+	
 ####################
-    # triggerdetails
+
+
+	my $MSTRIGGER;
+	my $MSCMDONTRIGGER="";
+	my $MSCMDOFFTRIGGER="";
+	my $MSCMD1TRIGGER="";
+	my $MSCMD2TRIGGER="";
+	my $MSSAVEEVENT="";
+	my $MSADDEVENT="";
+	my $MSMODLINE="";
+	my $MSTESTEVENT="";
+	my $MSHELP5="";
+	my $MSHELP6="";
+	my $triggerdetailhtml="
+<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
+
+<!-- 
+info: festlegung einer zelleknöhe
+MS-cellhigh=30;
+-->
+
+<!-- 
+start:textersetzung:ger
+execute only cmd1->nur CMD1 ausführen
+execute only cmd2->nur CMD2 ausführen
+Save incomming events->eingehende Events speichern
+Add event manually->Event manuell eintragen
+switch $Name on and execute cmd1->$Name anschalten und CMD1 ausführen
+switch $Name off and execute cmd2->$Name ausschalten und CMD2 ausführen
+trigger details:->Trigger Details
+test event->Event testen
+add event->Event einfügen
+modify Trigger->Triggerdetails speichern
+apply filter to saved events->Filter auf gespeicherte Events anwenden
+clear saved events->Eventliste löschen
+end:textersetzung:ger
+-->
+
+<!-- 
+start:textersetzung:eng
+end:textersetzung:eng
+-->
+
+
+<!-- start htmlcode -->
+<table border='0' cellpadding='4' class='block wide' style='border-spacing:0px;'>
+		<tr>
+		<td colspan='4'>trigger details:</td>
+	</tr>
+	<tr MS-HIDE>
+		<td></td>
+		<td>MS-CHANGETEXT</td>
+		<td>MS-TRIGGER</td>
+		<td>MS-ONCMD1TRIGGER</td>
+	</tr>
+	<tr MS-HIDE MS-HIDE1>
+		<td></td>
+		<td>switch $Name off and execute cmd2</td>
+		<td>MS-TRIGGER</td>
+		<td>MS-OFFCMD2TRIGGER</td>
+	</tr>
+	<tr>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr MS-HIDE1>
+		<td></td>
+		<td>execute only cmd1</td>
+		<td>MS-TRIGGER</td>
+		<td>MS-CMD1TRIGGER</td>
+	</tr>
+	<tr MS-HIDE1>
+		<td></td>
+		<td>execute only cmd2</td>
+		<td>MS-TRIGGER</td>
+		<td nowrap>MS-CMD2TRIGGER</td>
+	</tr>
+	<tr>
+		<td>MS-HELP5</td>
+		<td>Save incomming events</td>
+		<td>MS-SAVEEVENT</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td>MS-HELP6</td>
+		<td>Add event manually</td>
+		<td nowrap>MS-ADDEVENT</td>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td colspan='3'>MS-MODLINE</td>
+		<td>MS-TESTEVENT</td>
+	</tr>
+</table>
+";
+
+
+	
+my $extrakt2 = $triggerdetailhtml;
+  $extrakt2 =~ s/\n/#/g;
+  
+  $extrakthtml = $extrakt2;
+# umstellen auf globales attribut !!!!!!
+if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+  $extrakt2 =~m/start:textersetzung:ger(.*)end:textersetzung:ger/ ;
+  $extrakt2 = $1;
+  }
+  else
+  {
+  $extrakt2 =~m/start:textersetzung:eng(.*)end:textersetzung:eng/ ;
+  $extrakt2 = $1;
+  }
+  
+  @translate="";
+  if(defined $extrakt2)
+  {
+  $extrakt2 =~ s/^.//;
+  $extrakt2 =~ s/.$//;
+  @translate = split(/#/,$extrakt2);
+  }
+
+$extrakthtml =~m/<!-- start htmlcode -->(.*)/ ;
+$triggerdetailhtml=$1;
+$triggerdetailhtml=~ s/#/\n/g; 
+  
+  
+
+
+
+
+
+
     my $selectedcheck3 = "";
     my $SELF           = $Name;
     my $testlog        = ReadingsVal( $Name, 'Trigger_log', 'on' );
@@ -5665,28 +6343,10 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 	$selftrigger ="1";
 	$showtriggerdevice = "MSwitch_Self:";
 	}
-
     if ( ReadingsVal( $Name, 'Trigger_device', 'no_trigger' ) ne 'no_trigger' || $selftrigger ne "")
     {
-        $ret .=
-"<table border='$border' class='block wide' id='MSwitchWebTRDT' nm='$hash->{NAME}'>
-		<tr class=\"even\">
-		<td id =\"triggerdetails\">trigger details :</td>
-		<td></td>
-		<td></td>
-		</tr>
-		<tr class=\"even\">
-		<td></td>
-		<td></td>
-		<td></td>
-		</tr>";
-        $ret .= "<tr " . $displaynot . " class=\"even\"><td>";
-        $ret .= $inhalt5 . "</td><td>";
-        $ret .= "Trigger " . $showtriggerdevice. " :
-		</td>
-		<td>";
-        $ret .="<select id = \"trigon\" name=\"trigon\">" . $optionon . "</select>";
-
+		$MSTRIGGER="Trigger " . $showtriggerdevice. "";
+		$MSCMDONTRIGGER="<select id = \"trigon\" name=\"trigon\">" . $optionon . "</select>";
 ##############
         my $fieldon = "";
         if ( $triggeron =~ m/{(.*)}/ ) 
@@ -5697,23 +6357,11 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
 			}
             eval($exec);
-            $ret .="<input style='background-color:#e5e5e5;' name='info' readonly value='value = " . $fieldon . "'>";
-        }
+            $MSCMDONTRIGGER.="<input style='background-color:#e5e5e5;' name='info' readonly value='value = " . $fieldon . "'>";      
+		}
         #####################
 
-        $ret .= "</td>
-		</tr>
-		<tr " . $displaynot . $displayntog . "class=\"even\">
-		<td>
-		switch " . $Name . " off + execute 'cmd2'</td>
-		<td>
-		Trigger " . $showtriggerdevice. " :
-		</td>
-		<td>";
-        $ret .=
-            "<select id = \"trigoff\" name=\"trigoff\">"
-          . $optionoff
-          . "</select>";
+		$MSCMDOFFTRIGGER="<select id = \"trigoff\" name=\"trigoff\">". $optionoff. "</select>";
 
         ##############
         my $fieldoff = "";
@@ -5725,25 +6373,11 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
 			}
             eval($exec);
-            $ret .=
-"<input style='background-color:#e5e5e5;' name='info' readonly value='value = "
-              . $fieldoff . "'>";
+		$MSCMDOFFTRIGGER.="<input style='background-color:#e5e5e5;' name='info' readonly value='value = " . $fieldoff . "'>";			  
         }
         #####################
 
-        $ret .= "</td>
-		</tr>";
-
-        $ret .= "<tr class=\"even\">
-		<td colspan=\"3\" >&nbsp</td>
-		</tr>
-		<tr " . $displayntog . "  class=\"even\">
-		<td>" . $inhalt2 . "</td>
-		<td>
-		Trigger " . $showtriggerdevice." :
-		</td>
-		<td>
-		<select id = \"trigcmdon\" name=\"trigcmdon\">" . $optioncmdon . "</select>";
+		$MSCMD1TRIGGER="<select id = \"trigcmdon\" name=\"trigcmdon\">" . $optioncmdon . "</select>";
 
         ##############
         my $fieldcmdon = "";
@@ -5755,24 +6389,15 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 			MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
 			}
             eval($exec);
-            $ret .=
-"<input style='background-color:#e5e5e5;' name='info' readonly value='value = "
+			$MSCMD1TRIGGER.="<input style='background-color:#e5e5e5;' name='info' readonly value='value = "
               . $fieldcmdon . "'>";
         }
-        #####################
-        $ret .= "</td>
-		</tr>";
+
 
         if ( $hash->{INIT} ne 'define' ) 
 		{
-            $ret .= "<tr " . $displayntog . "class=\"even\">
-		<td>" . $inhalt3 . "</td>
-		<td>
-		Trigger " . $showtriggerdevice. " :
-		</td>
-		<td>
-		<select id = \"trigcmdoff\" name=\"trigcmdoff\">"
-              . $optioncmdoff . "</select>";
+		$MSCMD2TRIGGER="<select id = \"trigcmdoff\" name=\"trigcmdoff\">". $optioncmdoff . "</select>";			  
+			  
             ##############
             my $fieldcmdoff = "";
             if ( $triggercmdoff =~ m/{(.*)}/ ) {
@@ -5782,65 +6407,72 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 				MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
 				}
                 eval($exec);
-                $ret .=
-"<input style='background-color:#e5e5e5;' name='info' readonly value='value = "
+				  
+			$MSCMD2TRIGGER.="<input style='background-color:#e5e5e5;' name='info' readonly value='value = "
                   . $fieldcmdoff . "'>";
             }
             #####################
-            $ret .= "</td>
-		</tr>";
         }
 
-        $ret .= "<tr class=\"even\">
-		<td colspan=\"1\"><left>";
+		$MSSAVEEVENT="<input $selectedcheck3 name=\"aw_save\" type=\"checkbox\" $disable>";
 
         if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
 		{
-            $ret = $ret . "<input name='info' type='button' value='?' onclick=\"javascript: info('saveevent')\">&nbsp;";
-        }
-
-        $ret = $ret . "Save incomming events : 
-		</td>
-		<td><input $selectedcheck3 name=\"aw_save\" type=\"checkbox\" $disable></td>
-		<td></td>
-		</tr>
-		<tr class=\"even\">
-		<td colspan=\"1\"><left>";
-        if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
-		{
-            $ret = $ret . "<input name='info' type='button' value='?' onclick=\"javascript: info('addevent')\">&nbsp;";
-        }
-        $ret .= "Add event manually : 
-		</td>
-		<td><left>
-		<input type='text' id='add_event' name='add_event' size='40'  value =''>
+		$MSHELP5="<input name='info' type='button' value='?' onclick=\"javascript: info('saveevent')\">&nbsp;";
+		$MSHELP6="<input name='info' type='button' value='?' onclick=\"javascript: info('addevent')\">&nbsp;";
+		}
+		$MSADDEVENT="<input type='text' id='add_event' name='add_event' size='40'  value =''>
 		<input type=\"button\" id=\"aw_addevent\" value=\"add event\"$disable>";
-
-        $ret .= "</td>
-		<td><left>
-		</td>
-		</tr>
-		<tr class=\"even\">
-		<td colspan=\"2\"><left>
-		<input type=\"button\" id=\"aw_md\" value=\"modify Trigger\"$disable>
+		$MSMODLINE="<input type=\"button\" id=\"aw_md\" value=\"modify Trigger\" $disable>
 		<input type=\"button\" id=\"aw_md1\" value=\"apply filter to saved events\" $disable>
-		<input type=\"button\" id=\"aw_md2\" value=\"clear saved events\"$disable>&nbsp;&nbsp;&nbsp;
-		</td>
-		<td><left>";
-
+		<input type=\"button\" id=\"aw_md2\" value=\"clear saved events\" $disable>";
+		
         if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' && $optiongeneral ne '' )
         {
-            $ret .="<select id = \"eventtest\" name=\"eventtest\">"
+			$MSTESTEVENT="<select id = \"eventtest\" name=\"eventtest\">"
               . $optiongeneral
               . "</select><input type=\"button\" id=\"aw_md2\" value=\"test event\"$disable onclick=\"javascript: checkevent(document.querySelector('#eventtest').value)\">";
-        }
-        $ret .= "</td></tr>	</table></p>";
+
+	   }
     }
     else 
 	{
-# ACHTUNG
-        $ret .= "<p id=\"MSwitchWebTRDT\"></p>";
+		$triggerdetailhtml= "<p id=\"MSwitchWebTRDT\"></p>";	
     }
+
+##############################################################
+
+#MS-HIDEWHITELIST
+	$triggerdetailhtml =~ s/MS-OFFCMD2TRIGGER/$MSCMDOFFTRIGGER/g;
+	$triggerdetailhtml =~ s/MS-ONCMD1TRIGGER/$MSCMDONTRIGGER/g;
+	$triggerdetailhtml =~ s/MS-CMD2TRIGGER/$MSCMD2TRIGGER/g;
+	$triggerdetailhtml =~ s/MS-CMD1TRIGGER/$MSCMD1TRIGGER/g;
+	$triggerdetailhtml =~ s/MS-SAVEEVENT/$MSSAVEEVENT/g;
+	$triggerdetailhtml =~ s/MS-TRIGGER/$MSTRIGGER/g;
+	$triggerdetailhtml =~ s/MS-ADDEVENT/$MSADDEVENT/g;
+	$triggerdetailhtml =~ s/MS-MODLINE/$MSMODLINE/g;
+	$triggerdetailhtml =~ s/MS-TESTEVENT/$MSTESTEVENT/g;
+	$triggerdetailhtml =~ s/MS-CHANGETEXT/$inhalt5/g;
+	$triggerdetailhtml =~ s/MS-HIDE1/$displayntog/g;
+	$triggerdetailhtml =~ s/MS-HIDE/$displaynot/g;
+	$triggerdetailhtml =~ s/MS-HELP5/$MSHELP5/g;
+	$triggerdetailhtml =~ s/MS-HELP6/$MSHELP6/g;
+	
+	
+
+	foreach (@translate)
+{
+my($wert1,$wert2) = split (/->/,$_);
+$triggerdetailhtml =~ s/$wert1/$wert2/g;
+}
+	
+
+	$ret.="<div id='MSwitchWebTRDT' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>".$triggerdetailhtml."</div><br>";
+
+
+#################################################################
+
+
 
     # id event bridge
     my $expertmode = AttrVal( $Name, 'MSwitch_Expert', '0' );
@@ -5852,13 +6484,13 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         $ret .=
 "<table border='$border' class='block wide' id='MSwitchWebBridge' nm='$hash->{NAME}'>
 	<tr class=\"even\">
-	<td>Event to ID distributor (Settings via attribute):</td></tr>
+	<td>$MSDISTRIBUTORTEXT</td></tr>
 	<tr class=\"even\">
 	<td>&nbsp;</td></tr>";
         my $toid = $hash->{helper}{eventtoid};
         foreach my $a ( keys %{$toid} ) 
 		{
-            $ret .="<tr class=\"even\"><td>&nbsp;&nbsp;&nbsp;&nbsp;incommming Event: "
+            $ret .="<tr class=\"even\"><td>&nbsp;&nbsp;&nbsp;&nbsp;$MSDISTRIBUTOREVENT "
               . $a
               . " =\> execute "
               . $hash->{helper}{eventtoid}{$a}
@@ -5866,9 +6498,10 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         }
         $ret .= "<tr class=\"even\"><td>&nbsp;</td></tr></table></p>";
     }
+###############################################################
+
 
     #auswfirst  MSwitch_Selftrigger_always
-	
 	my $style = "";
 	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" && AttrVal( $Name, 'MSwitch_Selftrigger_always', '0' ) ne "1") 
 	{
@@ -5882,62 +6515,111 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 	";
 	}
 
+
+
+my $MSSAVED="";
+my $MSSELECT="";
+my $MSHELP="";
+my $MSEDIT="";
+my $MSLOCK="";
+my $MSMOD="";
+my $selectaffectedhtml="
+<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
+<!-- 
+start:textersetzung:ger
+quickedit locked->Auswahlfeld gesperrt
+edit list->Liste editieren
+multiple selection with ctrl and mousebutton->mehrfachauswahl mit CTRL und Maustaste
+all devicecomands saved->alle Devicekommandos gespeichert
+modify Devices->Devices speichern
+show greater list->grosses Auswahlfeld
+reload->neu laden
+end:textersetzung:ger
+-->
+<!-- 
+start:textersetzung:eng
+end:textersetzung:eng
+-->
+<!-- start htmlcode -->
+<table width='100%' border='$border' class='block wide' $style >
+	<tr>
+		<td>affected devices<br>MS-SAVED</td>
+		<td>&nbsp;</td>
+		<td></td>
+	</tr>
+	<tr>
+		<td>MS-HELP&nbsp;multiple selection with ctrl and mousebutton</td>
+		<td>MS-SELECT</td>
+		<td><center>MS-EDIT<br>MS-LOCK</td>
+	</tr>
+	<tr>
+		<td>MS-MOD</td>
+		<td>&nbsp;</td>
+		<td>&nbsp;</td>
+	</tr>
+</table>
+";
+my $extrakt3 = $selectaffectedhtml;
+
+  $extrakt3 =~ s/\n/#/g;
+  if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+  $extrakt3 =~m/start:textersetzung:ger(.*)end:textersetzung:ger/ ;
+  $extrakt3 = $1;
+  }
+  else
+  {
+  $extrakt3 =~m/start:textersetzung:eng(.*)end:textersetzung:eng/ ;
+  $extrakt3 = $1;
+  }
+  
+  @translate="";
+  if(defined $extrakt3)
+  {
+  $extrakt3 =~ s/^.//;
+  $extrakt3 =~ s/.$//;
+  @translate = split(/#/,$extrakt3);
+  }
+
     if ( $hash->{INIT} ne 'define' ) 
 	{
         # affected devices   class='block wide' style ='visibility: collapse'
-        $ret .="<table border='$border' class='block wide' $style id='MSwitchWebAF' nm='$hash->{NAME}'>
-	<tr class=\"even\">
-	<td>affected devices :
-	";
         if ( $savecmds ne "nosave" && $cmdfrombase eq "1" ) 
 		{
-            $ret .="<br>(all devicecomands saved <input type=\"button\" id=\"del_savecmd\" value=\"reload\">)";
-        }
-        $ret .= "
-	</td>
-	<td></td>
-	<td></td>
-	</tr>
-	<tr class=\"even\">
-	<td>
-	</td>
-	<td>
-	</td>
-	<td></td>
-	</tr>
-	<tr class=\"even\">
-	<td>";
-
+		$MSSAVED="all devicecomands saved <input type=\"button\" id=\"del_savecmd\" value=\"reload\">";
+		}
         if ( AttrVal( $Name, 'MSwitch_Help', "0" ) eq '1' ) 
 		{
-            $ret .="<input name='info' type='button' value='?' onclick=\"javascript: info('affected')\">&nbsp;";
-        }
-
-        $ret .= "multiple selection with ctrl + mousebutton</td>
-	<td><p id =\"textfie\">
-	<select id =\"devices\" multiple=\"multiple\" name=\"affected_devices\" size=\"6\" disabled >";
-        $ret .= $deviceoption;
-        $ret .= "</select>
-	</p>
-	</td>
-	<td><center>
-	<input type=\"button\" id=\"aw_great\"
-	value=\"edit list\" onClick=\"javascript:deviceselect();\">
-	<br>
-	<input onChange=\"javascript:switchlock();\" checked=\"checked\" id=\"lockedit\" name=\"lockedit\" type=\"checkbox\" value=\"lockedit\" /> quickedit locked
-	<br>
-	<br>
-	</td>
-	</tr>
-	<tr class=\"even\">
-	<td><leftt>
-	<input type=\"button\" id=\"aw_dev\" value=\"modify Devices\"$disable>
-	</td>
-	<td>&nbsp;</td>
-	<td>&nbsp;</td>
-	</tr>
-	</table>";
+		$MSHELP="<input name='info' type='button' value='?' onclick=\"javascript: info('affected')\">";
+		}
+		
+	$MSSELECT	="<select id =\"devices\" multiple=\"multiple\" name=\"affected_devices\" size=\"6\" disabled >"
+	.$deviceoption."</select>";
+	$MSEDIT="<input type=\"button\" id=\"aw_great\" value=\"edit list\" onClick=\"javascript:deviceselect();\">";	
+	$MSLOCK="<input onChange=\"javascript:switchlock();\" checked=\"checked\" id=\"lockedit\" name=\"lockedit\" type=\"checkbox\" value=\"lockedit\" /> quickedit locked";	
+	$MSMOD="<input type=\"button\" id=\"aw_dev\" value=\"modify Devices\"$disable>";
     }
+
+$selectaffectedhtml =~ s/MS-SAVED/$MSSAVED/g;
+$selectaffectedhtml =~ s/MS-SELECT/$MSSELECT/g;
+$selectaffectedhtml =~ s/MS-HELP/$MSHELP/g;
+$selectaffectedhtml =~ s/MS-EDIT/$MSEDIT/g;
+$selectaffectedhtml =~ s/MS-LOCK/$MSLOCK/g;
+$selectaffectedhtml =~ s/MS-MOD/$MSMOD/g;
+
+foreach (@translate)
+{
+my($wert1,$wert2) = split (/->/,$_);
+$selectaffectedhtml =~ s/$wert1/$wert2/g;
+}
+$selectaffectedhtml=~ s/#/\n/g; 
+$ret.="<div id='MSwitchWebAF' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>".
+		$selectaffectedhtml.
+		"</div>";
+
+
+
+
 
 ####################
     #javascript$jsvarset
@@ -5981,6 +6663,10 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
 		sel3 = 'cmdsetoff' +  devices[i];
 		aktcmd = document.getElementById(sel).value;
 		aktset = document.getElementById(sel3).value;
+		
+		//alert(sel1);
+		//activate(document.getElementById(sel).value,sel1,aktset,sel2); 
+		
 		activate(document.getElementById(sel).value,sel1,aktset,sel2); 
 		};"
     }
@@ -6327,7 +7013,7 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	// event = \"test:test:test\";
 	if (selected == '')
 	{
-	var textfinal = \"<div style ='font-size: medium;'>Es ist keine Bedingung definiert, das Kommando wird immer ausgeführt.</div>\";
+	var textfinal = \"<div style ='font-size: medium;'>".$NOCONDITION."</div>\";
 	FW_okDialog(textfinal);
 	return;
 	}
@@ -6482,7 +7168,7 @@ Increase
 
 	function slider(first,step,last,target,copytofield){
 	var selected =document.getElementById(copytofield).value;
-	var selectfield = \"&nbsp;<br><input type='text' id='\" + target +\"_opt' size='3' value='' readonly>&nbsp;&nbsp;&nbsp;\" + first +\"<input type='range' min='\" + first +\"' max='\" + last + \"' value='\" + selected +\"' step='\" + step + \"' onchange=\\\"javascript: showValue(this.value,'\" + copytofield + \"','\" + target + \"')\\\">\" + last  ;
+	var selectfield = \"<input type='text' id='\" + target +\"_opt' size='3' value='' readonly>&nbsp;&nbsp;&nbsp;\" + first +\"<input type='range' min='\" + first +\"' max='\" + last + \"' value='\" + selected +\"' step='\" + step + \"' onchange=\\\"javascript: showValue(this.value,'\" + copytofield + \"','\" + target + \"')\\\">\" + last  ;
 	document.getElementById(target).innerHTML = selectfield + '<br>';
 	var opt = target + '_opt';
 	document.getElementById(opt).value=selected;
@@ -6504,7 +7190,7 @@ Increase
 	var selected =document.getElementById(copytofield).value;
 	if (copytofield.indexOf('cmdonopt') != -1) {
 
-	var selectfield = \"&nbsp;<br><input type='text' size='30' value='\" + selected +\"' onchange=\\\"javascript: showtextfield(this.value,'\" + copytofield + \"','\" + target + \"')\\\">\"  ;
+	var selectfield = \"<input type='text' size='30' value='\" + selected +\"' onchange=\\\"javascript: showtextfield(this.value,'\" + copytofield + \"','\" + target + \"')\\\">\"  ;
 	document.getElementById(target).innerHTML = selectfield + '<br>';	
 	}
 	else{
@@ -6764,12 +7450,34 @@ Increase
 	function  switchlock(){	
 	test = document.getElementById('lockedit').checked ;	
 	if (test){
-	\$(\"#devices\").prop(\"disabled\", 'disabled');
-	document.getElementById('aw_great').value='edit list';
+	\$(\"#devices\").prop(\"disabled\", 'disabled');";
+	
+	
+	if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+	$j1.="document.getElementById('aw_great').value='Liste editieren';";
 	}
 	else{
-	\$(\"#devices\").prop(\"disabled\", false);
-	document.getElementById('aw_great').value='schow greater list';
+	$j1.="document.getElementById('aw_great').value='edit list';";
+	}
+	
+
+	
+	$j1.="}
+	else{
+	\$(\"#devices\").prop(\"disabled\", false);";
+
+if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
+  {
+	
+	$j1.="document.getElementById('aw_great').value='öffne grosse Liste';";
+	} 
+	else
+	{
+	$j1.="document.getElementById('aw_great').value='schow greater list';";
+	}
+	
+	$j1.="
 	}
 	}
 	
@@ -7256,7 +7964,7 @@ sub MSwitch_Exec_Notif($$$$$) {
                          && $devicedetails{ $device . '_repeattime' } > 0 )
                     {
                         my $i;
-                        for ( $i = 1;
+                        for ( $i = 1 ;
                               $i <= $devicedetails{ $device . '_repeatcount' } ;
                               $i++ )
                         {
@@ -8834,12 +9542,14 @@ sub MSwitch_Createtimer($) {
             my $part1 = $1;
             my $part3 = $3;
 			
-			if ($debugging eq "1")
-		{
-		MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
-		}
-
+		#	if ($debugging eq "1")
+		#{
+		#MSwitch_LOG( "Debug", 0,"eval line" . __LINE__ );
+		#}
+#MSwitch_LOG( "Debug", 0,"2: $2" . __LINE__ );
             my $part2 = eval $2;
+# MSwitch_LOG( "Debug", 0,"part2: $part2" . __LINE__ );			
+			
             if ( $part2 !~ m/^[0-9]{2}:[0-9]{2}$|^[0-9]{2}:[0-9]{2}:[0-9]{2}$/ )
             {
                 MSwitch_LOG(
@@ -8854,6 +9564,8 @@ sub MSwitch_Createtimer($) {
             my $test = substr( $part2, 0, 2 ) * 1;
             $part2 = "" if $test > 23;
             $condition = $part1 . $part2 . $part3;
+			
+			
         }
     }
 
