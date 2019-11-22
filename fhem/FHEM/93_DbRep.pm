@@ -50,7 +50,7 @@ use DBI::Const::GetInfoType;
 use Blocking;
 use Color;                           # colorpicker Widget
 use Time::Local;
-use Encode qw(encode_utf8);
+use Encode;
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 # no if $] >= 5.018000, warnings => 'experimental';
@@ -58,65 +58,68 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.29.0" => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
-  "8.28.2" => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
-  "8.28.1" => "09.10.2019  fix warnings line 5173 ",
-  "8.28.0" => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
-  "8.27.2" => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
-  "8.27.1" => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
-  "8.27.0" => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
-  "8.26.0" => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                           "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
-  "8.25.0" => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                           "sub DbRep_modAssociatedWith changed ",
-  "8.24.0" => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
-  "8.23.1" => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
-  "8.23.0" => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
-  "8.22.0" => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
-  "8.21.2" => "14.08.2019  commandRef revised ",
-  "8.21.1" => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
-  "8.21.0" => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
-  "8.20.1" => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
-  "8.20.0" => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
-                           "command, \"repository\" added in Meta.json ",
-  "8.19.1" => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
-  "8.19.0" => "04.04.2019  explain is possible in sqlCmd ",
-  "8.18.0" => "01.04.2019  new aggregation year ",
-  "8.17.2" => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
-  "8.17.1" => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
-  "8.17.0" => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
-  "8.16.0" => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
-  "8.15.0" => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
-  "8.14.1" => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
-  "8.14.0" => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
-  "8.13.0" => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
-  "8.12.0" => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
-  "8.11.2" => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
-  "8.11.1" => "25.01.2019  fix sort of versionNotes ",
-  "8.11.0" => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.1" => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
-  "8.10.0" => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
-  "8.9.10" => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
-  "8.9.9"  => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
-  "8.9.8"  => "27.11.2018  minor fix in deviceRename, commandref revised ",
-  "8.9.7"  => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
-  "8.9.6"  => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
-  "8.9.5"  => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
-  "8.9.0"  => "07.11.2018  command delDoublets added ",
-  "8.8.0"  => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
-  "8.7.0"  => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
-  "8.6.0"  => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"  => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
-  "8.4.0"  => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
-                           "versionNotes changed to support en/de, get dbValue as textfield-long ",
-  "8.3.0"  => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
-  "8.2.3"  => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"  => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
-  "8.2.1"  => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
-  "8.2.0"  => "05.10.2018  direct help for attributes ",
-  "8.1.0"  => "02.10.2018  new get versionNotes command ",
-  "8.0.1"  => "20.09.2018  DbRep_getInitData improved",
-  "8.0.0"  => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "8.30.1"  => "22.11.2019  commandref revised ",
+  "8.30.0"  => "14.11.2019  new command set adminCredentials and get storedCredentials, attribute useAdminCredentials ",
+  "8.29.1"  => "11.11.2019  commandref revised ",
+  "8.29.0"  => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
+  "8.28.2"  => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
+  "8.28.1"  => "09.10.2019  fix warnings line 5173 ",
+  "8.28.0"  => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
+  "8.27.2"  => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
+  "8.27.1"  => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
+  "8.27.0"  => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
+  "8.26.0"  => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                            "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
+  "8.25.0"  => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
+                            "sub DbRep_modAssociatedWith changed ",
+  "8.24.0"  => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
+  "8.23.1"  => "26.08.2019  fix add newline at the end of DbRep_dbValue result, Forum: #103295 ",
+  "8.23.0"  => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
+  "8.22.0"  => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
+  "8.21.2"  => "14.08.2019  commandRef revised ",
+  "8.21.1"  => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
+  "8.21.0"  => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
+  "8.20.1"  => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
+  "8.20.0"  => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
+                            "command, \"repository\" added in Meta.json ",
+  "8.19.1"  => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
+  "8.19.0"  => "04.04.2019  explain is possible in sqlCmd ",
+  "8.18.0"  => "01.04.2019  new aggregation year ",
+  "8.17.2"  => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
+  "8.17.1"  => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
+  "8.17.0"  => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
+  "8.16.0"  => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
+  "8.15.0"  => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
+  "8.14.1"  => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
+  "8.14.0"  => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
+  "8.13.0"  => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.12.0"  => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
+  "8.11.2"  => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
+  "8.11.1"  => "25.01.2019  fix sort of versionNotes ",
+  "8.11.0"  => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
+  "8.10.1"  => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
+  "8.10.0"  => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
+  "8.9.10"  => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
+  "8.9.9"   => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
+  "8.9.8"   => "27.11.2018  minor fix in deviceRename, commandref revised ",
+  "8.9.7"   => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
+  "8.9.6"   => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
+  "8.9.5"   => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
+  "8.9.0"   => "07.11.2018  command delDoublets added ",
+  "8.8.0"   => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
+  "8.7.0"   => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
+  "8.6.0"   => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"   => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
+  "8.4.0"   => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
+                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
+  "8.3.0"   => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
+  "8.2.3"   => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
+  "8.2.2"   => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
+  "8.2.1"   => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
+  "8.2.0"   => "05.10.2018  direct help for attributes ",
+  "8.1.0"   => "02.10.2018  new get versionNotes command ",
+  "8.0.1"   => "20.09.2018  DbRep_getInitData improved",
+  "8.0.0"   => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
   "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
@@ -146,68 +149,73 @@ our %DbRep_vNotesIntern = (
   "7.12.0"  => "16.02.2018  compression of dumpfile, restore of compressed files possible ",
   "7.11.0"  => "12.02.2018  new command 'repairSQLite' to repair a corrupted SQLite database ",
   "7.10.0"  => "10.02.2018  bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"  => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"  => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"  => "04.02.2018  new command 'eraseReadings' ", 
-  "7.7.1"  => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"  => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"  => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.6.0"  => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
-  "7.5.5"  => "25.01.2018  minor change in delSeqDoublets ",
-  "7.5.4"  => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
-  "7.5.3"  => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.5.2"  => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
-  "7.5.1"  => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
-  "7.5.0"  => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
-  "7.4.1"  => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"  => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"  => "08.01.2018  fix syntax error for perl < 5.20 ",
-  "7.3.0"  => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
-  "7.2.1"  => "04.01.2018  bugfix month out of range that causes fhem crash ",
-  "1.0.0"  => "19.05.2016  Initial"
+  "7.9.0"   => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"   => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"   => "04.02.2018  new command 'eraseReadings' ", 
+  "7.7.1"   => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"   => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"   => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.6.0"   => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
+  "7.5.5"   => "25.01.2018  minor change in delSeqDoublets ",
+  "7.5.4"   => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
+  "7.5.3"   => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.5.2"   => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
+  "7.5.1"   => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
+  "7.5.0"   => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
+  "7.4.1"   => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"   => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"   => "08.01.2018  fix syntax error for perl < 5.20 ",
+  "7.3.0"   => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
+  "7.2.1"   => "04.01.2018  bugfix month out of range that causes fhem crash ",
+  "1.0.0"   => "19.05.2016  Initial"
 );
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
-  "8.25.0" => "29.08.2019 If a list of devices in attribute \"device\" contains a SQL wildcard (\%), this wildcard is now "
-                          ."dissolved into separate devices if they are still existing in your FHEM configuration. "
-                          ."Please see <a href=\"https://forum.fhem.de/index.php/topic,101756.0.html\">this Forum Thread</a> "
-                          ."for further information. ",
-  "8.24.0" => "24.08.2019 Devices which are specified in attribute \"device\" are marked as \"Associated With\" if they are "
-                          ."still existing in your FHEM configuration. At least fhem.pl 20069 2019-08-27 08:36:02 is needed. ",
-  "8.22.0" => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
-                          "the value displayed from the VALUE database field before create the appropriate reading. ",
-  "8.21.0" => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
-  "8.20.0" => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
-              "needed for DbLog and/or DbRep operation.",
-  "8.19.0" => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
-  "8.18.0" => "01.04.2019 New aggregation type \"year\" ",
-  "8.17.0" => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
-              "before running a SQL-statement with sqlCmd command.",
-  "8.16.0" => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
-  "8.15.0" => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
-  "8.13.0" => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
-  "8.11.0" => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.0" => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082 ",
-  "8.9.0"  => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
-  "8.8.0"  => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
-              ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
-              ."first task. ",
-  "8.7.0"  => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
-              ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
-              ." 'valueFilter' generally applied to database field 'VALUE' ",
-  "8.6.0"  => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"  => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
-  "8.4.0"  => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
-                          "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
-                          "Function \"get dbValue\" opens an editor window ",
-  "8.3.0"  => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
-                          "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
-                          "and timeDiffToNow can be calculated dynamically ",
-  "8.2.2"  => "07.10.2018 fix don't get the real min timestamp in rare cases ",
-  "8.2.0"  => "05.10.2018 direct help for attributes ",
-  "8.1.0"  => "01.10.2018 new get versionNotes command ",
-  "8.0.0"  => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
+  "8.30.0"  => "14.11.2019 A new command \"set <name> adminCredentials\" and \"get <name> storedCredentials\" ist provided. ".
+                           "Use it to store a database priviledged user. This user DbRep can utilize for several operations which are need more (administative) ".
+						   "user rights (e.g. index, sqlCmd). ",
+  "8.29.0"  => "08.11.2019 add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
+  "8.28.0"  => "30.09.2019 seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
+  "8.25.0"  => "29.08.2019 If a list of devices in attribute \"device\" contains a SQL wildcard (\%), this wildcard is now "
+                           ."dissolved into separate devices if they are still existing in your FHEM configuration. "
+                           ."Please see <a href=\"https://forum.fhem.de/index.php/topic,101756.0.html\">this Forum Thread</a> "
+                           ."for further information. ",
+  "8.24.0"  => "24.08.2019 Devices which are specified in attribute \"device\" are marked as \"Associated With\" if they are "
+                           ."still existing in your FHEM configuration. At least fhem.pl 20069 2019-08-27 08:36:02 is needed. ",
+  "8.22.0"  => "23.08.2019 A new attribute \"fetchValueFn\" is provided. When fetching the database content, you are able to manipulate ".
+                           "the value displayed from the VALUE database field before create the appropriate reading. ",
+  "8.21.0"  => "28.04.2019 FHEM command \"dbReadingsVal\" implemented.",
+  "8.20.0"  => "27.04.2019 With the new set \"index\" command it is now possible to list and (re)create the indexes which are ".
+                           "needed for DbLog and/or DbRep operation.",
+  "8.19.0"  => "04.04.2019 The \"explain\" SQL-command is possible in sqlCmd ",
+  "8.18.0"  => "01.04.2019 New aggregation type \"year\" ",
+  "8.17.0"  => "20.03.2019 With new attribute \"sqlCmdVars\" you are able to set SQL session variables or SQLite PRAGMA every time ".
+                           "before running a SQL-statement with sqlCmd command.",
+  "8.16.0"  => "17.03.2019 allow SQLite PRAGMAS leading an SQLIte SQL-Statement in sqlCmd ",
+  "8.15.0"  => "04.03.2019 readingsRename can now rename readings of a given (optional) device instead of all found readings specified in command ",
+  "8.13.0"  => "11.02.2019 executeBeforeProc / executeAfterProc is now available for sqlCmd,sumValue, maxValue, minValue, diffValue, averageValue ",
+  "8.11.0"  => "24.01.2019 command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
+  "8.10.0"  => "19.01.2019 In commands sqlCmd, dbValue you may now use SQL session variables like \"SET \@open:=NULL,\@closed:=NULL; SELECT ...\", Forum:#96082 ",
+  "8.9.0"   => "07.11.2018 new command set delDoublets added. This command allows to delete multiple occuring identical records. ",
+  "8.8.0"   => "06.11.2018 new attribute 'fastStart'. Usually every DbRep-device is making a short connect to its database when "
+                           ."FHEM is restarted. When this attribute is set, the initial connect is done when the DbRep-device is doing its "
+                           ."first task. ",
+  "8.7.0"   => "04.11.2018 attribute valueFilter applied to functions 'averageValue, changeValue, countEntries, delEntries, "
+                           ."delSeqDoublets, diffValue, exportToFile, fetchrows, maxValue, minValue, reduceLog, sumValue, syncStandby' ,"
+                           ." 'valueFilter' generally applied to database field 'VALUE' ",
+  "8.6.0"   => "29.10.2018 reduceLog use attributes device/reading (can be overwritten by set-options) ",
+  "8.5.0"   => "27.10.2018 devices and readings can be excluded by EXCLUDE-option in attributes \$reading/\$device ",
+  "8.4.0"   => "22.10.2018 New attribute \"countEntriesDetail\". Function countEntries creates number of datasets for every ".
+                           "reading separately if attribute \"countEntriesDetail\" is set. Get versionNotes changed to support en/de. ".
+                           "Function \"get dbValue\" opens an editor window ",
+  "8.3.0"   => "17.10.2018 reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes ".
+                           "timeOlderThan and timeDiffToNow can be set at same time -> the selection time between timeOlderThan ".
+                           "and timeDiffToNow can be calculated dynamically ",
+  "8.2.2"   => "07.10.2018 fix don't get the real min timestamp in rare cases ",
+  "8.2.0"   => "05.10.2018 direct help for attributes ",
+  "8.1.0"   => "01.10.2018 new get versionNotes command ",
+  "8.0.0"   => "11.09.2018 get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
   "7.20.0"  => "04.09.2018 deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
   "7.19.0"  => "25.08.2018 attribute 'valueFilter' to filter datasets in fetchrows ",
   "7.18.2"  => "02.08.2018 fix in fetchrow function (forum:#89886), fix highlighting ",
@@ -225,32 +233,32 @@ our %DbRep_vNotesExtern = (
   "7.12.0"  => "16.02.2018 compression of dumpfile, restore of compressed files possible ",
   "7.11.0"  => "12.02.2018 new command 'repairSQLite' to repair a corrupted SQLite database ",
   "7.10.0"  => "10.02.2018 bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"  => "09.02.2018 new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"  => "04.02.2018 bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"  => "04.02.2018 new command 'eraseReadings' ", 
-  "7.7.1"  => "03.02.2018 minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"  => "29.01.2018 attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"  => "27.01.2018 new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.5.3"  => "23.01.2018 new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.4.1"  => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"  => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"  => "08.01.2018 fix syntax error for perl < 5.20 ",
-  "7.3.0"  => "07.01.2018 charfilter avoid control characters in datasets to exportToFile / importFromFile, changed to use aggregation for split selects in timeslices by exportToFile (avoid heavy memory consumption) ",
-  "7.1.0"  => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
-  "6.4.1"  => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
-  "6.4.0"  => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
-  "6.1.0"  => "29.11.2017 new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
-  "6.0.0"  => "18.11.2017 FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
-  "5.6.4"  => "05.10.2017 abortFn's adapted to use abortArg (Forum:77472) ",
-  "5.6.3"  => "01.10.2017 fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
-  "5.6.0"  => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
-  "5.4.0"  => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
-  "5.3.1"  => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
-  "5.3.0"  => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
-  "5.0.6"  => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
-  "5.0.3"  => "07.06.2017 mysql_DoDumpServerSide added ",
-  "5.0.1"  => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
-  "5.0.0"  => "04.06.2017 MySQL Dump nonblocking added ",
+  "7.9.0"   => "09.02.2018 new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
+  "7.8.1"   => "04.02.2018 bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
+  "7.8.0"   => "04.02.2018 new command 'eraseReadings' ", 
+  "7.7.1"   => "03.02.2018 minor fix in DbRep_firstconnect if IsDisabled ",
+  "7.7.0"   => "29.01.2018 attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
+  "7.6.1"   => "27.01.2018 new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
+  "7.5.3"   => "23.01.2018 new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
+  "7.4.1"   => "14.01.2018 fix old dumpfiles not deleted by dumpMySQL clientSide ",
+  "7.4.0"   => "09.01.2018 dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
+  "7.3.1"   => "08.01.2018 fix syntax error for perl < 5.20 ",
+  "7.3.0"   => "07.01.2018 charfilter avoid control characters in datasets to exportToFile / importFromFile, changed to use aggregation for split selects in timeslices by exportToFile (avoid heavy memory consumption) ",
+  "7.1.0"   => "22.12.2017 new attribute timeYearPeriod for reports correspondig to e.g. electricity billing, bugfix connection check is running after restart allthough dev is disabled ",
+  "6.4.1"   => "13.12.2017 new Attribute 'sqlResultFieldSep' for field separate options of sqlCmd result ",
+  "6.4.0"   => "10.12.2017 prepare module for usage of datetime picker widget (Forum:#35736) ",
+  "6.1.0"   => "29.11.2017 new command delSeqDoublets (adviceRemain,adviceDelete), add Option to LASTCMD ",
+  "6.0.0"   => "18.11.2017 FTP transfer dumpfile after dump, delete old dumpfiles within Blockingcall (avoid freezes) commandref revised, minor fixes ",
+  "5.6.4"   => "05.10.2017 abortFn's adapted to use abortArg (Forum:77472) ",
+  "5.6.3"   => "01.10.2017 fix crash of fhem due to wrong rmday-calculation if month is changed, Forum:#77328 ",
+  "5.6.0"   => "17.07.2017 default timeout changed to 86400, new get-command 'procinfo' (MySQL) ",
+  "5.4.0"   => "03.07.2017 restoreMySQL - restore of csv-files (from dumpServerSide), RestoreRowsHistory/ DumpRowsHistory, Commandref revised ",
+  "5.3.1"   => "28.06.2017 vacuum for SQLite added, readings enhanced for optimizeTables / vacuum, commandref revised ",
+  "5.3.0"   => "26.06.2017 change of DbRep_mysqlOptimizeTables, new command optimizeTables ",
+  "5.0.6"   => "13.06.2017 add Aria engine to DbRep_mysqlOptimizeTables ",
+  "5.0.3"   => "07.06.2017 mysql_DoDumpServerSide added ",
+  "5.0.1"   => "05.06.2017 dependencies between dumpMemlimit and dumpSpeed created, enhanced verbose 5 logging ",
+  "5.0.0"   => "04.06.2017 MySQL Dump nonblocking added ",
   "4.16.1"  => "22.05.2017 encode json without JSON module, requires at least fhem.pl 14348 2017-05-22 20:25:06Z ",
   "4.14.1"  => "16.05.2017 limitation of fetchrows result datasets to 1000 by attr limit ",
   "4.14.0"  => "15.05.2017 UserExitFn added as separate sub (DbRep_userexit) and attr userExitFn defined, new subs ReadingsBulkUpdateTimeState, ReadingsBulkUpdateValue, ReadingsSingleUpdateValue, commandref revised ",
@@ -259,46 +267,46 @@ our %DbRep_vNotesExtern = (
   "4.12.0"  => "31.03.2017 support of primary key for insert functions ",
   "4.11.3"  => "26.03.2017 usage of daylight saving time changed to avoid wrong selection when wintertime switch to summertime, minor bug fixes ",
   "4.11.0"  => "18.02.2017 added [current|previous]_[month|week|day|hour]_begin and [current|previous]_[month|week|day|hour]_end as options of timestamp ",
-  "4.9.0"  => "23.12.2016 function readingRename added ",
-  "4.8.6"  => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
-  "4.8.5"  => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
-  "4.7.6"  => "07.12.2016 DbRep version as internal, check if perl module DBI is installed ",
-  "4.7.4"  => "28.11.2016 sub DbRep_calcount changed due to Forum #msg529312 ",
-  "4.7.3"  => "20.11.2016 new diffValue function made suitable to SQLite ",
-  "4.6.0"  => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
-  "4.5.1"  => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
-  "4.2.0"  => "10.10.2016 allow SQL-Wildcards in attr reading & attr device ",
-  "4.1.3"  => "09.10.2016 bugfix delEntries running on SQLite ",
+  "4.9.0"   => "23.12.2016 function readingRename added ",
+  "4.8.6"   => "17.12.2016 new bugfix group by-clause due to incompatible changes made in MyQL 5.7.5 (Forum #msg541103) ",
+  "4.8.5"   => "16.12.2016 bugfix group by-clause due to Forum #msg540610 ",
+  "4.7.6"   => "07.12.2016 DbRep version as internal, check if perl module DBI is installed ",
+  "4.7.4"   => "28.11.2016 sub DbRep_calcount changed due to Forum #msg529312 ",
+  "4.7.3"   => "20.11.2016 new diffValue function made suitable to SQLite ",
+  "4.6.0"   => "31.10.2016 bugfix calc issue due to daylight saving time end (winter time) ",
+  "4.5.1"   => "18.10.2016 get svrinfo contains SQLite database file size (MB), modified timeout routine ",
+  "4.2.0"   => "10.10.2016 allow SQL-Wildcards in attr reading & attr device ",
+  "4.1.3"   => "09.10.2016 bugfix delEntries running on SQLite ",
   "3.13.0"  => "03.10.2016 added deviceRename to rename devices in database, new Internal DATABASE ",
   "3.12.0"  => "02.10.2016 function minValue added ",
   "3.11.1"  => "30.09.2016 bugfix include first and next day in calculation if Timestamp is exactly 'YYYY-MM-DD 00:00:00' ",
-  "3.9.0"  => "26.09.2016 new function importFromFile to import data from file (CSV format) ",
-  "3.8.0"  => "16.09.2016 new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
-  "3.7.2"  => "04.09.2016 problem in diffValue fixed if if no value was selected ",
-  "3.7.1"  => "31.08.2016 Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
-  "3.7.0"  => "30.08.2016 exportToFile added exports data to file (CSV format) ",
-  "3.5.0"  => "18.08.2016 new attribute timeOlderThan ",
-  "3.4.4"  => "12.08.2016 current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestamp attribute ",
-  "3.4.0"  => "03.08.2016 function 'insert' added ",
-  "3.3.1"  => "15.07.2016 function 'diffValue' changed, write '-' if no value ",
-  "3.3.0"  => "12.07.2016 function 'diffValue' added ",
-  "3.1.1"  => "10.07.2016 state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
-  "3.1.0"  => "09.07.2016 new Attr 'timeDiffToNow' and change subs according to that ",
-  "3.0.0"  => "04.07.2016 no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
-  "2.9.8"  => "01.07.2016 changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
-  "2.9.5"  => "30.06.2016 format of readingnames changed again (substitute ':' with '-' in time) ",
-  "2.9.4"  => "30.06.2016 change readingmap to readingNameMap, prove of unsupported characters added ",
-  "2.9.3"  => "27.06.2016 format of readingnames changed avoiding some problems after restart and splitting ",
-  "2.9.0"  => "25.06.2016 attributes showproctime, timeout added ",
-  "2.8.0"  => "24.06.2016 function averageValue changed to nonblocking function ",
-  "2.7.0"  => "23.06.2016 changed function countEntries to nonblocking ",
-  "2.6.2"  => "21.06.2016 aggregation week corrected ",
-  "2.6.1"  => "20.06.2016 routine maxval_ParseDone corrected ",
-  "2.6.0"  => "31.05.2016 maxValue changed to nonblocking function ",
-  "2.4.0"  => "29.05.2016 changed to nonblocking function for sumValue ",
-  "2.0.0"  => "24.05.2016 added nonblocking function for fetchrow ",
-  "1.2.0"  => "21.05.2016 function and attribute for delEntries added ",
-  "1.0.0"  => "19.05.2016 Initial"
+  "3.9.0"   => "26.09.2016 new function importFromFile to import data from file (CSV format) ",
+  "3.8.0"   => "16.09.2016 new attr readingPreventFromDel to prevent readings from deletion when a new operation starts ",
+  "3.7.2"   => "04.09.2016 problem in diffValue fixed if if no value was selected ",
+  "3.7.1"   => "31.08.2016 Reading 'errortext' added, commandref continued, exportToFile changed, diffValue changed to fix wrong timestamp if error occur ",
+  "3.7.0"   => "30.08.2016 exportToFile added exports data to file (CSV format) ",
+  "3.5.0"   => "18.08.2016 new attribute timeOlderThan ",
+  "3.4.4"   => "12.08.2016 current_year_begin, previous_year_begin, current_year_end, previous_year_end added as possible values for timestamp attribute ",
+  "3.4.0"   => "03.08.2016 function 'insert' added ",
+  "3.3.1"   => "15.07.2016 function 'diffValue' changed, write '-' if no value ",
+  "3.3.0"   => "12.07.2016 function 'diffValue' added ",
+  "3.1.1"   => "10.07.2016 state turns to initialized and connected after attr 'disabled' is switched from '1' to '0' ",
+  "3.1.0"   => "09.07.2016 new Attr 'timeDiffToNow' and change subs according to that ",
+  "3.0.0"   => "04.07.2016 no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries ",
+  "2.9.8"   => "01.07.2016 changed fetchrows_ParseDone to handle readingvalues with whitespaces correctly ",
+  "2.9.5"   => "30.06.2016 format of readingnames changed again (substitute ':' with '-' in time) ",
+  "2.9.4"   => "30.06.2016 change readingmap to readingNameMap, prove of unsupported characters added ",
+  "2.9.3"   => "27.06.2016 format of readingnames changed avoiding some problems after restart and splitting ",
+  "2.9.0"   => "25.06.2016 attributes showproctime, timeout added ",
+  "2.8.0"   => "24.06.2016 function averageValue changed to nonblocking function ",
+  "2.7.0"   => "23.06.2016 changed function countEntries to nonblocking ",
+  "2.6.2"   => "21.06.2016 aggregation week corrected ",
+  "2.6.1"   => "20.06.2016 routine maxval_ParseDone corrected ",
+  "2.6.0"   => "31.05.2016 maxValue changed to nonblocking function ",
+  "2.4.0"   => "29.05.2016 changed to nonblocking function for sumValue ",
+  "2.0.0"   => "24.05.2016 added nonblocking function for fetchrow ",
+  "1.2.0"   => "21.05.2016 function and attribute for delEntries added ",
+  "1.0.0"   => "19.05.2016 Initial"
 );
 
 # Hint Hash en
@@ -323,6 +331,7 @@ our %DbRep_vHintsExt_de = (
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
 
+# foreward declaration
 sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
@@ -338,6 +347,7 @@ sub DbRep_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
  $hash->{UndefFn}      = "DbRep_Undef";
+ $hash->{DeleteFn}     = "DbRep_Delete";
  $hash->{ShutdownFn}   = "DbRep_Shutdown"; 
  $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
@@ -399,6 +409,7 @@ sub DbRep_Initialize($) {
                        "timeDiffToNow ".
                        "timeOlderThan ".
                        "timeout ".
+                       "useAdminCredentials:1,0 ".
 					   "userExitFn ".
                        "valueFilter ".
                        $readingFnAttributes;
@@ -531,6 +542,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
+                (($dbmodel =~ /MYSQL/)?"adminCredentials ":"").
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
@@ -539,11 +551,11 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"dumpMySQL:clientSide,serverSide ":"").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"dumpSQLite:noArg ":"").
-                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/ )?"repairSQLite ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/ )?"optimizeTables:noArg ":"").
-				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/ )?"vacuum:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"dumpMySQL:clientSide,serverSide ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"dumpSQLite:noArg ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"repairSQLite ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"optimizeTables:noArg ":"").
+				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE|POSTGRESQL/)?"vacuum:noArg ":"").
 				(($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"restoreMySQL:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent" && $dbmodel =~ /SQLITE/)?"restoreSQLite:".$cj." ":"").
                 (($hash->{ROLE} ne "Agent")?"countEntries:history,current ":"");
@@ -713,6 +725,17 @@ sub DbRep_Set($@) {
        return undef;
   }
   
+  if ($opt eq "adminCredentials" && $hash->{ROLE} ne "Agent") {
+      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
+      my $success = DbRep_setcredentials($hash,"adminCredentials",$prop,$prop1);
+	  
+	  if($success) {
+		  return "Username and password for database root access saved successfully";
+	  } else {
+		  return "Error while saving username / password - see logfile for details";
+	  }		
+  }
+  
   #######################################################################################################
   ##        keine Aktionen außer die über diesem Eintrag solange Reopen xxxx im DbLog-Device läuft
   #######################################################################################################
@@ -869,7 +892,7 @@ sub DbRep_Set($@) {
           $sqlcmd = $prop;
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
-              DbRep_setCmdFile($name."_sqlCmdList","",$hash);         # Löschen der sql History Liste im DbRep-Keyfile
+              DbRep_setCmdFile($name."_sqlCmdList","",$hash);                        # Löschen der sql History Liste im DbRep-Keyfile
               return "SQL command historylist of $name deleted.";
           }
       }
@@ -945,6 +968,7 @@ sub DbRep_Get($@) {
                 "svrinfo:noArg ".
 				"blockinginfo:noArg ".
                 "minTimestamp:noArg ".
+                (($dbmodel =~ /MYSQL/)?"storedCredentials:noArg ":"").
                 "dbValue:textField-long ".
                 (($dbmodel eq "MYSQL")?"dbstatus:noArg ":"").
                 (($dbmodel eq "MYSQL")?"tableinfo:noArg ":"").
@@ -1007,7 +1031,31 @@ sub DbRep_Get($@) {
       my ($err,$ret) = DbRep_dbValue($name,$sqlcmd);
       return $err?$err:$ret;
   
-  } elsif ($opt =~ /versionNotes/) {
+  } elsif ($opt eq "storedCredentials") {
+        # Credentials abrufen
+        my $atxt;
+        my $username   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
+        my $dblogname  = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
+        my $password   = $attr{"sec$dblogname"}{secret};
+        my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+        if($success) {
+            $atxt = "Username: $admusername, Password: $admpassword\n";
+        } else {
+            $atxt = "Credentials of $name couldn't be read - make sure you've set it with \"set $name adminCredentials username password\"";        
+        }
+        
+        return "Stored Credentials for database default access:\n".
+               "===============================================\n".
+               "Username: $username, Password: $password\n".
+               "\n".
+               "\n".              
+               "Stored Credentials for database admin access:\n".
+               "=============================================\n".
+               $atxt.
+               "\n"
+               ;
+                
+    } elsif ($opt =~ /versionNotes/) {
 	  my $header  = "<b>Module release information</b><br>";
       my $header1 = "<b>Helpful hints</b><br>";
 	  my %hs;
@@ -1348,6 +1396,13 @@ sub DbRep_Attr($$$$) {
 		if ($aName eq "ftpUseSSL") {
             delete($attr{$name}{ftpUse});
         }
+        
+        if ($aName eq "useAdminCredentials" && $aVal) {
+            my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+            unless ($success) {return "The credentials of a database admin user couldn't be read. ".
+                                      "Make shure you have set them with command \"set $name adminCredentials <user> <password>\" before. ";}
+        }
+        
 		if ($aName eq "reading" || $aName eq "device") {
             if ($aVal !~ m/,/ && $dbmodel && $dbmodel ne 'SQLITE') {
                 my $attrname = uc($aName);
@@ -1455,6 +1510,27 @@ return undef;
 }
 
 ###################################################################################
+# Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
+# X_Undef aufgerufen um offene Verbindungen zu schließen, 
+# anschließend wird die Funktion X_Delete aufgerufen. 
+# Funktion: Aufräumen von dauerhaften Daten, welche durch das 
+# Modul evtl. für dieses Gerät spezifisch erstellt worden sind. 
+# Es geht hier also eher darum, alle Spuren sowohl im laufenden 
+# FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
+# Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
+###################################################################################
+sub DbRep_Delete($$) {
+    my ($hash, $arg) = @_;
+    my $name = $hash->{NAME};
+    
+    # gespeicherte Credentials löschen
+    my $index = $hash->{TYPE}."_".$name."_adminCredentials";
+    setKeyValue($index, undef);
+    
+return undef;
+}
+
+###################################################################################
 # DbRep_Shutdown
 ###################################################################################
 sub DbRep_Shutdown($) {  
@@ -1521,19 +1597,19 @@ sub DbRep_getInitData($) {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
+  my $database   = $hash->{DATABASE};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $mintsdef   = "1970-01-01 01:00:00";
   my $idxstate   = "";
-  my ($dbh,$sql,$err,$mints);
+  my ($dbh,$sth,$sql,$err,$mints);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
- 
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 }); };
-  if ($@) {
-      $err = encode_base64($@,"");
-      Log3 ($name, 2, "DbRep $name - $@");
-      return "$name|''|''|$err";
+  
+  ($err,$dbh) = DbRep_dbConnect($name,0);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|''|$err";
   }
  
   # SQL-Startzeit
@@ -1568,6 +1644,34 @@ sub DbRep_getInitData($) {
           }
       }
   }
+  
+  # effektive Userrechte in MYSQL ermitteln
+  my ($grants,@uniq);  
+  if($dbmodel =~ /MYSQL/) {
+      eval {$sth = $dbh->prepare("SHOW GRANTS FOR CURRENT_USER();"); $sth->execute();};
+      if($@) {
+          Log3($name, 2, "DbRep $name - WARNING - user rights couldn't be determined: ".$@);
+      } else {
+          my $row = "";
+          while (my @line = $sth->fetchrow_array()) {
+              foreach (@line) {
+                  next if($_!~/(\s+ON \*\.\*\s+|\s+ON `$database`)/ );
+                  $row .= "," if($row); 
+                  $row .= (split(" ON ",(split("GRANT ",$_,2))[1],2))[0];                 
+              }
+          }
+          $sth->finish;
+          my %seen = ();
+          my @g = split(/,(\s?)/,$row);
+          foreach (@g) {
+              next if(!$_ || $_=~/^\s+$/);
+              $seen{$_}++;
+          }
+          @uniq   = keys %seen;
+          $grants = join(",",@uniq);
+          Log3 ($name, 4, "DbRep $name - all grants: $grants");
+      }
+  }
  
   $dbh->disconnect;
  
@@ -1576,6 +1680,7 @@ sub DbRep_getInitData($) {
  
   $mints    = $mints?encode_base64($mints,""):encode_base64($mintsdef,"");
   $idxstate = encode_base64($idxstate,"");
+  $grants   = encode_base64($grants,"") if($grants);
  
   # Background-Laufzeit ermitteln
   my $brt = tv_interval($bst);
@@ -1584,7 +1689,7 @@ sub DbRep_getInitData($) {
   no warnings 'uninitialized';
   Log3 ($name, 3, "DbRep $name - Initial data information retrieved successfully - total time used: ".sprintf("%.4f",$brt)." seconds");
  
-return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate";
+return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
 }
 
 ####################################################################################################
@@ -1603,6 +1708,7 @@ sub DbRep_getInitDataDone($) {
   my $prop           = $a[5];
   my $fret           = \&{$a[6]} if($a[6]);
   my $idxstate       = $a[7]?decode_base64($a[7]):"";
+  my $grants         = $a[8]?decode_base64($a[8]):"";
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
   
@@ -1626,7 +1732,8 @@ sub DbRep_getInitDataDone($) {
       
       Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn successful") if($hash->{LASTCMD} ne "minTimestamp");
       
-      $hash->{HELPER}{MINTS} = $mints;
+      $hash->{HELPER}{MINTS}  = $mints;
+      $hash->{HELPER}{GRANTS} = $grants if($grants);
   }
   
   delete($hash->{HELPER}{RUNNING_PID});
@@ -1652,6 +1759,50 @@ sub DbRep_getInitDataAborted(@) {
   
   delete($hash->{HELPER}{RUNNING_PID});
 return;
+}
+
+######################################################################################
+#                       Connect zur Datenbank herstellen
+######################################################################################
+sub DbRep_dbConnect($$) {
+  my ($name,$uac) = @_;
+  my $hash        = $defs{$name};
+  my $dbconn      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbconn};
+  my $dbuser      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbuser};
+  my $dblogname   = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{NAME};
+  my $dbmodel     = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{MODEL};
+  my $dbpassword  = $attr{"sec$dblogname"}{secret};
+  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  $uac            = $uac?$uac:AttrVal($name, "useAdminCredentials", 0);
+  my ($dbh,$err);
+  
+  if($uac) {
+      my ($success,$admusername,$admpassword) = DbRep_getcredentials($hash,"adminCredentials");
+      if($success) {
+          $dbuser     = $admusername;
+          $dbpassword = $admpassword;
+      } else {
+          $err = "Can't use admin credentials for database access, see logfile !";
+          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database access, but can't use it");
+		  return $err;
+      }
+  }
+  
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
+                                                                    RaiseError => 1, 
+                                                                    AutoCommit => 1, 
+                                                                    AutoInactiveDestroy => 1,
+                                                                    mysql_enable_utf8 => $utf8
+                                                                  } ); };
+  
+  if ($@) {
+      $err = $@;
+      Log3 ($name, 2, "DbRep $name - ERROR: $@");
+  }
+  
+  Log3 ($name, 4, "DbRep $name - database user for operation: $dbuser") if($dbuser); 
+
+return ($err,$dbh);
 }
 
 ################################################################################################################
@@ -1742,7 +1893,7 @@ sub DbRep_Main($$;$) {
      return;
  }
  
-  if ($opt =~ /index/) {	
+ if ($opt =~ /index/) {	
      if (exists($hash->{HELPER}{RUNNING_INDEX})) {
          Log3 ($name, 3, "DbRep $name - WARNING - old process $hash->{HELPER}{RUNNING_INDEX}{pid} will be killed now to start a new index operation");
          BlockingKill($hash->{HELPER}{RUNNING_INDEX});
@@ -5841,18 +5992,15 @@ sub sqlCmd_DoParse($) {
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
-  my ($err,@pms);
+  my ($err,$dbh,@pms);
 
   # Background-Startzeit
   my $bst = [gettimeofday];
 
-  my $dbh;
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- 
-  if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|$opt|$cmd|''|''|$err";
+  ($err,$dbh) = DbRep_dbConnect($name,0);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|$opt|$cmd|''|''|$err";
   }
        
   # only for this block because of warnings if details of readings are not set
@@ -6033,7 +6181,6 @@ sub sqlCmd_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "sqlResultNumRows", $nrows);
   
   # Drop-Down Liste bisherige sqlCmd-Befehle füllen und in Key-File sichern
-  # my $hl      = $hash->{HELPER}{SQLHIST};
   my @sqlhist = split(",",$hash->{HELPER}{SQLHIST});
   $cmd =~ s/\s+/&nbsp;/g; 
   $cmd =~ s/,/&#65292;/g;                                                   # Forum: https://forum.fhem.de/index.php/topic,103908.0.html
@@ -6390,22 +6537,36 @@ sub DbRep_Index($) {
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbmodel    = $dbloghash->{MODEL};
+  my $grants     = $hash->{HELPER}{GRANTS};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
   my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my ($dbh,$err,$sth,$rows,@six);
   my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
+  my $p          = 0;
 	
   Log3 ($name, 5, "DbRep $name -> Start DbRep_Index");
     
   # Background-Startzeit
   my $bst = [gettimeofday];
-	
-  eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
- 
-  if ($@) {
-      $err = encode_base64($@,"");
-      Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
-      return "$name|''|''|$err";
+  
+  # Rechte Check MYSQL
+  if($cmdidx ne "list_all") {
+      if($dbmodel =~ /MYSQL/ && $grants && $grants ne "ALL PRIVILEGES") {
+          # Rechte INDEX und ALTER benötigt
+          my $i = index($grants,"INDEX");
+          my $a = index($grants,"ALTER");
+          if($i==-1 || $a==-1) {
+              $p = 1;
+          }
+      } elsif (!$grants) {
+          $p = 1;
+      }
+  }
+  
+  ($err,$dbh) = DbRep_dbConnect($name,$p);
+  if ($err) {
+	  $err = encode_base64($err,"");
+	  return "$name|''|''|$err";
   }
   
   my ($cmd,$idx) = split("_",$cmdidx,2);
@@ -9960,6 +10121,78 @@ sub DbRep_byteOutput ($) {
 return $ret;
 }
 
+######################################################################################
+#                            Username / Paßwort speichern
+#   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
+######################################################################################
+sub DbRep_setcredentials ($$@) {
+    my ($hash, $cre, @credentials) = @_;
+    my $name                       = $hash->{NAME};
+    my ($success, $credstr, $index, $retcode,$username,$passwd);
+    my (@key,$len,$i);
+    
+    $credstr = encode_base64(join(':', @credentials));
+    
+    # Beginn Scramble-Routine
+    @key     = qw(1 3 4 5 6 3 2 1 9);
+    $len     = scalar @key;  
+    $i       = 0;  
+    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+    # End Scramble-Routine    
+       
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$cre;
+    $retcode = setKeyValue($index, $credstr);
+    
+    if ($retcode) { 
+        Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
+        $success = 0;
+    } else {
+        ($success, $username, $passwd) = DbRep_getcredentials($hash,$cre);
+    }
+
+return ($success);
+}
+
+######################################################################################
+#                             Username / Paßwort abrufen
+#   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
+######################################################################################
+sub DbRep_getcredentials ($$) {
+    my ($hash, $cre) = @_;
+    my $name         = $hash->{NAME};
+    my ($success, $username, $passwd, $index, $retcode, $credstr);
+    my (@key,$len,$i);
+    
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$cre;
+    ($retcode, $credstr) = getKeyValue($index);
+    
+    if ($retcode) {
+        Log3($name, 2, "DbRep $name - Unable to read password from file: $retcode");
+        $success = 0;
+    }  
+        
+    if($credstr) {
+        # Beginn Descramble-Routine
+        @key     = qw(1 3 4 5 6 3 2 1 9); 
+        $len     = scalar @key;  
+        $i       = 0;  
+        $credstr = join "",  
+        map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;   
+        # Ende Descramble-Routine
+        
+        ($username, $passwd) = split(":",decode_base64($credstr));
+    
+        Log3($name, 4, "DbRep $name - $cre successfully read from file");
+    
+    } else {
+        Log3($name, 2, "DbRep $name - ERROR - $cre not set. Use \"set $name adminCredentials\" first.");
+    }
+
+    $success = (defined($passwd))?1:0;
+
+return ($success, $username, $passwd);        
+}
+
 ####################################################################################################
 #                      Schreibroutine in DbRep Keyvalue-File
 ####################################################################################################
@@ -10002,7 +10235,7 @@ sub DbRep_createCmdFile ($) {
                ForceType  => "file",
               };
   my @new;
-  push(@new, "# This file is auto generated from 93_DbRep.",
+  push(@new, "# This file is auto generated from 93_DbRep.pm",
              "# Please do not modify, move or delete it.",
              "");
 
@@ -11236,9 +11469,18 @@ return;
   <br><br>
   
   <b>Examples: </b><br>
-  my $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
-  <br><br>
+  <pre>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00","");
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} 
+  attr &lt;name&gt; userReadings todayPowerIn 
+    {  
+       my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+       $month++; 
+       $year+=1900;
+       my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
+       DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)
+    } 
+  </pre>
   
   The command syntax for the FHEM command is: <br><br>
   
@@ -11327,6 +11569,15 @@ return;
  <br><br>
  
  <ul><ul>
+ 
+     <li><b> adminCredentials &lt;User&gt; &lt;Passwort&gt; </b>          
+	                           - Save a user / password for the privileged respectively administrative database access. 
+                               The user is required for database operations which has to be executed by a privileged user. 
+                               Please see also attribute <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
+                               (only valid if database type is MYSQL)
+                               
+                               </li> <br>
+ 
     <li><b> averageValue [display | writeToDB]</b> 
                                  - calculates the average value of database column "VALUE" between period given by 
                                  timestamp-<a href="#DbRepattr">attributes</a> which are set. 
@@ -11361,7 +11612,7 @@ return;
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                     </table>
 	                             </ul>
 	                             <br>
@@ -11388,9 +11639,11 @@ return;
                                 
                                 <table>  
                                 <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                   <tr><td style="vertical-align:top"><b>&lt;old string&gt; :</b> <td><li>a simple string with/without spaces, e.g. "OL 12" </li>
+                                   <tr><td><b>&lt;old string&gt; :</b> </td><td><li>a simple string with/without spaces, e.g. "OL 12" </li>
 									                                                                  <li>a string with usage of SQL-wildcard, e.g. "%OL%" </li> </td></tr>
-                                   <tr><td style="vertical-align:top"><b>&lt;new string&gt; :</b> <td><li>a simple string with/without spaces, e.g. "12 kWh" </li>
+                                   <tr><td> </td><td> </td></tr>
+								   <tr><td> </td><td> </td></tr>
+								   <tr><td><b>&lt;new string&gt; :</b> </td><td><li>a simple string with/without spaces, e.g. "12 kWh" </li>
                                                                                                       <li>Perl code embedded in "{}" with quotes, e.g. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                                                                                                           The perl expression the variables $VALUE and $UNIT are committed to. 
 								  																	      The variables are changable within the perl code. The returned value 
@@ -11423,7 +11676,7 @@ return;
                                       <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
  	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of changeValue </td></tr>
                                       <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after changeValue is finished </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -11454,7 +11707,7 @@ return;
                                                       <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
                                                       <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>
                                                       <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                                       </table>
 	                                               </ul>
 	                                               <br>                                           
@@ -11514,7 +11767,7 @@ return;
  	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execute a FHEM command (or Perl-routine) before start of the function </td></tr>
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after the function is finished </td></tr>                       
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>
@@ -11636,7 +11889,7 @@ return;
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: execute a FHEM command (or Perl-routine) after the function is finished </td></tr>                       
   						            <tr><td> <b>seqDoubletsVariance</b>                    </td><td>: Up to this value consecutive numerical datasets are handled as identical and should be deleted </td></tr>                                      
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 								 </table>
 	                             </ul>
                                 
@@ -11664,14 +11917,12 @@ return;
                                  </ul>     
     
     <li><b> diffValue [display | writeToDB]</b>    
-                                 - calculates the difference of database column "VALUE" between period given by 
-                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
-                                 The reading to evaluate must be defined using attribute "reading". 
-                                 This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. 
-                                 The difference will be generated from the first available dataset (VALUE-Field) to the last available dataset between the 
-								 specified time linits/aggregation, in which a balanced difference value of the previous aggregation period will be transfered to the
-								 following aggregation period in case this period contains a value. <br>
-								 A possible counter overrun (restart with value "0") will be considered (compare <a href="#DbRepattr">attribute</a> "diffAccept"). <br><br>
+                                 - calculates the difference of database column "VALUE" in the given time period. (see also the several time*-attributes). <br> 
+                                 The reading to evaluate must be defined in attribute <a href="#reading">reading</a>. <br>
+                                 This function is mostly reasonable if values are increasing permanently and don't write value differences into the database. 
+								 The difference will always be generated between all consecutive datasets (VALUE-Field) and add them together, in doing add carry value of the 
+								 previous aggregation period to the next aggregation period in case the previous period contains a value. <br>
+								 A possible counter overrun (restart with value "0") will be considered (compare attribute <a href="#diffAccept">diffAccept</a>). <br><br>
 								 
 								 If only one dataset will be found within the evalution period, the difference can be calculated only in combination with the balanced
 								 difference of the previous aggregation period. In this case a logical inaccuracy according the assignment of the difference to the particular aggregation period
@@ -11691,7 +11942,7 @@ return;
                                  option "writeToDB" the calculation results are stored in the database with a new reading
                                  name. <br>
                                  The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	
+                                 in which the original reading name can be partly replaced by the value of attribute <a href="#readingNameMap">readingNameMap</a>.	
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
@@ -11710,14 +11961,14 @@ return;
                                  <table>  
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
 								    <tr><td> <b>aggregation</b>                            </td><td>: choose the aggregation period </td></tr>
-								    <tr><td> <b>diffAccept</b>                             </td><td>: the maximum accepted difference between sequential records </td></tr>
+								    <tr><td> <b>diffAccept</b>                             </td><td>: the accepted maximum difference between sequential records </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
  	                                <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted reading name </td></tr>
  								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 								 </table>
 	                             </ul>
 	                             <br>
@@ -11757,15 +12008,15 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpComment              </td><td>: User comment in head of dump file  </td></tr>
-                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: the local destination directory for dump file creation </td></tr>
-                                      <tr><td> dumpMemlimit             </td><td>: limits memory usage </td></tr>
-                                      <tr><td> dumpSpeed                </td><td>: limits CPU utilization </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
+                                      <tr><td> <b>dumpComment </b>              </td><td>: User comment in head of dump file  </td></tr>
+                                      <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
+                                      <tr><td> <b>dumpDirLocal </b>             </td><td>: the local destination directory for dump file creation </td></tr>
+                                      <tr><td> <b>dumpMemlimit </b>             </td><td>: limits memory usage </td></tr>
+                                      <tr><td> <b>dumpSpeed </b>                </td><td>: limits CPU utilization </td></tr>
+	                                  <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
+	                                  <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+                                      <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
+	                                  <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 								 
@@ -11814,13 +12065,13 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpDirRemote            </td><td>: destination directory of dump file on remote server  </td></tr>
-                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: the local mounted directory dumpDirRemote </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
+                                      <tr><td> <b>dumpDirRemote </b>            </td><td>: destination directory of dump file on remote server  </td></tr>
+                                      <tr><td> <b>dumpCompress </b>             </td><td>: compress of dump files after creation </td></tr>
+                                      <tr><td> <b>dumpDirLocal </b>             </td><td>: the local mounted directory dumpDirRemote </td></tr>
+	                                  <tr><td> <b>dumpFilesKeep </b>            </td><td>: number of dump files to keep </td></tr>
+	                                  <tr><td> <b>executeBeforeProc </b>        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
+                                      <tr><td> <b>executeAfterProc </b>         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
+	                                  <tr><td> <b>optimizeTablesBeforeDump </b> </td><td>: table optimization before dump </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 
@@ -11971,8 +12222,7 @@ return;
                                       <tr><td> <b>executeAfterProc</b>                     </td><td>: execution of FHEM command (or Perl-routine) after export </td></tr>
 	                                  <tr><td> <b>expimpfile</b>                           </td><td>: the name of exportfile </td></tr>
                                       <tr><td> <b>time.*</b>                               </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
-
+                                      <tr><td> <b>valueFilter</b>                          </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                       </table>
 	                               </ul>                                   
                                  
@@ -12020,14 +12270,14 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
-                                      <tr><td> <b>fetchRoute</b>                             </td><td>: direction of selection read in database </td></tr>                                      
-                                      <tr><td> <b>fetchMarkDuplicates</b>                    </td><td>: Highlighting of found doublets </td></tr>
-                                      <tr><td> <b>fetchValueFn</b>                           </td><td>: the displayed value of the VALUE database field can be changed by a function before the reading is created </td></tr>
-                                      <tr><td> <b>limit</b>                                  </td><td>: limits the number of datasets to select and display </td></tr>
-                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
-                                      <tr><td> <b>time.*</b>                                 </td><td>: A number of attributes to limit selection by time </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                      <tr><td> <b>device</b>               </td><td>: include or exclude &lt;device&gt; from selection </td></tr>
+                                      <tr><td> <b>fetchRoute</b>           </td><td>: direction of selection read in database </td></tr>                                      
+                                      <tr><td> <b>fetchMarkDuplicates</b>  </td><td>: Highlighting of found doublets </td></tr>
+                                      <tr><td> <b>fetchValueFn</b>         </td><td>: the displayed value of the VALUE database field can be changed by a function before the reading is created </td></tr>
+                                      <tr><td> <b>limit</b>                </td><td>: limits the number of datasets to select and display </td></tr>
+                                      <tr><td> <b>reading</b>              </td><td>: include or exclude &lt;reading&gt; from selection </td></tr>                                      
+                                      <tr><td> <b>time.*</b>               </td><td>: A number of attributes to limit selection by time </td></tr>
+                                      <tr><td> <b>valueFilter</b>          </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12058,8 +12308,19 @@ return;
 	                           </ul>
 	                           <br>
                                
+                               For a better overview the relevant attributes for this operation are listed here: <br><br>
+
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=42%> <col width=58%> </colgroup>
+                                   <tr><td> <b>useAdminCredentials</b>        </td><td>: use privileged user for the operation </td></tr>
+                                 </table>
+	                           </ul>
+	                           <br>
+	                           <br>
+                               
                                <b>Note:</b> <br>
-                               The used database user needs the ALTER and INDEX privilege. <br>
+                               The used database user needs the ALTER, CREATE and INDEX privilege. <br>
                                    
                                </li> <br>
                                  
@@ -12151,7 +12412,7 @@ return;
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 								 </table>
 	                             </ul>                                 
                                  
@@ -12193,7 +12454,7 @@ return;
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 								 </table>
 	                             </ul>                                   
                                  
@@ -12265,7 +12526,7 @@ return;
                                       <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
                                       <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
                                       <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
                                    </table>
 	                               </ul>
                                    <br>
@@ -12379,15 +12640,15 @@ return;
 								 </li><br>
 
 	<li><b> sqlCmd </b>        - Execute an arbitrary user specific command. <br>
-                                 If the command contains a operation to delete data, the <a href="#DbRepattr">attribute</a> 
-								 "allowDeletion" has to be set for security reason. <br>
+                                 If the command contains a operation to delete data, the attribute <a href="#allowDeletion">'allowDeletion'</a> 
+								 has to be set for security reason. <br>
                                  The statement doesn't consider limitations by attributes "device", "reading", "time.*" 
                                  respectively "aggregation". <br>
                                  This command also accept the setting of MySQL session variables like "SET @open:=NULL, 
                                  @closed:=NULL;" or the usage of SQLite PRAGMA before execution the SQL-Statement.
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
-                                 <a href="#DbRepattr">attribute</a> "sqlCmdVars" can be set. <br>                                 
-								 If the <a href="#DbRepattr">attribute</a> "timestamp_begin" respectively "timestamp_end" 
+                                 attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                 
+								 If the attribute <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
 								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
 								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
 								 
@@ -12452,6 +12713,7 @@ return;
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: choice of a useful field separator for result </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: activates command history and length </td></tr>
                                       <tr><td> <b>sqlCmdVars</b>          </td><td>: set SQL session variable or PRAGMA before execute the SQL statement</td></tr>
+                                      <tr><td> <b>useAdminCredentials</b> </td><td>: use privileged user for the operation </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -12553,7 +12815,7 @@ return;
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; from selection </td></tr> 
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: rename the resulted readings </td></tr>									
 								    <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 								 </table>
 	                             </ul>                                   
                                  
@@ -12583,7 +12845,7 @@ return;
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr> 
                                     <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for transmission </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: a number of attributes to limit selection by time  </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
 
                                  </table>
 	                             </ul>
@@ -12726,7 +12988,7 @@ return $ret;
                                 </li>     
                                 <br><br>                                     
 
-    <li><b> procinfo </b> - reports the existing database processes in a summary table (only MySQL). <br>
+    <li><b> procinfo </b> - Reports the existing database processes in a summary table (only MySQL). <br>
 	                        Typically only the own processes of the connection user (set in DbLog configuration file) will be
 							reported. If all precesses have to be reported, the global "PROCESS" right has to be granted to the 
 							user. <br>
@@ -12736,9 +12998,14 @@ return $ret;
 							Further informations can be found
                             <a href=https://mariadb.com/kb/en/mariadb/show-processlist/>there</a>. <br>
                             </li>     
-                            <br><br>								 
+                            <br><br>	
 
-    <li><b> svrinfo </b> -  common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
+    <li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
+                                   (only valid if database type is MYSQL)
+                                   </li>     
+                                   <br><br>                            
+
+    <li><b> svrinfo </b> -  Common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
                             on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
                             the desired values. Further detailed informations of items meaning are explained                             
                             <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>there</a>. <br>
@@ -12752,7 +13019,7 @@ return $ret;
                                  <br><br>
                                  </ul>                                                      
                                  
-    <li><b> tableinfo </b> -  access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
+    <li><b> tableinfo </b> -  Access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
 	                          All available tables in the connected database will be selected by default. 
                               Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited to tables you want to show. 
 							  Further detailed informations of items meaning are explained <a href=http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html>there</a>.  <br>
@@ -12764,7 +13031,7 @@ return $ret;
                                  # Only informations related to tables "current" and "history" are going to be created
                                  </li> 
                                  <br><br>
-                                 </ul>                                                                                   
+                                 </ul>                                                                            
   
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
                               Shows realease informations and/or hints about the module. It contains only main release 
@@ -12815,11 +13082,13 @@ return $ret;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean                          :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
-                                      <tr><td style="vertical-align:top"><b>avgDailyMeanGWS :</b> <td>calculates the daily medium temperature according the 
+                                      <tr><td><b>avgArithmeticMean :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+									  <tr><td><b>avgDailyMeanGWS   :</b> </td><td>calculates the daily medium temperature according the 
                                                                                                   specifications of german weather service (pls. see "get &lt;name&gt; versionNotes 2"). <br>
                                                                                                   This variant uses aggregation "day" automatically. </td></tr>
-                                      <tr><td><b>avgTimeWeightMean                          :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+									  <tr><td><b>avgTimeWeightMean                          :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
 								   </table>
 	                               </ul>								   
                                 </li><br>
@@ -13462,6 +13731,13 @@ sub bdump {
   <a name="timeout"></a>
   <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
 
+  <a name="useAdminCredentials"></a> 								
+  <li><b>useAdminCredentials </b>         
+                                - If set, a before with "set &lt;aame&gt; adminCredentials" saved privileged user is used
+                                  for particular database operations. <br>
+                                  (only valid if database type is MYSQL)
+                                  </li> <br>
+                                  
   <a name="userExitFn"></a>
   <li><b>userExitFn   </b>   - provides an interface to execute user specific program code. <br>
                                To activate the interfaace at first you should implement the subroutine which will be 
@@ -13686,9 +13962,18 @@ sub bdump {
   <br><br>
   
   <b>Beispiele: </b><br>
-  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00",""); <br>
-  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")}
-  <br><br>
+  <pre>
+  $ret = DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-01-13_08:00:00","");
+  attr &lt;name&gt; userReadings oldtemp {DbReadingsVal("Rep.LogDB1","MyWetter:temperature","2018-04-13_08:00:00","")} 
+  attr &lt;name&gt; userReadings todayPowerIn 
+    {  
+       my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+       $month++; 
+       $year+=1900;
+       my $today = sprintf('%04d-%02d-%02d', $year,$month,$mday);
+       DbReadingsVal("Rep.LogDB1","SMA_Energymeter:Bezug_Wirkleistung_Zaehler",$today."_00:00:00",0)
+    } 
+  </pre>
   
   Die Befehlssyntax als FHEM Kommando ist: <br><br>
     
@@ -13778,6 +14063,15 @@ sub bdump {
  <br><br>
  
  <ul><ul>
+ 
+    <li><b> adminCredentials &lt;User&gt; &lt;Passwort&gt; </b>          
+	                           - Speichert einen User / Passwort für den privilegierten bzw. administrativen 
+                               Datenbankzugriff. Er wird bei Datenbankoperationen benötigt, die mit einem privilegierten User 
+                               ausgeführt werden müssen. Siehe auch Attribut <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
+                               (nur gültig bei Datenbanktyp MYSQL)
+                               
+                               </li> <br>
+                               
     <li><b> averageValue [display | writeToDB]</b> 
                                  - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den 
                                  gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
@@ -13814,7 +14108,7 @@ sub bdump {
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                       <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 								      <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									  </table>
 	                               </ul>
 	                               <br>
@@ -13840,9 +14134,11 @@ sub bdump {
                                  
                                 <table>  
                                 <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                   <tr><td style="vertical-align:top"><b>&lt;alter String&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
+                                   <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
 									                                                                    <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
-                                   <tr><td style="vertical-align:top"><b>&lt;neuer String&gt; :</b> <td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
+                                   <tr><td> </td><td> </td></tr>
+								   <tr><td> </td><td> </td></tr>
+								   <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
                                                                                                         <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                                                                                                           Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
                                                                                                           des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
@@ -13875,7 +14171,7 @@ sub bdump {
                                       <tr><td> <b>time.*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                  <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start changeValue </td></tr>
                                       <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende changeValue </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>       <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                             </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                       </table>
 	                               </ul>
 	                               <br>
@@ -13908,7 +14204,7 @@ sub bdump {
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
                                       <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                       </table>              
 	                               </ul>
 	                               <br>
@@ -13968,7 +14264,8 @@ sub bdump {
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start des Befehls </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>	                                
+									<tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>
@@ -14004,7 +14301,7 @@ sub bdump {
                                     <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start delEntries </td></tr>
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende delEntries </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>    
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>    
                                  </table>
 	                             </ul>
 	                             <br>
@@ -14018,8 +14315,8 @@ sub bdump {
 								 (Datenbankfeld VALUE). <br>
 								 Die <a href="#DbRepattr">Attribute</a> zur Aggregation,Zeit-,Device- und Reading-Abgrenzung werden dabei 
 								 berücksichtigt. Ist das Attribut "aggregation" nicht oder auf "no" gesetzt, wird als Standard die Aggregation 
-								 "day" verwendet. Für Datensätze mit numerischen Werten kann mit dem <a href="#DbRepattr">Attribut</a>
-                                 "seqDoubletsVariance" eine Abweichung eingestellt werden, bis zu der aufeinander folgende numerische Werte als
+								 "day" verwendet. Für Datensätze mit numerischen Werten kann mit dem Attribut <a href="#seqDoubletsVariance">seqDoubletsVariance</a>
+                                 eine Abweichung eingestellt werden, bis zu der aufeinander folgende numerische Werte als
                                  identisch angesehen und gelöscht werden sollen.
 	                             <br><br>
 								 
@@ -14033,14 +14330,14 @@ sub bdump {
 	                               </ul>
 	                               <br>
 
-                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" für die "delete" Option
+                                 Aus Sicherheitsgründen muss das Attribut <a href="#allowDeletion"></a> für die "delete" Option
 								 gesetzt sein. <br>
 								 Die Anzahl der anzuzeigenden Datensätze der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" ist 
-								 zunächst begrenzt (default 1000) und kann durch das <a href="#DbRepattr">Attribut</a> "limit" angepasst werden.
+								 zunächst begrenzt (default 1000) und kann durch das Attribut <a href="#limit">limit</a> angepasst werden.
 								 Die Einstellung von "limit" hat keinen Einfluss auf die "delSeqDoublets delete" Funktion, sondern beeinflusst <b>NUR</b> die 
 								 Anzeige der Daten.	 <br>
                                  Vor und nach der Ausführung von "delSeqDoublets" kann ein FHEM-Kommando bzw. Perl-Routine ausgeführt werden. 
-                                 (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
+                                 (siehe Attribute <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>)
                                  <br><br>						   
 								  
 								 <ul>
@@ -14094,7 +14391,7 @@ sub bdump {
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
 	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start des Befehls </td></tr>
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende des Befehls </td></tr>
-	                                <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+	                                <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>
@@ -14124,13 +14421,13 @@ sub bdump {
                                  </ul>
           
     <li><b> diffValue [display | writeToDB] </b>    
-                                 - berechnet den Differenzwert des Datenbankfelds "VALUE" in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading im Attribut "reading" angegeben sein. 
-                                 Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
-                                 Es wird immer die Differenz aus dem Value-Wert des ersten verfügbaren Datensatzes und dem Value-Wert des letzten verfügbaren Datensatzes innerhalb der angegebenen
-                                 Zeitgrenzen/Aggregation gebildet, wobei ein Übertragswert der Vorperiode (Aggregation) zur darauf folgenden Aggregationsperiode 
-                                 berücksichtigt wird sofern diese einen Value-Wert enhtält.  <br>
-								 Dabei wird ein Zählerüberlauf (Neubeginn bei 0) mit berücksichtigt (vergleiche <a href="#DbRepattr">Attribut</a> "diffAccept"). <br>
+                                 - berechnet den Differenzwert des Datenbankfelds "VALUE" in den angegebenen Zeitgrenzen (siehe verschiedenen time*-Attribute). 
+                                 Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> angegeben sein. <br>
+                                 Diese Funktion ist z.B. zur Auswertung von Daten sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. <br>								 
+                                 Es wird immer die Differenz aus den VALUE-Werten der im Aggregationszeitraum (z.B. day) vorhandenen Datensätzen gebildet und aufsummiert, 
+								 wobei ein Übertragswert der Vorperiode (<a href="#aggregation">aggregation</a>) zur darauf folgenden Aggregationsperiode berücksichtigt wird, sofern diese einen Value-Wert 
+								 enhtält.  <br>
+								 Dabei wird ein Zählerüberlauf (Neubeginn bei 0) mit berücksichtigt (vergleiche Attribut <a href="#diffAccept">diffAccept</a>). <br>
 								 Wird in einer auszuwertenden Zeit- bzw. Aggregationsperiode nur ein Datensatz gefunden, kann die Differenz in Verbindung mit dem 
 								 Differenzübertrag der Vorperiode berechnet werden. in diesem Fall kann es zu einer logischen Ungenauigkeit in der Zuordnung der Differenz
                                  zu der Aggregationsperiode kommen. Deswegen wird eine Warnung im "state" und das 						 
@@ -14148,7 +14445,7 @@ sub bdump {
                                  der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
-								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
+								 wobei der originale Readingname durch das Attribut <a href="#readingNameMap">readingNameMap</a> ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
                                  abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
@@ -14168,12 +14465,13 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+	                                <tr><td> <b>diffAccept</b>                             </td><td>: akzeptierte positive Werte-Differenz zwischen zwei unmittelbar aufeinander folgenden Datensätzen </td></tr>
+									<tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
-									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+									<tr><td> <b>time*</b>                                  </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>
@@ -14423,7 +14721,7 @@ sub bdump {
                                     <tr><td> <b>executeAfterProc</b>                       </td><td>: FHEM Kommando (oder Perl-Routine) nach dem Export ausführen </td></tr>
 	                                <tr><td> <b>expimpfile</b>                             </td><td>: der Name des Exportfiles </td></tr>
                                     <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                  </table>
 	                             </ul>
 	                                
@@ -14482,7 +14780,7 @@ sub bdump {
                                       <tr><td> <b>limit</b>                                  </td><td>: begrenzt die Anzahl zu selektierenden bzw. anzuzeigenden Datensätze  </td></tr>
                                       <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                       <tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck (Datenbank spezifischer REGEXP). Der REGEXP wird auf Werte des Datenbankfeldes 'VALUE' angewendet. </td></tr>
+                                      <tr><td> <b>valueFilter</b>                            </td><td>: filtert die anzuzeigenden Datensätze mit einem regulären Ausdruck (Datenbank spezifischer REGEXP). Der REGEXP wird auf Werte des Datenbankfeldes 'VALUE' angewendet. </td></tr>
                                    </table>
 	                               </ul>
 	                               <br>
@@ -14491,8 +14789,8 @@ sub bdump {
 								 <b>Hinweis:</b> <br>
                                  Auch wenn das Modul bezüglich der Datenbankabfrage nichtblockierend arbeitet, kann eine 
 								 zu große Ergebnismenge (Anzahl Zeilen bzw. Readings) die Browsersesssion bzw. FHEMWEB 
-								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem 
-								 <a href="#limit">Attribut</a> "limit" begrenzt. Bei Bedarf kann dieses Attribut 
+								 blockieren. Aus diesem Grund wird die Ergebnismenge mit dem Attribut
+								 <a href="#limit">'limit'</a> begrenzt. Bei Bedarf kann dieses Attribut 
 								 geändert werden, falls eine Anpassung der Selektionsbedingungen nicht möglich oder 
 								 gewünscht ist. <br><br>
 								 </li> <br> 
@@ -14515,8 +14813,18 @@ sub bdump {
 	                           </ul>
 	                           <br>
                                
+                               Die für diese Funktion relevanten Attribute sind: <br><br>
+                               
+	                           <ul>
+                                 <table>  
+                                   <colgroup> <col width=39%> <col width=61%> </colgroup>
+                                   <tr><td> <b>useAdminCredentials</b>        </td><td>: benutzt einen privilegierten User für die Operation </td></tr>
+                                 </table>
+	                           </ul>
+	                           <br>
+                               
                                <b>Hinweis:</b> <br>
-                               Der verwendete Datenbank-Nutzer benötigt das ALTER und INDEX Privileg. <br>
+                               Der verwendete Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
                                    
                                </li> <br>								 
        
@@ -14607,12 +14915,12 @@ sub bdump {
                                  <colgroup> <col width=5%> <col width=95%> </colgroup>
            					        <tr><td> <b>aggregation</b>                            </td><td>: Auswahl einer Aggregationsperiode </td></tr>
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
-	                                <tr><td> <b>executeBeforeProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
-                                    <tr><td> <b>executeAfterProc</b>                        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor Start Operation </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach Ende Operation </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>                                 
@@ -14659,7 +14967,7 @@ sub bdump {
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>                                 
@@ -14735,7 +15043,7 @@ sub bdump {
                                     <tr><td> <b>timestamp_end</b>                          </td><td>: es werden Datenbankeinträge <b>älter</b> als dieses Attribut reduziert </td></tr>
                                     <tr><td> <b>timeDiffToNow</b>                          </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
                                     <tr><td> <b>timestamp_begin</b>                        </td><td>: es werden Datenbankeinträge <b>neuer</b> als dieses Attribut reduziert </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                  </table>
 	                             </ul>
                                  <br>
@@ -14928,9 +15236,9 @@ sub bdump {
                                       <tr><td> <b>sqlResultFieldSep</b>   </td><td>: Auswahl Feldtrenner im Ergebnis </td></tr>
                                       <tr><td> <b>sqlCmdHistoryLength</b> </td><td>: Aktivierung Kommando-Historie und deren Umfang</td></tr>
                                       <tr><td> <b>sqlCmdVars</b>          </td><td>: setzt SQL Session Variablen oder PRAGMA vor jeder Ausführung des SQL-Statements </td></tr>
+                                      <tr><td> <b>useAdminCredentials</b> </td><td>: benutzt einen privilegierten User für die Operation </td></tr>
                                    </table>
 	                               </ul>
-	                               <br>
 	                               <br>  
                                  
 								 <b>Hinweis:</b> <br>
@@ -15031,7 +15339,7 @@ sub bdump {
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>
                                     <tr><td> <b>readingNameMap</b>                         </td><td>: die entstehenden Ergebnisreadings werden partiell umbenannt </td></tr>									
 									<tr><td> <b>time.*</b>                                 </td><td>: eine Reihe von Attributen zur Zeitabgrenzung </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
 									</table>
 	                             </ul>
 	                             <br>                                 
@@ -15062,7 +15370,7 @@ sub bdump {
                                     <tr><td> <b>device</b>                                 </td><td>: einschließen oder ausschließen von Datensätzen die &lt;device&gt; enthalten </td></tr>
                                     <tr><td> <b>reading</b>                                </td><td>: einschließen oder ausschließen von Datensätzen die &lt;reading&gt; enthalten </td></tr>                                      
                                     <tr><td> <b>time.*</b>                                 </td><td>: Attribute zur Zeitabgrenzung der zu übertragenden Datensätze.  </td></tr>
-                                    <tr><td style="vertical-align:top"> <b>valueFilter</b>      <td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: ein zusätzliches REGEXP um die Datenselektion zu steuern. Der REGEXP wird auf das Datenbankfeld 'VALUE' angewendet. </td></tr>
                                  </table>
 	                             </ul>
 	                             <br>                               
@@ -15222,6 +15530,10 @@ return $ret;
                             </li>     
                             <br><br>
                          
+    <li><b> storedCredentials </b> - Listet die im Device gespeicherten User / Passworte für den Datenbankzugriff auf. <br>
+                                   (nur gültig bei Datenbanktyp MYSQL)
+                                   </li>     
+                                   <br><br>
 								 
     <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
                             ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
@@ -15306,10 +15618,12 @@ return $ret;
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
                                       <tr><td> <b>avgArithmeticMean                          :</b> </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
-                                      <tr><td style="vertical-align:top"> <b>avgDailyMeanGWS :</b> <td>berechnet die Tagesmitteltemperatur entsprechend den
+                                      <tr><td> </td><td> </td></tr>
+									  <tr><td> <b>avgDailyMeanGWS                            :</b> </td><td>berechnet die Tagesmitteltemperatur entsprechend den
                                                                                                    Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2"). <br>
                                                                                                    Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean                          :</b> </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+									  <tr><td> <b>avgTimeWeightMean                          :</b> </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
 								   </table>
 	                               </ul>
                                 </li><br>
@@ -15942,6 +16256,13 @@ sub bdump {
   <a name="timeout"></a> 								
   <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden  
                                 (Default: 86400) </li> <br>
+                                
+  <a name="useAdminCredentials"></a> 								
+  <li><b>useAdminCredentials </b>         
+                                - Wenn gesetzt, wird ein zuvor mit "set &lt;Name&gt; adminCredentials" gespeicherter 
+                                  privilegierter User für bestimmte Datenbankoperationen verwendet. <br>
+                                  (nur gültig für Datenbanktyp MYSQL)
+                                  </li> <br>
 
   <a name="userExitFn"></a> 								
   <li><b>userExitFn   </b>    - stellt eine Schnittstelle zur Ausführung eigenen Usercodes zur Verfügung. <br>
