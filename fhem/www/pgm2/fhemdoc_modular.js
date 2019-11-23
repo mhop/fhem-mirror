@@ -277,5 +277,8 @@ $(document).ready(function(){
       setTimeout(checkScroll, 500);
   };
 
+  calcOffsets();
   fd_csrfRefresh();
 });
+
+$(window).resize(calcOffsets);
