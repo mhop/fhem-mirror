@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
   "8.30.1"  => "22.11.2019  commandref revised ",
   "8.30.0"  => "14.11.2019  new command set adminCredentials and get storedCredentials, attribute useAdminCredentials ",
   "8.29.1"  => "11.11.2019  commandref revised ",
@@ -1712,12 +1713,13 @@ sub DbRep_getInitDataDone($) {
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   if ($err) {
       readingsBeginUpdate($hash);
       ReadingsBulkUpdateValue ($hash, "errortext", $err);
       ReadingsBulkUpdateValue ($hash, "state", "disconnected");
       readingsEndUpdate($hash, 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 2, "DbRep $name - DB connect failed. Make sure credentials of database $hash->{DATABASE} are valid and database is reachable.");
   
   } else {
@@ -1735,8 +1737,6 @@ sub DbRep_getInitDataDone($) {
       $hash->{HELPER}{MINTS}  = $mints;
       $hash->{HELPER}{GRANTS} = $grants if($grants);
   }
-  
-  delete($hash->{HELPER}{RUNNING_PID});
 
 return if(!$fret);
 return &$fret($hash,$opt,$prop);
@@ -1749,6 +1749,8 @@ sub DbRep_getInitDataAborted(@) {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
@@ -1757,7 +1759,6 @@ sub DbRep_getInitDataAborted(@) {
   ReadingsBulkUpdateValue ($hash, "state", "disconnected");
   readingsEndUpdate($hash, 1);
   
-  delete($hash->{HELPER}{RUNNING_PID});
 return;
 }
 
@@ -2945,13 +2946,14 @@ sub averval_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
   
@@ -2995,8 +2997,6 @@ sub averval_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);  
   readingsEndUpdate($hash, 1);
-  
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -3132,10 +3132,11 @@ sub count_ParseDone($) {
   my $table      = $a[5];
   my $reading_runtime_string;
   
-   if ($err) {
+  delete($hash->{HELPER}{RUNNING_PID});
+  
+  if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
   
@@ -3170,8 +3171,6 @@ sub count_ParseDone($) {
   
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
-  
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -3358,13 +3357,14 @@ sub maxval_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
   
@@ -3401,8 +3401,6 @@ sub maxval_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -3592,13 +3590,14 @@ sub minval_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
   
@@ -3635,8 +3634,6 @@ sub minval_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -3933,13 +3930,14 @@ sub diffval_ParseDone($) {
   my $difflimit  = AttrVal($name, "diffAccept", "20");   # legt fest, bis zu welchem Wert Differenzen akzeptoert werden (Ausreißer eliminieren)AttrVal($name, "diffAccept", "20");
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
 
@@ -3995,8 +3993,6 @@ sub diffval_ParseDone($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($ncpstr||$rowsrej)?"Warning":$state);
   
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -4138,13 +4134,14 @@ sub sumval_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
   
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
   
@@ -4175,9 +4172,7 @@ sub sumval_ParseDone($) {
   
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
-  
-  delete($hash->{HELPER}{RUNNING_PID});  
+  readingsEndUpdate($hash, 1); 
   
 return;
 }
@@ -4269,13 +4264,14 @@ sub del_ParseDone($) {
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g; 
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "delEntries");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
  
@@ -4302,8 +4298,6 @@ sub del_ParseDone($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -4417,10 +4411,11 @@ sub insert_Done($) {
   my $i_value     = delete $hash->{HELPER}{I_VALUE};
   my $i_unit      = delete $hash->{HELPER}{I_UNIT}; 
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
 
@@ -4436,8 +4431,6 @@ sub insert_Done($) {
   readingsEndUpdate($hash, 1);
   
   Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{DATABASE} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -4569,10 +4562,11 @@ sub currentfillup_Done($) {
   undef $device if ($device =~ m(^%$));
   undef $reading if ($reading =~ m(^%$));
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
 
@@ -4591,8 +4585,6 @@ sub currentfillup_Done($) {
   readingsEndUpdate($hash, 1);
   
   Log3 ($name, 3, "DbRep $name - Table '$hash->{DATABASE}'.'current' filled up with rows: $rowstr");
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -4895,13 +4887,14 @@ sub change_Done($) {
   
   my $renmode = delete $hash->{HELPER}{RENMODE};
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   my $erread = DbRep_afterproc($hash, $renmode);
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
 
@@ -4939,8 +4932,6 @@ sub change_Done($) {
       Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old reading \"$old\" was not found in database \"$hash->{DATABASE}\" ") if($renmode eq "readren"); 	
 	  Log3 ($name, 3, "DbRep ".(($hash->{ROLE} eq "Agent")?"Agent ":"")."$name - WARNING - old value \"$old\" not found in database \"$hash->{DATABASE}\" ") if($renmode eq "changeval");        
   }
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -5052,10 +5043,11 @@ sub fetchrows_ParseDone($) {
   my @row;
   my $reading_runtime_string;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
   
@@ -5140,8 +5132,6 @@ sub fetchrows_ParseDone($) {
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,($nrows-$limit>0)?
       "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a></html>":"done");
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -5536,10 +5526,11 @@ sub delseqdoubl_ParseDone($) {
   my $reading_runtime_string;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
   
@@ -5583,7 +5574,6 @@ sub delseqdoubl_ParseDone($) {
       "<html>done - Warning: not all items are shown, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#limit' target='_blank'>limit</a> if you want see more</html>":"done");
   readingsEndUpdate($hash, 1);
 
-  delete($hash->{HELPER}{RUNNING_PID});
 return;
 }
 
@@ -5749,13 +5739,14 @@ sub expfile_ParseDone($) {
   my $outfile    = $a[6];
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "export");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
  
@@ -5771,8 +5762,6 @@ sub expfile_ParseDone($) {
   ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -5948,13 +5937,14 @@ sub impfile_PushDone($) {
   my $infile     = $a[4];
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "import");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
  
@@ -5970,8 +5960,6 @@ sub impfile_PushDone($) {
   readingsEndUpdate($hash, 1);
 
   Log3 ($name, 3, "DbRep $name - Number of imported datasets to $hash->{DATABASE} from file $infile: $irowdone");  
-
-  delete($hash->{HELPER}{RUNNING_PID});
   
 return;
 }
@@ -6159,13 +6147,14 @@ sub sqlCmd_ParseDone($) {
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "sqlCmd");
   
   if ($err) {
     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-    delete($hash->{HELPER}{RUNNING_PID});
     return;
   }
   
@@ -6256,9 +6245,7 @@ sub sqlCmd_ParseDone($) {
 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-  
-  delete($hash->{HELPER}{RUNNING_PID});
-  
+    
 return;
 }
 
@@ -6480,10 +6467,11 @@ sub dbmeta_ParseDone($) {
   my ($rt,$brt)  = split(",", $bt);
   my $err        = $a[4]?decode_base64($a[4]):undef;
   
-   if ($err) {
+  delete($hash->{HELPER}{RUNNING_PID});
+  
+  if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       return;
   }
     
@@ -6510,11 +6498,7 @@ sub dbmeta_ParseDone($) {
   
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,"done");
   readingsEndUpdate($hash, 1);
-  
-  # InternalTimer(time+0.5, "browser_refresh", $hash, 0);
-  
-  delete($hash->{HELPER}{RUNNING_PID});
-  
+    
 return;
 }
 
@@ -8450,13 +8434,14 @@ sub DbRep_syncStandbyDone($) {
   my $err        = $a[3]?decode_base64($a[3]):undef;
   my $erread;
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   # Befehl nach Procedure ausführen
   $erread = DbRep_afterproc($hash, "syncStandby");
   
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
       ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-      delete($hash->{HELPER}{RUNNING_PID});
       Log3 ($name, 4, "DbRep $name -> BlockingCall change_Done finished");
       return;
   } 
@@ -8469,9 +8454,7 @@ sub DbRep_syncStandbyDone($) {
   ReadingsBulkUpdateValue ($hash, "number_lines_inserted_Standby", $irows); 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
   readingsEndUpdate($hash, 1);
-
-  delete($hash->{HELPER}{RUNNING_PID});
-  
+ 
 return;
 }
 
@@ -8939,6 +8922,8 @@ sub DbRep_ParseAborted(@) {
   my $dbh = $hash->{DBH}; 
   my $erread = "";
   
+  delete($hash->{HELPER}{RUNNING_PID});
+  
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
   
@@ -8953,7 +8938,6 @@ sub DbRep_ParseAborted(@) {
   
   Log3 ($name, 2, "DbRep $name - Database command aborted due to \"$cause\" ");
   
-  delete($hash->{HELPER}{RUNNING_PID});
 return;
 }
 

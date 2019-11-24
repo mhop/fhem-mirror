@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: internal code change, 
+                      Forum: topic,105591.msg996089.html#msg996089
  - feature: 70_VIERA: crypted communication with new TVs (2019+)
                       DEF of the devices changed (commandref)
                       reading power deleted, state => initialized/on/off
