@@ -59,6 +59,7 @@ my %SSChatBot_errlist = (
   100 => "Unknown error",
   102 => "API does not exist- may be the Chat server package is stopped",
   120 => "payload has wrong format",
+  404 => "bot is not legal",
   407 => "record is not valid",
 );
 
