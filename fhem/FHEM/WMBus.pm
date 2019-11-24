@@ -1326,7 +1326,8 @@ sub findVIF($$$) {
       #printf "vifType $vifType VIF $vif typeMask $vifInfoRef->{$vifType}{typeMask} type $vifInfoRef->{$vifType}{type}\n"; 
     
       if (($vif & $vifInfoRef->{$vifType}{typeMask}) == $vifInfoRef->{$vifType}{type}) {
-        #printf " match vifType $vifType\n"; 
+        #printf " match vif %02x vifType %s\n", $vif, $vifType; 
+        $dataBlockRef->{vif} = $vif;
         
         $bias = $vifInfoRef->{$vifType}{bias};
         $dataBlockRef->{exponent} = $vif & $vifInfoRef->{$vifType}{expMask};
@@ -1388,6 +1389,9 @@ sub decodeValueInformationBlock($$$) {
     $vif = unpack('C', substr($vib,$offset++,1));
     $isExtension = $vif & VIF_EXTENSION_BIT;
     #printf("vif: %x isExtension %d\n", $vif, $isExtension);
+    if ($isExtension) {
+      $dataBlockRef->{vif} = $vif;
+    }
     
     # Is this an extension?
     last EXTENSION if (!$isExtension);
@@ -1497,8 +1501,10 @@ sub decodeDataInformationBlock($$$) {
   my $storageNo = ($dif & 0b01000000) >> 6;
   my $functionField = ($dif & 0b00110000) >> 4;
   my $df = $dif & 0b00001111;
+  
+  $dataBlockRef->{dif} = $dif;
 
-  #printf("dif %x storage %d\n", $dif, $storageNo);
+  #printf("dif %02x storage %d\n", $dif, $storageNo);
   
   EXTENSION: while ($isExtension) {
     $dif = unpack('C', substr($dib,$offset,1));
@@ -1839,6 +1845,59 @@ sub decodeAFL($$) {
   return $offset;
 }
 
+sub decodeCompactFrame($$)
+{
+  my $self = shift;
+  my $compact = shift;
+  my $applicationlayer = "";
+
+  # VIF depends on the resolution of the volume register
+  # 13 = 3 decimals
+  # 14 = 2 decimals
+  # 15 = 1 decimal
+  # 16 = 0 decimals
+  # functionField part of DIF is also variable, at least for temperatures
+  # all in all that would be 4 * 4 (for vif) * 4 * 4 (for dif) * 3 (type of telegram) combinations (768)
+  # for now only search for those that are documented or habe been observed in real telegrams
+  for my $vif  ("13","14","15","16") { 
+    #printf("compact frame $vif\n");
+    if ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "44$vif"))) {
+      # Info, Volume, Target Volume
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
+                          . pack("H*", "04$vif") . substr($compact,7,4) # volume
+                          . pack("H*", "44$vif") . substr($compact,11,4); # target volume 
+      last;
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "523B"))) {
+      # Info, Volume, Max flow
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
+                          . pack("H*", "04$vif") . substr($compact,7,4) # volume
+                          . pack("H*", "523B") . substr($compact,11,2); # max flow 
+      last;
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "44$vif" . "615B" . "6167"))) {
+      # Info, Volume, Max flow, min flow temp, max external temp
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
+                          . pack("H*", "04$vif") . substr($compact,7,4) # volume
+                          . pack("H*", "44$vif") . substr($compact,11,4) # target volume 
+                          . pack("H*", "615B") . substr($compact,15,1) # flow temp 
+                          . pack("H*", "6167") . substr($compact,16,1); # external temp
+      last;
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "44$vif" . "615B" . "5167"))) {
+      # Info, Volume, Max flow, min flow temp, max external temp
+      # convert into full frame
+      $applicationlayer =   pack("H*", "02FF20") . substr($compact, 5, 2) # Info
+                          . pack("H*", "04$vif") . substr($compact,7,4) # volume
+                          . pack("H*", "44$vif") . substr($compact,11,4) # target volume 
+                          . pack("H*", "615B") . substr($compact,15,1) # flow temp 
+                          . pack("H*", "5167") . substr($compact,16,1); # external temp
+      last;
+    }
+  }
+  return $applicationlayer;
+}
+
 sub decodeApplicationLayer($) {
   my $self = shift;
   my $applicationlayer = $self->{applicationlayer};
@@ -1846,6 +1905,7 @@ sub decodeApplicationLayer($) {
   
   #print unpack("H*", $applicationlayer) . "\n";
   
+  $self->{isEncrypted} = 0;
   if ($self->{errorcode} != ERR_NO_ERROR) {
     # CRC check failed
     return 0;
@@ -1960,7 +2020,6 @@ sub decodeApplicationLayer($) {
   $self->{statusstring} = "";
   $self->{access_no} = 0;
   $self->{sent_from_master} = 0;
-  $self->{isEncrypted} = 0;
   
   #printf("CI Field %02x\n", $self->{cifield});
   
@@ -1982,7 +2041,7 @@ sub decodeApplicationLayer($) {
     $self->{meter_manufacturer} = uc($self->manId2ascii($self->{meter_man}));
     #printf("Long header access_no %x\n", $self->{access_no});
     $offset += 12;
-  } elsif ($self->{cifield} == CI_RESP_0) {
+  } elsif ($self->{cifield} == CI_RESP_0 || $self->{cifield} == 0x30) {
     # no header
     #print "No header\n";
 
@@ -1992,33 +2051,13 @@ sub decodeApplicationLayer($) {
     $offset += 2;
     $self->{full_frame_payload_crc} = unpack("v", substr($applicationlayer, $offset, 2));
     $offset += 2;
-    if ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "4413"))) {
-      # Info, Volume, Target Volume
-      # convert into full frame
-      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
-                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
-                          . pack("H*", "4413") . substr($applicationlayer,11,4); # target volume 
-      $offset = 0;
-    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "523B"))) {
-      # Info, Volume, Max flow
-      # convert into full frame
-      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
-                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
-                          . pack("H*", "523B") . substr($applicationlayer,11,2); # max flow 
-      $offset = 0;
-    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "0413" . "4413" . "615B" . "6167"))) {
-      # Info, Volume, Max flow, flow temp, external temp
-      # convert into full frame
-      $applicationlayer =   pack("H*", "02FF20") . substr($applicationlayer, 5, 2) # Info
-                          . pack("H*", "0413") . substr($applicationlayer,7,4) # volume
-                          . pack("H*", "4413") . substr($applicationlayer,11,4) # target volume 
-                          . pack("H*", "615B") . substr($applicationlayer,15,1) # flow temp 
-                          . pack("H*", "6167") . substr($applicationlayer,16,1); # external temp
-      $offset = 0;
-    } else {
+    $applicationlayer = $self->decodeCompactFrame($applicationlayer);
+    if ($applicationlayer eq "") {
       $self->{errormsg} = 'Unknown Kamstrup compact frame format';
       $self->{errorcode} = ERR_UNKNOWN_COMPACT_FORMAT;
       return 0;
+    } else {
+      $offset = 0;
     }
     if ($self->{full_frame_payload_crc} != $self->calcCRC($applicationlayer)) {
       $self->{errormsg} = 'Kamstrup compact frame format payload CRC error';
@@ -2134,6 +2173,7 @@ sub decodeLinkLayer($$)
 {
   my $self = shift;
   my $linklayer = shift;
+  #print "decodeLinkLayer\n";
 
   if (length($linklayer) < TL_BLOCK_SIZE + $self->{crc_size}) {
     $self->{errormsg} = "link layer too short";
@@ -2149,6 +2189,7 @@ sub decodeLinkLayer($$)
   #printf("lfield %d\n", $self->{lfield});
 
   if ($self->{frame_type} eq FRAME_TYPE_A) {
+    print "FRAME TYPE A\n";
     if ($self->{crc_size} > 0) {
       $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
     
@@ -2168,8 +2209,9 @@ sub decodeLinkLayer($$)
     $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
     $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
       
-    #printf("calc len %d, actual %d\n", $self->{msglen}, length($self->{msg}));
+    #printf("calc len %d, actual %d crc_size %d\n", $self->{msglen}, length($self->{msg}), $self->{crc_size});
     $self->{applicationlayer} = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
+    return 0 if $self->{errorcode};
   
   } else {
     # FRAME TYPE B
@@ -2177,6 +2219,7 @@ sub decodeLinkLayer($$)
     # first contains the header (TL_BLOCK), L field and trailing crc
     # L field is included in crc calculation
     # each following block contains only data and trailing crc
+    #print "FRAME TYPE B\n";
     if (length($self->{msg}) < $self->{lfield}) {
       $self->{errormsg} = "message too short, expected " . $self->{lfield} . ", got " . length($self->{msg}) . " bytes";
       $self->{errorcode} = ERR_MSG_TOO_SHORT;
