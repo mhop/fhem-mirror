@@ -80,7 +80,7 @@ sub SSChatBot_Initialize($) {
  $hash->{FW_deviceOverview} = 1;
  
  $hash->{AttrList} = "disable:1,0 ".
-                     "recepUser:--wait#for#userlist-- ".
+                     "defaultPeer:--wait#for#userlist-- ".
                      "showTokenInLog:1,0 ".
                      "httptimeout ".
                      $readingFnAttributes;   
@@ -309,9 +309,9 @@ sub SSChatBot_Set($@) {
        
        return "Your sendstring is incorrect. It must contain at least the \"text\" tag like 'text=\"...\" '." if(!$text);
        
-       $users = AttrVal($name,"recepUser", "") if(!$users);
+       $users = AttrVal($name,"defaultPeer", "") if(!$users);
        return "You haven't defined any receptor for send the message to. ".
-              "You have to use the \"users\" tag or define default receptors with attribute \"recepUser\"." if(!$users);
+              "You have to use the \"users\" tag or define default receptors with attribute \"defaultPeer\"." if(!$users);
        
        # User aufsplitten und zu jedem die ID ermitteln
        my @ua = split(/,/, $users);
@@ -765,7 +765,12 @@ sub SSChatBot_chatop ($) {
       $url .= "}";
    }
 
-   Log3($name, 4, "$name - Call-Out: $url");
+   my $part = (split("&token=", $url))[0];
+   if(AttrVal($name, "showTokenInLog", "0") == 1) {
+       Log3($name, 4, "$name - Call-Out: $url");
+   } else {
+       Log3($name, 4, "$name - Call-Out: $part&token=<secret>");
+   }
    
    $param = {
             url      => $url,
@@ -853,15 +858,16 @@ sub SSChatBot_chatop_parse ($) {
 					$i++;
                 }
                 $hash->{HELPER}{USERS} = \%users if(%users);
-                
+               
                 my @newa;
-                my @deva = split(" ", $hash->{".AttrList"});
+                my $list = $modules{$hash->{TYPE}}{AttrList};
+                my @deva = split(" ", $list);
                 foreach (@deva) {
-                     push @newa, $_ if($_ !~ /recepUser/);
+                     push @newa, $_ if($_ !~ /defaultPeer:/);
                 }
-                push @newa, ($uids?"recepUser:multiple-strict,$uids ":"recepUser:--no#userlist#selectable-- ");
-                $hash->{".AttrList"} = join(" ", @newa);
-                
+                push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
+                $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
+               
                 $out .= "</table>";
                 $out .= "</html>";
                 
