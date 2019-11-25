@@ -693,7 +693,7 @@ sub WaterCalculator_Notify($$)
 		if ($WaterCountReadingTimestampDelta > 10)
 		{
 			### Calculate water consumption (water consumption difference) of previous and current value / [qm]
-			my $WaterCountReadingValueDelta = sprintf('%.3f', ($WaterCountReadingValueCurrent - $WaterCountReadingValuePrevious));
+			my $WaterCountReadingValueDelta = sprintf('%.3f', ($WaterCountReadingValueCurrent )) - sprintf('%.3f', ($WaterCountReadingValuePrevious));
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValueDelta                : " . $WaterCountReadingValueDelta;
 
 			### Calculate Current water flow rate WFR = DV/Dt[qm/s] * 60[s/min] * 1000 [qm --> l] * WFRUnitFactor
