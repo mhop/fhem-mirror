@@ -213,6 +213,7 @@ HUEDevice_devStateIcon($)
         return undef if( !$createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", undef) );
 
         return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
+        return ".*:light_question:toggle" if( defined($hash->{mode}) && $hash->{mode} ne 'homeautomation' );
 
         return ".*:off:toggle" if( ReadingsVal($name,"onoff","0") eq "0" );
 
@@ -971,7 +972,7 @@ HUEDevice_Set($@)
 
   if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
     $list .= " alert:none,select,lselect";
-    $list .= ",breathe,okay,channelchange,finish,stop" if( $hash->{IODev}{modelid} eq 'deCONZ' );
+    $list .= ",breathe,okay,channelchange,finish,stop" if( $hash->{IODev} && $hash->{IODev}{modelid} eq 'deCONZ' );
 
     $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
 
@@ -1647,6 +1648,11 @@ HUEDevice_Parse($$)
 
   my $battery   = undef;
      $battery   = $config->{battery} if( defined($config->{battery}) );
+
+  if( defined($hash->{mode})
+      || ( defined($state->{mode}) && $state->{mode} ne 'homeautomation' ) ) {
+    $hash->{mode} = $state->{mode};
+  }
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
