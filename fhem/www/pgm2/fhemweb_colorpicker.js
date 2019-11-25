@@ -81,7 +81,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
       if( cmds[index] )
         cmds[index]( parseInt(arg * ranges[index][2]) );
-      else
+      else if( cmd )
         cmd( rgb );
     }
 
