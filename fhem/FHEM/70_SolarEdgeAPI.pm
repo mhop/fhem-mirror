@@ -4,7 +4,7 @@
 #
 # By (c) 2019 FHEM user 'pizmus' (pizmus at web de)
 #
-# Based on 70_SolarEdgeAPI.pm from https://github.com/felixmartens/fhem by 
+# Based on 70_SolarEdgeAPI.pm from https://github.com/felixmartens/fhem by
 # (c) 2018 Felix Martens (felix at martensmail dot de)
 #
 # Based on 46_TeslaPowerwall2AC by
@@ -41,7 +41,7 @@ use HttpUtils;
 #
 # $data = eval{decode_json($data)};
 # if($@){
-#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");  
+#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
 #   readingsSingleUpdate($hash, "state", "error", 1);
 #   return;
 # }
@@ -65,35 +65,35 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 # The <patchVersion> is incremented for small bug fixes, changes of source code
 # comments or documentation.
 #
-# A string starting with "beta" is attached for release candidates which are 
-# distributed for testing. If no issues are found in a beta version, the "beta" 
+# A string starting with "beta" is attached for release candidates which are
+# distributed for testing. If no issues are found in a beta version, the "beta"
 # string is removed and the source file is submitted.
 #
 ###############################################################################
-# 
+#
 # 1.0.0     initial version as copied from https://github.com/felixmartens/fhem
 #           with minimal changes to be able to submit it to FHEM SVN
 #
 # 1.1.0beta Detect that site does not support the "currentPowerFlow" API.
 #           Read "overview" API to get the current power.
-#           Added attributes enableStatusReadings, enableAggregatesReadings, 
+#           Added attributes enableStatusReadings, enableAggregatesReadings,
 #           and enableOverviewReadings.
 #           Note: This version was released by accident with "beta" in the
-#           version string. 
+#           version string.
 #
 # 1.1.1     source code formatting
 #           added TODOs in the source code
 #
-# 1.2.0     added internals that count requests, successful responses and error 
+# 1.2.0     added internals that count requests, successful responses and error
 #             responses
 #           added "set restartTimer" and "set resetDebugCounters"
-#           added attributes: 
+#           added attributes:
 #             intervalAtNightTime
 #             dayTimeStartHour
 #             nightTimeStartHour
 #             enableDebugReadings
-#           added internal NUMBER_OF_REQUESTS_PER_DAY that shows the 
-#             theoretical number of http requests per day, based on current 
+#           added internal NUMBER_OF_REQUESTS_PER_DAY that shows the
+#             theoretical number of http requests per day, based on current
 #             attribute settings
 #           Parameter "interval" of the "define" function is now optional. If
 #             it is not provided the default value "auto" is used.
@@ -102,13 +102,16 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 #           Restart periodic timer during _Define instead of _Notify.
 #
 # 1.3.0     show SolarEdge logo to comply with requirement from API documentation
-#           
+#
+# 1.4.0     new reading groups: dailyAggregates, storage, dailyStorage,
+#           dailyDetails, dailyOverview
+#
 ###############################################################################
 
 sub SolarEdgeAPI_SetVersion($)
 {
   my ($hash) = @_;
-  $hash->{VERSION} = "1.3.0";
+  $hash->{VERSION} = "1.4.0";
 }
 
 ###############################################################################
@@ -132,9 +135,14 @@ sub SolarEdgeAPI_Initialize($)
                         "enableStatusReadings:1,0 ".
                         "enableAggregatesReadings:1,0 ".
                         "enableOverviewReadings:1,0 ".
+                        "enableStorageReadings:1,0 ".
+                        "enableDailyDetailsReadings:1,0 ".
+                        "enableDailyStorageReadings:1,0 ".
+                        "enableDailyAggregatesReadings:1,0 ".
+                        "enableDailyOverviewReadings:1,0 ".
                         "enableDebugReadings:1,0 ".
                         $readingFnAttributes;
-                        
+
   $hash->{FW_detailFn} = "SolarEdgeAPI_fhemwebFn";
 }
 
@@ -148,33 +156,37 @@ sub SolarEdgeAPI_Define($$)
   {
     return "too few parameters: define <name> SolarEdgeAPI <API-Key> <Site-ID> [<interval>|auto]";
   }
-  
+
   if ($solarEdgeAPI_missingModul)
   {
     return "Cannot define a SolarEdgeAPI device. Perl modul $solarEdgeAPI_missingModul is missing.";
   }
 
   my $name = $a[0];
-  
+
   $hash->{APIKEY} = $a[2];
   $hash->{SITEID} = $a[3];
-  
+
   # if interval information is provided store it in the hash
   if ((int(@a) == 4) or ($a[4] eq 'auto'))
   {
-    $hash->{INTERVAL} = undef;
+    $hash->{INTERVAL} = 300;
   }
   else
   {
     $hash->{INTERVAL} = $a[4];
   }
-  
+  $hash->{DEFAULT_NIGHT_TIME_INTERVAL} = 1200;
+
+  $hash->{DEFAULT_DAY_TIME_START_HOUR} = 7;
+  $hash->{DEFAULT_NIGHT_TIME_START_HOUR} = 22;
+
   $hash->{PORT} = 80;
   $hash->{NOTIFYDEV} = "global";
   $hash->{actionQueue} = [];
-  
+
   SolarEdgeAPI_ResetDebugCounters($hash);
-  
+
   SolarEdgeAPI_SetVersion($hash);
 
   # TODO Remove this? (INCOMPATIBLE CHANGE)
@@ -182,11 +194,15 @@ sub SolarEdgeAPI_Define($$)
 
   Log3 $name, 3, "SolarEdgeAPI ($name) - defined";
 
-  # TODO why does one of the paths have a ".json" and the others do not?
   my %paths = (
     'status' => 'currentPowerFlow.json',
-    'aggregates' => 'energyDetails',
-    'overview' => 'overview'
+    'aggregates' => 'energyDetails.json',
+    'overview' => 'overview.json',
+    'storage' => 'storageData.json',
+    'dailyDetails' => 'details.json',
+    'dailyStorage' => 'storageData.json',
+    'dailyOverview' => 'overview.json',
+    'dailyAggregates' => 'energyDetails.json'
   );
   $hash->{PATHS} = \%paths;
 
@@ -194,7 +210,7 @@ sub SolarEdgeAPI_Define($$)
   RemoveInternalTimer($hash);
 
   # initiate periodic readings
-  InternalTimer(gettimeofday() + 60, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+  InternalTimer(gettimeofday() + 60, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
 
   return undef;
 }
@@ -203,7 +219,7 @@ sub SolarEdgeAPI_ResetDebugCounters($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  
+
   $hash->{NUMBER_OF_REQUESTS} = 0;
   $hash->{NUMBER_OF_GOOD_RESPONSES} = 0;
   $hash->{NUMBER_OF_ERROR_1} = 0;
@@ -211,7 +227,7 @@ sub SolarEdgeAPI_ResetDebugCounters($)
   $hash->{NUMBER_OF_ERROR_3} = 0;
   $hash->{NUMBER_OF_JSON_ERRORS} = 0;
   $hash->{NUMBER_OF_REQUESTS_PER_DAY} = 0;
-  
+
   if (AttrVal($name, "enableDebugReadings", undef))
   {
     readingsSingleUpdate($hash, 'debugNumRequests', $hash->{NUMBER_OF_REQUESTS}, 1);
@@ -229,7 +245,7 @@ sub SolarEdgeAPI_Undef($$)
   my $name = $hash->{NAME};
 
   Log3 $name, 3, "SolarEdgeAPI ($name) - deleted";
-  
+
   # remove any active timer
   RemoveInternalTimer($hash);
 
@@ -253,7 +269,7 @@ sub SolarEdgeAPI_Attr(@)
       }
       elsif ($attrVal eq "0")
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         readingsSingleUpdate($hash, "state", "active", 1);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute disable=0";
       }
@@ -263,10 +279,10 @@ sub SolarEdgeAPI_Attr(@)
         Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
         return $message;
       }
-    } 
+    }
     elsif ($cmd eq "del")
     {
-      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       readingsSingleUpdate($hash, "state", "active", 1);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute disable deleted";
     }
@@ -278,23 +294,23 @@ sub SolarEdgeAPI_Attr(@)
     {
       return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
         unless($attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/);
-      readingsSingleUpdate($hash, "state", "disabled", 1);        
+      readingsSingleUpdate($hash, "state", "disabled", 1);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute disabledForIntervals set";
-    } 
+    }
     elsif ($cmd eq "del")
     {
       readingsSingleUpdate( $hash, "state", "active", 1 );
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute disabledForIntervals deleted";
     }
   }
-    
+
   if ($attrName eq "interval")
   {
     if ($cmd eq "set")
     {
       if (($attrVal eq "auto") || ($attrVal >= 120))
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute interval set to $attrVal";
       }
       else
@@ -306,11 +322,11 @@ sub SolarEdgeAPI_Attr(@)
     }
     elsif ($cmd eq "del")
     {
-      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute interval deleted";
     }
   }
-  
+
   if ($attrName eq "intervalAtNightTime")
   {
     if ($cmd eq "set")
@@ -323,17 +339,17 @@ sub SolarEdgeAPI_Attr(@)
       }
       else
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute intervalAtNightTime set to $attrVal";
       }
     }
     elsif ($cmd eq "del")
     {
-      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute intervalAtNightTime deleted";
     }
   }
-                        
+
   if ($attrName eq "dayTimeStartHour")
   {
     if ($cmd eq "set")
@@ -346,17 +362,17 @@ sub SolarEdgeAPI_Attr(@)
       }
       else
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute dayTimeStartHour set to $attrVal";
       }
     }
     elsif ($cmd eq "del")
     {
-      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute dayTimeStartHour deleted";
     }
   }
-                        
+
   if ($attrName eq "nightTimeStartHour")
   {
     if ($cmd eq "set")
@@ -369,69 +385,42 @@ sub SolarEdgeAPI_Attr(@)
       }
       else
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute nightTimeStartHour set to $attrVal";
       }
     }
     elsif ($cmd eq "del")
     {
-      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+      InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       Log3 $name, 3, "SolarEdgeAPI ($name) - attribute nightTimeStartHour deleted";
     }
   }
-                        
-  if ($attrName eq "enableStatusReadings") 
+
+  if (($attrName eq "enableStatusReadings") or
+      ($attrName eq "enableAggregatesReadings") or
+      ($attrName eq "enableOverviewReadings") or
+      ($attrName eq "enableStorageReadings") or
+      ($attrName eq "enableDailyDetailsReadings") or
+      ($attrName eq "enableDailyStorageReadings") or
+      ($attrName eq "enableDailyOverviewReadings") or
+      ($attrName eq "enableDailyAggregatesReadings"))
   {
     if($cmd eq "set")
     {
       if (not (($attrVal eq "0") || ($attrVal eq "1")))
       {
-        my $message = "illegal value for enableStatusReadings";
+        my $message = "illegal value for $attrName";
         Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
-        return $message; 
+        return $message;
       }
       else
       {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
+        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
       }
-    } 
+    }
   }
 
-  if ($attrName eq "enableAggregatesReadings") 
-  {
-    if($cmd eq "set")
-    {
-      if (not (($attrVal eq "0") || ($attrVal eq "1")))
-      {
-        my $message = "illegal value for enableAggregatesReadings";
-        Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
-        return $message; 
-      }
-      else
-      {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
-      }
-    } 
-  }
-
-  if ($attrName eq "enableOverviewReadings") 
-  {
-    if($cmd eq "set")
-    {
-      if (not (($attrVal eq "0") || ($attrVal eq "1")))
-      {
-        my $message = "illegal value for enableOverviewReadings";
-        Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
-        return $message; 
-      }
-      else
-      {
-        InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimer', $hash);
-      }
-    } 
-  }
-
-  if ($attrName eq "enableDebugReadings") 
+  if ($attrName eq "enableDebugReadings")
   {
     if($cmd eq "set")
     {
@@ -439,9 +428,9 @@ sub SolarEdgeAPI_Attr(@)
       {
         my $message = "illegal value for enableDebugReadings";
         Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
-        return $message; 
+        return $message;
       }
-    } 
+    }
   }
 
   return undef;
@@ -456,7 +445,7 @@ sub SolarEdgeAPI_Set($$)
   if ($what eq "restartTimer")
   {
     Log3 $name, 3, "SolarEdgeAPI ($name) - set restartTimer";
-    SolarEdgeAPI_RestartHttpRequestTimer($hash);
+    SolarEdgeAPI_RestartHttpRequestTimers($hash);
   }
   elsif ($what eq "resetDebugCounters")
   {
@@ -480,8 +469,9 @@ sub SolarEdgeAPI_Set($$)
 sub SolarEdgeAPI_Get($@)
 {
   my ($hash, $name, $cmd) = @_;
-  
-  if (($cmd eq 'status') or ($cmd eq 'aggregates') or ($cmd eq 'overview'))
+
+  if (($cmd eq 'status') or ($cmd eq 'aggregates') or ($cmd eq 'overview') or ($cmd eq 'dailyOverview') or
+      ($cmd eq 'storage') or ($cmd eq 'dailyDetails') or ($cmd eq 'dailyStorage') or ($cmd eq 'dailyAggregates'))
   {
     Log3 $name, 3, "SolarEdgeAPI ($name) - get command: ".$cmd;
 
@@ -493,9 +483,35 @@ sub SolarEdgeAPI_Get($@)
     unshift( @{$hash->{actionQueue}}, $cmd );
     SolarEdgeAPI_SendHttpRequest($hash);
   }
-  else 
+  elsif ($cmd eq 'numberOfRequests')
   {
-    my $list = 'status:noArg aggregates:noArg overview:noArg';    
+    my $daytimeInterval = AttrVal($name, "interval", $hash->{INTERVAL});
+    my $nighttimeInterval = AttrVal($name, "intervalAtNightTime", $hash->{DEFAULT_NIGHT_TIME_INTERVAL});
+
+    my $dayTimeStartHour = AttrVal($name, "dayTimeStartHour", $hash->{DEFAULT_DAY_TIME_START_HOUR});
+    my $nightTimeStartHour = AttrVal($name, "nightTimeStartHour", $hash->{DEFAULT_NIGHT_TIME_START_HOUR});
+    my $numberOfDaytimeHours = $nightTimeStartHour - $dayTimeStartHour;
+    my $numberOfNighttimeHours = 24 - $numberOfDaytimeHours;
+
+    my $numberOfPeriodicHttpRequests = 0;
+    if (AttrVal($name, "enableStatusReadings", 1)) { $numberOfPeriodicHttpRequests += 1; }
+    if (AttrVal($name, "enableAggregatesReadings", 1)) { $numberOfPeriodicHttpRequests += 1; }
+    if (AttrVal($name, "enableOverviewReadings", 0)) { $numberOfPeriodicHttpRequests += 1; }
+    if (AttrVal($name, "enableStorageReadings", 0)) { $numberOfPeriodicHttpRequests += 1; }
+
+    $hash->{NUMBER_OF_REQUESTS_PER_DAY} =
+       (($numberOfDaytimeHours * 3600 / $daytimeInterval + $numberOfNighttimeHours * 3600 / $nighttimeInterval)
+        * $numberOfPeriodicHttpRequests)
+        + (AttrVal($name, "enableDailyStorageReadings", 0))
+        + (AttrVal($name, "enableDailyOverviewReadings", 0))
+        + (AttrVal($name, "enableDailyDetailsReadings", 0))
+        + (AttrVal($name, "enableDailyAggregatesReadings", 0));
+
+    return $hash->{NUMBER_OF_REQUESTS_PER_DAY};
+  }
+  else
+  {
+    my $list = 'status:noArg aggregates:noArg overview:noArg dailyOverview:noArg storage:noArg dailyDetails:noArg dailyStorage:noArg dailyAggregates:noArg numberOfRequests:noArg';
     return "Unknown argument $cmd, choose one of $list";
   }
 
@@ -506,6 +522,7 @@ sub SolarEdgeAPI_Get($@)
 # HTTP request generation
 ###############################################################################
 
+# precondition: There must be at least one entry in actionQueue.
 sub SolarEdgeAPI_SendHttpRequest($)
 {
   my ($hash) = @_;
@@ -515,18 +532,34 @@ sub SolarEdgeAPI_SendHttpRequest($)
   my $host = "monitoringapi.solaredge.com/site/".$siteid;
   my $apikey = $hash->{APIKEY};
   my $path = pop(@{$hash->{actionQueue}});
- 
-  # TODO explain  
+
+  # some API require additional parameters, e.g. the time frame and time
+  # resolution to use with the query
   my $params = "";
   if ($path eq "aggregates")
   {
+    # request data for the timeframe from midnight until now
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-    $params= "&timeUnit=QUARTER_OF_AN_HOUR&startTime=".(1900+$year)."-".(1+$mon)."-".$mday."%2000:00:00&endTime=".(1900+$year)."-".(1+$mon)."-".$mday."%20".$hour.":".$min.":".$sec;
+    $params = "&timeUnit=QUARTER_OF_AN_HOUR&startTime=".(1900+$year)."-".(1+$mon)."-".$mday."%2000:00:00&endTime=".(1900+$year)."-".(1+$mon)."-".$mday."%20".$hour.":".$min.":".$sec;
+  }
+  elsif ($path eq "dailyAggregates")
+  {
+    # request data for the timeframe from January 1st until today
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+    $params = "&timeUnit=DAY&startTime=".(1900+$year)."-1-1"."%20"."00:00:00&endTime=".(1900+$year)."-".(1+$mon)."-".$mday."%20".$hour.":".$min.":".$sec;
+  }
+  elsif (($path eq "storage") or ($path eq "dailyStorage"))
+  {
+    # request data for the last 1/2 hour
+    my ($sec1,$min1,$hour1,$mday1,$mon1,$year1,$wday1,$yday1,$isdst1) = localtime(time());
+    my ($sec2,$min2,$hour2,$mday2,$mon2,$year2,$wday2,$yday2,$isdst2) = localtime(time() - (30 * 60));
+    $params = "&startTime=".(1900+$year2)."-".(1+$mon2)."-".$mday2."%20".$hour2.":".$min2.":".$sec2.
+                "&endTime=".(1900+$year1)."-".(1+$mon1)."-".$mday1."%20".$hour1.":".$min1.":".$sec1;
   }
 
   my $pathsRef = $hash->{PATHS};
   my %paths = %$pathsRef;
-  
+
   my $uri = $host . '/' . $paths{$path} . "?api_key=" . $apikey.$params;
 
   # TODO remove this (INCOMPATIBLE CHANGE)
@@ -543,118 +576,147 @@ sub SolarEdgeAPI_SendHttpRequest($)
       callback    => \&SolarEdgeAPI_HandleHttpResponse,
     }
   );
-  
+
   # update debug counter
   $hash->{NUMBER_OF_REQUESTS} = $hash->{NUMBER_OF_REQUESTS} + 1;
   if (AttrVal($name, "enableDebugReadings", undef))
   {
     readingsSingleUpdate($hash, 'debugNumRequests', $hash->{NUMBER_OF_REQUESTS}, 1);
   }
- 
+
   Log3 $name, 4, "SolarEdgeAPI ($name) - SolarEdgeAPI_SendHttpRequest path: $path / $paths{$path}";
   Log3 $name, 5, "SolarEdgeAPI ($name) - request: http://$uri";
 }
 
-sub SolarEdgeAPI_HttpRequestTimerFunction($)
+sub SolarEdgeAPI_PeriodicHttpRequestTimerFunction($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "SolarEdgeAPI ($name) - timer expired";
+  Log3 $name, 4, "SolarEdgeAPI ($name) - periodic timer expired";
 
   my $pathsRef = $hash->{PATHS};
   my %paths = %$pathsRef;
 
-  if ((defined($hash->{actionQueue})) and (scalar(@{$hash->{actionQueue}}) == 0))
+  if ((defined($hash->{actionQueue})) and (scalar(@{$hash->{actionQueue}}) < 100))
   {
     if (not IsDisabled($name))
     {
-      while (my $obj = each %paths) 
+      while (my $obj = each %paths)
       {
         if ((($obj eq "status") and (AttrVal($name, "enableStatusReadings", 1))) or
             (($obj eq "aggregates") and (AttrVal($name, "enableAggregatesReadings", 1))) or
-            (($obj eq "overview") and (AttrVal($name, "enableOverviewReadings", 0))))
+            (($obj eq "overview") and (AttrVal($name, "enableOverviewReadings", 0))) or
+            (($obj eq "storage") and (AttrVal($name, "enableStorageReadings", 0))))
         {
-          Log3 $name, 4, "SolarEdgeAPI ($name) - adding request to actionQueue: ".$obj;
+          Log3 $name, 4, "SolarEdgeAPI ($name) - adding periodic request to actionQueue: ".$obj;
           unshift( @{$hash->{actionQueue}}, $obj );
         }
-      } 
+      }
       SolarEdgeAPI_SendHttpRequest($hash);
-    } 
-    else 
+    }
+    else
     {
       readingsSingleUpdate($hash,'state','disabled',1);
     }
   }
 
-  InternalTimer(SolarEdgeAPI_GetTimeOfNextReading($hash), 'SolarEdgeAPI_HttpRequestTimerFunction', $hash);
+  InternalTimer(SolarEdgeAPI_GetTimeOfNextReading($hash), 'SolarEdgeAPI_PeriodicHttpRequestTimerFunction', $hash);
 }
 
-sub SolarEdgeAPI_RestartHttpRequestTimer($)
+sub SolarEdgeAPI_DailyHttpRequestTimerFunction($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  
+
+  Log3 $name, 4, "SolarEdgeAPI ($name) - daily timer expired";
+
+  my $pathsRef = $hash->{PATHS};
+  my %paths = %$pathsRef;
+
+  if ((defined($hash->{actionQueue})) and (scalar(@{$hash->{actionQueue}}) < 100))
+  {
+    if (not IsDisabled($name))
+    {
+      while (my $obj = each %paths)
+      {
+        if ((($obj eq "dailyDetails") and (AttrVal($name, "enableDailyDetailsReadings", 0))) or
+            (($obj eq "dailyStorage") and (AttrVal($name, "enableDailyStorageReadings", 0))) or
+            (($obj eq "dailyOverview") and (AttrVal($name, "enableDailyOverviewReadings", 0))) or
+            (($obj eq "dailyAggregates") and (AttrVal($name, "enableDailyAggregatesReadings", 0))))
+        {
+          Log3 $name, 4, "SolarEdgeAPI ($name) - adding daily request to actionQueue: ".$obj;
+          unshift( @{$hash->{actionQueue}}, $obj );
+        }
+      }
+      SolarEdgeAPI_SendHttpRequest($hash);
+    }
+    else
+    {
+      readingsSingleUpdate($hash,'state','disabled',1);
+    }
+  }
+
+  InternalTimer(SolarEdgeAPI_GetTimeOfNextDailyReading($hash), 'SolarEdgeAPI_DailyHttpRequestTimerFunction', $hash);
+}
+
+sub SolarEdgeAPI_RestartHttpRequestTimers($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
   Log3 $name, 3, "SolarEdgeAPI ($name) - restarting timer";
- 
+
   # remove any active timer
   RemoveInternalTimer($hash);
-  
+
   # Do the next http request now. This will start a timer for the next one.
-  SolarEdgeAPI_HttpRequestTimerFunction($hash);  
+  SolarEdgeAPI_PeriodicHttpRequestTimerFunction($hash);
+
+  # Schedule the first daily request now. This will start a timer for the next one.
+  InternalTimer(SolarEdgeAPI_GetTimeOfNextDailyReading($hash), 'SolarEdgeAPI_DailyHttpRequestTimerFunction', $hash);
+}
+
+sub SolarEdgeAPI_GetTimeOfNextDailyReading($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $epoch = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($epoch);
+
+  if ($hour >= 22)
+  {
+    # If it is after 10pm the next reading should occur tomorrow.
+
+    # add 24 hours to epoch to get a time during the following day
+    $epoch += 24 * 60 * 60;
+
+    # convert again
+    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($epoch);
+  }
+
+  # change hour to 10pm and convert to epoch
+  $epoch = fhemTimeLocal(5, 0, 22, $mday, $mon, $year); # $sec, $min, $hour, $mday, $month, $year
+
+  return $epoch;
 }
 
 sub SolarEdgeAPI_GetTimeOfNextReading($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  
+
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 
-  my $dayTimeStartHour = AttrVal($name, "dayTimeStartHour", 7);
-  my $nightTimeStartHour = AttrVal($name, "nightTimeStartHour", 22);
+  my $dayTimeStartHour = AttrVal($name, "dayTimeStartHour", $hash->{DEFAULT_DAY_TIME_START_HOUR});
+  my $nightTimeStartHour = AttrVal($name, "nightTimeStartHour", $hash->{DEFAULT_NIGHT_TIME_START_HOUR});
 
-  # calculate interval during day time
-  
-  my $defaultDaytimeInterval = 300;
-  if (defined $hash->{INTERVAL})
-  {
-    # if an interval value was specified with "define" it is the new "default"
-    $defaultDaytimeInterval = $hash->{INTERVAL};
-  }
-  
-  # Try to use the attribute value as interval.
-  my $daytimeInterval = AttrVal($name, "interval", "auto");
-    
-  # If attribute "interval" does not provide a value use the default.
-  # This means if both the define parameter and the attribute are given
-  # the attribute wins.
-  if ($daytimeInterval eq "auto")
-  {
-    $daytimeInterval = $defaultDaytimeInterval;
-  }
-  
-  # calculate interval during night time
-  
-  my $defaultNighttimeInterval = 1200;
-  my $nighttimeInterval = AttrVal($name, "intervalAtNightTime", $defaultNighttimeInterval);
-  
-  # calculate approximate number of http requests within 24 hours
-  
-  my $numberOfDaytimeHours = $nightTimeStartHour - $dayTimeStartHour;
-  my $numberOfNighttimeHours = 24 - $numberOfDaytimeHours;
-  my $numberOfHttpRequests = 0; 
-  if (AttrVal($name, "enableStatusReadings", 1)) { $numberOfHttpRequests = $numberOfHttpRequests + 1; }
-  if (AttrVal($name, "enableAggregatesReadings", 1)) { $numberOfHttpRequests = $numberOfHttpRequests + 1; }
-  if (AttrVal($name, "enableOverviewReadings", 0)) { $numberOfHttpRequests = $numberOfHttpRequests + 1; }
-            
-  $hash->{NUMBER_OF_REQUESTS_PER_DAY} = 
-    ($numberOfDaytimeHours * 3600 / $daytimeInterval + 
-     $numberOfNighttimeHours * 3600 / $nighttimeInterval)
-    * $numberOfHttpRequests;
-  
+  my $daytimeInterval = AttrVal($name, "interval", $hash->{INTERVAL});
+  my $nighttimeInterval = AttrVal($name, "intervalAtNightTime", $hash->{DEFAULT_NIGHT_TIME_INTERVAL});
+
   # select the interval to use now
-  
+
   my $interval;
   if (($hour >= $dayTimeStartHour) && ($hour < $nightTimeStartHour))
   {
@@ -664,12 +726,12 @@ sub SolarEdgeAPI_GetTimeOfNextReading($)
   {
     $interval = $nighttimeInterval;
   }
-  
-  # TODO if the next night time interval ends after dayTimeStartHour change interval so 
+
+  # TODO if the next night time interval ends after dayTimeStartHour change interval so
   # that the next request goes out at dayTimeStartHour
 
   my $newTriggerTime = gettimeofday() + $interval;
-  
+
   Log3 $name, 4, "SolarEdgeAPI ($name) - next reading in $interval seconds";
 
   return $newTriggerTime;
@@ -691,30 +753,30 @@ sub SolarEdgeAPI_CheckHttpError($$$$)
     readingsBulkUpdate($hash, 'state', $err, 1);
     readingsBulkUpdate($hash, 'lastRequestError', $err, 1);
     readingsEndUpdate($hash, 1);
-      
+
     # update debug counter
     $hash->{NUMBER_OF_ERROR_1} = $hash->{NUMBER_OF_ERROR_1} + 1;
     if (AttrVal($name, "enableDebugReadings", undef))
     {
       readingsSingleUpdate($hash, 'debugNumError1', $hash->{NUMBER_OF_ERROR_1}, 1);
     }
-          
+
     Log3 $name, 3, "SolarEdgeAPI ($name) - error (1) in http response: $err";
 
     # drop all outstanding requests
     $hash->{actionQueue} = [];
-    
+
     return 1;
   }
 
   if (($data eq "") and (exists($param->{code})) and ($param->{code} ne 200))
-  {  
+  {
     # TODO Remove this. Do error reporting via Log3 and debug readings. (INCOMPATIBLE CHANGE)
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'state', $param->{code}, 1);
     readingsBulkUpdate($hash, 'lastRequestError', $param->{code}, 1);
     readingsEndUpdate($hash, 1);
-    
+
     # update debug counter
     $hash->{NUMBER_OF_ERROR_2} = $hash->{NUMBER_OF_ERROR_2} + 1;
     if (AttrVal($name, "enableDebugReadings", undef))
@@ -726,18 +788,18 @@ sub SolarEdgeAPI_CheckHttpError($$$$)
 
     # drop all outstanding requests
     $hash->{actionQueue} = [];
-    
+
     return 2;
   }
 
   if (($data =~ /Error/i) and (exists( $param->{code})))
-  {     
+  {
     # TODO Remove this. Do error reporting via Log3 and debug readings. (INCOMPATIBLE CHANGE)
-    readingsBeginUpdate($hash);    
+    readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, 'state', $param->{code}, 1);
     readingsBulkUpdate($hash, "lastRequestError", $param->{code}, 1);
     readingsEndUpdate($hash, 1);
-    
+
     # update debug counter
     $hash->{NUMBER_OF_ERROR_3} = $hash->{NUMBER_OF_ERROR_3} + 1;
     if (AttrVal($name, "enableDebugReadings", undef))
@@ -749,16 +811,16 @@ sub SolarEdgeAPI_CheckHttpError($$$$)
 
     # drop all outstanding requests
     $hash->{actionQueue} = [];
-    
+
     return 3;
   }
-  
+
   return undef;
 }
 
 sub SolarEdgeAPI_HandleHttpResponse($$$)
 {
-  my ($param, $err, $data)  = @_;  
+  my ($param, $err, $data)  = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
@@ -779,23 +841,37 @@ sub SolarEdgeAPI_HandleHttpResponse($$$)
   }
 
   SolarEdgeAPI_ProcessResponse($hash, $param->{setCmd}, $data);
-  
+
   if (defined($hash->{actionQueue}) and scalar(@{$hash->{actionQueue}}) > 0)
   {
     SolarEdgeAPI_SendHttpRequest($hash);
-  }  
+  }
 }
 
 sub SolarEdgeAPI_ProcessResponse($$$)
 {
   my ($hash, $path, $data) = @_;
   my $name = $hash->{NAME};
-  
-  Log3 $name, 4, "SolarEdgeAPI ($name) - SolarEdgeAPI_ProcessResponse: $path"; 
+
+  Log3 $name, 4, "SolarEdgeAPI ($name) - SolarEdgeAPI_ProcessResponse: $path";
 
   my $readings;
 
+  # generate fake data for storage data API for debug purposes
+  my $generateFakeStorageData = 0;
+  if ((($path eq 'storage') or ($path eq 'dailyStorage')) and ($generateFakeStorageData))
+  {
+    $data = '{"storageData":{"batteryCount":1,"batteries":[{
+    "nameplate":9800.0,"serialNumber":"R155XXX","modelNumber":"R155XXX","telemetryCount":4,"telemetries":
+    [{"timeStamp":"2019-11-15 00:02:35","power":100.0,"batteryState":3,"lifeTimeEnergyDischarged":2275121,"lifeTimeEnergyCharged":2646795,"batteryPercentageState":8.999232,"fullPackEnergyAvailable":9999.0,"internalTemp":21.1,"ACGridCharging":0.0},
+    {"timeStamp":"2019-11-15 00:07:34","power":100.0,"batteryState":3,"lifeTimeEnergyDischarged":2275122,"lifeTimeEnergyCharged":2646795,"batteryPercentageState":8.999232,"fullPackEnergyAvailable":9999.0,"internalTemp":21.0,"ACGridCharging":0.0},
+    {"timeStamp":"2019-11-15 00:12:34","power":100.0,"batteryState":3,"lifeTimeEnergyDischarged":2275123,"lifeTimeEnergyCharged":2646795,"batteryPercentageState":8.999232,"fullPackEnergyAvailable":9999.0,"internalTemp":21.0,"ACGridCharging":0.0},
+    {"timeStamp":"2019-11-15 00:17:33","power":100.0,"batteryState":3,"lifeTimeEnergyDischarged":2276198,"lifeTimeEnergyCharged":2648149,"batteryPercentageState":10.99419,"fullPackEnergyAvailable":9999.0,"internalTemp":20.6,"ACGridCharging":0.0}
+    ]}]}}';
+  }
+
   my $decodedJsonData = eval{decode_json($data)};
+
   if ($@)
   {
     # update debug counter
@@ -812,13 +888,13 @@ sub SolarEdgeAPI_ProcessResponse($$$)
     readingsBulkUpdate($hash, 'JSON Error', $@);
     readingsBulkUpdate($hash, 'state', 'JSON error');
     readingsEndUpdate($hash,1);
-    
+
     return;
   }
 
-  if ($path eq 'aggregates') 
+  if ($path eq 'aggregates')
   {
-    $readings = SolarEdgeAPI_ReadingsProcessing_Aggregates($hash, $decodedJsonData);     
+    $readings = SolarEdgeAPI_ReadingsProcessing_Aggregates($hash, $decodedJsonData);
   }
   elsif ($path eq 'status')
   {
@@ -826,10 +902,30 @@ sub SolarEdgeAPI_ProcessResponse($$$)
   }
   elsif ($path eq 'overview')
   {
-    $readings = SolarEdgeAPI_ReadingsProcessing_Overview($hash, $decodedJsonData);
-  } 
-  else 
-  {    
+    $readings = SolarEdgeAPI_ReadingsProcessing_Overview($hash, $decodedJsonData, 0);
+  }
+  elsif ($path eq 'storage')
+  {
+    $readings = SolarEdgeAPI_ReadingsProcessing_Storage($hash, $decodedJsonData, 0);
+  }
+  elsif ($path eq 'dailyDetails')
+  {
+    $readings = SolarEdgeAPI_ReadingsProcessing_DailyDetails($hash, $decodedJsonData);
+  }
+  elsif ($path eq 'dailyStorage')
+  {
+    $readings = SolarEdgeAPI_ReadingsProcessing_Storage($hash, $decodedJsonData, 1);
+  }
+  elsif ($path eq 'dailyOverview')
+  {
+    $readings = SolarEdgeAPI_ReadingsProcessing_Overview($hash, $decodedJsonData, 1);
+  }
+  elsif ($path eq 'dailyAggregates')
+  {
+    $readings = SolarEdgeAPI_ReadingsProcessing_DailyAggregates($hash, $decodedJsonData);
+  }
+  else
+  {
     Log3 $name, 3, "SolarEdgeAPI ($name) - unknown type of response: $path";
 
     # TODO Remove this. Do error reporting via Log3. (INCOMPATIBLE CHANGE)
@@ -840,49 +936,165 @@ sub SolarEdgeAPI_ProcessResponse($$$)
 }
 
 sub SolarEdgeAPI_ReadingsProcessing_Aggregates($$)
-{  
+{
   my ($hash, $decodedJsonData) = @_;
   my $name = $hash->{NAME};
 
   my %readings;
-    
-  if (ref($decodedJsonData) eq "HASH")
-  {
-    my $data = $decodedJsonData->{'energyDetails'};
-    $readings{'unit'} = $data->{'unit'} || "Error Reading Response";		
-    $readings{'timeUnit'} = $data->{'timeUnit'} || "Error Reading Response";
-    		
-    $data = $decodedJsonData->{'energyDetails'}->{'meters'};
-    my $meter_type = "";
-    my $meter_cum = 0;
-    my $meter_val = 0;
-    foreach my $meter (@{$decodedJsonData->{'energyDetails'}->{'meters'}}) 
-    {
-      # meters
-      $meter_type = $meter->{'type'};
-      $meter_cum = 0;
-      $meter_val = 0;
-      foreach my $meterTelemetry (@{$meter->{'values'}})
-      {
-        my $v = $meterTelemetry->{'value'};
-        if (defined $v)
-        {
-          $meter_cum = $meter_cum + $v;
-          $meter_val = $v;
-        }
-      }
-      $readings{$meter_type."-recent15min"} = $meter_val;
-      $readings{$meter_type."-cumToday"} = $meter_cum;
-    }
-  } 
-  else 
+
+  if (not (ref($decodedJsonData) eq "HASH"))
   {
     Log3 $name, 3, "SolarEdgeAPI ($name) - aggregates response is not a hash";
-    
+
     # TODO Remove this. Do error reporting via Log3. (INCOMPATIBLE CHANGE)
     $readings{'error'} = 'aggregates response is not a Hash';
+    return \%readings;
   }
-    
+
+  foreach my $meter ( @{$decodedJsonData->{'energyDetails'}->{'meters'}})
+  {
+    my $meterType = $meter->{'type'};
+    my $meterCum = 0;
+    my $meterRecent15Min = 0;
+    foreach my $meterData (@{$meter -> {'values'}})
+    {
+      my $value = $meterData->{'value'};
+      $meterCum = $meterCum + $value;
+    }
+    $readings{$meterType . "-cumToday"} = $meterCum;
+    $readings{$meterType . "-recent15min"} = $meterRecent15Min; # TODO Remove this. (INCOMPATIBLE CHANGE)
+  }
+
+  # TODO try to use the DAY query and let the server do the accumulation
+
+  return \%readings;
+}
+
+sub SolarEdgeAPI_IsLastDayOfMonth($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $isLastDayOfMonth = 0;
+
+  my $epoch = time();
+  my ($sec1, $min1, $hour1, $mday1, $mon1, $year1, $wday1, $yday1, $isdst1) = localtime($epoch);
+  my $epochOneDayLater = $epoch + 24 * 60 * 60;
+  my ($sec2, $min2, $hour2, $mday2, $mon2, $year2, $wday2, $yday2, $isdst2) = localtime($epochOneDayLater);
+
+  if ($mon1 != $mon2)
+  {
+    $isLastDayOfMonth = 1;
+  }
+
+  my $month = $mon1 + 1;
+  my $day = $mday1;
+
+  Log3 $name, 4, "SolarEdgeAPI ($name) - day $day month $month isLastDayOfMonth $isLastDayOfMonth";
+
+  return $isLastDayOfMonth;
+}
+
+sub SolarEdgeAPI_IsLastDayOfYear($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $isLastDayOfYear = 0;
+  my $epoch = time();
+  my ($sec1, $min1, $hour1, $mday1, $mon1, $year1, $wday1, $yday1, $isdst1) = localtime($epoch);
+  my $epochOneDayLater = $epoch + 24 * 60 * 60;
+  my ($sec2, $min2, $hour2, $mday2, $mon2, $year2, $wday2, $yday2, $isdst2) = localtime($epochOneDayLater);
+  if ($year1 != $year2)
+  {
+    $isLastDayOfYear = 1;
+  }
+  my $month = $mon1 + 1;
+  my $day = $mday1;
+
+  Log3 $name, 4, "SolarEdgeAPI ($name) - day $day month $month isLastDayOfYear $isLastDayOfYear";
+
+  return $isLastDayOfYear;
+}
+
+
+sub SolarEdgeAPI_ReadingsProcessing_DailyAggregates($$)
+{
+  my ($hash, $decodedJsonData) = @_;
+  my $name = $hash->{NAME};
+
+  my %readings;
+
+  if (not (ref($decodedJsonData) eq "HASH"))
+  {
+    Log3 $name, 3, "SolarEdgeAPI ($name) - daily aggregates response is not a hash";
+    return \%readings;
+  }
+
+  my ($sec, $min, $hour, $day, $month, $year, $wday, $yday, $isdst) = localtime(time());
+  my $month = $month + 1;
+
+  # iterate over day for different meters
+  foreach my $meter ( @{$decodedJsonData->{'energyDetails'}->{'meters'}})
+  {
+    my $meterType = $meter->{'type'};
+    my $cumYear = 0;
+    my $cumMonth = 0;
+    my $cumToday = 0;
+
+    Log3 $name, 4, "SolarEdgeAPI ($name) - meterType $meterType";
+
+    # accumulate values of one meter
+    foreach my $meterData (@{$meter -> {'values'}})
+    {
+      my $value = $meterData->{'value'};
+
+      # decode timestamp, example: "2015-10-19 00:00:00"
+      my $timestamp = $meterData->{'date'};
+      my $timestampMonth = -1;
+      my $timestampDay = -1;
+      if (!($timestamp =~ m/^([0-9]+)\-([0-9]+)\-([0-9]+)/))
+      {
+        Log3 $name, 1, "SolarEdgeAPI ($name) - invalid timestamp in energyDetails response";
+      }
+      else
+      {
+        $timestampMonth = $2;
+        $timestampDay = $3;
+      }
+
+      Log3 $name, 4, "SolarEdgeAPI ($name) - $timestamp $value - timestampMonth $timestampMonth timestampDay $timestampDay";
+
+      # cumulate for all days of this year
+      $cumYear += $value;
+
+      # cumulate for all days of this month
+      if ($timestampMonth == $month)
+      {
+        $cumMonth += $value;
+
+        # detect the cumulated value for today
+        if ($timestampDay == $day)
+        {
+          $cumToday = $value;
+        }
+      }
+    }
+
+    $readings{$meterType."-cumYear"} = $cumYear / 1000.0;
+    $readings{$meterType."-cumMonth"} = $cumMonth / 1000.0;
+    $readings{$meterType."-cumDay"} = $cumToday;
+
+    if (SolarEdgeAPI_IsLastDayOfMonth($hash))
+    {
+      $readings{$meterType."-cumMonthOnce"} = $cumMonth / 1000.0;
+    }
+    if (SolarEdgeAPI_IsLastDayOfYear($hash))
+    {
+      $readings{$meterType."-cumYearOnce"} = $cumYear / 1000.0;
+    }
+  }
+
   return \%readings;
 }
 
@@ -890,22 +1102,22 @@ sub SolarEdgeAPI_ReadingsProcessing_Status($$)
 {
   my ($hash, $decodedJsonData) = @_;
   my $name = $hash->{NAME};
-  
+
   my %readings;
   my $data = $decodedJsonData->{'siteCurrentPowerFlow'};
 
   if ((defined $data) && (!defined $data->{'unit'}))
   {
     Log3 $name, 3, "SolarEdgeAPI ($name) - API currentPowerFlow is not supported. Avoid unsuccessful server queries by setting attribute enableStatusReadings=0.";
-    
+
     # TODO Remove this. Do error reporting via Log3. (INCOMPATIBLE CHANGE)
     $readings{'error'} = 'API currentPowerFlow is not supported by site.';
   }
   else
   {
-    $readings{'unit'} = $data->{'unit'} || "Error Reading Response";		
+    $readings{'unit'} = $data->{'unit'} || "Error Reading Response";
     $readings{'updateRefreshRate'} = $data->{'updateRefreshRate'} || "Error Reading Response";
-    
+
     # Connections / Directions
     my $pv2load = 0;
     my $pv2storage = 0;
@@ -925,42 +1137,171 @@ sub SolarEdgeAPI_ReadingsProcessing_Status($$)
     }
 
     # GRID
-    $readings{'grid_status'} = $data->{'GRID'}->{"status"} || "Error Reading Response"; # TODO rethink error reporting via readings (INCOMPATIBLE CHANGE)	
+    $readings{'grid_status'} = $data->{'GRID'}->{"status"} || "Error Reading Response"; # TODO rethink error reporting via readings (INCOMPATIBLE CHANGE)
     $readings{'grid_power'} = (($load2grid > 0) ? "-" : "").$data->{'GRID'}->{"currentPower"};
 
     # LOAD
-    $readings{'load_status'} = $data->{'LOAD'}->{"status"} || "Error Reading Response";	
-    $readings{'load_power'} = $data->{'LOAD'}->{"currentPower"};		
+    $readings{'load_status'} = $data->{'LOAD'}->{"status"} || "Error Reading Response";
+    $readings{'load_power'} = $data->{'LOAD'}->{"currentPower"};
 
     # PV
-    $readings{'pv_status'} = $data->{'PV'}->{"status"} || "Error Reading Response";	
-    $readings{'pv_power'} = $data->{'PV'}->{"currentPower"};		
+    $readings{'pv_status'} = $data->{'PV'}->{"status"} || "Error Reading Response";
+    $readings{'pv_power'} = $data->{'PV'}->{"currentPower"};
 
     # Storage
     $readings{'storage_status'} = $data->{'STORAGE'}->{"status"} || "No storage found";
     if ($readings{'storage_status'} ne "No storage found")
     {
       $readings{'storage_power'} = (($storage2load > 0) ? "-" : "").$data->{'STORAGE'}->{"currentPower"};
-      $readings{'storage_level'} = $data->{'STORAGE'}->{"chargeLevel"} || "Error Reading Response";		
+      $readings{'storage_level'} = $data->{'STORAGE'}->{"chargeLevel"} || "Error Reading Response";
       $readings{'storage_critical'} = $data->{'STORAGE'}->{"critical"};
     }
   }
-    
+
   return \%readings;
 }
 
-sub SolarEdgeAPI_ReadingsProcessing_Overview($$)
+sub SolarEdgeAPI_ReadingsProcessing_Overview($$$)
+{
+  my ($hash, $decodedJsonData, $daily) = @_;
+  my $name = $hash->{NAME};
+
+  my %readings;
+  my $data = $decodedJsonData->{'overview'};
+
+  if (not $daily)
+  {
+    $readings{'power'} = $data->{'currentPower'}->{"power"};
+  }
+  $readings{'energyLifetime'} = $data->{'lifeTimeData'}->{"energy"} / 1000.0 / 1000.0;
+  my $energyYear = $data->{'lastYearData'}->{"energy"} / 1000.0;
+  $readings{'energyYear'} = $energyYear;
+
+  my $energyMonth = $data->{'lastMonthData'}->{"energy"} / 1000.0;
+  $readings{'energyMonth'} =  $energyMonth;
+
+  my $energyDay = $data->{'lastDayData'}->{"energy"};
+  $readings{'energyDay'} = $energyDay;
+
+  if (SolarEdgeAPI_IsLastDayOfMonth($hash))
+  {
+    $readings{"energyMonthOnce"} = $energyMonth;
+  }
+  if (SolarEdgeAPI_IsLastDayOfYear($hash))
+  {
+    $readings{"energyYearOnce"} = $energyYear;
+  }
+
+  return \%readings;
+}
+
+sub SolarEdgeAPI_decodeBatteryState($)
+{
+  my ($code) = @_;
+
+  my $result = "$code"."_";
+
+  if ($code == 0) { $result .= "Off"; }
+  elsif ($code == 1) { $result .= "Standby"; }
+  elsif ($code == 2) { $result .= "Init"; }
+  elsif ($code == 3) { $result .= "Charge"; }
+  elsif ($code == 4) { $result .= "Discharge"; }
+  elsif ($code == 5) { $result .= "Fault"; }
+  elsif ($code == 7) { $result .= "Idle"; }
+  else { $result .= "Unknown"; }
+
+  return $result;
+}
+
+sub SolarEdgeAPI_ReadingsProcessing_Storage($$$)
+{
+  my ($hash, $decodedJsonData, $daily) = @_;
+  my $name = $hash->{NAME};
+
+  my %readings;
+
+  if (not (ref($decodedJsonData) eq "HASH"))
+  {
+    Log3 $name, 3, "SolarEdgeAPI ($name) - storageData response is not a hash";
+    return \%readings;
+  }
+
+  foreach my $batteryData ( @{$decodedJsonData->{'storageData'}->{'batteries'}})
+  {
+    my $serialNumber = $batteryData->{'serialNumber'};
+
+    Log3 $name, 4, "SolarEdgeAPI ($name) - serialNumber $serialNumber";
+
+    my $power = 0;
+    my $batteryState = -1;
+    my $lifeTimeEnergyCharged = 0;
+    my $lifeTimeEnergyDischarged = 0;
+    my $fullPackEnergyAvailable = 0;
+    my $internalTemp = 0;
+    my $batteryPercentageState = 0;
+    my $acGridCharging = 0;
+
+    foreach my $dataset (@{$batteryData -> {'telemetries'}})
+    {
+      my $newPower = $dataset->{'power'};
+      my $newBatteryState = $dataset->{'batteryState'};
+      my $newLifeTimeEnergyCharged = $dataset->{'lifeTimeEnergyCharged'};
+      my $newLifeTimeEnergyDischarged = $dataset->{'lifeTimeEnergyDischarged'};
+      my $newFullPackEnergyAvailable = $dataset->{'fullPackEnergyAvailable'};
+      my $newInternalTemp = $dataset->{'internalTemp'};
+      my $newBatteryPercentageState = $dataset->{'batteryPercentageState'};
+      my $newAcGridCharging = $dataset->{'ACGridCharging'};
+
+      if (($newPower > -100000) and ($newPower < 100000)) { $power = $newPower; }
+      if (($newBatteryState >= 0) and ($newBatteryState <= 10)) { $batteryState = $newBatteryState; }
+      if ($newLifeTimeEnergyCharged > 0) { $lifeTimeEnergyCharged = $newLifeTimeEnergyCharged; }
+      if ($newLifeTimeEnergyDischarged > 0) { $lifeTimeEnergyDischarged = $newLifeTimeEnergyDischarged; }
+      if ($newFullPackEnergyAvailable > 0) { $fullPackEnergyAvailable = $newFullPackEnergyAvailable; }
+      if (($newInternalTemp > 0) and ($newInternalTemp < 200)) { $internalTemp = $newInternalTemp; }
+      if (($newBatteryPercentageState >= 0) and ($newBatteryPercentageState <= 100)) { $batteryPercentageState = $newBatteryPercentageState; }
+      if ($newAcGridCharging >= 0) { $acGridCharging = $newAcGridCharging; }
+
+      Log3 $name, 4, "SolarEdgeAPI ($name) - new: $newPower $newBatteryState $newLifeTimeEnergyCharged $newLifeTimeEnergyDischarged $newFullPackEnergyAvailable $newInternalTemp $newBatteryPercentageState $newAcGridCharging";
+      Log3 $name, 4, "SolarEdgeAPI ($name) - $power $batteryState $lifeTimeEnergyCharged $lifeTimeEnergyDischarged $fullPackEnergyAvailable $internalTemp $batteryPercentageState $acGridCharging";
+    }
+
+    if ($daily)
+    {
+      $readings{$serialNumber."-lifeTimeEnergyCharged"} = $lifeTimeEnergyCharged / 1000.0 / 1000.0;
+      $readings{$serialNumber."-lifeTimeEnergyDischarged"} = $lifeTimeEnergyDischarged / 1000.0 / 1000.0;
+      $readings{$serialNumber."-fullPackEnergyAvailable"} = $fullPackEnergyAvailable;
+    }
+    else
+    {
+      $readings{$serialNumber."-power"} = $power;
+      $readings{$serialNumber."-batteryState"} = $batteryState;
+      $readings{$serialNumber."-batteryStateDecoded"} = SolarEdgeAPI_decodeBatteryState($batteryState);
+      $readings{$serialNumber."-lifeTimeEnergyCharged"} = $lifeTimeEnergyCharged;
+      $readings{$serialNumber."-lifeTimeEnergyDischarged"} = $lifeTimeEnergyDischarged;
+      $readings{$serialNumber."-internalTemp"} = $internalTemp;
+      $readings{$serialNumber."-batteryPercentageState"} = $batteryPercentageState;
+      $readings{$serialNumber."-ACGridCharging"} = $acGridCharging;
+    }
+  }
+
+  return \%readings;
+}
+
+sub SolarEdgeAPI_ReadingsProcessing_DailyDetails($$)
 {
   my ($hash, $decodedJsonData) = @_;
   my $name = $hash->{NAME};
-    
+
   my %readings;
-  my $data = $decodedJsonData->{'overview'};
-    
-  $readings{'power'} = $data->{'currentPower'}->{"power"};            
-  
-  # TODO generate more readings from the overview API. Some readings might only be relevant once per day.
-  
+  my $data = $decodedJsonData->{'details'};
+
+  # documented but not in the response:
+  #$readings{'alertQuantity'} = $data->{'alertQuantity'};
+  #$readings{'alertSeverity'} = $data->{'alertSeverity'};
+
+  $readings{'peakPower'} = $data->{'peakPower'};
+  $readings{'status'} = $data->{'status'};
+
   return \%readings;
 }
 
@@ -976,7 +1317,7 @@ sub SolarEdgeAPI_UpdateReadings($$$)
   {
     readingsBulkUpdate($hash,$path.'-'.$r,$v);
   }
-  
+
   # TODO Remove this. (INCOMPATIBLE CHANGE)
   readingsBulkUpdateIfChanged($hash, 'actionQueue', scalar(@{$hash->{actionQueue}}).' entries in the Queue');
   readingsBulkUpdateIfChanged($hash, 'state', ((defined($hash->{actionQueue}) and (scalar(@{$hash->{actionQueue}}) == 0)) ? 'ready' : 'fetch data - '.scalar(@{$hash->{actionQueue}}).' paths in actionQueue'));
@@ -1002,11 +1343,10 @@ EOF
 
 1;
 
-
 =pod
 =item device
 =item summary       Retrieves data from a SolarEdge PV system via the SolarEdge Monitoring API
-=item summary_DE 
+=item summary_DE
 =begin html
 
 <a name="SolarEdgeAPI"></a>
@@ -1020,9 +1360,9 @@ EOF
   day is limited to 300.<br>
   The intervals as well as the start of day time and night time can be controlled by attributes.<br>
   In each interval each enabled group of readings is generated once. You can reduce the number of<br>
-  server queries by disabling groups of readings and by increasing the interval time.<br>  
+  server queries by disabling groups of readings and by increasing the interval time.<br>
   <br>
-  Note: Features marked as "depricated" or "debug only" may change or disappear in future versions.<br>
+  Note: Features marked as "deprecated" or "debug only" may change or disappear in future versions.<br>
   <br>
 
   <a name="SolarEdgeAPI_Define"></a>
@@ -1033,30 +1373,124 @@ EOF
     Monitoring Portal. The &lt;API Key&gt; has to be enabled in the "Admin" Secion<br>
     of the web portal.<br>
     The &lt;interval&gt; parameter is optional. If a value is given it replaces the default value for attribute<br>
-    interval, see below. This parameter is depricated.<br>
+    interval, see below. This parameter is deprecated.<br>
   </ul>
   <br>
-    
+
   <a name="SolarEdgeAPI_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>actionQueue     - information about the entries in the action queue (for debug only)</li>
-    <li>status-*        - readings generated from currentPowerFlow API response. This API is not supported by all sites.</li>
-    <li>aggregates-*    - cumulative data of the energyDetails response</li>
-    <li>overview-*      - readings generated from overview API response</li>    
-    <li>debug*          - debug data about successful and failing http requests (for debug only)</li>    
+    All reading names start with the name of the group of readings followed by "-".<br>
+    All readings that belong to the same group have the same timing: Some groups of readings are generated<br>
+    periodically. The period is defined by attributes interval, intervalAtNighttime, dayTimeStartHour and<br>
+    nightTimeStartHour. Other readings are generated once per day only. Reading groups which are update<br>
+    once per day have a name starting with "daily". Each update of a group of readings requires on http<br>
+    request to the SolarEdge server. The number of queries is limited to 300 per day, according to API<br>
+    documentation.<br>
+    <br>
+    Groups of readings:<br>
+    <br>
+
+    <li>overview - readings generated from "overview" API response
+      <ul>
+        <li>overview-power [W]</li>
+        <li>overview-energyLifetime [MWh]</li>
+        <li>overview-energyYear [kWh]</li>
+        <li>overview-energyMonth [kWh]</li>
+        <li>overview-energyDay [Wh]</li>
+      </ul>
+    </li>
+
+    <li>dailyOverview - readings generated from "overview" API response once per day
+      <ul>
+        <li>dailyOverview-energyDay [Wh] - This reading is derived. It depends on the latest dailyOverview-energyMonth reading.</li>
+        <li>dailyOverview-energyMonth [kWh]</li>
+        <li>dailyOverview-energyYear [kWh]</li>
+        <li>dailyOverview-energyLifetime [MWh]</li>
+        <li>dailyOverview-energyMonthOnce [kWh] generated on the last day of the month only</li>
+        <li>dailyOverview-energyYearOnce [kWh] generated on the last day of the year only</li>
+      </ul>
+    </li>
+
+    <li>aggregates - readings generated from "energyDetails" API response<br>
+      <ul>
+        <li>aggregates-&lt;meterType&gt;-cumToday [Wh]</li>
+        <li>aggregates-&lt;meterType&gt;-recent15min [Wh](deprecated) </li>
+      </ul>
+    </li>
+
+    <li>dailyAggregates - readings generated from "energyDetails" API response once per day<br>
+      <ul>
+        <li>dailyAggregates-&lt;meterType&gt;-cumDayOnce [Wh]</li>
+        <li>dailyAggregates-&lt;meterType&gt;-cumMonthDaily [kWh]</li>
+        <li>dailyAggregates-&lt;meterType&gt;-cumYearDaily [kWh]</li>
+        <li>dailyAggregates-&lt;meterType&gt;-cumMonthOnce [kWh] generated on the last day of the month only</li>
+        <li>dailyAggregates-&lt;meterType&gt;-cumYearOnce [kWh] generated on the last day of the year only</li>
+      </ul>
+    </li>
+
+    <li>storage - readings generated from "storageData" API response<br>
+      <ul>
+        <li>storage-&lt;serial&gt;-power [W]</li>
+        <li>storage-&lt;serial&gt;-batteryState</li>
+        <li>storage-&lt;serial&gt;-batteryStateDecoded [text]</li>
+        <li>storage-&lt;serial&gt;-lifetimeEnergyCharged</li>
+        <li>storage-&lt;serial&gt;-lifetimeEnergyDischarged</li>
+        <li>storage-&lt;serial&gt;-internalTemp [degrees C]</li>
+        <li>storage-&lt;serial&gt;-batteryPercentageState [percent]</li>
+      </ul>
+    </li>
+
+    <li>dailyStorage - readings generated from "storageData" API response once per day<br>
+      <ul>
+        <li>dailyStorage-&lt;serial&gt;-lifetimeEnergyCharged [MWh]</li>
+        <li>dailyStorage-&lt;serial&gt;-lifetimeEnergyDischarged [MWh]</li>
+        <li>dailyStorage-&lt;serial&gt;-fullPackEnergyAvailable [kWh]</li>
+      </ul>
+    </li>
+
+    <li>dailyDetails - readings generated from "details" API response once per day<br>
+      <ul>
+        <li>dailyDetails-peakPower [W]</li>
+        <li>dailyDetails-status [text]</li>
+      </ul>
+    </li>
+
+    <li>status - readings generated from "currentPowerFlow" API response. This API is not supported by all sites.<br>
+      <ul>
+        <li>status-grid_status [?]</li>
+        <li>status-grid_power [W]</li>
+        <li>status-load_status [?]</li>
+        <li>status-load_power [W]</li>
+        <li>status-pv_status [?]</li>
+        <li>status-pv_power [W]</li>
+        <li>status-storage_status [?]</li>
+        <li>status-storage_power [W]</li>
+        <li>status-storage_level [?]</li>
+        <li>status-storage_critical [?]</li>
+      </ul>
+    </li>
+
+    <li>debug - debug data about successful and failing http requests (for debug only)</li>
+    <li>actionQueue - information about the entries in the action queue (for debug only)</li>
   </ul>
   <br>
-    
+
   <a name="SolarEdgeAPI_Get"></a>
   <b>Get</b>
   <ul>
-    <li>status - fetch data from currentPowerFlow API (for debug only)</li>
-    <li>aggregates - fetch data from energyDetails API (for debug only)</li>
-    <li>overview - fetch data from overview API (for debug only)</li>
+    <li>numberOfRequests - get the expected number of requests per day with current attribute settings (for debug only)</li>
+    <li>status - fetch corresponding group of readings (for debug only)</li>
+    <li>aggregates - fetch corresponding group of readings (for debug only)</li>
+    <li>overview - fetch corresponding group of readings (for debug only)</li>
+    <li>storage - fetch corresponding group of readings (for debug only)</li>
+    <li>dailyDetails - fetch corresponding group of readings (for debug only)</li>
+    <li>dailyStorage - fetch corresponding group of readings (for debug only)</li>
+    <li>dailyAggregates - fetch corresponding group of readings (for debug only)</li>
+    <li>dailyOverview - fetch corresponding group of readings (for debug only)</li>
   </ul>
   <br>
-    
+
   <a name="SolarEdgeAPI_Set"></a>
   <b>Set</b>
   <ul>
@@ -1064,7 +1498,7 @@ EOF
     <li>resetDebugCounters - reset debug counters (internals and optional debug* readings) (for debug only)</li>
   </ul>
   <br>
-    
+
   <a name="SolarEdgeAPI_Attributes"></a>
   <b>Attributes</b>
   <ul>
@@ -1072,13 +1506,18 @@ EOF
     <li>intervalAtNightTime - interval of http requests during night time (default: 1200 (seconds))</li>
     <li>dayTimeStartHour - start of daytime, default 7 (= 7:00am)</li>
     <li>nightTimeStartHour - start of night time, default 22 (= 10:00pm)</li>
-    <li>enableStatusReadings Enable the status-* readings. Default: 1</li>
-    <li>enableAggregatesReadings Enable the aggregates-* readings. Default: 1</li>
-    <li>enableOverviewReadings Enable the overview-* readings. Default: 0 (for backward compatiblity)</li> 
+    <li>enableStatusReadings - enable the corresponding group of readings, default: 1</li>
+    <li>enableAggregatesReadings - enable the corresponding group of readings, default: 1</li>
+    <li>enableOverviewReadings  - enable the corresponding group of readings, default: 0</li>
+    <li>enableStorageReadings - enable the corresponding group of readings, default: 0</li>
+    <li>enableDailyDetailsReadings - enable the corresponding group of readings, default: 0</li>
+    <li>enableDailyStorageReadings - enable the corresponding group of readings, default: 0</li>
+    <li>enableDailyAggregatesReadings - enable the corresponding group of readings, default: 0</li>
+    <li>enableDailyOverviewReadings - enable the corresponding group of readings, default: 0</li>
     <li>enableDebugReadings Enable the debug* readings. These debug readings do not cause additional http requests. Default: 0</li>
   </ul>
   <br>
-  
+
 </ul>
 
 =end html
