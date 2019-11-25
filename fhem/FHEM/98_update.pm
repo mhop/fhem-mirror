@@ -285,7 +285,7 @@ doUpdate($$$$)
   my %lh;
   foreach my $l (@locList) {
     my @l = split(" ", $l, 4);
-    next if($l[0] ne "UPD");
+    next if($l[0] ne "UPD" && $l[0] ne "CRE");
     $lh{$l[3]}{TS} = $l[1];
     $lh{$l[3]}{LEN} = $l[2];
   }
@@ -322,7 +322,7 @@ doUpdate($$$$)
       uLog 4, "mv $root/$r[1] $root/$r[2]". ($mvret ? " FAILED:$mvret":"");
     }
 
-    next if($r[0] ne "UPD");
+    next if($r[0] ne "UPD" && $r[0] ne "CRE");
     my $fName = $r[3];
     my $wouldExcl;
     foreach my $ex (@excl) {
@@ -342,9 +342,10 @@ doUpdate($$$$)
       my $isExcl = (!$isCheck && $wouldExcl);
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
-      my $fileOk = ($lh{$fName} &&
-                    $lh{$fName}{TS} eq $r[1] &&
-                    $lh{$fName}{LEN} eq $r[2]);
+      my $fileOk = ($lh{$fName} &&                 # local files exists and
+                    ($r[0] eq "CRE") ||            # either file is create only
+                     ($lh{$fName}{TS} eq $r[1] &&  # or both TS and LEN is same
+                      $lh{$fName}{LEN} eq $r[2])); # as the remote one
       if($isExcl && !$fileOk) {
         uLog 1, "update: skipping $fName, matches exclude_from_update";
         $nSkipped++;
