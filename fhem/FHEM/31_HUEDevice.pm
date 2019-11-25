@@ -98,6 +98,10 @@ my %hueModels = (
   LLM012 => {name => 'Color Temperature Module' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'   ,subType => 'dimmer',
                                                                                     icon => 'hue_filled_outlet', },
+  LOM001 => {name => 'Hue Smart Plug'           ,type => 'On/Off plug-in unit'     ,subType => 'switch',
+                                                                                    icon => 'hue_filled_plug', },
+  LOM002 => {name => 'Hue Smart Plug'           ,type => 'On/Off plug-in unit'     ,subType => 'switch',
+                                                                                    icon => 'hue_filled_plug', },
 
   RWL020    => {name => 'Hue Dimmer Switch'     ,type => 'ZLLSwitch'               ,subType => 'sensor',
                                                                                     icon => 'hue_filled_hds', },
