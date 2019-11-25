@@ -1,4 +1,5 @@
 
+
 # $Id$
 
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
@@ -488,7 +489,7 @@ HUEDevice_SetParam($$@)
       $cmd = 'pct';
       $value = 0;
 
-    } if($cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
+    } elsif( $cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
       $cmd = "off";
       $value = $value2;
     }
@@ -681,6 +682,9 @@ HUEDevice_SetParam($$@)
 
   } elsif( $cmd eq 'stop' && $subtype  eq 'blind' ) {
     $obj->{stop} = JSON::true;
+
+  } elsif( $cmd eq 'habridgeupdate' ) {
+    $obj->{habridgeupdate} = JSON::true;
 
   } else {
     return 0;
@@ -924,6 +928,8 @@ HUEDevice_Set($@)
     if( $hash->{helper}->{devtype} eq 'G' ) {
       $hash->{helper}->{update} = 1;
       $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",\%obj);
+    } elsif( defined( $obj{habridgeupdate} ) ) {
+      $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/bridgeupdatestate",\%obj);
     } else {
       $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/state",\%obj);
     }

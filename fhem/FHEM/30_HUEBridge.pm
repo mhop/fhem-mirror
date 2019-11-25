@@ -953,9 +953,10 @@ HUEBridge_Set($@)
                                                  $group = $_ if( !$group );
 
                                                  $scene .= " ($group)";
-                                                 $scene .= " [id=$_]" if( 1 || $group =~ /;/ );;
+                                                 $scene .= " [id=$_]" if( 1 || $group =~ /;/ );
                                                }
-                                               $scene =~ s/ /#/g; $scene;} keys %{$scenes} );
+                                               $scene =~ s/ /#/g; $scene;
+                                             } keys %{$scenes} );
     } else {
       $list .= " scene";
     }
@@ -985,8 +986,8 @@ HUEBridge_Get($@)
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-". $key;
-      my $fhem_name ="";
-      $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      my $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $fhem_name = "" if( !$fhem_name );
       $ret .= sprintf( "%2i: %-25s %-15s %s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
     }
     $ret = sprintf( "%2s  %-25s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
@@ -1000,8 +1001,8 @@ HUEBridge_Get($@)
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-G". $key;
-      my $fhem_name ="";
-      $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      my $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $fhem_name = "" if( !$fhem_name );
       $result->{$key}{type} = '' if( !defined($result->{$key}{type}) );     #deCONZ fix
       $result->{$key}{class} = '' if( !defined($result->{$key}{class}) );   #deCONZ fix
       $result->{$key}{lights} = [] if( !defined($result->{$key}{lights}) ); #deCONZ fix
@@ -1021,7 +1022,7 @@ HUEBridge_Get($@)
     $hash->{helper}{scenes} = $result;
     my $ret = "";
     foreach my $key ( sort {$result->{$a}{name} cmp $result->{$b}{name}} keys %{$result} ) {
-      $ret .= sprintf( "%-20s %-20s", $key, $result->{$key}{name} );
+      $ret .= sprintf( "%-20s %-25s %-10s", $key, $result->{$key}{name}, $result->{$key}{type} );
       $ret .= sprintf( "%i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
       my $lights = join( ",", @{$result->{$key}{lights}} );
       my $group = HUEbridge_groupOfLights($hash,$lights);
@@ -1036,7 +1037,7 @@ HUEBridge_Get($@)
       }
     }
     if( $ret ) {
-      my $header = sprintf( "%-20s %-20s", "ID", "NAME" );
+      my $header = sprintf( "%-20s %-25s %-10s", "ID", "NAME", "TYPE" );
       $header .= sprintf( "%s %s %s %-40s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg && $arg eq 'detail' );
       $header .= sprintf( " %s\n", "LIGHTS" );
       $ret = $header . $ret;
@@ -1100,8 +1101,8 @@ HUEBridge_Get($@)
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-S". $key;
-      my $fhem_name ="";
-      $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      my $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $fhem_name = "" if( !$fhem_name );
       $ret .= sprintf( "%2i: %-15s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
       $ret .= sprintf( " %s", encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( "\n%-56s %s", '', encode_json($result->{$key}{config}) ) if( $arg && $arg eq 'detail' );
@@ -1239,42 +1240,106 @@ HUEBridge_updateGroups($$)
   foreach my $chash ( values %{$groups} ) {
     my $count = 0;
     my %readings;
+    my ($hue,$sat,$bri);
     foreach my $light ( split(',', $chash->{lights}) ) {
       next if( !$light );
       my $current = $modules{HUEDevice}{defptr}{"$name-$light"}{helper};
       next if( !$current );
+      #next if( !$current->{on} );
       next if( $current->{helper}{devtype} );
 
-      $readings{ct} += $current->{ct};
-      $readings{bri} += $current->{bri};
-      $readings{pct} += $current->{pct};
-      $readings{sat} += $current->{sat};
+      my( $h, $s, $v );
+
+      if( $current->{on} && $current->{colormode} && $current->{colormode} eq 'hs' ) {
+        $h = $current->{hue} / 65535;
+        $s = $current->{sat} / 254;
+        $v = $current->{bri} / 254;
+
+      } elsif( $current->{on} && $current->{rgb} &&  $current->{rgb}  =~ m/^(..)(..)(..)/ ) {
+        my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+        ( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
+
+        $s = 0 if( !defined($s) );
+      }
+
+
+      if( defined($h) ) {
+Log 1, ">>> $h $s $v";
+        if( defined($hue) ) {
+           my $a = $hue < $h ? $hue : $h;
+           my $b = $hue < $h ? $h : $hue;
+
+           my $d1 = $b-$a;
+           my $d2 = $a+1-$b;
+
+           if( $d1 < $d2 ) {
+             $hue = $a + $d1 / 2;
+           } else {
+              $hue = $b + $d2 / 2;
+           }
+
+           $sat += $s;
+           $bri += $v;
+
+        } else {
+          $hue = $h;
+          $sat = $s;
+          $bri = $v;
+
+        }
+      }
+
+      $readings{ct} += $current->{ct} if( $current->{ct} );
+      $readings{bri} += $current->{bri} if( defined($current->{bri}) );
+      $readings{pct} += $current->{pct} if( defined($current->{pct}) );
+      $readings{sat} += $current->{sat} if( defined($current->{sat}) );
 
       $readings{on} |= ($current->{on}?'1':'0');
       $readings{reachable} |= ($current->{reachable}?'1':'0');
 
       if( !defined($readings{alert}) ) {
         $readings{alert} = $current->{alert};
-      } elsif( $readings{alert} ne $current->{alert} ) {
-        $readings{alert} = "nonuniform";
+      } elsif( $current->{alert} && $readings{alert} ne $current->{alert} ) {
+        $readings{alert} = 'nonuniform';
       }
       if( !defined($readings{colormode}) ) {
         $readings{colormode} = $current->{colormode};
-      } elsif( $readings{colormode} ne $current->{colormode} ) {
+      } elsif( $current->{colormode} && $readings{colormode} ne $current->{colormode} ) {
         $readings{colormode} = "nonuniform";
       }
       if( !defined($readings{effect}) ) {
         $readings{effect} = $current->{effect};
-      } elsif( $readings{effect} ne $current->{effect} ) {
+      } elsif( $current->{effect} && $readings{effect} ne $current->{effect} ) {
         $readings{effect} = "nonuniform";
       }
 
       ++$count;
     }
-    $readings{ct} = int($readings{ct} / $count + 0.5);
-    $readings{bri} = int($readings{bri} / $count + 0.5);
-    $readings{pct} = int($readings{pct} / $count + 0.5);
-    $readings{sat} = int($readings{sat} / $count + 0.5);
+
+    if( defined($hue) && $readings{colormode} && $readings{colormode} ne "ct" ) {
+Log 1, "$hue $sat $bri";
+      $readings{colormode} = 'hs';
+      $readings{hue} = int($hue * 65535);
+      $readings{sat} = int($sat * 254);
+
+      $readings{bri} = int($bri * 254 / $count + 0.5);
+      $readings{pct} = int($bri * 100 / $count + 0.5);
+
+    } else {
+      foreach my $key ( qw( ct bri pct sat ) ) {
+        $readings{$key} = int($readings{$key} / $count + 0.5) if( defined($readings{$key}) );
+      }
+    }
+
+    if( defined($hue) ) {
+      my ($r,$g,$b) = Color::hsv2rgb($hue,$sat,$bri);
+
+      $r *= 255;
+      $g *= 255;
+      $b *= 255;
+
+      $readings{rgb} = sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 )
+    }
 
     if( $readings{on} ) {
       if( $readings{pct} > 0
@@ -1825,6 +1890,20 @@ HUEBridge_dispatch($$$;$)
     } elsif( $type =~ m/^lights\/(\d*)$/ ) {
       if( HUEDevice_Parse($param->{chash},$json) ) {
         HUEBridge_updateGroups($hash, $param->{chash}{ID});
+      }
+
+    } elsif( $type =~ m/^lights\/(\d*)\/bridgeupdatestate$/ ) { 
+      # only for https://github.com/bwssytems/ha-bridge
+      # see https://forum.fhem.de/index.php/topic,11020.msg961555.html#msg961555
+      if( $queryAfterSet ) {
+        my $chash = $param->{chash};
+        if( $chash->{helper}->{update_timeout} ) {
+          RemoveInternalTimer($chash);
+          InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $chash, 0);
+        } else {
+          RemoveInternalTimer($chash);
+          HUEDevice_GetUpdate( $chash );
+        }
       }
 
     } elsif( $type =~ m/^groups\/(\d*)$/ ) {
