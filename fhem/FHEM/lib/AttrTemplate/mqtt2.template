@@ -34,7 +34,9 @@ attr DEVCID bridgeRegexp \
   (ESPClient_[^/]+)[/].*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
   [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
-  wallpanel[/]([^/]+)[/].*:.* "$1"
+  wallpanel[/]([^/]+)[/].*:.* "$1"\
+  (wled)[/]([^/]+)[/].*::.* "$1_$2"\
+  (go-eCharger)[/]([^/]+)[/].*::.* "go_eCharger_$2"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -1510,7 +1512,8 @@ attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/light/0/command off\
   on:noArg shellies/DEVNAME/light/0/command on\
-  pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}
+  pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT)}\
@@ -1781,7 +1784,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt
 order:X_02
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "oMQTTgw_MCU" : InternalVal("DEVICE","DEF","mosquitto")}
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 deletereading -q DEVICE (?!associatedWith).*
@@ -1934,3 +1937,46 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
 attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 farewell:template has been applied successfully. For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 attr DEVICE model wallpanel_app
+
+#source post: https://forum.fhem.de/index.php/topic,98880.msg995308.html#msg995308
+name:wled_controller
+filter:TYPE=MQTT2_DEVICE
+desc:To control a WLED device, see https://github.com/Aircoookie/WLED/wiki for details).
+order:W_01
+par:BASE_ID;BASE_ID typically is wled;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/][^/]+[/].*:, ? $1 : undef }
+par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]([^/]+)[/].*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal("DEVICE","icon","hue_filled_iris") }
+attr DEVICE icon ICON
+attr DEVICE setList\
+  on:noArg BASE_ID/DEVNAME status on\
+  off:noArg BASE_ID/DEVNAME status off\
+  toggle:noArg BASE_ID/DEVNAME status t\
+  rgb:colorpicker,RGB BASE_ID/DEVNAME/col #$EVTPART1\
+  brightness:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME
+attr DEVICE readingList \
+  BASE_ID/DEVNAME/g:.* brightness\
+  BASE_ID/DEVNAME/c:.* {{"rgb"=>substr("$EVENT",1,6)}}\
+  BASE_ID/DEVNAME/v:.* api
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
+attr DEVICE webCmd rgb:brightness
+attr DEVICE model wled_controller
+
+#source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
+name:go_eCharger
+filter:TYPE=MQTT2_DEVICE
+desc:See source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924 for details. For complete MQTT-API see https://go-e.co/app/api.pdf
+order:W_02
+par:BASE_ID;BASE_ID typically is go-eCharger;{ AttrVal("DEVICE","readingList","") =~ m,(go-eCharger)[/][^/]+[/].*:, ? $1 : undef }
+par:SERIAL;Serial number;{ AttrVal("DEVICE","readingList","") =~ m,go-eCharger[/]([^/]+)[/].*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+attr DEVICE icon ICON
+attr DEVICE event-on-change-reading .*
+attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT) }\
+  BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
+attr DEVICE setList Charge_ON:noArg BASE_ID/SERIAL/cmd/req alw=1\
+  Charge_OFF:noArg BASE_ID/SERIAL/cmd/req alw=0\
+  amp:selectnumbers,1,1,22,1,lin go-eCharger/SERIAL/cmd/req amp=$EVTPART1
+attr DEVICE stateFormat Status: charger_state P_akt: energy_akt V1: nrg_1 V2: nrg_2 V3: nrg_3
+attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none"  => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished");; $rets{$val}}, temperature:temp.* { ReadingsVal($name,"tmp",0) }, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
+attr DEVICE model go_eCharger

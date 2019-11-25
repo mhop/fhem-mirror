@@ -727,13 +727,13 @@ filter:TYPE=HTTPMOD
 desc: Show updates for <a href="https://dnscrypt.info/">DNSCRYPT.</a><br>Define a HTTPMOD device like <br>defmod dnscrypt_proxy_version HTTPMOD https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest 86400<br><a href="https://forum.fhem.de/index.php/topic,97694.msg992002.html#msg992002">Source: Forum</a>
 order:X_01x
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
-attr DEVICE userattr userattr pihole_version
+attr DEVICE userattr userattr myInstalledVersion
 attr DEVICE extractAllJSON 1
 attr DEVICE extractAllJSONFilter tag_name
 attr DEVICE stateFormat {"<p align=\"left\">".ReadingsTimestamp($name,'tag_name','')."<br />Online: <a href=\"https://github.com/DNSCrypt/dnscrypt-proxy/blob/master/ChangeLog\"\
 title=\"ChangeLog\" rel=\"noopener noreferrer\" target=\"_blank\"><b>".ReadingsVal($name,'tag_name','')."</b></a><br />\
-pihole: <b>".AttrVal($name,'pihole_version','')."</b></p>"}
-attr DEVICE pihole_version 2.0.31
+pihole: <b>".AttrVal($name,'myInstalledVersion','')."</b></p>"}
+attr DEVICE myInstalledVersion 2.0.31
 attr DEVICE room WHICHROOM
 attr DEVICE enableControlSet 1
 attr DEVICE model dnscrypt-proxy_updates
