@@ -2189,7 +2189,7 @@ sub decodeLinkLayer($$)
   #printf("lfield %d\n", $self->{lfield});
 
   if ($self->{frame_type} eq FRAME_TYPE_A) {
-    print "FRAME TYPE A\n";
+    #print "FRAME TYPE A\n";
     if ($self->{crc_size} > 0) {
       $self->{crc0} = unpack('n', substr($linklayer,TL_BLOCK_SIZE, $self->{crc_size}));
     
