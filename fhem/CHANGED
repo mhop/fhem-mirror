@@ -1,6 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
  
+ - new:     66_EseraAnalogInOut.pm: new modul
+ - new:     66_EseraDigitalInOut.pm: new modul
+ - new:     66_EseraMulti.pm: new modul
+ - new:     66_EseraTemp.pm: new modul
+ - new:     66_EseraCount.pm: new modul
+ - new:     66_EseraIButton.pm: new modul
+ - new:     66_EseraOneWire.pm: new modul
  - feature: 70_SolarEdgeAPI: new readings from storageData API, overview API
  - bugfix:  73_ElectricityCalculator.pm: floating number flutter corrected
  - bugfix:  73_GasCalculator.pm: floating number flutter corrected
