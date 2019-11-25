@@ -673,6 +673,10 @@ HUEDevice_SetParam($$@)
     $defs{$name}->{helper}->{update_timeout} = 0;
   } elsif( $name &&  $cmd eq "noUpdate" ) {
     $defs{$name}->{helper}->{update_timeout} = -1;
+
+  } elsif( $cmd eq 'stop' && $subtype  eq 'blind' ) {
+    $obj->{stop} = JSON::true;
+
   } else {
     return 0;
   }
@@ -949,7 +953,7 @@ HUEDevice_Set($@)
   $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
   $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy" if( $subtype =~ m/color/ );
 
-  $list = 'up:noArg down:noArg pct:colorpicker,BRI,0,1,100' if( $subtype eq 'blind' );
+  $list = 'up:noArg stop:noArg down:noArg pct:colorpicker,BRI,0,1,100' if( $subtype eq 'blind' );
 
   if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (7<<8) ) {
     $list .= " dimUp:noArg dimDown:noArg" if( $subtype =~ m/dimmer/ );
@@ -1607,7 +1611,7 @@ HUEDevice_Parse($$)
       $attr{$name}{webCmd} = 'ct:ct 490:ct 380:ct 270:ct 160:toggle:on:off' if( $subtype eq "ctdimmer" );
       $attr{$name}{webCmd} = 'pct:toggle:on:off' if( $subtype eq "dimmer" );
       $attr{$name}{webCmd} = 'toggle:on:off' if( $subtype eq "switch" );
-      $attr{$name}{webCmd} = 'up:down:pct' if( $subtype eq "blind" );
+      $attr{$name}{webCmd} = 'up:stop:down:pct' if( $subtype eq "blind" );
     } elsif( $hash->{helper}->{devtype} eq 'G' ) {
       $attr{$name}{webCmd} = 'on:off';
     }
