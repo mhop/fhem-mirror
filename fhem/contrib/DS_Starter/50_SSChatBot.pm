@@ -249,6 +249,8 @@ sub SSChatBot_Set($@) {
   my $setlist;
         
   return if(IsDisabled($name));
+  
+  my $idxlist = join(",",(sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}));
  
   if(!$hash->{TOKEN}) {
       # initiale setlist für neue Devices
@@ -259,6 +261,7 @@ sub SSChatBot_Set($@) {
       $setlist = "Unknown argument $opt, choose one of ".
                  "botToken ".
                  "listSendqueue:noArg ".
+                 ($idxlist?"purgeSendqueue:-all-,$idxlist ":"purgeSendqueue:-all- ").
                  "sendItem:textField-long "
                  ;
   }
@@ -277,55 +280,66 @@ sub SSChatBot_Set($@) {
 	  }
       
   } elsif ($opt eq "listSendqueue") {
-        my $sub = sub ($) { 
-            my ($idx) = @_; 
-            my $ret;
-            foreach my $key (reverse sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}}) {
-                $ret .= ", " if($ret);
-                $ret .= $key."=>".$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{$key};
-            }
-            return $ret;
-        };
+      my $sub = sub ($) { 
+          my ($idx) = @_; 
+          my $ret;
+          foreach my $key (reverse sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}}) {
+              $ret .= ", " if($ret);
+              $ret .= $key."=>".$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{$key};
+          }
+          return $ret;
+      };
 	    
-        my $sq;
-	    foreach my $idx (sort{$a<=>$b}keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
-            $sq .= $idx." => ".$sub->($idx)."\n"; 			
-		}
-	    return $sq;
+      my $sq;
+	  foreach my $idx (sort{$a<=>$b}keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
+          $sq .= $idx." => ".$sub->($idx)."\n"; 			
+      }
+	  return $sq;
+  
+  } elsif ($opt eq "purgeSendqueue") {
+      if($prop eq "-all-") {
+          delete $hash->{OPIDX};
+          delete $data{SSChatBot}{$name}{sendqueue}{entries};
+          $data{SSChatBot}{$name}{sendqueue}{index} = 0;
+          return "All entries of SendQueue deleted";
+      } else {
+          delete $data{SSChatBot}{$name}{sendqueue}{entries}{$prop};
+          return "SendQueue entry with index \"$prop\" deleted";
+      }
   
   } elsif ($opt eq "sendItem") {
-       # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
-       # text="<https://www.synology.com>" users="user1"
-       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
-       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
-       my $cmd = join(" ", @a);
-       my ($text,$users,$fileUrl);
-       my($a, $h) = parseParams($cmd);
-       if($h) {
-           $text    = $h->{text}    if(defined $h->{text});
-           $users   = $h->{users}   if(defined $h->{users});
-           $fileUrl = $h->{fileUrl} if(defined $h->{fileUrl});
-       }
+      # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
+      # text="<https://www.synology.com>" users="user1"
+      # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
+      # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
+      my $cmd = join(" ", @a);
+      my ($text,$users,$fileUrl);
+      my($a, $h) = parseParams($cmd);
+      if($h) {
+          $text    = $h->{text}    if(defined $h->{text});
+          $users   = $h->{users}   if(defined $h->{users});
+          $fileUrl = $h->{fileUrl} if(defined $h->{fileUrl});
+      }
        
-       return "Your sendstring is incorrect. It must contain at least the \"text\" tag like 'text=\"...\" '." if(!$text);
+      return "Your sendstring is incorrect. It must contain at least the \"text\" tag like 'text=\"...\" '." if(!$text);
+      
+      $users = AttrVal($name,"defaultPeer", "") if(!$users);
+      return "You haven't defined any receptor for send the message to. ".
+             "You have to use the \"users\" tag or define default receptors with attribute \"defaultPeer\"." if(!$users);
        
-       $users = AttrVal($name,"defaultPeer", "") if(!$users);
-       return "You haven't defined any receptor for send the message to. ".
-              "You have to use the \"users\" tag or define default receptors with attribute \"defaultPeer\"." if(!$users);
-       
-       # User aufsplitten und zu jedem die ID ermitteln
-       my @ua = split(/,/, $users);
-       foreach (@ua) {
-           next if(!$_);
-           my $uid = $hash->{HELPER}{USERS}{$_}{id};
-           return "The receptor \"$_\" seems to be unknown because its ID coulnd't be found." if(!$uid);
+      # User aufsplitten und zu jedem die ID ermitteln
+      my @ua = split(/,/, $users);
+      foreach (@ua) {
+          next if(!$_);
+          my $uid = $hash->{HELPER}{USERS}{$_}{id};
+          return "The receptor \"$_\" seems to be unknown because its ID coulnd't be found." if(!$uid);
            
-           # Eintrag zur SendQueue hinzufügen
-           # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
-           SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", "");
-       }
+          # Eintrag zur SendQueue hinzufügen
+          # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
+          SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", "");
+      }
        
-       SSChatBot_getapisites($name);
+      SSChatBot_getapisites($name);
   
   } else {
       return "$setlist"; 
@@ -484,12 +498,12 @@ return $ret;                                                        # not genera
 ######################################################################################
 sub SSChatBot_initonboot ($) {
   my ($hash) = @_;
-  my $name = $hash->{NAME};
+  my $name   = $hash->{NAME};
   
   RemoveInternalTimer($hash, "SSChatBot_initonboot");
   
   if ($init_done == 1) {
-     RemoveInternalTimer($hash);                                                                     # alle Timer löschen
+     RemoveInternalTimer($hash);                                    # alle Timer löschen
      
      CommandGet(undef, "$name chatUserlist");     
   
@@ -565,7 +579,7 @@ sub SSChatBot_checkretry ($$) {
           $rs = 86400;
       }
       
-      Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" index \"$idx\" finished faulty. Restart SendQueue in $rs seconds (retryCount $rc).");
+      Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
       
       RemoveInternalTimer($hash, "SSChatBot_chatop");
       InternalTimer(gettimeofday()+$rs, "SSChatBot_chatop", "$name", 0);
@@ -1332,7 +1346,8 @@ return;
     "synology",
     "synologychat",
     "chatbot",
-    "chat"
+    "chat",
+    "messenger"
   ],
   "version": "v1.1.1",
   "release_status": "stable",
