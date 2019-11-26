@@ -311,8 +311,10 @@ doUpdate($$$$)
   my $isSingle = ($arg ne "all" && $arg ne "force"  && !$isCheck);
   foreach my $r (@remList) {
     my @r = split(" ", $r, 4);
+    my $cmd = $r[0];
+    next if(!defined($cmd));
 
-    if($r[0] eq "MOV" && ($arg eq "all" || $arg eq "force")) {
+    if($cmd eq "MOV" && ($arg eq "all" || $arg eq "force")) {
       if($r[1] =~ m+\.\.+ || $r[2] =~ m+\.\.+) {
         uLog 1, "Suspicious line $r, aborting";
         return 1;
@@ -322,7 +324,7 @@ doUpdate($$$$)
       uLog 4, "mv $root/$r[1] $root/$r[2]". ($mvret ? " FAILED:$mvret":"");
     }
 
-    next if($r[0] ne "UPD" && $r[0] ne "CRE");
+    next if($cmd ne "UPD" && $cmd ne "CRE");
     my $fName = $r[3];
     my $wouldExcl;
     foreach my $ex (@excl) {
@@ -342,10 +344,10 @@ doUpdate($$$$)
       my $isExcl = (!$isCheck && $wouldExcl);
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
-      my $fileOk = ($lh{$fName} &&                 # local files exists and
-                    ($r[0] eq "CRE") ||            # either file is create only
-                     ($lh{$fName}{TS} eq $r[1] &&  # or both TS and LEN is same
-                      $lh{$fName}{LEN} eq $r[2])); # as the remote one
+      my $fileOk = ($lh{$fName} &&                  # local files exists and
+                    ($cmd eq "CRE" ||               # either file is create only
+                     ($lh{$fName}{TS} eq $r[1] &&   # or both TS and LEN is same
+                      $lh{$fName}{LEN} eq $r[2]))); # as the remote one
       if($isExcl && !$fileOk) {
         uLog 1, "update: skipping $fName, matches exclude_from_update";
         $nSkipped++;
@@ -357,7 +359,8 @@ doUpdate($$$$)
 
       } else {
         my $sz = -s $fPath;
-        next if($isExcl || ($fileOk && defined($sz) && $sz eq $r[2]));
+        next if($isExcl || 
+                ($fileOk && defined($sz) && ($cmd eq "CRE" || $sz eq $r[2])));
 
       }
     }
@@ -371,7 +374,7 @@ doUpdate($$$$)
     $nChanged++;
     my $sfx = ($arg eq "checktime" ? " $r[1]" : "");
     $sfx =~ s/_.*//;
-    uLog 1, "$r[0] $fName$sfx".
+    uLog 1, "$cmd $fName$sfx".
         ($isCheck && $wouldExcl ? " (excluded from update)" : "");
     next if($isCheck);
 
