@@ -1,6 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
  
+ - change:  73_AutoShuttersControl: fix 'table with attributes' message then
+                          commandref create
  - new:     66_EseraAnalogInOut.pm: new modul
  - new:     66_EseraDigitalInOut.pm: new modul
  - new:     66_EseraMulti.pm: new modul

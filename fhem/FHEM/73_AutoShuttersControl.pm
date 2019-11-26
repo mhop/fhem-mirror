@@ -2702,6 +2702,7 @@ sub CreateSunRiseSetShuttersTimer($$) {
     my ( $hash, $shuttersDev ) = @_;
     my $name            = $hash->{NAME};
     my $shuttersDevHash = $defs{$shuttersDev};
+    my %funcHash;
     $shutters->setShuttersDev($shuttersDev);
 
     return if ( IsDisabled($name) );
@@ -2759,16 +2760,10 @@ sub CreateSunRiseSetShuttersTimer($$) {
     );
     readingsEndUpdate( $hash, 1 );
 
+
     RemoveInternalTimer( $shutters->getInTimerFuncHash )
       if ( defined( $shutters->getInTimerFuncHash ) );
 
-    ## kleine Hilfe für InternalTimer damit ich alle benötigten Variablen an die Funktion übergeben kann welche von Internal Timer aufgerufen wird.
-    my %funcHash = (
-        hash           => $hash,
-        shuttersdevice => $shuttersDev,
-        sunsettime     => $shuttersSunsetUnixtime,
-        sunrisetime    => $shuttersSunriseUnixtime
-    );
 
     ## Setzt den Privacy Modus für die Sichtschutzfahrt auf den Status 0
     ##  1 bedeutet das PrivacyDown Timer aktiviert wurde, 2 beudet das er im privacyDown ist
@@ -2777,9 +2772,6 @@ sub CreateSunRiseSetShuttersTimer($$) {
       if ( not defined( $shutters->getPrivacyUpStatus ) );
     $shutters->setPrivacyDownStatus(0)
       if ( not defined( $shutters->getPrivacyDownStatus ) );
-
-    ## Ich brauche beim löschen des InternalTimer den Hash welchen ich mitgegeben habe,dieser muss gesichert werden
-    $shutters->setInTimerFuncHash( \%funcHash );
 
     ## Abfrage für die Sichtschutzfahrt am Morgen vor dem eigentlichen kompletten öffnen
     if ( $shutters->getPrivacyUpTime > 0 ) {
@@ -2802,6 +2794,18 @@ sub CreateSunRiseSetShuttersTimer($$) {
           if (
             ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' ) );
     }
+
+
+    ## kleine Hilfe für InternalTimer damit ich alle benötigten Variablen an die Funktion übergeben kann welche von Internal Timer aufgerufen wird.
+    %funcHash = (
+        hash           => $hash,
+        shuttersdevice => $shuttersDev,
+        sunsettime     => $shuttersSunsetUnixtime,
+        sunrisetime    => $shuttersSunriseUnixtime
+    );
+    ## Ich brauche beim löschen des InternalTimer den Hash welchen ich mitgegeben habe,dieser muss gesichert werden
+    $shutters->setInTimerFuncHash( \%funcHash );
+
 
     InternalTimer( $shuttersSunsetUnixtime,
         'FHEM::AutoShuttersControl::SunSetShuttersAfterTimerFn', \%funcHash );
@@ -7343,7 +7347,7 @@ sub getblockAscDrivesAfterManual {
     <p>
         <pre><code>{ ascAPIget('Getter','SHUTTERS_DEVICENAME') }</code></pre>
     </p>
-    <table border="1">
+    <table>
         <tr>
             <th>Getter</th>
             <th>Description</th>
@@ -7441,26 +7445,26 @@ sub getblockAscDrivesAfterManual {
             <td>outTemp</td>
             <td>Current temperature of a configured temperature device, return -100 is no device configured</td>
         </tr>
-    <table/>
+    </table>
     </p>
     <u>&Uuml;bersicht f&uuml;r das Rollladen-Device mit Parameter&uuml;bergabe</u>
     <ul>
         <code>{ ascAPIget('Getter','ROLLODEVICENAME',VALUE) }</code><br>
     </ul>
-    <table border="1">
+    <table>
         <tr>
             <th>Getter</th><th>Erl&auml;uterung</th>
         </tr>
         <tr>
             <td>QueryShuttersPos</td><td>R&uuml;ckgabewert 1 bedeutet das die aktuelle Position des Rollos unterhalb der Valueposition ist. 0 oder nichts bedeutet oberhalb der Valueposition.</td>
         </tr>
-    <table/>
+    </table>
     </p>
     <u>Data points of the <abbr>ASC</abbr> device</u>
         <p>
             <code>{ ascAPIget('Getter') }</code><br>
         </p>
-        <table border="1">
+        <table>
             <tr>
                 <th>Getter</th>
                 <th>Description</th>
@@ -7489,7 +7493,7 @@ sub getblockAscDrivesAfterManual {
                 <td>ASCenable</td>
                 <td>Is <abbr>ASC</abbr> globally activated?</td>
             </tr>
-        <table/>
+        </table>
 </ul>
 
 =end html
@@ -7703,7 +7707,7 @@ sub getblockAscDrivesAfterManual {
     <ul>
         <code>{ ascAPIget('Getter','ROLLODEVICENAME') }</code><br>
     </ul>
-    <table border="1">
+    <table>
         <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
         <tr><td>FreezeStatus</td><td>1=soft, 2=Daytime, 3=hard</td></tr>
         <tr><td>NoDelay</td><td>Wurde die Behandlung von Offset deaktiviert (Beispiel bei Fahrten &uuml;ber Fensterevents)</td></tr>
@@ -7729,30 +7733,30 @@ sub getblockAscDrivesAfterManual {
         <tr><td>IsDay</td><td>Abfrage ob das Rollo im Tag oder Nachtmodus ist. Also nach Sunset oder nach Sunrise</td></tr>
         <tr><td>PrivacyDownStatus</td><td>Abfrage ob das Rollo aktuell im PrivacyDown Status steht</td></tr>
         <tr><td>OutTemp</td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
-    <table/>
+    </table>
     </p>
     <u>&Uuml;bersicht f&uuml;r das Rollladen-Device mit Parameter&uuml;bergabe</u>
     <ul>
         <code>{ ascAPIget('Getter','ROLLODEVICENAME',VALUE) }</code><br>
     </ul>
-    <table border="1">
+    <table>
         <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
         <tr><td>QueryShuttersPos</td><td>R&uuml;ckgabewert 1 bedeutet das die aktuelle Position des Rollos unterhalb der Valueposition ist. 0 oder nichts bedeutet oberhalb der Valueposition.</td></tr>
-    <table/>
-        </p>
-        <u>&Uuml;bersicht f&uuml;r das ASC Device</u>
-        <ul>
-            <code>{ ascAPIget('Getter') }</code><br>
-        </ul>
-        <table border="1">
-            <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
-            <tr><td>OutTemp </td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
-            <tr><td>ResidentsStatus</td><td>aktueller Status des Residents Devices</td></tr>
-            <tr><td>ResidentsLastStatus</td><td>letzter Status des Residents Devices</td></tr>
-            <tr><td>Azimuth</td><td>Azimut Wert</td></tr>
-            <tr><td>Elevation</td><td>Elevation Wert</td></tr>
-            <tr><td>ASCenable</td><td>ist die ASC Steuerung global aktiv?</td></tr>
-        <table/>
+    </table>
+    </p>
+    <u>&Uuml;bersicht f&uuml;r das ASC Device</u>
+    <ul>
+        <code>{ ascAPIget('Getter') }</code><br>
+    </ul>
+    <table>
+        <tr><th>Getter</th><th>Erl&auml;uterung</th></tr>
+        <tr><td>OutTemp </td><td>aktuelle Au&szlig;entemperatur sofern ein Sensor definiert ist, wenn nicht kommt -100 als Wert zur&uuml;ck</td></tr>
+        <tr><td>ResidentsStatus</td><td>aktueller Status des Residents Devices</td></tr>
+        <tr><td>ResidentsLastStatus</td><td>letzter Status des Residents Devices</td></tr>
+        <tr><td>Azimuth</td><td>Azimut Wert</td></tr>
+        <tr><td>Elevation</td><td>Elevation Wert</td></tr>
+        <tr><td>ASCenable</td><td>ist die ASC Steuerung global aktiv?</td></tr>
+    </table>
 </ul>
 
 =end html_DE
@@ -7776,7 +7780,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.2",
+  "version": "v0.8.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
