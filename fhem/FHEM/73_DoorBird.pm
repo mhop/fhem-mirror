@@ -84,6 +84,7 @@ sub DoorBird_Initialize($)
 							   "ImageFileDir " .
 							   "AudioFileDir " .
 							   "VideoFileDir " .
+							   "VideoFileFormat:mpeg,mpg,mp4,avi,mov,dvd,vob,ogg,ogv,mkv,flv,webm " .
 							   "VideoDurationDoorbell " .
 							   "VideoDurationMotion " .
 							   "VideoDurationKeypad " .
@@ -180,6 +181,7 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", "");
 	  $hash->{helper}{AudioFileDir}						= AttrVal($name, "AudioFileDir", "");
 	  $hash->{helper}{VideoFileDir}						= AttrVal($name, "VideoFileDir", "");
+	  $hash->{helper}{VideoFileFormat}					= AttrVal($name, "VideoFileFormat","mpeg");
 	  $hash->{helper}{VideoDurationDoorbell}			= AttrVal($name, "VideoDurationDoorbell", 0);
 	  $hash->{helper}{VideoDurationMotion}				= AttrVal($name, "VideoDurationMotion", 0);
 	  $hash->{helper}{VideoDurationKeypad}				= AttrVal($name, "VideoDurationKeypad", 0);
@@ -501,7 +503,19 @@ sub DoorBird_Attr(@)
 			### Set helper in hash
 			$hash->{helper}{VideoDurationKeypad} = "0";
 		}
-	}		
+	}
+	### Check whether VideoFileFormat attribute has been provided
+	elsif ($a[2] eq "VideoFileFormat") {
+		### Check whether VideoFileFormat is defined
+		if (defined($a[3])) {
+			### Set helper in hash
+			$hash->{helper}{VideoFileFormat} = $a[3];
+		}
+		else {
+			### Set helper in hash
+			$hash->{helper}{VideoFileFormat} = "mpeg";
+		}
+	}
 	### Check whether EventReset attribute has been provided
 	elsif ($a[2] eq "EventReset") {
 		### Remove Timer for Event Reset
@@ -3521,10 +3535,10 @@ sub DoorBird_Video_Request($$$$) {
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{VideoFileDir} =~ /\/\z/) {
-				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . ".mpeg";
+				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			else {
-				$VideoFileName .= "/" . $VideoFileTimeStamp . "_" . $event . ".mpeg";
+				$VideoFileName .= "/" . $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			
 			### Log Entry for debugging purposes
@@ -3564,10 +3578,10 @@ sub DoorBird_Video_Request($$$$) {
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{VideoFileDir} =~ /\\\z/) {
-				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . ".mpeg";
+				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			else {
-				$VideoFileName .= "\\" . $VideoFileTimeStamp . "_" . $event . ".mpeg";
+				$VideoFileName .= "\\" . $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			
 			### Log Entry for debugging purposes
@@ -4204,6 +4218,30 @@ sub DoorBird_BlockGet($$$$) {
 			</tr>
 			<tr>
 				<td>
+					<code>VideoFileDir</code> : </td><td>The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the video files supposed to be stored.<BR>
+																   The default value is <code>""</code> = disabled<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoFileFormat</code> : </td><td>The file format for the video file to be stored<BR>
+																   The default value is <code>"mpeg"</code><BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoDurationDoorbell</code> : </td><td>Time in seconds for how long the video shall be recorded in case of an doorbbell event.<BR>
+																   The default value is <code>0</code> = disabled<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoDurationMotion</code> : </td><td>Time in seconds for how long the video shall be recorded in case of an motion sensor event.<BR>
+																   The default value is <code>0</code> = disabled<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
 					<code>EventReset</code> : </td><td>Time in seconds after wich the Readings for the Events Events (e.g. "doorbell_button", "motions sensor", "keypad") shal be reset to "idle".<BR>
    																   The default value is 5s<BR>
 				</td>
@@ -4375,7 +4413,31 @@ sub DoorBird_BlockGet($$$$) {
 			</tr>
 			<tr>
 				<td>
+					<code>VideoFileFormat</code> : </td><td>Das Dateiformat f&uuml;r die Videodatei<BR>
+																   Der Default Wert ist <code>"mpeg"</code><BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
 					<code>ImageFileDir</code> : </td><td>Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>
+																   Der Default Wert ist <code>0</code> = deaktiviert<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoFileDir</code> : </td><td>Der relative (z.B. "images") oderr absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Video-Dateien gespeichert werden sollen.<BR>
+																   Der Default Wert ist <code>""</code> = deaktiviert<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoDurationDoorbell</code> : </td><td>Zeit in Sekunden für wie lange das Video im Falle eines Klingel Events aufgenommen werden soll.<BR>
+																   Der Default Wert ist <code>0</code> = deaktiviert<BR>
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<code>VideoDurationMotion</code> : </td><td>Zeit in Sekunden für wie lange das Video im Falle eines Bewegungssensor Events aufgenommen werden soll.<BR>
 																   Der Default Wert ist <code>0</code> = deaktiviert<BR>
 				</td>
 			</tr>
