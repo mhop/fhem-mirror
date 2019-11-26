@@ -988,9 +988,17 @@ HUEBridge_Get($@)
       my $code = $name ."-". $key;
       my $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
       $fhem_name = "" if( !$fhem_name );
-      $ret .= sprintf( "%2i: %-25s %-15s %s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= sprintf( "%2i  %-25s %-15s %-25s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= sprintf( "capabilities: %s", encode_json($result->{$key}{capabilities}) ) if( $arg && $arg eq 'detail' && defined($result->{$key}{capabilities}) );
+      $ret .= sprintf( "\n%2s  %-25s %-15s %-25s      config: %s", "", "", "", "", encode_json($result->{$key}{config}) ) if( $arg && $arg eq 'detail' && defined($result->{$key}{config}) );
+      $ret .= sprintf( "\n%2s  %-25s %-15s %-25s       state: %s", "", "", "", "", encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' && defined($result->{$key}{state}) );
+      $ret .= "\n";
     }
-    $ret = sprintf( "%2s  %-25s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
+    if( $arg && $arg eq 'detail' ) {
+      $ret = sprintf( "%2s  %-25s %-15s %-25s %s\n", "ID", "NAME", "FHEM", "TYPE", "DETAIL" ) .$ret if( $ret ); 
+    } else {
+      $ret = sprintf( "%2s  %-25s %-15s %-25s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret ); 
+    }
     return $ret;
 
   } elsif($cmd eq 'groups') {
@@ -1464,6 +1472,7 @@ HUEBridge_Autocreate($;$)
     } else {
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname group HUEDevice");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
 
       HUEDeviceSetIcon($devname);

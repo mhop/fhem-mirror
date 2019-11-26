@@ -1279,12 +1279,18 @@ HUEDeviceSetIcon($;$)
     return undef if( !$icon );
 
     $attr{$name}{icon} = $icon;
+
   } elsif( $hash->{class} ) {
     my $class = lc( $hash->{class} );
     $class =~ s/ room//;
     $class =~ s/ /_/;
 
     $attr{$name}{icon} = "hue_room_$class";
+
+  } elsif( defined($hash->{helper}{json}) && defined($hash->{helper}{json}{config}) ) {
+    my $archetype = $hash->{helper}{json}{config}{archetype};
+
+    # TODO ...
   }
 }
 sub
@@ -1310,6 +1316,8 @@ HUEDevice_Parse($$)
   $hash->{type} = $result->{type} if( defined($result->{type}) );
   $hash->{class} = $result->{class} if( defined($result->{class}) );
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
+
+  $hash->{helper}{json} = $result;
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
 
