@@ -170,7 +170,7 @@ sub COE_Node_HandleAnalogValues {
 
     if ($existingConfig) {
 
-      if ($type == 1) {
+      if ($type == 1 || $type == 10) {
         $value = (substr $value, 0, (length $value)-1) . "." . (substr $value, -1);
       } elsif ($type == 13) {
         $value = (substr $value, 0, (length $value)-2) . "." . (substr $value, -2);
