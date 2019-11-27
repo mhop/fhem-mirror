@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.07";
+my $version = "2.1";
 
 #-- these we may get on request
 my %gets = (
@@ -104,7 +104,8 @@ my %shelly_models = (
     "shelly2.5" => [2,1,0,2],
     "shellyplug" => [1,0,0,1],
     "shelly4" => [4,0,0,4],
-    "shellyrgbw" => [0,0,4,1]
+    "shellyrgbw" => [0,0,4,1],
+    "shellydimmer" => [0,0,1,1]
     );
     
 my %shelly_regs = (
@@ -308,6 +309,10 @@ sub Shelly_Attr(@) {
       }elsif( $attrVal eq "roller"){
         fhem("deletereading ".$name." relay.*");
       }    
+    }elsif( $model eq "shellydimmer" ){
+      fhem("deletereading ".$name." power.*");
+      fhem("deletereading ".$name." energy.*");
+      fhem("deletereading ".$name." overpower.*");
     }elsif( $model eq "shellyrgbw" ){
       fhem("deletereading ".$name." power.*");
       fhem("deletereading ".$name." energy.*");
@@ -385,6 +390,8 @@ sub Shelly_Get ($@) {
     my $txt;
     if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
       $txt = "roller";
+    }elsif( $model eq "shellydimmer" ){
+      $txt = "lights";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "white") ){
       $txt = "white";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "color") ){
@@ -411,6 +418,8 @@ sub Shelly_Get ($@) {
     my $pre = "settings/";
     if( ($model =~ /shelly2.*/) && ($mode eq "roller") ){
       $pre .= "roller/0?";
+    }elsif( $model eq "shellydimmer" ){
+      $pre .= "lights/0?";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "white") ){
       $pre .= "white/0?";
     }elsif( ($model eq "shellyrgbw") && ($mode eq "color") ){
@@ -593,8 +602,8 @@ sub Shelly_Set ($@) {
       Shelly_updown($hash,$cmd);
     }
       
-  #-- we have a Shelly rgbw type device in white mode
-  }elsif( ($model =~ /shellyrgbw.*/) && ($mode eq "white")){ 
+  #-- we have a Shelly dimmer type device or rgbw type device in white mode
+  }elsif( ($model =~ /shellydimmer/) || (($model =~ /shellyrgbw.*/) && ($mode eq "white")) ){ 
     if( $cmd eq "?" ) {   
       $newkeys = join(" ", sort keys %setsrgbww);
       return "[Shelly_Set] Unknown argument " . $cmd . ", choose one of ".$newkeys;
@@ -606,7 +615,9 @@ sub Shelly_Set ($@) {
         $time = $value;
         $channel = shift @a;
       }
-      if( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[3] ){
+      if( $shelly_models{$model}[2] == 1){
+        $channel = 0
+      }elsif( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[3] ){
         if( !defined($channel) ){
           $channel = AttrVal($name,"defchannel",undef);
           if( !defined($channel) ){
@@ -630,13 +641,19 @@ sub Shelly_Set ($@) {
       if( $cmd eq "toggle"){
         $cmd = (ReadingsVal($name,"state","off") eq "on") ? "off" : "on";
       }
-      Shelly_dim($hash,"white/$channel","?turn=".$cmd);
+      if( $model =~ /shellydimmer/ ){
+        Shelly_dim($hash,"light/$channel","?turn=".$cmd);
+      }else{
+        Shelly_dim($hash,"white/$channel","?turn=".$cmd);
+      }
       #Shelly_onoff($hash,"white/$channel","?turn=".$cmd);
       
     }elsif( $cmd eq "pct" ){
       #$channel = $value;
       $channel = shift @a;
-      if( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[3] ){
+      if( $shelly_models{$model}[2] == 1){
+        $channel = 0
+      }elsif( !defined($channel) || ($channel !~ /[0123]/) || $channel >= $shelly_models{$model}[3] ){
         if( !defined($channel) ){
           $channel = AttrVal($name,"defchannel",undef);
           if( !defined($channel) ){
@@ -649,7 +666,11 @@ sub Shelly_Set ($@) {
         }
       }
       #TODO check value
-      Shelly_dim($hash,"white/$channel","?brightness=".$value);
+      if( $model =~ /shellydimmer/ ){
+        Shelly_dim($hash,"light/$channel","?brightness=".$value);
+      }else{
+        Shelly_dim($hash,"white/$channel","?brightness=".$value);
+      }
     }
   #-- we have a Shelly rgbw type device in color mode
   }elsif( ($model =~ /shellyrgbw.*/) && ($mode eq "color")){ 
@@ -969,8 +990,8 @@ sub Shelly_pwd($){
       readingsBulkUpdateIfChanged($hash,"stop_reason".$subs,$rstopreason);
       readingsBulkUpdateIfChanged($hash,"last_dir".$subs,$rlastdir);
     }
-  #-- we have a Shelly RGBW white device
-  }elsif( $model eq "shellyrgbw" && $mode eq "white" ){ 
+  #-- we have a Shelly dimmer or RGBW white device
+  }elsif( ($model eq "shellydimmer") || ($model eq "shellyrgbw" && $mode eq "white") ){ 
     for( my $i=0;$i<$dimmers;$i++){
       $subs = (($dimmers == 1) ? "" : "_".$i);
       $ison      = $jhash->{'lights'}[$i]{'ison'};
@@ -985,7 +1006,8 @@ sub Shelly_pwd($){
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power); 
       readingsBulkUpdateIfChanged($hash,"overpower".$subs,$overpower);  
     }  
-    readingsBulkUpdateIfChanged($hash,"state","OK");
+    readingsBulkUpdateIfChanged($hash,"state","OK")
+      if ($dimmers > 1);
     
    #-- we have a Shelly RGBW color device
   }elsif( $model eq "shellyrgbw" && $mode eq "color" ){ 
@@ -1108,7 +1130,7 @@ sub Shelly_pwd($){
     #-- timer command
     if( index($cmd,"&") ne "-1"){
       $cmd = substr($cmd,0,index($cmd,"&"));
-      if( $hastimer ne "1" ){
+      if( $hastimer && $hastimer ne "1" ){
         Log3 $name,1,"[Shelly_dim] returns with problem, timer not set";
       }
     }
@@ -1377,7 +1399,7 @@ sub Shelly_updown2($){
 <a name="Shelly"></a>
 <h3>Shelly</h3>
 <ul>
-        <p> FHEM module to communicate with a Shelly switch/roller actuator/RGBW controller</p>
+        <p> FHEM module to communicate with a Shelly switch/roller actuator/dimmer/RGBW controller</p>
         <a name="Shellydefine" id="Shellydefine"></a>
         <h4>Define</h4>
         <p>
@@ -1428,7 +1450,7 @@ sub Shelly_updown2($){
                 <code>set &lt;name&gt; zero </code>
                 <br />calibration of roller device (only for model=shelly2/2.5)</li>      
         </ul>
-        <br/>For Shelly dimmer devices (model=shellyrgbw and mode=white)  
+        <br/>For Shelly dimmer devices model=shellydimmer or (model=shellyrgbw and mode=white)  
         <ul>
             <li>
                <code>set &lt;name&gt; on|off  [&lt;channel&gt;] </code>
@@ -1481,7 +1503,7 @@ sub Shelly_updown2($){
         <h4>Attributes</h4>
         <ul>
             <li><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
-            <li><<code>attr &lt;name&gt; model shelly1|shelly1pm|shelly2|shelly2.5|shelly4|shellyplug|shellyrgbw </code>
+            <li><<code>attr &lt;name&gt; model shelly1|shelly1pm|shelly2|shelly2.5|shelly4|shellyplug|shellydimmer|shellyrgbw </code>
                 <br />type of the Shelly device</li>
             <li><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2/2.5) mode white|color (only for model=shellyrgbw)</code>
                 <br />type of the Shelly device</li>

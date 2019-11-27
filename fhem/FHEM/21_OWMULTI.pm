@@ -43,7 +43,7 @@ BEGIN {
 
 sub Log($$);
 
-my $owx_version="7.2";
+my $owx_version="7.21";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel,$owg_sichannel);
 
@@ -425,10 +425,12 @@ sub OWMULTI_FormatValues($) {
   $vfunc =~ s/VDD/\$hash->{owg_val}->[1]/g;
   $vfunc =~ s/V/\$hash->{owg_val}->[2]/g;
   $vfunc =~ s/T/\$tval/g;
-  
+  $wfunc =~ s/VDD/\$hash->{owg_val}->[1]/g;
   $wfunc =~ s/W/\$hash->{owg_val}->[3]/g;
- 
+  $wfunc =~ s/T/\$tval/g;
+  $xfunc =~ s/VDD/\$hash->{owg_val}->[1]/g;
   $xfunc =~ s/X/\$hash->{owg_val}->[4]/g;
+  $xfunc =~ s/T/\$tval/g;
   
   #-- determine the measured value from the function
   $vfunc = "\$hash->{owg_val}->[1] = $hash->{owg_val}->[1]; \$hash->{owg_val}->[2] = $hash->{owg_val}->[2]; \$tval = $tval; ".$vfunc;
