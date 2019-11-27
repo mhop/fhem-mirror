@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
  
+ - bugfix:  73_AutoShuttersControl: fix time format problem
  - feature: 73_DoorBird: Videos File Format as Attribute
  - bugfix:  71_COE_Node: decimal for kWh fixed
  - change:  73_AutoShuttersControl: fix 'table with attributes' message then

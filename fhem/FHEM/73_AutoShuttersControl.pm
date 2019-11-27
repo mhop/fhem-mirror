@@ -2760,10 +2760,8 @@ sub CreateSunRiseSetShuttersTimer($$) {
     );
     readingsEndUpdate( $hash, 1 );
 
-
     RemoveInternalTimer( $shutters->getInTimerFuncHash )
       if ( defined( $shutters->getInTimerFuncHash ) );
-
 
     ## Setzt den Privacy Modus für die Sichtschutzfahrt auf den Status 0
     ##  1 bedeutet das PrivacyDown Timer aktiviert wurde, 2 beudet das er im privacyDown ist
@@ -2795,7 +2793,6 @@ sub CreateSunRiseSetShuttersTimer($$) {
             ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' ) );
     }
 
-
     ## kleine Hilfe für InternalTimer damit ich alle benötigten Variablen an die Funktion übergeben kann welche von Internal Timer aufgerufen wird.
     %funcHash = (
         hash           => $hash,
@@ -2805,7 +2802,6 @@ sub CreateSunRiseSetShuttersTimer($$) {
     );
     ## Ich brauche beim löschen des InternalTimer den Hash welchen ich mitgegeben habe,dieser muss gesichert werden
     $shutters->setInTimerFuncHash( \%funcHash );
-
 
     InternalTimer( $shuttersSunsetUnixtime,
         'FHEM::AutoShuttersControl::SunSetShuttersAfterTimerFn', \%funcHash );
@@ -6007,7 +6003,7 @@ sub getTimeUpEarly {
     }
 
     return (
-          $val =~ /^(?:[01]\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
+          $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
         : '05:00'
     );
@@ -6022,7 +6018,7 @@ sub getTimeUpLate {
     }
 
     return (
-          $val =~ /^(?:[01]\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
+          $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
         : '08:30'
     );
@@ -6037,7 +6033,7 @@ sub getTimeDownEarly {
     }
 
     return (
-          $val =~ /^(?:[01]\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
+          $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
         : '16:00'
     );
@@ -6052,7 +6048,7 @@ sub getTimeDownLate {
     }
 
     return (
-          $val =~ /^(?:[01]\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
+          $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
         : '22:00'
     );
@@ -6068,7 +6064,7 @@ sub getTimeUpWeHoliday {
     }
 
     return (
-          $val =~ /^(?:[01]\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
+          $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
         : '08:00'
     );
@@ -7780,7 +7776,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.3",
+  "version": "v0.8.4",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
