@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.1";
+my $version = "2.11";
 
 #-- these we may get on request
 my %gets = (
@@ -648,6 +648,12 @@ sub Shelly_Set ($@) {
       }
       #Shelly_onoff($hash,"white/$channel","?turn=".$cmd);
       
+    #-- command received via web to register local changes of the device input
+    }elsif( $cmd =~ /^button_((on)|(off))/){
+      my $ison = $1; 
+      #-- 
+      my $subs = "_".$value;
+      readingsSingleUpdate( $hash, "button".$subs, $ison, 1 )  
     }elsif( $cmd eq "pct" ){
       #$channel = $value;
       $channel = shift @a;
@@ -1408,7 +1414,7 @@ sub Shelly_updown2($){
         Notes: <ul>
          <li>The attribute <code>model</code> <b>must</b> be set</li>
          <li>This module needs the JSON package</li>
-         <li>In Shelly switch devices one may set URL values that are "hit" when the input or output status changes. Here one must set
+         <li>In Shelly switch devices or the Shelly dimmer device one may set URL values that are "hit" when the input or output status changes. Here one must set
            <ul>
            <li> For <i>Button switched ON url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>button_on</b>%20[&lt;channel&gt;]</li>
            <li> For <i>Button switched OFF url</i>: http://&lt;FHEM IP address&gt;:&lt;Port&gt;/fhem?XHR=1&cmd=set%20&lt;Devicename&gt;%20<b>button_off</b>%20[&lt;channel&gt;]</li>
