@@ -111,6 +111,7 @@ HUEBridge_Read($)
           }
 
           my $chash = $modules{HUEDevice}{defptr}{$code};
+          #Log 1, $chash;
           if( defined($chash) ) {
             HUEDevice_Parse($chash,$obj);
             HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
@@ -1272,7 +1273,7 @@ HUEBridge_updateGroups($$)
 
 
       if( defined($h) ) {
-Log 1, ">>> $h $s $v";
+        #Log 1, ">>> $h $s $v";
         if( defined($hue) ) {
            my $a = $hue < $h ? $hue : $h;
            my $b = $hue < $h ? $h : $hue;
@@ -1325,10 +1326,10 @@ Log 1, ">>> $h $s $v";
     }
 
     if( defined($hue) && $readings{colormode} && $readings{colormode} ne "ct" ) {
-Log 1, "$hue $sat $bri";
+      #Log 1, "$hue $sat $bri";
       $readings{colormode} = 'hs';
       $readings{hue} = int($hue * 65535);
-      $readings{sat} = int($sat * 254);
+      $readings{sat} = int($sat * 254/ $count + 0.5);
 
       $readings{bri} = int($bri * 254 / $count + 0.5);
       $readings{pct} = int($bri * 100 / $count + 0.5);
@@ -1340,7 +1341,7 @@ Log 1, "$hue $sat $bri";
     }
 
     if( defined($hue) ) {
-      my ($r,$g,$b) = Color::hsv2rgb($hue,$sat,$bri);
+      my ($r,$g,$b) = Color::hsv2rgb($hue,$sat/$count,$bri/$count);
 
       $r *= 255;
       $g *= 255;
