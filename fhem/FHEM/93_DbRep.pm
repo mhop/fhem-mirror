@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.30.3"  => "28.11.2019  countEntries encode \$device, change count_ParseDone for \"countEntriesDetail\" ",
   "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
   "8.30.1"  => "22.11.2019  commandref revised ",
   "8.30.0"  => "14.11.2019  new command set adminCredentials and get storedCredentials, attribute useAdminCredentials ",
@@ -2917,6 +2918,7 @@ sub averval_DoParse($) {
   
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
+ $device = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -2935,7 +2937,7 @@ sub averval_ParseDone($) {
   my $hash       = $defs{$a[0]};
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
-  my $device     = $a[2];
+  my $device     = decode_base64($a[2]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -3106,6 +3108,7 @@ sub count_DoParse($) {
  
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
+ $device = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3124,7 +3127,7 @@ sub count_ParseDone($) {
   my $hash       = $defs{$a[0]};
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
-  my $device     = $a[2];
+  my $device     = decode_base64($a[2]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[3];
   my ($rt,$brt)  = split(",", $bt);
@@ -3162,8 +3165,12 @@ sub count_ParseDone($) {
       } else {
           my $ds  = $device."__" if ($device);
           my $rds = $reading."__" if ($reading);
-          # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
-          $reading_runtime_string = $rsf."COUNT_".$table."__".$runtime_string;
+          if(AttrVal($name,"countEntriesDetail",0)) {
+              # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
+              $reading_runtime_string = $rsf.$rds."COUNT_".$table."__".$runtime_string;
+          } else {
+              $reading_runtime_string = $rsf."COUNT_".$table."__".$runtime_string;
+          }
       }
          
 	  ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?$c:"-");
@@ -3328,6 +3335,7 @@ sub maxval_DoParse($) {
  }
  
  my $rowlist = encode_base64($rows,"");
+ $device     = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3346,7 +3354,7 @@ sub maxval_ParseDone($) {
   my $hash      = $defs{$a[0]};
   my $name      = $hash->{NAME};
   my $rowlist   = decode_base64($a[1]);
-  my $device    = $a[2];
+  my $device    = decode_base64($a[2]);
      $device    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading   = $a[3];
      $reading   =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -3561,6 +3569,7 @@ sub minval_DoParse($) {
  }
  
  my $rowlist = encode_base64($rows,"");
+ $device     = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3579,7 +3588,7 @@ sub minval_ParseDone($) {
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
   my $rowlist   = decode_base64($a[1]);
-  my $device    = $a[2];
+  my $device    = decode_base64($a[2]);
      $device    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading   = $a[3];
      $reading   =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -3898,6 +3907,7 @@ sub diffval_DoParse($) {
  }
  
  my $rowlist = encode_base64($rows,"");
+ $device     = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -3916,7 +3926,7 @@ sub diffval_ParseDone($) {
   my $hash = $defs{$a[0]};
   my $name = $hash->{NAME};
   my $rowlist    = decode_base64($a[1]);
-  my $device     = $a[2];
+  my $device     = decode_base64($a[2]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -4105,6 +4115,7 @@ sub sumval_DoParse($) {
   
  # Daten müssen als Einzeiler zurückgegeben werden
  $arrstr = encode_base64($arrstr,"");
+ $device = encode_base64($device,"");
  
  # Background-Laufzeit ermitteln
  my $brt = tv_interval($bst);
@@ -4123,7 +4134,7 @@ sub sumval_ParseDone($) {
   my $hash       = $defs{$a[0]};
   my $name       = $hash->{NAME};
   my $arrstr     = decode_base64($a[1]);
-  my $device     = $a[2];
+  my $device     = decode_base64($a[2]);
      $device     =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $reading    = $a[3];
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
@@ -9389,7 +9400,7 @@ sub DbRep_specsForSql($$$) {
  # Devices inkludiert
  @idvs  = split(",",$idevice);
  foreach my $d (@idvs) {
-     $d       =~ s/%/\.*/g if($d !~ /^%$/);                          # SQL Wildcard % auflösen 
+     $d       =~ s/%/\.*/g if($d !~ /^%$/);                          # SQL Wildcard % auflösen  
      @idvspcs = devspec2array($d);
      @idvspcs = map {s/\.\*/%/g; $_; } @idvspcs;
      if((map {$_ =~ /%/;} @idvspcs) && $idevice !~ /^%$/) {          # Devices mit Wildcard (%) erfassen, die nicht aufgelöst werden konnten
@@ -13093,22 +13104,15 @@ return $ret;
   
                                 <ul>
 							    <b>Examples:</b> <br>
-								<code>attr &lt;name&gt; device TYPE=DbRep</code> <br>
-								# select datasets of active present devices with Type "DbRep" <br> 
-								<code>attr &lt;name&gt; device MySTP_5000</code> <br>
-								# select datasets of device "MySTP_5000" <br> 
-								<code>attr &lt;name&gt; device SMA.*</code> <br>
-								# select datasets of devices starting with "SMA" <br> 
-								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000</code> <br>
-								# select datasets of devices "SMA_Energymeter" and "MySTP_5000" <br>
-								<code>attr &lt;name&gt; device %5000</code> <br>
-								# select datasets of devices ending with "5000" <br> 
-                                <code>attr &lt;name&gt; device TYPE=SSCam EXCLUDE=SDS1_SVS </code> <br> 
-                                # select datasets of devices TYPE SSCam but exclude device "SDS1_SVS" <br>                                 
+								<code>attr &lt;name&gt; device TYPE=DbRep </code> <br>
+								<code>attr &lt;name&gt; device MySTP_5000 </code> <br> 
+								<code>attr &lt;name&gt; device SMA.*,MySTP.* </code> <br> 
+								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000 </code> <br>
+								<code>attr &lt;name&gt; device %5000 </code> <br>
+                                <code>attr &lt;name&gt; device TYPE=SSCam EXCLUDE=SDS1_SVS </code> <br>	
+                                <code>attr &lt;name&gt; device TYPE=SSCam,TYPE=ESPEasy EXCLUDE=SDS1_SVS </code> <br>	
                                 <code>attr &lt;name&gt; device EXCLUDE=SDS1_SVS </code> <br>
-                                # select all devices except device "SDS1_SVS" <br> 
-                                <code>attr &lt;name&gt; device EXCLUDE=TYPE=SSCam </code> <br>
-                                # select all devices except devices of TYPE "SSCam" <br>								
+                                <code>attr &lt;name&gt; device EXCLUDE=TYPE=SSCam </code> <br>								
 								</ul>
                                 <br>
                                 
@@ -15636,6 +15640,7 @@ return $ret;
 								<code>attr &lt;name&gt; device SMA_Energymeter,MySTP_5000 </code> <br>
 								<code>attr &lt;name&gt; device %5000 </code> <br>
                                 <code>attr &lt;name&gt; device TYPE=SSCam EXCLUDE=SDS1_SVS </code> <br>	
+                                <code>attr &lt;name&gt; device TYPE=SSCam,TYPE=ESPEasy EXCLUDE=SDS1_SVS </code> <br>	
                                 <code>attr &lt;name&gt; device EXCLUDE=SDS1_SVS </code> <br>
                                 <code>attr &lt;name&gt; device EXCLUDE=TYPE=SSCam </code> <br>
 								</ul>
