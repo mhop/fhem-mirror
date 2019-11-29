@@ -26,7 +26,7 @@ my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
 my %LAST_SEND;
 
-my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummy");
+my @DEVLIST_SEND = ("MAX","CUL_HM","HMCCUDEV","weekprofile","dummyWT","WeekdayTimer");
 
 my $CONFIG_VERSION = "1.1";
 
@@ -120,9 +120,11 @@ sub weekprofile_getDeviceType($$;$)
   
   my $type = undef;
 
-  Log3 $me, 5, "$me(getDeviceType): type: $devHash->{TYPE}";
+  my $devType = $devHash->{TYPE};
+  $devType = $devHash->{wt_type} if ($devType =~ /dummyWT/); #special dummy fake WT for testing
+  Log3 $me, 5, "$me(getDeviceType): type: $devType";
   
-  if ($devHash->{TYPE} =~ /CUL_HM/){
+  if ($devType =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
     
     #models: HM-TC-IT-WM-W-EU, HM-CC-RT-DN, HM-CC-TC
@@ -150,27 +152,35 @@ sub weekprofile_getDeviceType($$;$)
     $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-TC.*/) && ($channel == 2) );
   }
   #avoid max shutter contact
-  elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
+  elsif ( ($devType =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
-  elsif ( $devHash->{TYPE} =~ /HMCCUDEV/ || $devHash->{TYPE} =~ /dummyHM/){
+  elsif ( $devType =~ /HMCCUDEV/){
 	  my $model = $devHash->{ccutype};
+    if (!defined($model)) {
+      Log3 $me, 2, "$me(getDeviceType): ccutype not defined - take HM-xxx (HMCCU_HM)";
+      $model = "HM-xxx";
+    }
     Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model";
 	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
     $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
   }
-  elsif ($devHash->{TYPE} =~ /dummy/){
-    Log3 $me, 5, "$me(getDeviceType): dummy $device";
-    $type = "MAX"     if ($device =~ m/.*MAX.*FAKE.*/);    #dummy (FAKE WT) with name MAX inside for testing
-    $type = "CUL_HM"  if ($device =~ m/.*CUL_HM.*FAKE.*/); #dummy (FAKE WT) with name CUL_HM inside for testing
-    $type = "HMCCU_IP"if ($device =~ m/.*HMCCU_IP.*FAKE.*/);  #dummy (FAKE WT) with name HMCCU_IP inside for testing
-    $type = "HMCCU_HM"if ($device =~ m/.*HMCCU_HM.*FAKE.*/);  #dummy (FAKE WT) with name HMCCU_HM inside for testing
-  }
-  
+
   return $type if ($sndrcv eq "RCV");
   
-  if ($devHash->{TYPE} =~ /weekprofile/){
+  if ($devType =~ /weekprofile/){
     $type = "WEEKPROFILE";
+  }
+  elsif ($devType =~ /WeekdayTimer/){
+    my $def = $defs{$device}{DEF};
+    Log3 $me, 5, "$me(getDeviceType): def WDT $def";
+    #if (index($def, $me) != -1) {
+    if ($def =~ m/.*weekprofile.*/) {  
+      $type = "WDT";
+    }
+    else {
+      Log3 $me, 4, "$me(getDeviceType): found WDT but not configured for weekprofile";
+    }
   }
   
   if (defined($type)) {
@@ -179,6 +189,25 @@ sub weekprofile_getDeviceType($$;$)
     Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is not supported";
   }
   return $type;
+}
+
+############################################## 
+sub weekprofile_get_prefix_HM($@)
+{
+  my ($device,$base_name,$me) = @_;
+  my @prefix_lst = ("","R-1.P1_","R-","R-P1_","P1_");
+  my $prefix = undef;
+
+  foreach (@prefix_lst) {
+    my $reading = "$_"."$base_name";
+    my $time = ReadingsVal($device, $reading, "");
+    Log3 $me, 5, "$me(weekprofile_get_prefix_HM): check: $reading $time";
+    if ($time ne "") {
+      $prefix = $_;
+      last;
+    }
+  }
+  return $prefix;
 }
 
 ############################################## 
@@ -223,21 +252,19 @@ sub weekprofile_readDayProfile($@)
   }
   elsif ($type =~ /HMCCU.*/){    
     my $lastTime = "";
+    my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_$reading"."_1",$me);
+    if (!defined($prefix)) {
+      Log3 $me, 2, "$me(readDayProfile): no readings for $reading found";
+      return (\@times, \@temps);  
+    }
+    Log3 $me, 5, "$me(readDayProfile): HM-Prefix is $prefix";
+
     for (my $i = 1; $i < 14; $i+=1){
-      my $prfTime = ReadingsVal($device, "R-1.P1_ENDTIME_$reading"."_$i", "");
-      my $prfTemp = ReadingsVal($device, "R-1.P1_TEMPERATURE_$reading"."_$i", "");
-
-      $prfTime = ReadingsVal($device, "R-ENDTIME_$reading"."_$i", "") if (!$prfTime);
-      $prfTemp = ReadingsVal($device, "R-TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
-      
-      $prfTime = ReadingsVal($device, "R-P1_ENDTIME_$reading"."_$i", "") if (!$prfTime);
-      $prfTemp = ReadingsVal($device, "R-P1_TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
-
-      $prfTime = ReadingsVal($device, "P1_ENDTIME_$reading"."_$i", "") if (!$prfTime);
-      $prfTemp = ReadingsVal($device, "P1_TEMPERATURE_$reading"."_$i", "") if (!$prfTemp);
+      my $prfTime = ReadingsVal($device, "$prefix"."ENDTIME_$reading"."_$i", "");
+      my $prfTemp = ReadingsVal($device, "$prefix"."TEMPERATURE_$reading"."_$i", "");
 
       if ($prfTime eq "" or $prfTemp eq ""){
-        Log3 $me, 3, "$me(readDayProfile): unsupported readings";
+        Log3 $me, 2, "$me(readDayProfile): no readings for $reading found ($i)";
         return (\@times, \@temps);
       }
       else{
@@ -259,7 +286,7 @@ sub weekprofile_readDayProfile($@)
   }
   
   for(my $i = 0; $i < scalar(@temps); $i+=1){
-	  Log3 $me, 4, "$me(ReadDayProfile): temp $i $temps[$i]";
+	  Log3 $me, 5, "$me(ReadDayProfile): temp $i $temps[$i]";
     $temps[$i] =~s/[^\d.]//g; #only numbers
     my $tempON = myAttrVal($me, "tempON", undef);
     my $tempOFF = myAttrVal($me, "tempOFF", undef);
@@ -338,6 +365,11 @@ sub weekprofile_sendDevProfile(@)
       return "Error in profile data" if (!defined($json_text));
       
       return fhem("set $device profile_data $prf->{TOPIC}:$prf->{NAME} $json_text",1);
+  }
+  elsif ($type eq "WDT") {
+    my $cmd = "set $device weekprofile $me:$prf->{TOPIC}:$prf->{NAME}";
+    Log3 $me, 4, "$me(sendDevProfile): send to WDT $cmd";
+    return fhem("$cmd",1);
   }
 
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
@@ -419,31 +451,20 @@ sub weekprofile_sendDevProfile(@)
       $cmd .= ($k < $dayCnt-1) ? "; ": "";
       $k++;
     }
-  } elsif ($type eq "HMCCU_IP"){
+  } elsif ($type =~ /HMCCU.*/){ 
+    $cmd .= "set $device config" if ($type eq "HMCCU_HM");
+    $cmd .= "set $device config 1" if ($type eq "HMCCU_IP");
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
-    $cmd .= "set $device config 1";
-    foreach my $day (@dayToTransfer){
-      #Usage: set <device> datapoint [{channel-number}.]{datapoint} {value} 
-      my $reading = $DEV_READINGS{$day}{$type};
-      my $dpTime = "P1_ENDTIME_$reading";
-      my $dpTemp = "P1_TEMPERATURE_$reading";
-   
-      my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});      
-      for (my $i = 0; $i < $tmpCnt; $i++) {
-        $cmd .= " " . $dpTemp . "_" . ($i + 1) . "=" . $prfData->{$day}->{"temp"}[$i];
-        $cmd .= " " . $dpTime . "_" . ($i + 1) . "=" . weekprofile_timeToMinutes($prfData->{$day}->{"time"}[$i]);
-      }
-      $k++;
+    my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_SUNDAY_1",$me);
+    if (!defined($prefix)) {
+      Log3 $me, 3, "$me(sendDevProfile): no prefix found"; 
+      $prefix = ""; 
     }
-  } elsif ($type eq "HMCCU_HM"){
-    my $k=0;
-    my $dayCnt = scalar(@dayToTransfer);
-    $cmd .= "set $device config";
     foreach my $day (@dayToTransfer){
       my $reading = $DEV_READINGS{$day}{$type};
-      my $dpTime = "ENDTIME_$reading";
-      my $dpTemp = "TEMPERATURE_$reading";
+      my $dpTime = "$prefix"."ENDTIME_$reading";
+      my $dpTemp = "$prefix"."TEMPERATURE_$reading";
    
       my $tmpCnt =  scalar(@{$prfData->{$day}->{"temp"}});      
       for (my $i = 0; $i < $tmpCnt; $i++) {
@@ -503,7 +524,7 @@ sub weekprofile_refreshSendDevList($)
   my ($hash) = @_;
   my $me = $hash->{NAME};
   
-  delete $hash->{SNDDEVLIST};
+  splice(@{$hash->{SNDDEVLIST}});
   
   foreach my $d (keys %defs)   
   {
@@ -524,6 +545,9 @@ sub weekprofile_refreshSendDevList($)
     
     push @{$hash->{SNDDEVLIST}} , $dev;
   }
+  my $cnt = scalar(@{$hash->{SNDDEVLIST}});
+  Log3 $me, 5, "$me(weekprofile_refreshSendDevList): $cnt devices in list";
+  
   return undef;
 }
 
@@ -1109,6 +1133,8 @@ sub weekprofile_Notify($$)
       
       next if(!defined($s));
       my ($what,$who) = split(' ',$s);
+
+      Log3 $me, 5, "$me(Notify): $devName, $what";
            
       if ($what =~ m/^INITIALIZED$/ || $what =~ m/REREADCFG/) {
         delete $own->{PROFILES};
