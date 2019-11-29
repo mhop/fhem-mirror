@@ -42,6 +42,7 @@ use Time::HiRes;
 use HttpUtils;                                                    
 use Encode;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSChatBotNDom = "Net::Domain";
                                                     
 # no if $] >= 5.017011, warnings => 'experimental';
 
@@ -100,6 +101,7 @@ sub SSChatBot_Define($@) {
   my $name         = $hash->{NAME};
   
  return "Error: Perl module ".$SSChatBotMM." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SSChatBotMM);
+ return "Error: Perl module ".$SSChatBotNDom." is missing." if($SSChatBotNDom);
   
   my @a = split("[ \t][ \t]*", $def);
   
@@ -107,15 +109,17 @@ sub SSChatBot_Define($@) {
       return "You need to specify more parameters.\n". "Format: define <name> SSChatBot <ServerAddress> [Port] [HTTP(S)]";
   }
         
-  my $serveraddr = $a[2];
-  my $serverport = $a[3] ? $a[3] : 5000;
-  my $proto      = $a[4] ? lc($a[4]) : "http";
+  my $inaddr = $a[2];
+  my $inport = $a[3] ? $a[3] : 5000;
+  my $inprot = $a[4] ? lc($a[4]) : "http";
   
-  $hash->{SERVERADDR}            = $serveraddr;
-  $hash->{SERVERPORT}            = $serverport;
+  $hash->{INADDR}                = $inaddr;
+  $hash->{INPORT}                = $inport;
   $hash->{MODEL}                 = "ChatBot";         
-  $hash->{PROTOCOL}              = $proto;
+  $hash->{INPROT}                = $inprot;
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  
+  CommandAttr(undef,"$name room Chat");
   
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -129,14 +133,14 @@ sub SSChatBot_Define($@) {
   
   # Index der Sendequeue initialisieren
   $data{SSChatBot}{$name}{sendqueue}{index} = 0;
-  
+    
   readingsBeginUpdate($hash); 
-  readingsBulkUpdate($hash,"state", "Initialized");                              # Init state
+  readingsBulkUpdate($hash, "state", "Initialized");                             # Init state
   readingsEndUpdate($hash,1);              
 
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
   RemoveInternalTimer($hash, "SSChatBot_initonboot");
-  InternalTimer(gettimeofday()+int(rand(15)), "SSChatBot_initonboot", $hash, 0);  
+  InternalTimer(gettimeofday()+int(rand(20)), "SSChatBot_initonboot", $hash, 0);  
 
 return undef;
 }
@@ -156,6 +160,7 @@ sub SSChatBot_Undef($$) {
   my $name = $hash->{NAME};
   
   delete $data{SSChatBot}{$name};
+  SSChatBot_removeExtension($hash->{fhem}{infix});
   RemoveInternalTimer($hash);
    
 return undef;
@@ -223,7 +228,9 @@ sub SSChatBot_Attr($$$$) {
 		    InternalTimer(gettimeofday()+int(rand(30)), "SSChatBot_initonboot", $hash, 0);
 		}
     
-        readingsSingleUpdate($hash, "state", $val, 1);
+        readingsBeginUpdate($hash); 
+        readingsBulkUpdate($hash, "state", $val);                    
+        readingsEndUpdate($hash,1); 
     }
     
     if ($cmd eq "set") {
@@ -280,6 +287,7 @@ sub SSChatBot_Set($@) {
 	  }
       
   } elsif ($opt eq "listSendqueue") {
+  Log3($name, 1, "$name - FHEMWEB: ".$FW_RET);
       my $sub = sub ($) { 
           my ($idx) = @_; 
           my $ret;
@@ -290,8 +298,11 @@ sub SSChatBot_Set($@) {
           return $ret;
       };
 	    
+      if (!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+          return "SendQueue is empty.";
+      }
       my $sq;
-	  foreach my $idx (sort{$a<=>$b}keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
+	  foreach my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
           $sq .= $idx." => ".$sub->($idx)."\n"; 			
       }
 	  return $sq;
@@ -499,14 +510,65 @@ return $ret;                                                        # not genera
 sub SSChatBot_initonboot ($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
+  my ($ret);
   
   RemoveInternalTimer($hash, "SSChatBot_initonboot");
   
-  if ($init_done == 1) {
-     RemoveInternalTimer($hash);                                    # alle Timer löschen
+  if ($init_done) {
+      # check ob FHEMWEB Instanz für SSChatBot angelegt ist -> sonst anlegen
+      my @FWports;
+      my $FWname = "sschat";                                        # der Pfad nach http://hostname:port/ der neuen FHEMWEB Instanz -> http://hostname:port/sschat
+      my $FW     = "WEBSSChatBot";                                  # Name der FHEMWEB Instanz für SSChatBot
+      foreach ( devspec2array('TYPE=FHEMWEB:FILTER=TEMPORARY!=1') ) {
+          $hash->{FW} = $_ if ( AttrVal( $_, "webname", "fhem" ) eq $FWname );
+          push @FWports, $defs{$_}{PORT};
+      }
+
+      if (!defined($hash->{FW})) {                                          # FHEMWEB für SSChatBot ist noch nicht angelegt
+          my $room = AttrVal($name, "room", "Chat");
+          my $port = 8082;
+          
+          while (grep(/^$port$/ , @FWports)) {                              # den ersten freien FHEMWEB-Port ab 8082 finden
+              $port++;
+          }
+
+          if (!defined($defs{$FW})) {                                       # wenn Device "WEBSSChat" wirklich nicht existiert
+              Log3($name, 3, "$name - Creating new FHEMWEB instance \"$FW\" with webname \"$FWname\"... ");
+              $ret = CommandDefine(undef, "$FW FHEMWEB $port global");
+          }
+          
+          if(!$ret) {
+              Log3($name, 3, "$name - FHEMWEB instance \"$FW\" with webname \"$FWname\" created");
+              $hash->{FW} = $FW;
+              
+              CommandAttr(undef, "$hash->{FW} closeConn 1");
+              CommandAttr(undef, "$hash->{FW} webname $FWname"); 
+              CommandAttr(undef, "$hash->{FW} room $room");
+              CommandAttr(undef, "$hash->{FW} csrfToken none");
+              CommandAttr(undef, "$hash->{FW} comment WEB Instance for SSChat devices. Get outgoing messages from Synology Chat server.");
+              CommandAttr(undef, "$hash->{FW} stylesheetPrefix default");            
+          } else {
+              Log3($name, 2, "$name - ERROR while creating FHEMWEB instance ".$hash->{FW}." with webname \"$FWname\" !");
+	          readingsBeginUpdate($hash); 
+              readingsBulkUpdate ($hash, "state", "ERROR in initialization - see logfile");                             
+              readingsEndUpdate  ($hash,1);
+          }
+      }
      
-     CommandGet(undef, "$name chatUserlist");     
-  
+	  if(!$ret) {
+		  CommandGet(undef, "$name chatUserlist");                      # Chatuser Liste initial abrufen 
+	  
+		  my $host = hostname();                                        # eigener Host
+		  my $fqdn = hostfqdn();                                        # MYFQDN eigener Host 
+		  chop($fqdn) if($fqdn =~ /^.*\.$/);
+		  my $FWchatport  = $defs{$FW}{PORT};
+		  my $FWprot      = AttrVal($FW, "HTTS", 0);
+		  $hash->{OUTDEF} = ($FWprot?"https":"http")."://".($fqdn?$fqdn:$host).":".$FWchatport."/".$FWname."/outchat?botname=".$name; 
+
+		  SSChatBot_addExtension($name, "SSChatBot_CGI", "outchat");
+		  $hash->{fhem}{infix} = "outchat"; 
+	  }
+			  
   } else {
       InternalTimer(gettimeofday()+3, "SSChatBot_initonboot", $hash, 0);
   }
@@ -552,6 +614,11 @@ sub SSChatBot_checkretry ($$) {
   my $hash          = $defs{$name};  
   my $idx           = $hash->{OPIDX};
   
+  if(!$idx) {                                                                  # kein Index 
+      Log3($name, 4, "$name - SendQueue is empty. Nothing to retry ...");
+      return;
+  }  
+  
   if(!$retry) {
       # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
@@ -594,9 +661,9 @@ return;
 sub SSChatBot_getapisites($) {
    my ($name)       = @_;
    my $hash         = $defs{$name};
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $proto        = $hash->{PROTOCOL}; 
+   my $inaddr       = $hash->{INADDR};
+   my $inport       = $hash->{INPORT};
+   my $inprot       = $hash->{INPROT}; 
    my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite ! 
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
    my $url;
@@ -604,7 +671,7 @@ sub SSChatBot_getapisites($) {
   
    # API-Pfade und MaxVersions ermitteln 
    Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###            start Chat operation                 "); 
+   Log3($name, 4, "$name - ###            start Chat operation Send            "); 
    Log3($name, 4, "$name - ####################################################"); 
    
    if ($hash->{HELPER}{APIPARSET}) {
@@ -617,7 +684,7 @@ sub SSChatBot_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$chatexternal";
+   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$chatexternal";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
@@ -639,8 +706,8 @@ sub SSChatBot_getapisites_parse ($) {
    my ($param, $err, $myjson) = @_;
    my $hash         = $param->{hash};
    my $name         = $hash->{NAME};
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
+   my $inaddr       = $hash->{INADDR};
+   my $inport       = $hash->{INPORT};
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
 
    my ($chatexternalmaxver,$chatexternalpath);
@@ -649,7 +716,11 @@ sub SSChatBot_getapisites_parse ($) {
 	    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
-        readingsSingleUpdate($hash, "Error", $err, 1);
+        readingsBeginUpdate($hash); 
+        readingsBulkUpdateIfChanged($hash, "Error", $err);
+        readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+        readingsBulkUpdate         ($hash, "state", "Error");                    
+        readingsEndUpdate($hash,1); 
         
         SSChatBot_checkretry($name,1);
         return;
@@ -685,8 +756,8 @@ sub SSChatBot_getapisites_parse ($) {
             $hash->{HELPER}{CHATEXTERNALMAXVER} = $chatexternalmaxver;        
        
             readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode","none");
-            readingsBulkUpdate($hash,"Error","none");
+            readingsBulkUpdateIfChanged($hash,"Errorcode","none");
+            readingsBulkUpdateIfChanged($hash,"Error","none");
             readingsEndUpdate($hash,1);
 			
 			# Webhook Hash values sind gesetzt
@@ -696,8 +767,8 @@ sub SSChatBot_getapisites_parse ($) {
             my $error = "couldn't get Synology Chat API informations";
        
             readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode","none");
-            readingsBulkUpdate($hash,"Error",$error);
+            readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+            readingsBulkUpdateIfChanged($hash, "Error", $error);
             readingsEndUpdate($hash, 1);
 
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
@@ -716,10 +787,9 @@ return SSChatBot_chatop($name);
 sub SSChatBot_chatop ($) {  
    my ($name) = @_;
    my $hash               = $defs{$name};
-   my $proto              = $hash->{PROTOCOL};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
-   # my $opmode             = $hash->{OPMODE};
+   my $inprot             = $hash->{INPROT};
+   my $inaddr             = $hash->{INADDR};
+   my $inport             = $hash->{INPORT};
    my $chatexternal       = $hash->{HELPER}{CHATEXTERNAL}; 
    my $chatexternalpath   = $hash->{HELPER}{CHATEXTERNALPATH};
    my $chatexternalmaxver = $hash->{HELPER}{CHATEXTERNALMAXVER};
@@ -731,8 +801,8 @@ sub SSChatBot_chatop ($) {
        $error = "The botToken couldn't be retrieved";
        
        readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error",$error);
+       readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+       readingsBulkUpdateIfChanged($hash, "Error", $error);
        readingsEndUpdate($hash, 1);
 
        Log3($name, 2, "$name - ERROR - $error"); 
@@ -741,12 +811,14 @@ sub SSChatBot_chatop ($) {
        return;
    }
    
-   # den nächsten Eintrag aus "SendQueue" verarbeiten
-   my $idx = (sort{$a<=>$b}keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0];
-   if(!$idx) {
+   if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
        Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
-       return;
+       return;  
    }
+   
+   # den nächsten Eintrag aus "SendQueue" verarbeiten
+   my $idx = (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0];
+
    $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{opmode};
    $hash->{OPIDX}  = $idx;
    my $opmode      = $hash->{OPMODE};
@@ -763,7 +835,7 @@ sub SSChatBot_chatop ($) {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    if ($opmode =~ /^chatUserlist$|^chatChannellist$/) {
-      $url = "$proto://$serveraddr:$serverport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
    }
    
    if ($opmode eq "sendItem") {
@@ -771,7 +843,7 @@ sub SSChatBot_chatop ($) {
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
       
-      $url  = "$proto://$serveraddr:$serverport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url  = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
       $url .= "&payload={";
       $url .= "\"text\": \"$text\","        if($text);
       $url .= "\"file_url\": \"$fileUrl\"," if($fileUrl);
@@ -805,9 +877,9 @@ sub SSChatBot_chatop_parse ($) {
    my ($param, $err, $myjson) = @_;
    my $hash               = $param->{hash};
    my $name               = $hash->{NAME};
-   my $proto              = $hash->{PROTOCOL};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
+   my $inprot             = $hash->{INPROT};
+   my $inaddr             = $hash->{INADDR};
+   my $inport             = $hash->{INPORT};
    my $opmode             = $hash->{OPMODE};
    my ($rectime,$data,$success);
    my ($error,$errorcode);
@@ -818,7 +890,11 @@ sub SSChatBot_chatop_parse ($) {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
         
-        readingsSingleUpdate($hash, "Error", $err, 1);    
+        readingsBeginUpdate($hash); 
+        readingsBulkUpdateIfChanged($hash, "Error", $err);
+        readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+        readingsBulkUpdate         ($hash, "state", "Error");                    
+        readingsEndUpdate($hash,1);         
 
         SSChatBot_checkretry($name,1);        
         return;
@@ -886,8 +962,8 @@ sub SSChatBot_chatop_parse ($) {
                 $out .= "</html>";
                 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+                readingsBulkUpdateIfChanged($hash, "Error", "none");
                 readingsEndUpdate($hash, 1);  
 
 				# Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
@@ -929,8 +1005,8 @@ sub SSChatBot_chatop_parse ($) {
                 $out .= "</html>";
                 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+                readingsBulkUpdateIfChanged($hash, "Error", "none");
                 readingsEndUpdate($hash, 1);  
 
 				# Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
@@ -941,14 +1017,17 @@ sub SSChatBot_chatop_parse ($) {
             } elsif ($opmode eq "sendItem") {
 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+                readingsBulkUpdateIfChanged($hash, "Error", "none");
                 readingsEndUpdate($hash, 1);             
 
             }            
 
             SSChatBot_checkretry($name,0);
-            readingsSingleUpdate($hash,"state", "connected", 1);
+
+            readingsBeginUpdate($hash); 
+            readingsBulkUpdate($hash, "state", "active");                    
+            readingsEndUpdate($hash,1); 
            
         } else {
             # die API-Operation war fehlerhaft
@@ -959,9 +1038,9 @@ sub SSChatBot_chatop_parse ($) {
             $error = SSChatBot_experror($hash,$errorcode);
 			
             readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode", $errorcode);
-            readingsBulkUpdate($hash,"Error",     $error);
-            readingsBulkUpdate($hash,"state",     "disconnected") if($errorcode =~ /102/);
+            readingsBulkUpdateIfChanged($hash,"Errorcode", $errorcode);
+            readingsBulkUpdateIfChanged($hash,"Error",     $error);
+            readingsBulkUpdate         ($hash,"state",     "Error");
             readingsEndUpdate($hash, 1);
        
             Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
@@ -988,8 +1067,8 @@ sub SSChatBot_evaljson($$) {
   eval {decode_json($myjson)} or do {
           $success = 0;
           readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"Errorcode","none");
-          readingsBulkUpdate($hash,"Error","malformed JSON string received");
+          readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
+          readingsBulkUpdateIfChanged($hash, "Error", "malformed JSON string received");
           readingsEndUpdate($hash, 1);  
   };
   
@@ -1000,7 +1079,7 @@ return($hash,$success,$myjson);
 #                       JSON Boolean Test und Mapping
 ###############################################################################
 sub SSChatBot_jboolmap($){ 
-  my ($bool)= @_;
+  my ($bool) = @_;
   
   if(JSON::is_bool($bool)) {
       $bool = $bool?"true":"false";
@@ -1143,6 +1222,36 @@ return ($success, $token);
 }
 
 #############################################################################################
+#                      FHEMWEB Extension hinzufügen           
+#############################################################################################
+sub SSChatBot_addExtension($$$) {
+  my ($name, $func, $link) = @_;
+
+  my $url                        = "/$link";  
+  $data{FWEXT}{$url}{deviceName} = $name;
+  $data{FWEXT}{$url}{FUNC}       = $func;
+  $data{FWEXT}{$url}{LINK}       = $link;
+  
+  Log3($name, 3, "$name - SSChatBot \"$name\" for URL $url registered");
+  
+return;
+}
+
+#############################################################################################
+#                      FHEMWEB Extension löschen           
+#############################################################################################
+sub SSChatBot_removeExtension($) {
+  my ($link) = @_;
+
+  my $url  = "/$link";
+  my $name = $data{FWEXT}{$url}{deviceName};
+  Log3($name, 2, "$name - Unregistering SSChatBot $name for URL $url...");
+  delete $data{FWEXT}{$url};
+  
+return;
+}
+
+#############################################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 #############################################################################################
 sub SSChatBot_trim ($) {
@@ -1236,6 +1345,120 @@ sub SSChatBot_setVersionInfo($) {
   }
   
 return;
+}
+
+#############################################################################################
+#                         Common Gateway Interface
+#                   parsen von outgoing Messages Chat -> FHEM       
+#############################################################################################
+sub SSChatBot_CGI() {
+  my ($request) = @_;
+  my ($hash,$name,$link,$args);
+  my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
+
+  return ( "text/plain; charset=utf-8", "Booting up" ) unless ($init_done);
+
+  # data received
+  if ($request =~ /^\/outchat?.*/) {
+      $args = (split(/outchat\?/, $request))[1];
+	  $args =~ s/&/" /g;
+	  $args =~ s/=/="/g;
+	  $args .= "\"";
+      
+	  my($a,$h) = parseParams($args);
+	  
+      if (!defined($h->{botname})) {
+	        Log 1, "TYPE SSChatBot - ERROR - no Botname received";
+            return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
+      }
+	  
+	  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
+	  $name = $h->{botname};
+	  return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" ) unless (IsDevice($name, 'SSChatBot'));
+	  $hash = $defs{$name};
+	  
+      if (!defined($h->{token})) {
+            Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
+            return ("text/plain; charset=utf-8", "Insufficient data");
+      }
+	  
+	  Log3($name, 4, "$name - ####################################################"); 
+	  Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
+	  Log3($name, 4, "$name - ####################################################"); 
+	  Log3($name, 5, "$name - data received:\n".Dumper($h));
+	  
+	  # ausgehende Datenfelder (Chat -> FHEM), die das Chat senden kann
+	  # ===============================================================
+	  # token: bot token
+      # channel_id
+      # channel_name
+      # user_id
+      # username
+      # post_id
+      # timestamp
+      # text
+      # trigger_word: which trigger word is matched 
+	  #
+
+	  if ($h->{channel_id}) {
+	      $channelid = urlDecode($h->{channel_id});                           
+          Log3($name, 4, "$name - channel_id received: ".$channelid);
+      }	  
+	  
+	  if ($h->{channel_name}) {
+	      $channelname = urlDecode($h->{channel_name});                           
+          Log3($name, 4, "$name - channel_name received: ".$channelname);
+      }
+	  
+	  if ($h->{user_id}) {
+	      $userid = urlDecode($h->{user_id});                           
+          Log3($name, 4, "$name - user_id received: ".$userid);
+      }
+	  
+	  if ($h->{username}) {
+	      $username = urlDecode($h->{username});                           
+          Log3($name, 4, "$name - username received: ".$username);
+      }
+	  
+	  if ($h->{post_id}) {
+	      $postid = urlDecode($h->{post_id});                           
+          Log3($name, 4, "$name - postid received: ".$postid);
+      }
+	  
+	  if ($h->{timestamp}) {
+          $timestamp = FmtDateTime(($h->{timestamp})/1000);
+          Log3($name, 4, "$name - timestamp received: ".$timestamp);
+	  }
+	  
+	  if ($h->{text}) {
+	      $text = urlDecode($h->{text});                          
+          Log3($name, 4, "$name - text received: ".$text);
+      }
+	  
+	  if ($h->{trigger_word}) {
+	      $triggerword = urlDecode($h->{trigger_word});                          
+          Log3($name, 4, "$name - trigger_word received: ".$triggerword);
+      }
+
+	  
+	  readingsBeginUpdate($hash);
+      readingsBulkUpdate ($hash, "recChannelid", $channelid);  
+	  readingsBulkUpdate ($hash, "recChannelname", $channelname); 
+	  readingsBulkUpdate ($hash, "recUserid", $userid); 
+	  readingsBulkUpdate ($hash, "recUsername", $username); 
+	  readingsBulkUpdate ($hash, "recPostid", $postid); 
+      readingsBulkUpdate ($hash, "recTimestamp", $timestamp); 
+	  readingsBulkUpdate ($hash, "recText", $text); 
+	  readingsBulkUpdate ($hash, "recTriggerword", $triggerword); 
+	  readingsEndUpdate  ($hash,1);
+	  
+	  return ("text/plain; charset=utf-8", "success");
+		
+  } else {
+      # no data received
+      return ("text/plain; charset=utf-8", "Missing data");
+  }
+
 }
 
 #############################################################################################
@@ -1370,7 +1593,8 @@ return;
         "MIME::Base64": 0,
         "Time::HiRes": 0,
         "HttpUtils": 0,
-        "Encode": 0        
+        "Encode": 0,
+        "Net::Domain": 0		
       },
       "recommends": {
         "FHEM::Meta": 0
