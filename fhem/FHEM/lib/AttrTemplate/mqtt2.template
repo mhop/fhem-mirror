@@ -620,6 +620,26 @@ attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
 
 
+# sonoff 1 channel + USB device flashed with Tasmota.
+name:tasmota_POW_USB_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Plug with additional USB outlet flashed with Tasmota. <br>For use e.g. with Gosund SP112 or Blitzwolf SH5<br>NOTE: a second device will be created for the USB channel.<br>NOTE: still untested template, feedback is welcome!
+order:A_01c1
+set DEVICE attrTemplate tasmota_2channel_split
+set DEVICE attrTemplate tasmota_POW
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+copy DEVICE DEVICE_CH2
+par:ICON;ICON as set, defaults to usb;{ AttrVal("DEVICE_CH2","icon","usb") }
+attr DEVICE_CH2 icon ICON
+attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
+attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
+attr DEVICE_CH2 setStateList on off toggle
+attr DEVICE model tasmota_POW_USB_split
+attr DEVICE_CH2 model tasmota_POW_USB_split
+
+
 #tasmota device with Infrared-circuit
 name:tasmota_ir
 desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">set <devicename> irsend</a>
@@ -814,8 +834,8 @@ setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
 #create device for CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat POWER2
-setreading DEVICE associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE_CH2 setList \
   off:noArg    CMNDTOPIC/POWER2 0\
   on:noArg     CMNDTOPIC/POWER2 1\
@@ -1034,7 +1054,7 @@ attr DEVICE setList\
   request_update_device:textField {"shellies/$EVTPART1/command update"}\
   request_announces:noArg {"shellies/command announce"}
 set DEVICE request_announces
-attr DEVICE readingList shellies/announce:.* { json2nameValue($EVENT, $CID."_") }
+attr DEVICE readingList shellies/announce:.* { $EVENT =~ m,id...([^"]+), ? json2nameValue($EVENT,$1."_") : json2nameValue($EVENT) }
 
 # shellyplug using original firmware.
 name:shellyplug
@@ -1960,6 +1980,7 @@ attr DEVICE readingList \
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
 attr DEVICE webCmd rgb:brightness
+attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
 attr DEVICE model wled_controller
 
 #source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
@@ -1976,7 +1997,11 @@ attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT) }\
   BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
 attr DEVICE setList Charge_ON:noArg BASE_ID/SERIAL/cmd/req alw=1\
   Charge_OFF:noArg BASE_ID/SERIAL/cmd/req alw=0\
-  amp:selectnumbers,1,1,22,1,lin go-eCharger/SERIAL/cmd/req amp=$EVTPART1
-attr DEVICE stateFormat Status: charger_state P_akt: energy_akt V1: nrg_1 V2: nrg_2 V3: nrg_3
-attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none"  => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished");; $rets{$val}}, temperature:temp.* { ReadingsVal($name,"tmp",0) }, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
+  amp:selectnumbers,1,1,22,1,lin go-eCharger/SERIAL/cmd/req amp=$EVTPART1\
+  alw:0,1 go-eCharger/007353/cmd/req alw=$EVTPART1
+attr DEVICE stateFormat Status: charger_state \
+ALW:alw\
+ P_akt: energy_akt V1: nrg_1 V2: nrg_2 V3: nrg_3
+attr DEVICE devStateIcon ALW.1:status_open:alw+0 ALW.0:status_locked:alw+1
+attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, temperature:tmp.* { ReadingsVal($name,"tmp",0) }, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.*  { ReadingsVal($name,"dws",0)*2.77 } device_state:alw.* { my $val = ReadingsVal($name,"alw","none");; my %rets = ("none"  => "-1","0" => "Locked","1" => "Open",);; $rets{$val}},
 attr DEVICE model go_eCharger
