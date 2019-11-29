@@ -73,7 +73,7 @@ sub Heating_Control_Get($@) {
 ########################################################################
 sub Heating_Control_Define($$){
   my ($hash, $def) = @_;
-  Log3 $hash, 3, "Heating_Control is deprecated, use WeekdayTimer instead!";
+  Log3 $hash, 1, "Heating_Control is deprecated, use WeekdayTimer instead!";
   my $ret = WeekdayTimer_Define($hash, $def);
   return $ret;
 }
