@@ -36,6 +36,7 @@ sub RandomTimer_Initialize($);
 
 sub RandomTimer_Define($$);
 sub RandomTimer_Undef($$);
+sub RandomTimer_Set($@);
 sub RandomTimer_Attr($$$);
 
 sub RandomTimer_addDays ($$);
@@ -64,6 +65,7 @@ sub RandomTimer_Initialize($) {
 
   $hash->{DefFn}     = "RandomTimer_Define";
   $hash->{UndefFn}   = "RandomTimer_Undef";
+  $hash->{SetFn}     = "RandomTimer_Set";
   $hash->{AttrFn}    = "RandomTimer_Attr";
   $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd ".
                        "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 ".
@@ -151,6 +153,28 @@ sub RandomTimer_Attr($$$) {
   }
   return undef;
 }
+
+sub RandomTimer_Set($@) {
+  my ($hash, @a) = @_;
+
+  return "no set value specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of execNow:noArg" if($a[1] eq "?");
+
+  my $name = shift @a;
+  my $v = join(" ", @a);
+
+  if ($v eq "execNow") {
+    Log3 ($hash, 3, "[$name] set $name $v");
+    if (AttrVal($name, "disable", 0)) {
+      Log3 ($hash, 3, "[$name] is disabled, set execNow not possible");
+    } else {
+      RandomTimer_RemoveInternalTimer("Exec", $hash);
+      RandomTimer_InternalTimer("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
+    }
+  }
+  return undef;
+}
+
 
 # module Fn ###################################################################
 sub RandomTimer_addDays ($$) {
@@ -603,7 +627,19 @@ sub RandomTimer_GetHashIndirekt ($$) {
         </li>
       </ul>
     </ul>
-    <br>
+  </ul>
+   <br>
+   <ul>
+     <a name="RandomTimerset"></a>
+     <b>Set</b><br>
+     <ul>
+	   <code>set &lt;name&gt; execNow</code>
+     <br>
+	 This will force the RandomTimer device to immediately execute the next switch instead of waiting untill timeToSwitch has passed. Use this in case you want immediate reaction on changes of reading values factored in disableCond. As RandomTimer itself will not be notified about any event at all, you'll need an additional event handler like notify that listens to relevant events and issues the "execNow" command towards your RandomTimer device(s).
+	 </ul>
+   </ul><br>  
+
+   <ul>  
     <a name="RandomTimerAttributes"></a>
     <b>Attributes</b>
     <ul>
