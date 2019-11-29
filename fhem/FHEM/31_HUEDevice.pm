@@ -1447,7 +1447,7 @@ HUEDevice_Parse($$)
       $hash->{sensitivitymax} = $config->{sensitivitymax} if( defined ($config->{sensitivitymax}) );
 
       #Eurotronic Spirit ZigBee (SPZB0001)
-      $readings{heatsetpoint} = $config->{heatsetpoint} * 0.01 if( defined ($config->{heatsetpoint}) );
+      $readings{heatsetpoint} = sprintf("%.1f",$config->{heatsetpoint} * 0.01) if( defined ($config->{heatsetpoint}) );
       $readings{locked} = $config->{locked}?'true':'false' if( defined ($config->{locked}) );
       $readings{displayflipped} = $config->{displayflipped}?'true':'false' if( defined ($config->{displayflipped}) );
       $readings{mode} = $config->{mode} if( defined ($config->{mode}) );
