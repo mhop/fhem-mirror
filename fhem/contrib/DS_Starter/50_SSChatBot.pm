@@ -274,11 +274,8 @@ sub SSChatBot_Set($@) {
   }
  
   if ($opt eq "botToken") {
-      $prop =~ /^(%22)(.*)(%22)$/ if($prop);
-      return "The token you entered was incomplete ! \n".
-             "Take the complete string after \"&token=\" from the Synology Chat \"Integration->Bots->incoming URL\" menu. \n".
-             "The token has the form like \"%22U6FOMH9IgT2WECJceaIW0fNwEiVVfqWQFP7gJQUJ6vpaGo8Z1SJkOGP7zlVIscCp%22\" " if (!$1 || !$3);         
-      ($success) = SSChatBot_setToken($hash,$2,"botToken");
+      return "The command \"$opt\" needs an argument." if (!$prop);         
+      ($success) = SSChatBot_setToken($hash,$prop,"botToken");
 	  
 	  if($success) {
 		  return "botToken saved successfully";
