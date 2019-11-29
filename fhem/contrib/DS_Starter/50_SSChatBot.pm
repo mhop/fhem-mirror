@@ -7,7 +7,7 @@
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate as Bot for Synology Chat.
-#       It's based on and uses Synology Chat Web Hook.
+#       It's based on and uses Synology Chat Webhook.
 # 
 #       This script is part of fhem.
 #
@@ -48,7 +48,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
-  "1.0.0"  => "20.11.2019  initial "
+  "1.0.0"  => "29.11.2019  initial "
 );
 
 # Versions History extern
@@ -122,8 +122,8 @@ sub SSChatBot_Define($@) {
   CommandAttr(undef,"$name room Chat");
   
   # benötigte API's in $hash einfügen
-  $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{CHATEXTERNAL}   = "SYNO.Chat.External"; 
+  $hash->{HELPER}{APIINFO}       = "SYNO.API.Info";                              # Info-Seite für alle API's, einzige statische Seite !                                                    
+  $hash->{HELPER}{CHATEXTERNAL}  = "SYNO.Chat.External"; 
     
   # Versionsinformationen setzen
   SSChatBot_setVersionInfo($hash);
@@ -160,7 +160,7 @@ sub SSChatBot_Undef($$) {
   my $name = $hash->{NAME};
   
   delete $data{SSChatBot}{$name};
-  SSChatBot_removeExtension($hash->{fhem}{infix});
+  SSChatBot_removeExtension($hash->{HELPER}{INFIX});
   RemoveInternalTimer($hash);
    
 return undef;
@@ -278,6 +278,7 @@ sub SSChatBot_Set($@) {
       ($success) = SSChatBot_setToken($hash,$prop,"botToken");
 	  
 	  if($success) {
+          CommandGet(undef, "$name chatUserlist");                      # Chatuser Liste abrufen
 		  return "botToken saved successfully";
 	  } else {
           return "Error while saving botToken - see logfile for details";
@@ -507,7 +508,7 @@ return $ret;                                                        # not genera
 sub SSChatBot_initonboot ($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
-  my ($ret);
+  my ($ret,$csrf,$fuuid);
   
   RemoveInternalTimer($hash, "SSChatBot_initonboot");
   
@@ -538,12 +539,16 @@ sub SSChatBot_initonboot ($) {
               Log3($name, 3, "$name - FHEMWEB instance \"$FW\" with webname \"$FWname\" created");
               $hash->{FW} = $FW;
               
-              CommandAttr(undef, "$hash->{FW} closeConn 1");
-              CommandAttr(undef, "$hash->{FW} webname $FWname"); 
-              CommandAttr(undef, "$hash->{FW} room $room");
-              CommandAttr(undef, "$hash->{FW} csrfToken none");
-              CommandAttr(undef, "$hash->{FW} comment WEB Instance for SSChat devices. Get outgoing messages from Synology Chat server.");
-              CommandAttr(undef, "$hash->{FW} stylesheetPrefix default");            
+              $fuuid = $defs{$FW}{FUUID};
+              $csrf  = (split("-", $fuuid, 2))[0];
+              
+              CommandAttr(undef, "$FW closeConn 1");
+              CommandAttr(undef, "$FW webname $FWname"); 
+              CommandAttr(undef, "$FW room $room");
+              CommandAttr(undef, "$FW csrfToken $csrf");
+              CommandAttr(undef, "$FW comment WEB Instance for SSChat devices.\nIt catches outgoing messages from Synology Chat server.\nDon't edit this device manually (except such attributes like \"room\", \"icon\") !");
+              CommandAttr(undef, "$FW stylesheetPrefix default");            
+          
           } else {
               Log3($name, 2, "$name - ERROR while creating FHEMWEB instance ".$hash->{FW}." with webname \"$FWname\" !");
 	          readingsBeginUpdate($hash); 
@@ -555,15 +560,19 @@ sub SSChatBot_initonboot ($) {
 	  if(!$ret) {
 		  CommandGet(undef, "$name chatUserlist");                      # Chatuser Liste initial abrufen 
 	  
-		  my $host = hostname();                                        # eigener Host
-		  my $fqdn = hostfqdn();                                        # MYFQDN eigener Host 
-		  chop($fqdn) if($fqdn =~ /^.*\.$/);
+		  my $host        = hostname();                                 # eigener Host
+		  my $fqdn        = hostfqdn();                                 # MYFQDN eigener Host 
+		  chop($fqdn) if($fqdn =~ /^.*\.$/);                            # eventuellen "." nach dem FQDN entfernen
 		  my $FWchatport  = $defs{$FW}{PORT};
-		  my $FWprot      = AttrVal($FW, "HTTS", 0);
-		  $hash->{OUTDEF} = ($FWprot?"https":"http")."://".($fqdn?$fqdn:$host).":".$FWchatport."/".$FWname."/outchat?botname=".$name; 
+		  my $FWprot      = AttrVal($FW, "HTTPS", 0);
+		  $FWname         = AttrVal($FW, "webname", 0);
+          CommandAttr(undef, "$FW csrfToken none") if(!AttrVal($FW, "csrfToken", ""));
+          $csrf           = $defs{$FW}{CSRFTOKEN}?$defs{$FW}{CSRFTOKEN}:"";
+     
+          $hash->{OUTDEF} = ($FWprot?"https":"http")."://".($fqdn?$fqdn:$host).":".$FWchatport."/".$FWname."/outchat?botname=".$name."&fwcsrf=".$csrf; 
 
 		  SSChatBot_addExtension($name, "SSChatBot_CGI", "outchat");
-		  $hash->{fhem}{infix} = "outchat"; 
+		  $hash->{HELPER}{INFIX} = "outchat"; 
 	  }
 			  
   } else {
@@ -1242,7 +1251,16 @@ sub SSChatBot_removeExtension($) {
 
   my $url  = "/$link";
   my $name = $data{FWEXT}{$url}{deviceName};
-  Log3($name, 2, "$name - Unregistering SSChatBot $name for URL $url...");
+  
+  my @chatdvs = devspec2array("TYPE=SSChatBot");
+  foreach (@chatdvs) {                                 # /outchat erst deregistrieren wenn keine SSChat-Devices mehr vorhanden sind außer $name
+      if($defs{$_} && $_ ne $name) {
+          Log3($name, 2, "$name - Skip unregistering SSChatBot for URL $url");
+          return;
+      }
+  }
+  
+  Log3($name, 2, "$name - Unregistering SSChatBot for URL $url...");
   delete $data{FWEXT}{$url};
   
 return;
