@@ -479,13 +479,13 @@ attr DEVICE httpVersion 1.1
 attr DEVICE reading01AutoNumLen 2
 attr DEVICE reading01Format https://www.eq-3.de%s
 attr DEVICE reading01Name fw_link
-attr DEVICE reading01RegOpt gi
-attr DEVICE reading01Regex <a.href="(\/downloads\/software\/firmware\/hm[^"]+)
+attr DEVICE reading01RegOpt g
+attr DEVICE reading01Regex (?i)<a.href="(\/downloads\/software\/firmware\/hm[^"]+)
 attr DEVICE reading02AutoNumLen 2
 attr DEVICE reading02Name changeLog_link
 attr DEVICE reading02OExpr $val=~m/(\/downloads\/software\/firmware\/[^"]+)/?"https://www.eq-3.de".$1:"none"
-attr DEVICE reading02RegOpt gis
-attr DEVICE reading02Regex (.{300})<a.href="\/downloads\/software\/firmware\/hm[^"]+
+attr DEVICE reading02RegOpt g
+attr DEVICE reading02Regex (?si)(.{300})<a.href="\/downloads\/software\/firmware\/hm[^"]+
 attr DEVICE readingMaxAge 10
 attr DEVICE readingMaxAgeReplacementMode delete
 attr DEVICE requestData.* suchbegriff=&quelle=29&suchkategorie=3&themenbereich=1
@@ -725,7 +725,7 @@ attr DEVICE model ESPEasy_firmware_updates
 name:dnscrypt-proxy_updates
 filter:TYPE=HTTPMOD
 desc: Show updates for <a href="https://dnscrypt.info/">DNSCRYPT.</a><br>Define a HTTPMOD device like <br>defmod dnscrypt_proxy_version HTTPMOD https://api.github.com/repos/jedisct1/dnscrypt-proxy/releases/latest 86400<br><a href="https://forum.fhem.de/index.php/topic,97694.msg992002.html#msg992002">Source: Forum</a>
-order:X_01x
+order:A_02f
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 attr DEVICE userattr userattr myInstalledVersion
 attr DEVICE extractAllJSON 1
