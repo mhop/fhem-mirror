@@ -42,6 +42,7 @@ alexa_Initialize($)
   $hash->{AttrList} = "alexaMapping:textField-long alexaTypes:textField-long fhemIntents:textField-long ".
                       "articles prepositions ".
                       "echoRooms:textField-long ".
+                      "persons:textField-long ".
                       "alexaConfirmationLevel:2,1,0 alexaStatusLevel:2,1 ".
                       "skillId:textField ".
                       "alexaFHEM-cmd ".
@@ -100,6 +101,10 @@ alexa_AttrDefaults($)
 
   if( !AttrVal( $name, 'echoRooms', undef ) ) {
     CommandAttr(undef,"$name echoRooms #<deviceId>=<room>\n" );
+  }
+
+  if( !AttrVal( $name, 'persons', undef ) ) {
+    CommandAttr(undef,"$name persons #<personId>=<name>\n" );
   }
 
 
@@ -1292,6 +1297,9 @@ alexa_Attr($$$)
 
     <li>alexaName<br>
       The name to use for a device with alexa.</li>
+
+    <br>The following attributes are only relevant for custom skills:
+
     <li>alexaRoom<br>
       The room name to use for a device with alexa.</li>
     <li>articles<br>
@@ -1304,6 +1312,8 @@ alexa_Attr($$$)
       maps spoken device types to ServiceClasses. eg: attr alexa alexaTypes light:licht,lampe,lampen blind:rolladen,jalousie,rollo Outlet:steckdose TemperatureSensor:thermometer LockMechanism:schloss OccupancySensor: anwesenheit</li>
     <li>echoRooms<br>
       maps echo devices to default rooms.</li>
+    <li>persons<br>
+      maps personIds to names.</li>
     <li>fhemIntents<br>
       maps spoken commands directed to fhem as a whole (i.e. not to specific devices) to events from the alexa device.</li>
     <li>alexaConfirmationLevel<br>
