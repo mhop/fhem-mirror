@@ -285,7 +285,6 @@ sub SSChatBot_Set($@) {
 	  }
       
   } elsif ($opt eq "listSendqueue") {
-  Log3($name, 1, "$name - FHEMWEB: ".$FW_RET);
       my $sub = sub ($) { 
           my ($idx) = @_; 
           my $ret;
@@ -323,6 +322,7 @@ sub SSChatBot_Set($@) {
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
       my $cmd = join(" ", @a);
+      $cmd    = SSChatBot_substText($cmd);
       my ($text,$users,$fileUrl);
       my ($a,$h) = parseParams($cmd);
       if($h) {
@@ -335,15 +335,15 @@ sub SSChatBot_Set($@) {
           my @t = @{$a};
           shift @t; shift @t;
           $text = join(" ", @t);
-          Log3($name, 1, "$name - sendItem: ".$text);
       }      
        
       return "Your sendstring is incorrect. It must contain at least text with the \"text\" tag like 'text=\"...\"\nor only some text like \"this is a test\" '." if(!$text);
+      Log3($name, 5, "$name - Add sendItem to queue: ".$text);
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
       return "You haven't defined any receptor for send the message to. ".
              "You have to use the \"users\" tag or define default receptors with attribute \"defaultPeer\"." if(!$users);
-       
+      
       # User aufsplitten und zu jedem die ID ermitteln
       my @ua = split(/,/, $users);
       foreach (@ua) {
@@ -1286,6 +1286,18 @@ return ($str);
 }
 
 #############################################################################################
+#             Text formatieren und nicht erlaubte Zeichen entfernen           
+#############################################################################################
+sub SSChatBot_substText ($) {
+  my $txt = shift;
+  
+  $txt =~ s/["']/´/g;
+  $txt =~ s/H/h/g;                        # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+
+return ($txt);
+}
+
+#############################################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 #############################################################################################
@@ -1379,7 +1391,7 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command) = ("");
+  my ($command,$cr) = ("","");
  
   my $ret = "success";
 
@@ -1468,25 +1480,21 @@ sub SSChatBot_CGI() {
               Log3($name, 4, "$name - received FHEM command: ".$command);
               
               if($p1 =~ /set/i) {
-                  $ret = CommandSet(undef, $p2);                             # set-Befehl in FHEM ausführen
+                  $cr = CommandSet(undef, $p2);                             # set-Befehl in FHEM ausführen
               } elsif ($p1 =~ /get/i) {
-                  $ret = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen
+                  $cr = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen
               } elsif ($p1 =~ /code/i) {
               
               } 
               
-              $ret = $ret?$ret:"command '$command' executed";              
-              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $ret, "", "", "");
-              SSChatBot_getapisites($name);              
-              Log3($name, 4, "$name - FHEM command return: ".$ret);              
-          }
-          
-          if($text =~ /^\/get\s+(.*)$/) {                                   # get-Befehl in FHEM ausführen
-          
-          }
-       
-          if($text =~ /^\/code\s+(\{.*\})$/) {                              # Perl Code in FHEM ausführen
-          
+              $cr = $cr?$cr:"command '$command' executed";
+              Log3($name, 4, "$name - FHEM command return: ".$cr);
+              
+              $cr = SSChatBot_substText($cr);            
+              Log3($name, 5, "$name - Add sendItem to queue: ".$cr);
+              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
+              SSChatBot_getapisites($name);    
+                            
           }
       }
 	  
@@ -1505,7 +1513,7 @@ sub SSChatBot_CGI() {
 	  readingsBulkUpdateIfChanged ($hash, "recText", $text); 
 	  readingsBulkUpdateIfChanged ($hash, "recTriggerword", $triggerword);
 	  readingsBulkUpdateIfChanged ($hash, "recCommand", $command);       
-      readingsBulkUpdateIfChanged ($hash, "sendCommandReturn", $ret);       
+      readingsBulkUpdateIfChanged ($hash, "sendCommandReturn", $cr);       
       readingsBulkUpdateIfChanged ($hash, "Errorcode","none");
       readingsBulkUpdateIfChanged ($hash, "Error","none");
       readingsBulkUpdate          ($hash, "state", "active");        
