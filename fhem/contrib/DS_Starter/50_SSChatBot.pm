@@ -338,6 +338,7 @@ sub SSChatBot_Set($@) {
       }      
        
       return "Your sendstring is incorrect. It must contain at least text with the \"text\" tag like 'text=\"...\"\nor only some text like \"this is a test\" '." if(!$text);
+      
       Log3($name, 5, "$name - Add sendItem to queue: ".$text);
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
@@ -1293,7 +1294,7 @@ sub SSChatBot_substText ($) {
   
   $txt =~ s/["']/´/g;
   $txt =~ s/H/h/g;                        # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-
+  
 return ($txt);
 }
 
