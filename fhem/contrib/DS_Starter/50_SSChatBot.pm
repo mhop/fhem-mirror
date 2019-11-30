@@ -317,6 +317,7 @@ sub SSChatBot_Set($@) {
       }
   
   } elsif ($opt eq "sendItem") {
+      # einfachster Sendetext users="user1"
       # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
@@ -864,11 +865,12 @@ sub SSChatBot_chatop ($) {
       $url .= "}";
    }
 
-   my $part = (split("&token=", $url))[0];
+   my $part = $url;
    if(AttrVal($name, "showTokenInLog", "0") == 1) {
        Log3($name, 4, "$name - Call-Out: $url");
    } else {
-       Log3($name, 4, "$name - Call-Out: $part&token=<secret>");
+       $part =~ s/$token/<secret>/;
+       Log3($name, 4, "$name - Call-Out: $part");
    }
    
    $param = {
@@ -1377,6 +1379,9 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
+  my ($command) = ("");
+ 
+  my $ret = "success";
 
   return ( "text/plain; charset=utf-8", "Booting up" ) unless ($init_done);
 
@@ -1455,6 +1460,34 @@ sub SSChatBot_CGI() {
 	  if ($h->{text}) {
 	      $text = urlDecode($h->{text});                          
           Log3($name, 4, "$name - text received: ".$text);
+          
+          if($text =~ /^\/([Ss]et|[Gg]et|[Cc]ode)\s+(.*)$/) {                # Befehle in FHEM ausführen
+              $command = "$1 ".$2;
+              my $p1   = $1;
+              my $p2   = $2;
+              Log3($name, 4, "$name - received FHEM command: ".$command);
+              
+              if($p1 =~ /set/i) {
+                  $ret = CommandSet(undef, $p2);                             # set-Befehl in FHEM ausführen
+              } elsif ($p1 =~ /get/i) {
+                  $ret = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen
+              } elsif ($p1 =~ /code/i) {
+              
+              } 
+              
+              $ret = $ret?$ret:"command '$command' executed";              
+              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $ret, "", "", "");
+              SSChatBot_getapisites($name);              
+              Log3($name, 4, "$name - FHEM command return: ".$ret);              
+          }
+          
+          if($text =~ /^\/get\s+(.*)$/) {                                   # get-Befehl in FHEM ausführen
+          
+          }
+       
+          if($text =~ /^\/code\s+(\{.*\})$/) {                              # Perl Code in FHEM ausführen
+          
+          }
       }
 	  
 	  if ($h->{trigger_word}) {
@@ -1462,7 +1495,6 @@ sub SSChatBot_CGI() {
           Log3($name, 4, "$name - trigger_word received: ".$triggerword);
       }
 
-	  
 	  readingsBeginUpdate($hash);
       readingsBulkUpdateIfChanged ($hash, "recChannelid", $channelid);  
 	  readingsBulkUpdateIfChanged ($hash, "recChannelname", $channelname); 
@@ -1471,13 +1503,15 @@ sub SSChatBot_CGI() {
 	  readingsBulkUpdateIfChanged ($hash, "recPostid", $postid); 
       readingsBulkUpdateIfChanged ($hash, "recTimestamp", $timestamp); 
 	  readingsBulkUpdateIfChanged ($hash, "recText", $text); 
-	  readingsBulkUpdateIfChanged ($hash, "recTriggerword", $triggerword); 
-      readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
-      readingsBulkUpdateIfChanged ($hash,"Error","none");
+	  readingsBulkUpdateIfChanged ($hash, "recTriggerword", $triggerword);
+	  readingsBulkUpdateIfChanged ($hash, "recCommand", $command);       
+      readingsBulkUpdateIfChanged ($hash, "sendCommandReturn", $ret);       
+      readingsBulkUpdateIfChanged ($hash, "Errorcode","none");
+      readingsBulkUpdateIfChanged ($hash, "Error","none");
       readingsBulkUpdate          ($hash, "state", "active");        
 	  readingsEndUpdate  ($hash,1);
 	  
-	  return ("text/plain; charset=utf-8", "success");
+	  return ("text/plain; charset=utf-8", $ret);
 		
   } else {
       # no data received
