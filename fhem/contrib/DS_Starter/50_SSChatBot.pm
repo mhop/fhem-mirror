@@ -323,14 +323,21 @@ sub SSChatBot_Set($@) {
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
       my $cmd = join(" ", @a);
       my ($text,$users,$fileUrl);
-      my($a, $h) = parseParams($cmd);
+      my ($a,$h) = parseParams($cmd);
       if($h) {
           $text    = $h->{text}    if(defined $h->{text});
           $users   = $h->{users}   if(defined $h->{users});
           $fileUrl = $h->{fileUrl} if(defined $h->{fileUrl});
       }
+      
+      if($a) {
+          my @t = @{$a};
+          shift @t; shift @t;
+          $text = join(" ", @t);
+          Log3($name, 1, "$name - sendItem: ".$text);
+      }      
        
-      return "Your sendstring is incorrect. It must contain at least the \"text\" tag like 'text=\"...\" '." if(!$text);
+      return "Your sendstring is incorrect. It must contain at least text with the \"text\" tag like 'text=\"...\"\nor only some text like \"this is a test\" '." if(!$text);
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
       return "You haven't defined any receptor for send the message to. ".
@@ -1457,14 +1464,17 @@ sub SSChatBot_CGI() {
 
 	  
 	  readingsBeginUpdate($hash);
-      readingsBulkUpdate ($hash, "recChannelid", $channelid);  
-	  readingsBulkUpdate ($hash, "recChannelname", $channelname); 
-	  readingsBulkUpdate ($hash, "recUserid", $userid); 
-	  readingsBulkUpdate ($hash, "recUsername", $username); 
-	  readingsBulkUpdate ($hash, "recPostid", $postid); 
-      readingsBulkUpdate ($hash, "recTimestamp", $timestamp); 
-	  readingsBulkUpdate ($hash, "recText", $text); 
-	  readingsBulkUpdate ($hash, "recTriggerword", $triggerword); 
+      readingsBulkUpdateIfChanged ($hash, "recChannelid", $channelid);  
+	  readingsBulkUpdateIfChanged ($hash, "recChannelname", $channelname); 
+	  readingsBulkUpdateIfChanged ($hash, "recUserid", $userid); 
+	  readingsBulkUpdateIfChanged ($hash, "recUsername", $username); 
+	  readingsBulkUpdateIfChanged ($hash, "recPostid", $postid); 
+      readingsBulkUpdateIfChanged ($hash, "recTimestamp", $timestamp); 
+	  readingsBulkUpdateIfChanged ($hash, "recText", $text); 
+	  readingsBulkUpdateIfChanged ($hash, "recTriggerword", $triggerword); 
+      readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
+      readingsBulkUpdateIfChanged ($hash,"Error","none");
+      readingsBulkUpdate          ($hash, "state", "active");        
 	  readingsEndUpdate  ($hash,1);
 	  
 	  return ("text/plain; charset=utf-8", "success");
