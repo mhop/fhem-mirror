@@ -1907,6 +1907,10 @@ HUEDevice_Attr($$$;$)
       Renames the device in the bridge and changes the fhem alias.</li>
       <li>json [setsensor|configsensor] &lt;json&gt;<br>
       send &lt;json&gt; to the state or config endpoints for this device.</li>
+      <li>habridgeupdate [ : &lt; on | off &gt; ] [ : &lt; bri | pct &gt; &lt; value &gt; ] <br>
+      This command is only for usage of HA-Bridges that are emulating an Hue Hub. <br>
+      It updates your HA-Bridge internal light state of the devices without changing the devices itself.
+      <br>bri and pct have to be used in the same way as changing the brightness or dimvalue of the device. </li>
       <br>
       <li><a href="#setExtensions"> set extensions</a> are supported.</li>
       <br>
