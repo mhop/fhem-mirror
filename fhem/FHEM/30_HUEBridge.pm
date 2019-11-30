@@ -944,7 +944,7 @@ HUEBridge_Set($@)
       map { $count{$scenes->{$_}{name}}++ } keys %{$scenes};
       $list .= " scene:". join(",", sort map { my $scene = $scenes->{$_}{name};
                                                my $group = '';
-                                               if( $count{$scene} > 1 ) {
+                                               if( $scenes->{$_}{lights} && $count{$scene} > 1 ) {
                                                  my $lights = join( ",", @{$scenes->{$_}{lights}} );
                                                  $group = HUEbridge_groupOfLights($hash,$lights);
                                                  $group = join( ";", map { my $l = $hash->{helper}{lights}{$_}{name}; $l?$l:$_;} @{$scenes->{$_}{lights}} ) if( !$group && $hash->{helper}{lights} );
@@ -1033,7 +1033,8 @@ HUEBridge_Get($@)
     foreach my $key ( sort {$result->{$a}{name} cmp $result->{$b}{name}} keys %{$result} ) {
       $ret .= sprintf( "%-20s %-25s %-10s", $key, $result->{$key}{name}, $result->{$key}{type} );
       $ret .= sprintf( "%i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
-      my $lights = join( ",", @{$result->{$key}{lights}} );
+      my $lights = "";
+      $lights = join( ",", @{$result->{$key}{lights}} ) if( $result->{$key}{lights} );
       my $group = HUEbridge_groupOfLights($hash,$lights);
 
       if( !$arg && $group ) {
