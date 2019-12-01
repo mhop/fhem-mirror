@@ -90,7 +90,7 @@ attr DEVICE setList\
   x_group_add_group:textField BASE_TOPIC/bridge/config/add_group $EVTPART1\
   x_group_rm_group:textField BASE_TOPIC/bridge/config/remove_group $EVTPART1\
   z_elapsed:textField BASE_TOPIC/bridge/config/elapsed $EVTPART1\
-  z_last_seen:textField BASE_TOPIC/bridge/config/last_seen $EVTPART1\
+  z_last_seen:disable,ISO_8601,epoch,ISO_8601_local BASE_TOPIC/bridge/config/last_seen $EVTPART1\
   z_ban:textField BASE_TOPIC/bridge/config/ban $EVTPART1\
   z_rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
   z_reset_CC:noArg BASE_TOPIC/bridge/config/reset
@@ -119,7 +119,7 @@ attr DEVICE model zigbee2mqtt_router_only_device
 
 # A dimmable light connected via zigbee2mqtt
 name:zigbee2mqtt_light_dimmer
-desc: A dimmable light connected via zigbee2mqtt <br>Tested with: Tradfri LED1650R5, Osram Lightify W32
+desc: A dimmable light connected via zigbee2mqtt <br>Tested with: Tradfri LED1650R5 + LED1649C5, Osram Lightify W32
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
 order:L_02a
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
@@ -1404,10 +1404,11 @@ attr DEVICE setList\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
-attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}
+attr DEVICE readingList shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}
 attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}, rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:pct:ct:rgb
-attr DEVICE genericDeviceType light
+#attr DEVICE genericDeviceType light
+attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 attr DEVICE model shellybulb
 
@@ -1467,56 +1468,57 @@ order:A_17a
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
-attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVENT)}\
+attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/0:.* state\
   shellies/DEVNAME/white/0/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
-  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
-attr DEVICE webCmd on:off:brightness
+attr DEVICE webCmd on:off:pct
 set DEVICE x_mqttcom announce
+attr DEVICE jsonMap brightness:pct
 attr DEVICE model shelly2rgbw_4w_split
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE autocreate 0
 attr DEVICE setStateList on off
 copy DEVICE DEVICE_CH2
 setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
-attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT)}\
+attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/1:.* state\
   shellies/DEVNAME/white/1/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH2 setList off:noArg shellies/DEVNAME/white/1/command off\
   on:noArg shellies/DEVNAME/white/1/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
-  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH2 setStateList on off
 copy DEVICE DEVICE_CH3
 setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
-attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($EVENT)}\
+attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/2:.* state\
   shellies/DEVNAME/white/2/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH3 setList off:noArg shellies/DEVNAME/white/2/command off\
   on:noArg shellies/DEVNAME/white/2/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
-  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH3 setStateList on off
 copy DEVICE DEVICE_CH4
-attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT)}\
-shellies/DEVNAME/white/3:.* state\
-shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
-shellies/DEVNAME/online:.* online
+attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
+  shellies/DEVNAME/white/3:.* state\
+  shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/online:.* online
 attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   on:noArg shellies/DEVNAME/white/3/command on\
-  brightness:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
-  brightness_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setStateList on off
 
@@ -1536,7 +1538,7 @@ attr DEVICE setList\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
-  shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT)}\
+  shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/temperature_f:.* temperature_f\
   shellies/DEVNAME/overtemperature:.* overtemperature\
@@ -1544,6 +1546,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/loaderror:.* loaderror\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
 attr DEVICE webCmd pct:on:off
+attr DEVICE jsonMap brightness:pct
 attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "true"?"10px-kreis-rot":"10px-kreis-gruen";; my $light = ReadingsVal($name,"ison","false") eq "true"?"on":"off";; my $cons = ReadingsVal($name,"light_0_power","unknown");; FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Leistung: $cons</div>"}
 set DEVICE x_mqttcom announce
 attr DEVICE model shellydimmer
