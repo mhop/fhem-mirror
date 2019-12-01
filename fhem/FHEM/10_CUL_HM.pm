@@ -6324,7 +6324,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     #peerSmart <peer>  
     $state = "";
     my $set  = $a[2] =~ s/^remove_// ? 0    : 1;
-    my $cmdB = $set                ? "01" : "02";
+    my $cmdB = $set                  ? "01" : "02";
     my %PInfo;
     my $pCnt = 0;
     my $ret;
@@ -10769,6 +10769,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                will be peered/unpeerd to the actor. <a href="CUL_HMpress">press</a> can be
                used to stimulate the related actions as defined in the actor register.
           </li>
+          <li><B>peerSmart [&lt;peer&gt;] </B><a name="CUL_HMpeerSmart"></a><br>
+               The command is similar to <B><a href="#CUL_HMpeerChan">peerChan</a></B>. 
+               peerChan uses only one parameter, the peer which the channel shall be peered to. <br>
+               Therefore peerSmart peers always in single mode (see peerChan). Funktionallity of the peered actor shall be applied 
+               manually by setting register. This is not a big difference to peerChan. <br>
+               Smart register setting could be done using hmTemplate. <br>
+               peerSmart is also available for actor-channel.
+          </li>
           <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse][<u>set</u>|unset] [<u>both</u>|actor|remote]</B>
               <a name="CUL_HMpeerChan"></a><br>
           
@@ -12209,7 +12217,15 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           <li><B>trgPressL [all|&lt;peer&gt;] </B><a name="CUL_HMtrgPressL"></a><br>
                Initiiert ein pressL fuer die peer entity. Wenn <B>all</B> ausgewählt ist wird das Kommando bei jedem der Peers ausgeführt. Siehe auch <a href="CUL_HMpressL">pressL</a><br>
           </li>
-            <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
+          <li><B>peerSmart [&lt;peer&gt;] </B><a name="CUL_HMpeerSmart"></a><br>
+               Das Kommando ist aehnlich dem <B><a href="#CUL_HMpeerChan">peerChan</a></B>. 
+               peerChan braucht nur einen Parameter, den Peer zu welchem die Beziehung hergestellt werden soll.<br>
+               Daher peert peerSmart immer single mode (siehe peerChan). Die Funktionalitaet des gepeerten Aktors wird über das manuelle 
+               setzen der Register eingestellt. Am Ende ist das kein grosser Unterschied zu peerChan. <br>
+               Smartes Register Setzen kann man mit hmTemplate erreichen. <br>
+               peerSmart ist auch für Aktor Kanäle verfügbar.
+          </li>
+          <li><B>peerChan &lt;btn_no&gt; &lt;actChan&gt; [single|<u>dual</u>|reverse]
               [<u>set</u>|unset] [<u>both</u>|actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
               "peerChan" richtet eine Verbindung zwischen Sender-<B>Kanal</B> und
               Aktor-<B>Kanal</B> ein, bei HM "link" genannt. "Peering" darf dabei nicht
