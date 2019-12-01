@@ -1334,7 +1334,7 @@ sub HMinfo_GetFn($@) {#########################################################
       $ret =~s/-ret-/\n/g;
     }
   }
-  elsif($cmd eq "configChkResult"){##check peers and register----------------------
+  elsif($cmd eq "configChkResult"){##check peers and register------------------
     return $defs{$name}{helper}{cfgChkResult} ? $defs{$name}{helper}{cfgChkResult} :"no results available";
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
@@ -1345,7 +1345,7 @@ sub HMinfo_GetFn($@) {#########################################################
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
     $ret = "";
   }
-  elsif($cmd =~ m/^templateUs(g|gG)$/){##template: see if it applies ------------------
+  elsif($cmd =~ m/^templateUs(g|gG)$/){##template: see if it applies ----------
     return HMinfo_templateUsg($opt,$filter,@a);
   }
   #------------ print tables ---------------
@@ -1378,6 +1378,84 @@ sub HMinfo_GetFn($@) {#########################################################
       }
       push @peerPairs,$dName." => ".join(" ",(sort @pl)) if (@pl);
     }
+    #--- calculate peerings to Central ---
+    my %fChn;
+    foreach (@fheml){
+      my ($fhId,$fhCh,$p)= unpack 'A6A2A*',$_;
+      my $fhemCh = "fhem_io_${fhId}_$fhCh";
+      $fChn{$fhemCh} = ($fChn{$fhemCh}?$fChn{$fhemCh}.", ":"").$p;
+    }
+    push @peerFhem,map {"$_ => $fChn{$_}"} keys %fChn;
+    $ret = $cmd." done:" ."\n x-ref list"."\n    ".(join "\n    ",sort @peerPairs)
+                                         ."\n    ".(join "\n    ",sort @peerFhem)
+                         ;
+    $ret .=               "\n warning: sensor triggers but no config found"
+                                         ."\n    ".(join "\n    ",sort @peerUndef)
+            if(@peerUndef)
+                         ;
+  }
+  elsif($cmd eq "peerUsg")    {##print cross-references and usage--------------
+    my @peerPairs;
+    my @peerFhem;
+    my @peerUndef;
+    my @fheml = ();
+    foreach my $dName (HMinfo_getEntities($opt,$filter)){
+      my $tmpRegl = join("",CUL_HM_reglUsed($dName));
+      next if($tmpRegl !~ m/RegL_04/);
+
+      # search for irregular trigger
+      my $peerIDs = AttrVal($dName,"peerIDs","");
+      $peerIDs =~ s/00000000,//;
+      foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
+                                              grep /^trigDst_/,
+                                              keys %{$defs{$dName}{READINGS}})){
+        push @peerUndef,"$dName triggers $_"
+            if(  ($peerIDs && $peerIDs !~ m/$_/)
+               &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
+      }
+
+      #--- check regular references
+      next if(!$peerIDs);
+      my $dId = unpack 'A6',CUL_HM_name2Id($dName);
+      my @pl = ();
+      my @peers = split(",",$peerIDs); #array of peers
+      foreach (split",",$peerIDs){     #add peers that are implicitely added
+        my $pDevN = CUL_HM_id2Name(substr($_,0,6));
+        foreach (grep (/^channel_/, keys%{$defs{$pDevN}})){
+          if(InternalVal($defs{$pDevN}{$_},"peerList","unknown") =~ m/$dName/){
+            push @peers,$defs{$pDevN}{$_};
+          }
+        }
+        if(InternalVal($pDevN,"peerList","unknown") =~ m/$dName/){
+          push @peers,$pDevN;
+        }
+      }
+      @peers = CUL_HM_noDup(@peers);
+     
+#      foreach (split",",$peerIDs){
+      foreach (@peers){
+        my $pn = CUL_HM_peerChName($_,$dId);
+        $pn =~ s/_chn-01//;
+        my $tmpl = "-";
+        if(defined $defs{$pn}){
+          if   ( defined $defs{$pn}{helper}{role}{vrt}){
+            $tmpl = "virt";
+          } 
+          elsif(!defined $defs{$pn}{helper}{role}{chn}){
+            next;
+          }
+          elsif( defined $defs{$pn}{helper}{tmpl}){
+            $tmpl = join(",", map{$_.":".$defs{$pn}{helper}{tmpl}{$_}} grep /$dName/,keys %{$defs{$pn}{helper}{tmpl}});
+            $tmpl =~ s/${dName}://g;
+            $tmpl = "-" if($tmpl eq "");
+          }
+        }
+        push @pl,$pn." \t:".$tmpl;
+        push @fheml,"$_$dName" if ($pn =~ m/^fhem..$/);
+      }
+      push @peerPairs,$dName." \t=> $_" foreach(@pl);
+    }
+    @peerPairs = CUL_HM_noDup(@peerPairs);
     #--- calculate peerings to Central ---
     my %fChn;
     foreach (@fheml){
@@ -1481,6 +1559,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"configChkResult:noArg"
             ,"param"
             ,"peerCheck"
+            ,"peerUsg"
             ,"peerXref"
             ,"protoEvents:all,short,long"
             ,"msgStat"
@@ -1687,6 +1766,7 @@ sub HMInfo_help(){ ############################################################
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [-typeFilter-]                        # devicefilter parse devicename. Partial strings supported"
+           ."\n get peerUsg  [-typeFilter-]                        # peer cross-reference with template information"
            ."\n get peerXref [-typeFilter-]                        # peer cross-reference"
            ."\n get models [-typeFilter-]                          # list of models incl native parameter"
            ."\n get protoEvents [-typeFilter-] [short|all|long]    # protocol status - names can be filtered"
@@ -2475,7 +2555,7 @@ sub HMinfo_templateDef(@){#####################################################
     delete $HMConfig::culHmTpl{$name};
     return;
   }
-  return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
+  return "$name : param:$param already defined, delete it first" if($HMConfig::culHmTpl{$name});
   if ($param eq "fromMaster"){#set hm templateDef <tmplName> fromMaster <master> <(peer:long|0)> <descr>
     my ($master,$pl) = ($desc,@regs);
     return "master $master not defined" if(!$defs{$master});
@@ -2978,6 +3058,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           performs a consistency check on peers. If a peer is set in a channel
           it will check wether the peer also exist on the opposit side.
       </li>
+      <li><a name="#HMinfopeerUsg">peerUsg</a> <a href="#HMinfoFilter">[filter]</a><br>
+          provides a cross-reference on peerings and assigned template information
+      </li>
       <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
           provides a cross-reference on peerings, a kind of who-with-who summary over HM
       </li>
@@ -3435,6 +3518,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfopeerCheck">peerCheck</a> <a href="#HMinfoFilter">[filter]</a><br>
           validiert die Einstellungen der Paarungen (Peers). Hat ein Kanal einen Peer gesetzt, muss dieser auch auf
           der Gegenseite gesetzt sein.
+      </li>
+      <li><a name="#HMinfopeerUsg">peerUsg</a> <a href="#HMinfoFilter">[filter]</a><br>
+          erzeugt eine komplette Querverweisliste aller Paarungen und die Nutzung der Templates
       </li>
       <li><a name="#HMinfopeerXref">peerXref</a> <a href="#HMinfoFilter">[filter]</a><br>
           erzeugt eine komplette Querverweisliste aller Paarungen (Peerings)
