@@ -9,9 +9,12 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.25
+# Version = 1.26
 #
 # Version  History:
+# - 1.26 - 2019-11-24 Dr. H-J Breymayer
+# -- problem with unexpected crypted command, correct Session Sequence
+#
 # - 1.25 - 2019-11-23 Dr. H-J Breymayer
 # -- removed Readings "power". Redefined state -> Initialized/on/off
 # -- removed spaces at remote control layout, problems with images not appearing
@@ -824,6 +827,9 @@ sub VIERA_GetAbortFn($) {
 sub VIERA_Encrypted_Command($$) {
    my ($hash, $command) = @_;
    
+   my $i = 0;
+   my $message = "";
+   
    if ($hash->{helper}{ENCRYPTION} eq "yes") {
       
       if ($hash->{helper}{pincode} eq "0000") {return VIERA_request_pin_code($hash)};
@@ -834,13 +840,22 @@ sub VIERA_Encrypted_Command($$) {
 		 
       
       my $params = "<X_KeyEvent>NRC_$command-ONOFF</X_KeyEvent>";
-      my $message = VIERA_Build_soap_message_Encrypt($hash, "X_SendKey", $params, "u");
+      $message   = VIERA_Build_soap_message_Encrypt($hash, "X_SendKey", $params, "u");
       $hash->{helper}{BUFFER} = "";
+      if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
+		  sleep (0.1);
+		  $i += 1;
+	  }
       VIERA_connection($hash, $message);
    }
    else {
+	  $message = VIERA_BuildXML_NetCtrl($hash, $command);
 	  $hash->{helper}{BUFFER} = "";
-      VIERA_connection($hash, VIERA_BuildXML_NetCtrl($hash, $command));
+	  if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
+		  sleep (0.1);
+		  $i += 1;
+	  }
+      VIERA_connection($hash, $message);
    }
 
    return;
@@ -1305,6 +1320,13 @@ sub VIERA_RClayout_TV_SVG() {
     delete the "?" and replace 0000 with the PinCode. Execute the command again while the PinCode is still displayed on TV.
     You are done.
     <br><br>
+    This module may require further PERL libraries. For raspbian you have to enter the following commands in the terminal:<br>
+    <b>sudo cpan<br>
+       install MIME::Base64<br>
+       install Crypt::Mode::CBC<br>
+       install Digest::SHA<br>
+       q </b>  for exit.<br>
+    <br>
     <b>Notes:</b><br>
     <ul>Activate volume remotecontrol by DLNA: Menu -> Setup -> Network Setup -> Network Link Settings -> DLNA RemoteVolume -> On</ul>
     <br>
@@ -1462,6 +1484,13 @@ sub VIERA_RClayout_TV_SVG() {
     ausf&uuml;hren (set myTV1 off), danach wird ein PinCode am TV angezeigt. Die Definition editieren den PinCode eintragen und das ? l&ouml;schen.
     Das Kommando nochmals ausf&uuml;hren, solange der PinCode angezeigt wird. Das wars.  
     <br><br>
+    Diese Modul ben&ouml;tigt evtl. weitere PERL Bibliotheken. F&uuml;r raspbian bitte folgende Kommandos im Terminmal eingeben:<br>
+    <b>sudo cpan<br>
+       install MIME::Base64<br>
+       install Crypt::Mode::CBC<br>
+       install Digest::SHA<br>
+       q </b>  f&uuml;r exit.<br>
+    <br>
     <b>Anmerkung:</b><br>
     <ul>Aktivieren von Fernbedienung der Lautst&auml;rke per DLNA: Men&uuml; -> Setup -> Netzwerk-Setup -> Netzwerkverbindungsein. -> DLNA-Fernbed. Lautst. -> Ein</ul>
     <br>
