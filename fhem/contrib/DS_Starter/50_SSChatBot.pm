@@ -58,10 +58,16 @@ our %SSChatBot_vNotesExtern = (
 
 my %SSChatBot_errlist = (
   100 => "Unknown error",
-  102 => "API does not exist- may be the Chat server package is stopped",
+  101 => "Payload is empty",
+  102 => "API does not exist - may be the Synology Chat Server package is stopped",
   120 => "payload has wrong format",
   404 => "bot is not legal",
   407 => "record is not valid",
+  800 => "malformed or unsupported URL",
+  805 => "empty API data received - may be the Synology Chat Server package is stopped",
+  806 => "couldn't get Synology Chat API informations",
+  810 => "The botToken couldn't be retrieved",
+  900 => "malformed JSON string received from Synology Chat Server",
 );
 
 # Standardvariablen und Forward-Deklaration                                          
@@ -322,7 +328,6 @@ sub SSChatBot_Set($@) {
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
       my $cmd = join(" ", @a);
-      $cmd    = SSChatBot_substText($cmd);
       my ($text,$users,$fileUrl);
       my ($a,$h) = parseParams($cmd);
       if($h) {
@@ -334,12 +339,12 @@ sub SSChatBot_Set($@) {
       if($a) {
           my @t = @{$a};
           shift @t; shift @t;
-          $text = join(" ", @t);
+          $text = join(" ", @t) if(!$text);
       }      
        
-      return "Your sendstring is incorrect. It must contain at least text with the \"text\" tag like 'text=\"...\"\nor only some text like \"this is a test\" '." if(!$text);
+      return "Your sendstring is incorrect. It must contain at least text with the \"text=\" tag like text=\"...\"\nor only some text like \"this is a test\" without the \"text=\" tag." if(!$text);
       
-      Log3($name, 5, "$name - Add sendItem to queue: ".$text);
+      $text = SSChatBot_substText($text);
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
       return "You haven't defined any receptor for send the message to. ".
@@ -597,7 +602,21 @@ return;
 sub SSChatBot_addQueue ($$$$$$$$) {
     my ($name,$opmode,$method,$userid,$text,$fileUrl,$channel,$attachment) = @_;
     my $hash                = $defs{$name};
+    
+    if(!$text && $opmode !~ /chatUserlist|chatChannellist/) {
+        Log3($name, 2, "$name - ERROR - can't add message to queue: \"text\" is empty");
+        
+        readingsBeginUpdate         ($hash);
+        readingsBulkUpdateIfChanged ($hash,"Errorcode", "none");
+        readingsBulkUpdateIfChanged ($hash,"Error",     "can't add message to queue: \"text\" is empty");
+        readingsBulkUpdate          ($hash,"state",     "Error");
+        readingsEndUpdate           ($hash, 1);       
 
+        return;        
+    }
+
+   Log3($name, 5, "$name - Add sendItem to queue - Opmode: $opmode, Text: $text");
+   
    $data{SSChatBot}{$name}{sendqueue}{index}++;
    my $index = $data{SSChatBot}{$name}{sendqueue}{index};
    
@@ -622,49 +641,65 @@ return;
 #              bzw. den SendQueue-Eintrag bei Erfolg löschen
 #              $name  = Name des Chatbot-Devices
 #              $retry = 0 -> Opmode erfolgreich (DS löschen), 
-#                       1 -> Opmode nicht erfolgreich (Abarbeitung verzögert wiederholen)
+#                       1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
+#                            eventuell verzögert wiederholen)
 #############################################################################################
 sub SSChatBot_checkretry ($$) {  
   my ($name,$retry) = @_;
   my $hash          = $defs{$name};  
   my $idx           = $hash->{OPIDX};
+  my $forbidSend    = 0;
   
-  if(!$idx) {                                                                  # kein Index 
-      Log3($name, 4, "$name - SendQueue is empty. Nothing to retry ...");
-      return;
-  }  
+  if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+      Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
+      return;  
+  } 
   
   if(!$retry) {
       # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
-      return SSChatBot_chatop($name) if((sort{$a<=>$b}keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0]);      # nächsten Eintrag abarbeiten wenn SendQueue nicht leer
+      return SSChatBot_getapisites($name) if((sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0]);      # nächsten Eintrag abarbeiten wenn SendQueue nicht leer
   
   } else {
       # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
       $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
-      
-      my $rs = 0;
-      if($rc <= 5) {
-          $rs = 5;
-      } elsif ($rc < 10) {
-          $rs = 20;
-      } elsif ($rc < 15) {
-          $rs = 60;
-      } elsif ($rc < 20) {
-          $rs = 1800;
-      } elsif ($rc < 25) {
-          $rs = 3600;
-      } else {
-          $rs = 86400;
+  
+      my $errorcode = ReadingsVal($name, "Errorcode", 0);
+      if($errorcode =~ /100|101|120|407|800/) {                                 
+          # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = 1;
+          $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
+          
+          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
+          
+          delete $hash->{OPIDX};
+          delete $hash->{OPMODE};
       }
       
-      Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
-      
-      RemoveInternalTimer($hash, "SSChatBot_chatop");
-      InternalTimer(gettimeofday()+$rs, "SSChatBot_chatop", "$name", 0);
+      if(!$forbidSend) {
+          my $rs = 0;
+          if($rc <= 5) {
+              $rs = 5;
+          } elsif ($rc < 10) {
+              $rs = 20;
+          } elsif ($rc < 15) {
+              $rs = 60;
+          } elsif ($rc < 20) {
+              $rs = 1800;
+          } elsif ($rc < 25) {
+              $rs = 3600;
+          } else {
+              $rs = 86400;
+          }
+          
+          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
+          
+          RemoveInternalTimer($hash, "SSChatBot_getapisites");
+          InternalTimer(gettimeofday()+$rs, "SSChatBot_getapisites", "$name", 0);
+      }
   }
 
 return;
@@ -681,13 +716,36 @@ sub SSChatBot_getapisites($) {
    my $inprot       = $hash->{INPROT}; 
    my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite ! 
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
-   my $url;
-   my $param;
+   my ($url,$param,$idxset);
   
    # API-Pfade und MaxVersions ermitteln 
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###            start Chat operation Send            "); 
-   Log3($name, 4, "$name - ####################################################"); 
+   Log3($name, 4, "$name - ####################################################");
+
+   if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
+       return;  
+   }
+   
+   # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
+   foreach my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+       if (!$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend}) {
+           $hash->{OPIDX}  = $idx;
+           $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{opmode};
+           $idxset         = 1;
+           last;
+       }               
+   }
+   
+   if(!$idxset) {
+       Log3($name, 4, "$name - Only entries with \"forbidSend\" are in Sendqueue. Escaping ..."); 
+       return; 
+   }
+    
+#    $hash->{OPIDX}  = (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0];
+      
+#    $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$hash->{OPIDX}}{opmode};
    
    if ($hash->{HELPER}{APIPARSET}) {
        # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
@@ -725,17 +783,17 @@ sub SSChatBot_getapisites_parse ($) {
    my $inport       = $hash->{INPORT};
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
 
-   my ($chatexternalmaxver,$chatexternalpath);
+   my ($error,$errorcode,$chatexternalmaxver,$chatexternalpath);
   
     if ($err ne "") {
 	    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
+        Log3($name, 2, "$name - ERROR message: $err");
        
-        readingsBeginUpdate($hash); 
-        readingsBulkUpdateIfChanged($hash, "Error", $err);
-        readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-        readingsBulkUpdate         ($hash, "state", "Error");                    
-        readingsEndUpdate($hash,1); 
+        readingsBeginUpdate         ($hash); 
+        readingsBulkUpdateIfChanged ($hash, "Error",       $err);
+        readingsBulkUpdateIfChanged ($hash, "Errorcode", "none");
+        readingsBulkUpdate          ($hash, "state",    "Error");                    
+        readingsEndUpdate           ($hash,1); 
         
         SSChatBot_checkretry($name,1);
         return;
@@ -761,30 +819,47 @@ sub SSChatBot_getapisites_parse ($) {
             $chatexternalpath      =~ tr/_//d if (defined($chatexternalpath));
             my $chatexternalmaxver = $data->{'data'}->{$chatexternal}->{'maxVersion'}; 
        
-            $logstr = defined($chatexternalpath) ? "Path of $chatexternal selected: $chatexternalpath" : "Path of $chatexternal undefined - Surveillance Station may be stopped";
+            $logstr = defined($chatexternalpath) ? "Path of $chatexternal selected: $chatexternalpath" : "Path of $chatexternal undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($chatexternalmaxver) ? "MaxVersion of $chatexternal selected: $chatexternalmaxver" : "MaxVersion of $chatexternal undefined - Surveillance Station may be stopped";
+            $logstr = defined($chatexternalmaxver) ? "MaxVersion of $chatexternal selected: $chatexternalmaxver" : "MaxVersion of $chatexternal undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
 			       
             # ermittelte Werte in $hash einfügen
-            $hash->{HELPER}{CHATEXTERNALPATH}   = $chatexternalpath;
-            $hash->{HELPER}{CHATEXTERNALMAXVER} = $chatexternalmaxver;        
+            if(defined($chatexternalpath) && defined($chatexternalmaxver)) {
+                $hash->{HELPER}{CHATEXTERNALPATH}   = $chatexternalpath;
+                $hash->{HELPER}{CHATEXTERNALMAXVER} = $chatexternalmaxver;            
        
-            readingsBeginUpdate($hash);
-            readingsBulkUpdateIfChanged($hash,"Errorcode","none");
-            readingsBulkUpdateIfChanged($hash,"Error","none");
-            readingsEndUpdate($hash,1);
+                readingsBeginUpdate         ($hash);
+                readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
+                readingsBulkUpdateIfChanged ($hash,"Error",    "none");
+                readingsEndUpdate           ($hash,1);
 			
-			# Webhook Hash values sind gesetzt
-			$hash->{HELPER}{APIPARSET} = 1;
+			    # Webhook Hash values sind gesetzt
+			    $hash->{HELPER}{APIPARSET} = 1;
+            
+            } else {
+                $errorcode = "805";
+                $error = SSChatBot_experror($hash,$errorcode);                   # Fehlertext zum Errorcode ermitteln
+			
+                readingsBeginUpdate         ($hash);
+                readingsBulkUpdateIfChanged ($hash,"Errorcode", $errorcode);
+                readingsBulkUpdateIfChanged ($hash,"Error",     $error);
+                readingsBulkUpdate          ($hash,"state",     "Error");
+                readingsEndUpdate           ($hash, 1); 
+ 
+                SSChatBot_checkretry($name,1);  
+                return;                
+            }
                         
         } else {
-            my $error = "couldn't get Synology Chat API informations";
-       
-            readingsBeginUpdate($hash);
-            readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-            readingsBulkUpdateIfChanged($hash, "Error", $error);
-            readingsEndUpdate($hash, 1);
+            $errorcode = "806";
+            $error     = SSChatBot_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
+            
+            readingsBeginUpdate         ($hash);
+            readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdateIfChanged ($hash, "Error",     $error);
+            readingsBulkUpdate          ($hash,"state",      "Error");
+            readingsEndUpdate           ($hash, 1);
 
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
             
@@ -808,34 +883,27 @@ sub SSChatBot_chatop ($) {
    my $chatexternal       = $hash->{HELPER}{CHATEXTERNAL}; 
    my $chatexternalpath   = $hash->{HELPER}{CHATEXTERNALPATH};
    my $chatexternalmaxver = $hash->{HELPER}{CHATEXTERNALMAXVER};
-   my ($url,$httptimeout,$param,$error);
+   my ($url,$httptimeout,$param,$error,$errorcode);
    
    # Token abrufen
    my ($success, $token) = SSChatBot_getToken($hash,0,"botToken");
    unless ($success) {
-       $error = "The botToken couldn't be retrieved";
+       $errorcode = "810";
+       $error     = SSChatBot_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
        
-       readingsBeginUpdate($hash);
-       readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-       readingsBulkUpdateIfChanged($hash, "Error", $error);
-       readingsEndUpdate($hash, 1);
+       readingsBeginUpdate         ($hash);
+       readingsBulkUpdateIfChanged ($hash, "Errorcode",  $errorcode);
+       readingsBulkUpdateIfChanged ($hash, "Error",      $error);
+       readingsBulkUpdate          ($hash,"state",      "Error");
+       readingsEndUpdate           ($hash, 1);
 
        Log3($name, 2, "$name - ERROR - $error"); 
        
        SSChatBot_checkretry($name,1);
        return;
    }
-   
-   if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
-       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
-       return;  
-   }
-   
-   # den nächsten Eintrag aus "SendQueue" verarbeiten
-   my $idx = (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0];
-
-   $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{opmode};
-   $hash->{OPIDX}  = $idx;
+      
+   my $idx         = $hash->{OPIDX};
    my $opmode      = $hash->{OPMODE};
    my $method      = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{method};
    my $userid      = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid};
@@ -904,13 +972,16 @@ sub SSChatBot_chatop_parse ($) {
    
    if ($err ne "") {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
+        Log3($name, 2, "$name - ERROR message: $err");
         
-        readingsBeginUpdate($hash); 
-        readingsBulkUpdateIfChanged($hash, "Error", $err);
-        readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-        readingsBulkUpdate         ($hash, "state", "Error");                    
-        readingsEndUpdate($hash,1);         
+        $errorcode = "none";
+        $errorcode = "800" if($err =~ /: malformed or unsupported URL$/s);
+
+        readingsBeginUpdate         ($hash); 
+        readingsBulkUpdateIfChanged ($hash, "Error",           $err);
+        readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
+        readingsBulkUpdate          ($hash, "state",        "Error");                    
+        readingsEndUpdate           ($hash,1);         
 
         SSChatBot_checkretry($name,1);        
         return;
@@ -976,11 +1047,6 @@ sub SSChatBot_chatop_parse ($) {
                
                 $out .= "</table>";
                 $out .= "</html>";
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-                readingsBulkUpdateIfChanged($hash, "Error", "none");
-                readingsEndUpdate($hash, 1);  
 
 				# Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
                 # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)	    
@@ -1018,46 +1084,36 @@ sub SSChatBot_chatop_parse ($) {
                 $hash->{HELPER}{CHANNELS} = \%channels if(%channels);
                 
                 $out .= "</table>";
-                $out .= "</html>";
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-                readingsBulkUpdateIfChanged($hash, "Error", "none");
-                readingsEndUpdate($hash, 1);  
+                $out .= "</html>";  
 
 				# Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
                 # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)	    
 				asyncOutput($hash->{HELPER}{CL}{1},"$out");
 				delete($hash->{HELPER}{CL});                
 			
-            } elsif ($opmode eq "sendItem") {
-
-                readingsBeginUpdate($hash);
-                readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-                readingsBulkUpdateIfChanged($hash, "Error", "none");
-                readingsEndUpdate($hash, 1);             
+            } elsif ($opmode eq "sendItem") {            
 
             }            
 
             SSChatBot_checkretry($name,0);
 
-            readingsBeginUpdate($hash); 
-            readingsBulkUpdate($hash, "state", "active");                    
-            readingsEndUpdate($hash,1); 
+            readingsBeginUpdate         ($hash);
+            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none");
+            readingsBulkUpdateIfChanged ($hash, "Error",     "none");            
+            readingsBulkUpdate          ($hash, "state",     "active");                    
+            readingsEndUpdate           ($hash,1); 
            
         } else {
             # die API-Operation war fehlerhaft
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
-
-            # Fehlertext zum Errorcode ermitteln
-            $error = SSChatBot_experror($hash,$errorcode);
+            $error     = SSChatBot_experror($hash,$errorcode);                # Fehlertext zum Errorcode ermitteln
 			
-            readingsBeginUpdate($hash);
-            readingsBulkUpdateIfChanged($hash,"Errorcode", $errorcode);
-            readingsBulkUpdateIfChanged($hash,"Error",     $error);
-            readingsBulkUpdate         ($hash,"state",     "Error");
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate         ($hash);
+            readingsBulkUpdateIfChanged ($hash,"Errorcode", $errorcode);
+            readingsBulkUpdateIfChanged ($hash,"Error",     $error);
+            readingsBulkUpdate          ($hash,"state",     "Error");
+            readingsEndUpdate           ($hash, 1);
        
             Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
@@ -1079,13 +1135,20 @@ sub SSChatBot_evaljson($$) {
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
   my $success = 1;
+  my ($error,$errorcode);
   
   eval {decode_json($myjson)} or do {
           $success = 0;
-          readingsBeginUpdate($hash);
-          readingsBulkUpdateIfChanged($hash, "Errorcode", "none");
-          readingsBulkUpdateIfChanged($hash, "Error", "malformed JSON string received");
-          readingsEndUpdate($hash, 1);  
+          
+          $errorcode = "900";
+
+          # Fehlertext zum Errorcode ermitteln
+          $error = SSChatBot_experror($hash,$errorcode);
+            
+          readingsBeginUpdate         ($hash);
+          readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
+          readingsBulkUpdateIfChanged ($hash, "Error",     $error);
+          readingsEndUpdate           ($hash, 1);  
   };
   
 return($hash,$success,$myjson);
@@ -1114,7 +1177,7 @@ sub SSChatBot_experror ($$) {
   my $device = $hash->{NAME};
   my $error;
   
-  unless (exists($SSChatBot_errlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSChatBot_errlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSChatBot_errlist{"$errorcode"};
@@ -1291,9 +1354,17 @@ return ($str);
 #############################################################################################
 sub SSChatBot_substText ($) {
   my $txt = shift;
+  my (%replacements,$pat);
   
-  $txt =~ s/["']/´/g;
-  $txt =~ s/H/h/g;                        # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+  %replacements = (
+      '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
+      " H" => " h",                             # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+      "#"  => "",                               # Hashtags sind im Text nicht erlaubt     
+  );
+  
+  $pat = join '|', map quotemeta, keys(%replacements);
+  
+  $txt =~ s/($pat)/$replacements{$1}/g;                   
   
 return ($txt);
 }
@@ -1491,11 +1562,12 @@ sub SSChatBot_CGI() {
               $cr = $cr?$cr:"command '$command' executed";
               Log3($name, 4, "$name - FHEM command return: ".$cr);
               
-              $cr = SSChatBot_substText($cr);            
-              Log3($name, 5, "$name - Add sendItem to queue: ".$cr);
+              $cr = SSChatBot_substText($cr);   
+
               SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
-              SSChatBot_getapisites($name);    
-                            
+
+              RemoveInternalTimer($hash, "SSChatBot_getapisites");
+              InternalTimer(gettimeofday()+2, "SSChatBot_getapisites", "$name", 0);                                 
           }
       }
 	  
@@ -1504,21 +1576,21 @@ sub SSChatBot_CGI() {
           Log3($name, 4, "$name - trigger_word received: ".$triggerword);
       }
 
-	  readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged ($hash, "recChannelid", $channelid);  
-	  readingsBulkUpdateIfChanged ($hash, "recChannelname", $channelname); 
-	  readingsBulkUpdateIfChanged ($hash, "recUserid", $userid); 
-	  readingsBulkUpdateIfChanged ($hash, "recUsername", $username); 
-	  readingsBulkUpdateIfChanged ($hash, "recPostid", $postid); 
-      readingsBulkUpdateIfChanged ($hash, "recTimestamp", $timestamp); 
-	  readingsBulkUpdateIfChanged ($hash, "recText", $text); 
-	  readingsBulkUpdateIfChanged ($hash, "recTriggerword", $triggerword);
-	  readingsBulkUpdateIfChanged ($hash, "recCommand", $command);       
+	  readingsBeginUpdate         ($hash);
+      readingsBulkUpdateIfChanged ($hash, "recChannelid",      $channelid);  
+	  readingsBulkUpdateIfChanged ($hash, "recChannelname",    $channelname); 
+	  readingsBulkUpdateIfChanged ($hash, "recUserid",         $userid); 
+	  readingsBulkUpdateIfChanged ($hash, "recUsername",       $username); 
+	  readingsBulkUpdateIfChanged ($hash, "recPostid",         $postid); 
+      readingsBulkUpdateIfChanged ($hash, "recTimestamp",      $timestamp); 
+	  readingsBulkUpdateIfChanged ($hash, "recText",           $text); 
+	  readingsBulkUpdateIfChanged ($hash, "recTriggerword",    $triggerword);
+	  readingsBulkUpdateIfChanged ($hash, "recCommand",        $command);       
       readingsBulkUpdateIfChanged ($hash, "sendCommandReturn", $cr);       
-      readingsBulkUpdateIfChanged ($hash, "Errorcode","none");
-      readingsBulkUpdateIfChanged ($hash, "Error","none");
-      readingsBulkUpdate          ($hash, "state", "active");        
-	  readingsEndUpdate  ($hash,1);
+      readingsBulkUpdateIfChanged ($hash, "Errorcode",         "none");
+      readingsBulkUpdateIfChanged ($hash, "Error",             "none");
+      readingsBulkUpdate          ($hash, "state",             "active");        
+	  readingsEndUpdate           ($hash,1);
 	  
 	  return ("text/plain; charset=utf-8", $ret);
 		
