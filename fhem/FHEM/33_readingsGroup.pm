@@ -1218,6 +1218,8 @@ readingsGroup_Update($$$)
   my ($hash, $item, $value) = @_;
   my $name  = $hash->{NAME};
 
+  $hash->{changed} = 1;
+
   if( $hash->{alwaysTrigger} ) {
     DoTrigger( $name, "$item: $value" );
 
@@ -1268,6 +1270,8 @@ readingsGroup_Notify($$)
 
   my $devices = $hash->{DEVICES};
   $devices = $hash->{DEVICES2} if( $hash->{DEVICES2} );
+
+  $hash->{changed} = 0;
 
   my %triggers = ();
   my $max = int(@{$events});
@@ -1521,7 +1525,7 @@ readingsGroup_Notify($$)
     }
   }
 
-  readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+  our %readings;
   foreach my $trigger (keys %triggers) {
     readingsGroup_Update( $hash, $trigger, "<html>$triggers{$trigger}</html>" );
 
@@ -1554,9 +1558,7 @@ readingsGroup_Notify($$)
 
         readingsGroup_Update( $hash, "calc:$row:$col", "<html>$v</html>" );
 
-        if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
-          readingsBulkUpdate($hash, $func, $hash->{helper}{values}{formated}[$col][$row]);
-        }
+        $readings{$func} = $hash->{helper}{values}{formated}[$col][$row];
 
         if( my $refs = $hash->{helper}{recalc}[$col][$row] ) {
           updateRefs( $hash, $refs );
@@ -1576,7 +1578,22 @@ readingsGroup_Notify($$)
     }
 
   }
-  readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+
+  return undef if( !$hash->{changed} );
+  delete $hash->{changed};
+
+
+  if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
+    readingsBeginUpdate($hash);
+    foreach my $key ( keys %readings ) {
+      if( defined($readings{$key}) ) {
+        readingsBulkUpdate($hash, $key, $readings{$key}, 1); #if( !defined($hash->{helper}{$key}) || $hash->{helper}{$key} ne $readings{$key} );
+        $hash->{helper}{$key} = $readings{$key};
+      }
+    }
+    readingsEndUpdate($hash,1);
+  }
+
 
   if( %triggers ) {
     my $sort_column = AttrVal( $hash, 'sortColumn', undef );
@@ -1848,7 +1865,7 @@ readingsGroup_Attr($$$;$)
     <b>Attributes</b>
     <ul>
       <li>alwaysTrigger<br>
-        1 -> alwaysTrigger update events. even if not visible.<br>
+        1 -> always trigger update events. even if not visible.<br>
         2 -> trigger events for calculated values.</li><br>
       <li>disable<br>
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
@@ -2105,8 +2122,8 @@ readingsGroup_Attr($$$;$)
     <b>Attribute</b>
     <ul>
       <li>alwaysTrigger<br>
-        1 -> alwaysTrigger Ereignisse aktualisieren auch wenn nicht sichtbar.<br>
-        2 -> trigger Ereignisse f&uuml;r berechnete Werte.</li><br>
+        1 -> Events auch wenn nicht sichtbar.<br>
+        2 -> Events f&uuml;r berechnete Werte.</li><br>
       <li>disable<br>
         1 -> Deaktivieren der Benachrichtigung Verarbeitung und Longpoll-Updates. Hinweis: Dadurch wird auch die Umbenennung und L&ouml;schbehandlung deaktiviert.<br>
         2 -> Deaktivieren der HTML-Tabellenerstellung<br>
