@@ -1213,6 +1213,35 @@ readingsGroup_detailFn()
 }
 
 sub
+readingsGroup_Update($$$)
+{
+  my ($hash, $item, $value) = @_;
+  my $name  = $hash->{NAME};
+
+  if( $hash->{alwaysTrigger} ) {
+    DoTrigger( $name, "$item: $value" );
+
+  } else {
+    foreach my $ntfy (values(%defs)) {
+      next if(!$ntfy->{TYPE} ||
+              $ntfy->{TYPE} ne "FHEMWEB" ||
+              !$ntfy->{inform} ||
+              !$ntfy->{inform}{devices}{$name} ||
+              $ntfy->{inform}{type} ne "status");
+      next if($ntfy->{inform}{filter} !~ m/$name/);
+      if(!FW_addToWritebuffer($ntfy,
+          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", $value, $value)."\n" )) {
+        my $name = $ntfy->{NAME};
+        Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
+        TcpServer_Close($ntfy, 1);
+      }
+    }
+
+  }
+
+}
+
+sub
 readingsGroup_Notify($$)
 {
   my ($hash,$dev) = @_;
@@ -1374,7 +1403,7 @@ readingsGroup_Notify($$)
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              DoTrigger( $name, "item:$cell_row:$item: <html>$txt</html>" );
+              readingsGroup_Update( $hash, "item:$cell_row:$item", "<html>$txt</html>" );
             }
 
             next;
@@ -1441,7 +1470,7 @@ readingsGroup_Notify($$)
                 }
               }
 
-              DoTrigger( $name, "$n.$reading: <html>$devStateIcon</html>" );
+              readingsGroup_Update( $hash, "$n.$reading", "<html>$devStateIcon</html>" );
               next;
             }
           }
@@ -1449,11 +1478,9 @@ readingsGroup_Notify($$)
           $cmd = lookup2($hash->{helper}{commands},$n,$reading,$value);
           if( $cmd && $cmd =~ m/^(\w.*):(\S.*)?$/ ) {
             if( $reading eq "state" ) {
-              DoTrigger( $name, "$n: $value" );
-              #DoTrigger( $name, "$n: <html>$value</html>" );
+              readingsGroup_Update( $hash, $n, $value );
             } else {
-              DoTrigger( $name, "$n.$reading: $value" );
-              #DoTrigger( $name, "$n.$reading: <html>$value</html>" );
+              readingsGroup_Update( $hash, "$n.$reading", $value );
             }
             next;
           }
@@ -1496,7 +1523,7 @@ readingsGroup_Notify($$)
 
   readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
   foreach my $trigger (keys %triggers) {
-    DoTrigger( $name, "$trigger: <html>$triggers{$trigger}</html>" );
+    readingsGroup_Update( $hash, $trigger, "<html>$triggers{$trigger}</html>" );
 
     our $count = 0;
     sub updateRefs($$);
@@ -1525,11 +1552,9 @@ readingsGroup_Notify($$)
         my($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name,$func,$func,$row,$col,undef);
         $v = "" if( !defined($v) );
 
-        #FIXME: use FW_directNotify
-        DoTrigger( $name, "calc:$row:$col: <html>$v</html>" ) if( $hash->{mayBeVisible} );
+        readingsGroup_Update( $hash, "calc:$row:$col", "<html>$v</html>" );
 
         if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
-          #DoTrigger( $name, "$func: $hash->{helper}{values}{formated}[$col][$row]" );
           readingsBulkUpdate($hash, $func, $hash->{helper}{values}{formated}[$col][$row]);
         }
 
@@ -1554,8 +1579,8 @@ readingsGroup_Notify($$)
   readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
 
   if( %triggers ) {
-    my $sort_column = AttrVal( $hash->{NAME}, 'sortColumn', undef );
-    DoTrigger( $hash->{NAME}, "sort: $sort_column" ) if( defined($sort_column) )
+    my $sort_column = AttrVal( $hash, 'sortColumn', undef );
+    readingsGroup_Update( $hash, "sort", $sort_column ) if( defined($sort_column) )
   }
 
   return undef;
@@ -1573,7 +1598,7 @@ readingsGroup_Set($@)
     return undef;
   } elsif( $cmd eq "visibility" ) {
     readingsGroup_updateDevices($hash);
-    DoTrigger( $hash->{NAME}, "visibility: $param" );
+    readingsGroup_Update( $hash, "visibility", $param );
     return undef;
   }
 
