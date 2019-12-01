@@ -893,8 +893,8 @@ sub WeekdayTimer_Update($) {
      $activeTimer      = WeekdayTimer_isAnActiveTimer ($hash, $dieGanzeWoche, $newParam, $overrulewday);
      $activeTimerState = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
      Log3 $hash, 4, "[$name] Update   - past timer activated";
-     WeekdayTimer_InternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0) if $timToSwitch > $now;
-     #WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+     WeekdayTimer_RemoveInternalTimer("$idx",  $hash);
+     WeekdayTimer_InternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0) if ($timToSwitch > $now && ($activeTimerState||$activeTimer));
   } else {
      $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
      $activeTimerState = $activeTimer;
