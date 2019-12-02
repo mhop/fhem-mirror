@@ -1095,8 +1095,18 @@ sub SSChatBot_chatop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$out");
 				delete($hash->{HELPER}{CL});                
 			
-            } elsif ($opmode eq "sendItem") {            
-
+            } elsif ($opmode eq "sendItem") {
+                my $postid = "";
+                my $idx    = $hash->{OPIDX};
+                my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
+                if($data->{data}{succ}{user_id_post_map}{$uid}) {
+                    $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
+                }                
+                     
+                readingsBeginUpdate         ($hash);
+                readingsBulkUpdateIfChanged ($hash, "sendPostId", $postid); 
+                readingsBulkUpdateIfChanged ($hash, "sendUserId", $uid);                    
+                readingsEndUpdate           ($hash,1); 
             }            
 
             SSChatBot_checkretry($name,0);
@@ -1603,11 +1613,11 @@ sub SSChatBot_CGI() {
       }
 
 	  readingsBeginUpdate         ($hash);
-      readingsBulkUpdateIfChanged ($hash, "recChannelid",      $channelid);  
+      readingsBulkUpdateIfChanged ($hash, "recChannelId",      $channelid);  
 	  readingsBulkUpdateIfChanged ($hash, "recChannelname",    $channelname); 
-	  readingsBulkUpdateIfChanged ($hash, "recUserid",         $userid); 
+	  readingsBulkUpdateIfChanged ($hash, "recUserId",         $userid); 
 	  readingsBulkUpdateIfChanged ($hash, "recUsername",       $username); 
-	  readingsBulkUpdateIfChanged ($hash, "recPostid",         $postid); 
+	  readingsBulkUpdateIfChanged ($hash, "recPostId",         $postid); 
       readingsBulkUpdateIfChanged ($hash, "recTimestamp",      $timestamp); 
 	  readingsBulkUpdateIfChanged ($hash, "recText",           $text); 
 	  readingsBulkUpdateIfChanged ($hash, "recTriggerword",    $triggerword);
