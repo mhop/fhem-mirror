@@ -560,7 +560,7 @@ sub SSChatBot_initonboot ($) {
               CommandAttr(undef, "$FW webname $FWname"); 
               CommandAttr(undef, "$FW room $room");
               CommandAttr(undef, "$FW csrfToken $csrf");
-              CommandAttr(undef, "$FW comment WEB Instance for SSChat devices.\nIt catches outgoing messages from Synology Chat server.\nDon't edit this device manually (except such attributes like \"room\", \"icon\") !");
+              CommandAttr(undef, "$FW comment WEB Instance for SSChatBot devices.\nIt catches outgoing messages from Synology Chat server.\nDon't edit this device manually (except such attributes like \"room\", \"icon\") !");
               CommandAttr(undef, "$FW stylesheetPrefix default");            
           
           } else {
@@ -1647,34 +1647,7 @@ sub SSChatBot_CGI() {
 <h3>SSChatBot</h3>
 <ul>
 
-  <a name="SSChatBotdefine"></a>
-  <b>Define</b>
-  <br>
-  <ul>
-  </ul>
-  <br>  
-  
-  <a name="SSChatBotset"></a>
-  <b>Set </b>
-  <br>
-  <ul>    
-  </ul>
-  <br>
-
-
-<a name="SSChatBotget"></a>
-<b>Get</b>
-  <br>
-  <ul>
-  </ul>
-  <br>
-
-<a name="SSChatBotattr"></a>
-<b>Attributes</b>
-  <br>
-  <ul>
-  </ul>
-  <br>
+The guide for this module is currently only available in the germin <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">Wiki</a>.
 
 </ul>
 
@@ -1686,34 +1659,7 @@ sub SSChatBot_CGI() {
 <h3>SSChatBot</h3>
 <ul>
 
-
-<a name="SSChatBotdefine"></a>
-<b>Definition</b>
-  <br>
-  <ul>    
-  </ul>
-  <br>
-  
-<a name="SSChatBotset"></a>
-<b>Set </b>
-  <br>
-  <ul>
-  </ul>
-  <br>
-
-<a name="SSChatBotget"></a>
-<b>Get</b>
-  <br>
-  <ul>
-  </ul>
-  <br>
-
-<a name="SSChatBotattr"></a>
-<b>Attribute</b>
-  <br>
-  <ul>  
- </ul>
- <br>
+Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">Wiki</a> vorhanden.
  
 </ul>
 
