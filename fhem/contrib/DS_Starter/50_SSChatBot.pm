@@ -61,7 +61,7 @@ my %SSChatBot_errlist = (
   101 => "Payload is empty",
   102 => "API does not exist - may be the Synology Chat Server package is stopped",
   120 => "payload has wrong format",
-  404 => "bot is not legal",
+  404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407 => "record is not valid",
   800 => "malformed or unsupported URL",
   805 => "empty API data received - may be the Synology Chat Server package is stopped",
@@ -344,7 +344,7 @@ sub SSChatBot_Set($@) {
        
       return "Your sendstring is incorrect. It must contain at least text with the \"text=\" tag like text=\"...\"\nor only some text like \"this is a test\" without the \"text=\" tag." if(!$text);
       
-      $text = SSChatBot_substText($text);
+      $text = SSChatBot_formText($text);
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
       return "You haven't defined any receptor for send the message to. ".
@@ -1350,9 +1350,10 @@ return ($str);
 }
 
 #############################################################################################
-#             Text formatieren und nicht erlaubte Zeichen entfernen           
+#             Text für den Versand an Synology Chat formatieren 
+#             und nicht erlaubte Zeichen entfernen           
 #############################################################################################
-sub SSChatBot_substText ($) {
+sub SSChatBot_formText ($) {
   my $txt = shift;
   my (%replacements,$pat);
   
@@ -1362,9 +1363,19 @@ sub SSChatBot_substText ($) {
       "#"  => "",                               # Hashtags sind im Text nicht erlaubt     
   );
   
+  $txt =~ s/\n/ESC_newline_ESC/g;
+  my @acr = split (/\s+/, $txt);
+              
+  $txt = "";
+  foreach (@acr) {                              # Einzeiligkeit für Versand herstellen
+      $txt .= " " if($txt);
+      $_ =~ s/ESC_newline_ESC/\\n/g;
+      $txt .= $_;
+  }
+  
   $pat = join '|', map quotemeta, keys(%replacements);
   
-  $txt =~ s/($pat)/$replacements{$1}/g;                   
+  $txt =~ s/($pat)/$replacements{$1}/g;   
   
 return ($txt);
 }
@@ -1497,6 +1508,8 @@ sub SSChatBot_CGI() {
 	  Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
 	  Log3($name, 4, "$name - ####################################################"); 
 	  Log3($name, 5, "$name - data received:\n".Dumper($h));
+      
+      $hash->{OPMODE} = "receiveData";
 	  
 	  # ausgehende Datenfelder (Chat -> FHEM), die das Chat senden kann
 	  # ===============================================================
@@ -1545,29 +1558,38 @@ sub SSChatBot_CGI() {
 	      $text = urlDecode($h->{text});                          
           Log3($name, 4, "$name - text received: ".$text);
           
-          if($text =~ /^\/([Ss]et|[Gg]et|[Cc]ode)\s+(.*)$/) {                # Befehle in FHEM ausführen
+          if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # Befehle in FHEM ausführen
               $command = "$1 ".$2;
               my $p1   = $1;
               my $p2   = $2;
-              Log3($name, 4, "$name - received FHEM command: ".$command);
               
-              if($p1 =~ /set/i) {
+              if($p1 =~ /set.*/i) {
+                  Log3($name, 4, "$name - execute FHEM command: set ".$p2);
                   $cr = CommandSet(undef, $p2);                             # set-Befehl in FHEM ausführen
-              } elsif ($p1 =~ /get/i) {
-                  $cr = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen
-              } elsif ($p1 =~ /code/i) {
-              
+              } elsif ($p1 =~ /get.*/i) {
+                  Log3($name, 4, "$name - execute FHEM command: get ".$p2);
+                  $cr = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen                  
+              } elsif ($p1 =~ /code.*/i) {
+                  my $code = $p2;
+                  if( $p2 =~ m/^\s*(\{.*\})\s*$/s ) {
+                      $p2 = $1;
+                  } else {
+                      $p2 = '';
+                  }    
+                  
+                  Log3($name, 4, "$name - execute FHEM command: ".$p2);
+                  $cr = AnalyzeCommandChain(undef, $p2) if($p2);
               } 
-              
-              $cr = $cr?$cr:"command '$command' executed";
+                  
+              $cr = $cr ne ""?$cr:"command '$command' executed";
               Log3($name, 4, "$name - FHEM command return: ".$cr);
               
-              $cr = SSChatBot_substText($cr);   
+              $cr = SSChatBot_formText($cr);   
 
               SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
 
               RemoveInternalTimer($hash, "SSChatBot_getapisites");
-              InternalTimer(gettimeofday()+2, "SSChatBot_getapisites", "$name", 0);                                 
+              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);                                 
           }
       }
 	  
