@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Fixed problems during shutdown / restart
  - bugfix: 70_VIERA: avoid possible interaction GET status/SET command
                      see also Forum #99994
  - change:  33_readingsGroup: don't use events to update cells
