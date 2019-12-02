@@ -88,6 +88,9 @@ sub SSChatBot_Initialize($) {
  
  $hash->{AttrList} = "disable:1,0 ".
                      "defaultPeer:--wait#for#userlist-- ".
+                     "allowedUserForSet:--wait#for#userlist-- ".
+                     "allowedUserForGet:--wait#for#userlist-- ".
+                     "allowedUserForCode:--wait#for#userlist-- ".
                      "showTokenInLog:1,0 ".
                      "httptimeout ".
                      $readingFnAttributes;   
@@ -1044,9 +1047,13 @@ sub SSChatBot_chatop_parse ($) {
                 my $list = $modules{$hash->{TYPE}}{AttrList};
                 my @deva = split(" ", $list);
                 foreach (@deva) {
-                     push @newa, $_ if($_ !~ /defaultPeer:/);
+                     push @newa, $_ if($_ !~ /defaultPeer:|allowedUserFor(Set|Get|Code):|/);
                 }
                 push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
+                push @newa, ($uids?"allowedUserForSet:multiple-strict,$uids ":"allowedUserForSet:--no#userlist#selectable--");
+                push @newa, ($uids?"allowedUserForGet:multiple-strict,$uids ":"allowedUserForGet:--no#userlist#selectable--");
+                push @newa, ($uids?"allowedUserForCode:multiple-strict,$uids ":"allowedUserForCode:--no#userlist#selectable--");
+                
                 $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
                
                 $out .= "</table>";
@@ -1103,10 +1110,10 @@ sub SSChatBot_chatop_parse ($) {
                     $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
                 }                
                      
-                readingsBeginUpdate         ($hash);
-                readingsBulkUpdateIfChanged ($hash, "sendPostId", $postid); 
-                readingsBulkUpdateIfChanged ($hash, "sendUserId", $uid);                    
-                readingsEndUpdate           ($hash,1); 
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "sendPostId", $postid); 
+                readingsBulkUpdate  ($hash, "sendUserId", $uid);                    
+                readingsEndUpdate   ($hash,1); 
             }            
 
             SSChatBot_checkretry($name,0);
@@ -1374,7 +1381,8 @@ sub SSChatBot_formText ($) {
   %replacements = (
       '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
       " H" => " h",                             # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      "#"  => "",                               # Hashtags sind im Text nicht erlaubt     
+      "#"  => "",                               # Hashtags sind im Text nicht erlaubt
+      "&"  => "",                               # & ist im Text nicht erlaubt      
   );
   
   $txt =~ s/\n/ESC_newline_ESC/g;
@@ -1488,7 +1496,9 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr) = ("","");
+  my ($command,$cr,$au) = ("","","");
+  my @aul;
+  my $state = "active";
  
   my $ret = "success";
 
@@ -1578,21 +1588,46 @@ sub SSChatBot_CGI() {
               my $p2   = $2;
               
               if($p1 =~ /set.*/i) {
-                  Log3($name, 4, "$name - execute FHEM command: set ".$p2);
-                  $cr = CommandSet(undef, $p2);                             # set-Befehl in FHEM ausführen
-              } elsif ($p1 =~ /get.*/i) {
-                  Log3($name, 4, "$name - execute FHEM command: get ".$p2);
-                  $cr = CommandGet(undef, $p2);                             # get-Befehl in FHEM ausführen                  
-              } elsif ($p1 =~ /code.*/i) {
-                  my $code = $p2;
-                  if( $p2 =~ m/^\s*(\{.*\})\s*$/s ) {
-                      $p2 = $1;
+                  $au  = AttrVal($name,"allowedUserForSet", "all");
+                  @aul = split(",",$au);
+                  if($au eq "all" || $username ~~ @aul) {
+                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: set ".$p2);
+                      $cr = CommandSet(undef, $p2);                                   # set-Befehl in FHEM ausführen
                   } else {
-                      $p2 = '';
-                  }    
+                      $cr    = "User \"$username\" is not allowed execute \"$command\" command";
+                      $state = "command execution denied";
+                      Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$command\" command. Execution denied !");
+                  }
                   
-                  Log3($name, 4, "$name - execute FHEM command: ".$p2);
-                  $cr = AnalyzeCommandChain(undef, $p2) if($p2);
+              } elsif ($p1 =~ /get.*/i) {                             
+                  $au  = AttrVal($name,"allowedUserForGet", "all");
+                  @aul = split(",",$au);
+                  if($au eq "all" || $username ~~ @aul) {
+                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: get ".$p2);
+                      $cr = CommandGet(undef, $p2);                                   # get-Befehl in FHEM ausführen  
+                  } else {
+                      $cr    = "User \"$username\" is not allowed execute \"$command\" command";
+                      $state = "command execution denied";
+                      Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$command\" command. Execution denied !");
+                  }
+                  
+              } elsif ($p1 =~ /code.*/i) {
+                  $au  = AttrVal($name,"allowedUserForCode", "all");
+                  @aul = split(",",$au);
+                  if($au eq "all" || $username ~~ @aul) {
+                      my $code = $p2;
+                      if($p2 =~ m/^\s*(\{.*\})\s*$/s) {
+                          $p2 = $1;
+                      } else {
+                          $p2 = '';
+                      } 
+                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$p2);
+                      $cr = AnalyzeCommand(undef, $p2) if($p2);                  # Perl Code in FHEM ausführen  
+                  } else {
+                      $cr    = "User \"$username\" is not allowed execute \"$command\" command";
+                      $state = "command execution denied";
+                      Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$command\" command. Execution denied !");
+                  }                 
               } 
                   
               $cr = $cr ne ""?$cr:"command '$command' executed";
@@ -1612,21 +1647,21 @@ sub SSChatBot_CGI() {
           Log3($name, 4, "$name - trigger_word received: ".$triggerword);
       }
 
-	  readingsBeginUpdate         ($hash);
-      readingsBulkUpdateIfChanged ($hash, "recChannelId",      $channelid);  
-	  readingsBulkUpdateIfChanged ($hash, "recChannelname",    $channelname); 
-	  readingsBulkUpdateIfChanged ($hash, "recUserId",         $userid); 
-	  readingsBulkUpdateIfChanged ($hash, "recUsername",       $username); 
-	  readingsBulkUpdateIfChanged ($hash, "recPostId",         $postid); 
-      readingsBulkUpdateIfChanged ($hash, "recTimestamp",      $timestamp); 
-	  readingsBulkUpdateIfChanged ($hash, "recText",           $text); 
-	  readingsBulkUpdateIfChanged ($hash, "recTriggerword",    $triggerword);
-	  readingsBulkUpdateIfChanged ($hash, "recCommand",        $command);       
-      readingsBulkUpdateIfChanged ($hash, "sendCommandReturn", $cr);       
-      readingsBulkUpdateIfChanged ($hash, "Errorcode",         "none");
-      readingsBulkUpdateIfChanged ($hash, "Error",             "none");
-      readingsBulkUpdate          ($hash, "state",             "active");        
-	  readingsEndUpdate           ($hash,1);
+	  readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "recChannelId",      $channelid);  
+	  readingsBulkUpdate  ($hash, "recChannelname",    $channelname); 
+	  readingsBulkUpdate  ($hash, "recUserId",         $userid); 
+	  readingsBulkUpdate  ($hash, "recUsername",       $username); 
+	  readingsBulkUpdate  ($hash, "recPostId",         $postid); 
+      readingsBulkUpdate  ($hash, "recTimestamp",      $timestamp); 
+	  readingsBulkUpdate  ($hash, "recText",           $text); 
+	  readingsBulkUpdate  ($hash, "recTriggerword",    $triggerword);
+	  readingsBulkUpdate  ($hash, "recCommand",        $command);       
+      readingsBulkUpdate  ($hash, "sendCommandReturn", $cr);       
+      readingsBulkUpdate  ($hash, "Errorcode",         "none");
+      readingsBulkUpdate  ($hash, "Error",             "none");
+      readingsBulkUpdate  ($hash, "state",             $state);        
+	  readingsEndUpdate   ($hash,1);
 	  
 	  return ("text/plain; charset=utf-8", $ret);
 		
