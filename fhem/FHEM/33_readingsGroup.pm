@@ -1218,6 +1218,8 @@ readingsGroup_Update($$$)
   my ($hash, $item, $value) = @_;
   my $name  = $hash->{NAME};
 
+  #Log 1, "$name, $item, $value";
+
   $hash->{changed} = 1;
 
   if( $hash->{alwaysTrigger} ) {
@@ -1230,9 +1232,9 @@ readingsGroup_Update($$$)
               !$ntfy->{inform} ||
               !$ntfy->{inform}{devices}{$name} ||
               $ntfy->{inform}{type} ne "status");
-      next if($ntfy->{inform}{filter} !~ m/$name/);
+      next if( !$ntfy->{inform}{devices}{$name} );
       if(!FW_addToWritebuffer($ntfy,
-          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", $value, $value)."\n" )) {
+          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", "", $value )."\n" )) {
         my $name = $ntfy->{NAME};
         Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
         TcpServer_Close($ntfy, 1);
