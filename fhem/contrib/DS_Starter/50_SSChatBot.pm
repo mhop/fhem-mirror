@@ -801,8 +801,11 @@ sub SSChatBot_getapisites_parse ($) {
     } elsif ($myjson ne "") {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, my $success) = SSChatBot_evaljson($hash,$myjson);
-        
-        unless ($success) {return;}
+        unless ($success) {
+            Log3($name, 4, "$name - Data returned: ".$myjson);
+            SSChatBot_checkretry($name,1);       
+            return;
+        }
         
         my $data = decode_json($myjson);
         
@@ -992,6 +995,7 @@ sub SSChatBot_chatop_parse ($) {
         ($hash,$success,$myjson) = SSChatBot_evaljson($hash,$myjson);        
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
+            SSChatBot_checkretry($name,1);       
             return;
         }
         
