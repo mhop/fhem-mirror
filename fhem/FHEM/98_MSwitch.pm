@@ -3815,8 +3815,8 @@ my $NOCONDITION;
 my $MSDISTRIBUTORTEXT;
 my $MSDISTRIBUTOREVENT; 
 my $NOSPACE;
-my $MSTEST1;
-my $MSTEST2;
+my $MSTEST1="";
+my $MSTEST2="";
 my $EXECCMD;
 
 if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
@@ -5076,10 +5076,7 @@ $controlhtml=~ s/#/\n/g;
                 $savedetails{ $aktdevice . '_showreihe' } = '1';
             }
 			
-			
-			
-			
-			
+
 
             $savedetails{ $aktdevice . '_onarg' } =~ s/#\[ti\]/~/g;
             $savedetails{ $aktdevice . '_offarg' } =~ s/#\[ti\]/~/g;
@@ -5302,7 +5299,8 @@ $controlhtml=~ s/#/\n/g;
 					  </td></tr></table>
 					  ";
 					  
-					  
+	if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+			{				  
 $MSTEST1="<input name='info' name='TestCMD". $_
 . "' id='TestCMD". $_
 ."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdon$nopoint','$devicenamet')\">";					  
@@ -5310,7 +5308,7 @@ $MSTEST1="<input name='info' name='TestCMD". $_
 $MSTEST2="<input name='info' name='TestCMD". $_
 . "' id='TestCMD". $_
 ."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdoff$nopoint','$devicenamet')\">";					  
-
+}
 					  
 	  
                 }
@@ -5333,7 +5331,11 @@ $MSTEST2="<input name='info' name='TestCMD". $_
 							. "' name='cmdsetoff"
 							. $_
 							. "' size='20'  value ='cmd'>";
-							
+	
+
+
+	if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+			{
 $MSTEST1="<input name='info' name='TestCMD". $_
 . "' id='TestCMD". $_
 ."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdonopt$nopoint','$devicenamet')\">";					  
@@ -5342,7 +5344,7 @@ $MSTEST2="<input name='info' name='TestCMD". $_
 . "' id='TestCMD". $_
 ."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdoffopt$nopoint','$devicenamet')\">";					  
 
-
+}
 
 
 							
@@ -6490,13 +6492,7 @@ $extrakthtml =~m/<!-- start htmlcode -->(.*)/ ;
 $triggerdetailhtml=$1;
 $triggerdetailhtml=~ s/#/\n/g; 
   
-  
-
-
-
-
-
-
+ 
     my $selectedcheck3 = "";
     my $SELF           = $Name;
     my $testlog        = ReadingsVal( $Name, 'Trigger_log', 'on' );
