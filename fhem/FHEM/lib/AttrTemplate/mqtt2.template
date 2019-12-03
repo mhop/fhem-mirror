@@ -95,6 +95,7 @@ attr DEVICE setList\
   z_rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
   z_reset_CC:noArg BASE_TOPIC/bridge/config/reset
 attr DEVICE setStateList on off
+attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
 attr DEVICE model zigbee2mqtt_bridge
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
@@ -331,6 +332,34 @@ set DEVICE attrTemplate zigbee2mqtt_smart+plug
 #and additional devStateIcon
 attr DEVICE model zigbee2mqtt_plug_w_energy_measuring
 
+# zigbee2mqtt 2 channel device
+name:zigbee2mqtt_2channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+desc:For zigbee2mqtt 2 channel device. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested updated version, should work with LLKZMK11LM
+order:L_05c
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
+attr DEVICE icon ICON
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE readingList BASE_TOPIC/DEV_ID/l1:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap l1:state
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"OFF"}\
+attr DEVICE setStateList on off
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+setreading DEVICE associatedWith DEVICE_CH2
+attr DEVICE model zigbee2mqtt_2channel_split
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
+attr DEVICE_CH2 setList \
+  on:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"OFF"}
+attr DEVICE_CH2 setStateList on off toggle
+attr DEVICE_CH2 jsonMap l2:state
+attr DEVICE_CH2 model zigbee2mqtt_2channel_split
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
@@ -1579,6 +1608,12 @@ attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
 set DEVICE getKnown
 attr DEVICE model eBus_daemon_splitter
 
+###############
+#ems-esp
+#
+#ems-esp thermostat device
+
+
 
 ###############
 #ESP Milight Hub
@@ -1996,15 +2031,15 @@ par:SERIAL;Serial number;{ AttrVal("DEVICE","readingList","") =~ m,go-eCharger[/
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
 attr DEVICE event-on-change-reading .*
-attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT) }\
+attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT,'';$JSONMAP) }\
   BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
-attr DEVICE setList Charge_ON:noArg BASE_ID/SERIAL/cmd/req alw=1\
-  Charge_OFF:noArg BASE_ID/SERIAL/cmd/req alw=0\
-  amp:selectnumbers,1,1,22,1,lin go-eCharger/SERIAL/cmd/req amp=$EVTPART1\
-  alw:0,1 go-eCharger/007353/cmd/req alw=$EVTPART1
+attr DEVICE setList Activation:0,1 BASE_ID/SERIAL/cmd/req alw=$EVTPART1\
+  Ampere:selectnumbers,1,1,22,1,lin BASE_ID/SERIAL/cmd/req amp=$EVTPART1
+attr DEVICE jsonMap alw:Activation amp:Ampere tmp:temperature
 attr DEVICE stateFormat Status: charger_state \
-ALW:alw\
- P_akt: energy_akt V1: nrg_1 V2: nrg_2 V3: nrg_3
-attr DEVICE devStateIcon ALW.1:status_open:alw+0 ALW.0:status_locked:alw+1
-attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, temperature:tmp.* { ReadingsVal($name,"tmp",0) }, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.*  { ReadingsVal($name,"dws",0)*2.77 } device_state:alw.* { my $val = ReadingsVal($name,"alw","none");; my %rets = ("none"  => "-1","0" => "Locked","1" => "Open",);; $rets{$val}},
+ALW:Activation\
+ P_akt: energy_akt
+attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Activation+1
+attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
+deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model go_eCharger

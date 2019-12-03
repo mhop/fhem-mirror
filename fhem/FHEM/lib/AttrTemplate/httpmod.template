@@ -11,7 +11,7 @@
 ###########################################
 name:General_Info
 filter:TYPE=HTTPMOD
-desc: Forum <a href="https://forum.fhem.de/index.php/topic,97694.0.html">link</a> for suggestions or bug reports on httpmod-template
+desc: Forum <a href="https://forum.fhem.de/index.php/topic,97694.0.html">link</a> for suggestions or bug reports on httpmod-template.<br>For changes and updates on this file, see <a href="https://svn.fhem.de/trac/log/trunk/fhem/FHEM/lib/AttrTemplate/httpmod.template">svn changelog</a>. In most cases, major changes will be mentionned there.
 order:00000000
 
 
@@ -469,7 +469,8 @@ filter:TYPE=HTTPMOD
 desc: Check eQ3 homepage for available new firmware files; provides also links for direct downloads<br>Define a HTTPMOD device like <br>define eq3 HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800<br><a href="https://https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144">Source: Forum</a><br><a href="https://wiki.fhem.de/wiki/HomeMatic_Firmware_Update#Basis-Definitionen_f.C3.BCr_Device_eq3">Wiki</a>
 order:X_01a
 par:WHICHROOM;Actual room of the device; {AttrVal("DEVICE","room","CUL_HM" )}
-defmod DEVICE HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php 604800
+par:INTERVAL;Actual interval for updating, defaults to one week; {InternalVal("DEVICE","Interval","604800")}
+defmod DEVICE HTTPMOD https://www.eq-3.de/ajax/downloads/downloads_eq3.php INTERVAL
 attr DEVICE userattr reading01AutoNumLen reading01Format reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02OExpr reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete
 attr DEVICE alignTime 00:45
 attr DEVICE enableControlSet 1
@@ -568,19 +569,22 @@ attr DEVICE model CUL_HM_firmware_update_downloader
 #Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg992348.html#msg992348
 name:tasmota_firmware_updates
 filter:TYPE=HTTPMOD
-desc: Check Tasmota homepage for available new firmware files<br>Define a HTTPMOD device like <br>define tasmotaupdates HTTPMOD https://github.com/arendst/Tasmota/releases/latest 86400<a href="https://forum.fhem.de/index.php/topic,97694.msg992308.html#msg992308">Source: Forum</a>.
+desc: Check Tasmota homepage for available new firmware files<br>Define a HTTPMOD device like <br>define tasmotaupdates HTTPMOD https://github.com/arendst/Tasmota/tags 86400<a href="https://forum.fhem.de/index.php/topic,97694.msg992308.html#msg992308">Source: Forum</a>.
 order:X_01e
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
-attr DEVICE userattr reading01Name reading01Regex reading02Name reading02OExpr reading02Regex
+par:UPDATABLEDEVICESMODE;Actual mode for updatableDevices, defaults to onlyUpdatable; {AttrVal("DEVICE","updatableDevicesMode","onlyUpdatable")}
+par:INTERVAL;Actual interval for updating, defaults to one week; {InternalVal("DEVICE","Interval","604800")}
+defmod DEVICE HTTPMOD https://github.com/arendst/Tasmota/tags INTERVAL
+attr DEVICE userattr reading01Name reading01Regex reading02Name reading02OExpr reading02Regex updatableDevicesMode:onlyUpdatable,all
 attr DEVICE enableControlSet 1
 attr DEVICE event-on-change-reading .*
 attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
-attr DEVICE handleRedirects 1
+attr DEVICE handleRedirects 0
 attr DEVICE reading01Name latestVersion
-attr DEVICE reading01Regex <h2>Changelog</h2>[\w\W]*?<p>Version (\d*.\d*.\d*)\s\d*</p>
+attr DEVICE reading01Regex commit-title">[\w\W]*?<a href=".*">[\w\W]*?v(\d*.\d*.\d*)[\w\W]*?</a>
 attr DEVICE reading02Name latestDate
-attr DEVICE reading02OExpr $val =~ m/^(.{4})(.{2})(.{2})$/ ;; "$3.$2.$1"
-attr DEVICE reading02Regex <h2>Changelog</h2>[\w\W]*?<p>Version \d*.\d*.\d*\s(\d*)</p>
+attr DEVICE reading02OExpr $val =~ m/^(.{4})-(.{2})-(.{2})$/ ;; "$3.$2.$1"
+attr DEVICE reading02Regex relative-time[\w\W]*?datetime="(\d*-\d*-\d*)T\d*:\d*:\d*Z"
 attr DEVICE showError 1
 attr DEVICE showMatched 1
 attr DEVICE stateFormat {   my $ret ="";;\
@@ -596,7 +600,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } elsif($check eq "error => no or wrong data from server!") {\
-      $ret .= '| <b style="color:red">';;\
+      $ret .= '| <b style="color:'.(($new eq $old)?'black':'red').'">';;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } else {\
@@ -624,6 +628,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
   return $ret;;\
 }
 attr DEVICE timestamp-on-change-reading .*
+attr DEVICE updatableDevicesMode UPDATABLEDEVICESMODE
 attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
   my $ret = "";;\
   if (ReadingsVal($name,"MATCHED_READINGS","") eq "") {\
@@ -631,11 +636,11 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
   } else {\
     my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
     my $DATE = ReadingsVal($name,"latestDate","unknown");;\
-    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version=.*\\(.*sonoff\\)")) {\
-      my $version = ReadingsVal($dev,"INFO1_Version","unknown");;\
+    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version!=")) {\
+      my $version = ReadingsVal($dev,"INFO1_Version","0.0.0");;\
       $version =~ m/([0-9.]*).*/;;\
       $version = $1;;\
-      if($version ne $VERSION) {\
+      if ( AttrVal($name,"updatableDevicesMode","onlyUpdatable") eq "all" || $version ne $VERSION ) {\
         $ret .= "," if($ret ne "");;\
         $ret .= $dev." (".$version." | ".$VERSION." | ".$DATE.")";;\
       }\
@@ -646,6 +651,95 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model tasmota_firmware_updates
+
+#Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg998835.html#msg998835
+name:zigbee2mqtt_daemon_updates
+filter:TYPE=HTTPMOD
+desc: Check zigbee2mqtt homepage for new versions of the deamon software.<br>Define a HTTPMOD device like <br>define zigbee2mqtt_updates HTTPMOD https://github.com/Koenkk/zigbee2mqtt/tags 604800<br>
+<a href="https://forum.fhem.de/index.php/topic,97694.msg998835.html#msg998835">Source: Forum</a>.
+order:X_01e1
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+par:INTERVAL;Actual interval for updating, defaults to one day; {InternalVal("DEVICE","Interval",604800)}
+par:UPDATABLEDEVICESMODE;Actual mode for updatableDevices, defaults to onlyUpdatable; {AttrVal("DEVICE","updatableDevicesMode","onlyUpdatable")}
+defmod DEVICE HTTPMOD https://github.com/Koenkk/zigbee2mqtt/tags INTERVAL
+attr DEVICE userattr reading01Name reading01Regex reading02Name reading02OExpr reading02Regex updatableDevicesMode:onlyUpdatable,all
+attr DEVICE enableControlSet 1
+attr DEVICE event-on-change-reading .*
+attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
+attr DEVICE handleRedirects 0
+attr DEVICE reading01Name latestVersion
+attr DEVICE reading01Regex commit-title">[\w\W]*?<a href=".*">[\w\W]*?(\d*\.\d*\.\d*)[\w\W]*?</a>
+attr DEVICE reading02Name latestDate
+attr DEVICE reading02OExpr $val =~ m/^(.{4})-(.{2})-(.{2})$/ ;; "$3.$2.$1"
+attr DEVICE reading02Regex relative-time[\w\W]*?datetime="(\d*-\d*-\d*)T\d*:\d*:\d*Z"
+attr DEVICE showError 1
+attr DEVICE showMatched 1
+attr DEVICE stateFormat {   my $ret ="";;\
+    my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
+    $ret .= '<div style="text-align:left">';;\
+    $ret .= 'last <a title="versions" href="'.InternalVal($name,"MainURL","unknown").'">ZigBee</a>-check => '.$lastCheck;;\
+    $ret .= '<br><br><pre>';;\
+    $ret .= "| device                           | current |   new   |  released  |<br>";;\
+    $ret .= "---------------------------------------------------------------------<br>";;\
+    my $check = ReadingsVal($name,"updatableDevices","error => no or wrong data from server!");;\
+    if($check eq "no updates needed!") {\
+      $ret .= '| <b style="color:green">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } elsif($check eq "error => no or wrong data from server!") {\
+      $ret .= '| <b style="color:red">';;\
+      $ret .= sprintf("%-65s",$check);;\
+      $ret .= '</b> |';;\
+    } else {\
+      my @devices = split(',',$check);;\
+      foreach my $devStr (@devices) {\
+        my ($dev,$old,$new,$date) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\s([^\s]+)\s\|\s([^\)]+)\)$/;;\
+        $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
+        $ret .= sprintf("%-32s",$dev);;\
+        $ret .= '</b></a> | ';;\
+        $ret .= '<b style="color:lightgray">';;\
+        $ret .= sprintf("%7s",$old);;\
+        $ret .= '</b> | ';;\
+        $ret .= '<a href="https://github.com/Koenkk/zigbee2mqtt/releases/tag/'.$new.'">';;\
+        $ret .= '<b style="color:'.(($new eq $old)?'black':'red').'">';;\
+        $ret .= sprintf("%7s",$new);;\
+        $ret .= '</b></a> | ';;\
+        $ret .= '<a href="https://github.com/Koenkk/zigbee2mqtt/releases/tag/'.$new.'">';;\
+        $ret .= '<b style="color:black">';;\
+        $ret .= sprintf("%-10s",$date);;\
+        $ret .= '</b></a>';;\
+        $ret .= " |<br>";;\
+      }\
+    }\
+    $ret .= '</pre></div>';;\
+  return $ret;;\
+}
+attr DEVICE updatableDevicesMode UPDATABLEDEVICESMODE
+attr DEVICE timestamp-on-change-reading .*
+attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
+  my $ret = "";;\
+  if (ReadingsVal($name,"MATCHED_READINGS","") eq "") {\
+    $ret = "error => no or wrong data from server!";;\
+  } else {\
+    my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
+    my $DATE = ReadingsVal($name,"latestDate","unknown");;\
+    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=permit_join!=")) {\
+      my $version = ReadingsVal($dev,"version","0.0.0");;\
+      $version =~ m/([0-9.]*).*/;;\
+      $version = $1;;\
+      if (AttrVal($name,"updatableDevicesMode","onlyUpdatable") eq "all" || $version ne $VERSION) {\
+        $ret .= "," if($ret ne "");;\
+        $ret .= $dev." (".$version." | ".$VERSION." | ".$DATE.")";;\
+      }\
+    }\
+  }\
+  return ($ret eq "")?"no updates needed!":$ret;;\
+}
+attr DEVICE webCmd reread
+attr DEVICE room WHICHROOM
+attr DEVICE model zigbee2mqtt_daemon_updates
+
+
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg992432.html#msg992432
 name:ESPEasy_firmware_updates
@@ -737,3 +831,4 @@ attr DEVICE myInstalledVersion 2.0.31
 attr DEVICE room WHICHROOM
 attr DEVICE enableControlSet 1
 attr DEVICE model dnscrypt-proxy_updates
+
