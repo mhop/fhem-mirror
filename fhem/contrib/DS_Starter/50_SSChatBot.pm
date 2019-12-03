@@ -92,6 +92,7 @@ sub SSChatBot_Initialize($) {
                      "allowedUserForSet:--wait#for#userlist-- ".
                      "allowedUserForGet:--wait#for#userlist-- ".
                      "allowedUserForCode:--wait#for#userlist-- ".
+                     "allowedUserForOwn:--wait#for#userlist-- ".
                      "ownCommand ".
                      "showTokenInLog:1,0 ".
                      "httptimeout ".
@@ -1049,12 +1050,13 @@ sub SSChatBot_chatop_parse ($) {
                 my $list = $modules{$hash->{TYPE}}{AttrList};
                 my @deva = split(" ", $list);
                 foreach (@deva) {
-                     push @newa, $_ if($_ !~ /defaultPeer:|allowedUserFor(Set|Get|Code):/);
+                     push @newa, $_ if($_ !~ /defaultPeer:|allowedUserFor(Set|Get|Code|Own):/);
                 }
                 push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
                 push @newa, ($uids?"allowedUserForSet:multiple-strict,$uids ":"allowedUserForSet:--no#userlist#selectable--");
                 push @newa, ($uids?"allowedUserForGet:multiple-strict,$uids ":"allowedUserForGet:--no#userlist#selectable--");
                 push @newa, ($uids?"allowedUserForCode:multiple-strict,$uids ":"allowedUserForCode:--no#userlist#selectable--");
+                push @newa, ($uids?"allowedUserForOwn:multiple-strict,$uids ":"allowedUserForOwn:--no#userlist#selectable--");
                 
                 $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
                
