@@ -41,6 +41,7 @@ use MIME::Base64;
 use Time::HiRes;
 use HttpUtils;                                                    
 use Encode;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSChatBotNDom = "Net::Domain";
                                                     
@@ -91,6 +92,7 @@ sub SSChatBot_Initialize($) {
                      "allowedUserForSet:--wait#for#userlist-- ".
                      "allowedUserForGet:--wait#for#userlist-- ".
                      "allowedUserForCode:--wait#for#userlist-- ".
+                     "ownCommand ".
                      "showTokenInLog:1,0 ".
                      "httptimeout ".
                      $readingFnAttributes;   
@@ -1047,7 +1049,7 @@ sub SSChatBot_chatop_parse ($) {
                 my $list = $modules{$hash->{TYPE}}{AttrList};
                 my @deva = split(" ", $list);
                 foreach (@deva) {
-                     push @newa, $_ if($_ !~ /defaultPeer:|allowedUserFor(Set|Get|Code):|/);
+                     push @newa, $_ if($_ !~ /defaultPeer:|allowedUserFor(Set|Get|Code):/);
                 }
                 push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
                 push @newa, ($uids?"allowedUserForSet:multiple-strict,$uids ":"allowedUserForSet:--no#userlist#selectable--");
@@ -1381,8 +1383,10 @@ sub SSChatBot_formText ($) {
   %replacements = (
       '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
       " H" => " h",                             # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      "#"  => "",                               # Hashtags sind im Text nicht erlaubt
-      "&"  => "",                               # & ist im Text nicht erlaubt      
+      "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
+      "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
+      "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
+      "+"  => "%2B",
   );
   
   $txt =~ s/\n/ESC_newline_ESC/g;
@@ -1496,7 +1500,7 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au) = ("","","");
+  my ($command,$cr,$au,$arg) = ("","","","");
   my @aul;
   my $state = "active";
  
@@ -1582,16 +1586,21 @@ sub SSChatBot_CGI() {
 	      $text = urlDecode($h->{text});                          
           Log3($name, 4, "$name - text received: ".$text);
           
-          if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # Befehle in FHEM ausführen
-              $command = "$1 ".$2;
+          my $uc = AttrVal($name,"ownCommand", "");                                   # User Commands zusammenstellen
+          if ($uc) {
+              ($uc,$arg) = split(" ", $uc, 2);
+          }
+      
+          if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
               my $p1   = $1;
               my $p2   = $2;
               
               if($p1 =~ /set.*/i) {
+                  $command = "set ".$p2;
                   $au  = AttrVal($name,"allowedUserForSet", "all");
                   @aul = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
-                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: set ".$p2);
+                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$command);
                       $cr = CommandSet(undef, $p2);                                   # set-Befehl in FHEM ausführen
                   } else {
                       $cr    = "User \"$username\" is not allowed execute \"$command\" command";
@@ -1599,11 +1608,12 @@ sub SSChatBot_CGI() {
                       Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$command\" command. Execution denied !");
                   }
                   
-              } elsif ($p1 =~ /get.*/i) {                             
+              } elsif ($p1 =~ /get.*/i) {
+                  $command = "get ".$p2;              
                   $au  = AttrVal($name,"allowedUserForGet", "all");
                   @aul = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
-                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: get ".$p2);
+                      Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$command);
                       $cr = CommandGet(undef, $p2);                                   # get-Befehl in FHEM ausführen  
                   } else {
                       $cr    = "User \"$username\" is not allowed execute \"$command\" command";
@@ -1612,6 +1622,7 @@ sub SSChatBot_CGI() {
                   }
                   
               } elsif ($p1 =~ /code.*/i) {
+                  $command = $p2;
                   $au  = AttrVal($name,"allowedUserForCode", "all");
                   @aul = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
@@ -1622,7 +1633,7 @@ sub SSChatBot_CGI() {
                           $p2 = '';
                       } 
                       Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$p2);
-                      $cr = AnalyzeCommand(undef, $p2) if($p2);                  # Perl Code in FHEM ausführen  
+                      $cr = AnalyzePerlCommand(undef, $p2) if($p2);                  # Perl Code in FHEM ausführen  
                   } else {
                       $cr    = "User \"$username\" is not allowed execute \"$command\" command";
                       $state = "command execution denied";
@@ -1631,6 +1642,29 @@ sub SSChatBot_CGI() {
               } 
                   
               $cr = $cr ne ""?$cr:"command '$command' executed";
+              Log3($name, 4, "$name - FHEM command return: ".$cr);
+              
+              $cr = SSChatBot_formText($cr);   
+
+              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
+
+              RemoveInternalTimer($hash, "SSChatBot_getapisites");
+              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);                                 
+          }
+          
+          if($uc && $uc =~ /^$text(\s+)?$/) {                                     # User eigene Befehle, z.B.: /Wetter
+              $au  = AttrVal($name,"allowedUserForOwn", "all");
+              @aul = split(",",$au);
+              if($au eq "all" || $username ~~ @aul) { 
+                  Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$arg);
+                  $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
+              } else {
+                  $cr    = "User \"$username\" is not allowed execute \"$arg\" command";
+                  $state = "command execution denied";
+                  Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$arg\" command. Execution denied !");
+              }                 
+                                
+              $cr = $cr ne ""?$cr:"command '$arg' executed";
               Log3($name, 4, "$name - FHEM command return: ".$cr);
               
               $cr = SSChatBot_formText($cr);   
