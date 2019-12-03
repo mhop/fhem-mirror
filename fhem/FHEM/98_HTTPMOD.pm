@@ -169,7 +169,8 @@
 #   2019-11-11  modified precompilation of regexes to better support regex options
 #   2019-11-17  remove unused function, reformat
 #   2019-11-19  little bug fixes
-#   2019-11-20  precompilation of preProcessRegex removed - needs more testing before a release
+#   2019-11-20  precompilation of preProcessRegex removed - can't compile a regex inluding a replacement part for s//
+#   2019-11-29  new fix for special compiled regexes with regex options
 #
 #
 
@@ -241,7 +242,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.18 - 20.11.2019';
+my $HTTPMOD_Version = '3.5.19 - 29.11.2019';
 
 #
 # FHEM module intitialisation
@@ -2003,11 +2004,12 @@ sub HTTPMOD_ExtractReading($$$$$)
             @matchlist = (join ",", @matchlist);    # old syntax returns only one value
             
         } else {                                    # normal regex
+            $regopt =~ s/[^gceor]//g if ($regopt);  # remove anything but gceor options - rest is already compiled in
             if ($regopt) {
-                $regopt =~ s/[^gceor]//g;           # remove anything but gceor options - rest is already compiled in
                 Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/$regopt ...";
-                eval '@matchlist = ($buffer =~ /' . "$regex/$regopt" . ')';
-                Log3 $name, 3, "$name: error in regex matching with regex option: $@" if ($@);
+                #eval '@matchlist = ($buffer =~ /' . "$regex/$regopt" . ')'; # so geht es nicht bei speziellen Regexes
+                eval "\@matchlist = (\$buffer =~ /\$regex/$regopt)";    
+                Log3 $name, 3, "$name: error in regex matching (with regex option $regopt): $@" if ($@);
                 %namedRegexGroups = %+ if (%+);
             } else {
                 Log3 $name, 5, "$name: ExtractReading $reading with regex /$regex/...";
@@ -2774,7 +2776,11 @@ sub HTTPMOD_Read($$$)
     }
 
     my $ppr = AttrVal($name, "preProcessRegex", "");
-    #my $ppr = HTTPMOD_GetRegex($name, "", "", "preProcessRegex", "");      # klappt so einfach nicht -> intensiveres debugging wegen s// nötig
+    # can't precompile a whole substitution so the GetRegex way doesn't work here.
+    # we would need to split the regex into match/replace part and only compile the matching part ...
+    # if a user s affected by Perl's memory he leak he might just add option a to his regex attr
+    
+    #Log3 $name, 5, "$name: Read preProcessRegex is $ppr";
     if ($ppr) {
             my $pprexp = '$body=~' . $ppr; 
             my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
