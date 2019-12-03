@@ -4873,9 +4873,9 @@ readingsBulkUpdate($$$@)
         $ts= $readings->{".ts"};
       } else {
         require "TimeSeries.pm";
-        $ts= TimeSeries->new( { method => $method, 
-                                autoreset => $duration,
-                                holdTime => $holdTime } );
+        $ts = TimeSeries->new( { method => $method, 
+                  autoreset=>(looks_like_number($duration) ? $duration:undef),
+                  holdTime =>(looks_like_number($holdTime) ? $holdTime:undef)});
         $readings->{".ts"}= $ts;
         # access from command line:
         # { $defs{"myClient"}{READINGS}{"myValue"}{".ts"}{max} }
