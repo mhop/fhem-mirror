@@ -1587,12 +1587,7 @@ sub SSChatBot_CGI() {
 	  if ($h->{text}) {
 	      $text = urlDecode($h->{text});                          
           Log3($name, 4, "$name - text received: ".$text);
-          
-          my $uc = AttrVal($name,"ownCommand", "");                                   # User Commands zusammenstellen
-          if ($uc) {
-              ($uc,$arg) = split(" ", $uc, 2);
-          }
-      
+   
           if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
               my $p1   = $1;
               my $p2   = $2;
@@ -1654,28 +1649,38 @@ sub SSChatBot_CGI() {
               InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);                                 
           }
           
-          if($uc && $uc =~ /^$text(\s+)?$/) {                                     # User eigene Befehle, z.B.: /Wetter
-              $au  = AttrVal($name,"allowedUserForOwn", "all");
-              @aul = split(",",$au);
-              if($au eq "all" || $username ~~ @aul) { 
-                  Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$arg);
-                  $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
-              } else {
-                  $cr    = "User \"$username\" is not allowed execute \"$arg\" command";
-                  $state = "command execution denied";
-                  Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$arg\" command. Execution denied !");
-              }                 
-                                
-              $cr = $cr ne ""?$cr:"command '$arg' executed";
-              Log3($name, 4, "$name - FHEM command return: ".$cr);
+          my $uc = AttrVal($name,"ownCommand", "");                                       # User Commands zusammenstellen
+          if ($uc) {
+              my @cmda = split(",", $uc);
+              foreach my $cmd (@cmda) {
+                  $cmd = SSChatBot_trim($cmd);
+                  ($uc,$arg) = split(":", $cmd, 2);
+                  
+                  if($uc && $text =~ /^$uc\s?$/) {                                        # User eigene Slash-Befehle, z.B.: /Wetter 
+                      $au  = AttrVal($name,"allowedUserForOwn", "all");
+                      @aul = split(",",$au);
+                      if($au eq "all" || $username ~~ @aul) { 
+                          Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$arg);
+                          $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
+                      } else {
+                          $cr    = "User \"$username\" is not allowed execute \"$arg\" command";
+                          $state = "command execution denied";
+                          Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$arg\" command. Execution denied !");
+                      }                 
+                                        
+                      $cr = $cr ne ""?$cr:"command '$arg' executed";
+                      Log3($name, 4, "$name - FHEM command return: ".$cr);
+                      
+                      $cr = SSChatBot_formText($cr);   
+
+                      SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
+                  }
+              }
               
-              $cr = SSChatBot_formText($cr);   
-
-              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
-
               RemoveInternalTimer($hash, "SSChatBot_getapisites");
-              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);                                 
+              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);           
           }
+          
       }
 	  
 	  if ($h->{trigger_word}) {
