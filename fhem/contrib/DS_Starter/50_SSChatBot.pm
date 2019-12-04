@@ -130,6 +130,7 @@ sub SSChatBot_Define($@) {
   $hash->{MODEL}                 = "ChatBot";         
   $hash->{INPROT}                = $inprot;
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  $hash->{HELPER}{USERFETCHED}   = 0;                                            # Chat User sind noch nicht abgerufen
   
   CommandAttr(undef,"$name room Chat");
   
@@ -151,8 +152,7 @@ sub SSChatBot_Define($@) {
   readingsEndUpdate($hash,1);              
 
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
-  RemoveInternalTimer($hash, "SSChatBot_initonboot");
-  InternalTimer(gettimeofday()+int(rand(20)), "SSChatBot_initonboot", $hash, 0);  
+  SSChatBot_initonboot($hash);  
 
 return undef;
 }
@@ -225,19 +225,16 @@ sub SSChatBot_Attr($$$$) {
        
     if ($aName eq "disable") {
         if($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
+            $do = $aVal?1:0;
         }
-        $do = 0 if($cmd eq "del");
-		if(SSChatBot_IsModelCam($hash)) {
-            $val = ($do == 1 ? "inactive" : "off");
-		} else {
-		    $val = ($do == 1 ? "disabled" : "initialized");
-		}
+        $do  = 0 if($cmd eq "del");
+		
+        $val = ($do == 1 ? "disabled" : "initialized");
 		
 		if ($do == 1) {
 		    RemoveInternalTimer($hash);
 		} else {
-		    InternalTimer(gettimeofday()+int(rand(30)), "SSChatBot_initonboot", $hash, 0);
+            InternalTimer(gettimeofday()+2, "SSChatBot_initonboot", $hash, 0) if($init_done); 
 		}
     
         readingsBeginUpdate($hash); 
@@ -333,6 +330,7 @@ sub SSChatBot_Set($@) {
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
+      return undef if(!$hash->{HELPER}{USERFETCHED});
       my $cmd = join(" ", @a);
       my ($text,$users,$fileUrl);
       my ($a,$h) = parseParams($cmd);
@@ -674,7 +672,7 @@ sub SSChatBot_checkretry ($$) {
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|120|407|800/) {                                 
+      if($errorcode =~ /100|101|120|407|800|900/) {                                 
           # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = 1;
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
@@ -1044,7 +1042,8 @@ sub SSChatBot_chatop_parse ($) {
                     }
 					$i++;
                 }
-                $hash->{HELPER}{USERS} = \%users if(%users);
+                $hash->{HELPER}{USERS}       = \%users if(%users);
+                $hash->{HELPER}{USERFETCHED} = 1;
                
                 my @newa;
                 my $list = $modules{$hash->{TYPE}}{AttrList};
