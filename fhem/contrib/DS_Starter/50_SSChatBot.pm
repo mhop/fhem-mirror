@@ -248,9 +248,9 @@ sub SSChatBot_Attr($$$$) {
         }     
 
         if ($aName =~ m/ownCommand([1-9][0-9]*)$/) {
-            # add neue ownCommand dynamisch
-			return "The $aName must beginn with a slash like \"/Weather \"." unless ($aVal =~ /^\/.*$/);
-			addToDevAttrList($name, "ownCommand".($1+1));
+            my $num = $1;
+			return "The value of $aName must start with a slash like \"/Weather \"." unless ($aVal =~ /^\/.*$/);
+			addToDevAttrList($name, "ownCommand".($num+1));                        # add neue ownCommand dynamisch
         }        
     }
     
