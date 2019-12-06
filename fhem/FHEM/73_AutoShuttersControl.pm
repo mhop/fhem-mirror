@@ -2609,6 +2609,7 @@ sub EventProcessingExternalTriggerDevice($@) {
 
         $shutters->setLastDrive('external trigger device active');
         $shutters->setNoDelay(1);
+        $shutters->setExternalTriggerState(1);
         ShuttersCommandSet( $hash, $shuttersDev, $triggerPosActive );
     }
     elsif (
@@ -2625,6 +2626,7 @@ sub EventProcessingExternalTriggerDevice($@) {
 
         $shutters->setLastDrive('external trigger device inactive');
         $shutters->setNoDelay(1);
+        $shutters->setExternalTriggerState(1);
         ShuttersCommandSet( $hash, $shuttersDev, $triggerPosInactive );
     }
 
@@ -4349,12 +4351,15 @@ sub setDriveCmd {
         ( $shutters->getPartyMode eq 'on' and $ascDev->getPartyMode eq 'on' )
         or (    $shutters->getAdv
             and not $shutters->getQueryShuttersPos($posValue)
-            and not $shutters->getAdvDelay )
+            and not $shutters->getAdvDelay
+            and not $shutters->getExternalTriggerState)
       )
     {
         $shutters->setDelayCmd($posValue);
         $ascDev->setDelayCmdReading;
         $shutters->setNoDelay(0);
+        $shutters->setExternalTriggerState(0)
+          if ( $shutters->getExternalTriggerState );
 
         FHEM::AutoShuttersControl::ASC_Debug( 'setDriveCmd: '
               . $shutters->getShuttersDev
@@ -4367,6 +4372,8 @@ sub setDriveCmd {
         $shutters->setDelayCmd('none')
           if ( $shutters->getDelayCmd ne 'none' )
           ; # setzt den Wert auf none da der Rolladen nun gesteuert werden kann.
+        $shutters->setExternalTriggerState(0)
+          if ( $shutters->getExternalTriggerState );
 
         ### antifreeze Routine
         if ( $shutters->getFreezeStatus > 0 ) {
@@ -4884,6 +4891,14 @@ sub setRainProtectionStatus {    # Werte protected, unprotected
     my ( $self, $value ) = @_;
 
     $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL} = $value
+      if ( defined($value) );
+    return 0;
+}
+
+sub setExternalTriggerState {
+    my ( $self, $value ) = @_;
+    
+    $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event} = $value
       if ( defined($value) );
     return 0;
 }
@@ -5724,6 +5739,13 @@ sub getExternalTriggerPosInactive {
 
     return $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
       ->{posinactive};
+}
+
+sub getExternalTriggerState {
+    my $self = shift;
+    
+    return ( (defined($self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event})
+      and $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}) ? 1 : 0 );
 }
 
 sub getDelay {
@@ -7559,8 +7581,8 @@ sub getblockAscDrivesAfterManual {
         <u>In den Rolll&auml;den-Ger&auml;ten</u>
         <ul>
             <li><strong>ASC_Enable - on/off</strong> - wird der Rollladen &uuml;ber ASC gesteuert oder nicht</li>
-            <li><strong>ASC_Time_DriveUp</strong> - Im Astro-Modus ist hier die Sonnenaufgangszeit f&uuml;r das Rollo gespeichert. Im Brightness- und Zeit-Modus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Up_Late</em> gespeichert.</li>
-            <li><strong>ASC_Time_DriveDown</strong>  - Im Astro-Modus ist hier die Sonnenuntergangszeit f&uuml;r das Rollo gespeichert. Im Brightness- und Zeit-Modus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Down_Late</em> gespeichert.</li>
+            <li><strong>ASC_Time_DriveUp</strong> - Im Astro-Modus ist hier die Sonnenaufgangszeit f&uuml;r das Rollo gespeichert. Im Brightnessmodus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Up_Late</em> gespeichert. Im Timemodus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Up_Early</em> gespeichert.</li>
+            <li><strong>ASC_Time_DriveDown</strong>  - Im Astro-Modus ist hier die Sonnenuntergangszeit f&uuml;r das Rollo gespeichert. Im Brightnessmodus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Down_Late</em> gespeichert. Im Timemodus ist hier der Zeitpunkt aus dem Attribut <em>ASC_Time_Down_Early</em> gespeichert.</li>
             <li><strong>ASC_ShuttersLastDrive</strong>  - Grund der letzten Fahrt vom Rollladen</li>
         </ul>
     </ul>
@@ -7568,7 +7590,7 @@ sub getblockAscDrivesAfterManual {
     <a name="AutoShuttersControlSet"></a>
     <strong>Set</strong>
     <ul>
-        <li><strong>advDriveDown</strong> - holt alle ADV ausgesetzen Fahrten nach.</li>
+        <li><strong>advDriveDown</strong> - holt bei allen Rolll&auml;den durch ASC_Adv on ausgesetzte Fahrten nach.</li>
         <li><strong>ascEnable - on/off</strong> - Aktivieren oder deaktivieren der globalen ASC Steuerung</li>
         <li><strong>controlShading - on/off</strong> - Aktiviert oder deaktiviert die globale Beschattungssteuerung</li>
         <li><strong>createNewNotifyDev</strong> - Legt die interne Struktur f&uuml;r NOTIFYDEV neu an. Diese Funktion steht nur zur Verf&uuml;gung, wenn Attribut ASC_expert auf 1 gesetzt ist.</li>
@@ -7674,7 +7696,7 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_ExternalTrigger</strong> - DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:POSINACTIVE, Beispiel: "WohnzimmerTV:state on:off 66:100" bedeutet das wenn ein "state:on" Event kommt soll das Rollo in Position 66 fahren, kommt ein "state:off" Event soll es in Position 100 fahren. Es ist m&ouml;glich die POSINACTIVE weg zu lassen dann f&auml;hrt das Rollo in LastStatus Position.</li>
             <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. on=JA, off=NEIN.</li>
             <li><strong>ASC_Roommate_Device</strong> - mit Komma getrennte Namen des/der Roommate Device/s, welche den/die Bewohner des Raumes vom Rollladen wiedergibt. Es macht nur Sinn in Schlaf- oder Kinderzimmern (default: none)</li>
-            <li><strong>ASC_Adv - on/off</strong> bei on wird das runterfahren des Rollos w&auml;hrend der Weihnachtszeit (1. Advent bis 6. Januar) ausgesetzt! Durch set advDriveDown wird die ausgesetzte Fahrt nachgeholt.</li>
+            <li><strong>ASC_Adv - on/off</strong> bei on wird das runterfahren des Rollos w&auml;hrend der Weihnachtszeit (1. Advent bis 6. Januar) ausgesetzt! Durch set ASCDEVICE advDriveDown werden alle ausgesetzten Fahrten nachgeholt.</li>
             <li><strong>ASC_Roommate_Reading</strong> - das Reading zum Roommate Device, welches den Status wieder gibt (default: state)</li>
             <li><strong>ASC_Self_Defense_Mode - absent/gone/off</strong> - ab welchen Residents Status soll Selfdefense aktiv werden ohne das Fenster auf sind. (default: gone)</li>
             <li><strong>ASC_Self_Defense_AbsentDelay</strong> - um wie viele Sekunden soll das fahren in Selfdefense bei Residents absent verz&ouml;gert werden. (default: 300)</li>
@@ -7790,7 +7812,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.5",
+  "version": "v0.8.6",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
