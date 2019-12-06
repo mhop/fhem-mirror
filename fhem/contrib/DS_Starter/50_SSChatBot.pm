@@ -1530,13 +1530,27 @@ sub SSChatBot_CGI() {
       }
 	  
 	  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
-	  $name = $h->{botname};
+	  $name = $h->{botname};                             # das SSChatBot Device
 	  return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" ) unless (IsDevice($name, 'SSChatBot'));
-	  $hash = $defs{$name};
+	  $hash = $defs{$name};                              # hash des SSChatBot Devices
 	  
       if (!defined($h->{token})) {
             Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
             return ("text/plain; charset=utf-8", "Insufficient data");
+      }
+      
+      # CSRF Token check
+      my $FWdev    = $hash->{FW};                           # das FHEMWEB Device für SSChatBot Device -> ist das empfangene Device
+      my $FWhash   = $defs{$FWdev};
+      my $want     = $FWhash->{CSRFTOKEN};
+      $want        = $want?$want:"none";
+      my $supplied = $h->{fwcsrf};
+      if($want eq "none" || $want ne $supplied) {
+          Log3 ($FW_wname, 2, "$FW_wname - WARNING - FHEMWEB CSRF error for client \"$FWdev\": ".
+                              "received $supplied token is not $want. ".
+                              "For details see the csrfToken FHEMWEB attribute. ".
+                              "The csrfToken must be identical to the token in OUTDEF of $name device.");
+          return ("text/plain; charset=utf-8", "400 Bad Request");          
       }
 	  
 	  Log3($name, 4, "$name - ####################################################"); 
