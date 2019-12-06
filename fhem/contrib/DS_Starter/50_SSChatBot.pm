@@ -93,7 +93,7 @@ sub SSChatBot_Initialize($) {
                      "allowedUserForGet:--wait#for#userlist-- ".
                      "allowedUserForCode:--wait#for#userlist-- ".
                      "allowedUserForOwn:--wait#for#userlist-- ".
-                     "ownCommand ".
+                     "ownCommand1 ".
                      "showTokenInLog:1,0 ".
                      "httptimeout ".
                      $readingFnAttributes;   
@@ -152,7 +152,7 @@ sub SSChatBot_Define($@) {
   readingsEndUpdate($hash,1);              
 
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
-  SSChatBot_initonboot($hash);  
+  SSChatBot_initonboot($hash);
 
 return undef;
 }
@@ -238,14 +238,19 @@ sub SSChatBot_Attr($$$$) {
 		}
     
         readingsBeginUpdate($hash); 
-        readingsBulkUpdate($hash, "state", $val);                    
-        readingsEndUpdate($hash,1); 
+        readingsBulkUpdate ($hash, "state", $val);                    
+        readingsEndUpdate  ($hash,1); 
     }
     
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout/) {
             unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-        }       
+        }     
+
+        if ($aName =~ m/ownCommand([1-9][0-9]*)$/) {
+            # add neue ownCommand dynamisch
+			addToDevAttrList($name, "ownCommand".($1+1));
+        }        
     }
     
 return undef;
@@ -1504,8 +1509,8 @@ sub SSChatBot_CGI() {
   my ($command,$cr,$au,$arg) = ("","","","");
   my @aul;
   my $state = "active";
- 
-  my $ret = "success";
+  my $do    = 0;  
+  my $ret   = "success";
 
   return ( "text/plain; charset=utf-8", "Booting up" ) unless ($init_done);
 
@@ -1588,13 +1593,14 @@ sub SSChatBot_CGI() {
           Log3($name, 4, "$name - text received: ".$text);
    
           if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
-              my $p1   = $1;
-              my $p2   = $2;
+              my $p1 = $1;
+              my $p2 = $2;
               
               if($p1 =~ /set.*/i) {
                   $command = "set ".$p2;
-                  $au  = AttrVal($name,"allowedUserForSet", "all");
-                  @aul = split(",",$au);
+				  $do      = 1;
+                  $au      = AttrVal($name,"allowedUserForSet", "all");
+                  @aul     = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
                       Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$command);
                       $cr = CommandSet(undef, $p2);                                   # set-Befehl in FHEM ausführen
@@ -1605,9 +1611,10 @@ sub SSChatBot_CGI() {
                   }
                   
               } elsif ($p1 =~ /get.*/i) {
-                  $command = "get ".$p2;              
-                  $au  = AttrVal($name,"allowedUserForGet", "all");
-                  @aul = split(",",$au);
+                  $command = "get ".$p2;      
+                  $do      = 1;				  
+                  $au      = AttrVal($name,"allowedUserForGet", "all");
+                  @aul     = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
                       Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$command);
                       $cr = CommandGet(undef, $p2);                                   # get-Befehl in FHEM ausführen  
@@ -1619,8 +1626,9 @@ sub SSChatBot_CGI() {
                   
               } elsif ($p1 =~ /code.*/i) {
                   $command = $p2;
-                  $au  = AttrVal($name,"allowedUserForCode", "all");
-                  @aul = split(",",$au);
+				  $do      = 1;
+                  $au      = AttrVal($name,"allowedUserForCode", "all");
+                  @aul     = split(",",$au);
                   if($au eq "all" || $username ~~ @aul) {
                       my $code = $p2;
                       if($p2 =~ m/^\s*(\{.*\})\s*$/s) {
@@ -1642,44 +1650,46 @@ sub SSChatBot_CGI() {
               
               $cr = SSChatBot_formText($cr);   
 
-              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");
-
-              RemoveInternalTimer($hash, "SSChatBot_getapisites");
-              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);                                 
+              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                 
           }
-          
-          my $uc = AttrVal($name,"ownCommand", "");                                       # User Commands zusammenstellen
-          if ($uc) {
-              my @cmda = split(",", $uc);
-              foreach my $cmd (@cmda) {
-                  $cmd = SSChatBot_trim($cmd);
-                  ($uc,$arg) = split(":", $cmd, 2);
-                  
-                  if($uc && $text =~ /^$uc\s?$/) {                                        # User eigene Slash-Befehle, z.B.: /Wetter 
-                      $au  = AttrVal($name,"allowedUserForOwn", "all");
-                      @aul = split(",",$au);
-                      if($au eq "all" || $username ~~ @aul) { 
-                          Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$arg);
-                          $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
-                      } else {
-                          $cr    = "User \"$username\" is not allowed execute \"$arg\" command";
-                          $state = "command execution denied";
-                          Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$arg\" command. Execution denied !");
-                      }                 
-                                        
-                      $cr = $cr ne ""?$cr:"command '$arg' executed";
-                      Log3($name, 4, "$name - FHEM command return: ".$cr);
-                      
-                      $cr = SSChatBot_formText($cr);   
+                                  
+          my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommand.. zusammenstellen
+          $ua    = "" if(!$ua);
+          my %hc = map { ($_ => 1) } grep { "$_" =~ m/ownCommand(\d+)/ } split(" ","ownCommand1 $ua");
+       
+		  foreach my $ca (sort keys %hc) {
+			  my $uc = AttrVal($name, $ca, "");
+			  next if (!$uc);
+			  ($uc,$arg) = split(/\s+/, $uc, 2);
+			  
+			  if($uc && $text =~ /^$uc\s?$/) {                                        # User eigener Slash-Befehl, z.B.: /Wetter 
+			      $command = $arg;
+				  $do      = 1;
+				  $au      = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
+				  @aul     = split(",",$au);
+				  if($au eq "all" || $username ~~ @aul) { 
+					  Log3($name, 4, "$name - Synology Chat user \"$username\" execute FHEM command: ".$arg);  
+					  $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
+				  } else {
+					  $cr    = "User \"$username\" is not allowed execute \"$arg\" command";
+					  $state = "command execution denied";
+					  Log3($name, 2, "$name - WARNING - Chat user \"$username\" is not authorized for \"$arg\" command. Execution denied !");
+				  }                 
+									
+				  $cr = $cr ne ""?$cr:"command '$arg' executed";
+				  Log3($name, 4, "$name - FHEM command return: ".$cr);
+				  
+				  $cr = SSChatBot_formText($cr);   
 
-                      SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
-                  }
-              }
-              
-              RemoveInternalTimer($hash, "SSChatBot_getapisites");
-              InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0);           
-          }
-          
+				  SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
+			  }
+		  }
+		  
+		  # Wenn Kommando ausgeführt wurde Ergebnisse aus Queue übertragen
+		  if($do) {
+		      RemoveInternalTimer($hash, "SSChatBot_getapisites");
+		      InternalTimer(gettimeofday()+1, "SSChatBot_getapisites", "$name", 0); 
+          }		  
       }
 	  
 	  if ($h->{trigger_word}) {
