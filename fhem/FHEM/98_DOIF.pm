@@ -281,17 +281,17 @@ sub DOIF_RegisterCell
     if ($@) {
       return "'error $@ in expression: $expr'";
     }
-    if (defined $sty and $sty eq "") {
-      if (defined $wid and $wid ne "") {
-         if ($event) {
-           $dev=$hash->{$table}{dev} if (defined $hash->{$table}{dev});
-           $reading=$hash->{$table}{reading} if (defined $hash->{$table}{reading});
-         } else {
-           return "'no trigger reading in widget: $expr'";
-         }
-         $reading="state" if ($reading eq '&STATE');
-         return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,".(defined $com ? "":"'',")."'$dev','$reading')";
-      }
+    if (defined $sty and $sty eq "" and defined $wid and $wid ne "") {
+       if ($event) {
+         $dev=$hash->{$table}{dev} if (defined $hash->{$table}{dev});
+         $reading=$hash->{$table}{reading} if (defined $hash->{$table}{reading});
+       } else {
+         return "'no trigger reading in widget: $expr'";
+       }
+       $reading="state" if ($reading eq '&STATE');
+       return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,".(defined $com ? "":"'',")."'$dev','$reading')";
+    } elsif (defined $sty) {
+      $widsty=3;
     }
   }
   $trigger=$event; 
@@ -335,6 +335,8 @@ sub DOIF_RegisterCell
   if ($widsty==2) {
       $reading="state" if ($reading eq '&STATE');
       return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style,$widget,".(defined $command ? "$command":"''").",'$dev','$reading')";
+  } elsif ($widsty==3) {
+      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr)";
   } elsif (($widsty==1) or $trigger) {
       return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style)";
   } else {
@@ -348,7 +350,8 @@ sub parse_tpl
   my ($hash,$wcmd,$table) = @_;
   my $d=$hash->{NAME};
   my $err="";
-  while ($wcmd =~ /(?:^|\n)\s*IMPORT\s*(.*)(\n|$)/g) {
+##  while ($wcmd =~ /(?:^|\n)\s*IMPORT\s*(.*)(\n|$)/g) {
+  while ($wcmd =~ /\s*IMPORT\s*(.*)(\n|$)/g) {
     $err=import_tpl($hash,$1,$table);
     return ($err,"") if ($err);
   }
@@ -356,7 +359,9 @@ sub parse_tpl
   #$wcmd =~ s/(^|\n)\s*\#.*(\n|$)/\n/g;
   #$wcmd =~ s/(#.*\n)|(#.*$)|\n/ /g;
   $wcmd =~ s/(##.*\n)|(##.*$)/\n/g;
-  $wcmd =~ s/(^|\n)\s*IMPORT.*(\n|$)//g;
+  ##$wcmd =~ s/(^|\n)\s*IMPORT.*(\n|$)//g;
+  $wcmd =~ s/\s*IMPORT.*(\n|$)//g;
+
   $wcmd =~ s/\$TPL\{/\$hash->\{$table\}\{template\}\{/g;
   #$wcmd =~ s/\$TD{/\$hash->{$table}{td}{/g;
   #$wcmd =~ s/\$TC{/\$hash->{$table}{tc}{/g;
@@ -445,17 +450,22 @@ sub DOIF_uiTable_def
   ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
   return $err if ($err);
   
-  my @rcmd = split(/\n/,$wcmd);
-  my $ii=0;
-  for (my $i=0; $i<@rcmd; $i++) {
-    next if ($rcmd[$i] =~ /^\s*$/);
-    my @ccmd = SplitDoIf('|',$rcmd[$i]);
-    for (my $k=0;$k<@ccmd;$k++) {
-      if ($ccmd[$k] =~ /^\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+  my $tail=$wcmd;
+  my $beginning;
+  my $currentBlock;
+  my $output="";
+
+  #while ($wcmd =~ /^\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+  while ($tail ne "") {
+    if ($tail =~ /TPL_/g) {
+      my $prefix=substr($tail,0,pos($tail));
+      my $begin=substr($tail,0,pos($tail)-4);
+      $tail=substr($tail,pos($tail)-4);
+      if ($tail =~ /^(TPL_\w*)\s*\(/) {
         my $template=$1;
         if (defined $hash->{$table}{tpl}{$template}) {
           my $templ=$hash->{$table}{tpl}{$template};
-          my ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($ccmd[$k],'[\(\)]');
+          ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
           if ($err) {
             return "error in $table: $err";
           } elsif ($currentBlock ne "") {
@@ -464,18 +474,35 @@ sub DOIF_uiTable_def
               my $p=$j+1;
               $templ =~ s/\$$p/$param[$j]/g;
             }
-            $ccmd[$k]=$templ;
           }
-        } else {
+          $output.=($begin.$templ);
+        }  else {
           return ("no Template $template defined");
         }
+      } else {
+        $tail=substr($tail,4);
+        $output.=$prefix;
       }
+    } else {
+      $output.=$tail;
+      $tail="";
+    }
+  }
+
+  $wcmd=$output;
+
+  my @rcmd = split(/\n/,$wcmd);
+  my $ii=0;
+
+  for (my $i=0; $i<@rcmd; $i++) {
+    next if ($rcmd[$i] =~ /^\s*$/);
+    my @ccmd = SplitDoIf('|',$rcmd[$i]);
+    for (my $k=0;$k<@ccmd;$k++) {
       my @cccmd = SplitDoIf(',',$ccmd[$k]);
       for (my $l=0;$l<@cccmd;$l++) {
         my @crcmd = SplitDoIf('.',$cccmd[$l]);
         for (my $m=0;$m<@crcmd;$m++) {
           $hash->{$table}{table}{$ii}{$k}{$l}{$m}= DOIF_RegisterCell($hash,$table,$crcmd[$m],$ii,$k,$l,$m);
-          
         }
       }
     }
@@ -3740,6 +3767,104 @@ sub FW_makeImage {
   my ($image) = @_;
   return (::FW_makeImage($image));
 }
+#Styles
+ sub temp
+ {
+   my ($temp,$size,$icon)=@_;
+   return((defined($icon) ? ::FW_makeImage($icon):"").$temp."&nbsp;°C","font-weight:bold;".(defined ($size) ? "font-size:".$size."pt;":"").ui_Table::temp_style($temp));
+ }
+
+ sub temp_style
+ {
+     my ($temp)=@_;
+     if ($temp >=30) {
+	   return ("color:".::DOIF_hsv ($temp,30,50,20,0,90,95));
+     } elsif ($temp >= 10) {
+       return ("color:".::DOIF_hsv ($temp,10,30,73,20,80,95));  
+	 } elsif ($temp >= 0) {
+	   return ("color:".::DOIF_hsv ($temp,0,10,211,73,60,95));
+	 } elsif ($temp >= -20) {
+	   return ("color:".::DOIF_hsv ($temp,-20,0,277,211,50,95));
+	 }
+ }
+ 
+ sub hum
+ {
+    my ($hum,$size,$icon)=@_;
+    return ((defined($icon) ? ::FW_makeImage($icon):"").$hum."&nbsp;%","font-weight:bold;".(defined ($size) ? "font-size:".$size."pt;":"")."color:".::DOIF_hsv ($hum,30,100,30,260,60,90));
+ }
+
+ sub style
+ {
+   my ($text,$color,$font_size,$font_weight)=@_;
+   my $style="";
+   $style.="color:$color;" if (defined ($color));
+   $style.="font-size:$font_size"."pt;" if (defined ($font_size));
+   $style.="font-weight:$font_weight;" if (defined ($font_weight));
+   return ($text,$style);
+
+ }
+ 
+
+# Widgets
+ 
+ sub temp_knob {
+    my ($value,$color)=@_;
+    $color="DarkOrange" if (!defined $color); 
+    return ($value,"","knob,min:17,max:25,width:40,height:35,step:0.5,fgColor:$color,bgcolor:grey,anglearc:270,angleOffset:225,cursor:15,thickness:.3","set") 
+ }
+ 
+ sub shutter {
+   my ($value,$color,$type)=@_;
+   $color="\@darkorange" if (!defined ($color));
+   if (!defined ($type) or $type == 3) {
+     return ($value,"","iconRadio,$color,100,fts_shutter_10,30,fts_shutter_70,0,fts_shutter_100","set");
+   } elsif ($type == 4) {
+       return ($value,"","iconRadio,$color,100,fts_shutter_10,50,fts_shutter_50,30,fts_shutter_70,0,fts_shutter_100","set");
+     } elsif ($type == 5) {
+         return ($value,"","iconRadio,$color,100,fts_shutter_10,70,fts_shutter_30,50,fts_shutter_50,30,fts_shutter_70,0,fts_shutter_100","set");
+       } elsif ($type >= 6) {
+           return ($value,"","iconRadio,$color,100,fts_shutter_10,70,fts_shutter_30,50,fts_shutter_50,30,fts_shutter_70,20,fts_shutter_80,0,fts_shutter_100","set");
+         } elsif ($type == 2) {
+             return ($value,"","iconRadio,$color,100,fts_shutter_10,0,fts_shutter_100","set");
+         }
+ } 
+ 
+ sub dimmer {
+   my ($value,$color,$type)=@_;
+   $color="\@darkorange" if (!defined ($color));
+   if (!defined ($type) or $type == 3) {
+     return ($value,"","iconRadio,$color,0,light_light_dim_00,50,light_light_dim_50,100,light_light_dim_100","set");
+   } elsif ($type == 4) {
+       return ($value,"","iconRadio,$color,0,light_light_dim_00,50,light_light_dim_50,70,light_light_dim_70,100,light_light_dim_100","set");
+     } elsif ($type == 5) {
+         return ($value,"","iconRadio,$color,0,light_light_dim_00,30,light_light_dim_30,50,light_light_dim_50,70,light_light_dim_70,100,light_light_dim_100","set");
+       } elsif ($type == 6) {
+         return ($value,"","iconRadio,$color,0,light_light_dim_00,30,light_light_dim_30,50,light_light_dim_50,70,light_light_dim_70,80,light_light_dim_80,100,light_light_dim_100","set");
+         } elsif ($type >= 7) {
+           return ($value,"","iconRadio,$color,0,light_light_dim_00,20,light_light_dim_20,30,light_light_dim_30,50,light_light_dim_50,70,light_light_dim_70,80,light_light_dim_80,100,light_light_dim_100","set");
+           } elsif ($type == 2) {
+             return ($value,"","iconRadio,$color,0,light_light_dim_00,100,light_light_dim_100","set");
+           }
+ } 
+ 
+ sub switch {
+   my ($value,$icon_off,$icon_on,$state_off,$state_on)=@_;
+   $state_on=(defined ($state_on) and $state_on ne "") ? $state_on : "on";
+   $state_off=(defined ($state_off) and $state_off ne "") ? $state_off : "off";
+   $icon_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
+   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on : "$icon_off\@DarkOrange");
+   return($value,"",("iconSwitch,".$state_on.",".$icon_off.",".$state_off.",".$icon_on));
+ }
+ 
+ sub icon {
+   my ($value,$icon_off,$icon_on,$state_off,$state_on)=@_;
+   $state_on=(defined ($state_on) and $state_on ne "") ? $state_on : "on";
+   $state_off=(defined ($state_off) and $state_off ne "") ? $state_off : "off";
+   $icon_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
+   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on : "$icon_off\@DarkOrange");
+   return($value,"",("iconLabel,".$state_on.",".$icon_on.",".$state_off.",".$icon_off));
+ }
 
 1;
 
@@ -5154,6 +5279,13 @@ Features:<br>
 - dynamische Styles (z. B. Temperaturfarbe abhängig vom Temperaturwert)<br> 
 - es brauchen keine eigenen CSS- oder js-Dateien definiert werden<br>
 - Nutzung vordefinierter Templates aus Template-Dateien<br>
+- vordefinierte Perl-Funktionen für Standardwidgets oder Styles<br>
+<br>
+Ein guter Einblick in die uiTable-Benutzerschnittstelle lässt sich am besten mit Hilfe von Bildern über entsprechende Wiki-Seiten verschaffen:<br>
+<br>
+Schnelleinstieg in uiTable mit bebilderten Beispielen: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable für Beginner im FHEM-Wiki</a><br>
+<br>
+Anwendungsbeispiele für Fortgeschrittene: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable">uiTable für Fortgeschrittene im FHEM-Wiki</a><br>
 <br>
 <b>Aufbau des uiTable-Attributs<br></b>
 <br>
@@ -5185,6 +5317,8 @@ Eine Zellendefinition kann sein:<br>
 2) <code>STY(&lt;Perlausdruck mit [DOIF-Syntax]&gt;,&lt;css-Style-Definition mit [DOIF-Syntax]&gt;)<br></code>
 <br>
 3) <code>WID([&lt;DEVICE&gt;:&lt;READING&gt;],&lt;FHEM-Widget-Definition mit [DOIF-Syntax]&gt;,"&lt;set-/setreading-Kommando optional&gt;")<br></code>
+<br>
+4) vordefinierte Perl-Funktionen
 <br>
 Die oberen Definitionen können innerhalb einer Zelle mit Punkt bzw. Komma beliebig kombiniert werden. Beim Punkt werden die Ausdrücke aneinandergereiht, bei Komma werden die Ausdrücke mit Zeilenumbruch untereinander innerhalb einer Zelle angeordnet.<br>
 <br>
