@@ -342,8 +342,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
-attr DEVICE readingList BASE_TOPIC/DEV_ID/l1:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE jsonMap l1:state
+attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 
 attr DEVICE setList \
   on:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"OFF"}\
@@ -358,7 +358,7 @@ attr DEVICE_CH2 setList \
   on:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"ON"}\
   off:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"OFF"}
 attr DEVICE_CH2 setStateList on off toggle
-attr DEVICE_CH2 jsonMap l2:state
+attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH2 model zigbee2mqtt_2channel_split
 
 name:zigbee2mqtt_ContactSensor
@@ -2031,7 +2031,7 @@ par:SERIAL;Serial number;{ AttrVal("DEVICE","readingList","") =~ m,go-eCharger[/
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
 attr DEVICE event-on-change-reading .*
-attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT,'';$JSONMAP) }\
+attr DEVICE readingList BASE_ID/SERIAL/status:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   BASE_ID/SERIAL/ip:.* { json2nameValue($EVENT) }
 attr DEVICE setList Activation:0,1 BASE_ID/SERIAL/cmd/req alw=$EVTPART1\
   Ampere:selectnumbers,1,1,22,1,lin BASE_ID/SERIAL/cmd/req amp=$EVTPART1
