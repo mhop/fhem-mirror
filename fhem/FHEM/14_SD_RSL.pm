@@ -7,15 +7,19 @@
 # 2019 - Ralf9 & Sidey79
 #
 # Supports following devices:
-# - Conrad RSL 
+# - Conrad RSL  
 #####################################################################
 
 package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
-my %sets = ( "on:noArg"  => "", "off:noArg"  => "");
+my %sets = ( 
+		"on"	=> sub { return $_[0]->{OnCode};  }, 
+		"off"	=> sub { return $_[0]->{OffCode}; }
+		);
 
 my @RSLCodes;
 
@@ -113,35 +117,25 @@ sub SD_RSL_Define($$) {
 
 ##########################################################
 sub SD_RSL_Set($@) { 
-  my ($hash,  $name, @a) = @_;
-  my $ioHash = $hash->{IODev};
-  my $ioName = $ioHash->{NAME};
-  my $cmd  = $a[0];
-  my $c;
-  my $message;
-  my $device = substr($hash->{DEF},0,6);
+	my ($hash,  $name, @a) = @_;	  
+	my $cmd  = $a[0];
+	return "\"set $name\" needs at least one argument" unless(defined($cmd));
 
-  return join(" ", sort keys %sets) if((@a < 1) || ($cmd eq "?"));
-
-  $c = $hash->{OnCode}  if  ($cmd eq "on") ;
-  $c = $hash->{OffCode} if  ($cmd eq "off");
-
-  return "Unknown argument $cmd, choose  on or off" if(!$c);
-
-  ## Send Message to IODev using IOWrite
-  $message = 'P1#0x' . $c . $device . '#R' . AttrVal($name, "RSLrepetition", 6);
-  Log3 $name, 3, "$ioName RSL_set: $name $cmd -> sendMsg: $message";
-  IOWrite($hash, 'sendMsg', $message);
-  #my $ret = IOWrite($hash, 'sendMsg', $c."_".AttrVal($name, "RSLrepetition", 6));
-  #Log3 $hash, 5, "$name Set return : $ret";
-
-  #if (($cmd eq "on")  && ($hash->{STATE} eq "off")){$cmd = "stop";}
-  #if (($cmd eq "off") && ($hash->{STATE} eq "on")) {$cmd = "stop";}
-
-  #$hash->{CHANGED}[0] = $cmd;
-  #$hash->{STATE} = $cmd;
-  readingsSingleUpdate($hash,"state",$cmd,1); 
-  return undef;
+	my $cmdList= join(" ", map { "$_:noArg" } sort keys %sets);
+	if (exists($sets{$cmd})) {
+		my $ioHash = $hash->{IODev};
+		my $ioName = $ioHash->{NAME};
+		my $device = substr($hash->{DEF},0,6);		
+		my $c= $sets{$cmd}->($hash,@a); 
+		my $message = 'P1#0x' . $c . $device . '#R' . AttrVal($name, "RSLrepetition", 6);
+		Log3 $name, 3, "$ioName RSL_set: $name $cmd -> sendMsg: $message";
+		IOWrite($hash, 'sendMsg', $message);
+		readingsSingleUpdate($hash,"state",$cmd,1); 		
+	} else {
+		return SetExtensions($hash, $cmdList, $name, @a)
+	}
+	
+	return undef;
 }
 
 ###################################################################
@@ -207,7 +201,7 @@ sub SD_RSL_Parse($$) {
 
     Log3 $hash, 4, "$name: SD_RSL_Parse - Device: $deviceCode  Action: $action";
 		
-		$modules{SD_RSL}{defptr}{ioname} = $name;
+	$modules{SD_RSL}{defptr}{ioname} = $name;
     my $def = $modules{SD_RSL}{defptr}{$hash->{NAME} . "." . $deviceCode};
     $def = $modules{SD_RSL}{defptr}{$deviceCode} if(!$def);
 
@@ -243,6 +237,7 @@ sub SD_RSL_Parse($$) {
 ########################################################
 sub SD_RSL_Undef($$) { 
   my ($hash, $name) = @_;
+  SetExtensionsCancel($hash);
   delete($modules{SD_RSL}{defptr}{$hash->{DEF}}) if($hash && $hash->{DEF});
   return undef;
 }
@@ -296,13 +291,11 @@ If autocreate is used, a device &quot;&lt;code&gt;_ALL&quot; like RSL_74A400_ALL
 <a name="SD_RSL_Set"></a>
 <b>Set</b>
 <ul>
-  <code>set &lt;name&gt; &lt;value&gt;</code>
+  <code>set <name> &lt;[on|off|toggle]&gt;</code><br>
+  Switches the device on or off.<br><br>
+  <code>set <name> &lt;[on-for-timer|off-for-timer|on-till|off-till|blink|intervals]&gt;</code><br>
+  Switches the socket for a specified duration. For Details see <a href="#setExtensions">set extensions</a>.<br><br>
   <br /><br />
-  <code>&lt;value&gt;</code> can be one of the following values:<br>
-  <pre>
-  off
-  on
-  </pre>
 </ul>
 <a name="SD_RSL_Get"></a>
 <b>Get</b>
@@ -350,13 +343,11 @@ Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button
 <a name="SD_RSL_Set"></a>
 <b>Set</b>
 <ul>
-  <code>set &lt;name&gt; &lt;value&gt;</code>
+  <code>set <name> &lt;[on|off|toggle]&gt;</code><br
+  Schaltet das Ger&auml;t ein oder aus.<br><br>
+  <code>set <name> &lt;[on-for-timer|off-for-timer|on-till|off-till|blink|intervals]&gt;</code><br>
+  Schaltet das Ger&auml;t f&uuml;r einen bestimmten Zeitraum. Weitere Infos hierzu unter <a href="#setExtensions">set extensions</a>.<br><br>
   <br /><br />
-  <code>&lt;value&gt;</code> kann einer der folgenden Werte sein:<br>
-  <pre>
-  off
-  on
-  </pre>
 </ul>
 <a name="SD_RSL_Get"></a>
 <b>Get</b>
