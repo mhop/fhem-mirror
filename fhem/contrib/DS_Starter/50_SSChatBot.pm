@@ -244,11 +244,12 @@ sub SSChatBot_Attr($$$$) {
     
     if ($cmd eq "set") {
         if ($aName =~ m/httptimeout/) {
-            unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
+            unless ($aVal =~ /^\d+$/) { return "The Value for $aName is not valid. Use only figures 1-9 !";}
         }     
 
         if ($aName =~ m/ownCommand([1-9][0-9]*)$/) {
             # add neue ownCommand dynamisch
+			return "The $aName must beginn with a slash like \"/Weather \"." unless ($aVal =~ /^\/.*$/);
 			addToDevAttrList($name, "ownCommand".($1+1));
         }        
     }
