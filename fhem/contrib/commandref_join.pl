@@ -181,7 +181,8 @@ generateModuleCommandref($$;$$)
           if($l =~ m/<$tag ([^>]+)>/i) {
             my $attr = $1;
             print "*** $lang $mod line $line: $tag with attributes (apart ".
-                "from class) is not allowed\n" if($attr !~ m/class="[^"]*"/);
+                "from class) is not allowed\n" 
+              if($attr !~ m/class="[^"]*"/ && !$noWarnings);
           }
           $tagcount{$tag} +=()= ($l =~ /<$tag( [^>]+)?>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
