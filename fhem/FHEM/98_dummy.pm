@@ -63,7 +63,6 @@ dummy_Set($@)
     }
   };
   return if($doRet);
-  
 
   my $v = join(" ", @a);
   Log3 $name, 4, "dummy set $name $v";
