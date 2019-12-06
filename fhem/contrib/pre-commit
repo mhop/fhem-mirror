@@ -129,7 +129,12 @@ foreach my $row (split("\n", $fList)) {
         $hasLink = ($l =~ m/<a name="$modName"/) if(!$hasLink);
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
-          $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
+          if($l =~ m/<$tag ([^>]+)>/i) {
+            my $attr = $1;
+            err $fName, "$lang line $line: $tag with attributes (apart ".
+                "from class) is not allowed\n" ;
+          }
+          $tagcount{$tag} +=()= ($l =~ /<$tag( [^>]+)?>/gi);
           $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
           if($tagcount{$tag} < 0) {
             err $fName, "$lang: negative tagcount for $tag, line $line";
