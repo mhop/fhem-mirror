@@ -988,7 +988,7 @@ sub WeatherCheckOptions($@) {
 
        The parameters have the following meanings:<br>
 
-       <table border="1">
+       <table>
        <tr><td><code>API</code></td><td>name of the weather API, e.g. <code>DarkSkyAPI</code></td></tr>
        <tr><td><code>apioptions</code></td><td>indivual options for the chosen API</td></tr>
        <tr><td><code>apikey</code></td><td>key for the chosen API</td></tr>
@@ -997,7 +997,7 @@ sub WeatherCheckOptions($@) {
        <tr><td><code>interval</code></td><td>duration in seconds between updates</td></tr>
        <tr><td><code>lang</code></td><td>language of the forecast: <code>de</code>,
          <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> or <code>nl</code></td></tr>
-       <table/>
+       </table>
        <p>
 
     A very simple definition is:<br><br>
@@ -1016,7 +1016,7 @@ sub WeatherCheckOptions($@) {
 
         <b>Dark Sky</b><p>
 
-        <table border="1">
+        <table>
         <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
         <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
           in seconds to retrieve the forecast from the cache instead from the API<br><code>extend=hourly</code>
@@ -1025,12 +1025,12 @@ sub WeatherCheckOptions($@) {
           geographic coordinates in degrees of the location for which the
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
-        <table/>
+        </table>
         <p><p>
 
         <b>OpenWeatherMap</b><p>
 
-        <table border="1">
+        <table>
         <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
         <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>duration
           in seconds to retrieve the forecast from the cache instead from the API</td></tr>
@@ -1038,7 +1038,7 @@ sub WeatherCheckOptions($@) {
           geographic coordinates in degrees of the location for which the
           weather is forecast; if missing, the values of the attributes
           of the <code>global</code> device are taken, if these exist.</td></tr>
-        <table/>
+        </table>
         <p><p>
 
     The module provides four additional functions <code>WeatherAsHtml</code>,
@@ -1162,7 +1162,7 @@ sub WeatherCheckOptions($@) {
 
     Die Parameter haben die folgende Bedeutung:<br>
 
-    <table border="1">
+    <table>
     <tr><td><code>API</code></td><td>Name des Wetter-APIs, z.B. <code>DarkSkyAPI</code></td></tr>
     <tr><td><code>apioptions</code></td><td>Individuelle Optionen f&uuml;r das gew&auml;hlte API</td></tr>
     <tr><td><code>apikey</code></td><td>Schl&uuml;ssel f&uuml;r das gew&auml;hlte API</td></tr>
@@ -1172,7 +1172,7 @@ sub WeatherCheckOptions($@) {
       Aktualisierungen der Wetterdaten</td></tr>
     <tr><td><code>lang</code></td><td>Sprache der Wettervorhersage: <code>de</code>,
       <code>en</code>, <code>pl</code>, <code>fr</code>, <code>it</code> oder <code>nl</code></td></tr>
-    <table/>
+    </table>
     <p>
 
     Eine ganz einfache Definition ist:<br><br>
@@ -1192,7 +1192,7 @@ sub WeatherCheckOptions($@) {
 
     <b>Dark Sky</b><p>
 
-    <table border="1">
+    <table>
     <tr><td>API</td><td><code>DarkSkyAPI</code></td></tr>
     <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code><br>Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
@@ -1202,12 +1202,12 @@ sub WeatherCheckOptions($@) {
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
-    <table/>
+    </table>
     <p><p>
 
     <b>OpenWeatherMap</b><p>
 
-    <table border="1">
+    <table>
     <tr><td>API</td><td><code>OpenWeatherMapAPI</code></td></tr>
     <tr><td>apioptions</td><td><code>cachemaxage=&lt;cachemaxage&gt;</code> Zeitdauer in
       Sekunden, innerhalb derer die Wettervorhersage nicht neu abgerufen
@@ -1216,7 +1216,7 @@ sub WeatherCheckOptions($@) {
       und L&auml;nge des Ortes in Grad, f&uuml;r den das Wetter vorhergesagt wird.
       Bei fehlender Angabe werden die Werte aus den gleichnamigen Attributen
       des <code>global</code>-Device genommen, sofern vorhanden.</td></tr>
-    <table/>
+    </table>
     <p><p>
 
     Das Modul unterst&uuml;tzt zus&auml;tzlich vier verschiedene Funktionen

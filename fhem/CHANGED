@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  59_Weather: delete table options in commandref
  - bugfix:  73_AutoShuttersControl: fix Commandref, skip ExternalTrigger Drive
                       from adv check
  - bugfix:  88_HMCCU: Fixed problems during shutdown / restart
