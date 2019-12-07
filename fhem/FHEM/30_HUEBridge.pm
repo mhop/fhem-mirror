@@ -523,6 +523,31 @@ HUEBridge_scene2id($$)
   return '<unknown>';
 }
 sub
+HUEBridge_scene2id_deCONZ($$)
+{
+  my ($hash,$id) = @_;
+  my $name = $hash->{NAME};
+  #Log3 $name, 4, "HUEBridge_scene2id_deCONZ: $id, hash: " . Dumper $hash;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+  return undef if( !$hash );
+
+  if( $id =~ m/\[id=(.*)\]$/ ) {
+    $id = $1;
+  }
+
+  if( my $scenes = $hash->{scenes} ) {
+    $id = lc($id);
+    $id =~ s/\((.*)\)$/\\\($1\\\)/;
+    for my $scene ( @{$scenes} ) {
+       #Log3 $name, 4, "HUEBridge_scene2id_deCONZ scene:". Dumper $scene;
+      return $scene->{id} if( lc($scene->{name}) =~ m/^$id$/ );
+    }
+  }
+
+  return '<unknown>';
+}
+
+sub
 HUEbridge_groupOfLights($$)
 {
   my ($hash,$lights) = @_;
@@ -1330,7 +1355,7 @@ HUEBridge_updateGroups($$)
       #Log 1, "$hue $sat $bri";
       $readings{colormode} = 'hs';
       $readings{hue} = int($hue * 65535);
-      $readings{sat} = int($sat * 254/ $count + 0.5);
+      $readings{sat} = int($sat * 254 / $count + 0.5);
 
       $readings{bri} = int($bri * 254 / $count + 0.5);
       $readings{pct} = int($bri * 100 / $count + 0.5);

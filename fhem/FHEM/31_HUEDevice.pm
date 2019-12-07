@@ -741,11 +741,21 @@ HUEDevice_Set($@)
     } elsif( $cmd eq 'scene' ) {
       return "usage: scene <id>|<name>" if( !@args );
       my $arg = join( ' ', @args );
-      $arg = HUEBridge_scene2id($hash->{IODev}, $arg) if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' );
+      my $deConz;
+      if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
+        if( $hash->{IODev}{modelid} eq 'deCONZ' ) {
+          $deConz = 1;
+          $arg = HUEBridge_scene2id_deCONZ($hash, $arg);
+        } else {
+          $arg = HUEBridge_scene2id($hash->{IODev}, $arg);
+        }
+      }
 
       my $obj = {'scene' => $arg};
       $hash->{helper}->{update} = 1;
-      my $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",$obj);
+      my $result;
+      $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",$obj) if( !$deConz );
+      $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/scenes/$arg/recall",$obj) if( $deConz );
       return $result->{error}{description} if( $result->{error} );
 
       if( defined($result) && $result->{'error'} ) {
@@ -991,7 +1001,18 @@ HUEDevice_Set($@)
     }
   }
 
-  if( my $scenes = $hash->{IODev}{helper}{scenes} ) {
+  if( $hash->{IODev} && $hash->{IODev}{modelid} ne 'deCONZ' ) {
+    if( my $scenes = $hash->{scenes} ) {
+      my @names;
+      for my $scene (@{$scenes}) {
+         push(@names, $scene->{name});
+      }
+      # my $s_scenes = join (",",(my $names = map { $_->{name}} @$scenes));
+      my $s_scenes = join (',', @names);
+      $list .= " scene:".$s_scenes;
+    }
+
+  } elsif( my $scenes = $hash->{IODev}{helper}{scenes} ) {
     local *containsOneOfMyLights = sub($) {
       return 1 if( !defined($hash->{helper}{lights}) );
 
@@ -1014,8 +1035,10 @@ HUEDevice_Set($@)
                                                                 $scene =~ s/ /#/g; $scene;
                                                               }
                                                             } keys %{$scenes} );
+
   } else {
     $list .= " scene";
+
   }
 
   return SetExtensions($hash, $list, $name, @aa);
