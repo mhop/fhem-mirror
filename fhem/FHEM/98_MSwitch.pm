@@ -81,13 +81,13 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.9';
+my $version    = '2.91';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 30; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
 my $eventset = '0';
 my $deletesavedcmds = 1800; # zeitraum nachdem gespeicherte devicecmds gelöscht werden ( beschleunugung des webinterfaces )
-my $deletesavedcmdsstandart = "nosave"; # standartverhalten des attributes "MSwitch_DeleteCMDs" <manually,nosave,automatic>
+my $deletesavedcmdsstandart = "automatic"; # standartverhalten des attributes "MSwitch_DeleteCMDs" <manually,nosave,automatic>
 
 # standartlist ignorierter Devices . kann durch attribut überschrieben werden .
 my @doignore =qw(notify allowed at watchdog doif fhem2fhem telnet FileLog readingsGroup FHEMWEB autocreate eventtypes readingsproxy svg cul);
@@ -2239,36 +2239,37 @@ my %setlist;
                 $count++;
             }
 
-            my $key        = $device . "_" . $cmd;
+        # teste auf delayinhalt
+		###########################################################	
+			my $key        = $device . "_" . $cmd;
             my $timerkey   = $device . "_time" . $cmd;
-            my $testtstate = $devicedetails{$timerkey};
-
-            # teste auf delayinhalt
-            MSwitch_LOG( $name, 6, "$name: teste auf timerstatus -> $testtstate" );
-            $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtstate eq "[:]" || $testtstate eq "[\$:]" ) 
-			{
-			if ($debugging eq "1")
-					{
-					MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
-					}
-                $devicedetails{$timerkey} = eval MSwitch_Checkcond_state( $devicedetails{$timerkey},$name );
-                if ( $devicedetails{$timerkey} =~ m/[0-9]\d:[0-9]\d:[0-9]\d/ ) 
+			if ( $devicedetails{$timerkey} =~ m/{.*}/ )
 				{
-                    MSwitch_LOG( $name, 6, "$name:   format ok " );
+					$devicedetails{$timerkey} = eval $devicedetails{$timerkey};
+				}
+			if ( $devicedetails{$timerkey} =~ m/\[.*:.*\]/ ) 
+				{
+					$devicedetails{$timerkey} = eval MSwitch_Checkcond_state( $devicedetails{$timerkey},$name );
+				}
+
+			if ( $devicedetails{$timerkey} =~ m/[\d]{2}:[\d]{2}:[\d]{2}/ ) 
+				{
                     my $hdel =( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
                     my $mdel =( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
                     my $sdel =( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
                     $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
                 }
+			elsif( $devicedetails{$timerkey} =~ m/^\d*\.?\d*$/  ) 
+				{
+				$devicedetails{$timerkey} = $devicedetails{$timerkey} ;
+				}
                 else 
 				{
-                    MSwitch_LOG($name,1, "$name: ERROR Timerformat ". $devicedetails{$timerkey}  . " fehlerhaf " );
+                    MSwitch_LOG($name,1, "$name: ERROR Timerformat ". $devicedetails{$timerkey}  . " fehlerhaft " );
                     $devicedetails{$timerkey} = 0;
-                }
-            }
+                }		
             MSwitch_LOG( $name,6, "$name: timerstatus nach test -> ". $devicedetails{$timerkey});
-            # suche befehl
+		   # suche befehl
             if (    $devicedetails{$key} ne ""&& $devicedetails{$key} ne "no_action" )    #befehl gefunden
             {
                 my $cs = '';
@@ -2345,6 +2346,8 @@ my %setlist;
                         MSwitch_LOG( $name, 6,"$name: delaykey -> " . $delaykey );
                         MSwitch_LOG( $name, 6,"$name: delaykeyinhalt -> " . $delayinhalt );
                         MSwitch_LOG( $name, 6,"$name: delaykeyinhaltorg -> " . $teststateorg );
+
+
 
                         if ( $delayinhalt eq 'at0' || $delayinhalt eq 'at1' ) 
 						{
@@ -5295,63 +5298,22 @@ $COND1check1="<input name='info' type='button' value='check condition' onclick=\
 									  . "</select>";					    
                 }
 
-                #### zeitrechner
+
+
+
+        #### zeitrechner    ABSATZ UAF NOTWENDIGKEIT PRÜF
                 my $delaym = 0;
                 my $delays = 0;
                 my $delayh = 0;
                 my $timestroff;
                 my $testtimestroff = $savedetails{ $aktdevice . '_timeoff' };
-
-                if ( $testtimestroff ne '[random]' ) {
-                    $testtimestroff =~ s/[A-Za-z0-9#\.\-_]//g;
-
-                    if (    $testtimestroff eq "[:]"|| $testtimestroff eq "[\$:]" || $testtimestroff eq "::" )
-                    {
-                        $timestroff = $savedetails{ $aktdevice . '_timeoff' };    #sekunden
-                    }
-                    else 
-					{
-                        $timestroff =  $savedetails{ $aktdevice . '_timeoff' };    #sekunden
-                        $delaym = int $timestroff / 60;
-                        $delays = $timestroff - ( $delaym * 60 );
-                        $delayh = int $delaym / 60;
-                        $delaym = $delaym - ( $delayh * 60 );
-                        $timestroff =sprintf( "%02d:%02d:%02d", $delayh, $delaym, $delays );
-                    }
-                }
-                else 
-				{
-                    $timestroff = "[random]";
-                }
-
+				$timestroff=$savedetails{ $aktdevice . '_timeoff' };
                 my $timestron;
                 my $testtimestron = $savedetails{ $aktdevice . '_timeon' };
+				$timestron=$savedetails{ $aktdevice . '_timeon' };
+		#########################################
 
-                if ( $testtimestron ne '[random]' ) 
-				{
-                    $testtimestron =~ s/[A-Za-z0-9#\.\-_]//g;
-					
-					
-					
-                    if ( $testtimestron eq "[:]" || $testtimestron eq "[\$:]" || $testtimestron eq "::" )
-                    {
-                        $timestron = $savedetails{ $aktdevice . '_timeon' };    #sekunden
-                    }
-                    else 
-					{
-                        $timestron = $savedetails{ $aktdevice . '_timeon' };    #sekunden
-                        $delaym = int $timestron / 60;
-                        $delays = $timestron - ( $delaym * 60 );
-                        $delayh = int $delaym / 60;
-                        $delaym = $delaym - ( $delayh * 60 );
-                        $timestron =
-                        sprintf( "%02d:%02d:%02d", $delayh, $delaym,$delays );
-                    }
-                }
-                else 
-				{
-                    $timestron = "[random]";
-                }
+
 
 				$DELAYset1=	"<select id = '' name='onatdelay". $nopoint . "'>";			
 				
@@ -5386,9 +5348,9 @@ $COND1check1="<input name='info' type='button' value='check condition' onclick=\
                   . $_
                   . "' name='timeseton"
                   . $nopoint
-                  . "' size='8' value ='"
+                  . "' size='15' value ='"
                   . $timestron
-                  . "'> (hh:mm:ss)";		  
+                  . "'>";		  
 
 				$DELAYset2 = "<select id = '' name='offatdelay". $nopoint . "'>";
 
@@ -5417,9 +5379,9 @@ $COND1check1="<input name='info' type='button' value='check condition' onclick=\
                   . $nopoint
                   . "' name='timesetoff"
                   . $nopoint
-                  . "' size='8' value ='"
+                  . "' size='15' value ='"
                   . $timestroff
-                  . "'> (hh:mm:ss)";
+                  . "'>";
 
 
 			if ( $expertmode eq '1' )
@@ -5862,7 +5824,7 @@ $detailhtml .= $modify;
         $ret .= "<table border='$border' class='block wide' id=''>
 		 <tr class='even'>
 		 <td><center>&nbsp;<br>$INACTIVE<br>&nbsp;<br>
-		 </td></tr></table>";
+		 </td></tr></table><br>";
     }
     elsif ( IsDisabled($Name) )
 	{
@@ -7037,7 +6999,14 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	text = text +  'Bei Auswahl dieses Feldes ergolgt ein Abbruch des Programms, nach Ausfuehrung dieses Befehles (in Abhaengigkeit der Conditions).<br>Folgende Befehle werden nur dann ausgefuehrt, wenn dieser Befehl nicht ausgefuehrt wurde.<br>Diese Option macht im Grunde nur Sinn in Zusammenhang mit der Priority-Funktion';}
 	
 	if (from == 'timer'){
-	text = text +  'Hier kann entweder eine direkte Angabe einer Verzögerungszeit (delay with Cond_check) angegeben werden, oder es kann eine Ausführungszeit (at with Cond-check) für den Befehl angegeben werden<br> Bei der Angabe einer Ausführungszeit wird der Schaltbefehl beim nächsten erreichen der angegebenen Zeit ausgeführt. Ist die Zeit am aktuellen Tag bereits überschritten , wird der angegebene Zeitpunkt am Folgetag gesetzt.<br>Die Auswahl \"with Conf-check\" oder \"without Conf-check\" legt fest, ob unmittelbar vor Befehlsausführung nochmals die Condition für den Befehl geprüft wird oder nicht.<br><brAlternativ kann hier auch ein Verweis auf ein beliebiges Reading eines Devices erfolgen, das entsprechenden Wert enthält. Dieser Verweis muss in folgendem Format erfolgen:<br><br>[NAME.reading] des Devices  ->z.B.  [dummy.state]<br>Das Reading muss in folgendem Format vorliegen: hh:mm:ss ';}
+	text = text +  'Hier kann entweder eine direkte Angabe einer Verzögerungszeit (delay with Cond_check) angegeben werden, oder es kann eine Ausführungszeit (at with Cond-check) für den Befehl angegeben werden<br> Bei der Angabe einer Ausführungszeit wird der Schaltbefehl beim nächsten erreichen der angegebenen Zeit ausgeführt. Ist die Zeit am aktuellen Tag bereits überschritten , wird der angegebene Zeitpunkt am Folgetag gesetzt.<br>Die Auswahl \"with Conf-check\" oder \"without Conf-check\" legt fest, ob unmittelbar vor Befehlsausführung nochmals die Condition für den Befehl geprüft wird oder nicht.<br><brAlternativ kann hier auch ein Verweis auf ein beliebiges Reading eines Devices erfolgen, das entsprechenden Wert enthält.
+	Dieser Verweis kannin folgenden Formaten erfolgen:<br><br>
+	[NAME:reading] des Devices  ->z.B.  [dummy.state] - der Inhalt muss eine Zahl (sekunden) oder ein eine Zeitangabe enthalten<br>
+	hh:mm:ss ->  Zeitangabe Formatiert<br>
+	ss -> Angabe in Sekunden<br>
+	[random] -> siehe Fhemwiki
+	{perl} -> perlcode - der Rückgabewert  muss eine Zahl (sekunden) oder ein eine Zeitangabe hh:mm:ss enthalten<br>
+	 ';}
 					   
 if (from == 'trigger')
 {
@@ -7576,48 +7545,39 @@ sub MSwitch_makeCmdHash($) {
         $_ =~ s/#\[ko\]/,/g;     #neu
         $_ =~ s/#\[bs\]/\\/g;    #neu
 
+
+### achtung on/off vertauscht
+############### off
+
+
         my @detailarray = split( /#\[NF\]/, $_ );    #enthält daten 0-5 0 - name 1-5 daten 7 und9 sind zeitangaben
         my $key            = '';
-        my $testtimestroff = $detailarray[7];
+       # my $testtimestroff = $detailarray[7];
         $key = $detailarray[0] . "_delayatonorg";
         $savedetails{$key} = $detailarray[7];
 
- MSwitch_LOG( $Name, 5, "testtimestroff -$testtimestroff-" );
+		#$detailarray[7]=$testtimestroff;
 
-        if ( $testtimestroff ne '[random]' ) 
-		{
 
-		#### hier ein LOG !!!!
-            $testtimestroff =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtimestroff ne "[:]" && $testtimestroff ne "[\$:]" ) 
-			{
-                my $hdel = ( substr( $detailarray[7], 0, 2 ) ) * 3600;
-                my $mdel = ( substr( $detailarray[7], 3, 2 ) ) * 60;
-                my $sdel = ( substr( $detailarray[7], 6, 2 ) ) * 1;
-                $detailarray[7] = $hdel + $mdel + $sdel;
-            }
-        }
+##### on
 
         my $testtimestron = $detailarray[8];
         $key = $detailarray[0] . "_delayatofforg";
         $savedetails{$key} = $detailarray[8];
 
-        if ( $testtimestron ne '[random]' ) 
-		{
-            $testtimestron =~ s/[A-Za-z0-9#\.\-_]//g;
-            if ( $testtimestron ne "[:]" && $testtimestroff ne "[\$:]" )
-			{
-                if ( $detailarray[8] ne "00:00:00" ) 
-				{
-				#MSwitch_LOG( $Name, 0, "$Name:     detailarray8  " .$detailarray[8] );
-                }
+		$detailarray[8]	=$testtimestron;
+		
+		# ^\d*\.?\d*$
+		
+		
+		
+	
 
-                my $hdel = substr( $detailarray[8], 0, 2 ) * 3600;
-                my $mdel = substr( $detailarray[8], 3, 2 ) * 60;
-                my $sdel = substr( $detailarray[8], 6, 2 ) * 1;
-                $detailarray[8] = $hdel + $mdel + $sdel;
-            }
-        }
+
+
+
+
+
 
         $key               = $detailarray[0] . "_on";
         $savedetails{$key} = $detailarray[1];
@@ -7834,42 +7794,45 @@ sub MSwitch_Exec_Notif($$$$$) {
         # teste auf on kommando
         my $key        = $device . "_" . $comand;
         my $timerkey   = $device . "_time" . $comand;
-        my $testtstate = $devicedetails{$timerkey};
+       # my $testtstate = $devicedetails{$timerkey};
 
-		MSwitch_LOG( "$name", 6,"timerkey blanko: ".$devicedetails{$timerkey}." " . __LINE__ );
-		MSwitch_LOG( "$name", 6,"############################################## " . __LINE__ );
 
-        $testtstate =~ s/[A-Za-z0-9#\.\-_]//g;
-        if ( $testtstate eq "[:]" || $testtstate eq "[\$:]" ) 
-		{
-		if ($debugging eq "1")
-				{
-				MSwitch_LOG( "Debug", 0,"eveal line" . __LINE__ );
-				}
-            $devicedetails{$timerkey} = eval MSwitch_Checkcond_state( $devicedetails{$timerkey}, $name );
+
+			MSwitch_LOG( $name, 6,"$name: timer -> " . $devicedetails{$timerkey} );
+			if ( $devicedetails{$timerkey} =~ m/{.*}/ )
+			{
+			$devicedetails{$timerkey} = eval $devicedetails{$timerkey};
+			}
+			MSwitch_LOG( $name, 6,"$name: timer -> " . $devicedetails{$timerkey} );
 			
-            if ( $devicedetails{$timerkey} =~ m/[0-9]\d:[0-9]\d:[0-9]\d/ ) 
-			{
-                MSwitch_LOG( $name, 5, "$name:   format ok " );
-                my $hdel = ( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
-                my $mdel = ( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
-                my $sdel = ( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
-                $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
-            }
-            else 
-			{
-                MSwitch_LOG(
-                             $name,
-                             1,
-                             "$name: ERROR Timerformat "
-                               . $devicedetails{$timerkey}
-                               . " fehlerhaf "
-                );
-                $devicedetails{$timerkey} = 0;
-            }
+			if ( $devicedetails{$timerkey} =~ m/\[.*:.*\]/ ) 
+				{
+				MSwitch_LOG( $name, 6,"$name: FOUND -> " . $devicedetails{$timerkey} );
+					$devicedetails{$timerkey} = eval MSwitch_Checkcond_state( $devicedetails{$timerkey},$name );
+				}
+			
+			if ( $devicedetails{$timerkey} =~ m/[\d]{2}:[\d]{2}:[\d]{2}/ ) 
+				{
+					MSwitch_LOG( $name, 6, "$name:   format ok " );
+                    my $hdel =( substr( $devicedetails{$timerkey}, 0, 2 ) ) * 3600;
+                    my $mdel =( substr( $devicedetails{$timerkey}, 3, 2 ) ) * 60;
+                    my $sdel =( substr( $devicedetails{$timerkey}, 6, 2 ) ) * 1;
+                    $devicedetails{$timerkey} = $hdel + $mdel + $sdel;
+                }
+			elsif( $devicedetails{$timerkey} =~ m/^\d*\.?\d*$/  ) 
+				{
+				$devicedetails{$timerkey} = $devicedetails{$timerkey} ;
+				}
+                else 
+				{
+                    MSwitch_LOG($name,1, "$name: ERROR Timerformat ". $devicedetails{$timerkey}  . " fehlerhaft " );
+                    $devicedetails{$timerkey} = 0;
+                }
 
-        }
-        MSwitch_LOG( $name, 6, "$name:     timer des devices -> " . $devicedetails{$timerkey} );
+		
+        MSwitch_LOG( $name,6, "$name:     timer des devices -> " . $devicedetails{$timerkey} );
+
+
 
         # teste auf condition
         # antwort $execute 1 oder 0 ;
