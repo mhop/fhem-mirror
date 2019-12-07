@@ -763,7 +763,7 @@ sub SSChatBot_getapisites($) {
        return SSChatBot_chatop($name);
    }
 
-   my $httptimeout = AttrVal($name,"httptimeout",4);
+   my $httptimeout = AttrVal($name,"httptimeout",20);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
@@ -926,7 +926,7 @@ sub SSChatBot_chatop ($) {
    my $fileUrl     = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{fileUrl};
    Log3($name, 4, "$name - start SendQueue entry index \"$idx\" ($hash->{OPMODE}) for operation."); 
 
-   $httptimeout   = AttrVal($name, "httptimeout", 4);
+   $httptimeout   = AttrVal($name, "httptimeout", 20);
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
@@ -1530,9 +1530,9 @@ sub SSChatBot_CGI() {
       }
 	  
 	  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
-	  $name = $h->{botname};                             # das SSChatBot Device
+	  $name = $h->{botname};                                # das SSChatBot Device
 	  return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" ) unless (IsDevice($name, 'SSChatBot'));
-	  $hash = $defs{$name};                              # hash des SSChatBot Devices
+	  $hash = $defs{$name};                                 # hash des SSChatBot Devices
 	  
       if (!defined($h->{token})) {
             Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
@@ -1545,7 +1545,7 @@ sub SSChatBot_CGI() {
       my $want     = $FWhash->{CSRFTOKEN};
       $want        = $want?$want:"none";
       my $supplied = $h->{fwcsrf};
-      if($want eq "none" || $want ne $supplied) {
+      if($want eq "none" || $want ne $supplied) {           # $FW_wname enthält ebenfalls das aufgerufenen FHEMWEB-Device
           Log3 ($FW_wname, 2, "$FW_wname - WARNING - FHEMWEB CSRF error for client \"$FWdev\": ".
                               "received $supplied token is not $want. ".
                               "For details see the csrfToken FHEMWEB attribute. ".
@@ -1761,7 +1761,7 @@ sub SSChatBot_CGI() {
 <h3>SSChatBot</h3>
 <ul>
 
-The guide for this module is currently only available in the germin <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">Wiki</a>.
+The guide for this module is currently only available in the german <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers">Wiki</a>.
 
 </ul>
 
