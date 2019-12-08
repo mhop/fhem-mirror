@@ -173,9 +173,19 @@ generateModuleCommandref($$;$$)
 
       } elsif(!$skip) {
         print $fh $l if($fh);
+        if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
+          my ($dir, $re) = ($1, $2);
+          if(opendir(DH, $dir)) {
+            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
+              generateModuleCommandref("$dir/$file", $lang, $fh, 1);
+            }
+            closedir(DH);
+          }
+        }
         chkAndGenLangLinks($l, $lang, $fh);
 
         $docCount++;
+        next if($noWarnings);
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           if($l =~ m/<$tag ([^>]+)>/i) {
@@ -194,15 +204,6 @@ generateModuleCommandref($$;$$)
           $llwct{$tag} = $line if(!$tagcount{$tag});
         }
 
-        if($l =~ m,INSERT_DOC_FROM: ([^ ]+)/([^ /]+) ,) {
-          my ($dir, $re) = ($1, $2);
-          if(opendir(DH, $dir)) {
-            foreach my $file (grep { m/^$2$/ } readdir(DH)) {
-              generateModuleCommandref("$dir/$file", $lang, $fh, 1);
-            }
-            closedir(DH);
-          }
-        }
       }
     }
     close($modFh);
