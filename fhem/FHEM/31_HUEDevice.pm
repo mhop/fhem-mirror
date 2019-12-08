@@ -206,6 +206,9 @@ HUEDevice_devStateIcon($)
   return undef if( !$hash );
   my $name = $hash->{NAME};
 
+  return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
+  return ".*:light_question:toggle" if( defined($hash->{mode}) && $hash->{mode} ne 'homeautomation' );
+
   my $pct = ReadingsVal($name, 'pct', 100);
   my $subtype = AttrVal($name, 'subType', 'extcolordimmer' );
 
@@ -222,8 +225,6 @@ HUEDevice_devStateIcon($)
         return undef if( $createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", 1) );
         return undef if( !$createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", undef) );
 
-        return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
-        return ".*:light_question:toggle" if( defined($hash->{mode}) && $hash->{mode} ne 'homeautomation' );
 
         return ".*:off:toggle" if( ReadingsVal($name,"onoff","0") eq "0" );
 
@@ -242,8 +243,6 @@ HUEDevice_devStateIcon($)
   }
 
   return undef if( $hash->{helper}->{devtype} );
-
-  return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
 
   return ".*:off:toggle" if( ReadingsVal($name,"state","off") eq "off" );
 
