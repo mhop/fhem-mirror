@@ -63,7 +63,7 @@ my %SSChatBot_errlist = (
   102 => "API does not exist - may be the Synology Chat Server package is stopped",
   120 => "payload has wrong format",
   404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
-  407 => "record is not valid",
+  407 => "record not valid",
   800 => "malformed or unsupported URL",
   805 => "empty API data received - may be the Synology Chat Server package is stopped",
   806 => "couldn't get Synology Chat API informations",
@@ -127,8 +127,9 @@ sub SSChatBot_Define($@) {
   
   $hash->{INADDR}                = $inaddr;
   $hash->{INPORT}                = $inport;
-  $hash->{MODEL}                 = "ChatBot";         
+  $hash->{MODEL}                 = "ChatBot"; 
   $hash->{INPROT}                = $inprot;
+  $hash->{RESEND}                = "next planned SendQueue start: immediately by next entry";
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   $hash->{HELPER}{USERFETCHED}   = 0;                                            # Chat User sind noch nicht abgerufen
   
@@ -147,9 +148,10 @@ sub SSChatBot_Define($@) {
   # Index der Sendequeue initialisieren
   $data{SSChatBot}{$name}{sendqueue}{index} = 0;
     
-  readingsBeginUpdate($hash); 
-  readingsBulkUpdate($hash, "state", "Initialized");                             # Init state
-  readingsEndUpdate($hash,1);              
+  readingsBeginUpdate         ($hash);                                             
+  readingsBulkUpdateIfChanged ($hash, "QueueLenth", 0);                          # Länge Sendqueue initialisieren  
+  readingsBulkUpdate          ($hash, "state", "Initialized");                   # Init state
+  readingsEndUpdate           ($hash,1);              
 
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
   SSChatBot_initonboot($hash);
@@ -272,7 +274,7 @@ sub SSChatBot_Set($@) {
         
   return if(IsDisabled($name));
   
-  my $idxlist = join(",",(sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}));
+  my $idxlist = join(",", SSCam_sortVersion("asc",keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}));
  
   if(!$hash->{TOKEN}) {
       # initiale setlist für neue Devices
@@ -283,7 +285,7 @@ sub SSChatBot_Set($@) {
       $setlist = "Unknown argument $opt, choose one of ".
                  "botToken ".
                  "listSendqueue:noArg ".
-                 ($idxlist?"purgeSendqueue:-all-,$idxlist ":"purgeSendqueue:-all- ").
+                 ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
                  "sendItem:textField-long "
                  ;
   }
@@ -324,7 +326,13 @@ sub SSChatBot_Set($@) {
           delete $hash->{OPIDX};
           delete $data{SSChatBot}{$name}{sendqueue}{entries};
           $data{SSChatBot}{$name}{sendqueue}{index} = 0;
-          return "All entries of SendQueue deleted";
+          return "All entries of SendQueue are deleted";
+      } elsif($prop eq "-permError-") {
+	      foreach my $idx (keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
+              delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx} 
+                  if($data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend}); 			
+          }
+          return "All entries with state \"permanent send error\" are deleted";
       } else {
           delete $data{SSChatBot}{$name}{sendqueue}{entries}{$prop};
           return "SendQueue entry with index \"$prop\" deleted";
@@ -640,7 +648,9 @@ sub SSChatBot_addQueue ($$$$$$$$) {
                'retryCount' => 0,               
               };
 				      
-   $data{SSChatBot}{$name}{sendqueue}{entries}{$index} = $pars;   
+   $data{SSChatBot}{$name}{sendqueue}{entries}{$index} = $pars; 
+
+   SSChatBot_updQLength ($hash);                        # updaten Länge der Sendequeue     
    
 return;
 }
@@ -662,24 +672,23 @@ sub SSChatBot_checkretry ($$) {
   
   if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
+      SSChatBot_updQLength ($hash);
       return;  
   } 
   
-  if(!$retry) {
-      # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
+  if(!$retry) {                                                # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
-      return SSChatBot_getapisites($name) if((sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0]);      # nächsten Eintrag abarbeiten wenn SendQueue nicht leer
+      SSChatBot_updQLength ($hash);
+      return SSChatBot_getapisites($name);                     # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
-  } else {
-      # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
+  } else {                                                     # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
       $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|120|407|800|900/) {                                 
-          # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      if($errorcode =~ /100|101|120|407|800|900/) {            # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = 1;
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
@@ -687,19 +696,23 @@ sub SSChatBot_checkretry ($$) {
           
           delete $hash->{OPIDX};
           delete $hash->{OPMODE};
+          
+          SSChatBot_updQLength ($hash);                        # updaten Länge der Sendequeue
+          
+          return SSChatBot_getapisites($name);                 # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
       if(!$forbidSend) {
           my $rs = 0;
-          if($rc <= 5) {
+          if($rc <= 1) {
               $rs = 5;
-          } elsif ($rc < 10) {
+          } elsif ($rc < 3) {
               $rs = 20;
-          } elsif ($rc < 15) {
+          } elsif ($rc < 5) {
               $rs = 60;
-          } elsif ($rc < 20) {
+          } elsif ($rc < 7) {
               $rs = 1800;
-          } elsif ($rc < 25) {
+          } elsif ($rc < 9) {
               $rs = 3600;
           } else {
               $rs = 86400;
@@ -707,12 +720,15 @@ sub SSChatBot_checkretry ($$) {
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
           
+          my $rst = gettimeofday()+$rs;                        # resend Timer 
+          SSChatBot_updQLength ($hash,$rst);                   # updaten Länge der Sendequeue mit resend Timer
+          
           RemoveInternalTimer($hash, "SSChatBot_getapisites");
-          InternalTimer(gettimeofday()+$rs, "SSChatBot_getapisites", "$name", 0);
+          InternalTimer($rst, "SSChatBot_getapisites", "$name", 0);
       }
   }
 
-return;
+return
 }
 
 #############################################################################################################################
@@ -1377,6 +1393,29 @@ sub SSChatBot_trim ($) {
   $str =~ s/^\s+|\s+$//g;
 
 return ($str);
+}
+
+#############################################################################################
+#                        Länge Senedequeue updaten          
+#############################################################################################
+sub SSChatBot_updQLength ($;$) {
+  my ($hash,$rst) = @_;
+  my $name        = $hash->{NAME};
+ 
+  my $ql = keys %{$data{SSChatBot}{$name}{sendqueue}{entries}};
+  
+  readingsBeginUpdate         ($hash);                                             
+  readingsBulkUpdateIfChanged ($hash, "QueueLenth", $ql);                          # Länge Sendqueue updaten
+  readingsEndUpdate           ($hash,1);
+  
+  my $head = "next planned SendQueue start:";
+  if($rst) {                                                                       # resend Timer gesetzt
+      $hash->{RESEND} = $head." ".FmtDateTime($rst);
+  } else {
+      $hash->{RESEND} = $head." immediately by next entry";
+  }
+
+return;
 }
 
 #############################################################################################
