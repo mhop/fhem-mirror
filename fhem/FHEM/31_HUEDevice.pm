@@ -482,16 +482,18 @@ HUEDevice_SetParam($$@)
   my $subtype = "extcolordimmer";
   if( $name ) {
     $subtype = AttrVal($name, "subType", $subtype);
-    if($cmd eq 'up' ) {
+    if( $cmd eq 'up' ) {
       $cmd = 'pct';
       $value = 100;
-    } elsif($cmd eq 'down' ) {
+
+    } elsif( $cmd eq 'down' ) {
       $cmd = 'pct';
       $value = 0;
 
-    } elsif( $cmd eq "pct" && $value == 0 && $subtype ne 'blind' ) {
+    } elsif( $cmd eq 'pct' && $value == 0 && $subtype ne 'blind' ) {
       $cmd = "off";
       $value = $value2;
+
     }
   }
 
@@ -743,7 +745,7 @@ HUEDevice_Set($@)
       my $arg = join( ' ', @args );
       my $deConz;
       if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
-        if( $hash->{IODev}{modelid} eq 'deCONZ' ) {
+        if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' ) {
           $deConz = 1;
           $arg = HUEBridge_scene2id_deCONZ($hash, $arg);
         } else {
@@ -988,7 +990,7 @@ HUEDevice_Set($@)
 
   if( $hash->{IODev} && $hash->{IODev}{TYPE} eq 'HUEBridge' ) {
     $list .= " alert:none,select,lselect";
-    $list .= ",breathe,okay,channelchange,finish,stop" if( $hash->{IODev} && $hash->{IODev}{modelid} eq 'deCONZ' );
+    $list .= ",breathe,okay,channelchange,finish,stop" if( defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' );
 
     $list .= " effect:none,colorloop" if( $subtype =~ m/color/ );
 
@@ -1001,7 +1003,7 @@ HUEDevice_Set($@)
     }
   }
 
-  if( $hash->{IODev} && $hash->{IODev}{modelid} ne 'deCONZ' ) {
+  if( $hash->{IODev} && defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} ne 'deCONZ' ) {
     if( my $scenes = $hash->{scenes} ) {
       my @names;
       for my $scene (@{$scenes}) {
@@ -1294,7 +1296,7 @@ HUEDeviceSetIcon($;$)
 
   return if( defined($attr{$name}{icon}) && !$force );
 
-  if( $hash->{modelid} ) {
+  if( defined($hash->{modelid}) ) {
     my $model = $hueModels{$hash->{modelid}};
     return undef if( !$model );
 
