@@ -206,6 +206,15 @@ HUEDevice_devStateIcon($)
   return undef if( !$hash );
   my $name = $hash->{NAME};
 
+  my $pct = ReadingsVal($name, 'pct', 100);
+  my $subtype = AttrVal($name, 'subType', 'extcolordimmer' );
+
+  if( $subtype eq 'blind' ) {
+    my $p = int(10-$pct/10)*10;
+    return ".*:fts_window_2w" if( $p == 0 );
+    return ".*:fts_shutter_$p";
+  }
+
   if( $hash->{helper}->{devtype} && $hash->{helper}->{devtype} eq 'G' ) {
     if( $hash->{IODev} ) {
       my $createGroupReadings = AttrVal($hash->{IODev}{NAME},"createGroupReadings",undef);
@@ -238,24 +247,12 @@ HUEDevice_devStateIcon($)
 
   return ".*:off:toggle" if( ReadingsVal($name,"state","off") eq "off" );
 
-  my $pct = ReadingsVal($name,"pct","100");
   my $s = $dim_values{int($pct/7)};
   $s="on" if( $pct eq "100" );
 
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
-  return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "dimmer" );
-  return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "switch" );
-
-  if( AttrVal($name, "subType", "") eq "blind" ) {
-    my $p = int(10-$pct/10)*10;
-    return ".*:fts_window_2w" if( $p == 0 );
-    return ".*:fts_shutter_$p";
-  }
-
-  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
-  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
-  #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB004" );
-
+  return ".*:$s:toggle" if( $subtype eq "dimmer" );
+  return ".*:$s:toggle" if( $subtype eq "switch" );
 
   return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $pct < 100 && AttrVal($name, "color-icons", 0) == 2 );
   return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
