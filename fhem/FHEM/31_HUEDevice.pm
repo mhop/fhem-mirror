@@ -999,7 +999,7 @@ HUEDevice_Set($@)
     }
   }
 
-  if( $hash->{IODev} && defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} ne 'deCONZ' ) {
+  if( $hash->{IODev} && defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} eq 'deCONZ' ) {
     if( my $scenes = $hash->{helper}{scenes} ) {
       my @names;
       for my $scene (@{$scenes}) {
