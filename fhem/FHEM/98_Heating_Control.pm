@@ -136,7 +136,7 @@ sub Heating_Control_ConvertToWDT() {
     my @b = GetAllReadings($hcName);
     CommandDelete(undef,$hcName);
     CommandDefine(undef,"$hcName WeekdayTimer $definition");
-    CommandAttr(undef, "$hcName WDT_delayedExecutionDevices $windows");
+    CommandAttr(undef, "$hcName WDT_delayedExecutionDevices $windows") if defined $windows;
     CommandAttr(undef, "$hcName WDT_Group former_HC");
     foreach my $linesa  ( @a ){
        AnalyzeCommand(undef, "$linesa") unless ($linesa =~ m/^attr $hcName windowSensor/);
