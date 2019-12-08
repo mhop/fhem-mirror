@@ -1109,6 +1109,7 @@ readingsGroup_2html($;$)
         ($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name2,$n,$v,$cell_row,$cell_column,$type);
         next if( !defined($informid) );
         #$informid = "informId=\"$d-item:$cell_row:$item\"" if( $format );
+        $informid =~ s/"$/:$format"/ if( $format );
 
         my $cell_style0 = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,0);
         my $cell_style = lookup2($hash->{helper}{cellStyle},$name,$n,$v,$cell_row,$cell_column);
@@ -1218,8 +1219,6 @@ readingsGroup_Update($$$)
   my ($hash, $item, $value) = @_;
   my $name  = $hash->{NAME};
 
-  #Log 1, "$name, $item, $value";
-
   $hash->{changed} = 1;
 
   if( $hash->{alwaysTrigger} ) {
@@ -1234,7 +1233,13 @@ readingsGroup_Update($$$)
               $ntfy->{inform}{type} ne "status");
       next if( !$ntfy->{inform}{devices}{$name} );
       if(!FW_addToWritebuffer($ntfy,
-          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", "", $value )."\n" )) {
+          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", "", $value ) ."\n" )) {
+        my $name = $ntfy->{NAME};
+        Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
+        TcpServer_Close($ntfy, 1);
+      }
+      if(!FW_addToWritebuffer($ntfy,
+          FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item-ts", "", TimeNow() ) ."\n" )) {
         my $name = $ntfy->{NAME};
         Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
         TcpServer_Close($ntfy, 1);
@@ -1298,8 +1303,10 @@ readingsGroup_Notify($$)
         $hash->{DEF} =~ s/ $//;
       }
       readingsGroup_updateDevices($hash);
+
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
       readingsGroup_updateDevices($hash);
+
     } else {
       next if(AttrVal($name,"disable", undef));
 
@@ -1511,7 +1518,11 @@ readingsGroup_Notify($$)
           $value = "<div $value_style>$value</div>" if( $value_style );
 
           #FIXME: create {'$n.$reading'} = $value hash to avaid multiple events and calculations if same reading is included multiple times
-          $triggers{"$n.$reading"} = $value;
+          if( $format ) {
+            $triggers{"$n.$reading:$format"} = $value;
+          } else {
+            $triggers{"$n.$reading"} = $value;
+          }
 
           if( my $cells = $hash->{helper}{positions}{"$n.$reading"} ) {
             foreach my $cell ( split( ',', $cells ) ) {
@@ -2143,14 +2154,14 @@ readingsGroup_Attr($$$;$)
       <li>notime<br>
         Wenn der Wert auf 1 gesetzt, wird der Readings-Timestamp nicht angezeigt.</li><br>
       <li>mapping<br>
-        Kann ein einfacher String oder ein in {} eingeschlossener Perl-Ausdruck sein, der einen Hash zur&uuml;ckgibt, der den Reading-Name dem angezeigten Namen zuordnet. 
+        Kann ein einfacher String oder ein in {} eingeschlossener Perl-Ausdruck sein, der einen Hash zur&uuml;ckgibt, der den Reading-Name dem angezeigten Namen zuordnet.
 		Der Schl&uuml;ssel kann entweder der Name des Readings oder &lt;device&gt;.&lt;reading&gt; oder &lt;reading&gt;.&lt;value&gt; oder &lt;device&gt;.&lt;reading&gt;.&lt;value&gt; sein.
         %DEVICE, %ALIAS, %ROOM, %GROUP, %ROW und %READING werden durch den Ger&auml;tenamen, Ger&auml;tealias, Raumattribut ersetzt. Sie k&ouml;nnen diesen Keywords auch ein Pr&auml;fix voranstellen $ anstatt von %. Beispiele:<br>
           <code>attr temperatures mapping $DEVICE-$READING</code><br>
           <code>attr temperatures mapping {temperature => "%DEVICE Temperatur"}</code>
         </li><br>
       <li>separator<br>
-        Das zu verwendende Trennzeichen zwischen dem Ger&auml;tealias und dem Reading-Namen, wenn keine Zuordnung angegeben ist, standardgem&auml;&szlig; ':' 
+        Das zu verwendende Trennzeichen zwischen dem Ger&auml;tealias und dem Reading-Namen, wenn keine Zuordnung angegeben ist, standardgem&auml;&szlig; ':'
         Ein Leerzeichen wird so dargestellt <code>&amp;nbsp;</code></li><br>
       <li>setList<br>
         Eine durch Leerzeichen getrennte Liste von Befehlen, die zur&uuml;ckgegeben werden "set name ?",
@@ -2163,7 +2174,7 @@ readingsGroup_Attr($$$;$)
           <code>attr temperatures style style="font-size:20px"</code></li><br>
       <li>cellStyle<br>
         Geben Sie einen HTML-Stil f&uuml;r eine Zelle der Readings-Tabelle an. Normale Zeilen und Spalten werden gez&auml;hlt beginnend mit 1,
-        Die Zeilen&uuml;berschriften beginnt mit der Spaltennummer 0. Perl-Code hat Zugriff auf $ROW und $COLUMN. Schl&uuml;ssel f&uuml;r Hash-Lookup k&ouml;nnen sein: 
+        Die Zeilen&uuml;berschriften beginnt mit der Spaltennummer 0. Perl-Code hat Zugriff auf $ROW und $COLUMN. Schl&uuml;ssel f&uuml;r Hash-Lookup k&ouml;nnen sein:
         r:#, c:# oder r:#,c:# , z.Bsp:<br>
           <code>attr temperatures cellStyle { "c:0" => 'style="text-align:right"' }</code></li><br>
       <li>nameStyle<br>
@@ -2179,7 +2190,7 @@ readingsGroup_Attr($$$;$)
         Geben Sie einen HTML-Colspan f&uuml;r die Readings-Werte an, z.Bsp:<br>
           <code>attr wzReceiverRG valueColumns { eventdescription => 'colspan="4"' }</code></li><br>
       <li>valueFormat<br>
-        Geben Sie eine Sprintf-Stilformat-Zeichenfolge an, die zum Anzeigen der Readings-Werte verwendet wird. Wenn die Formatzeichenfolge undef ist 
+        Geben Sie eine Sprintf-Stilformat-Zeichenfolge an, die zum Anzeigen der Readings-Werte verwendet wird. Wenn die Formatzeichenfolge undef ist
         wird dieser Messwert &uuml;bersprungen. Es kann als String angegeben werden, ein Perl-Ausdruck, der einen Hash- oder Perl-Ausdruck zur&uuml;ckgibt, der einen String zur&uuml;ckgibt, z.Bsp:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code><br>
           <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
@@ -2244,12 +2255,12 @@ readingsGroup_Attr($$$;$)
           <code>attr temperatures valueStyle {($DEVICE =~ m/aussen/)?'style="color:green"':'style="color:red"'}</code>
       </ul><br>
 
-      Hinweis: Nur valueStyle, valueFomat, valueIcon und <{...}@reading> werden bei Longpoll-Updates ausgewertet und valueStyle muss f&uuml;r jeden m&ouml;glichen Wert einen nicht leeren Stil zur&uuml;ckgeben. Alle anderen Perl-Ausdr&uuml;cke werden nur einmal w&auml;hrend der HTML-Erstellung ausgewertet und geben keine Wertupdates mit longpoll wieder. 
+      Hinweis: Nur valueStyle, valueFomat, valueIcon und <{...}@reading> werden bei Longpoll-Updates ausgewertet und valueStyle muss f&uuml;r jeden m&ouml;glichen Wert einen nicht leeren Stil zur&uuml;ckgeben. Alle anderen Perl-Ausdr&uuml;cke werden nur einmal w&auml;hrend der HTML-Erstellung ausgewertet und geben keine Wertupdates mit longpoll wieder.
       Aktualisieren Sie die Seite, um den dynamischen Stil zu aktualisieren. F&uuml;r nameStyle funktioniert das Farbattribut momentan nicht, die font -... und background Attribute funktionieren.<br><br>
 
       Berechnung: Bitte sehen Sie sich daf&uuml;r diese <a href="http://www.fhemwiki.de/wiki/ReadingsGroup#Berechnungen">Beschreibung</a> an in der Wiki.<br>
       z.Bsp: <code>define rg readingsGroup .*:temperature rg:$avg</code>
-      
+
 </ul>
 
 =end html_DE
