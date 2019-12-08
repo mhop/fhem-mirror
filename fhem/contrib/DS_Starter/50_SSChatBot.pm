@@ -269,7 +269,7 @@ sub SSChatBot_Set($@) {
   my $prop1   = $a[3];
   my $prop2   = $a[4];
   my $prop3   = $a[5];
-  my ($success,$ret,$setlist);
+  my ($success,$setlist);
         
   return if(IsDisabled($name));
   
@@ -303,7 +303,8 @@ sub SSChatBot_Set($@) {
       
   } elsif ($opt eq "listSendqueue") {
       my $sub = sub ($) { 
-          my ($idx) = @_; 
+          my ($idx) = @_;
+          my $ret;          
           foreach my $key (reverse sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}}) {
               $ret .= ", " if($ret);
               $ret .= $key."=>".$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{$key};
@@ -315,7 +316,7 @@ sub SSChatBot_Set($@) {
           return "SendQueue is empty.";
       }
       my $sq;
-	  foreach my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) { 
+	  foreach my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
           $sq .= $idx." => ".$sub->($idx)."\n"; 			
       }
 	  return $sq;
@@ -382,7 +383,7 @@ sub SSChatBot_Set($@) {
       SSChatBot_getapisites($name);
   
   } elsif ($opt eq "restartSendqueue") {
-      $ret = SSChatBot_getapisites($name);
+      my $ret = SSChatBot_getapisites($name);
       if($ret) {
           return $ret;
       } else {
@@ -639,11 +640,11 @@ sub SSChatBot_addQueue ($$$$$$$$) {
 
         return;        
     }
-
-   Log3($name, 5, "$name - Add sendItem to queue - Opmode: $opmode, Text: $text");
    
    $data{SSChatBot}{$name}{sendqueue}{index}++;
    my $index = $data{SSChatBot}{$name}{sendqueue}{index};
+   
+   Log3($name, 5, "$name - Add sendItem to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, userid: $userid");
    
    my $pars = {'opmode'     => $opmode,   
                'method'     => $method, 
@@ -652,10 +653,10 @@ sub SSChatBot_addQueue ($$$$$$$$) {
                'text'       => $text,
                'attachment' => $attachment,
                'fileUrl'    => $fileUrl,  
-               'retryCount' => 0,               
+               'retryCount' => 0               
               };
 				      
-   $data{SSChatBot}{$name}{sendqueue}{entries}{$index} = $pars; 
+   $data{SSChatBot}{$name}{sendqueue}{entries}{$index} = $pars;  
 
    SSChatBot_updQLength ($hash);                        # updaten Länge der Sendequeue     
    
