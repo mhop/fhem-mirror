@@ -4512,136 +4512,7 @@ MS-HELPdelay
 ";
   
  
-  my $controlhtmlalternativ="
-<!-- folgende HTML-Kommentare dürfen nicht gelöscht werden -->
 
-<!-- 
-info: festlegung einer zelleknöhe
-MS-cellhigh=30;
--->
-
-<!-- 
-start:textersetzung:ger
-Set->&nbsp;Schaltbefehl
-condition:->Schaltbedingung
-execute and exit if applies->Abbruch nach Ausführung
-Repeats:->Befehlswiederholungen:
-Repeatdelay in sec:->Wiederholungsverzögerung in Sekunden:
-delay with Cond-check immediately and delayed:->Verzögerung mit Bedingungsprüfung sofort und vor Ausführung:
-delay with Cond-check immediately only:->Verzögerung mit Bedingungsprüfung sofort:
-delay with Cond-check delayed only:->Verzögerung mit Bedingungsprüfung vor Ausführung:
-at with Cond-check immediately and delayed:->Ausführungszeit mit Bedingungsprüfung sofort und vor Ausführung:
-at with Cond-check immediately only:->Ausführungszeit mit Bedingungsprüfung sofort:
-at with Cond-check delayed only->Ausführungszeit mit Bedingungsprüfung vor Ausführung:
-check condition->prüfe Bedinhgung
-\\(hh:mm:ss\\)-> 
-end:textersetzung:ger
--->
-
-<!-- 
-start:textersetzung:eng
-end:textersetzung:eng
--->
-
-
-
-<!--
-MS-cellhighstandart
-MS-cellhighexpert
-MS-cellhighdebug
-MS-IDSATZ
-MS-NAMESATZMS-ACTIONSATZ
-MS-SET1
-MS-SET2
-MS-COND1
-MS-COND2
-MS-EXEC1
-MS-EXEC2
-MS-DELAYset1
-MS-DELAYset2
-MS-REPEATset
-MS-COMMENTset
-MS-HELPpriority
-MS-HELPonoff
-MS-HELPcondition
-MS-HELPexit
-MS-HELPtimer
-MS-HELPrepeats
-MS-HELPexeccmd
-MS-HELPdelay
---> 
-
-<!-- start htmlcode -->
-<table border='0' class='block wide' id='MSwitchWebTR'cellpadding='4' style='border-spacing:0px;'>
-    <tr class='even'>
-		<td colspan='4'><center>MS-COMMENTset</td>
-	</tr>
-	<tr class='even'>
-        <td style='border-bottom:1px solid #000;'></td>
-		<td style='border-bottom:1px solid #000;width: 50%'>MS-NAMESATZ</td>
-		<td style='border-bottom:1px solid #000;'>&nbsp;</td>
-		<td align=right style='border-bottom:1px solid #000; width: 50%'>MS-HELPpriority MS-IDSATZ</td>
-	</tr>
-	<tr class='even'>
-        <td style='border-bottom:1px solid #000;'></td>
-		<td style='border-bottom:1px solid #000;'>CMD 1</td>
-		<td style='border-left:1px solid #000;border-bottom:1px solid #000;'>&nbsp;</td>
-		<td style='border-bottom:1px solid #000;'>CMD 2</td>
-	</tr>
-        <tr class='even'>
-		<td></td>
-        <td></td>
-		<td style='border-left:1px solid #000;'>&nbsp;</td>
-		<td></td>
-	</tr>
-	<tr class='even'>
-        <td>MS-HELPonoff</td>
-		<td>MS-SET1</td>
-		<td style='border-left:1px solid #000;'>&nbsp;</td>
-		<td>MS-SET2</td>
-	</tr>
-	<tr class='even'>
-        <td>MS-HELPcondition</td>
-		<td>&nbsp;MS-COND1</td>
-		<td style='border-left:1px solid #000;'>&nbsp;</td>
-		<td>&nbsp;MS-COND2</td>
-	</tr>
-        <tr class='even'>
-        <td></td>
-		<td>MS-CONDCHECK1</td>
-		<td style='border-left:1px solid #000;'></td>
-		<td>MS-CONDCHECK1</td>
-	</tr>
-	<tr class='even'>
-        <td>MS-HELPexit</td>
-		<td>MS-EXEC1</td>
-		<td style='border-left:1px solid #000;'></td>
-		<td>MS-EXEC2</td>
-	</tr>
-	<tr class='even'>
-        <td>MS-HELPtimer</td>
-		<td>MS-DELAYset1</td>
-		<td style='border-left:1px solid #000;'>&nbsp;</td>
-		<td>MS-DELAYset2</td>
-	</tr>
-	<tr class='even'>
-        <td style='border-bottom:1px solid #000;'></td>
-		<td style='border-bottom:1px solid #000; width: 50%'></td>
-		<td style='border-left:1px solid #000;border-bottom:1px solid #000;'>&nbsp;</td>
-		<td style='border-bottom:1px solid #000; width: 50%'></td>
-	</tr>
-
-	<tr class='even'>
-		<td colspan='4'><center>MS-HELPrepeats MS-REPEATset</td>
-	</tr>
-	<tr class='even'>
-		<td colspan='4'></td>
-	</tr>
-	<tr class='even'>
-		<td colspan='4'><center>MS-ACTIONSATZ</td>
-	</tr>
-</table><br>
-";
 
   $controlhtml = AttrVal( $Name, 'MSwitch_Develop_Affected', $controlhtml ) ; 
   #### extrakt ersetzung
@@ -5175,11 +5046,11 @@ $controlhtml=~ s/#/\n/g;
 			{				  
 			$MSTEST1="<input name='info' name='TestCMD". $_
 			. "' id='TestCMD". $_
-			."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdon$nopoint','$devicenamet')\">";					  
+			."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdon$nopoint','$devicenamet','cmdonopt$nopoint')\">";					  
 
 			$MSTEST2="<input name='info' name='TestCMD". $_
 			. "' id='TestCMD". $_
-			."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdoff$nopoint','$devicenamet')\">";					  
+			."'type='button' value='test comand' onclick=\"javascript: testcmd('cmdoff$nopoint','$devicenamet','cmdoffopt$nopoint')\">";					  
 			}
 
                 }
@@ -6946,9 +6817,10 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	}
 	
 
-	function testcmd(field,devicename){
+	function testcmd(field,devicename,opt){
 	comand = \$(\"[name=\"+field+\"]\").val()
-	
+	comand1 = \$(\"[name=\"+opt+\"]\").val()
+	comand =comand+\" \"+comand1;
 	comand = comand.replace(/\\\$SELF/g,'".$Name."');
 	
 	if (devicename != 'FreeCmd')
@@ -6956,7 +6828,7 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	cmd ='set '+devicename+' '+comand;
 	FW_cmd(FW_root+'?cmd='+encodeURIComponent(cmd)+'&XHR=1');
 	FW_okDialog('".$EXECCMD." '+cmd);
-	//FW_errmsg(cmd, 5);
+	FW_errmsg(cmd, 5);
 	
 	}
 	else{
