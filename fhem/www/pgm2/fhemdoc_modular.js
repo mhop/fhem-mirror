@@ -3,7 +3,7 @@
 
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
     fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X",
-    fd_mode = "FHEM";
+    fd_modLangs={}, fd_mode = "FHEM";
 var fd_otherSrc = { "usb":"autocreate", "createlog":"autocreate" };
 
 
@@ -182,7 +182,11 @@ checkScroll()
     $("a#otherLang span.mod").html(mname);
     $("a#otherLang span[lang="+l1+"]").hide();
     $("a#otherLang span[lang="+l2+"]").show();
-    $("a#otherLang").show();
+    if(fd_modLangs[mname] && fd_modLangs[mname][l2]) {
+      $("a#otherLang").show();
+    } else {
+      $("a#otherLang").hide();
+    }
   }
 }
 
@@ -231,6 +235,15 @@ $(document).ready(function(){
       for(var i2=0; i2<a2.length; i2++)
         if(!fd_modLinks[a2[i2]])
           fd_modLinks[a2[i2]] = mName;
+    }
+  });
+  $("div#modLangs").each(function(){
+    var a1 = $(this).html().split(" ");
+    for(var i1=0; i1<a1.length; i1++) {
+      var a2 = a1[i1].split(/[:,]/);
+      fd_modLangs[a2[0]] = {};
+      for(var i2=1; i2<a2.length; i2++)
+        fd_modLangs[a2[0]][a2[i2]] = true;
     }
   });
 

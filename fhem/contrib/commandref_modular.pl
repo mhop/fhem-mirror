@@ -56,6 +56,13 @@ for my $lang (@lang) {
           }
         }
       }
+
+      if($l =~ m,<div id='modLangs'[^>]*> ([^<]+)</div>,) {
+        for my $ml (split(" ", $1)) {
+          my ($n,$v) = split(/[:,]/,$ml,2);
+          $modData{$n}{modLangs} = $v;
+        }
+      }
     }
     close(FH);
   }
@@ -66,18 +73,22 @@ for my $lang (@lang) {
     my $mName = $1;
     my $ts = (stat("$modDir/$fName"))[9];
     if($protVersion != $fileVersion ||
-       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts) {
+       !$modData{$mName} || !$modData{$mName}{ts} || $modData{$mName}{ts}<$ts ||
+       !$modData{$mName}{modLangs}) {
       #print "Checking $fName for $lang short description\n";
 
       $modData{$mName}{type}="device" if(!$modData{$mName}{type});
       delete($modData{$mName}{modLinks});
       open(FH, "$modDir/$fName") || die("Cant open $modDir/$fName: $!\n");
+      my @lang;
       while(my $l = <FH>) {
+        push @lang,($1 eq "" ? "EN":substr($1,1)) if($l =~ m/^=begin html(.*)/);
         $modData{$mName}{type}=$1 if($l =~ m/^=item\s+(helper|command|device)/);
         $modData{$mName}{$1}  =$2 if($l =~ m/^=item\s+(summary[^ ]*)\s(.*)$/);
         $modData{$mName}{modLinks}{$1} = 1
                  if($l =~ m/<a\s+name=['"]([^ '"]+)['"]>/);
       }
+      $modData{$mName}{modLangs} = join(",", @lang);
       close(FH);
     }
   }
@@ -104,12 +115,15 @@ EOF
     if($l =~ m,<!-- header:(.*) -->,) {
       my @mList = sort {uc($a) cmp uc($b)} keys %modData;
       if(!$linkDumped) {
-        my $ml = "";
+        my ($mlink,$mlang) = ("","");
         for my $m (@mList) {
-          next if(!$modData{$m}{modLinks});
-          $ml .= " $m:".join(",", keys(%{$modData{$m}{modLinks}}));
+          $mlink .= " $m:".join(",", keys(%{$modData{$m}{modLinks}}))
+            if($modData{$m}{modLinks});
+          $mlang .= " $m:$modData{$m}{modLangs}"
+            if($modData{$m}{modLangs});
         }
-        print OUT "<div id='modLinks' style='display:none'>$ml</div>\n";
+        print OUT "<div id='modLinks' style='display:none'>$mlink</div>\n";
+        print OUT "<div id='modLangs' style='display:none'>$mlang</div>\n";
         $linkDumped = 1;
       }
       my $type = $1;
