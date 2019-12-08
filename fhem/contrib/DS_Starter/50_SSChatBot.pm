@@ -269,8 +269,7 @@ sub SSChatBot_Set($@) {
   my $prop1   = $a[3];
   my $prop2   = $a[4];
   my $prop3   = $a[5];
-  my $success;
-  my $setlist;
+  my ($success,$ret,$setlist);
         
   return if(IsDisabled($name));
   
@@ -286,6 +285,7 @@ sub SSChatBot_Set($@) {
                  "botToken ".
                  "listSendqueue:noArg ".
                  ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
+                 "restartSendqueue:noArg ".
                  "sendItem:textField-long "
                  ;
   }
@@ -304,7 +304,6 @@ sub SSChatBot_Set($@) {
   } elsif ($opt eq "listSendqueue") {
       my $sub = sub ($) { 
           my ($idx) = @_; 
-          my $ret;
           foreach my $key (reverse sort keys %{$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}}) {
               $ret .= ", " if($ret);
               $ret .= $key."=>".$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{$key};
@@ -382,6 +381,14 @@ sub SSChatBot_Set($@) {
        
       SSChatBot_getapisites($name);
   
+  } elsif ($opt eq "restartSendqueue") {
+      $ret = SSChatBot_getapisites($name);
+      if($ret) {
+          return $ret;
+      } else {
+          return "The SendQueue has been restarted.";
+      }
+      
   } else {
       return "$setlist"; 
   }
@@ -712,7 +719,7 @@ sub SSChatBot_checkretry ($$) {
               $rs = 60;
           } elsif ($rc < 7) {
               $rs = 1800;
-          } elsif ($rc < 9) {
+          } elsif ($rc < 30) {
               $rs = 3600;
           } else {
               $rs = 86400;
@@ -742,7 +749,7 @@ sub SSChatBot_getapisites($) {
    my $inprot       = $hash->{INPROT}; 
    my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite ! 
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
-   my ($url,$param,$idxset);
+   my ($url,$param,$idxset,$ret);
   
    # API-Pfade und MaxVersions ermitteln 
    Log3($name, 4, "$name - ####################################################"); 
@@ -750,8 +757,9 @@ sub SSChatBot_getapisites($) {
    Log3($name, 4, "$name - ####################################################");
 
    if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
-       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
-       return;  
+       $ret = "Sendqueue is empty. Nothing to do ...";
+       Log3($name, 4, "$name - $ret"); 
+       return $ret;  
    }
    
    # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
@@ -765,16 +773,12 @@ sub SSChatBot_getapisites($) {
    }
    
    if(!$idxset) {
-       Log3($name, 4, "$name - Only entries with \"forbidSend\" are in Sendqueue. Escaping ..."); 
-       return; 
+       $ret = "Only entries with \"forbidSend\" are in Sendqueue. Escaping ...";
+       Log3($name, 4, "$name - $ret"); 
+       return $ret; 
    }
-    
-#    $hash->{OPIDX}  = (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}})[0];
-      
-#    $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$hash->{OPIDX}}{opmode};
    
-   if ($hash->{HELPER}{APIPARSET}) {
-       # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+   if ($hash->{HELPER}{APIPARSET}) {                     # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
 	   Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
        return SSChatBot_chatop($name);
    }
@@ -796,6 +800,8 @@ sub SSChatBot_getapisites($) {
                callback => \&SSChatBot_getapisites_parse
             };
    HttpUtils_NonblockingGet ($param);  
+
+return;
 } 
 
 ####################################################################################  
