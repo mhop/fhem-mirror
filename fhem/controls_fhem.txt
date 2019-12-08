@@ -1,4 +1,4 @@
-REV 20679
+REV 20691
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -173,7 +173,7 @@ UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
 UPD 2019-06-17_07:45:03 64846 FHEM/26_tahoma.pm
 UPD 2019-10-22_07:45:02 93142 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
-UPD 2019-12-08_07:45:04 74279 FHEM/30_HUEBridge.pm
+UPD 2019-12-08_20:09:25 74330 FHEM/30_HUEBridge.pm
 UPD 2019-11-12_07:45:02 32693 FHEM/30_LIGHTIFY.pm
 UPD 2018-02-05_07:45:02 15418 FHEM/30_MilightBridge.pm
 UPD 2017-04-26_07:45:02 3562 FHEM/30_pilight_contact.pm
@@ -185,7 +185,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2019-11-12_07:45:02 17479 FHEM/30_tradfri.pm
 UPD 2019-10-05_07:45:03 29783 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2019-12-08_07:45:04 77073 FHEM/31_HUEDevice.pm
+UPD 2019-12-08_20:09:25 76964 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -199,7 +199,7 @@ UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
 UPD 2019-07-02_07:45:03 154796 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
-UPD 2019-12-03_07:45:03 90067 FHEM/33_readingsGroup.pm
+UPD 2019-12-08_20:09:25 90480 FHEM/33_readingsGroup.pm
 UPD 2019-03-21_07:45:03 23869 FHEM/33_readingsHistory.pm
 UPD 2018-03-02_07:47:09 12101 FHEM/33_readingsProxy.pm
 UPD 2019-02-17_07:45:05 183107 FHEM/34_ESPEasy.pm
@@ -724,8 +724,8 @@ UPD 2019-09-07_07:45:03 18901 FHEM/msgSchema.pm
 UPD 2015-07-28_14:05:31 401 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2019-09-14_07:45:02 34993 FHEM/wundergroundAPI.pm
-UPD 2019-12-07_07:45:11 6709 contrib/commandref_join.pl
-UPD 2019-06-08_12:09:35 4360 contrib/commandref_modular.pl
+UPD 2019-12-08_20:09:34 6739 contrib/commandref_join.pl
+UPD 2019-12-08_20:09:34 4931 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
 UPD 2019-03-15_07:45:03 390 demolog/LightScenes.save
 UPD 2015-07-28_14:05:35 28600 demolog/cellar.log
@@ -742,11 +742,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2019-12-07_07:45:06 4189023 docs/commandref.html
-UPD 2019-12-07_07:45:08 2585825 docs/commandref_DE.html
+UPD 2019-12-08_20:09:31 2585814 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-08_07:45:11 221478 docs/commandref_modular.html
-UPD 2019-12-08_07:45:12 232445 docs/commandref_modular_DE.html
+UPD 2019-12-08_20:09:33 229001 docs/commandref_modular.html
+UPD 2019-12-08_20:09:34 239968 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2181,7 +2181,7 @@ UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2019-08-28_07:45:03 30859 www/pgm2/f18.js
 UPD 2019-06-26_07:45:02 9996 www/pgm2/f18style.css
-UPD 2019-11-24_07:45:05 7564 www/pgm2/fhemdoc_modular.js
+UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
 UPD 2019-11-21_07:45:03 61294 www/pgm2/fhemweb.js
 UPD 2019-11-26_07:45:03 13796 www/pgm2/fhemweb_colorpicker.js
 UPD 2019-01-09_07:45:02 4402 www/pgm2/fhemweb_fbcalllist.js
