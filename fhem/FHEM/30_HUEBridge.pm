@@ -498,6 +498,7 @@ HUEBridge_string2array($)
 sub
 HUEBridge_scene2id($$)
 {
+  # hash is the bridge device
   my ($hash,$id) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   return undef if( !$hash );
@@ -506,13 +507,13 @@ HUEBridge_scene2id($$)
     $id = $1;
   }
 
-  if( $hash->{helper}{scenes} ) {
+  if( my $scenes = $hash->{helper}{scenes} ) {
     return $id if( defined($hash->{helper}{scenes}{$id}) );
     $id = lc($id);
     $id =~ s/\((.*)\)$/\\\($1\\\)/;
 
-    foreach my $key ( keys %{$hash->{helper}{scenes}} ) {
-      my $scene = $hash->{helper}{scenes}{$key};
+    foreach my $key ( keys %{$scenes} ) {
+      my $scene = $scenes->{$key};
 
       return $key if( lc($key) eq $id );
       #return $key if( $scene->{name} eq $id );
@@ -525,6 +526,7 @@ HUEBridge_scene2id($$)
 sub
 HUEBridge_scene2id_deCONZ($$)
 {
+  # hash is the client device
   my ($hash,$id) = @_;
   my $name = $hash->{NAME};
   #Log3 $name, 4, "HUEBridge_scene2id_deCONZ: $id, hash: " . Dumper $hash;
@@ -535,7 +537,7 @@ HUEBridge_scene2id_deCONZ($$)
     $id = $1;
   }
 
-  if( my $scenes = $hash->{scenes} ) {
+  if( my $scenes = $hash->{helper}{scenes} ) {
     $id = lc($id);
     $id =~ s/\((.*)\)$/\\\($1\\\)/;
     for my $scene ( @{$scenes} ) {
