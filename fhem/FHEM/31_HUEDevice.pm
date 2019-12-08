@@ -1001,7 +1001,7 @@ HUEDevice_Set($@)
   }
 
   if( $hash->{IODev} && defined($hash->{IODev}{modelid}) && $hash->{IODev}{modelid} ne 'deCONZ' ) {
-    if( my $scenes = $hash->{scenes} ) {
+    if( my $scenes = $hash->{helper}{scenes} ) {
       my @names;
       for my $scene (@{$scenes}) {
          push(@names, $scene->{name});
@@ -1338,6 +1338,8 @@ HUEDevice_Parse($$)
   $hash->{type} = $result->{type} if( defined($result->{type}) );
   $hash->{class} = $result->{class} if( defined($result->{class}) );
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
+
+  $hash->{helper}{scenes} = $result->{scenes} if( defined($result->{scenes}) );
 
   $hash->{helper}{json} = $result;
 
