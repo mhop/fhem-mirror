@@ -64,6 +64,7 @@ my %SSChatBot_errlist = (
   120 => "payload has wrong format",
   404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407 => "record not valid",
+  409 => "exceed max file size",
   800 => "malformed or unsupported URL",
   805 => "empty API data received - may be the Synology Chat Server package is stopped",
   806 => "couldn't get Synology Chat API informations",
@@ -696,7 +697,7 @@ sub SSChatBot_checkretry ($$) {
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|120|407|800|900/) {            # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      if($errorcode =~ /100|101|120|407|409|800|900/) {        # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = 1;
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
@@ -995,14 +996,13 @@ sub SSChatBot_chatop ($) {
 #############################################################################################
 sub SSChatBot_chatop_parse ($) {  
    my ($param, $err, $myjson) = @_;
-   my $hash               = $param->{hash};
-   my $name               = $hash->{NAME};
-   my $inprot             = $hash->{INPROT};
-   my $inaddr             = $hash->{INADDR};
-   my $inport             = $hash->{INPORT};
-   my $opmode             = $hash->{OPMODE};
-   my ($rectime,$data,$success);
-   my ($error,$errorcode);
+   my $hash   = $param->{hash};
+   my $name   = $hash->{NAME};
+   my $inprot = $hash->{INPROT};
+   my $inaddr = $hash->{INADDR};
+   my $inport = $hash->{INPORT};
+   my $opmode = $hash->{OPMODE};
+   my ($rectime,$data,$success,$error,$errorcode,$cherror);
    
    my $lang = AttrVal("global","language","EN");
    
@@ -1160,7 +1160,11 @@ sub SSChatBot_chatop_parse ($) {
             # die API-Operation war fehlerhaft
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
-            $error     = SSChatBot_experror($hash,$errorcode);                # Fehlertext zum Errorcode ermitteln
+            $cherror   = $data->{'error'}->{'errors'};                        # vom Chat gelieferter Fehler
+            $error     = SSChatBot_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
+            if ($error =~ /not found/) {
+                $error .= " New error: ".$cherror;
+            }
 			
             readingsBeginUpdate         ($hash);
             readingsBulkUpdateIfChanged ($hash,"Errorcode", $errorcode);
@@ -1230,7 +1234,10 @@ sub SSChatBot_experror ($$) {
   my $device = $hash->{NAME};
   my $error;
   
-  unless (exists($SSChatBot_errlist{"$errorcode"})) {$error = "Message of errorcode \"$errorcode\" not found."; return ($error);}
+  unless (exists($SSChatBot_errlist{"$errorcode"})) {
+      $error = "Value of errorcode \"$errorcode\" not found."; 
+      return ($error);
+  }
 
   # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSChatBot_errlist{"$errorcode"};
