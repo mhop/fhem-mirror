@@ -1164,7 +1164,7 @@ sub SSChatBot_chatop_parse ($) {
             $cherror   = $data->{'error'}->{'errors'};                        # vom Chat gelieferter Fehler
             $error     = SSChatBot_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
             if ($error =~ /not found/) {
-                $error .= " New error: ".$cherror;
+                $error .= " New error: ".($cherror?$cherror:"");
             }
 			
             readingsBeginUpdate         ($hash);
