@@ -8905,6 +8905,7 @@ sub SSCam_sendTelegram ($$) {
        readingsBeginUpdate($hash);
        readingsBulkUpdate($hash,"sendTeleState",$ret);
        readingsEndUpdate($hash, 1);
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return $ret;
    }
    
@@ -8915,6 +8916,7 @@ sub SSCam_sendTelegram ($$) {
        $ret = "No TelegramBot device \"$telebot\" available";
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
        Log3($name, 2, "$name - $ret");
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;
    }
   
@@ -8924,6 +8926,7 @@ sub SSCam_sendTelegram ($$) {
            $ret = "No peers of TelegramBot device \"$telebot\" found";
            readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
            Log3($name, 2, "$name - $ret");
+           $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
            return;       
        }
    }
@@ -8932,6 +8935,7 @@ sub SSCam_sendTelegram ($$) {
        $ret = "no video or image data existing for send process by TelegramBot \"$telebot\" ";
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
        Log3($name, 2, "$name - $ret");
+       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
        return;   
    } 
                                     
