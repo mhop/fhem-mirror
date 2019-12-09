@@ -61,6 +61,7 @@ my %SSChatBot_errlist = (
   100 => "Unknown error",
   101 => "Payload is empty",
   102 => "API does not exist - may be the Synology Chat Server package is stopped",
+  117 => "file or file location not valid",
   120 => "payload has wrong format",
   404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407 => "record not valid",
@@ -697,7 +698,7 @@ sub SSChatBot_checkretry ($$) {
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|120|407|409|800|900/) {        # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      if($errorcode =~ /100|101|117|120|407|409|800|900/) {    # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = 1;
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
