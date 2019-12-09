@@ -507,22 +507,19 @@ HUEDevice_SetParam($$@)
   } elsif($cmd eq "pct") {
     if( $subtype  eq 'blind' ) {
       $obj->{'pct'}  = int($value);
-
-    } else {
-      my $bri;
-      if( $value > 50 ) {
-        $bri = 2.57 * ($value-50) + 128;
-      } else {
-        $bri = 2.59 * ($value-50) + 128;
-      }
-      $bri = 0 if( $bri < 0 );
-      $bri = 254 if( $bri > 254 );
-      #$value = 3.5 if( $value < 3.5 && AttrVal($name, "model", "") eq "LWL001" );
-      $obj->{'on'}  = JSON::true;
-      #$obj->{'bri'}  = int(2.55 * $value);
-      $obj->{'bri'}  = int($bri);
-      $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
     }
+
+    my $bri;
+    if( $value > 50 ) {
+      $bri = 2.57 * ($value-50) + 128;
+    } else {
+      $bri = 2.59 * ($value-50) + 128;
+    }
+    $bri = 0 if( $bri < 0 );
+    $bri = 254 if( $bri > 254 );
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = int($bri);
+    $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
 
   } elsif($cmd eq "bri") {
     #$value = 8 if( $value < 8 && AttrVal($name, "model", "") eq "LWL001" );
