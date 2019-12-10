@@ -3852,18 +3852,18 @@ sub FW_makeImage {
    my ($value,$icon_off,$icon_on,$state_off,$state_on)=@_;
    $state_on=(defined ($state_on) and $state_on ne "") ? $state_on : "on";
    $state_off=(defined ($state_off) and $state_off ne "") ? $state_off : "off";
-   $icon_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
-   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on : "$icon_off\@DarkOrange");
-   return($value,"",("iconSwitch,".$state_on.",".$icon_off.",".$state_off.",".$icon_on));
+   my $i_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
+   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on :(defined ($icon_off) and $icon_off ne "") ? "$icon_off\@DarkOrange" : "on");
+   return($value,"",("iconSwitch,".$state_on.",".$i_off.",".$state_off.",".$icon_on));
  }
  
  sub icon {
    my ($value,$icon_off,$icon_on,$state_off,$state_on)=@_;
    $state_on=(defined ($state_on) and $state_on ne "") ? $state_on : "on";
    $state_off=(defined ($state_off) and $state_off ne "") ? $state_off : "off";
-   $icon_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
-   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on : "$icon_off\@DarkOrange");
-   return($value,"",("iconLabel,".$state_on.",".$icon_on.",".$state_off.",".$icon_off));
+   my $i_off=(defined ($icon_off) and $icon_off ne "") ? $icon_off : "off";
+   $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on :(defined ($icon_off) and $icon_off ne "") ? "$icon_off\@DarkOrange" : "on");
+   return($value,"",("iconLabel,".$state_on.",".$icon_on.",".$state_off.",".$i_off));
  }
 
 1;
