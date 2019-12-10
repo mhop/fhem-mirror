@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix SelfDefense drive up then coming home
+                         up at night
  - feature: 30_HUEBridge, 31_HUEDevice: added deCONZ scenes (by shadowghost)
  - feature: 14_SD_RSL.PM: support for setExtensions added
  - change:  59_Weather: delete table options in commandref

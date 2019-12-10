@@ -184,6 +184,7 @@ GP_Export(
     qw(
       Initialize
       ascAPIget
+      DevStateIcon
       )
 );
 
@@ -363,11 +364,9 @@ sub Define($$) {
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
     CommandAttr( undef, $name . ' icon fts_shutter_automatic' )
       if ( AttrVal( $name, 'icon', 'none' ) eq 'none' );
-
     CommandAttr( undef,
-        $name
-          . ' devStateIcon selfDefense.terrace:fts_door_tilt created.new.drive.timer:clock .*asleep:scene_sleeping roommate.(awoken|home):user_available residents.(home|awoken):status_available manual:fts_shutter_manual selfDefense.active:status_locked selfDefense.inactive:status_open day.open:scene_day night.close:scene_night shading.in:weather_sun shading.out:weather_cloudy'
-    ) if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
+        $name . ' devStateIcon { AutoShuttersControl_DevStateIcon($name) }' )
+      if ( AttrVal( $name, 'devStateIcon', 'none' ) eq 'none' );
 
     addToAttrList('ASC:0,1,2');
 
@@ -1392,9 +1391,10 @@ sub EventProcessingResidents($@) {
                     )
                   )
                 {
-                    $shutters->setLastDrive('selfDefense active');
+                    $shutters->setLastDrive('selfDefense absent active');
                     $shutters->setSelfDefenseAbsent( 0, 1 )
                       ; # der erste Wert ist ob der timer schon läuft, der zweite ist ob self defense aktiv ist durch die Bedingungen
+                    $shutters->setSelfDefenseState(1);
                     $shutters->setDriveCmd( $shutters->getClosedPos );
                 }
                 elsif (
@@ -1421,7 +1421,8 @@ sub EventProcessingResidents($@) {
             $shutters->setHardLockOut('off');
             if ( $shutters->getSelfDefenseMode ne 'off' ) {
 
-                $shutters->setLastDrive('selfDefense');
+                $shutters->setLastDrive('selfDefense gone active');
+                $shutters->setSelfDefenseState(1);
                 $shutters->setDriveCmd( $shutters->getClosedPos );
             }
         }
@@ -1448,6 +1449,7 @@ sub EventProcessingResidents($@) {
                 and (  $getResidentsLastStatus ne 'asleep'
                     or $getResidentsLastStatus ne 'awoken' )
                 and IsAfterShuttersTimeBlocking($shuttersDev)
+                and not $shutters->getSelfDefenseState
               )
             {
                 $shutters->setLastDrive('residents come home');
@@ -1465,6 +1467,7 @@ sub EventProcessingResidents($@) {
                 and not $shutters->getShadingManualDriveStatus
                 and not( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                     and $shutters->getShuttersPlace eq 'terrace' )
+                and not $shutters->getSelfDefenseState
               )
             {
                 $shutters->setLastDrive('shading in');
@@ -1479,6 +1482,7 @@ sub EventProcessingResidents($@) {
                 and not $shutters->getShadingManualDriveStatus
                 and not( CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                     and $shutters->getShuttersPlace eq 'terrace' )
+                and not $shutters->getSelfDefenseState
               )
             {
                 $shutters->setLastDrive('shading out');
@@ -1490,7 +1494,7 @@ sub EventProcessingResidents($@) {
                 and not $shutters->getIfInShading
                 and (  $getResidentsLastStatus eq 'gone'
                     or $getResidentsLastStatus eq 'absent' )
-                and $shutters->getLastDrive eq 'selfDefense active'
+                and $shutters->getSelfDefenseState
               )
             {
                 RemoveInternalTimer( $shutters->getSelfDefenseAbsentTimerhash )
@@ -1511,6 +1515,7 @@ sub EventProcessingResidents($@) {
                             or $getModeUp eq 'off' )
                       );
 
+                    $shutters->setSelfDefenseState(0);
                     $shutters->setLastDrive('selfDefense inactive');
                     $shutters->setDriveCmd(
                         (
@@ -1529,6 +1534,7 @@ sub EventProcessingResidents($@) {
                     or $getModeUp eq 'always' )
                 and IsAfterShuttersTimeBlocking($shuttersDev)
                 and not $shutters->getIfInShading
+                and not $shutters->getSelfDefenseState
               )
             {
                 if (   $getResidentsLastStatus eq 'asleep'
@@ -1996,19 +2002,19 @@ sub EventProcessingBrightness($@) {
 
                 $shutters->setLastDrive($lastDrive);
 
-                if (    $shutters->getPrivacyDownStatus != 2
-                    and $posValue != $shutters->getStatus )
+                if (
+                    $shutters->getPrivacyDownStatus != 2
+                    and (  $posValue != $shutters->getStatus
+                        or $shutters->getSelfDefenseState )
+                  )
                 {
-                    print(  'ASC_DEBUG!!! PrivacyStatus_2: '
-                          . $shutters->getPrivacyDownStatus
-                          . ' Innerhalb der unless Abfrage'
-                          . "\n" );
                     $shutters->setSunrise(0);
                     $shutters->setSunset(1);
                 }
 
                 $shutters->setPrivacyDownStatus(0)
-                  if ( $shutters->getPrivacyDownStatus == 2 );
+                  if (  $shutters->getPrivacyDownStatus == 2
+                    and $shutters->getSunset );
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
 
                 ASC_Debug( 'EventProcessingBrightness: '
@@ -4244,6 +4250,62 @@ sub _IsAdv {
     return $adv;
 }
 
+sub DevStateIcon($) {
+    my ($hash) = @_;
+    $hash = $defs{$hash} if ( ref($hash) ne 'HASH' );
+
+    return undef if ( !$hash );
+    my $name = $hash->{NAME};
+
+    if ( ReadingsVal( $name, 'state', undef ) eq 'created new drive timer' ) {
+        return '.*:clock';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'selfDefense terrace' ) {
+        return '.*:fts_door_tilt';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) =~ /.*asleep$/ ) {
+        return '.*:scene_sleeping';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) =~ /^roommate.(awoken|home)$/ )
+    {
+        return '.*:user_available';
+    }
+    elsif (
+        ReadingsVal( $name, 'state', undef ) =~ /^residents.(home|awoken)$/ )
+    {
+        return '.*:status_available';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'manual' ) {
+        return '.*:fts_shutter_manual';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'selfDefense inactive' ) {
+        return '.*:status_open';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) =~ /^selfDefense.*.active$/ ) {
+        return '.*:status_locked';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'day open' ) {
+        return '.*:scene_day';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'night close' ) {
+        return '.*:scene_night';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'shading in' ) {
+        return '.*:fts_shutter_shadding_run';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'shading out' ) {
+        return '.*:fts_shutter_shadding_stop';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) eq 'active' ) {
+        return '.*:hourglass';
+    }
+    elsif ( ReadingsVal( $name, 'state', undef ) =~ /.*privacy.*/ ) {
+        return '.*:fts_shutter_50';
+    }
+
+    return undef;
+}
+
 ######################################
 ######################################
 ########## Begin der Klassendeklarierungen für OOP (Objektorientierte Programmierung) #########################
@@ -4352,7 +4414,8 @@ sub setDriveCmd {
         or (    $shutters->getAdv
             and not $shutters->getQueryShuttersPos($posValue)
             and not $shutters->getAdvDelay
-            and not $shutters->getExternalTriggerState)
+            and not $shutters->getExternalTriggerState
+            and not $shutters->getSelfDefenseState )
       )
     {
         $shutters->setDelayCmd($posValue);
@@ -4403,7 +4466,7 @@ sub setDriveCmd {
         if (    $shutters->getSelfDefenseAbsent
             and not $shutters->getSelfDefenseAbsentTimerrun
             and $shutters->getSelfDefenseMode ne 'off'
-            and $shutters->getLastDrive eq 'selfDefense active'
+            and $shutters->getSelfDefenseState
             and $ascDev->getSelfDefense eq 'on' )
         {
             InternalTimer(
@@ -4563,6 +4626,13 @@ sub setPrivacyUpStatus {
     return 0;
 }
 
+sub setSelfDefenseState {
+    my ( $self, $value ) = @_;
+
+    $self->{ $self->{shuttersDev} }{selfDefenseState} = $value;
+    return 0;
+}
+
 sub setAdvDelay {
     my ( $self, $advDelay ) = @_;
 
@@ -4671,6 +4741,14 @@ sub getNoDelay {
     my $self = shift;
 
     return $self->{ $self->{shuttersDev} }{noDelay};
+}
+
+sub getSelfDefenseState {
+    my $self = shift;
+
+    return $self->{ $self->{shuttersDev} }{selfDefenseState}
+      if ( defined( $self->{ $self->{shuttersDev} }{selfDefenseState} ) );
+
 }
 
 sub getSelfDefenseAbsent {
@@ -4897,7 +4975,7 @@ sub setRainProtectionStatus {    # Werte protected, unprotected
 
 sub setExternalTriggerState {
     my ( $self, $value ) = @_;
-    
+
     $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event} = $value
       if ( defined($value) );
     return 0;
@@ -5743,9 +5821,16 @@ sub getExternalTriggerPosInactive {
 
 sub getExternalTriggerState {
     my $self = shift;
-    
-    return ( (defined($self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event})
-      and $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}) ? 1 : 0 );
+
+    return (
+        (
+            defined(
+                $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
+              )
+              and
+              $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
+        ) ? 1 : 0
+    );
 }
 
 sub getDelay {
@@ -7812,7 +7897,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.6",
+  "version": "v0.8.7",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
