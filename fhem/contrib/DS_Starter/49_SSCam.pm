@@ -873,7 +873,7 @@ sub SSCam_Attr($$$$) {
 			return "When you want activate \"$aName\", you have to set first the attribute \"videofolderMap\" to the root folder ".
                    "of recordings and snapshots provided by an URL.\n".
                    "Example: http://server.domain:8081/surveillance "                   
-		           if(!AttrVal($name, "videofolderMap", ""));
+		           if(!AttrVal($name, "videofolderMap", "") && $init_done == 1);
 
         }  
     }
