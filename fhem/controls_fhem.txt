@@ -1,4 +1,4 @@
-REV 20693
+REV 20702
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -185,7 +185,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2019-11-12_07:45:02 17479 FHEM/30_tradfri.pm
 UPD 2019-10-05_07:45:03 29783 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2019-12-08_20:09:25 76964 FHEM/31_HUEDevice.pm
+UPD 2019-12-10_07:45:04 76802 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -518,7 +518,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2019-02-13_07:45:03 20746 FHEM/98_WOL.pm
-UPD 2019-12-02_07:45:03 63885 FHEM/98_WeekdayTimer.pm
+UPD 2019-12-10_07:45:04 63446 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -643,7 +643,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2019-12-04_07:45:03 50228 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-12-06_07:45:02 135829 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-12-10_07:45:04 135933 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -741,12 +741,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-12-07_07:45:06 4189023 docs/commandref.html
+UPD 2019-12-10_07:45:08 4189071 docs/commandref.html
 UPD 2019-12-08_20:09:31 2585814 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-09_07:45:28 229001 docs/commandref_modular.html
-UPD 2019-12-09_07:45:29 239968 docs/commandref_modular_DE.html
+UPD 2019-12-10_07:45:11 229001 docs/commandref_modular.html
+UPD 2019-12-10_07:45:12 239968 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
