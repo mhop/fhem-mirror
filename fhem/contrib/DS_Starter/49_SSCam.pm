@@ -11242,7 +11242,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] [snapChatTxt:"chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] <br>
+  
+                                [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] <br>
+                                [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br>
+                                [snapChatTxt:"chatbot => &lt;SSChatBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"]    <br>
+                                </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   One or multiple snapshots are triggered. The number of snapshots to trigger and the time difference (in seconds) between
   each snapshot can be optionally specified. Without any specification only one snapshot is triggered. <br>
@@ -13129,7 +13134,11 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] [snapChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] <br>
+                                [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
+                                [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
+                                [snapChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]    <br>
+                                </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Ein oder mehrere Schnappschüsse werden ausgelöst. Es kann die Anzahl der auszulösenden Schnappschüsse und deren zeitlicher
   Abstand in Sekunden optional angegeben werden. Ohne Angabe wird ein Schnappschuß getriggert. <br>
