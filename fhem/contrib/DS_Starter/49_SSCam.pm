@@ -191,6 +191,9 @@ our %SSCam_vNotesIntern = (
 
 # Versions History extern
 our %SSCam_vNotesExtern = (
+  "9.1.0"  => "10.12.2019 With the new attribute \"snapChatTxt\" it is possible to send snapshots by the Synology Chat server. ".
+                          "Please read more information about the possibilities in the ".
+                          "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Versand_von_Aufnahmen_und_Schnappsch.C3.BCssen_mit_Synology_Chat_.28SSChatBot.29\">Wiki</a>. ",
   "9.0.0"  => "06.10.2019 To store image and recording data used by streaming devices or for transmission by email and telegram, ".
                           "several cache types can be used now. So in-memory caches are available or file- and Redis-cache support ".
                           "is intergated. In both latter cases the FHEM-process RAM is released. All transmission processes ".
@@ -10286,6 +10289,9 @@ return;
 #                                       Hint Hash EN           
 #############################################################################################
 %SSCam_vHintsExt_en = (
+  "9" => "Further infomations about sending snapshots and recordings by Synology Chat server in our ".
+         "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Versand_von_Aufnahmen_und_Schnappsch.C3.BCssen_mit_Synology_Chat_.28SSChatBot.29\">Wiki</a>. ".
+         "In addition here is provided the link to the <a href=\"https://www.synology.com/en-us/knowledgebase/DSM/help/Chat/chat_desc\">Chat knowledgebase</a>. <br><br>",
   "8" => "Link to official <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> in Synology community".
          "<br><br>",
   "7" => "<b>Setup Email Shipping <br>".
@@ -10346,6 +10352,10 @@ return;
 #                                       Hint Hash DE           
 #############################################################################################
 %SSCam_vHintsExt_de = (
+  "9" => "Weitere Informationen zum Versand von Schnappschüssen und Aufnahmen mit dem Synology Chat Server findet man im ".
+         "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Versand_von_Aufnahmen_und_Schnappsch.C3.BCssen_mit_Synology_Chat_.28SSChatBot.29\">Wiki</a>. ".
+         "Ergänzend dazu Hinweise zur Einrichtung und Administration des Synology Chat Servers im ".
+         "<a href=\"https://www.synology.com/de-de/knowledgebase/DSM/help/Chat/chat_desc\">Support-Center</a>. <br><br>",
   "8" => "Link zur offiziellen <a href=\"https://community.synology.com/forum/3\">Surveillance Forum</a> Seite innerhalb der Synology Community".
          "<br><br>",
   "7" => "<b>Einstellung Email-Versand <br>".
