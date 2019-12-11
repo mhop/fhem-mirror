@@ -1017,7 +1017,7 @@ if (AttrVal( $name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) e
             $x++;    # exit
             last if $x > 20;    # exit
             $reads .= "ReadingVal: [$5:$6]      -      ".$INHALT." " . ReadingsVal( $5, $6, 'undef' ) . "<br>";
-            $reads .= "ReadingNum: [$5:$6]      -      ".$INHALT." ". ReadingsNum( $5, $6, 'undef' );
+            $reads .= "ReadingNum: [$5:$6:d]      -      ".$INHALT." ". ReadingsNum( $5, $6, 'undef' );
             $reads .="<div style=\"color: #FF0000\">".$NOREADING."</div>" if ( ReadingsVal( $5, $6, 'undef' ) ) eq "undef";
             $reads .= "<br>";
             $condsplit = $1 . $2 . $3 . $4 . $7;
@@ -2153,6 +2153,8 @@ my %setlist;
     if ( $cmd eq "off" || $cmd eq "on" ) 
 	{
 
+
+
 	 if ( $devicemode eq "Dummy"  &&  AttrVal( $name, "MSwitch_Selftrigger_always", 0 ) eq "0" ) 
 			{
 					readingsSingleUpdate( $hash, "state", $cmd, 1 );
@@ -2874,6 +2876,10 @@ sub MSwitch_Notify($$) {
     my $devName;
     $devName = $dev_hash->{NAME};
 	
+
+	
+	
+	
 	if ( ReadingsVal( $ownName, '.First_init', 'undef' ) ne 'done' ) 
 		{
 		# events blocken wenn datensatz unvollständig
@@ -2944,8 +2950,7 @@ sub MSwitch_Notify($$) {
     my $startdelay = AttrVal( $ownName, 'MSwitch_Startdelay', $standartstartdelay );
     my $attrrandomnumber = AttrVal( $ownName, 'MSwitch_RandomNumber', '' );
 
-   # return if ( $devicemode eq 'Dummy' );
-	
+
 	if ( AttrVal( $ownName, "MSwitch_Selftrigger_always", 0 ) ne "1") 
 		{
 		return if ( ReadingsVal( $ownName, "Trigger_device", "no_trigger" ) eq 'no_trigger' );
@@ -2953,8 +2958,6 @@ sub MSwitch_Notify($$) {
 		}
 	else
 		{
-		 #Log3( $ownName, 0, 'aufruf selftrigger' );
-		 #return;
 		}
 
     # startverzöferung abwarten
@@ -3142,6 +3145,9 @@ sub MSwitch_Notify($$) {
                 MSwitch_LOG( $ownName, 5,"$ownName:     changedevent -> $event  " );
                 #next EVENT;
             }
+			
+	
+			
 
             $own_hash->{eventsave} = 'unsaved';
             MSwitch_LOG(
@@ -3301,6 +3307,11 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
 				$x++;
 				}
             }
+			
+			
+			
+			
+			
 ################ alle events für weitere funktionen speichern
 #############################################################
             #anzahl checken / ggf nicht mehr nötig
@@ -3336,7 +3347,9 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
 				{
 				$eventcopy1 = "MSwitch_Self:$eventcopy";
 				$eventcopy = $eventcopy1;
-				}
+		}
+		
+		
 
             my $direktswitch = 0;
             my @eventsplit   = split( /\:/, $eventcopy );
@@ -3391,6 +3404,10 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
             }
 #}
 
+
+
+
+
 #test auf zweige cmd1/2 and switch MSwitch on/off ENDE
 #test auf zweige cmd1/2 only
 # ergebnisse werden in  @cmdarray geschrieben
@@ -3414,6 +3431,9 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                 }
                 MSwitch_LOG( $ownName, 6, "$ownName: checktrigger ergebniss -> " . $testvar );
             }
+			
+			
+			
 
             if ( $triggercmdon ne 'no_trigger' ) 
 			{
@@ -3436,6 +3456,10 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                     $foundcmd1 = 1;
                 }
             } 
+			
+			
+
+			
 # speichert 20 events ab zur weiterne funktion ( funktionen )
 # ändern auf bedarfschaltung
 
@@ -3499,6 +3523,11 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                 return;
             }
         }
+		
+			
+		
+		
+		
 #foundcmd1/2
         if ( $foundcmd1 eq "1" && AttrVal( $ownName, "MSwitch_Reset_EVT_CMD1_COUNT", 'undef' ) ne 'undef' )
         {
@@ -3535,14 +3564,21 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
 #my @cmdarray1;	#enthält auszuführende befehle nach conditiontest
 #schaltet zweig 3 und 4
 
+
+
+
+
 # ACHTUNG
         if ( $anzahl && $anzahl != 0 )
 		{
             MSwitch_LOG( $ownName, 6, "$ownName: abarbeiten aller befehle aus eventprüfung " );
 #aberabeite aller befehlssätze in cmdarray
             MSwitch_Safemode($own_hash);
+			
+			
           LOOP31: foreach (@cmdarray) 
 		  {
+
                 MSwitch_LOG( $ownName, 6, "$ownName: Befehl -> " . $_ );
                 if ( $_ eq 'undef' ) { next LOOP31; }
                 my ( $ar1, $ar2, $ar3, $ar4 ) = split( /,/, $_ );
@@ -3634,9 +3670,14 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
 # schalte modul an/aus bei entsprechendem notify
 # teste auf condition
         return if $set eq 'noset';   # keine MSwitch on/off incl cmd1/2 gefunden
+		
+
+		
+		
 ######################
 # schaltet zweig 1 und 2 , wenn $set befehl enthält , es wird nur MSwitch geschaltet, Devices werden dann 'mitgerissen'
         my $cs;
+
         if ( $triggerdevice eq "all_events" ) 
 		{
             $cs = "set $ownName $set $devName:$trigevent";
@@ -3658,7 +3699,8 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
         MSwitch_LOG( $ownName, 6, "$ownName: Befehlsausführung -> " . $cs );
         if ( $debugmode ne '2' ) 
 		{
-            my $errors = AnalyzeCommandChain( undef, $cs );
+		
+         my $errors = AnalyzeCommandChain( undef, $cs );
         }
         return;
     }
@@ -3740,10 +3782,11 @@ my $NOSPACE;
 my $MSTEST1="";
 my $MSTEST2="";
 my $EXECCMD;
+my $DUMMYMODE;
 
 if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) eq "DE")
 			{
-			
+			$DUMMYMODE="Device befindet sich im passiven Dummymode, für den aktiven Dummymode muss dass Attribut 'MSwitch_Selftrigger_always' auf '1' gesetzt werden. ";
 			$MSDISTRIBUTORTEXT="Zuordnung Event/ID (einstellung über Attribut)";
 			$MSDISTRIBUTOREVENT="eingehendes Event"; 
 			$LOOPTEXT= "ACHTUNG: Der Safemodus hat eine Endlosschleife erkannt, welche zum Fhemabsturz führen könnte.<br>Dieses Device wurde automatisch deaktiviert ( ATTR 'disable') !<br>&nbsp;";
@@ -3764,6 +3807,7 @@ if (AttrVal( $Name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) e
 			}
 			else
 			{
+			$DUMMYMODE="Device is in passive dummy mode, for the active dummy mode the attribute 'MSwitch_Selftrigger_always' must be set to '1'.";
 			$MSDISTRIBUTORTEXT="Event to ID distributor (Settings via attribute)";
 			$MSDISTRIBUTOREVENT="incommming Event:"; 
 			$LOOPTEXT= "ATTENTION: The safe mode has detected an endless loop, which could lead to a crash.<br> This device has been deactivated automatically ( ATTR 'disable') !<br>&nbsp;";
@@ -3855,6 +3899,14 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         $triggeroff = "";
         $triggeron  = "";
     }
+	
+	if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" ) {
+	
+        $triggeroff = "";
+        $triggeron  = "";
+    }
+	
+	
 
     if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) eq "Toggle" ) 
 	{
@@ -5890,6 +5942,8 @@ my $MScheckcondition="";
 	else
 	{
 	$MSHidedummy="style ='visibility: collapse'";
+	$MShidefull="style='display:none;'";
+    $displaynot = "style='display:none;'";
 	}
 
 	$MStrigger=	"<select id =\"trigdev\" name=\"trigdev\">" . $triggerdevices . "</select>";
@@ -6293,9 +6347,7 @@ $triggerdetailhtml =~ s/$wert1/$wert2/g;
 	$ret .=
 	"<table border='$border' class='block wide' id='MSwitchWebAF' nm='$hash->{NAME}'>
 	<tr class=\"even\">
-	<td><center><br>
-	Device befindet sich im passiven Dummymode, für den aktiven Dummymode muss dass Attribut 'MSwitch_Selftrigger_always' auf '1' gesetzt werden.
-	<br>&nbsp;<br></td></tr></table>
+	<td><center><br>$DUMMYMODE<br>&nbsp;<br></td></tr></table>
 	";
 	}
 
@@ -6818,7 +6870,13 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	
 
 	function testcmd(field,devicename,opt){
+	
+	
 	comand = \$(\"[name=\"+field+\"]\").val()
+	if (comand == 'no_action')
+	{
+	return;
+	}
 	comand1 = \$(\"[name=\"+opt+\"]\").val()
 	comand =comand+\" \"+comand1;
 	comand = comand.replace(/\\\$SELF/g,'".$Name."');
@@ -6928,7 +6986,10 @@ und \"execute \\'cmd1+cmd2\\' only at:\" möglich. <br /><br>Die Variable \$we i
 	if (from == 'condition'){
 	text = text + 
 	'
-Hier kann die Angabe von Bedingungen erfolgen, die erfüllt sein müssen um den Schaltbefehl auszuführen.<br>Diese Bedingunge sind eng an DOIF- Bedingungen angelehnt.<br><br>Zeitabhängiges schalten: [19.10-23:00] - Schaltbefehl erfolgt nur in angegebenem Zeitraum<br>Readingabhängiges schalten [Devicename:Reading] =/>/< X oder [Devicename:Reading] eq \"x\" - Schaltbefehl erfolgt nur bei erfüllter Bedingung.<br>Achtung! Bei der Abfrage von Readings nach Strings ( on,off,etc. ) ist statt \"=\" \"eq\" zu nutzen und der String muss in \"x\" gesetzt werden!<br> Die Kombination mehrerer Bedingungen und Zeiten ist durch AND oder OR möglich:<br> [19.10-23:00] AND [Devicename:Reading] = 10 - beide Bedingungen müssen erfüllt sein<br>[19.10-23:00] OR [Devicename:Reading] = 10 - eine der Bedingungen muss erfüllt sein.<br>Es ist auf korrekte Eingabe der Leerzeichen zu achten.<br><br>sunset - Bedingungen werden mit zusätzlichen {} eingefügt z.B. : [{ sunset() }-23:00].<br><br>Variable \$we:<br>Die globlae Variable \$we ist nutzbar und muss {} gesetzt werden .<br>{ !\$we } löst den Schaltvorgang nur Werktagen aus<br>{ \$we } löst den Schaltvorgang nur Wochenenden, Feiertagen aus<br><br>Soll nur an bestimmten Wochentagen geschaltet werden, muss eine Zeitangsbe gemacht werden und durch z.B. |135 ergänzt werden.<br>[10:00-11:00|13] würde den Schaltvorgang z.B nur Montag und Mitwoch zwischen 10 uhr und 11 uhr auslösen. Hierbei zählen die Wochentage von 1-7 für Montag-Sonntag.<br>Achtung: Bei Anwendung der geschweiften Klammern zur einletung eines Perlasdrucks ist unbedingt auf die Leerzeichen hinter und vor der Klammer zu achten !<br>Überschreitet die Zeitangabe die Tagesgrenze (24.00 Uhr ), so gelten die angegebenen Tage noch bis zum ende der angegebenen Schaltzeit , d.H. es würde auch am Mitwoch noch der schaltvorgang erfolgen, obwohl als Tagesvorgabe Dienstag gesetzt wurde.<br><br>\$EVENT Variable: Die Variable EVENT enthält den auslösenden Trigger, d.H. es kann eine Reaktion in direkter Abhängigkeit zum auslösenden Trigger erfolgen.<br>[\$EVENT] eq \"state:on\" würde den Kommandozweig nur dann ausführen, wenn der auslösende Trigger \"state:on\" war.<br>Wichtig ist dieses, wenn bei den Triggerdetails nicht schon auf ein bestimmtes Event getriggert wird, sondern hier durch die Nutzung eines wildcards (*) auf alle Events getriggert wird, oder auf alle Events eines Readings z.B. (state:*)<br><br>Bei eingestellter Delayfunktion werden die Bedingungen je nach Einstellung sofort,verzögert oder sowohl-als-auch überprüft, d.H hiermit sind verzögerte Ein-, und Ausschaltbefehle möglich die z.B Nachlauffunktionen oder verzögerte Einschaltfunktionen ermöglichen, die sich selbst überprüfen. z.B. [wenn Licht im Bad an -> schalte Lüfter 2 Min später an -> nur wenn Licht im Bad noch an ist]<br><br>Anstatt einer Verzögerung kann hier auch eine festgelegte Schaltzeit erfolgen.
+Hier kann die Angabe von Bedingungen erfolgen, die erfüllt sein müssen um den Schaltbefehl auszuführen.<br>Diese Bedingunge sind eng an DOIF- Bedingungen angelehnt.<br><br>Zeitabhängiges schalten: [19.10-23:00] - Schaltbefehl erfolgt nur in angegebenem Zeitraum<br>
+Readingabhängiges schalten [Devicename:Reading] =/>/< X oder [Devicename:Reading] eq \"x\" - Schaltbefehl erfolgt nur bei erfüllter Bedingung.<br>
+Um nur den numerischen Wert eine Readings zu erhalten muss dem Ausdruck ein \":d\" angehangen werden ->  [Devicename:Reading:d]<br>
+Achtung! Bei der Abfrage von Readings nach Strings ( on,off,etc. ) ist statt \"=\" \"eq\" zu nutzen und der String muss in \"x\" gesetzt werden!<br> Die Kombination mehrerer Bedingungen und Zeiten ist durch AND oder OR möglich:<br> [19.10-23:00] AND [Devicename:Reading] = 10 - beide Bedingungen müssen erfüllt sein<br>[19.10-23:00] OR [Devicename:Reading] = 10 - eine der Bedingungen muss erfüllt sein.<br>Es ist auf korrekte Eingabe der Leerzeichen zu achten.<br><br>sunset - Bedingungen werden mit zusätzlichen {} eingefügt z.B. : [{ sunset() }-23:00].<br><br>Variable \$we:<br>Die globlae Variable \$we ist nutzbar und muss {} gesetzt werden .<br>{ !\$we } löst den Schaltvorgang nur Werktagen aus<br>{ \$we } löst den Schaltvorgang nur Wochenenden, Feiertagen aus<br><br>Soll nur an bestimmten Wochentagen geschaltet werden, muss eine Zeitangsbe gemacht werden und durch z.B. |135 ergänzt werden.<br>[10:00-11:00|13] würde den Schaltvorgang z.B nur Montag und Mitwoch zwischen 10 uhr und 11 uhr auslösen. Hierbei zählen die Wochentage von 1-7 für Montag-Sonntag.<br>Achtung: Bei Anwendung der geschweiften Klammern zur einletung eines Perlasdrucks ist unbedingt auf die Leerzeichen hinter und vor der Klammer zu achten !<br>Überschreitet die Zeitangabe die Tagesgrenze (24.00 Uhr ), so gelten die angegebenen Tage noch bis zum ende der angegebenen Schaltzeit , d.H. es würde auch am Mitwoch noch der schaltvorgang erfolgen, obwohl als Tagesvorgabe Dienstag gesetzt wurde.<br><br>\$EVENT Variable: Die Variable EVENT enthält den auslösenden Trigger, d.H. es kann eine Reaktion in direkter Abhängigkeit zum auslösenden Trigger erfolgen.<br>[\$EVENT] eq \"state:on\" würde den Kommandozweig nur dann ausführen, wenn der auslösende Trigger \"state:on\" war.<br>Wichtig ist dieses, wenn bei den Triggerdetails nicht schon auf ein bestimmtes Event getriggert wird, sondern hier durch die Nutzung eines wildcards (*) auf alle Events getriggert wird, oder auf alle Events eines Readings z.B. (state:*)<br><br>Bei eingestellter Delayfunktion werden die Bedingungen je nach Einstellung sofort,verzögert oder sowohl-als-auch überprüft, d.H hiermit sind verzögerte Ein-, und Ausschaltbefehle möglich die z.B Nachlauffunktionen oder verzögerte Einschaltfunktionen ermöglichen, die sich selbst überprüfen. z.B. [wenn Licht im Bad an -> schalte Lüfter 2 Min später an -> nur wenn Licht im Bad noch an ist]<br><br>Anstatt einer Verzögerung kann hier auch eine festgelegte Schaltzeit erfolgen.
 <br />
 <br />
 Sonderfunktionen:<br />
@@ -10082,8 +10143,18 @@ sub MSwitch_Check_Event($$) {
         }
     }
 
+
+
+
+
     my $we = AnalyzeCommand( 0, '{return $we}' );
+	
+#MSwitch_LOG( "Debug", 0,"we  $we " . __LINE__ );
+	
+	
     MSwitch_Notify( $hash, $dev_hash );
+	
+	
     delete( $hash->{helper}{testevent_device} );
     delete( $hash->{helper}{testevent_event} );
     delete( $hash->{helper}{testevent_event1} );
