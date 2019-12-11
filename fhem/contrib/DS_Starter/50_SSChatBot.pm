@@ -54,14 +54,15 @@ our %SSChatBot_vNotesIntern = (
 
 # Versions History extern
 our %SSChatBot_vNotesExtern = (
-  "1.0.0"  => "12.12.2015 initial "
+  "1.0.1"  => "11.12.2019 check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
+  "1.0.0"  => "08.12.2019 initial "
 );
 
 my %SSChatBot_errlist = (
   100 => "Unknown error",
   101 => "Payload is empty",
   102 => "API does not exist - may be the Synology Chat Server package is stopped",
-  117 => "file or file location not valid",
+  117 => "illegal file name or path",
   120 => "payload has wrong format",
   404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407 => "record not valid",
@@ -678,7 +679,7 @@ sub SSChatBot_checkretry ($$) {
   my ($name,$retry) = @_;
   my $hash          = $defs{$name};  
   my $idx           = $hash->{OPIDX};
-  my $forbidSend    = 0;
+  my $forbidSend    = "";
   
   if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
@@ -686,20 +687,20 @@ sub SSChatBot_checkretry ($$) {
       return;  
   } 
   
-  if(!$retry) {                                                # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
+  if(!$retry) {                                                     # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
       SSChatBot_updQLength ($hash);
-      return SSChatBot_getapisites($name);                     # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      return SSChatBot_getapisites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
-  } else {                                                     # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
+  } else {                                                          # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
       $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|117|120|407|409|800|900/) {    # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
-          $forbidSend = 1;
+      if($errorcode =~ /100|101|117|120|407|409|800|900/) {         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = SSChatBot_experror($hash,$errorcode);       # Fehlertext zum Errorcode ermitteln
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
@@ -707,9 +708,9 @@ sub SSChatBot_checkretry ($$) {
           delete $hash->{OPIDX};
           delete $hash->{OPMODE};
           
-          SSChatBot_updQLength ($hash);                        # updaten Länge der Sendequeue
+          SSChatBot_updQLength ($hash);                             # updaten Länge der Sendequeue
           
-          return SSChatBot_getapisites($name);                 # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
+          return SSChatBot_getapisites($name);                      # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
       if(!$forbidSend) {
@@ -1135,7 +1136,7 @@ sub SSChatBot_chatop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$out");
 				delete($hash->{HELPER}{CL});                
 			
-            } elsif ($opmode eq "sendItem") {
+            } elsif ($opmode eq "sendItem" && $hash->{OPIDX}) {
                 my $postid = "";
                 my $idx    = $hash->{OPIDX};
                 my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
@@ -1161,7 +1162,7 @@ sub SSChatBot_chatop_parse ($) {
             # die API-Operation war fehlerhaft
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
-            $cherror   = $data->{'error'}->{'errors'};                        # vom Chat gelieferter Fehler
+            $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
             $error     = SSChatBot_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
             if ($error =~ /not found/) {
                 $error .= " New error: ".($cherror?$cherror:"");
@@ -1807,8 +1808,8 @@ sub SSChatBot_CGI() {
 1;
 
 =pod
-=item summary    module to use a Synology Chat Bot
-=item summary_DE Modul zur Installation eines Synology Chat Bot
+=item summary    module to integrate Synology Chat into FHEM
+=item summary_DE Modul zur Integration von Synology Chat in FHEM
 =begin html
 
 <a name="SSChatBot"></a>
