@@ -349,8 +349,9 @@ sub SSChatBot_Set($@) {
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
       return undef if(!$hash->{HELPER}{USERFETCHED});
       my $cmd = join(" ", @a);
-      my ($text,$users,$fileUrl);
-      my ($a,$h) = parseParams($cmd);
+      my ($text,$users);
+      my $fileUrl = "";
+      my ($a,$h)  = parseParams($cmd);
       if($h) {
           $text    = $h->{text}    if(defined $h->{text});
           $users   = $h->{users}   if(defined $h->{users});
