@@ -79,7 +79,6 @@ sub SMAEM_Initialize ($) {
 						       "diffAccept ".
                                "disableSernoInReading:1,0 ".
                                "feedinPrice ".
-							  # "firmwareVersion:>=#2.03.4.R ".
                                "powerCost ".
                                "serialNumber ".
                                "timeout ".						
@@ -286,7 +285,6 @@ sub SMAEM_Read ($) {
   my $name    = $hash->{NAME};
   my $socket  = $hash->{TCPDev};
   my $timeout = AttrVal($name, "timeout", 60);
-#  my $fw      = AttrVal($name, "firmwareVersion", "1.02.04.R");
   my $refsn   = AttrVal($name, "serialNumber", "");
   my $data;
   
@@ -320,7 +318,11 @@ sub SMAEM_Read ($) {
   return if($refsn && $refsn ne $smaserial);                       # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
   
   $hex =~ /.*90000000(.{6})5200000000$/;
-  $hash->{FIRMWARE} = $1 if($1);
+  if($1) {
+      my $fw = $1;
+      $fw =~ s/^(.{2})(.{2})(.{2})/"$1.$2.$3"/e;
+      $hash->{FIRMWARE} = $fw;
+  }
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
   if(!defined($hash->{HELPER}{ALLSERIALS}) || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {
