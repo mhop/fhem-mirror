@@ -79,7 +79,7 @@ sub SMAEM_Initialize ($) {
 						       "diffAccept ".
                                "disableSernoInReading:1,0 ".
                                "feedinPrice ".
-							   "firmwareVersion:>=#2.03.4.R ".
+							  # "firmwareVersion:>=#2.03.4.R ".
                                "powerCost ".
                                "serialNumber ".
                                "timeout ".						
@@ -216,6 +216,8 @@ sub SMAEM_Set ($@) {
 
   if ($opt eq "reset") {
       delete $hash->{HELPER}{ALLSERIALS};
+      #delete $hash->{'GRIDIN_SUM_'.$smaserial};
+      #delete $hash->{'GRIDOUT_SUM_'.$smaserial};
       BlockingKill($hash->{HELPER}{RUNNING_PID}) if(defined($hash->{HELPER}{RUNNING_PID}));
       my $result = unlink $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM"; 
       if ($result) {      
@@ -284,16 +286,27 @@ sub SMAEM_Read ($) {
   my $name    = $hash->{NAME};
   my $socket  = $hash->{TCPDev};
   my $timeout = AttrVal($name, "timeout", 60);
-  my $fw      = AttrVal($name, "firmwareVersion", "1.02.04.R");
+#  my $fw      = AttrVal($name, "firmwareVersion", "1.02.04.R");
   my $refsn   = AttrVal($name, "serialNumber", "");
   my $data;
   
   return if(IsDisabled($name));
   
-  if($fw eq "1.02.04.R") {
-      return unless $socket->recv($data, 600);                     # Each SMAEM packet is 600 bytes of packed payload
-  } elsif ($fw eq ">= 2.03.4.R") {
-      return unless $socket->recv($data, 608);                     # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
+#  if($fw eq "1.02.04.R") {
+#      return unless $socket->recv($data, 600);                     # Each SMAEM packet is 600 bytes of packed payload
+#  } elsif ($fw eq ">= 2.03.4.R") {
+#      return unless $socket->recv($data, 608);                     # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
+#  }
+  
+  $socket->recv($data, 608);
+  my $dl = length($data);
+  if($dl == 600) {
+      $hash->{FIRMWARE} = "1.02.04.R";
+  } elsif($dl == 608) {
+      $hash->{FIRMWARE} = ">= 2.03.4.R";
+  } else {
+      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
+      return;
   }
   
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
@@ -347,32 +360,32 @@ return undef;
 #          non-blocking Inverter Datenabruf
 ###############################################################
 sub SMAEM_DoParse ($) {
- my ($string) = @_;
- my ($name,$dataenc,$smaserial) = split("\\|", $string);
- my $hash       = $defs{$name};
- my $data       = decode_base64($dataenc);
- my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
- my $diffaccept = AttrVal($name, "diffAccept", 10);
- my $fw         = AttrVal($name, "firmwareVersion", "1.02.04.R");
- my ($error,@row_array,@array);
+    my ($string) = @_;
+    my ($name,$dataenc,$smaserial) = split("\\|", $string);
+    my $hash       = $defs{$name};
+    my $data       = decode_base64($dataenc);
+    my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
+    my $diffaccept = AttrVal($name, "diffAccept", 10);
+    my $fw         = $hash->{FIRMWARE};
+    my ($error,@row_array,@array);
  
- Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
+    Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
  
- my $gridinsum  = $hash->{'GRIDIN_SUM_'.$smaserial} ?sprintf("%.4f",$hash->{'GRIDIN_SUM_'.$smaserial}):'';    
- my $gridoutsum = $hash->{'GRIDOUT_SUM_'.$smaserial}?sprintf("%.4f",$hash->{'GRIDOUT_SUM_'.$smaserial}):'';
+    my $gridinsum  = $hash->{'GRIDIN_SUM_'.$smaserial} ?sprintf("%.4f",$hash->{'GRIDIN_SUM_'.$smaserial}):'';    
+    my $gridoutsum = $hash->{'GRIDOUT_SUM_'.$smaserial}?sprintf("%.4f",$hash->{'GRIDOUT_SUM_'.$smaserial}):'';
  
- # check if cacheSMAEM-file has been opened at module start and try again if not
- if($hash->{HELPER}{READFILEERROR}) {
-     my $retcode = SMAEM_getsum($hash,$smaserial);
-	 if ($retcode) {
-	     $error = encode_base64($retcode,"");
-	     Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
-		 $discycles++;
-         return "$name|''|''|''|$error|$discycles|''"; 
-	 } else {
-	     delete($hash->{HELPER}{READFILEERROR})
-	 }
- }
+    # check if cacheSMAEM-file has been opened at module start and try again if not
+    if($hash->{HELPER}{READFILEERROR}) {
+        my $retcode = SMAEM_getsum($hash,$smaserial);
+        if ($retcode) {
+            $error = encode_base64($retcode,"");
+            Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
+            $discycles++;
+            return "$name|''|''|''|$error|$discycles|''"; 
+        } else {
+            delete($hash->{HELPER}{READFILEERROR})
+        }
+    }
  
     # Format of the udp packets of the SMAEM:
     # http://www.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf
