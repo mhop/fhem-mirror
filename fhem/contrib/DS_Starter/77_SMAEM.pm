@@ -301,9 +301,9 @@ sub SMAEM_Read ($) {
   $socket->recv($data, 608);
   my $dl = length($data);
   if($dl == 600) {
-      $hash->{FIRMWARE} = "1.02.04.R";
+      $hash->{MODEL} = "EM / HM 2.0 < 2.03.4.R";
   } elsif($dl == 608) {
-      $hash->{FIRMWARE} = ">= 2.03.4.R";
+      $hash->{MODEL} = "HM 2.0 >= 2.03.4.R";
   } else {
       Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
       return;
@@ -312,11 +312,15 @@ sub SMAEM_Read ($) {
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
   
   # decode serial number of dataset received
+  # unpack big-endian to 2-digit hex (bin2hex)
   my $hex       = unpack('H*', $data);
   my $smaserial = hex(substr($hex,40,8));
   
   return if(!$smaserial);
   return if($refsn && $refsn ne $smaserial);                       # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
+  
+  $hex =~ /.*90000000(.{6})5200000000$/;
+  $hash->{FIRMWARE} = $1 if($1);
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
   if(!defined($hash->{HELPER}{ALLSERIALS}) || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {
@@ -406,7 +410,8 @@ sub SMAEM_DoParse ($) {
     if($1 eq "000e04") {
         $grid_freq = hex($2)/1000;
         $offset = 16;
-    }    
+    } 
+    Log3 ($name, 4, "SMAEM $name - Offset: $offset");    
   
  	################ Aufbau Ergebnis-Array ####################
     # Extract datasets from hex:
