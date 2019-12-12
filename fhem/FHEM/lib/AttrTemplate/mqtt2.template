@@ -670,6 +670,58 @@ attr DEVICE_CH2 setStateList on off toggle
 attr DEVICE model tasmota_POW_USB_split
 attr DEVICE_CH2 model tasmota_POW_USB_split
 
+# plug with LED flashed with Tasmota.
+name:tasmota_plug_with_rgb_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:plug with seperate RGB LED flashed with Tasmota. <br>NOTE: a second device will be created for the rgb device.<br>Tested with Tasmota V. 7.1.2 and Maxcio YX-DE02 Plug using template: {"NAME":"Maxcio YX-DE04","GPIO":[255,17,255,21,56,40,0,0,37,38,39,255,255],"FLAG":1,"BASE":18}
+order:A_01c1a
+set DEVICE attrTemplate tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+attr DEVICE comment Mains channel for DEVICE, see also DEVICE_CH2 for rgb LED
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");;"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef)}
+deleteattr DEVICE stateFormat
+attr DEVICE setList \
+  off:noArg    CMNDTOPIC/POWER1 0\
+  on:noArg     CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER1:.* state
+attr DEVICE jsonMap POWER1:state Dimmer:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER2:0
+setreading DEVICE associatedWith DEVICE_CH2
+deletereading -q DEVICE (?!associatedWith).*
+copy DEVICE DEVICE_CH2
+deleteattr DEVICE_CH2 stateFormat
+attr DEVICE_CH2 comment RGB channel for DEVICE
+setreading DEVICE_CH2 associatedWith DEVICE
+attr DEVICE_CH2 setList \
+  off:noArg    CMNDTOPIC/POWER2 0\
+  on:noArg     CMNDTOPIC/POWER2 1\
+  toggle:noArg CMNDTOPIC/POWER2 2\
+  Color:colorpicker,RGB CMNDTOPIC/COLOR\
+  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+attr DEVICE_CH2 readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER2:.* state
+attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0
+attr DEVICE_CH2 webCmd pct:Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
+attr DEVICE_CH2 devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")}
+attr DEVICE_CH2 setStateList on off toggle
+deletereading -q DEVICE_CH2 (?!associatedWith).*
+attr DEVICE model tasmota_plug_with_rgb_split
+attr DEVICE_CH2 model tasmota_plug_with_rgb_split
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
@@ -775,6 +827,7 @@ order:A_02
 set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+setreading DEVICE associatedWith DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 stateFormat POWER2
 attr DEVICE_CH2 comment Channel 2 for DEVICE
@@ -1136,7 +1189,7 @@ order:A_10b1
 desc:Example how to configure a single relay Shelly device offering energy meassuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off. 
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate shelly1_w_energy_meassuring
-attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"relay_0_power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
 attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","relay_0_kWh",0) },wash:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","wash",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
 attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results or change the refference/the value "0.30" in userReadings "price".
 attr DEVICE model shelly1_w_energy_meassuring_washer_example
