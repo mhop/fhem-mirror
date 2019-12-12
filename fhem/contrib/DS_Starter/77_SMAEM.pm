@@ -338,7 +338,7 @@ sub SMAEM_Read ($) {
       Log3 ($name, 4, "SMAEM $name - ### Begin of new SMA Energymeter $smaserial get data cycle ###");
 	  Log3 ($name, 4, "SMAEM $name - ###############################################################");
 	  Log3 ($name, 4, "SMAEM $name - discarded cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
-      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." ready to parse:\n".$hex);
+      Log3 ($name, 5, "SMAEM $name - Buffer length ".$dl." ready to parse:\n".$hex);
       
 	  if($hash->{HELPER}{RUNNING_PID}) {
           Log3 ($name, 3, "SMAEM $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} has been killed to start a new BlockingCall");
@@ -407,7 +407,7 @@ sub SMAEM_DoParse ($) {
     my $offset = 0;
     my $grid_freq;
     $hex =~ /.*000d04.{11}(000e04)(.*)(001504).*/;
-    if($1 eq "000e04") {
+    if($1 && $1 eq "000e04") {
         $grid_freq = hex($2)/1000;
         $offset = 16;
     } 
