@@ -1,4 +1,4 @@
-REV 20709
+REV 20715
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -199,7 +199,7 @@ UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
 UPD 2019-07-02_07:45:03 154796 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
-UPD 2019-12-08_20:09:25 90480 FHEM/33_readingsGroup.pm
+UPD 2019-12-12_07:45:03 90484 FHEM/33_readingsGroup.pm
 UPD 2019-03-21_07:45:03 23869 FHEM/33_readingsHistory.pm
 UPD 2018-03-02_07:47:09 12101 FHEM/33_readingsProxy.pm
 UPD 2019-02-17_07:45:05 183107 FHEM/34_ESPEasy.pm
@@ -745,8 +745,8 @@ UPD 2019-12-10_07:45:08 4189071 docs/commandref.html
 UPD 2019-12-08_20:09:31 2585814 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-11_07:45:10 229001 docs/commandref_modular.html
-UPD 2019-12-11_07:45:11 239968 docs/commandref_modular_DE.html
+UPD 2019-12-12_07:45:11 229001 docs/commandref_modular.html
+UPD 2019-12-12_07:45:12 239968 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1439,6 +1439,8 @@ UPD 2016-06-19_07:45:12 770 www/images/fhemSVG/hue_room_other.svg
 UPD 2016-06-19_07:45:12 953 www/images/fhemSVG/hue_room_recreation.svg
 UPD 2017-11-14_07:45:02 692 www/images/fhemSVG/hue_room_terrace.svg
 UPD 2016-06-19_07:45:12 641 www/images/fhemSVG/hue_room_toilet.svg
+UPD 2019-12-12_07:45:03 1763 www/images/fhemSVG/hue_smartbutton_v1.svg
+UPD 2019-12-12_07:45:03 1154 www/images/fhemSVG/hue_smartbutton_v2.svg
 UPD 2015-07-28_14:05:32 4224 www/images/fhemSVG/humidity.svg
 UPD 2019-09-05_07:45:02 1678 www/images/fhemSVG/inverter.svg
 UPD 2017-09-07_07:45:02 3979 www/images/fhemSVG/ios_off_fill.svg
@@ -1646,6 +1648,8 @@ UPD 2019-06-02_07:45:03 1591 www/images/fhemSVG/telescope.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
 UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
+UPD 2019-12-12_07:45:03 3216 www/images/fhemSVG/tuer_fenster_kontakt_closed.svg
+UPD 2019-12-12_07:45:03 3318 www/images/fhemSVG/tuer_fenster_kontakt_opened.svg
 UPD 2019-02-09_07:45:03 2304 www/images/fhemSVG/ubuntu.svg
 UPD 2015-07-28_14:05:32 2613 www/images/fhemSVG/unknown.svg
 UPD 2017-11-14_07:45:02 2414 www/images/fhemSVG/usb.svg
