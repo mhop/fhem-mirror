@@ -1,5 +1,5 @@
 ################################################################################################
-# $Id: 77_SMAEM.pm 16201 2018-02-17 15:01:35Z DS_Starter $
+# $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $
 #
 #  Copyright notice
 #
@@ -36,6 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History done by DS_Starter 
 our %SMAEM_vNotesIntern = (
+  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attributes \"firmwareVersion\", \"serialNumber\" ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
   "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
   "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
@@ -78,7 +79,9 @@ sub SMAEM_Initialize ($) {
 						       "diffAccept ".
                                "disableSernoInReading:1,0 ".
                                "feedinPrice ".
+							   "firmwareVersion:>=#2.03.4.R ".
                                "powerCost ".
+                               "serialNumber ".
                                "timeout ".						
                                "$readingFnAttributes";
                                
@@ -277,14 +280,21 @@ return undef;
 ###############################################################
 # called from the global loop, when the select for hash->{FD} reports data
 sub SMAEM_Read ($) {
-  my ($hash) = @_;
-  my $name= $hash->{NAME};
-  my $socket= $hash->{TCPDev};
+  my ($hash)  = @_;
+  my $name    = $hash->{NAME};
+  my $socket  = $hash->{TCPDev};
   my $timeout = AttrVal($name, "timeout", 60);
+  my $fw      = AttrVal($name, "firmwareVersion", "1.02.04.R");
+  my $refsn   = AttrVal($name, "serialNumber", "");
   my $data;
   
   return if(IsDisabled($name));
-  return unless $socket->recv($data, 600); # Each SMAEM packet is 600 bytes of packed payload
+  
+  if($fw eq "1.02.04.R") {
+      return unless $socket->recv($data, 600);                     # Each SMAEM packet is 600 bytes of packed payload
+  } elsif ($fw eq ">= 2.03.4.R") {
+      return unless $socket->recv($data, 608);                     # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
+  }
   
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
   
@@ -293,6 +303,7 @@ sub SMAEM_Read ($) {
   my $smaserial = hex(substr($hex,40,8));
   
   return if(!$smaserial);
+  return if($refsn && $refsn ne $smaserial);                       # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
   if(!defined($hash->{HELPER}{ALLSERIALS}) || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {
@@ -342,6 +353,7 @@ sub SMAEM_DoParse ($) {
  my $data       = decode_base64($dataenc);
  my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
  my $diffaccept = AttrVal($name, "diffAccept", 10);
+ my $fw         = AttrVal($name, "firmwareVersion", "1.02.04.R");
  my ($error,@row_array,@array);
  
  Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
@@ -379,7 +391,13 @@ sub SMAEM_DoParse ($) {
     my $susyid       = hex(substr($hex,36,4));
     my $milliseconds = hex(substr($hex,48,8));
 	# Prestring with SMAEM and SERIALNO or not
-    my $ps = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
+    my $ps     = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
+	
+    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
+    my $offset = 0;
+    if ($fw eq ">= 2.03.4.R") {
+        $offset = 16;
+    }
 	
     # Counter Divisor: [Hex-Value]=Ws => Ws/1000*3600=kWh => divide by 3600000
     # Sum L1-3
@@ -498,10 +516,10 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
 
     # L1
-    my $l1_bezug_wirk=hex(substr($hex,320,8))/10;
-    my $l1_bezug_wirk_count=hex(substr($hex,336,16))/3600000;
-    my $l1_einspeisung_wirk=hex(substr($hex,360,8))/10;
-    my $l1_einspeisung_wirk_count=hex(substr($hex,376,16))/3600000;
+    my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
+    my $l1_bezug_wirk_count       = hex(substr($hex,336+$offset,16))/3600000;
+    my $l1_einspeisung_wirk       = hex(substr($hex,360+$offset,8))/10;
+    my $l1_einspeisung_wirk_count = hex(substr($hex,376+$offset,16))/3600000;
     push(@row_array, $ps."L1_Saldo_Wirkleistung ".sprintf("%.1f",$l1_einspeisung_wirk-$l1_bezug_wirk)."\n");
     push(@row_array, $ps."L1_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_wirk_count-$l1_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L1_Bezug_Wirkleistung ".sprintf("%.1f",$l1_bezug_wirk)."\n");
@@ -509,36 +527,36 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L1_Einspeisung_Wirkleistung ".sprintf("%.1f",$l1_einspeisung_wirk)."\n");
     push(@row_array, $ps."L1_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_wirk_count)."\n");	
  
-    my $l1_bezug_blind=hex(substr($hex,400,8))/10;
-    my $l1_bezug_blind_count=hex(substr($hex,416,16))/3600000;
-    my $l1_einspeisung_blind=hex(substr($hex,440,8))/10;
-    my $l1_einspeisung_blind_count=hex(substr($hex,456,16))/3600000;
+    my $l1_bezug_blind             = hex(substr($hex,400+$offset,8))/10;
+    my $l1_bezug_blind_count       = hex(substr($hex,416+$offset,16))/3600000;
+    my $l1_einspeisung_blind       = hex(substr($hex,440+$offset,8))/10;
+    my $l1_einspeisung_blind_count = hex(substr($hex,456+$offset,16))/3600000;
     push(@row_array, $ps."L1_Bezug_Blindleistung ".sprintf("%.1f",$l1_bezug_blind)."\n");
     push(@row_array, $ps."L1_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l1_bezug_blind_count)."\n");
     push(@row_array, $ps."L1_Einspeisung_Blindleistung ".sprintf("%.1f",$l1_einspeisung_blind)."\n");
     push(@row_array, $ps."L1_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_blind_count)."\n");
 
-    my $l1_bezug_schein=hex(substr($hex,480,8))/10;
-    my $l1_bezug_schein_count=hex(substr($hex,496,16))/3600000;
-    my $l1_einspeisung_schein=hex(substr($hex,520,8))/10;
-    my $l1_einspeisung_schein_count=hex(substr($hex,536,16))/3600000;
+    my $l1_bezug_schein             = hex(substr($hex,480+$offset,8))/10;
+    my $l1_bezug_schein_count       = hex(substr($hex,496+$offset,16))/3600000;
+    my $l1_einspeisung_schein       = hex(substr($hex,520+$offset,8))/10;
+    my $l1_einspeisung_schein_count = hex(substr($hex,536+$offset,16))/3600000;
 	push(@row_array, $ps."L1_Bezug_Scheinleistung ".sprintf("%.1f",$l1_bezug_schein)."\n");
 	push(@row_array, $ps."L1_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l1_bezug_schein_count)."\n");
 	push(@row_array, $ps."L1_Einspeisung_Scheinleistung ".sprintf("%.1f",$l1_einspeisung_schein)."\n");
 	push(@row_array, $ps."L1_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_schein_count)."\n");
 
-    my $l1_thd=hex(substr($hex,560,8))/1000;
-    my $l1_v=hex(substr($hex,576,8))/1000;
-    my $l1_cosphi=hex(substr($hex,592,8))/1000;
+    my $l1_thd    = hex(substr($hex,560+$offset,8))/1000;
+    my $l1_v      = hex(substr($hex,576+$offset,8))/1000;
+    my $l1_cosphi = hex(substr($hex,592+$offset,8))/1000;
 	push(@row_array, $ps."L1_THD ".sprintf("%.2f",$l1_thd)."\n");
 	push(@row_array, $ps."L1_Spannung ".sprintf("%.1f",$l1_v)."\n");
 	push(@row_array, $ps."L1_CosPhi ".sprintf("%.3f",$l1_cosphi)."\n");
 
     # L2
-    my $l2_bezug_wirk=hex(substr($hex,608,8))/10;
-    my $l2_bezug_wirk_count=hex(substr($hex,624,16))/3600000;
-    my $l2_einspeisung_wirk=hex(substr($hex,648,8))/10;
-    my $l2_einspeisung_wirk_count=hex(substr($hex,664,16))/3600000;
+    my $l2_bezug_wirk             = hex(substr($hex,608+$offset,8))/10;
+    my $l2_bezug_wirk_count       = hex(substr($hex,624+$offset,16))/3600000;
+    my $l2_einspeisung_wirk       = hex(substr($hex,648+$offset,8))/10;
+    my $l2_einspeisung_wirk_count = hex(substr($hex,664+$offset,16))/3600000;
     push(@row_array, $ps."L2_Saldo_Wirkleistung ".sprintf("%.1f",$l2_einspeisung_wirk-$l2_bezug_wirk)."\n");
     push(@row_array, $ps."L2_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_wirk_count-$l2_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L2_Bezug_Wirkleistung ".sprintf("%.1f",$l2_bezug_wirk)."\n");
@@ -546,36 +564,36 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L2_Einspeisung_Wirkleistung ".sprintf("%.1f",$l2_einspeisung_wirk)."\n");
     push(@row_array, $ps."L2_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_wirk_count)."\n");
  
-    my $l2_bezug_blind=hex(substr($hex,688,8))/10;
-    my $l2_bezug_blind_count=hex(substr($hex,704,16))/3600000;
-    my $l2_einspeisung_blind=hex(substr($hex,728,8))/10;
-    my $l2_einspeisung_blind_count=hex(substr($hex,744,16))/3600000;
+    my $l2_bezug_blind             = hex(substr($hex,688+$offset,8))/10;
+    my $l2_bezug_blind_count       = hex(substr($hex,704+$offset,16))/3600000;
+    my $l2_einspeisung_blind       = hex(substr($hex,728+$offset,8))/10;
+    my $l2_einspeisung_blind_count = hex(substr($hex,744+$offset,16))/3600000;
     push(@row_array, $ps."L2_Bezug_Blindleistung ".sprintf("%.1f",$l2_bezug_blind)."\n");
     push(@row_array, $ps."L2_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l2_bezug_blind_count)."\n");	
     push(@row_array, $ps."L2_Einspeisung_Blindleistung ".sprintf("%.1f",$l2_einspeisung_blind)."\n");
     push(@row_array, $ps."L2_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_blind_count)."\n");
 
-    my $l2_bezug_schein=hex(substr($hex,768,8))/10;
-    my $l2_bezug_schein_count=hex(substr($hex,784,16))/3600000;
-    my $l2_einspeisung_schein=hex(substr($hex,808,8))/10;
-    my $l2_einspeisung_schein_count=hex(substr($hex,824,16))/3600000;
+    my $l2_bezug_schein             = hex(substr($hex,768+$offset,8))/10;
+    my $l2_bezug_schein_count       = hex(substr($hex,784+$offset,16))/3600000;
+    my $l2_einspeisung_schein       = hex(substr($hex,808+$offset,8))/10;
+    my $l2_einspeisung_schein_count = hex(substr($hex,824+$offset,16))/3600000;
     push(@row_array, $ps."L2_Bezug_Scheinleistung ".sprintf("%.1f",$l2_bezug_schein)."\n");
     push(@row_array, $ps."L2_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l2_bezug_schein_count)."\n");	
     push(@row_array, $ps."L2_Einspeisung_Scheinleistung ".sprintf("%.1f",$l2_einspeisung_schein)."\n");
     push(@row_array, $ps."L2_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_schein_count)."\n");
 
-    my $l2_thd=hex(substr($hex,848,8))/1000;
-    my $l2_v=hex(substr($hex,864,8))/1000;
-    my $l2_cosphi=hex(substr($hex,880,8))/1000;
+    my $l2_thd    = hex(substr($hex,848+$offset,8))/1000;
+    my $l2_v      = hex(substr($hex,864+$offset,8))/1000;
+    my $l2_cosphi = hex(substr($hex,880+$offset,8))/1000;
     push(@row_array, $ps."L2_THD ".sprintf("%.2f",$l2_thd)."\n");
     push(@row_array, $ps."L2_Spannung ".sprintf("%.1f",$l2_v)."\n");	
     push(@row_array, $ps."L2_CosPhi ".sprintf("%.3f",$l2_cosphi)."\n");
 
     # L3
-    my $l3_bezug_wirk=hex(substr($hex,896,8))/10;
-    my $l3_bezug_wirk_count=hex(substr($hex,912,16))/3600000;
-    my $l3_einspeisung_wirk=hex(substr($hex,936,8))/10;
-    my $l3_einspeisung_wirk_count=hex(substr($hex,952,16))/3600000;
+    my $l3_bezug_wirk             = hex(substr($hex,896+$offset,8))/10;
+    my $l3_bezug_wirk_count       = hex(substr($hex,912+$offset,16))/3600000;
+    my $l3_einspeisung_wirk       = hex(substr($hex,936+$offset,8))/10;
+    my $l3_einspeisung_wirk_count = hex(substr($hex,952+$offset,16))/3600000;
     push(@row_array, $ps."L3_Saldo_Wirkleistung ".sprintf("%.1f",$l3_einspeisung_wirk-$l3_bezug_wirk)."\n");
     push(@row_array, $ps."L3_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_wirk_count-$l3_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L3_Bezug_Wirkleistung ".sprintf("%.1f",$l3_bezug_wirk)."\n");
@@ -583,27 +601,27 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L3_Einspeisung_Wirkleistung ".sprintf("%.1f",$l3_einspeisung_wirk)."\n");
     push(@row_array, $ps."L3_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_wirk_count)."\n");
 
-    my $l3_bezug_blind=hex(substr($hex,976,8))/10;
-    my $l3_bezug_blind_count=hex(substr($hex,992,16))/3600000;
-    my $l3_einspeisung_blind=hex(substr($hex,1016,8))/10;
-    my $l3_einspeisung_blind_count=hex(substr($hex,1032,16))/3600000;
+    my $l3_bezug_blind             = hex(substr($hex,976+$offset,8))/10;
+    my $l3_bezug_blind_count       = hex(substr($hex,992+$offset,16))/3600000;
+    my $l3_einspeisung_blind       = hex(substr($hex,1016+$offset,8))/10;
+    my $l3_einspeisung_blind_count = hex(substr($hex,1032+$offset,16))/3600000;
     push(@row_array, $ps."L3_Bezug_Blindleistung ".sprintf("%.1f",$l3_bezug_blind)."\n");
     push(@row_array, $ps."L3_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l3_bezug_blind_count)."\n");	
     push(@row_array, $ps."L3_Einspeisung_Blindleistung ".sprintf("%.1f",$l3_einspeisung_blind)."\n");
     push(@row_array, $ps."L3_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_blind_count)."\n");
 
-    my $l3_bezug_schein=hex(substr($hex,1056,8))/10;
-    my $l3_bezug_schein_count=hex(substr($hex,1072,16))/3600000;
-    my $l3_einspeisung_schein=hex(substr($hex,1096,8))/10;
-    my $l3_einspeisung_schein_count=hex(substr($hex,1112,16))/3600000;
+    my $l3_bezug_schein             = hex(substr($hex,1056+$offset,8))/10;
+    my $l3_bezug_schein_count       = hex(substr($hex,1072+$offset,16))/3600000;
+    my $l3_einspeisung_schein       = hex(substr($hex,1096+$offset,8))/10;
+    my $l3_einspeisung_schein_count = hex(substr($hex,1112+$offset,16))/3600000;
     push(@row_array, $ps."L3_Bezug_Scheinleistung ".sprintf("%.1f",$l3_bezug_schein)."\n");
     push(@row_array, $ps."L3_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l3_bezug_schein_count)."\n");	
     push(@row_array, $ps."L3_Einspeisung_Scheinleistung ".sprintf("%.1f",$l3_einspeisung_schein)."\n");
     push(@row_array, $ps."L3_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_schein_count)."\n");
 
-    my $l3_thd=hex(substr($hex,1136,8))/1000;
-    my $l3_v=hex(substr($hex,1152,8))/1000;
-    my $l3_cosphi=hex(substr($hex,1168,8))/1000;
+    my $l3_thd    = hex(substr($hex,1136+$offset,8))/1000;
+    my $l3_v      = hex(substr($hex,1152+$offset,8))/1000;
+    my $l3_cosphi = hex(substr($hex,1168+$offset,8))/1000;
     push(@row_array, $ps."L3_THD ".sprintf("%.2f",$l3_thd)."\n");
     push(@row_array, $ps."L3_Spannung ".sprintf("%.1f",$l3_v)."\n");	
     push(@row_array, $ps."L3_CosPhi ".sprintf("%.3f",$l3_cosphi)."\n");
@@ -924,12 +942,12 @@ sub SMAEM_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 19280 2019-04-28 17:20:21Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
