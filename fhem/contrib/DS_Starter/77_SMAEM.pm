@@ -308,7 +308,7 @@ sub SMAEM_Read ($) {
       Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
       return;
   }
-  
+
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
   
   # decode serial number of dataset received
@@ -334,6 +334,7 @@ sub SMAEM_Read ($) {
       Log3 ($name, 4, "SMAEM $name - ### Begin of new SMA Energymeter $smaserial get data cycle ###");
 	  Log3 ($name, 4, "SMAEM $name - ###############################################################");
 	  Log3 ($name, 4, "SMAEM $name - discarded cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
+      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." ready to parse:\n".$hex);
       
 	  if($hash->{HELPER}{RUNNING_PID}) {
           Log3 ($name, 3, "SMAEM $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} has been killed to start a new BlockingCall");
@@ -366,7 +367,7 @@ sub SMAEM_DoParse ($) {
     my $data       = decode_base64($dataenc);
     my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
     my $diffaccept = AttrVal($name, "diffAccept", 10);
-    my $fw         = $hash->{FIRMWARE};
+#    my $fw         = $hash->{FIRMWARE};
     my ($error,@row_array,@array);
  
     Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
@@ -397,6 +398,15 @@ sub SMAEM_DoParse ($) {
 
     # unpack big-endian to 2-digit hex (bin2hex)
     my $hex = unpack('H*', $data);
+    
+    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
+    my $offset = 0;
+    my $grid_freq;
+    $hex =~ /.*000d04.{11}(000e04)(.*)(001504).*/;
+    if($1 eq "000e04") {
+        $grid_freq = hex($2)/1000;
+        $offset = 16;
+    }    
   
  	################ Aufbau Ergebnis-Array ####################
     # Extract datasets from hex:
@@ -406,11 +416,11 @@ sub SMAEM_DoParse ($) {
 	# Prestring with SMAEM and SERIALNO or not
     my $ps     = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
 	
-    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
-    my $offset = 0;
-    if ($fw eq ">= 2.03.4.R") {
-        $offset = 16;
-    }
+#    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
+#    my $offset = 0;
+#    if ($fw eq ">= 2.03.4.R") {
+#        $offset = 16;
+#    }
 	
     # Counter Divisor: [Hex-Value]=Ws => Ws/1000*3600=kWh => divide by 3600000
     # Sum L1-3
@@ -507,19 +517,19 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."Einspeisung_Wirkleistung ".sprintf("%.1f",$einspeisung_wirk)."\n");
 	push(@row_array, $ps."Einspeisung_Wirkleistung_Zaehler ".sprintf("%.4f",$einspeisung_wirk_count)."\n");
       
-    my $bezug_blind=hex(substr($hex,144,8))/10;
-    my $bezug_blind_count=hex(substr($hex,160,16))/3600000;
-    my $einspeisung_blind=hex(substr($hex,184,8))/10;
-    my $einspeisung_blind_count=hex(substr($hex,200,16))/3600000;
+    my $bezug_blind             = hex(substr($hex,144,8))/10;
+    my $bezug_blind_count       = hex(substr($hex,160,16))/3600000;
+    my $einspeisung_blind       = hex(substr($hex,184,8))/10;
+    my $einspeisung_blind_count = hex(substr($hex,200,16))/3600000;
 	push(@row_array, $ps."Bezug_Blindleistung ".sprintf("%.1f",$bezug_blind)."\n");
 	push(@row_array, $ps."Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$bezug_blind_count)."\n");
 	push(@row_array, $ps."Einspeisung_Blindleistung ".sprintf("%.1f",$einspeisung_blind)."\n");
 	push(@row_array, $ps."Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$einspeisung_blind_count)."\n");
 
-    my $bezug_schein=hex(substr($hex,224,8))/10;
-    my $bezug_schein_count=hex(substr($hex,240,16))/3600000;
-    my $einspeisung_schein=hex(substr($hex,264,8))/10;
-    my $einspeisung_schein_count=hex(substr($hex,280,16))/3600000;
+    my $bezug_schein             = hex(substr($hex,224,8))/10;
+    my $bezug_schein_count       = hex(substr($hex,240,16))/3600000;
+    my $einspeisung_schein       = hex(substr($hex,264,8))/10;
+    my $einspeisung_schein_count = hex(substr($hex,280,16))/3600000;
 	push(@row_array, $ps."Bezug_Scheinleistung ".sprintf("%.1f",$bezug_schein)."\n");
 	push(@row_array, $ps."Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$bezug_schein_count)."\n");
 	push(@row_array, $ps."Einspeisung_Scheinleistung ".sprintf("%.1f",$einspeisung_schein)."\n");
@@ -527,6 +537,8 @@ sub SMAEM_DoParse ($) {
 
     my $cosphi=hex(substr($hex,304,8))/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
+    
+    push(@row_array, $ps."GridFreq ".$grid_freq."\n") if($grid_freq);
 
     # L1
     my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
