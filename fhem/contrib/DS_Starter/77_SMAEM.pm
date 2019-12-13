@@ -316,7 +316,7 @@ sub SMAEM_Read ($) {
   if($1) {
       my $fw = $1;
       $fw    =~ /(.{2})(.{2})(.{2})/;
-      $hash->{FIRMWARE} = $fw;
+      $hash->{FIRMWARE} = hex($1).".".hex($2).".".hex($3);
   }
   
   $hash->{MODEL} = $model;
