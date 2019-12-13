@@ -398,8 +398,8 @@ sub SMAEM_DoParse ($) {
     # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
     my $offset = 0;
     my $grid_freq;
-    $hex =~ /.*000d04.{10}(000e04)(.*)(001504).*/;
-    if($1 && $1 eq "000e04") {
+    $hex =~ /.*000d0400.{8}(000e0400)(.*)(00150400).*/;
+    if($1 && $1 eq "000e0400") {
         $grid_freq = hex($2)/1000;
         $offset    = 16;
     } 
