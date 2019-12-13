@@ -312,13 +312,6 @@ sub SMAEM_Read ($) {
   return if(!$smaserial);
   return if($refsn && $refsn ne $smaserial);                        # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
   
-  $hex =~ /.*90000000(.{6})5200000000$/;                            # Firmware Version extrahieren
-  if($1) {
-      my $fw = $1;
-      $fw    =~ /(.{2})(.{2})(.{2})/;
-      $hash->{FIRMWARE} = hex($1).".".hex($2).".".hex($3);
-  }
-  
   $hash->{MODEL} = $model;
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
@@ -410,14 +403,24 @@ sub SMAEM_DoParse ($) {
         $grid_freq = hex($2)/1000;
         $offset    = 16;
     } 
-    Log3 ($name, 4, "SMAEM $name - Offset: $offset");    
+    Log3 ($name, 4, "SMAEM $name - Offset: $offset");
+
+    # Firmware Version extrahieren
+    my $fwversion;
+    $hex =~ /.*90000000(.{8})00000000$/;                            
+    if($1) {
+        my $fw     = $1;
+        $fw        =~ /(.{2})(.{2})(.{2})(.{2})/;
+        $fwversion = hex($1).".".sprintf("%02d", hex($2)).".".sprintf("%02d", hex($3)).".".chr(hex($4));
+    }    
   
  	################ Aufbau Ergebnis-Array ####################
     # Extract datasets from hex:
     # Generic:
     my $susyid       = hex(substr($hex,36,4));
     my $milliseconds = hex(substr($hex,48,8));
-	# Prestring with SMAEM and SERIALNO or not
+	
+    # Prestring with SMAEM and SERIALNO or not
     my $ps     = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
 	
     # Counter Divisor: [Hex-Value]=Ws => Ws/1000*3600=kWh => divide by 3600000
@@ -533,10 +536,12 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."Einspeisung_Scheinleistung ".sprintf("%.1f",$einspeisung_schein)."\n");
 	push(@row_array, $ps."Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$einspeisung_schein_count)."\n");
 
-    my $cosphi=hex(substr($hex,304,8))/1000;
+    my $cosphi = hex(substr($hex,304,8))/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
-    push(@row_array, $ps."GridFreq ".$grid_freq."\n") if($grid_freq);
+    push(@row_array, $ps."GridFreq ".$grid_freq."\n")     if($grid_freq);
+    push(@row_array, $ps."FwVersion ".$fwversion."\n")    if($fwversion);
+    push(@row_array, "SerialNumber ".$smaserial."\n")     if(!$ps);
 
     # L1
     my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
