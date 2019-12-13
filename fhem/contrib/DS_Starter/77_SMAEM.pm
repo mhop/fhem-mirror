@@ -36,7 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History done by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\" ",
+  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", delete hash  keys by set reset ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
   "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
   "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
@@ -214,10 +214,11 @@ sub SMAEM_Set ($@) {
                 ;
 
   if ($opt eq "reset") {
-      delete $hash->{HELPER}{ALLSERIALS};
-      #delete $hash->{'GRIDIN_SUM_'.$smaserial};
-      #delete $hash->{'GRIDOUT_SUM_'.$smaserial};
       BlockingKill($hash->{HELPER}{RUNNING_PID}) if(defined($hash->{HELPER}{RUNNING_PID}));
+      delete $hash->{HELPER}{ALLSERIALS};
+	  foreach my $key (keys %{$hash}) {
+		  delete $hash->{$key} if($key =~ /GRIDIN_SUM|GRIDOUT_SUM/);
+      } 
       my $result = unlink $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM"; 
       if ($result) {      
           $result = "Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM deleted. It will be initialized immediately.";  
@@ -354,7 +355,7 @@ sub SMAEM_Read ($) {
   
   } else {
       
-	  Log3 $hash, 5, "SMAEM $name: - received " . length($data) . " bytes but interval $hash->{INTERVAL}s isn't expired.";
+	  Log3 $hash, 5, "SMAEM $name: - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
   }
 return undef;
 }
@@ -418,12 +419,6 @@ sub SMAEM_DoParse ($) {
     my $milliseconds = hex(substr($hex,48,8));
 	# Prestring with SMAEM and SERIALNO or not
     my $ps     = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
-	
-#    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
-#    my $offset = 0;
-#    if ($fw eq ">= 2.03.4.R") {
-#        $offset = 16;
-#    }
 	
     # Counter Divisor: [Hex-Value]=Ws => Ws/1000*3600=kWh => divide by 3600000
     # Sum L1-3
