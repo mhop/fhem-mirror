@@ -316,7 +316,6 @@ sub SMAEM_Read ($) {
   if($1) {
       my $fw = $1;
       $fw    =~ /(.{2})(.{2})(.{2})/;
-	  Log3 ($name, 1, "SMAEM $name - Firmware: ".hex($1).".".hex($2).".".hex($3));
       $hash->{FIRMWARE} = $fw;
   }
   
