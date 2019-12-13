@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_Timer: fix PERL WARNING: Use of uninitialized value
  - bugfix:  73_AutoShuttersControl: fix SelfDefense drive up then coming home
                          up at night
  - feature: 30_HUEBridge, 31_HUEDevice: added deCONZ scenes (by shadowghost)

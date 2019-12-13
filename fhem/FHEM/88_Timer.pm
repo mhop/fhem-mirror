@@ -571,7 +571,7 @@ sub Timer_FW_Detail($$$$) {
 		for(my $spalte = 1; $spalte <= $cnt_max; $spalte++) {
 			$style_code1 .= "Padding-bottom:5px; " if ($zeile == $Timers_Count - 1);	# letzte Zeile
 			$html.= "<td align=\"center\" style=\"$style_code1\">".sprintf("%02s", $timer_nr[$zeile])."</td>" if ($spalte == 1);	# Spalte Timer-Nummer
-			if ($spalte >=2 && $spalte <= 7) {	## DropDown-Listen fuer Jahr, Monat, Tag, Stunde, Minute, Sekunde
+			if ($spalte >=2 && $spalte <= 7) {              ## DropDown-Listen fuer Jahr, Monat, Tag, Stunde, Minute, Sekunde
 				my $start = 0;																# Stunde, Minute, Sekunde
 				my $stop = 12;																# Monat
 				my $step = 1;																	# Jahr, Monat, Tag, Stunde, Minute
@@ -601,7 +601,7 @@ sub Timer_FW_Detail($$$$) {
 				$html.="</select></td>";
 			}
 
-			if ($spalte == 8) {			## Spalte Geraete
+			if ($spalte == 8) {  ## Spalte Geraete
 				$id ++;
 				my $comment = "";
 				$comment = AttrVal($select_Value[$spalte-2],"alias","") if (AttrVal($name,"Show_DeviceInfo","") eq "alias");
@@ -609,7 +609,7 @@ sub Timer_FW_Detail($$$$) {
 				$html.= "<td align=\"center\" style=\"$style_code1\"><input size=\"$Table_Size_TextBox\" type=\"text\" placeholder=\"Timer_".($zeile + 1)."\" id=\"".$id."\" value=\"".$select_Value[$spalte-2]."\"><br><small>$comment</small></td>";
 			}
 
-			if ($spalte == 9) {			## DropDown-Liste Aktion
+			if ($spalte == 9) {  ## DropDown-Liste Aktion
 				$id ++;
 				$html.= "<td align=\"center\" style=\"$style_code1\"><select id=\"".$id."\">";							# id need for java script
 				foreach (@action) {
@@ -619,21 +619,21 @@ sub Timer_FW_Detail($$$$) {
 				$html.="</select></td>";
 			}
 
-			if ($spalte > 9 && $spalte < $cnt_max) {	## Spalte Wochentage + aktiv
+			if ($spalte > 9 && $spalte < $cnt_max) {  ## Spalte Wochentage + aktiv
 				$id ++;
 				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"0\" onclick=\"Checkbox(".$id.")\"></td>" if ($select_Value[$spalte-2] eq "0");
 				$html.= "<td align=\"center\" style=\"$style_code1\"><input type=\"checkbox\" name=\"days\" id=\"".$id."\" value=\"1\" onclick=\"Checkbox(".$id.")\" checked></td>" if ($select_Value[$spalte-2] eq "1");
 			}
 
-			if ($spalte == $cnt_max) {	## Button Speichern
+			if ($spalte == $cnt_max) {  ## Button Speichern
 				$id ++;
 				$html.= "<td align=\"center\" style=\"$style_code1 Padding-right:5px\"> <INPUT type=\"reset\" onclick=\"pushed_savebutton(".$id.")\" value=\"&#128190;\"/></td>"; # &#128427; &#128190;
 			}
 			Log3 $name, 5, "$name: attr2html | Timer=".$timer_nr[$zeile]." ".$names[$spalte-1]."=".$select_Value[$spalte-2]." cnt_max=$cnt_max ($spalte)" if ($spalte > 1 && $spalte < $cnt_max);
 		}
-		$html.= "</tr>";			## Zeilenende
+		$html.= "</tr>";  ## Zeilenende
 	}
-	$html.= "</table>";			## Tabellenende
+	$html.= "</table>";  ## Tabellenende
 
 	## Tabellenende	+ Script
 	$html.= '</div>
@@ -760,8 +760,8 @@ sub FW_pushed_savebutton {
 		}
 	}
 
-	return "ERROR: The time is in the past. Please set a time in the future!" if ((time() - fhemTimeLocal($sec, $min, $hour, $mday, $month, $year)) > 0);
-	return "ERROR: The next switching point is too small!" if ((fhemTimeLocal($sec, $min, $hour, $mday, $month, $year) - time()) < 60);
+	return "ERROR: The time is in the past. Please set a time in the future!" if ((time() - fhemTimeLocal($sec, $min, $hour, $mday, $month - 1, $year)) > 0);
+	return "ERROR: The next switching point is too small!" if ((fhemTimeLocal($sec, $min, $hour, $mday, $month - 1, $year) - time()) < 60);
 
 	readingsDelete($hash,"Timer_".sprintf("%02s", $timer)."_set") if ($selected_buttons[8] ne "DEF" && ReadingsVal($name, "Timer_".sprintf("%02s", $timer)."_set", 0) ne "0");
 
