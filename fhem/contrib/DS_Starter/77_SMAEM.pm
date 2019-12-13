@@ -539,9 +539,9 @@ sub SMAEM_DoParse ($) {
     my $cosphi = hex(substr($hex,304,8))/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
-    push(@row_array, $ps."GridFreq ".$grid_freq."\n")     if($grid_freq);
-    push(@row_array, $ps."FwVersion ".$fwversion."\n")    if($fwversion);
-    push(@row_array, "SerialNumber ".$smaserial."\n")     if(!$ps);
+    push(@row_array, $ps."GridFreq ".$grid_freq."\n")         if($grid_freq);
+    push(@row_array, $ps."FirmwareVersion ".$fwversion."\n")  if($fwversion);
+    push(@row_array, "SerialNumber ".$smaserial."\n")         if(!$ps);
 
     # L1
     my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
