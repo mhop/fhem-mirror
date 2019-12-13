@@ -1033,6 +1033,22 @@ return;
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
+
+  <a name="diffAccept"></a>
+  <li><b>diffAccept</b> <br>
+  diffAccept determines the threshold,  up to that a calaculated difference between two 
+  straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
+  Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
+  tamper the result and the measure cycles will be discarded.  
+  </li>
+  <br>
+  
+  <a name="disable"></a>
+  <li><b>disable</b> <br>
+  1 = the module is disabled 
+  </li>
+  <br>
+  
   <a name="disableSernoInReading"></a>
   <li><b>disableSernoInReading</b> <br>
   prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  
@@ -1051,24 +1067,16 @@ return;
   </li>
   <br>
   
-  <a name="disable"></a>
-  <li><b>disable</b> <br>
-  1 = the module is disabled 
-  </li>
-  <br>
-  
-  <a name="diffAccept"></a>
-  <li><b>diffAccept</b> <br>
-  diffAccept determines the threshold,  up to that a calaculated difference between two 
-  straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
-  Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
-  tamper the result and the measure cycles will be discarded.  
-  </li>
-  <br>
-  
   <a name="powerCost"></a>
   <li><b>powerCost</b> <br>
   the individual amount of power cost per kWh 
+  </li>
+  <br>
+  
+  <a name="serialNumber"></a>
+  <li><b>serialNumber</b> <br>
+  The serial number (e.g. 1900212213) of the SMA Energy Meter which data has to be received. <br>
+  (default: no restriction)
   </li>
   <br>
   
@@ -1147,6 +1155,23 @@ However there are readings what maybe need some explanation. <br>
 <a name="SMAEMattr"></a>
 <b>Attribute</b>
 <ul>
+
+  <a name="diffAccept"></a>
+  <li><b>diffAccept</b> <br>
+  diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
+  zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
+  soll (Standard ist 10). <br>
+  Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
+  ausgeschlossen und der Messzyklus verworfen.  
+  </li>
+  <br>
+
+  <a name="disable"></a>
+  <li><b>disable</b> <br>
+  1 = das Modul ist disabled 
+  </li>
+  <br>
+  
   <a name="disableSernoInReading"></a>
   <li><b>disableSernoInReading</b> <br>
   unterdrückt das Prefix "SMAEM&lt;serialnumber_&gt;....."  
@@ -1165,25 +1190,16 @@ However there are readings what maybe need some explanation. <br>
   </li>
   <br>
   
-  <a name="disable"></a>
-  <li><b>disable</b> <br>
-  1 = das Modul ist disabled 
-  </li>
-  <br>
-  
-  <a name="diffAccept"></a>
-  <li><b>diffAccept</b> <br>
-  diffAccept legt fest, bis zu welchem Schwellenwert eine berechnete positive Werte-Differenz 
-  zwischen zwei unmittelbar aufeinander folgenden Zählerwerten (Readings mit *_Diff) akzeptiert werden 
-  soll (Standard ist 10). <br>
-  Damit werden eventuell fehlerhafte Differenzen mit einem unverhältnismäßig hohen Differenzwert von der Berechnung 
-  ausgeschlossen und der Messzyklus verworfen.  
-  </li>
-  <br>
-  
   <a name="powerCost"></a>
   <li><b>powerCost</b> <br>
   die individuelle Höhe der Stromkosten pro Kilowattstunde 
+  </li>
+  <br>
+  
+  <a name="serialNumber"></a>
+  <li><b>serialNumber</b> <br>
+  Die Seriennummer (z.B. 1900212213) des SMA Energy Meters der durch das SMAEM-Device empfangen werden soll. <br>
+  (default: keine Einschränkung)
   </li>
   <br>
   
@@ -1193,7 +1209,8 @@ However there are readings what maybe need some explanation. <br>
   "interval" sein. 
   </li> 
   <br>
-</ul>
+
+  </ul>
 <br>
 
 <a name="SMAEMreadings"></a>
