@@ -36,7 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History done by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attributes \"firmwareVersion\", \"serialNumber\" ",
+  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\" ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
   "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
   "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
@@ -286,22 +286,16 @@ sub SMAEM_Read ($) {
   my $socket  = $hash->{TCPDev};
   my $timeout = AttrVal($name, "timeout", 60);
   my $refsn   = AttrVal($name, "serialNumber", "");
-  my $data;
+  my ($data,$model);
   
   return if(IsDisabled($name));
   
-#  if($fw eq "1.02.04.R") {
-#      return unless $socket->recv($data, 600);                     # Each SMAEM packet is 600 bytes of packed payload
-#  } elsif ($fw eq ">= 2.03.4.R") {
-#      return unless $socket->recv($data, 608);                     # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
-#  }
-  
   $socket->recv($data, 608);
   my $dl = length($data);
-  if($dl == 600) {
-      $hash->{MODEL} = "EM / HM 2.0 < 2.03.4.R";
-  } elsif($dl == 608) {
-      $hash->{MODEL} = "HM 2.0 >= 2.03.4.R";
+  if($dl == 600) {                                                  # Each SMAEM packet is 600 bytes of packed payload
+      $model = "EM / HM 2.0 < 2.03.4.R";
+  } elsif($dl == 608) {                                             # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
+      $model = "HM 2.0 >= 2.03.4.R";
   } else {
       Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
       return;
@@ -315,14 +309,16 @@ sub SMAEM_Read ($) {
   my $smaserial = hex(substr($hex,40,8));
   
   return if(!$smaserial);
-  return if($refsn && $refsn ne $smaserial);                       # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
+  return if($refsn && $refsn ne $smaserial);                        # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
   
-  $hex =~ /.*90000000(.{6})5200000000$/;
+  $hex =~ /.*90000000(.{6})5200000000$/;                            # Firmware Version extrahieren
   if($1) {
       my $fw = $1;
-      $fw =~ s/^(.{2})(.{2})(.{2})/"$1.$2.$3"/e;
+      $fw    =~ s/^(.{2})(.{2})(.{2})/"$1.$2.$3"/e;
       $hash->{FIRMWARE} = $fw;
   }
+  
+  $hash->{MODEL} = $model;
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
   if(!defined($hash->{HELPER}{ALLSERIALS}) || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {
@@ -408,10 +404,10 @@ sub SMAEM_DoParse ($) {
     # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
     my $offset = 0;
     my $grid_freq;
-    $hex =~ /.*000d04.{11}(000e04)(.*)(001504).*/;
+    $hex =~ /.*000d04.{10}(000e04)(.*)(001504).*/;
     if($1 && $1 eq "000e04") {
         $grid_freq = hex($2)/1000;
-        $offset = 16;
+        $offset    = 16;
     } 
     Log3 ($name, 4, "SMAEM $name - Offset: $offset");    
   
