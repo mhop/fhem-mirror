@@ -1,4 +1,4 @@
-REV 20715
+REV 20724
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -643,7 +643,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2019-12-04_07:45:03 50228 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2019-12-10_07:45:04 135933 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2019-12-13_07:45:02 139656 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -745,8 +745,8 @@ UPD 2019-12-10_07:45:08 4189071 docs/commandref.html
 UPD 2019-12-08_20:09:31 2585814 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-12_07:45:11 229001 docs/commandref_modular.html
-UPD 2019-12-12_07:45:12 239968 docs/commandref_modular_DE.html
+UPD 2019-12-13_07:45:09 229001 docs/commandref_modular.html
+UPD 2019-12-13_07:45:10 239968 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
