@@ -40,65 +40,65 @@ use constant {
 # dir: Himmelsrichtung des Fensters
 # typ: n-normal, s-schlaf bis wecken geschlossen, o-nachts offen
 my @rolls = (
-    { roll => "wohn.rollTerrR", dir=>"W", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"wohn.fenTerr", state=>STATE_IDLE, },
-    { roll => "wohn.rollTerrL", dir=>"W", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "wohn.rollSofa",  dir=>"S", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "ess.roll",       dir=>"S", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "kuch.rollBar",   dir=>"S", typ=>"n",  temp=>"tempKueche", tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "kuch.rollStr",   dir=>"O", typ=>"n",  temp=>"tempKueche", tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "arb.rollTerr",   dir=>"W", typ=>"n",  temp=>"tempStudio", tempSoll=>20, win=>"wohn.fenTerr", state=>STATE_IDLE, },
-    { roll => "arb.rollWeg",    dir=>"S", typ=>"n",  temp=>"tempStudio", tempSoll=>20, win=>"",             state=>STATE_IDLE, },
-    { roll => "bad.roll",       dir=>"S", typ=>"n",  temp=>"tempBad",    tempSoll=>22, win=>"",             state=>STATE_IDLE, },
-    { roll => "schlaf.rollWeg", dir=>"S", typ=>"s",  temp=>"tempSchlaf", tempSoll=>18, win=>"",             state=>STATE_IDLE, },
-    { roll => "schlaf.rollStr", dir=>"O", typ=>"so", temp=>"tempSchlaf", tempSoll=>18, win=>"",             state=>STATE_IDLE, },
+    { roll => "wohn.rollTerrR", dir=>"W", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"wohn.fenTerr", block=>"",          state=>STATE_IDLE, },
+    { roll => "wohn.rollTerrL", dir=>"W", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "wohn.rollSofa",  dir=>"S", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "ess.roll",       dir=>"S", typ=>"n",  temp=>"tempWohn",   tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "kuch.rollBar",   dir=>"S", typ=>"n",  temp=>"tempKueche", tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "kuch.rollStr",   dir=>"O", typ=>"n",  temp=>"tempKueche", tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "arb.rollTerr",   dir=>"W", typ=>"n",  temp=>"tempStudio", tempSoll=>20, win=>"wohn.fenTerr", block=>"blockRoll", state=>STATE_IDLE, },
+    { roll => "arb.rollWeg",    dir=>"S", typ=>"n",  temp=>"tempStudio", tempSoll=>20, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "bad.roll",       dir=>"S", typ=>"n",  temp=>"tempBad",    tempSoll=>22, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "schlaf.rollWeg", dir=>"S", typ=>"s",  temp=>"tempSchlaf", tempSoll=>18, win=>"",             block=>"",          state=>STATE_IDLE, },
+    { roll => "schlaf.rollStr", dir=>"O", typ=>"so", temp=>"tempSchlaf", tempSoll=>18, win=>"",             block=>"",          state=>STATE_IDLE, },
 );
 
 
-my @rollHoch = (
-  "bad.roll",
-  "arb.rollWeg",
-  "arb.rollTerr",
-  "kuch.rollStr",
-  "kuch.rollBar",
-  "ess.roll",
-  "wohn.rollSofa",
-  "wohn.rollTerrL",
-  "wohn.rollTerrR"
-);
-
-
-my @rollRunter = (
-  "wohn.rollTerrR",
-  "wohn.rollTerrL",
-  "wohn.rollSofa",
-  "ess.roll",
-  "kuch.rollBar",
-  "kuch.rollStr",
-  "arb.rollTerr",
-  "arb.rollWeg",
-  "bad.roll",
-  "schlaf.rollWeg"
+#my @rollHoch = (
+#  "bad.roll",
+#  "arb.rollWeg",
+#  "arb.rollTerr",
+#  "kuch.rollStr",
+#  "kuch.rollBar",
+#  "ess.roll",
+#  "wohn.rollSofa",
+#  "wohn.rollTerrL",
+#  "wohn.rollTerrR"
+#);
+#
+#
+#my @rollRunter = (
+#  "wohn.rollTerrR",
+#  "wohn.rollTerrL",
+#  "wohn.rollSofa",
+#  "ess.roll",
+#  "kuch.rollBar",
+#  "kuch.rollStr",
+#  "arb.rollTerr",
+#  "arb.rollWeg",
+#  "bad.roll",
+#  "schlaf.rollWeg"
+##  "schlaf.rollStr"
+#);
+#
+#my @rollWeck = (
+#  "schlaf.rollWeg",
 #  "schlaf.rollStr"
-);
-
-my @rollWeck = (
-  "schlaf.rollWeg",
-  "schlaf.rollStr"
-);
-
-my @rollTest = (
-  "wohn.rollTerrR"
-);
-
-my @rollSchlaf = (
-  "schlaf.rollWeg",
-  "schlaf.rollStr"
-);
-
-my @rollArb = (
-  "arb.rollTerr",
-  "arb.rollWeg",
-);
+#);
+#
+#my @rollTest = (
+#  "wohn.rollTerrR"
+#);
+#
+#my @rollSchlaf = (
+#  "schlaf.rollWeg",
+#  "schlaf.rollStr"
+#);
+#
+#my @rollArb = (
+#  "arb.rollTerr",
+#  "arb.rollWeg",
+#);
 
 my $tc=0;
 my @blocktime=localtime;
@@ -106,7 +106,7 @@ my $blocktimerRunning=0;
 my $delaySec=11;
 
 my $tempIn_offset=0;
-my $tempOut_offset=+5;
+my $tempOut_offset=+3;
 
 #------------------------------------------
 
@@ -118,120 +118,135 @@ sub myfhem($)
 
 #------------------------------------------
 
-sub RollCheckSkip($$)
+sub findRoll($)
 {
-    my($cmd, $roll) = @_;
-    my $skip=0;
-    if ($cmd eq "closes") {
-       if ($roll eq "wohn.rollTerrR") {
-          if (Value("wohn.fenTerr") eq "Open") {
-              $skip=1;
-          }
-      }
-   }
-   return $skip
-}
-
-#------------------------------------------
-
-sub RollCmd($$$)
-{
-    my ($cmd, $roll, $delay) = @_;
-    if(RollCheckSkip($cmd, $roll)==0) {
-        myfhem ("define r".int(rand(10000))." at +".$delay." set ".$roll." ".$cmd);
-    }
-}
-
-#------------------------------------------
-
-sub RollGroup(\@$$)
-{
-    my ($rolls, $cmd, $delay) = @_;
-    #Log 1, "RollGroup ## cmd:$cmd del:$delay";
-    my $i;
-    my @myrolls;
-    @myrolls=@$rolls;
-
-    $i=0;
-    for my $r (@myrolls) {
-        my @tparts = gmtime($i*$delay+1);
-        my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
-        my $skip=0;
-        #$t="00:00:".sprintf("%02d", $i*5);
-        #Log 1, "time $t";
-        if ($cmd eq "closes") {
-           if ($r eq "wohn.rollTerrR") {
-              if (Value("wohn.fenTerr") eq "Open") {
-                 $skip=1;
-              }
-           }
-        }
-        if($skip==0) {
-	    myfhem ("define r".$i." at +".$t." set ".$r." ".$cmd);
-        }
-	$i=$i+1;
-    }
-}
-
-
-sub RollGroup2(\@$$)
-{
-    my ($typ, $cmd, $delay) = @_;
-    #Log 1, "RollGroup ## cmd:$cmd del:$delay";
-    my $i=0;
+    my($name) = @_;
     my $r=0;
 
     for $r (@rolls) {
-        if (index($r->{typ}, $typ) != -1) {
-          my @tparts = gmtime($i*$delay+1);
-          my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
-          my $skip=0;
-          #$t="00:00:".sprintf("%02d", $i*5);
-          #Log 1, "time $t";
-          if ($cmd eq "closes") {
-             if ($r eq "wohn.rollTerrR") {
-                if (Value("wohn.fenTerr") eq "Open") {
-                   $skip=1;
-                }
-              }
-          }
-          if($skip==0) {
-              myfhem ("define r".$i." at +".$t." set ".$r." ".$cmd);
-          }
-          $i=$i+1;
-       }
+        if ($r->{roll} eq $name) {
+            return $r;
+        }
     }
+    return undef;
 }
 
 #------------------------------------------
 
-sub RollTest() {
-     &RollGroup(\@rollTest, "closes", 1);
-}
-
-#------------------------------------------
-
-sub RollAll($$) {
-   my ($cmd, $delay) = @_;
-#   Log 1, "c:$cmd d:$delay";
-   if($cmd eq "closes") {
-     &RollGroup(\@rollRunter, $cmd,$delay);
-   }
-   else {
-     &RollGroup(\@rollHoch, $cmd,$delay);
-  }
-}
-
-#------------------------------------------
-
-sub RollWeck($) {
-   my ($delay) = @_;
-   #&RollGroup(\@rollWeck, "up 5", $delay);
-   &RollGroup(\@rollWeck, "opens", $delay);
-   myfhem("define weckwachat at +03:00:00 set wach 1");
-}
-
-#------------------------------------------
+#sub RollCheckSkip($$)
+#{
+#    my($cmd, $roll) = @_;
+#    my $skip=0;
+#    if ($cmd eq "closes") {
+#       if ($roll eq "wohn.rollTerrR") {
+#          if (Value("wohn.fenTerr") eq "Open") {
+#              $skip=1;
+#          }
+#      }
+#   }
+#   return $skip
+#}
+#
+##------------------------------------------
+#
+#sub RollCmd($$$)
+#{
+#    my ($cmd, $roll, $delay) = @_;
+#    if(RollCheckSkip($cmd, $roll)==0) {
+#        myfhem ("define r".int(rand(10000))." at +".$delay." set ".$roll." ".$cmd);
+#    }
+#}
+#
+##------------------------------------------
+#
+#sub RollGroup(\@$$)
+#{
+#    my ($rolls, $cmd, $delay) = @_;
+#    #Log 1, "RollGroup ## cmd:$cmd del:$delay";
+#    my $i;
+#    my @myrolls;
+#    @myrolls=@$rolls;
+#
+#    $i=0;
+#    for my $r (@myrolls) {
+#        my @tparts = gmtime($i*$delay+1);
+#        my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+#        my $skip=0;
+#        #$t="00:00:".sprintf("%02d", $i*5);
+#        #Log 1, "time $t";
+#        if ($cmd eq "closes") {
+#           if ($r eq "wohn.rollTerrR") {
+#              if (Value("wohn.fenTerr") eq "Open") {
+#                 $skip=1;
+#              }
+#           }
+#        }
+#        if($skip==0) {
+#	    myfhem ("define r".$i." at +".$t." set ".$r." ".$cmd);
+#        }
+#	$i=$i+1;
+#    }
+#}
+#
+#
+#sub RollGroup2(\@$$)
+#{
+#    my ($typ, $cmd, $delay) = @_;
+#    #Log 1, "RollGroup ## cmd:$cmd del:$delay";
+#    my $i=0;
+#    my $r=0;
+#
+#    for $r (@rolls) {
+#        if (index($r->{typ}, $typ) != -1) {
+#          my @tparts = gmtime($i*$delay+1);
+#          my $t=sprintf ("%02d:%02d:%02d",@tparts[2,1,0]);
+#          my $skip=0;
+#          #$t="00:00:".sprintf("%02d", $i*5);
+#          #Log 1, "time $t";
+#          if ($cmd eq "closes") {
+#             if ($r eq "wohn.rollTerrR") {
+#                if (Value("wohn.fenTerr") eq "Open") {
+#                   $skip=1;
+#                }
+#              }
+#          }
+#          if($skip==0) {
+#              myfhem ("define r".$i." at +".$t." set ".$r." ".$cmd);
+#          }
+#          $i=$i+1;
+#       }
+#    }
+#}
+#
+##------------------------------------------
+#
+#sub RollTest() {
+#     &RollGroup(\@rollTest, "closes", 1);
+#}
+#
+##------------------------------------------
+#
+#sub RollAll($$) {
+#   my ($cmd, $delay) = @_;
+##   Log 1, "c:$cmd d:$delay";
+#   if($cmd eq "closes") {
+#     &RollGroup(\@rollRunter, $cmd,$delay);
+#   }
+#   else {
+#     &RollGroup(\@rollHoch, $cmd,$delay);
+#  }
+#}
+#
+##------------------------------------------
+#
+#sub RollWeck($) {
+#   my ($delay) = @_;
+#   #&RollGroup(\@rollWeck, "up 5", $delay);
+#   &RollGroup(\@rollWeck, "opens", $delay);
+#   myfhem("define weckwachat at +03:00:00 set wach 1");
+#}
+#
+##------------------------------------------
 
 sub Dbg($) {
     if(Value("DebugRoll") eq "1") {
@@ -319,6 +334,8 @@ sub getWeather($)
     # cloudy: 26, 27, 28 29
     return(WEATHER_BAD);
 }
+
+#------------------------------------------
 
 sub IsSunny($)
 {
@@ -427,11 +444,17 @@ sub checkSunIn($$$$$)
 #------------------------------------------
 
 # Offene Fenster nicht mit Rollaeden verschliessen
-sub checkSkip($$$)
+sub checkSkip($$)
 {
-    my ($winstate, $typ, $wach)=@_;
+    my ($r, $wach)=@_;
+    my $winstate=Value($r->{win});
+    my $typ=$r->{typ};
     my $skipRunter=SKIP_NO; my $skipHoch=SKIP_NO;
 
+    if (Value($r->{block})) {
+        $skipRunter=SKIP_ALL;
+        $skipHoch=SKIP_ALL;
+    }
     if ($winstate eq "Open") {
         # Offene Fenster nicht mit Rollaeden verschliessen
         $skipRunter=SKIP_ALL;
@@ -488,7 +511,7 @@ sub RollCheck()
         my($tempI, $tempO)=checkTemps($tempIn, $tempOut, $r->{tempSoll}); # Temperatur klassifizieren
         my $sunIn=checkSunIn($twil, $sr, $r->{dir}, $sonneblock, $sunny); # Sonne scheint ins Fenster ?
         # Offene Fenster nicht mit Rollaeden verschliessen, zur Schlafenszeit nicht öffnen
-        my ($skipRunter, $skipHoch)=checkSkip(Value($r->{win}), $r->{typ}, $wach);
+        my ($skipRunter, $skipHoch)=checkSkip($r, $wach);
         Dbg("RollCheck:$r->{roll}-tempLevI,O:$tempI,$tempO tempI,O:$tempIn,$tempOut so:$sunIn wett:$wett sr:$sr "
              . "twil:$twil tag:$tag wach:$wach skipR,H:$skipRunter,$skipHoch st:$r->{state}");
         if (!$tag) {
