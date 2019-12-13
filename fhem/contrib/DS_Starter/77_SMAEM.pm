@@ -314,8 +314,9 @@ sub SMAEM_Read ($) {
   
   $hex =~ /.*90000000(.{6})5200000000$/;                            # Firmware Version extrahieren
   if($1) {
-      my $fw = hex($1);
-      $fw    =~ s/^(.{2})(.{2})(.{2})/"$1.$2.$3"/e;
+      my $fw = $1;
+      $fw    =~ /(.{2})(.{2})(.{2})/;
+	  Log3 ($name, 1, "SMAEM $name - Firmware: ".hex($1).".".hex($2).".".hex($3));
       $hash->{FIRMWARE} = $fw;
   }
   
