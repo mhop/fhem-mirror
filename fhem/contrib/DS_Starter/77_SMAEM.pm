@@ -418,6 +418,7 @@ sub SMAEM_DoParse ($) {
     # Extract datasets from hex:
     # Generic:
     my $susyid       = hex(substr($hex,36,4));
+    # SerialNumber     hex(substr($hex,40,8))
     my $milliseconds = hex(substr($hex,48,8));
 	
     # Prestring with SMAEM and SERIALNO or not
@@ -542,6 +543,7 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."GridFreq ".$grid_freq."\n")         if($grid_freq);
     push(@row_array, $ps."FirmwareVersion ".$fwversion."\n")  if($fwversion);
     push(@row_array, "SerialNumber ".$smaserial."\n")         if(!$ps);
+    push(@row_array, $ps."SUSyID ".$susyid."\n");
 
     # L1
     my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
