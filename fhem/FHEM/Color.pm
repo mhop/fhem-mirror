@@ -452,6 +452,7 @@ devStateIcon($$@)
     my $s = $value;
 
     return ".*:light_question" if( !$s );
+    return ".*:light_question" if( $s =~ m/^set/i );
     return ".*:$s:toggle";
 
   } elsif( $type && $type eq "dimmer" ) {
@@ -465,6 +466,7 @@ devStateIcon($$@)
     }
 
     return ".*:light_question" if( !defined($percent) );
+    return ".*:light_question" if( $percent =~ m/^set/i );
 
     return ".*:on:toggle" if( $percent eq "on" );
     return ".*:off:toggle" if( $percent eq "off" );
@@ -489,13 +491,17 @@ devStateIcon($$@)
     }
 
     return ".*:light_question" if( !defined($value) );
+    return ".*:light_question" if( $value =~ m/^set/i );
     return ".*:on:toggle" if( $value eq "on" );
     return ".*:off:toggle" if( $value eq "off" );
+
+    $value = substr($value,0,6);
 
     my $s = 'on';
     if( $pct ) {
       my $percent = ::ReadingsVal($name,$pct, undef);
       $percent = ::CommandGet("","$name $pct") if( !$percent );
+      return ".*:off:toggle" if( $onoff && ::ReadingsVal($name,$onoff,'') =~ m/(0|off$)/i );
       return ".*:off:toggle" if( $percent eq "off" );
       $percent = 100 if( $percent eq "on" );
       $s = $dim_values{int($percent/7)} if( $percent && $percent < 100 );
