@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 77_SMAEM: support of SMA Homemanager 2.0 >= 2.03.4.R, new attribute
+                      serialNumber
  - bugfix:  88_Timer: fix PERL WARNING: Use of uninitialized value
  - bugfix:  73_AutoShuttersControl: fix SelfDefense drive up then coming home
                          up at night

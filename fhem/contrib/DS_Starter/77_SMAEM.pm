@@ -36,7 +36,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History done by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "3.5.0" => "12.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", delete hash  keys by set reset ",
+  "3.5.0" => "14.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", ".
+                          "delete hash keys by set reset, initial OBIS items resolution ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
   "3.3.0" => "21.05.2019  set reset to delete and reinitialize cacheFile, support of DelayedShutdownFn ",
   "3.2.0" => "26.07.2018  log entry enhanced if diff overflow ",
@@ -58,6 +59,66 @@ our %SMAEM_vNotesIntern = (
   "2.1.0" => "29.11.2016  move \$hash->{GRIDin_SUM}, \$hash->{GRIDOUT_SUM} calc to smaread_ParseDone, ".
                           "some little improvements to logging process",
   "2.0.0" => "28.11.2016  switch to nonblocking "
+);
+
+# Beschreibung OBIS Kennzahlen
+our %SMAEM_obisitem = (
+  "1:1.4.0"   => "SUM Wirkleistung +",
+  "1:1.8.0"   => "SUM Wirkleistung + Zaehler",
+  "1:2.4.0"   => "SUM Wirkleistung −",
+  "1:2.8.0"   => "SUM Wirkleistung − Zaehler",
+  "1:3.4.0"   => "SUM Blindleistung +",
+  "1:3.8.0"   => "SUM Blindleistung + Zaehler",
+  "1:4.4.0"   => "SUM Blindleistung −",
+  "1:4.8.0"   => "SUM Blindleistung − Zaehler",
+  "1:9.4.0"   => "SUM Scheinleistung +",
+  "1:9.8.0"   => "SUM Scheinleistung + Zaehler",
+  "1:10.4.0"  => "SUM Scheinleistung −",
+  "1:10.8.0"  => "SUM Scheinleistung − Zaehler",
+  "1:13.4.0"  => "SUM Leistungsfaktor",
+  "1:21.4.0"  => "L1 Wirkleistung +",
+  "1:21.8.0"  => "L1 Wirkleistung + Zaehler",
+  "1:22.4.0"  => "L1 Wirkleistung −",
+  "1:22.8.0"  => "L1 Wirkleistung − Zaehler",
+  "1:23.4.0"  => "L1 Blindleistung +",
+  "1:23.8.0"  => "L1 Blindleistung + Zaehler",
+  "1:24.4.0"  => "L1 Blindleistung −",
+  "1:24.8.0"  => "L1 Blindleistung − Zaehler",
+  "1:29.4.0"  => "L1 Scheinleistung +",
+  "1:29.8.0"  => "L1 Scheinleistung + Zaehler",
+  "1:30.4.0"  => "L1 Scheinleistung −",
+  "1:30.8.0"  => "L1 Scheinleistung − Zaehler",
+  "1:31.4.0"  => "L1 Strom",
+  "1:32.4.0"  => "L1 Spannung",
+  "1:41.4.0"  => "L2 Wirkleistung +",
+  "1:41.8.0"  => "L2 Wirkleistung + Zaehler",
+  "1:42.4.0"  => "L2 Wirkleistung −",
+  "1:42.8.0"  => "L2 Wirkleistung − Zaehler",
+  "1:43.4.0"  => "L2 Blindleistung +",
+  "1:43.8.0"  => "L2 Blindleistung + Zaehler",
+  "1:44.4.0"  => "L2 Blindleistung −",
+  "1:44.8.0"  => "L2 Blindleistung − Zaehler",
+  "1:49.4.0"  => "L2 Scheinleistung +",
+  "1:49.8.0"  => "L2 Scheinleistung + Zaehler",
+  "1:50.4.0"  => "L2 Scheinleistung −",
+  "1:50.8.0"  => "L2 Scheinleistung − Zaehler",
+  "1:51.4.0"  => "L2 Strom",
+  "1:52.4.0"  => "L2 Spannung",
+  "1:61.4.0"  => "L3 Wirkleistung +",
+  "1:61.8.0"  => "L3 Wirkleistung + Zaehler",
+  "1:62.4.0"  => "L3 Wirkleistung −",
+  "1:62.8.0"  => "L3 Wirkleistung − Zaehler",
+  "1:63.4.0"  => "L3 Blindleistung +",
+  "1:63.8.0"  => "L3 Blindleistung + Zaehler",
+  "1:64.4.0"  => "L3 Blindleistung −",
+  "1:64.8.0"  => "L3 Blindleistung − Zaehler",
+  "1:69.4.0"  => "L3 Scheinleistung +",
+  "1:69.8.0"  => "L3 Scheinleistung + Zaehler",
+  "1:70.4.0"  => "L3 Scheinleistung −",
+  "1:70.8.0"  => "L3 Scheinleistung − Zaehler",
+  "1:71.4.0"  => "L3 Strom",
+  "1:72.4.0"  => "L3 Spannung",
+  "144:0.0.0" => "Softwareversion",
 );
 
 ###############################################################
@@ -342,7 +403,7 @@ sub SMAEM_Read ($) {
 	  
 	  my $dataenc = encode_base64($data,"");
       
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc|$smaserial", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
+	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc|$smaserial|$dl", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
       Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
   
   } else {
@@ -357,7 +418,7 @@ return undef;
 ###############################################################
 sub SMAEM_DoParse ($) {
     my ($string) = @_;
-    my ($name,$dataenc,$smaserial) = split("\\|", $string);
+    my ($name,$dataenc,$smaserial,$dl) = split("\\|", $string);
     my $hash       = $defs{$name};
     my $data       = decode_base64($dataenc);
     my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
@@ -392,10 +453,10 @@ sub SMAEM_DoParse ($) {
     
     # OBIS Kennzahlen Zerlegung
     my $obis = {};
-    my $i    = 56;
+    my $i    = 56;                                            # Start nach Header (28 Bytes)
     my $length;
     my ($b,$c,$d,$e);                                         # OBIS Klassen
-    while (substr($hex,$i,8) ne "00000000") {
+    while (substr($hex,$i,8) ne "00000000" && $i<=($dl*4)) {
       $b = hex(substr($hex,$i,2));
       $c = hex(substr($hex,$i+2,2));
       $d = hex(substr($hex,$i+4,2));
@@ -403,7 +464,7 @@ sub SMAEM_DoParse ($) {
       $length = $d*2;
       if ($b == 144) {
         # Firmware Version
-        $obis->{"1-144:0.0.0"} = hex(substr($hex,$i+8,2)).".".sprintf("%02d", hex(substr($hex,$i+10,2))).".".sprintf("%02d", hex(substr($hex,$i+12,2))).".".chr(hex(substr($hex,$i+14,2)));
+        $obis->{$b.":0.0.0"} = hex(substr($hex,$i+8,2)).".".sprintf("%02d", hex(substr($hex,$i+10,2))).".".sprintf("%02d", hex(substr($hex,$i+12,2))).".".chr(hex(substr($hex,$i+14,2)));
         $i = $i + 16;
         next;
       }
@@ -413,7 +474,8 @@ sub SMAEM_DoParse ($) {
 
     Log3 ($name, 5, "SMAEM $name - OBIS metrics identified:");
     foreach my $k (sort keys %{$obis}) {
-        Log3 ($name, 5, "SMAEM $name - $k -> ".$obis->{$k});
+        my $item = $SMAEM_obisitem{$k}?$SMAEM_obisitem{$k}:"no item found";
+        Log3 ($name, 5, "SMAEM $name - $k -> ".$item." -> ".$obis->{$k});
     }    
     
     # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
@@ -550,7 +612,7 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
     push(@row_array, $ps."GridFreq ".$grid_freq."\n")         if($grid_freq);
-    push(@row_array, $ps."FirmwareVersion ".$obis->{"1-144:0.0.0"}."\n");
+    push(@row_array, $ps."FirmwareVersion ".$obis->{"144:0.0.0"}."\n");
     push(@row_array, "SerialNumber ".$smaserial."\n")         if(!$ps);
     push(@row_array, $ps."SUSyID ".$susyid."\n");
 
@@ -704,12 +766,6 @@ sub SMAEM_ParseDone ($) {
 
  my @row_array = split("_ESC_", $rowlist);
  
- Log3 ($name, 5, "SMAEM $name - row_array after decoding:");
- foreach my $row (@row_array) {
-     chomp $row;
-     Log3 ($name, 5, "SMAEM $name - $row");
- }
- 
  readingsBeginUpdate($hash); 
  foreach my $row (@row_array) {
      chomp $row;
@@ -825,6 +881,7 @@ sub SMAEM_setsum ($$$$) {
         Log3($name, 4, "SMAEM $name - new energy values saved to $modpath/FHEM/FhemUtils/cacheSMAEM");
 		Log3($name, 4, "SMAEM $name - GRIDIN_SUM_$smaserial: $gridinsum, GRIDOUT_SUM_$smaserial: $gridoutsum"); 
     }
+    
 return ($retcode);
 }
 
@@ -878,6 +935,7 @@ sub SMAEM_getserials ($) {
             Log3 ($name, 3, "SMAEM $name - read saved serial numbers from $modpath/FHEM/FhemUtils/cacheSMAEM");  
         }
 	}
+    
 return ($retcode);        
 }
 
@@ -901,6 +959,7 @@ sub SMAEM_getsum ($$) {
 			Log3 ($name, 3, "SMAEM $name - GRIDIN_SUM_$smaserial: $hash->{'GRIDIN_SUM_'.$smaserial}, GRIDOUT_SUM_$smaserial: $hash->{'GRIDOUT_SUM_'.$smaserial}");  
         }
 	}
+    
 return ($retcode);        
 }
 
@@ -918,7 +977,8 @@ sub SMAEM_getCacheValue ($) {
   for my $l (@l) {
     return (undef, $1) if($l =~ m/^$key:(.*)/);
   }
-  return (undef, undef);
+  
+return (undef, undef);
 }
 
 ###############################################################
