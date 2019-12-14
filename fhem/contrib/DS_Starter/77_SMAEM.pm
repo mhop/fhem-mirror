@@ -330,7 +330,6 @@ sub SMAEM_Read ($) {
       Log3 ($name, 4, "SMAEM $name - ### Begin of new SMA Energymeter $smaserial get data cycle ###");
 	  Log3 ($name, 4, "SMAEM $name - ###############################################################");
 	  Log3 ($name, 4, "SMAEM $name - discarded cycles since module start: $hash->{HELPER}{FAULTEDCYCLES}");
-      Log3 ($name, 5, "SMAEM $name - Buffer length ".$dl." ready to parse:\n".$hex);
       
 	  if($hash->{HELPER}{RUNNING_PID}) {
           Log3 ($name, 3, "SMAEM $name - WARNING - old process $hash->{HELPER}{RUNNING_PID}{pid} has been killed to start a new BlockingCall");
@@ -395,6 +394,32 @@ sub SMAEM_DoParse ($) {
     # unpack big-endian to 2-digit hex (bin2hex)
     my $hex = unpack('H*', $data);
     
+    # OBIS Kennzahlen Zerlegung
+    my $obis = {};
+    my $i    = 56;
+    my $length;
+    my ($b,$c,$d,$e);                                         # OBIS Klassen
+    while (substr($hex,$i,8) ne "00000000") {
+      $b = hex(substr($hex,$i,2));
+      $c = hex(substr($hex,$i+2,2));
+      $d = hex(substr($hex,$i+4,2));
+      $e = hex(substr($hex,$i+6,2));
+      $length = $d*2;
+      if ($b == 144) {
+        # Firmware Version
+        $obis->{"1-144:0.0.0"} = hex(substr($hex,$i+8,2)).".".sprintf("%02d", hex(substr($hex,$i+10,2))).".".sprintf("%02d", hex(substr($hex,$i+12,2))).".".chr(hex(substr($hex,$i+14,2)));
+        $i = $i + 16;
+        next;
+      }
+      $obis->{"1:".$c.".".$d.".".$e} = hex(substr($hex,$i+8,$length));
+      $i = $i + 8 + $length;
+    }
+
+    Log3 ($name, 5, "SMAEM $name - OBIS metrics identified:");
+    foreach my $k (sort keys %{$obis}) {
+        Log3 ($name, 5, "SMAEM $name - $k -> ".$obis->{$k});
+    }    
+    
     # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
     my $offset = 0;
     my $grid_freq;
@@ -403,16 +428,7 @@ sub SMAEM_DoParse ($) {
         $grid_freq = hex($2)/1000;
         $offset    = 16;
     } 
-    Log3 ($name, 4, "SMAEM $name - Offset: $offset");
-
-    # Firmware Version extrahieren
-    my $fwversion;
-    $hex =~ /.*90000000(.{8})00000000$/;                            
-    if($1) {
-        my $fw     = $1;
-        $fw        =~ /(.{2})(.{2})(.{2})(.{2})/;
-        $fwversion = hex($1).".".sprintf("%02d", hex($2)).".".sprintf("%02d", hex($3)).".".chr(hex($4));
-    }    
+    Log3 ($name, 4, "SMAEM $name - Offset: $offset");   
   
  	################ Aufbau Ergebnis-Array ####################
     # Extract datasets from hex:
@@ -541,7 +557,7 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
     push(@row_array, $ps."GridFreq ".$grid_freq."\n")         if($grid_freq);
-    push(@row_array, $ps."FirmwareVersion ".$fwversion."\n")  if($fwversion);
+    push(@row_array, $ps."FirmwareVersion ".$obis->{"1-144:0.0.0"}."\n");
     push(@row_array, "SerialNumber ".$smaserial."\n")         if(!$ps);
     push(@row_array, $ps."SUSyID ".$susyid."\n");
 
