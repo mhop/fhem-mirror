@@ -21,6 +21,7 @@
 # 15.04.2019 Protokoll 33: sub crcok ergaenzt
 # 02.05.2019 neues Protokoll 94: Atech wireless weather station (vermutlicher Name: WS-308)
 # 14.06.2019 neuer Sensor TECVANCE TV-4848 - Protokoll 84 angepasst (prematch)
+# 09.11.2019 neues Protokoll 53: Lidl AURIOL AHFL 433 B2 IAN 314695
 
 package main;
 
@@ -53,13 +54,14 @@ sub SD_WS_Initialize($)
 		"SD_WS37_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
 		"SD_WS50_SM.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,",  autocreateThreshold => "2:180"},
 		"BresserTemeo.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"},
-		"SD_WS_51_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "3:180"},
-		"SD_WS_58_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:90"},
 		"SD_WH2.*"			=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:90"},
 		"SD_WS71_T.*"		=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4:Temp,", autocreateThreshold => "2:180"},
 		"SD_WS_33_T_.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.* model:other", FILTER => "%NAME", GPLOT => "temp4:Temp,", autocreateThreshold => "2:180"},
 		"SD_WS_33_TH_.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.* model:other", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:180"},
 		"SD_WS_38_T_.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4:Temp,", autocreateThreshold => "3:180"},
+		"SD_WS_51_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "3:180"},
+		"SD_WS_53_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "3:180"},
+		"SD_WS_58_TH.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:90"},
 		"SD_WS_84_TH_.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "2:120"},
 		"SD_WS_85_THW_.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "4:120"},
 		"SD_WS_89_TH.*"	=> { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME", GPLOT => "temp4hum4:Temp/Hum,", autocreateThreshold => "3:180"},
@@ -290,6 +292,42 @@ sub SD_WS_Parse($$)
 				temp       => sub {my (undef,$bitData) = @_; return round(((SD_WS_binaryToNumber($bitData,16,27)) - 1220) * 5 / 90.0 , 1); },
 				hum        => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,28,31) * 10) + (SD_WS_binaryToNumber($bitData,32,35));},
 				channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,38,39) );},
+			},
+		53 =>
+			{
+				# AURIOL AHFL 433 B2 IAN 314695 Message Format
+				# ----------------------------------------------------
+				# 0    4    8    12   16   20   24   28   32   36   40
+				# 0000 0111 0000 0000 1101 1111 0111 1010 0100 1110 00
+				# iiii iiii b?cc tttt tttt tttt hhhh hhh? ???? ssss ss
+				# i:  8 bit random id (changes on power-loss)
+				# b:  1 bit battery indicator (0=>OK, 1=>LOW)
+				# c:  2 bit channel, valid channels are 1-3
+				# t: 12 bit signed temperature, scaled by 10
+				# h:  7 bit humidity
+				# s:  6 bit checksum (sum over nibble 0 - 8)
+				# ?:  x bit unknown (bit 32-35 always 0100)
+				sensortype => 'Auriol IAN 314695',
+				model      => 'SD_WS_53_TH',
+				# prematch => sub {my $msg = shift; return 1 if ($msg =~ /^[0-9A-F]{11}$/); }, 							# prematch
+				prematch   => sub {my $msg = shift; return 1 if ($msg =~ /^[0-9A-F]{8}4[0-9A-F]{2}$/); },	# prematch 0700F276 4 A4
+				crcok      => sub	{	my (undef,$bitData) = @_;
+														my $sum = 0;
+														for (my $n = 0; $n < 36; $n += 4) {
+															$sum += SD_WS_binaryToNumber($bitData, $n, $n + 3)
+														}
+														if (($sum &= 0x3F) == SD_WS_binaryToNumber($bitData, 36, 41)) {
+															return 1;
+														} else {
+															Log3 $name, 3, "$name: SD_WS_53 Parse msg $msg - ERROR checksum $sum != " . SD_WS_binaryToNumber($bitData, 36, 41);
+															return 0;
+														}
+													},
+				id         =>	sub {my (undef,$bitData) = @_; return substr($rawData,0,2);}, # long-id in hex
+				bat        => sub {my (undef,$bitData) = @_; return substr($bitData,8,1) eq "1" ? "low" : "ok";},
+				channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,10,11) + 1);},
+				temp       => sub {my (undef,$bitData) = @_; return substr($bitData,12,1) eq "1" ? ((SD_WS_binaryToNumber($bitData,12,23) - 4096) / 10.0) : (SD_WS_binaryToNumber($bitData,12,23) / 10.0);},
+				hum        => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,24,30) );},
 			},
        58 => 
    	 	 {
@@ -1037,6 +1075,7 @@ sub SD_WS_WH2SHIFT($){
 		<li>TX-EZ6 for Weatherstation TZS First Austria</li>
 		<li>WH2 (TFA Dostmann/Wertheim 30.3157 (sold in Germany), Agimex Rosenborg 66796 (sold in Denmark),ClimeMET CM9088 (Sold in UK)</li>
 		<li>Weatherstation Auriol IAN 283582 Version 06/2017 (Lidl), Modell-Nr.: HG02832D</li>
+		<li>Weatherstation Auriol AHFL 433 B2, IAN 314695 (Lidl)</li>
 		<li>Weatherstation TFA 35.1140.01 with temperature / humidity sensor TFA 30.3221.02 and temperature / humidity / windspeed sensor TFA 30.3222.02</li>
   </ul><br><br>
 
@@ -1133,6 +1172,7 @@ sub SD_WS_WH2SHIFT($){
 		<li>TX-EZ6 fuer Wetterstation TZS First Austria</li>
 		<li>WH2 (TFA Dostmann/Wertheim 30.3157 (Deutschland), Agimex Rosenborg 66796 (Denmark), ClimeMET CM9088 (UK)</li>
 		<li>Wetterstation Auriol IAN 283582 Version 06/2017 (Lidl), Modell-Nr.: HG02832D</li>
+		<li>Wetterstation Auriol AHFL 433 B2, IAN 314695 (Lidl)</li>
 		<li>Wetterstation TFA 35.1140.01 mit Temperatur-/Feuchtesensor TFA 30.3221.02 und Temperatur-/Feuchte- und Windsensor TFA 30.3222.02</li>
 		</ul>
   <br><br>
