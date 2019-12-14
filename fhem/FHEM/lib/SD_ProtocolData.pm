@@ -54,7 +54,7 @@
 ##### notice #### or #### info ############################################################################################################
 # !!! Between the keys and values ​​no tabs not equal to a width of 8 or please use spaces !!!
 # !!! Please use first unused id for new protocols !!!
-# ID´s are currently unused: 20 | 54 | 68 | 78
+# ID´s are currently unused: 20 | 54 | 78
 # ID´s need to be revised (preamble u): 5|6|19|21|22|23|24|25|26|27|28|31|36|40|42|52|56|59|63
 ###########################################################################################################################################
 # Please provide at least three messages for each new MU/MC/MS protocol and a URL of issue in GitHub or discussion in FHEM Forum
@@ -66,7 +66,7 @@ package lib::SD_ProtocolData;
 	use strict;
 	use warnings;
 	
-	our $VERSION = '1.06';
+	our $VERSION = '1.10';
 	our %protocols = (
 		"0"	=>	## various weather sensors (500 | 9100)
 						# ABS700 | Id:79 T: 3.3 Bat:low                MS;P1=-7949;P2=492;P3=-1978;P4=-3970;D=21232423232424242423232323232324242423232323232424;CP=2;SP=1;R=245;O;
@@ -214,7 +214,7 @@ package lib::SD_ProtocolData;
 				length_max			=> '34',				# Don't know maximal lenth of a valid message
 				paddingbits			=> '8',					# pad up to 8 bits, default is 4
 			},
-		"3"	=>	## itv1 - remote with IC PT2262 example: ELRO | REWE | Intertek Modell 1946518 | WOFI Lamp
+		"3"	=>	## itv1 - remote with IC PT2262 example: ELRO | REWE | Intertek Modell 1946518 | WOFI Lamp // PIR JCHENG with Wireless Coding EV1527
 						## (real CP=300 | repeatpause=9300)
 						# REWE Model: 0175926R -> on | v1      MS;P1=-905;P2=896;P3=-317;P4=303;P5=-9299;D=45412341414123412341414123412341234141412341414123;CP=4;SP=5;R=91;A;#;
 						## (real CP=330 | repeatpause=10100)
@@ -224,9 +224,16 @@ package lib::SD_ProtocolData;
 						# door/window switch from CHN (PT2262 compatible) from amazon & ebay | itswitch_CHN model
 						# open                                 MS;P1=-478;P2=1360;P3=468;P4=-1366;P5=-14045;D=35212134212134343421212134213434343434343421342134;CP=3;SP=5;R=30;O;m2;4;
 						# close                                MS;P1=-474;P2=1373;P3=455;P4=-1367;P5=-14044;D=35212134212134343421212134213434343434343421212134;CP=3;SP=5;R=37;O;m2;
+						## JCHENG SECURITY Wireless PIR
+						# (only autocreate -> J2 Data setting D0 open | D1 closed | D2 closed | D3 open)
+						# on                                   MS;P1=-12541;P2=1227;P3=-405;P4=407;P5=-1209;D=41232323232345452323454523452323234545234545232345;CP=4;SP=1;R=35;O;m2;E;
+						## benon (Semexo OHG) | remote BH-P with 5 Channels, switch B2112 | Amazon
+						## (real CP=160) chip HS2260C-R4 | length 24
+						# on                                   MS;P0=160;P4=-542;P5=515;P6=-174;P7=-5406;D=07040404560404045604560456045604560404565604045656;CP=0;SP=7;R=24;O;m2;
+						# off                                  MS;P1=-538;P2=163;P3=518;P4=-175;P5=-5396;D=25212121342121213421342134213421342121343434342121;CP=2;SP=5;R=31;O;m2;4;
 			{
-				name						=> 'chip xx2262',
-				comment					=> 'remote for ELRO|Kangtai|Intertek|REWE|WOFI',
+				name						=> 'chip xx2260 / xx2262',
+				comment					=> 'remote for benon|ELRO|Kangtai|Intertek|REWE|WOFI / PIR JCHENG',
 				id							=> '3',
 				knownFreqs      => '433.92',
 				one							=> [3,-1],
@@ -307,24 +314,26 @@ package lib::SD_ProtocolData;
 				length_min			=> '24',				# ?
 				length_max			=> '24',				# ?
 			},
-		"6"	=>	## Eurochron Protocol
-						# u6#B1002A022   MS;P1=-7982;P2=262;P3=-1949;P4=-948;D=21232423232424242324242424242424242424232424232323242424242424232424242324;CP=2;SP=1;R=249;O;m2;
-						# u6#B1002A022   MS;P0=254;P1=-7990;P2=-1935;P3=-950;D=01020302020303030203030303030303030303020302030203030303030303020303030203;CP=0;SP=1;R=248;O;m2;
+		"6"	=>	## TCM 218943, Eurochron
+						# https://github.com/RFD-FHEM/RFFHEM/issues/692 @ Ralf9 2019-11-15
+						# T:22.9, H:24     MS;P0=-970;P1=254;P3=-1983;P4=-8045;D=14101310131010101310101010101010101010101313101010101010101313131010131013;CP=1;SP=4;
+						# T:22.7, H:23, tx MS;P0=-2054;P1=236;P2=-1032;P3=-7760;D=13121012101212121012121210121212121212121012101010121212121010101212121010;CP=1;SP=3;
 			{
-				name					=> 'weather',
-				comment				=> 'unknown sensor is under development',
-				id						=> '6',
-				knownFreqs		=> '',
-				one						=> [1,-10],
-				zero					=> [1,-5],
-				sync					=> [1,-36],				# This special device has no sync
-				clockabs			=> 220,						# -1 = auto
-				format				=> 'twostate',		# tristate can't be migrated from bin into hex!
-				preamble			=> 'u6#',					# Append to converted message
-				#clientmodule	=> '',
-				#modulematch	=> '^u......',
-				length_min		=> '24',
-				#length_max		=> '36',					# missing
+				name         => 'TCM 218943',
+				comment      => 'Weatherstation TCM 218943, Eurochron',
+				id           => '6',
+				knownFreqs   => '434.92',
+				one          => [1,-5],
+				zero         => [1,-10],
+				sync         => [1,-32],
+				clockabs     => 248,
+				format       => 'twostate',
+				preamble     => 's',  # prepend to converted message	 	
+				postamble    => '00', # append to converted message	 	
+				clientmodule => 'CUL_TCM97001',
+				length_min   => '36', # sync, postamble und paddingbits werden nicht mitgezaehlt
+				length_max   => '36', # sync, postamble und paddingbits werden nicht mitgezaehlt
+				paddingbits  => '8',  # pad up to 8 bits, default is 4
 			},
 		"7"	=>	## weather sensors like EAS800z
 						# Ch:1 T: 19.8 H: 11 Bat:low   MS;P1=-3882;P2=504;P3=-957;P4=-1949;D=21232424232323242423232323232323232424232323242423242424242323232324232424;CP=2;SP=1;R=249;m=2;
@@ -374,13 +383,13 @@ package lib::SD_ProtocolData;
 				zero					=> [3,-2],
 				one					=> [1,-2],
 				clockabs				=> 480,					# -1 = auto undef=noclock
-				#reconstructBit				=> '1',
 				format					=> 'pwm',				# tristate can't be migrated from bin into hex!
 				preamble				=> 'P9#',				# prepend to converted message
 				clientmodule			=> 'SD_WS09',
 				#modulematch			=> '^u9#.....',
 				length_min			=> '60',
 				length_max			=> '120',
+				reconstructBit  => '1',
 			},
 		"10"	=>	## Oregon Scientific 2
 			{
@@ -877,11 +886,14 @@ package lib::SD_ProtocolData;
 							# P32#154FFF | ring   MU;P0=-6676;P1=578;P2=-278;P4=-680;P5=176;P6=-184;D=541654165412545412121212121212121212121250545454125412541254125454121212121212121212121212;CP=1;R=0;
 							# P32#154FFF | ring   MU;P0=146;P1=245;P3=571;P4=-708;P5=-284;P7=-6689;D=14351435143514143535353535353535353535350704040435043504350435040435353535353535353535353507040404350435043504350404353535353535353535353535070404043504350435043504043535353535353535353535350704040435043504350435040435353535353535353535353507040404350435;CP=3;R=0;O;
 							# P32#154FFF | ring   MU;P0=-6680;P1=162;P2=-298;P4=253;P5=-699;P6=555;D=45624562456245456262626262626262626262621015151562156215621562151562626262626262626262626210151515621562156215621515626262626262626262626262;CP=6;R=0;
+							## VLOXO Wireless Türklingel
+							# https://github.com/RFD-FHEM/RFFHEM/issues/655 @schwatter
+							# P32#7ED403 | ring   MU;P0=130;P1=-666;P2=533;P3=-273;P5=-6200;CP=0;R=15;D=01232301230123010101010101010123230501232323232323012323012301230101010101010101232305012323232323230123230123012301010101010101012323050123232323232301232301230123010101010101010123230501232323232323012323012301230101010101010101232305012323232323230123;O;
 			{
-				name						=> 'FreeTec PE-6946',
-				comment					=> 'wireless doorbell',
+				name						=> 'wireless doorbell',
+				comment					=> 'FreeTec PE-6946 / VLOXO',
 				id							=> '32',
-				knownFreqs      => '',
+				knownFreqs      => '433.92',
 				one							=> [4,-2],
 				zero						=> [1,-5],
 				start						=> [1,-45],				# neuerdings MU Erknnung
@@ -1257,13 +1269,15 @@ package lib::SD_ProtocolData;
 				length_min      => '14',       # ???
 				length_max      => '18',
 			},
-		"47"	=>	## Maverick
+		"47"	=>	## Maverick ET-732, ET-733; TFA 14.1504
+							# https://github.com/RFD-FHEM/RFFHEM/issues/61
 							# Food: 23 BBQ: 22   MC;LL=-507;LH=490;SL=-258;SH=239;D=AA9995599599A959996699A969;C=248;L=104;
+							# https://github.com/RFD-FHEM/RFFHEM/issues/167
 			{
 				name						=> 'Maverick',
 				comment					=> 'BBQ / food thermometer',
 				id							=> '47',
-				knownFreqs      => '',
+				knownFreqs      => '433.92',
 				clockrange			=> [180,260],
 				format					=> 'manchester',
 				preamble				=> 'P47#',						# prepend to converted message
@@ -1386,6 +1400,27 @@ package lib::SD_ProtocolData;
 				length_max			=> '30',
 				method					=> \&main::SIGNALduino_OSPIR,		# Call to process this message
 				polarity				=> 'invert',
+			},
+		"53"	=>	## Lidl AURIOL AHFL 433 B2 IAN 314695
+							# https://github.com/RFD-FHEM/RFFHEM/issues/663 @Kreidler1221 05.10.2019
+							# IAN 314695 Id:07 Ch:1 T:24.2 H:59   MS;P1=611;P2=-2075;P3=-4160;P4=-9134;D=14121212121213131312121212121212121313131312121312121313131213131212131212131213121213;CP=1;SP=4;R=0;O;m2;
+							# IAN 314695 Id:07 Ch:1 T:22.3 H:61   MS;P1=608;P2=-2074;P3=-4138;P4=-9138;D=14121212121213131312121212121212121313121313131313121313131312131212131212131313121212;CP=1;SP=4;R=0;O;m1;
+							# IAN 314695 Id:07 Ch:2 T:18.4 H:70   MS;P0=606;P1=-2075;P2=-4136;P3=-9066;D=03010101010102020201010102010101010201020202010101020101010202010101020101020201010202;CP=0;SP=3;R=0;O;m2;
+			{
+				name          => 'AHFL 433 B2',
+				comment       => 'Auriol weatherstation IAN 314695',
+				id            => '53',
+				knownFreqs    => '433.92',
+				one           => [1,-7],
+				zero          => [1,-3.5],
+				sync          => [1,-15],
+				clockabs      => 600,
+				format        => 'twostate',		# not used now
+				preamble      => 'W53#',
+				clientmodule  => 'SD_WS',
+				modulematch   => '^W53#.*',
+				length_min    => '42',
+				length_max    => '44',
 			},
 		"55"	=>	## QUIGG GT-1000
 			{
@@ -1651,9 +1686,28 @@ package lib::SD_ProtocolData;
 				length_max				=> '34',
 				postDemodulation	=> \&main::SIGNALduino_postDemo_WS7053,
 			},
-
-			# "68"	=>	can use
-
+		"68"	=>	## Medion OR28V RF Vista Remote Control (Made in china by X10)
+							# sendet zwei verschiedene Codes pro Taste
+							# Taste ok    739E0  MS;P1=-1746;P2=513;P3=-571;P4=-4612;P5=2801;D=24512321212123232121212323212121212323232323;CP=2;SP=4;R=58;#;#;
+							# Taste ok    F31E0  MS;P1=-1712;P2=518;P3=-544;P4=-4586;P5=2807;D=24512121212123232121232323212121212323232323;CP=2;SP=4;R=58;m2;#;#;
+							# Taste Vol+  E00B0  MS;P1=-1620;P2=580;P3=-549;P4=-4561;P5=2812;D=24512121212323232323232323232123212123232323;CP=2;SP=4;R=69;O;m2;#;#;
+							# Taste Vol+  608B0  MS;P1=-1645;P2=574;P3=-535;P4=-4556;P5=2811;D=24512321212323232323212323232123212123232323;CP=2;SP=4;R=57;m2;#;#;
+			{
+				name         => 'OR28V',
+				comment      => 'Medion OR28V RF Vista Remote Control',
+				id           => '68',
+				knownFreqs   => '433.92',
+				one          => [1,-3],
+				zero         => [1,-1],
+				sync         => [1,-8,5,-3],
+				clockabs     => 550,
+				format       => 'twostate',
+				preamble     => 'P68#',
+				clientmodule => 'SD_UT',
+				modulematch  => '^P68#.{5}',
+				length_min   => '20',
+				length_max   => '20',
+			},
 		"69"	=>	## Hoermann HSM2, HSM4, HS1-868-BS (868 MHz)
 							# https://github.com/RFD-FHEM/RFFHEM/issues/149
 							# HSM4 | button_1   MU;P0=-508;P1=1029;P2=503;P3=-1023;P4=12388;D=01010232323232310104010101010101010102323231010232310231023232323231023101023101010231010101010232323232310104010101010101010102323231010232310231023232323231023101023101010231010101010232323232310104010101010101010102323231010232310231023232323231023101;CP=2;R=37;O;
@@ -2146,15 +2200,27 @@ package lib::SD_ProtocolData;
 				length_min		=> '72',					# 72
 				length_max		=> '85',					# 85
 			},
-		"88"	=>	## Roto Dachfensterrolladen | Aurel Fernbedienung "TX-nM-HCS" (HCS301 Chip) | three buttons -> up, stop, down
+		"88"	=>	## Roto Dachfensterrolladen | Aurel Fernbedienung "TX-nM-HCS" (HCS301 chip) | three buttons -> up, stop, down
 							# https://forum.fhem.de/index.php/topic,91244.0.html @bruen985
 							# P88#AC3895D790EAFEF2C | button=0100   MS;P1=361;P2=-435;P4=-4018;P5=-829;P6=759;P7=-16210;D=141562156215156262626215151562626215626215621562151515621562151515156262156262626215151562156215621515151515151562151515156262156215171212121212121212121212;CP=1;SP=4;R=66;O;m0;
 							# P88#9451E57890EAFEF24 | button=0100   MS;P0=-16052;P1=363;P2=-437;P3=-4001;P4=-829;P5=755;D=131452521452145252521452145252521414141452521452145214141414525252145252145252525214141452145214521414141414141452141414145252145252101212121212121212121212;CP=1;SP=3;R=51;O;m1;
-							# Waeco_MA650_TX | too buttons
-							# KeeLoq is a registered trademark of Microchip Technology Inc.
+							## remote control Waeco MA650_TX (HCS300 chip) | two buttons
+							# P88#4A823F65482822040 | button=blue MS;P0=344;P3=-429;P4=-3926;P5=719;P6=-823;P7=-15343;D=045306535306530653065353535353065353530606060606065306065353065306530653530653535353530653065353535353065353530653535353535306535353570303030303030303030303;CP=0;SP=4;R=38;O;m2;0;0;
+							## remote control RADEMACHER RP-S1-HS-RF11 (HCS301 chip) fuer Garagentorantrieb RolloPort S1 with two buttons
+							# https://github.com/RFD-FHEM/RFFHEM/issues/612 @ D3ltorohd 20.07.2019
+							# Firmware: Signalduino V 3.3.2.1-rc8 SIGNALduino cc1101 - compiled at Jan 10 2019 20:13:56
+							# P88#7EFDFFDDF9C284E4C | button=0010 MS;P1=735;P2=-375;P3=377;P4=-752;P6=-3748;D=3612343434343434123434343434341234343434343434343434341234343412343434343434121234343412121212341234121212123412123434341212341212343;CP=3;SP=6;R=42;e;m1;
+							# P88#C2C85435F9C284E18 | button=1000 MS;P1=385;P2=-375;P3=-3756;P4=-745;P5=766;P6=-15000;D=131414525252521452141452521452525252145214521452525252141452145214141414141452521414145252525214521452525252145252141414525252521414561212121212121212121212;CP=1;SP=3;R=54;O;s=36;m0;
+							## remote control SCS Sentinel - PR3-4207-002 (HCS300 chip) | four buttons
+							# https://github.com/RFD-FHEM/RFFHEM/issues/616
+							# P88#0A8423F39D6020044 | button=one   MS;P0=844;P1=-4230;P2=420;P4=-860;P6=-17704;P7=-439;D=210707070724072407240707070724070707072407070724242424242407072424240707242424072407242407070707070707240707070707070707070724070707262727272727272727272727;CP=2;SP=1;R=18;O;s=36;m0;
+							# P88#00C7922B9D6020024 | button=two   MS;P1=417;P3=847;P4=-442;P5=-858;P7=-4258;D=1734343434343434341515343434151515153434153434153434341534153415151534341515153415341515343434343434341534343434343434343434341534341;CP=1;SP=7;R=25;e;m1;
+							# P88#F82542039D6020014 | button=three MS;P0=-855;P1=852;P2=-433;P3=432;P5=-17236;P6=-4250;D=363030303030121212121230121230123012301212121230121212121212123030301212303030123012303012121212121212301212121212121212121212123012353232323232323232323232;CP=3;SP=6;R=29;O;s=36;m0;
+							# P88#DB06531F9D6020084 | button=four  MS;P0=-17496;P1=435;P2=-438;P4=-4269;P5=-845;P6=850;D=141515621515621515626262626215156262156215626215156262621515151515156262151515621562151562626262626262156262626262626262621562626262101212121212121212121212;CP=1;SP=4;R=34;O;m1;
+							## KeeLoq is a registered trademark of Microchip Technology Inc.
 			{
-				name					=> 'Roto shutter | other',
-				comment				=> 'remote control Aurel TX-nM-HCS | Waeco_MA650_TX',
+				name					=> 'HCS300/HCS301',
+				comment				=> 'remote controls Aurel TX-nM-HCS, Rademacher RP-S1-HS-RF11, SCS Sentinel PR3-4207-002, Waeco MA650_TX',
 				id						=> '88',
 				knownFreqs		=> '433.92',
 				one						=> [1,-2],        # PWM bit pulse width typ. 1.2 mS
@@ -2162,12 +2228,11 @@ package lib::SD_ProtocolData;
 				preSync				=> [1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1,],	# 11 pulses preambel, 1 sync, 66 data, pause ... repeat
 				sync					=> [1,-10],				# Header duration typ. 4 mS
 				pause         => [-39],         # Guard Time typ. 15.6 mS
-				clockabs			=> 400,						# Basic pulse element typ. 0.4 mS (TABLE 8-4)
+				clockabs			=> 400,						# Basic pulse element typ. 0.4 mS (Timings from table CODE WORD TRANSMISSION TIMING REQUIREMENTS in PDF)
 				reconstructBit	=> '1',
 				format				=> 'twostate',
-				preamble			=> 'P88#',				# prepend to converted message
+				preamble			=> 'P88#',
 				clientmodule			=> 'SD_Keeloq',
-				#modulematch	=> '',
 				length_min		=> '65',
 				length_max		=> '78',
 			},
@@ -2204,7 +2269,7 @@ package lib::SD_ProtocolData;
 							# B	AUS   MS;P1=268;P3=793;P4=-337;P6=-871;P7=-10159;D=17163416161616343434341616341634341616161634341616341634161616343416;CP=1;SP=7;R=24;O;m2;
 			{
 				name         => 'mumbi | MANAX',
-				comment      => 'remote control mumbi RC-10, MANAX MX-RCS250 (only receive)',
+				comment      => 'remote control mumbi RC-10, MANAX MX-RCS250',
 				id           => '90',
 				knownFreqs   => '433.92',
 				one          => [3,-1],
@@ -2346,23 +2411,28 @@ package lib::SD_ProtocolData;
 				length_min      => '50',
 				length_max      => '50',
 			},
-		"96"	=>	# Funk-Gong | Taster Grothe Mistral SE 03.1 , Innenteil Grothe Mistral 200M(E)
+		"96"	=>	# Funk-Gong | Taster Grothe Mistral SE 03.1 / 01.1, Innenteil Grothe Mistral 200M(E)
 							# https://forum.fhem.de/index.php/topic,64251.msg940593.html?PHPSESSID=nufcvvjobdd8r7rgr0cq3qkrv0#msg940593 @coolheizer
-							# Button_1    MC;LL=-424;LH=438;SL=-215;SH=212;D=238823B1001F8;C=214;L=49;R=68;
-							# Button_2    MC;LL=-412;LH=458;SL=-187;SH=240;D=238129D9A78;C=216;L=41;R=241;
+							# SD_BELL_104762 Alarm        MC;LL=-430;LH=418;SL=-216;SH=226;D=23C823B1401F8;C=214;L=49;R=53;
+							# SD_BELL_104762 ring         MC;LL=-439;LH=419;SL=-221;SH=212;D=238823B1001F8;C=215;L=49;R=69;
+							# SD_BELL_104762 ring low bat MC;LL=-433;LH=424;SL=-214;SH=210;D=238823B100248;C=213;L=49;R=65;
+							# SD_BELL_0253B3 Alarm        MC;LL=-407;LH=451;SL=-195;SH=239;D=23C129D9E78;C=215;L=41;R=241;
+							# SD_BELL_0253B3 ring         MC;LL=-412;LH=458;SL=-187;SH=240;D=238129D9A78;C=216;L=41;R=241;
+							# SD_BELL_024DB5 Alarm        MC;LL=-415;LH=454;SL=-200;SH=226;D=23C126DAE58;C=215;L=41;R=246;
+							# SD_BELL_024DB5 ring         MC;LL=-409;LH=448;SL=-172;SH=262;D=238126DAA58;C=215;L=41;R=238;
 			{
-				name            => 'Grothe Mistral',
-				comment         => 'wireless gong',
+				name            => 'Grothe Mistral SE',
+				comment         => 'Wireless doorbell Grothe Mistral SE 01.1 or 03.1',
 				id              => '96',
-				knownFreqs      => '866.35',
-				clockrange			=> [210,220],							# min , max
-				format					=> 'manchester',					# tristate can't be migrated from bin into hex!
-				#clientmodule		 => '',
-				#modulematch		 => '^u96#',
-				preamble				=> 'u96#',
-				length_min			=> '41',
-				length_max			=> '49',
-				method					=> \&lib::SD_Protocols::MCRAW,		# Call to process this message
+				knownFreqs      => '868.35',
+				clockrange      => [170,260],
+				format          => 'manchester',
+				clientmodule    => 'SD_BELL',
+				modulematch     => '^P96#',
+				preamble        => 'P96#',
+				length_min      => '40',
+				length_max      => '49',
+				method          => \&main::SIGNALduino_GROTHE,
 			},
 	);
 	sub getProtocolList	{	
