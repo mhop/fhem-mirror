@@ -1369,6 +1369,7 @@ HUEBridge_updateGroups($$)
     }
 
     if( defined($hue) ) {
+      $hue -= 1 if( $hue >= 1 );
       my ($r,$g,$b) = Color::hsv2rgb($hue,$sat/$count,$bri/$count);
 
       $r *= 255;
