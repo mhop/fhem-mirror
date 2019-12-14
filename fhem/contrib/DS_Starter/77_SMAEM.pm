@@ -362,10 +362,7 @@ sub SMAEM_DoParse ($) {
     my $data       = decode_base64($dataenc);
     my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
     my $diffaccept = AttrVal($name, "diffAccept", 10);
-#    my $fw         = $hash->{FIRMWARE};
     my ($error,@row_array,@array);
- 
-    Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_DoParse");
  
     my $gridinsum  = $hash->{'GRIDIN_SUM_'.$smaserial} ?sprintf("%.4f",$hash->{'GRIDIN_SUM_'.$smaserial}):'';    
     my $gridoutsum = $hash->{'GRIDOUT_SUM_'.$smaserial}?sprintf("%.4f",$hash->{'GRIDOUT_SUM_'.$smaserial}):'';
@@ -375,7 +372,6 @@ sub SMAEM_DoParse ($) {
         my $retcode = SMAEM_getsum($hash,$smaserial);
         if ($retcode) {
             $error = encode_base64($retcode,"");
-            Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
             $discycles++;
             return "$name|''|''|''|$error|$discycles|''"; 
         } else {
@@ -474,8 +470,7 @@ sub SMAEM_DoParse ($) {
                              "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
-		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
-				$gridinsum = $einspeisung_wirk_count;
+				$gridinsum  = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
                 return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";     
@@ -506,8 +501,7 @@ sub SMAEM_DoParse ($) {
                              "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
 			    $error = encode_base64($errtxt,"");
 				Log3 ($name, 1, "SMAEM $name - $errtxt");
-		        Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
-				$gridinsum = $einspeisung_wirk_count;
+				$gridinsum  = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
 		        $discycles++;
                 return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";  
@@ -522,7 +516,6 @@ sub SMAEM_DoParse ($) {
 	# error while writing values to file
 	if ($retcode) {
 	    $error = encode_base64($retcode,"");
-		Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
 		$discycles++;
         return "$name|''|''|''|$error|$discycles|''"; 
 	}
@@ -671,18 +664,10 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L3_THD ".sprintf("%.2f",$l3_thd)."\n");
     push(@row_array, $ps."L3_Spannung ".sprintf("%.1f",$l3_v)."\n");	
     push(@row_array, $ps."L3_CosPhi ".sprintf("%.3f",$l3_cosphi)."\n");
-
-    Log3 ($name, 5, "$name - row_array before encoding:");
-    foreach my $row (@row_array) {
-	    chomp $row;
-        Log3 ($name, 5, "SMAEM $name - $row");
-    }
  
     # encoding result 
     my $rowlist = join('_ESC_', @row_array);
     $rowlist    = encode_base64($rowlist,"");
- 
-    Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_DoParse finished");
  
 return "$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles|$smaserial"; 
 }
@@ -702,8 +687,6 @@ sub SMAEM_ParseDone ($) {
  my $discycles  = $a[5];
  my $smaserial  = $a[6];
  
- Log3 ($name, 4, "SMAEM $name -> Start BlockingCall SMAEM_ParseDone");
- 
  $hash->{HELPER}{FAULTEDCYCLES} = $discycles;
  
  # update time
@@ -711,7 +694,6 @@ sub SMAEM_ParseDone ($) {
  
  if ($error) {
      readingsSingleUpdate($hash, "state", $error, 1);
-	 Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_ParseDone finished");
 	 delete($hash->{HELPER}{RUNNING_PID});
 	 return;
  }
@@ -737,7 +719,6 @@ sub SMAEM_ParseDone ($) {
  readingsEndUpdate($hash, 1);
  
  delete($hash->{HELPER}{RUNNING_PID});
- Log3 ($name, 4, "SMAEM $name -> BlockingCall SMAEM_ParseDone finished");
  CancelDelayedShutdown($name);
  
 return;
