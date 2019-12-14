@@ -3809,14 +3809,15 @@ sub FW_makeImage {
 # Widgets
  
  sub temp_knob {
-    my ($value,$color)=@_;
+    my ($value,$color,$set)=@_;
     $color="DarkOrange" if (!defined $color); 
-    return ($value,"","knob,min:17,max:25,width:40,height:35,step:0.5,fgColor:$color,bgcolor:grey,anglearc:270,angleOffset:225,cursor:15,thickness:.3","set") 
+    $set="set" if (!defined $set);
+    return ($value,"","knob,min:17,max:25,width:40,height:35,step:0.5,fgColor:$color,bgcolor:grey,anglearc:270,angleOffset:225,cursor:15,thickness:.3",$set) 
  }
  
  sub shutter {
    my ($value,$color,$type)=@_;
-   $color="\@darkorange" if (!defined ($color));
+   $color="\@darkorange" if (!defined ($color) or $color eq "");
    if (!defined ($type) or $type == 3) {
      return ($value,"","iconRadio,$color,100,fts_shutter_10,30,fts_shutter_70,0,fts_shutter_100","set");
    } elsif ($type == 4) {
@@ -3832,7 +3833,7 @@ sub FW_makeImage {
  
  sub dimmer {
    my ($value,$color,$type)=@_;
-   $color="\@darkorange" if (!defined ($color));
+   $color="\@darkorange" if (!defined ($color) or $color eq "");
    if (!defined ($type) or $type == 3) {
      return ($value,"","iconRadio,$color,0,light_light_dim_00,50,light_light_dim_50,100,light_light_dim_100","set");
    } elsif ($type == 4) {
