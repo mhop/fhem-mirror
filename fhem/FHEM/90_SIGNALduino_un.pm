@@ -102,45 +102,7 @@ SIGNALduino_un_Parse($$)
 	my $bitData= unpack("B$blen", pack("H$hlen", $rawData)); 
 	Log3 $hash, 4, "$name converted to bits: $bitData";
 		
-	if ($protocol == "6" && length($bitData)>=36)  ## Eurochron 
-	{   
-
-		  # EuroChron / Tchibo
-		  #                /--------------------------- Channel, changes after every battery change      
-		  #               /        / ------------------ Battery state 0 == Ok      
-		  #              /        / /------------------ unknown      
-		  #             /        / /  / --------------- forced send      
-		  #            /        / /  /  / ------------- unknown      
-		  #           /        / /  /  /     / -------- Humidity      
-		  #          /        / /  /  /     /       / - neg Temp: if 1 then temp = temp - 2048
-		  #         /        / /  /  /     /       /  / Temp
-		  #         01100010 1 00 1  00000 0100011 0  00011011101
-		  # Bit     0        8 9  11 12    17      24 25        36
-
-		my $SensorTyp = "EuroChron";
-		my $channel = "";
-		my $bin = substr($bitData,0,8);
-		my $id = sprintf('%X', oct("0b$bin"));
-		my $bat = int(substr($bitData,8,1)) eq "0" ? "ok" : "critical";
-		my $trend = "";
-		my $sendMode = int(substr($bitData,11,1)) eq "0" ? "automatic" : "manual";
-		my $temp = SIGNALduino_un_bin2dec(substr($bitData,25,11));
-		if (substr($bitData,24,1) eq "1") {
-		  $temp = $temp - 2048
-		}
-		$temp = $temp / 10.0;
-		my $hum = SIGNALduino_un_bin2dec(substr($bitData,17,7));
-		my $val = "T: $temp H: $hum B: $bat";
-		Log3 $hash, 4, "$name decoded protocolid: 6  $SensorTyp, sensor id=$id, channel=$channel, temp=$temp\n" ;
-
-	} elsif ($protocol == "15" && length($bitData)>=64)  ## TCM 
-	{  
-		my $deviceCode = $a[4].$a[5].$a[6].$a[7].$a[8];
-
-
-		Log3 $hash, 4, "$name found TCM doorbell. devicecode=$deviceCode";
-
-	} elsif ($protocol == "21" && length($bitData)>=32)  ##Einhell doorshutter
+	if ($protocol == "21" && length($bitData)>=32)  ##Einhell doorshutter
 	{
 		Log3 $hash, 4, "$name / Einhell doorshutter received";
 		
