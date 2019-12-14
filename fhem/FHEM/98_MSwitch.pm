@@ -81,7 +81,7 @@ if ( $preconf && $preconf ne "" ) {
 }
 
 my $autoupdate = 'off';    #off/on
-my $version    = '2.91';
+my $version    = '2.92';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 30; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
@@ -3217,17 +3217,29 @@ sub MSwitch_Notify($$) {
 delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben auf nach abarbeitung conditions
 # sequenz
           my $x = 0;
+		  my $zeit = time;
           SEQ: foreach my $sequenz (@sequenzall) {
                 $x++;
                 if ( $sequenz ne "undef" ) 
 				{
                     my $fulldev = "$devName:$eventcopy";
-                    if ( grep { $_ eq $fulldev } @sequenzarrayfull ) 
+					#MSwitch_LOG( $ownName, 0,"$_ -- $fulldev --- @sequenzarrayfull" );
+					foreach my $test(@sequenzarrayfull) 
+					{ 
+					#MSwitch_LOG( $ownName, 0,"test: ".$test );
+					if ( $fulldev =~ /$test/ )
 					{
-                        my $zeit = time;
-                        $own_hash->{helper}{sequenz}{$x}{$zeit} = $fulldev;
-                    }
+					
+					#MSwitch_LOG( $ownName, 0,"FOUND. $fulldev --- $test" );
+                    $own_hash->{helper}{sequenz}{$x}{$zeit} = $fulldev;
+					}
+					}
 
+                    # if ( grep { $_ eq $fulldev } @sequenzarrayfull ) 
+					# {
+                        # my $zeit = time;
+                        # $own_hash->{helper}{sequenz}{$x}{$zeit} = $fulldev;
+                    # }
                     my $seqhash    = $own_hash->{helper}{sequenz}{$x};
                     my $aktsequenz = "";
                     foreach my $seq ( sort keys %{$seqhash} ) 
@@ -3235,10 +3247,17 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                         $aktsequenz .= $own_hash->{helper}{sequenz}{$x}{$seq} . " ";
                     }
 
-                    chop $aktsequenz;
-                    my $re = qr/$sequenz/;
-                    if ( $aktsequenz =~ /$re/ ) 
+                    #chop $aktsequenz;
+                    #my $re = qr/$sequenz/;
+					#MSwitch_LOG( $ownName, 0,"Name:aktsequenz ". $aktsequenz );
+					# MSwitch_LOG( $ownName, 0,"Name:sequenz  ". $sequenz );
+					#  re (?^:codedummy:state:8 codedummy:state:9 codedummy:state:0 codedummy:state:1)
+					#  aktsequenz codedummy:state:1 codedummy:state:1
+					#MSwitch_LOG( $ownName, 0,"if $aktsequenz = $sequenz" );
+					# if ( $aktsequenz =~ /$re/ )
+				if ( $aktsequenz =~ /$sequenz/ )
 					{
+					#MSwitch_LOG( $ownName, 0,"Name: sequenz passt" );
                         delete( $own_hash->{helper}{sequenz}{$x} );
                         readingsSingleUpdate( $own_hash, "SEQUENCE", 'match', 1 );
                         readingsSingleUpdate( $own_hash, "SEQUENCE_Number", $x, 1 );
@@ -3255,6 +3274,7 @@ delete( $own_hash->{helper}{history} );# lösche historyberechnung verschieben a
                             readingsSingleUpdate( $own_hash, "SEQUENCE_Number", '0', 1 );
                         }
                     }
+					#MSwitch_LOG( $ownName, 0,"         " );
                 }
             }
 			
@@ -6870,15 +6890,16 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	
 
 	function testcmd(field,devicename,opt){
-	
-	
 	comand = \$(\"[name=\"+field+\"]\").val()
 	if (comand == 'no_action')
 	{
 	return;
 	}
 	comand1 = \$(\"[name=\"+opt+\"]\").val()
+	if (devicename != 'FreeCmd')
+	{
 	comand =comand+\" \"+comand1;
+	}
 	comand = comand.replace(/\\\$SELF/g,'".$Name."');
 	
 	if (devicename != 'FreeCmd')
@@ -6887,30 +6908,35 @@ if ( AttrVal( $Name, 'MSwitch_Mode', 'Notify' ) ne "Dummy"  )
 	FW_cmd(FW_root+'?cmd='+encodeURIComponent(cmd)+'&XHR=1');
 	FW_okDialog('".$EXECCMD." '+cmd);
 	FW_errmsg(cmd, 5);
-	
 	}
-	else{
+	else
+	{
+	//alert('freecmd');
 	comand = comand.replace(/;;/g,'[DS]');
 	comand = comand.replace(/;/g,';;');
 	comand = comand.replace(/\\[DS\\]/g,';;');
 	var t0 = comand.substr(0, 1);
 	var t1 = comand.substr(comand.length-1,1 );
+	//alert (comand);
+	//alert(t1);
+	
 	if (t1 == ' ')
 	{
-	
-	
 	var space = '".$NOSPACE."';
 	var textfinal = \"<div style ='font-size: medium;'>\"+space+\"</div>\";
 	FW_okDialog(textfinal);
 	//FW_errmsg(textfinal, 1000);
-	
 	//alert('Befehl kann nicht getestet werden. Das letzte Zeichen dar kein Leerzeichen sein.');
 	return;
 	}
-	if (t0 == '{' && t1 == '}') {
-	}else{
+	
+	if (t0 == '{' && t1 == '}') 
+	{
+	}else
+	{
 	comand = '{fhem(\"'+comand+'\")}';
 	}
+	
 	cmd = comand;
 	FW_cmd(FW_root+'?cmd='+encodeURIComponent(cmd)+'&XHR=1');
 	
