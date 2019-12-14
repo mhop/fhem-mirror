@@ -10,6 +10,10 @@
 # Version 1.1
 #  - changed: 14_SD_WS_Maverick: rename Readings for Temperatures
 #  - feature: 14_SD_WS_Maverick: added Readings for Sensor-states
+#  - feature: 14_SD_WS_Maverick: added support for device TFA 14.1504 (Radio-controlled grill and meat thermometer)
+#  - changed: 14_SD_WS_Maverick: removed internals which are identical to readings
+#  - changed: 14_SD_WS_Maverick: removed declaration of stateFormat
+#  - changed: 14_SD_WS_Maverick: code optimization
 
 package main;
 
@@ -23,9 +27,9 @@ sub SD_WS_Maverick_Define($$);
 sub SD_WS_Maverick_Undef($$);
 sub SD_WS_Maverick_Parse($$);
 sub SD_WS_Maverick_Attr(@);
-sub SD_WS_Maverick_SetSensor1Inaktiv($);
-sub SD_WS_Maverick_SetSensor2Inaktiv($);
-sub SD_WS_Maverick_updateReadings($);
+sub SD_WS_Maverick_SetSensor1Inactive($);
+sub SD_WS_Maverick_SetSensor2Inactive($);
+sub SD_WS_Maverick_UpdateState($);
 
 sub
 SD_WS_Maverick_Initialize($)
@@ -62,36 +66,6 @@ SD_WS_Maverick_Define($$)
   $modules{SD_WS_Maverick}{defptr}{$a[2]} = $hash;
   $hash->{STATE} = "Defined";
   
-  my $name= $hash->{NAME};
-  # prüfen, ob eine neue Definition angelegt wird 
-	if($init_done && !defined($hash->{OLDDEF}))
-	{
-		# setzen von stateFormat
-	 	$attr{$name}{"stateFormat"} = '{
-  my $s1=ReadingsVal($name,"Sensor-1-food_state",-1);
-  my $s2=ReadingsVal($name,"Sensor-2-bbq_state",-1);
-  if ($s1 ne "connected" && $s1 eq $s2 ) {
-    return $s1;
-  }else{
-    my $state="Food: ";
-    my $temp_food=ReadingsVal($name,"temp-food","");
-    my $temp_bbq=ReadingsVal($name,"temp-bbq","");
-    if($s1 eq "connected"){
-        $state .=$temp_food;
-    }else{
-        $state .=$s1;
-    }
-    $state .=" BBQ: ";
-    if($s2 eq "connected"){
-        $state .=$temp_bbq;
-    }else{
-        $state .=$s2;
-    }
-    return $state;
-  }
-}';
-
- 	}
   return undef;
 }
 
@@ -100,6 +74,8 @@ sub
 SD_WS_Maverick_Undef($$)
 {
   my ($hash, $name) = @_;
+  RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor1Inactive');
+  RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor2Inactive');
   delete($modules{SD_WS_Maverick}{defptr}{$hash->{CODE}})
      if(defined($hash->{CODE}) &&
         defined($modules{SD_WS_Maverick}{defptr}{$hash->{CODE}}));
@@ -152,12 +128,12 @@ SD_WS_Maverick_Parse($$)
   
   Log3 $iohash, 4, "$name $model decoded protocolid: 47 sensor messageType=$messageType, temp-f=$temp_str1, temp-b=$temp_str2, checksum-s=$checksum_str";
   
-  if ($messageType eq '59'){
-    $messageType="normal";
-  }elsif ($messageType eq '6A') {
-    $messageType="sync";  
-  }else{
-    Log3 $iohash, 4, "$name $model ERROR: wrong messageType=$messageType (must be 59 or 6A)";
+  if ($messageType eq '55' || $messageType eq '59') {
+    $messageType = "normal";
+  } elsif ($messageType eq '66' || $messageType eq '6A') {
+    $messageType = "sync";
+  } else {
+    Log3 $iohash, 4, "$name $model ERROR: wrong messageType '$messageType' (must be one of: 55, 59, 66, 6A)";
     return '';
   }
   
@@ -240,14 +216,12 @@ SD_WS_Maverick_Parse($$)
   # Den SensorState bei Inaktivität zurücksetzen lassen durch Timer 
   my $inactivityinterval=int(AttrVal($name,"inactivityinterval",360));
   if ($sensor_1_state ne "unknown") {
-    $hash->{sensor_1_state}=$sensor_1_state;
-    RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor1Inaktiv');
-    InternalTimer(time()+($inactivityinterval), 'SD_WS_Maverick_SetSensor1Inaktiv', $hash, 0);
+    RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor1Inactive');
+    InternalTimer(time()+($inactivityinterval), 'SD_WS_Maverick_SetSensor1Inactive', $hash, 0);
   }
   if ( $sensor_2_state ne "unknown") {
-    $hash->{sensor_2_state}=$sensor_2_state;
-    RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor2Inaktiv');
-    InternalTimer(time()+($inactivityinterval), 'SD_WS_Maverick_SetSensor2Inaktiv', $hash, 0);
+    RemoveInternalTimer($hash, 'SD_WS_Maverick_SetSensor2Inactive');
+    InternalTimer(time()+($inactivityinterval), 'SD_WS_Maverick_SetSensor2Inactive', $hash, 0);
   }
   
   # Checksum auswerten
@@ -257,18 +231,22 @@ SD_WS_Maverick_Parse($$)
   # TODO: Die eigentliche Checksum errechnen. Diese ändert sich bei jedem Temperaturwechsel
   # TODO: Evtl. ist in den checksum-bits auch noch eine Info zur Batterie enthalten
   #       ggf. ist es möglich die checksum als ID zu verwenden und so mehrere Mavericks in fhem einbinden zu können.
-  $hash->{checksum}=$checksum;
-  $hash->{temp_food}=$temp_food if ($temp_food ne"");
-  $hash->{temp_bbq}=$temp_bbq if ($temp_bbq ne"");
-  $hash->{messageType}=$messageType;
-  
+
   # TODO: Logging kann entfernt werden, wenn checksum entschlüsselt ist. Wird zur Analyse verwendet.
-  Log3 $hash, 4, "$name statistic: checksum=$checksum, t1=$temp_str1, temp-food=$temp_food, t2_$temp_str2, temp-bbq=$temp_bbq;";
-  
-  SD_WS_Maverick_updateReadings($hash);
+  Log3 $hash, 4, "$name statistic: checksum=$checksum, t1=$temp_str1, temp-food=$temp_food, t2=$temp_str2, temp-bbq=$temp_bbq;";
+
+  # update readings
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "checksum",  $checksum);
+  readingsBulkUpdate($hash, "temp-food", $temp_food) if ($temp_food ne "");
+  readingsBulkUpdate($hash, "temp-bbq",  $temp_bbq) if ($temp_bbq ne "");
+  readingsBulkUpdate($hash, "messageType", $messageType);
+  readingsBulkUpdate($hash, "Sensor-1-food_state", $sensor_1_state);
+  readingsBulkUpdate($hash, "Sensor-2-bbq_state", $sensor_2_state);
+  readingsEndUpdate($hash, 1); # Notify is done by Dispatch
+  SD_WS_Maverick_UpdateState($hash);
 
   return $name;
-
 }
 
 sub SD_WS_Maverick_Attr(@)
@@ -294,38 +272,44 @@ sub SD_WS_Maverick_Attr(@)
   return undef;
 }
 
-sub SD_WS_Maverick_SetSensor1Inaktiv($){
+sub SD_WS_Maverick_SetSensor1Inactive($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $hash, 5, "$name SD_WS_Maverick_SetSensor1Inaktiv";
-  
-  $hash->{sensor_1_state}="inactiv";
-  SD_WS_Maverick_updateReadings($hash);
+  Log3 $hash, 5, "$name SD_WS_Maverick_SetSensor1Inactive";
+  readingsSingleUpdate($hash, "Sensor-1-food_state", "inactive", 1);
+  SD_WS_Maverick_UpdateState($hash);
 }
 
-sub SD_WS_Maverick_SetSensor2Inaktiv($){
+sub SD_WS_Maverick_SetSensor2Inactive($){
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $hash, 5, "$name SD_WS_Maverick_SetSensor2Inaktiv";
-
-  $hash->{sensor_2_state}="inactiv";
-  SD_WS_Maverick_updateReadings($hash);
+  Log3 $hash, 5, "$name SD_WS_Maverick_SetSensor2Inactive";
+  readingsSingleUpdate($hash, "Sensor-2-bbq_state", "inactive", 1);
+  SD_WS_Maverick_UpdateState($hash);
 }
 
-sub SD_WS_Maverick_updateReadings($){
+sub SD_WS_Maverick_UpdateState($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  Log3 $hash, 5, "$name SD_WS_Maverick_updateReadings";
-  
-  readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "temp-food", $hash->{temp_food});
-    readingsBulkUpdate($hash, "temp-bbq", $hash->{temp_bbq});
-    readingsBulkUpdate($hash, "messageType ", $hash->{messageType});
-    readingsBulkUpdate($hash, "checksum", $hash->{checksum});
-    readingsBulkUpdate($hash, "Sensor-1-food_state", $hash->{sensor_1_state});
-    readingsBulkUpdate($hash, "Sensor-2-bbq_state", $hash->{sensor_2_state});
-  readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-  return undef;
+  Log3 $hash, 5, "$name SD_WS_Maverick_UpdateState";
+
+  my $state_food = ReadingsVal($name, "Sensor-1-food_state", undef);
+  my $temp_food  = ReadingsVal($name, "temp-food", undef);
+  my $state_bbq  = ReadingsVal($name, "Sensor-2-bbq_state",  undef);
+  my $temp_bbq   = ReadingsVal($name, "temp-bbq", undef);;
+
+  my $state = "???";
+  if ($state_food ne "connected" && $state_food eq $state_bbq ) {
+    $state = $state_food;
+  } else {
+    $state = "Food: ";
+    $state .= $state_food eq "connected" ? $temp_food : $state_food;
+    $state .= " BBQ: ";
+    $state .= $state_bbq  eq "connected" ? $temp_bbq  : $state_bbq;
+  }
+
+  Log3 $hash, 5, "$name state: $state";
+  readingsSingleUpdate($hash, "state", $state, 1);
 }
 
 1;
@@ -344,6 +328,7 @@ sub SD_WS_Maverick_updateReadings($){
   <b>Known models:</b>
   <ul>
     <li>Maverick 732/733</li>
+    <li>TFA 14.1504 (Radio-controlled grill and meat thermometer)</li>
   </ul>
   <br>
   New received device will be added in fhem with autocreate (if autocreate is globally enabled).
@@ -362,8 +347,8 @@ sub SD_WS_Maverick_updateReadings($){
   	 <li>State (Food: BBQ: )</li>
      <li>temp-food (&deg;C)</li>
      <li>temp-bbq (&deg;C)</li>
-     <li>Sensor-1-food_state (connected, disconnected or inactiv)</li>
-     <li>Sensor-2-bbq_state (connected, disconnected or inactiv)</li>
+     <li>Sensor-1-food_state (connected, disconnected or inactive)</li>
+     <li>Sensor-2-bbq_state (connected, disconnected or inactive)</li>
      <li>messageType (sync at startup or resync, otherwise normal)</li>
      <li>checksum (experimental)</li>
   </ul>
@@ -371,7 +356,7 @@ sub SD_WS_Maverick_updateReadings($){
   <b>Attributes</b>
   <ul>
     <li>inactivityinterval <seconds (60-3600)><br>
-    The Interval to set Sensor-1-food_state and/or Sensor-2-bbq_state to inactiv after defined minutes. This can help to detect empty batteries or the malfunction of a tempertature-sensor.<br> 
+    The Interval to set Sensor-1-food_state and/or Sensor-2-bbq_state to inactive after defined minutes. This can help to detect empty batteries or the malfunction of a tempertature-sensor.<br>
     <code>default: 360</code></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore </a></li>
@@ -399,6 +384,7 @@ sub SD_WS_Maverick_updateReadings($){
   <b>Unterst&uumltzte Modelle:</b>
   <ul>
     <li>Maverick 732/733</li>
+    <li>TFA 14.1504 (Küchen-Chef Funk-Bratenthermometer)</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in FHEM per autocreate angelegt (sofern autocreate in global aktiv ist).
@@ -417,8 +403,8 @@ sub SD_WS_Maverick_updateReadings($){
   	 <li>State (Food: BBQ: )</li>
      <li>temp-food (&deg;C)</li>
      <li>temp-bbq (&deg;C)</li>
-     <li>Sensor-1-food_state (connected, disconnected oder inactiv)</li>
-     <li>Sensor-2-bbq_state (connected, disconnected oder inactiv)</li>
+     <li>Sensor-1-food_state (connected, disconnected oder inactive)</li>
+     <li>Sensor-2-bbq_state (connected, disconnected oder inactive)</li>
      <li>messageType (sync bei Start oder resync, sonst normal)</li>
      <li>checksum (experimentell)</li>
   </ul>
@@ -426,7 +412,7 @@ sub SD_WS_Maverick_updateReadings($){
   <b>Attribute</b>
   <ul>
     <li>inactivityinterval <Sekunden (60-3600)><br>
-    Das Interval nach dem Sensor-1-food_state und/oder Sensor-2-bbq_state auf inactiv gesetzt werden, wenn keine Signale mehr empfangen werden.
+    Das Interval nach dem Sensor-1-food_state und/oder Sensor-2-bbq_state auf inactive gesetzt werden, wenn keine Signale mehr empfangen werden.
     Hilfreich zum erkennen einer leeren Batterie oder eines defekten Termperaturf&uumlhlers.<br> 
     <code>default: 360</code></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>

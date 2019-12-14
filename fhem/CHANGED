@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_WS_Maverick: added support for device TFA 14.1504 
+                              (Radio-controlled grill and meat thermometer)
+ - changed: 14_SD_WS_Maverick: removed internals which are identical to readings
+                               removed declaration of stateFormat
  - feature: 14_SD_WS.pm: new weatherstation Lidl AURIOL AHFL 433 B2 IAN 314695
  - feature: 00_SIGNALduino.pm: 
             new Internal hasCC1101 added
