@@ -138,7 +138,7 @@ sub SMAEM_Initialize ($) {
   $hash->{DefFn}             = "SMAEM_Define";
   $hash->{UndefFn}           = "SMAEM_Undef";
   $hash->{DeleteFn}          = "SMAEM_Delete";
-  $hash->{DbLog_splitFn}     = "SMAEM_DbLog_splitFn";
+  $hash->{DbLog_splitFn}     = "SMAEM_DbLogSplit";
   $hash->{DelayedShutdownFn} = "SMAEM_DelayedShutdown";
   $hash->{AttrFn}            = "SMAEM_Attr";
   $hash->{AttrList}          = "interval ".
@@ -793,7 +793,6 @@ sub SMAEM_ParseDone ($) {
 	 my @a = split(" ", $row, 2);
      readingsBulkUpdate($hash, $a[0], $a[1]);
  }
-
  readingsEndUpdate($hash, 1);
 
  delete($hash->{HELPER}{RUNNING_PID});
@@ -824,7 +823,7 @@ return;
 ###############################################################
 #                  DbLog_splitFn
 ###############################################################
-sub SMAEM_DbLog_splitFn ($) {
+sub SMAEM_DbLogSplit ($) {
   my ($event,$device) = @_;
   my ($reading, $value, $unit) = "";
 
@@ -839,8 +838,6 @@ sub SMAEM_DbLog_splitFn ($) {
       $unit = 'V';
   } elsif($reading =~ m/.*leistung_Zaehler$/) {
       $unit = 'kWh';
-  } elsif($reading =~ m/.*THD$/) {
-      $unit = '%';
   } else {
       if(!defined($parts[1])) {
 	      $reading = "state";
@@ -852,8 +849,7 @@ sub SMAEM_DbLog_splitFn ($) {
 	  }
   }
 
-  Log3 ($device, 5, "SMAEM $device - splitFn returns Reading: ".$reading.", Value: ".
-       defined($value)?$value:''.", Unit: ".defined($unit)?$unit:'');
+  Log3 ($device, 5, "SMAEM $device - Split for DbLog done -> Reading: ".$reading.", Value: ".(defined($value)?$value:'').", Unit: ".(defined($unit)?$unit:''));
 
 return ($reading, $value, $unit);
 }
