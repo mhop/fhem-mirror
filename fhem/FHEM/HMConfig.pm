@@ -537,7 +537,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   baudrate        =>{a=> 35.0,s=>1.0,l=>0,min=>0      ,max=>6     ,c=>'lit'      ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"baudrate"                             ,lit=>{Bd300=>0,Bd600=>1,Bd1200=>2,Bd2400=>3,Bd4800=>4,Bd9600=>5,Bd19200=>6}},
   serialFormat    =>{a=> 36.0,s=>1.0,l=>0,min=>0      ,max=>3     ,c=>'lit'      ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"serial Format"                        ,lit=>{s7D1PE1S=>0,s7D1PE2S=>1,s8D0PN1S=>2,s8D1PE1S=>3}},
   powerMode       =>{a=> 37.0,s=>1.0,l=>0,min=>0      ,max=>1     ,c=>'lit'      ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"meter powermode"                      ,lit=>{mainPower=>0,batPower=>1}},
-  protocolMode    =>{a=> 38.0,s=>1.0,l=>0,min=>0      ,max=>3     ,c=>'lit'      ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"meter protocol mode"                  ,lit=>{modeA=>0,modeB=>1,modeC=>2,modeD=>3}},
+  protocolMode    =>{a=> 38.0,s=>1.0,l=>0,min=>0      ,max=>4     ,c=>'lit'      ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"meter protocol mode"                  ,lit=>{modeA=>0,modeB=>1,modeC=>2,modeD=>3,modeSML=>4}},
   samplPerCycl    =>{a=> 39.0,s=>1.0,l=>0,min=>1      ,max=>10    ,c=>''         ,p=>'n',f=>''      ,u=>''    ,d=>0,t=>"samples per cycle"},
   
 #rf_st_6_sh                r:TRANSMIT_DEV_TRY_MAX                     l:0   idx:20       size:1      type:integer    log## ty: integer    min:1.0        max:10.0       def:5.0        uni:           
