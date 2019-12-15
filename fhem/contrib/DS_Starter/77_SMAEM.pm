@@ -836,6 +836,8 @@ sub SMAEM_DbLogSplit ($) {
       $unit = 'W';
   } elsif($reading =~ m/.*Spannung/) {
       $unit = 'V';
+  } elsif($reading =~ m/.*Strom/) {
+      $unit = 'A';
   } elsif($reading =~ m/.*leistung_Zaehler$/) {
       $unit = 'kWh';
   } else {
