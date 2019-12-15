@@ -414,6 +414,7 @@ sub SMAEM_Read ($) {
           SMAEM_DoParse ("$name|$dataenc|$smaserial|$dl");
       } else {
 	      $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc|$smaserial|$dl", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
+          $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});          # Forum #77057
           Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
       }
   
