@@ -1,4 +1,4 @@
-REV 20750
+REV 20754
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -570,7 +570,7 @@ UPD 2019-03-17_07:45:03 9845 FHEM/99_Utils.pm
 UPD 2019-10-31_07:45:03 7952 FHEM/AttrTemplate.pm
 UPD 2018-10-18_07:45:03 8469 FHEM/Blocking.pm
 UPD 2019-01-27_07:45:03 9757 FHEM/CoProcess.pm
-UPD 2019-12-15_07:45:10 12828 FHEM/Color.pm
+UPD 2019-12-15_12:43:29 12997 FHEM/Color.pm
 UPD 2019-09-14_07:45:02 57034 FHEM/DarkSkyAPI.pm
 UPD 2019-09-17_07:45:03 16554 FHEM/DevIo.pm
 UPD 2015-07-28_14:05:29 562 FHEM/FhemUtils/release.pm
@@ -578,7 +578,7 @@ UPD 2015-07-28_14:05:29 5739 FHEM/FhemUtils/update-20130127-001
 UPD 2018-05-06_07:45:03 3548 FHEM/FritzBoxUtils.pm
 UPD 2019-06-21_07:45:02 2767 FHEM/GPUtils.pm
 UPD 2019-09-09_07:45:04 62889 FHEM/HMCCUConf.pm
-UPD 2019-10-04_07:45:03 200817 FHEM/HMConfig.pm
+UPD 2019-12-15_12:43:29 200828 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
 UPD 2019-10-18_07:45:03 30391 FHEM/HttpUtils.pm
 UPD 2015-07-28_14:05:31 2324 FHEM/MaxCommon.pm
@@ -745,8 +745,8 @@ UPD 2019-12-15_07:45:14 4197460 docs/commandref.html
 UPD 2019-12-15_07:45:16 2594884 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-15_07:45:17 229049 docs/commandref_modular.html
-UPD 2019-12-15_07:45:19 240016 docs/commandref_modular_DE.html
+UPD 2019-12-15_12:43:37 229049 docs/commandref_modular.html
+UPD 2019-12-15_12:43:38 240016 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
