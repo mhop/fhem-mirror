@@ -468,8 +468,9 @@ devStateIcon($$@)
     return ".*:light_question" if( !defined($percent) );
     return ".*:light_question" if( $percent =~ m/^set/i );
 
-    return ".*:on:toggle" if( $percent eq "on" );
+    return ".*:off:toggle" if( $onoff && ::ReadingsVal($name,$onoff,'') =~ m/(0|off$)/i );
     return ".*:off:toggle" if( $percent eq "off" );
+    return ".*:on:toggle" if( $percent eq "on" );
 
     $percent =~ s/[^\d]//g if( $percent );
 
@@ -506,6 +507,8 @@ devStateIcon($$@)
       $percent = 100 if( $percent eq "on" );
       $s = $dim_values{int($percent/7)} if( $percent && $percent < 100 );
     }
+
+    return ".*:$s:toggle" if( $value eq "000000" ); #for rgbww in white mode
 
     return ".*:$s@#$value:toggle";
   }
