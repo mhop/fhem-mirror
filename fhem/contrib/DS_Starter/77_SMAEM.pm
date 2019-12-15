@@ -469,7 +469,7 @@ sub SMAEM_DoParse ($) {
     my $length;
     my ($b,$c,$d,$e);                                                        # OBIS Klassen
     
-    while (substr($hex,$i,8) ne "00000000" && $i<=($dl*4)) {
+    while (substr($hex,$i,8) ne "00000000" && $i<=($dl*2)) {
         $b = hex(substr($hex,$i,2));
         $c = hex(substr($hex,$i+2,2));
         $d = hex(substr($hex,$i+4,2));
