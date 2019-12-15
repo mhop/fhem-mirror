@@ -359,7 +359,7 @@ sub SMAEM_Read ($) {
   
   return if(IsDisabled($name));
   
-  $socket->recv($data, 608);
+  $socket->recv($data, 656);
   my $dl = length($data);
   if($dl == 600) {                                                  # Each SMAEM packet is 600 bytes of packed payload
       $model = "EM / HM 2.0 < 2.03.4.R";
