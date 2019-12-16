@@ -36,8 +36,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "4.0.0" => "15.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
-                          "new attribute \"noCoprocess\" ",
+  "4.0.0" => "16.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
+                          "new attribute \"noCoprocess\", many internal code changes ",
   "3.5.0" => "14.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", ".
                           "delete hash keys by set reset, initial OBIS items resolution ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
@@ -367,7 +367,7 @@ sub SMAEM_Read ($) {
       $model = "HM 2.0 >= 2.03.4.R";
   } else {
       $model = "unknown";
-      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
+      Log3 ($name, 3, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
   }
 
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
