@@ -79,7 +79,7 @@ else {
 if ( $preconf && $preconf ne "" ) {
     $preconf = "MSwitch_preconf:" . $preconf;
 }
-
+  
 my $autoupdate = 'off';    #off/on
 my $version    = '2.92';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
@@ -9182,6 +9182,7 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
 
 			if ( $testarg =~ '.*:h\d{1,3}' ) 
 			{
+
 			# historyformatierung erkannt - auswerten über sub
 			# in der regex evtl auf zeilenende definieren
 			$newargarray[$count] = MSwitch_Checkcond_history( $args, $name );
@@ -9404,7 +9405,7 @@ foreach $seq ( sort{$b <=> $a} keys  %{$log} )
 		{
 		my @historyevent = split( /:/, $hash->{helper}{eventlog}{$seq} );
 		$hash->{helper}{history}{event}{$x}{EVENT} = $historyevent[1].":".$historyevent[2];
-		$hash->{helper}{history}{event}{$x}{EVFULL} = $hash->{helper}{eventlog}{$seq};
+		$hash->{helper}{history}{event}{$x}{EVTFULL} = $hash->{helper}{eventlog}{$seq};
 		$hash->{helper}{history}{event}{$x}{EVTPART1} = $historyevent[0];
 		$hash->{helper}{history}{event}{$x}{EVTPART2} = $historyevent[1];
 		$hash->{helper}{history}{event}{$x}{EVTPART3} = $historyevent[2];
@@ -9418,6 +9419,8 @@ my $historynumber = $historysplit[1];
 #$historynumber =~ s/[0-9]+//gs;
 $historynumber =~ s/[a-z]+//gs;
 # den letzten inhalt ernittel ( anzahl im array )
+
+
 my $inhalt = $hash->{helper}{history}{event}{$historynumber}{$historysplit[0]}; #????
 $return ="'".$inhalt."'";
 
