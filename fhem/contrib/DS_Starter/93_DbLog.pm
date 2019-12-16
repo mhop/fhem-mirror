@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $
+# $Id: 93_DbLog.pm 20515 2019-11-16 09:09:31Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
   "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
   "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
                            "Forum: https://forum.fhem.de/index.php/topic,65860.msg972352.html#msg972352 ",
@@ -1442,6 +1443,7 @@ sub DbLog_Log($$) {
 			      # Device spezifische DbLogValueFn-Funktion anwenden
  		  	      if($DbLogValueFn ne '') {
  				      my $TIMESTAMP  = $timestamp;
+                      my $DEVICE     = $dev_name;
  				      my $EVENT      = $event;
  				      my $READING    = $reading;
  		  	          my $VALUE 	 = $value;
@@ -6041,12 +6043,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20515 2019-11-16 09:09:31Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20445 2019-11-03 16:50:27Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20515 2019-11-16 09:09:31Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -6929,10 +6931,10 @@ sub DbLog_showChildHandles ($$$$) {
       DbLogInclude works just like DbLogExclude but to include matching readings.
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
       last value is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
-      equal the last one and the defined interval is not reached.
-      is not reached and the 
-      See also DbLogSelectionMode-Attribute of DbLog device which takes influence on how DbLogExclude and DbLogInclude 
-      are handled. <br><br>
+      equal the last one and the defined interval is not reached. <br>
+      See also the attributes <i>defaultMinInterval</i> and <i>DbLogSelectionMode</i> of DbLog device which takes influence on 
+      how DbLogExclude and DbLogInclude are handled. 
+      <br><br>
 	
 	  <b>Example</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
@@ -6956,7 +6958,9 @@ sub DbLog_showChildHandles ($$$$) {
       comma. 
       If a MinInterval is set, the logentry is dropped if the defined interval is not reached <b>and</b> the value vs. 
       lastvalue is equal. If the optional parameter "force" is set, the logentry is also dropped even though the value is not 
-      equal the last one and the defined interval is not reached.
+      equal the last one and the defined interval is not reached. <br>
+      See also the attributes <i>defaultMinInterval</i> and <i>DbLogSelectionMode</i> of DbLog device which takes influence on 
+      how DbLogExclude and DbLogInclude are handled.
       <br><br>
     
 	  <b>Example</b> <br>
@@ -6979,7 +6983,8 @@ sub DbLog_showChildHandles ($$$$) {
        The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used. 
 	   This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of 
        reading) and $UNIT (unit of reading value). That means the changed values are logged.
-       You also have readonly-access to $EVENT for evaluation in your expression. <br>
+       You also have readonly access to $DEVICE (the source device name) and $EVENT for evaluation in your expression. <br>
+       $DEVICE and $EVENT cannot be changed. <br>
 	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
 	   be changed.
 	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
@@ -8318,8 +8323,8 @@ attr SMA_Energymeter DbLogValueFn
       des Readings sich nicht verändert hat. 
       Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
       Wert des Readings verändert hat. <br>
-      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
-      werden. <br><br>
+      Siehe auch die DbLog Attribute <i>defaultMinInterval</i> und <i>DbLogSelectionMode</i>. 
+      Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet werden. <br><br>
 
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogInclude .*</code> <br>
@@ -8345,8 +8350,8 @@ attr SMA_Energymeter DbLogValueFn
       Wert des Readings sich nicht verändert hat. 
       Ist der optionale Parameter "force" hinzugefügt, wird der Logeintrag auch dann nicht geloggt, wenn sich der 
       Wert des Readings verändert hat. <br>
-      Siehe auch das DbLog Attribut <i>DbLogSelectionMode</i>. Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet 
-      werden. <br><br>
+      Siehe auch die DbLog Attribute <i>defaultMinInterval</i> und <i>DbLogSelectionMode</i>. 
+      Es beeinflußt wie DbLogExclude und DbLogInclude ausgewertet werden. <br><br>
     
 	  <b>Beispiel</b> <br>
       <code>attr MyDevice1 DbLogExclude .*</code> <br>
@@ -8368,8 +8373,8 @@ attr SMA_Energymeter DbLogValueFn
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
 	   Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und 
 	   $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
-       Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
-	   $EVENT kann nicht verändert werden. <br>
+       Außerdem hat man lesenden Zugriff auf $DEVICE (den Namen des Devices) und $EVENT für eine Auswertung im Perl-Ausdruck. 
+	   $DEVICE und $EVENT kann nicht verändert werden. <br>
 	   Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
 	   geänderte $timestamp nicht übernommen.
 	   Zusätzlich kann durch Setzen der Variable "$IGNORE=1" der Datensatz vom Logging ausgeschlossen werden. <br> 
