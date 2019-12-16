@@ -22,7 +22,7 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#################################we#############################################
+##############################################################################
 ##############################################################################
 package main;
 use strict;
@@ -70,6 +70,7 @@ sub WeekdayTimer_Define($$) {
 
   $hash->{NAME}            = $name;
   $hash->{DEVICE}          = $device;
+  my $language = WeekdayTimer_Language  ($hash, \@a);
   
   InternalTimer(time(), "WeekdayTimer_Start",$hash,0);
   
@@ -1175,17 +1176,17 @@ sub WeekdayTimer_Attr($$$$) {
   $attrVal = 0 if(!defined $attrVal);
 
   my $hash = $defs{$name};
-  if(       $attrName eq "disable" ) {
+  if( $attrName eq "disable" ) {
     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
     WeekdayTimer_SetTimerOfDay({ HASH => $hash}) unless $attrVal;
   } elsif ( $attrName eq "enable" ) {
-    WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash}) if $init_done;
   } elsif ( $attrName eq "weekprofile" ) {
     $attr{$name}{$attrName} = $attrVal;
     WeekdayTimer_Start($hash) if $init_done;
-  }	elsif ( $attrName eq "switchInThePast" ) {
+  } elsif ( $attrName eq "switchInThePast" ) {
     $attr{$name}{$attrName} = $attrVal;
-    WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash}) if $init_done;
   }
   return undef;
 }
