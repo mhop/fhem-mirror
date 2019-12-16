@@ -3,7 +3,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2016 Copyright: Volker Kettenbach
+#  (c) 2016-2019 Copyright: Volker Kettenbach
 #  e-mail: volker at kettenbach minus it dot de
 #
 #  Credits: 
@@ -34,8 +34,10 @@ use IO::Socket::Multicast;
 use Blocking;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
-# Versions History done by DS_Starter 
+# Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
+  "4.0.0" => "16.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
+                          "new attribute \"noCoprocess\", many internal code changes ",
   "3.5.0" => "14.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", ".
                           "delete hash keys by set reset, initial OBIS items resolution ",
   "3.4.0" => "22.05.2019  support of Installer.pm/Meta.pm added, new version maintenance, commandref revised ",
@@ -63,62 +65,66 @@ our %SMAEM_vNotesIntern = (
 
 # Beschreibung OBIS Kennzahlen
 our %SMAEM_obisitem = (
-  "1:1.4.0"   => "SUM Wirkleistung +",
-  "1:1.8.0"   => "SUM Wirkleistung + Zaehler",
-  "1:2.4.0"   => "SUM Wirkleistung −",
-  "1:2.8.0"   => "SUM Wirkleistung − Zaehler",
-  "1:3.4.0"   => "SUM Blindleistung +",
-  "1:3.8.0"   => "SUM Blindleistung + Zaehler",
-  "1:4.4.0"   => "SUM Blindleistung −",
-  "1:4.8.0"   => "SUM Blindleistung − Zaehler",
-  "1:9.4.0"   => "SUM Scheinleistung +",
-  "1:9.8.0"   => "SUM Scheinleistung + Zaehler",
-  "1:10.4.0"  => "SUM Scheinleistung −",
-  "1:10.8.0"  => "SUM Scheinleistung − Zaehler",
+  "1:1.4.0"   => "SUM Wirkleistung Bezug",
+  "1:1.8.0"   => "SUM Wirkleistung Bezug Zaehler",
+  "1:2.4.0"   => "SUM Wirkleistung Einspeisung",
+  "1:2.8.0"   => "SUM Wirkleistung Einspeisung Zaehler",
+  "1:3.4.0"   => "SUM Blindleistung Bezug",
+  "1:3.8.0"   => "SUM Blindleistung Bezug Zaehler",
+  "1:4.4.0"   => "SUM Blindleistung Einspeisung",
+  "1:4.8.0"   => "SUM Blindleistung Einspeisung Zaehler",
+  "1:9.4.0"   => "SUM Scheinleistung Bezug",
+  "1:9.8.0"   => "SUM Scheinleistung Bezug Zaehler",
+  "1:10.4.0"  => "SUM Scheinleistung Einspeisung",
+  "1:10.8.0"  => "SUM Scheinleistung Einspeisung Zaehler",
   "1:13.4.0"  => "SUM Leistungsfaktor",
-  "1:21.4.0"  => "L1 Wirkleistung +",
-  "1:21.8.0"  => "L1 Wirkleistung + Zaehler",
-  "1:22.4.0"  => "L1 Wirkleistung −",
-  "1:22.8.0"  => "L1 Wirkleistung − Zaehler",
-  "1:23.4.0"  => "L1 Blindleistung +",
-  "1:23.8.0"  => "L1 Blindleistung + Zaehler",
-  "1:24.4.0"  => "L1 Blindleistung −",
-  "1:24.8.0"  => "L1 Blindleistung − Zaehler",
-  "1:29.4.0"  => "L1 Scheinleistung +",
-  "1:29.8.0"  => "L1 Scheinleistung + Zaehler",
-  "1:30.4.0"  => "L1 Scheinleistung −",
-  "1:30.8.0"  => "L1 Scheinleistung − Zaehler",
+  "1:14.4.0"  => "Netzfrequenz",
+  "1:21.4.0"  => "L1 Wirkleistung Bezug",
+  "1:21.8.0"  => "L1 Wirkleistung Bezug Zaehler",
+  "1:22.4.0"  => "L1 Wirkleistung Einspeisung",
+  "1:22.8.0"  => "L1 Wirkleistung Einspeisung Zaehler",
+  "1:23.4.0"  => "L1 Blindleistung Bezug",
+  "1:23.8.0"  => "L1 Blindleistung Bezug Zaehler",
+  "1:24.4.0"  => "L1 Blindleistung Einspeisung",
+  "1:24.8.0"  => "L1 Blindleistung Einspeisung Zaehler",
+  "1:29.4.0"  => "L1 Scheinleistung Bezug",
+  "1:29.8.0"  => "L1 Scheinleistung Bezug Zaehler",
+  "1:30.4.0"  => "L1 Scheinleistung Einspeisung",
+  "1:30.8.0"  => "L1 Scheinleistung Einspeisung Zaehler",
   "1:31.4.0"  => "L1 Strom",
   "1:32.4.0"  => "L1 Spannung",
-  "1:41.4.0"  => "L2 Wirkleistung +",
-  "1:41.8.0"  => "L2 Wirkleistung + Zaehler",
-  "1:42.4.0"  => "L2 Wirkleistung −",
-  "1:42.8.0"  => "L2 Wirkleistung − Zaehler",
-  "1:43.4.0"  => "L2 Blindleistung +",
-  "1:43.8.0"  => "L2 Blindleistung + Zaehler",
-  "1:44.4.0"  => "L2 Blindleistung −",
-  "1:44.8.0"  => "L2 Blindleistung − Zaehler",
-  "1:49.4.0"  => "L2 Scheinleistung +",
-  "1:49.8.0"  => "L2 Scheinleistung + Zaehler",
-  "1:50.4.0"  => "L2 Scheinleistung −",
-  "1:50.8.0"  => "L2 Scheinleistung − Zaehler",
+  "1:33.4.0"  => "L1 Leistungsfaktor",
+  "1:41.4.0"  => "L2 Wirkleistung Bezug",
+  "1:41.8.0"  => "L2 Wirkleistung Bezug Zaehler",
+  "1:42.4.0"  => "L2 Wirkleistung Einspeisung",
+  "1:42.8.0"  => "L2 Wirkleistung Einspeisung Zaehler",
+  "1:43.4.0"  => "L2 Blindleistung Bezug",
+  "1:43.8.0"  => "L2 Blindleistung Bezug Zaehler",
+  "1:44.4.0"  => "L2 Blindleistung Einspeisung",
+  "1:44.8.0"  => "L2 Blindleistung Einspeisung Zaehler",
+  "1:49.4.0"  => "L2 Scheinleistung Bezug",
+  "1:49.8.0"  => "L2 Scheinleistung Bezug Zaehler",
+  "1:50.4.0"  => "L2 Scheinleistung Einspeisung",
+  "1:50.8.0"  => "L2 Scheinleistung Einspeisung Zaehler",
   "1:51.4.0"  => "L2 Strom",
   "1:52.4.0"  => "L2 Spannung",
-  "1:61.4.0"  => "L3 Wirkleistung +",
-  "1:61.8.0"  => "L3 Wirkleistung + Zaehler",
-  "1:62.4.0"  => "L3 Wirkleistung −",
-  "1:62.8.0"  => "L3 Wirkleistung − Zaehler",
-  "1:63.4.0"  => "L3 Blindleistung +",
-  "1:63.8.0"  => "L3 Blindleistung + Zaehler",
-  "1:64.4.0"  => "L3 Blindleistung −",
-  "1:64.8.0"  => "L3 Blindleistung − Zaehler",
-  "1:69.4.0"  => "L3 Scheinleistung +",
-  "1:69.8.0"  => "L3 Scheinleistung + Zaehler",
-  "1:70.4.0"  => "L3 Scheinleistung −",
-  "1:70.8.0"  => "L3 Scheinleistung − Zaehler",
+  "1:53.4.0"  => "L2 Leistungsfaktor",
+  "1:61.4.0"  => "L3 Wirkleistung Bezug",
+  "1:61.8.0"  => "L3 Wirkleistung Bezug Zaehler",
+  "1:62.4.0"  => "L3 Wirkleistung Einspeisung",
+  "1:62.8.0"  => "L3 Wirkleistung Einspeisung Zaehler",
+  "1:63.4.0"  => "L3 Blindleistung Bezug",
+  "1:63.8.0"  => "L3 Blindleistung Bezug Zaehler",
+  "1:64.4.0"  => "L3 Blindleistung Einspeisung",
+  "1:64.8.0"  => "L3 Blindleistung Einspeisung Zaehler",
+  "1:69.4.0"  => "L3 Scheinleistung Bezug",
+  "1:69.8.0"  => "L3 Scheinleistung Bezug Zaehler",
+  "1:70.4.0"  => "L3 Scheinleistung Einspeisung",
+  "1:70.8.0"  => "L3 Scheinleistung Einspeisung Zaehler",
   "1:71.4.0"  => "L3 Strom",
   "1:72.4.0"  => "L3 Spannung",
-  "144:0.0.0" => "Softwareversion",
+  "1:73.4.0"  => "L3 Leistungsfaktor",
+  "144:0.0.0" => "Software Version",
 );
 
 ###############################################################
@@ -132,7 +138,7 @@ sub SMAEM_Initialize ($) {
   $hash->{DefFn}             = "SMAEM_Define";
   $hash->{UndefFn}           = "SMAEM_Undef";
   $hash->{DeleteFn}          = "SMAEM_Delete";
-  $hash->{DbLog_splitFn}     = "SMAEM_DbLog_splitFn";
+  $hash->{DbLog_splitFn}     = "SMAEM_DbLogSplit";
   $hash->{DelayedShutdownFn} = "SMAEM_DelayedShutdown";
   $hash->{AttrFn}            = "SMAEM_Attr";
   $hash->{AttrList}          = "interval ".
@@ -140,6 +146,7 @@ sub SMAEM_Initialize ($) {
 						       "diffAccept ".
                                "disableSernoInReading:1,0 ".
                                "feedinPrice ".
+                               "noCoprocess:1,0 ".
                                "powerCost ".
                                "serialNumber ".
                                "timeout ".						
@@ -352,15 +359,15 @@ sub SMAEM_Read ($) {
   
   return if(IsDisabled($name));
   
-  $socket->recv($data, 608);
+  $socket->recv($data, 656);
   my $dl = length($data);
   if($dl == 600) {                                                  # Each SMAEM packet is 600 bytes of packed payload
       $model = "EM / HM 2.0 < 2.03.4.R";
   } elsif($dl == 608) {                                             # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
       $model = "HM 2.0 >= 2.03.4.R";
   } else {
-      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
-      return;
+      $model = "unknown";
+      Log3 ($name, 3, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
   }
 
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
@@ -403,13 +410,18 @@ sub SMAEM_Read ($) {
 	  
 	  my $dataenc = encode_base64($data,"");
       
-	  $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc|$smaserial|$dl", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
-      Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
+      if(AttrVal($name, "noCoprocess", 0)) {
+          SMAEM_DoParse ("$name|$dataenc|$smaserial|$dl");
+      } else {
+	      $hash->{HELPER}{RUNNING_PID} = BlockingCall("SMAEM_DoParse", "$name|$dataenc|$smaserial|$dl", "SMAEM_ParseDone", $timeout, "SMAEM_ParseAborted", $hash); 
+          $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});          # Forum #77057
+          Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
+      }
   
   } else {
-      
-	  Log3 $hash, 5, "SMAEM $name: - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
+	  Log3 $hash, 5, "SMAEM $name - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
   }
+  
 return undef;
 }
 
@@ -443,6 +455,7 @@ sub SMAEM_DoParse ($) {
     # Format of the udp packets of the SMAEM:
     # http://www.sma.de/fileadmin/content/global/Partner/Documents/SMA_Labs/EMETER-Protokoll-TI-de-10.pdf
     # http://www.eb-systeme.de/?page_id=1240
+    # http://www.eb-systeme.de/?page_id=3005
 
     # Conversion like in this python code:
     # http://www.unifox.at/sma_energy_meter/
@@ -453,40 +466,34 @@ sub SMAEM_DoParse ($) {
     
     # OBIS Kennzahlen Zerlegung
     my $obis = {};
-    my $i    = 56;                                            # Start nach Header (28 Bytes)
+    my $i    = 56;                                                           # Start nach Header (28 Bytes)
     my $length;
-    my ($b,$c,$d,$e);                                         # OBIS Klassen
-    while (substr($hex,$i,8) ne "00000000" && $i<=($dl*4)) {
-      $b = hex(substr($hex,$i,2));
-      $c = hex(substr($hex,$i+2,2));
-      $d = hex(substr($hex,$i+4,2));
-      $e = hex(substr($hex,$i+6,2));
-      $length = $d*2;
-      if ($b == 144) {
-        # Firmware Version
-        $obis->{$b.":0.0.0"} = hex(substr($hex,$i+8,2)).".".sprintf("%02d", hex(substr($hex,$i+10,2))).".".sprintf("%02d", hex(substr($hex,$i+12,2))).".".chr(hex(substr($hex,$i+14,2)));
-        $i = $i + 16;
-        next;
-      }
-      $obis->{"1:".$c.".".$d.".".$e} = hex(substr($hex,$i+8,$length));
-      $i = $i + 8 + $length;
-    }
-
-    Log3 ($name, 5, "SMAEM $name - OBIS metrics identified:");
-    foreach my $k (sort keys %{$obis}) {
-        my $item = $SMAEM_obisitem{$k}?$SMAEM_obisitem{$k}:"no item found";
-        Log3 ($name, 5, "SMAEM $name - $k -> ".$item." -> ".$obis->{$k});
-    }    
+    my ($b,$c,$d,$e);                                                        # OBIS Klassen
     
-    # Entscheidung ob EM/HM2.0 mit Firmware >= 2.03.4.R
-    my $offset = 0;
-    my $grid_freq;
-    $hex =~ /.*000d0400.{8}(000e0400)(.*)(00150400).*/;
-    if($1 && $1 eq "000e0400") {
-        $grid_freq = hex($2)/1000;
-        $offset    = 16;
-    } 
-    Log3 ($name, 4, "SMAEM $name - Offset: $offset");   
+    while (substr($hex,$i,8) ne "00000000" && $i<=($dl*2)) {
+        $b = hex(substr($hex,$i,2));
+        $c = hex(substr($hex,$i+2,2));
+        $d = hex(substr($hex,$i+4,2));
+        $e = hex(substr($hex,$i+6,2));
+        $length = $d*2;
+        if ($b == 144) {
+            # Firmware Version
+            $obis->{$b.":0.0.0"} = hex(substr($hex,$i+8,2)).".".sprintf("%02d", hex(substr($hex,$i+10,2))).".".sprintf("%02d", hex(substr($hex,$i+12,2))).".".chr(hex(substr($hex,$i+14,2)));
+            $i = $i + 16;
+            next;
+        }
+        $obis->{"1:".$c.".".$d.".".$e} = hex(substr($hex,$i+8,$length));
+        $i = $i + 8 + $length;
+    }
+    
+    Log3 ($name, 5, "SMAEM $name - OBIS metrics identified:");
+    my @ui;                                                                  # Array für "unknown items"
+    foreach my $k (sort keys %{$obis}) {
+        my $uit  = "unknown item";
+        my $item = $SMAEM_obisitem{$k}?$SMAEM_obisitem{$k}:$uit;
+        push(@ui, $k) if($item eq $uit); 
+        Log3 ($name, 5, "SMAEM $name - $k -> ".$item." -> ".$obis->{$k});
+    }   
   
  	################ Aufbau Ergebnis-Array ####################
     # Extract datasets from hex:
@@ -498,12 +505,12 @@ sub SMAEM_DoParse ($) {
     # Prestring with SMAEM and SERIALNO or not
     my $ps     = (!AttrVal($name, "disableSernoInReading", undef)) ? "SMAEM".$smaserial."_" : "";
 	
-    # Counter Divisor: [Hex-Value]=Ws => Ws/1000*3600=kWh => divide by 3600000
-    # Sum L1-3
-    my $bezug_wirk             = hex(substr($hex,64,8))/10;
-    my $bezug_wirk_count       = hex(substr($hex,80,16))/3600000;
-    my $einspeisung_wirk       = hex(substr($hex,104,8))/10;
-    my $einspeisung_wirk_count = hex(substr($hex,120,16))/3600000;
+    # Counter Divisor: [Hex-Value] = Ws => Ws/1000*3600=kWh => divide by 3600000
+    # Sum L1-L3
+    my $bezug_wirk             = $obis->{"1:1.4.0"}/10;
+    my $bezug_wirk_count       = $obis->{"1:1.8.0"}/3600000;
+    my $einspeisung_wirk       = $obis->{"1:2.4.0"}/10;
+    my $einspeisung_wirk_count = $obis->{"1:2.8.0"}/3600000;
   
 	# calculation of GRID-hashes and persist to file
     Log3 ($name, 4, "SMAEM $name - old GRIDIN_SUM_$smaserial got from RAM: $gridinsum");
@@ -577,9 +584,13 @@ sub SMAEM_DoParse ($) {
 	
 	# error while writing values to file
 	if ($retcode) {
-	    $error = encode_base64($retcode,"");
-		$discycles++;
-        return "$name|''|''|''|$error|$discycles|''"; 
+      	$error = encode_base64($retcode,"");
+	    $discycles++;
+        if(AttrVal($name, "noCoprocess", 0)) {
+            return SMAEM_ParseDone("$name|''|''|''|$error|$discycles|''");
+        } else {
+            return "$name|''|''|''|$error|$discycles|''"; 
+        }
 	}
 	
 	push(@row_array, "state ".sprintf("%.1f", $einspeisung_wirk-$bezug_wirk)."\n");
@@ -590,37 +601,44 @@ sub SMAEM_DoParse ($) {
 	push(@row_array, $ps."Einspeisung_Wirkleistung ".sprintf("%.1f",$einspeisung_wirk)."\n");
 	push(@row_array, $ps."Einspeisung_Wirkleistung_Zaehler ".sprintf("%.4f",$einspeisung_wirk_count)."\n");
       
-    my $bezug_blind             = hex(substr($hex,144,8))/10;
-    my $bezug_blind_count       = hex(substr($hex,160,16))/3600000;
-    my $einspeisung_blind       = hex(substr($hex,184,8))/10;
-    my $einspeisung_blind_count = hex(substr($hex,200,16))/3600000;
+    my $bezug_blind             = $obis->{"1:3.4.0"}/10;
+    my $bezug_blind_count       = $obis->{"1:3.8.0"}/3600000;
+    my $einspeisung_blind       = $obis->{"1:4.4.0"}/10;
+    my $einspeisung_blind_count = $obis->{"1:4.8.0"}/3600000;
 	push(@row_array, $ps."Bezug_Blindleistung ".sprintf("%.1f",$bezug_blind)."\n");
 	push(@row_array, $ps."Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$bezug_blind_count)."\n");
 	push(@row_array, $ps."Einspeisung_Blindleistung ".sprintf("%.1f",$einspeisung_blind)."\n");
 	push(@row_array, $ps."Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$einspeisung_blind_count)."\n");
 
-    my $bezug_schein             = hex(substr($hex,224,8))/10;
-    my $bezug_schein_count       = hex(substr($hex,240,16))/3600000;
-    my $einspeisung_schein       = hex(substr($hex,264,8))/10;
-    my $einspeisung_schein_count = hex(substr($hex,280,16))/3600000;
+    my $bezug_schein             = $obis->{"1:9.4.0"}/10;
+    my $bezug_schein_count       = $obis->{"1:9.8.0"}/3600000;
+    my $einspeisung_schein       = $obis->{"1:10.4.0"}/10;
+    my $einspeisung_schein_count = $obis->{"1:10.8.0"}/3600000;
 	push(@row_array, $ps."Bezug_Scheinleistung ".sprintf("%.1f",$bezug_schein)."\n");
 	push(@row_array, $ps."Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$bezug_schein_count)."\n");
 	push(@row_array, $ps."Einspeisung_Scheinleistung ".sprintf("%.1f",$einspeisung_schein)."\n");
 	push(@row_array, $ps."Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$einspeisung_schein_count)."\n");
 
-    my $cosphi = hex(substr($hex,304,8))/1000;
+    my $cosphi = $obis->{"1:13.4.0"}/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
-    push(@row_array, $ps."GridFreq ".$grid_freq."\n")         if($grid_freq);
-    push(@row_array, $ps."FirmwareVersion ".$obis->{"144:0.0.0"}."\n");
-    push(@row_array, "SerialNumber ".$smaserial."\n")         if(!$ps);
+    my $grid_freq = $obis->{"1:14.4.0"}/1000;
+    push(@row_array, $ps."GridFreq ".$grid_freq."\n") if($grid_freq);
+    
+    push(@row_array, $ps."SoftwareVersion ".$obis->{"144:0.0.0"}."\n");
+    push(@row_array, "SerialNumber ".$smaserial."\n") if(!$ps);
     push(@row_array, $ps."SUSyID ".$susyid."\n");
+    
+    if(!@ui) {
+        push(@ui, "none");                                           # Wenn kein unbekanntes OBIS Item identifiziert wurde
+    }
+    push(@row_array, "OBISnewItems ".join(",",@ui)."\n");
 
     # L1
-    my $l1_bezug_wirk             = hex(substr($hex,320+$offset,8))/10;
-    my $l1_bezug_wirk_count       = hex(substr($hex,336+$offset,16))/3600000;
-    my $l1_einspeisung_wirk       = hex(substr($hex,360+$offset,8))/10;
-    my $l1_einspeisung_wirk_count = hex(substr($hex,376+$offset,16))/3600000;
+    my $l1_bezug_wirk             = $obis->{"1:21.4.0"}/10;
+    my $l1_bezug_wirk_count       = $obis->{"1:21.8.0"}/3600000;
+    my $l1_einspeisung_wirk       = $obis->{"1:22.4.0"}/10;
+    my $l1_einspeisung_wirk_count = $obis->{"1:22.8.0"}/3600000;
     push(@row_array, $ps."L1_Saldo_Wirkleistung ".sprintf("%.1f",$l1_einspeisung_wirk-$l1_bezug_wirk)."\n");
     push(@row_array, $ps."L1_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_wirk_count-$l1_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L1_Bezug_Wirkleistung ".sprintf("%.1f",$l1_bezug_wirk)."\n");
@@ -628,36 +646,36 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L1_Einspeisung_Wirkleistung ".sprintf("%.1f",$l1_einspeisung_wirk)."\n");
     push(@row_array, $ps."L1_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_wirk_count)."\n");	
  
-    my $l1_bezug_blind             = hex(substr($hex,400+$offset,8))/10;
-    my $l1_bezug_blind_count       = hex(substr($hex,416+$offset,16))/3600000;
-    my $l1_einspeisung_blind       = hex(substr($hex,440+$offset,8))/10;
-    my $l1_einspeisung_blind_count = hex(substr($hex,456+$offset,16))/3600000;
+    my $l1_bezug_blind             = $obis->{"1:23.4.0"}/10;
+    my $l1_bezug_blind_count       = $obis->{"1:23.8.0"}/3600000;
+    my $l1_einspeisung_blind       = $obis->{"1:24.4.0"}/10;
+    my $l1_einspeisung_blind_count = $obis->{"1:24.8.0"}/3600000;
     push(@row_array, $ps."L1_Bezug_Blindleistung ".sprintf("%.1f",$l1_bezug_blind)."\n");
     push(@row_array, $ps."L1_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l1_bezug_blind_count)."\n");
     push(@row_array, $ps."L1_Einspeisung_Blindleistung ".sprintf("%.1f",$l1_einspeisung_blind)."\n");
     push(@row_array, $ps."L1_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_blind_count)."\n");
 
-    my $l1_bezug_schein             = hex(substr($hex,480+$offset,8))/10;
-    my $l1_bezug_schein_count       = hex(substr($hex,496+$offset,16))/3600000;
-    my $l1_einspeisung_schein       = hex(substr($hex,520+$offset,8))/10;
-    my $l1_einspeisung_schein_count = hex(substr($hex,536+$offset,16))/3600000;
+    my $l1_bezug_schein             = $obis->{"1:29.4.0"}/10;
+    my $l1_bezug_schein_count       = $obis->{"1:29.8.0"}/3600000;
+    my $l1_einspeisung_schein       = $obis->{"1:30.4.0"}/10;
+    my $l1_einspeisung_schein_count = $obis->{"1:30.8.0"}/3600000;
 	push(@row_array, $ps."L1_Bezug_Scheinleistung ".sprintf("%.1f",$l1_bezug_schein)."\n");
 	push(@row_array, $ps."L1_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l1_bezug_schein_count)."\n");
 	push(@row_array, $ps."L1_Einspeisung_Scheinleistung ".sprintf("%.1f",$l1_einspeisung_schein)."\n");
 	push(@row_array, $ps."L1_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l1_einspeisung_schein_count)."\n");
 
-    my $l1_thd    = hex(substr($hex,560+$offset,8))/1000;
-    my $l1_v      = hex(substr($hex,576+$offset,8))/1000;
-    my $l1_cosphi = hex(substr($hex,592+$offset,8))/1000;
-	push(@row_array, $ps."L1_THD ".sprintf("%.2f",$l1_thd)."\n");
+    my $l1_i       = $obis->{"1:31.4.0"}/1000;
+    my $l1_v       = $obis->{"1:32.4.0"}/1000;
+    my $l1_cosphi  = $obis->{"1:33.4.0"}/1000;
+	push(@row_array, $ps."L1_Strom ".sprintf("%.2f",$l1_i)."\n");
 	push(@row_array, $ps."L1_Spannung ".sprintf("%.1f",$l1_v)."\n");
 	push(@row_array, $ps."L1_CosPhi ".sprintf("%.3f",$l1_cosphi)."\n");
 
     # L2
-    my $l2_bezug_wirk             = hex(substr($hex,608+$offset,8))/10;
-    my $l2_bezug_wirk_count       = hex(substr($hex,624+$offset,16))/3600000;
-    my $l2_einspeisung_wirk       = hex(substr($hex,648+$offset,8))/10;
-    my $l2_einspeisung_wirk_count = hex(substr($hex,664+$offset,16))/3600000;
+    my $l2_bezug_wirk             = $obis->{"1:41.4.0"}/10;
+    my $l2_bezug_wirk_count       = $obis->{"1:41.8.0"}/3600000;
+    my $l2_einspeisung_wirk       = $obis->{"1:42.4.0"}/10;
+    my $l2_einspeisung_wirk_count = $obis->{"1:42.8.0"}/3600000;
     push(@row_array, $ps."L2_Saldo_Wirkleistung ".sprintf("%.1f",$l2_einspeisung_wirk-$l2_bezug_wirk)."\n");
     push(@row_array, $ps."L2_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_wirk_count-$l2_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L2_Bezug_Wirkleistung ".sprintf("%.1f",$l2_bezug_wirk)."\n");
@@ -665,36 +683,36 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L2_Einspeisung_Wirkleistung ".sprintf("%.1f",$l2_einspeisung_wirk)."\n");
     push(@row_array, $ps."L2_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_wirk_count)."\n");
  
-    my $l2_bezug_blind             = hex(substr($hex,688+$offset,8))/10;
-    my $l2_bezug_blind_count       = hex(substr($hex,704+$offset,16))/3600000;
-    my $l2_einspeisung_blind       = hex(substr($hex,728+$offset,8))/10;
-    my $l2_einspeisung_blind_count = hex(substr($hex,744+$offset,16))/3600000;
+    my $l2_bezug_blind             = $obis->{"1:43.4.0"}/10;
+    my $l2_bezug_blind_count       = $obis->{"1:43.8.0"}/3600000;
+    my $l2_einspeisung_blind       = $obis->{"1:44.4.0"}/10;
+    my $l2_einspeisung_blind_count = $obis->{"1:44.8.0"}/3600000;
     push(@row_array, $ps."L2_Bezug_Blindleistung ".sprintf("%.1f",$l2_bezug_blind)."\n");
     push(@row_array, $ps."L2_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l2_bezug_blind_count)."\n");	
     push(@row_array, $ps."L2_Einspeisung_Blindleistung ".sprintf("%.1f",$l2_einspeisung_blind)."\n");
     push(@row_array, $ps."L2_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_blind_count)."\n");
 
-    my $l2_bezug_schein             = hex(substr($hex,768+$offset,8))/10;
-    my $l2_bezug_schein_count       = hex(substr($hex,784+$offset,16))/3600000;
-    my $l2_einspeisung_schein       = hex(substr($hex,808+$offset,8))/10;
-    my $l2_einspeisung_schein_count = hex(substr($hex,824+$offset,16))/3600000;
+    my $l2_bezug_schein             = $obis->{"1:49.4.0"}/10;
+    my $l2_bezug_schein_count       = $obis->{"1:49.8.0"}/3600000;
+    my $l2_einspeisung_schein       = $obis->{"1:50.4.0"}/10;
+    my $l2_einspeisung_schein_count = $obis->{"1:50.8.0"}/3600000;
     push(@row_array, $ps."L2_Bezug_Scheinleistung ".sprintf("%.1f",$l2_bezug_schein)."\n");
     push(@row_array, $ps."L2_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l2_bezug_schein_count)."\n");	
     push(@row_array, $ps."L2_Einspeisung_Scheinleistung ".sprintf("%.1f",$l2_einspeisung_schein)."\n");
     push(@row_array, $ps."L2_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l2_einspeisung_schein_count)."\n");
 
-    my $l2_thd    = hex(substr($hex,848+$offset,8))/1000;
-    my $l2_v      = hex(substr($hex,864+$offset,8))/1000;
-    my $l2_cosphi = hex(substr($hex,880+$offset,8))/1000;
-    push(@row_array, $ps."L2_THD ".sprintf("%.2f",$l2_thd)."\n");
+    my $l2_i      = $obis->{"1:51.4.0"}/1000;
+    my $l2_v      = $obis->{"1:52.4.0"}/1000;
+    my $l2_cosphi = $obis->{"1:53.4.0"}/1000;
+    push(@row_array, $ps."L2_Strom ".sprintf("%.2f",$l2_i)."\n");
     push(@row_array, $ps."L2_Spannung ".sprintf("%.1f",$l2_v)."\n");	
     push(@row_array, $ps."L2_CosPhi ".sprintf("%.3f",$l2_cosphi)."\n");
 
     # L3
-    my $l3_bezug_wirk             = hex(substr($hex,896+$offset,8))/10;
-    my $l3_bezug_wirk_count       = hex(substr($hex,912+$offset,16))/3600000;
-    my $l3_einspeisung_wirk       = hex(substr($hex,936+$offset,8))/10;
-    my $l3_einspeisung_wirk_count = hex(substr($hex,952+$offset,16))/3600000;
+    my $l3_bezug_wirk             = $obis->{"1:61.4.0"}/10;
+    my $l3_bezug_wirk_count       = $obis->{"1:61.8.0"}/3600000;
+    my $l3_einspeisung_wirk       = $obis->{"1:62.4.0"}/10;
+    my $l3_einspeisung_wirk_count = $obis->{"1:62.8.0"}/3600000;
     push(@row_array, $ps."L3_Saldo_Wirkleistung ".sprintf("%.1f",$l3_einspeisung_wirk-$l3_bezug_wirk)."\n");
     push(@row_array, $ps."L3_Saldo_Wirkleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_wirk_count-$l3_bezug_wirk_count)."\n");	
     push(@row_array, $ps."L3_Bezug_Wirkleistung ".sprintf("%.1f",$l3_bezug_wirk)."\n");
@@ -702,28 +720,28 @@ sub SMAEM_DoParse ($) {
     push(@row_array, $ps."L3_Einspeisung_Wirkleistung ".sprintf("%.1f",$l3_einspeisung_wirk)."\n");
     push(@row_array, $ps."L3_Einspeisung_Wirkleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_wirk_count)."\n");
 
-    my $l3_bezug_blind             = hex(substr($hex,976+$offset,8))/10;
-    my $l3_bezug_blind_count       = hex(substr($hex,992+$offset,16))/3600000;
-    my $l3_einspeisung_blind       = hex(substr($hex,1016+$offset,8))/10;
-    my $l3_einspeisung_blind_count = hex(substr($hex,1032+$offset,16))/3600000;
+    my $l3_bezug_blind             = $obis->{"1:63.4.0"}/10;
+    my $l3_bezug_blind_count       = $obis->{"1:63.8.0"}/3600000;
+    my $l3_einspeisung_blind       = $obis->{"1:64.4.0"}/10;
+    my $l3_einspeisung_blind_count = $obis->{"1:64.8.0"}/3600000;
     push(@row_array, $ps."L3_Bezug_Blindleistung ".sprintf("%.1f",$l3_bezug_blind)."\n");
     push(@row_array, $ps."L3_Bezug_Blindleistung_Zaehler ".sprintf("%.1f",$l3_bezug_blind_count)."\n");	
     push(@row_array, $ps."L3_Einspeisung_Blindleistung ".sprintf("%.1f",$l3_einspeisung_blind)."\n");
     push(@row_array, $ps."L3_Einspeisung_Blindleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_blind_count)."\n");
 
-    my $l3_bezug_schein             = hex(substr($hex,1056+$offset,8))/10;
-    my $l3_bezug_schein_count       = hex(substr($hex,1072+$offset,16))/3600000;
-    my $l3_einspeisung_schein       = hex(substr($hex,1096+$offset,8))/10;
-    my $l3_einspeisung_schein_count = hex(substr($hex,1112+$offset,16))/3600000;
+    my $l3_bezug_schein             = $obis->{"1:69.4.0"}/10;
+    my $l3_bezug_schein_count       = $obis->{"1:69.8.0"}/3600000;
+    my $l3_einspeisung_schein       = $obis->{"1:70.4.0"}/10;
+    my $l3_einspeisung_schein_count = $obis->{"1:70.8.0"}/3600000;
     push(@row_array, $ps."L3_Bezug_Scheinleistung ".sprintf("%.1f",$l3_bezug_schein)."\n");
     push(@row_array, $ps."L3_Bezug_Scheinleistung_Zaehler ".sprintf("%.1f",$l3_bezug_schein_count)."\n");	
     push(@row_array, $ps."L3_Einspeisung_Scheinleistung ".sprintf("%.1f",$l3_einspeisung_schein)."\n");
     push(@row_array, $ps."L3_Einspeisung_Scheinleistung_Zaehler ".sprintf("%.1f",$l3_einspeisung_schein_count)."\n");
 
-    my $l3_thd    = hex(substr($hex,1136+$offset,8))/1000;
-    my $l3_v      = hex(substr($hex,1152+$offset,8))/1000;
-    my $l3_cosphi = hex(substr($hex,1168+$offset,8))/1000;
-    push(@row_array, $ps."L3_THD ".sprintf("%.2f",$l3_thd)."\n");
+    my $l3_i      = $obis->{"1:71.4.0"}/1000;
+    my $l3_v      = $obis->{"1:72.4.0"}/1000;
+    my $l3_cosphi = $obis->{"1:73.4.0"}/1000;
+    push(@row_array, $ps."L3_Strom ".sprintf("%.2f",$l3_i)."\n");
     push(@row_array, $ps."L3_Spannung ".sprintf("%.1f",$l3_v)."\n");	
     push(@row_array, $ps."L3_CosPhi ".sprintf("%.3f",$l3_cosphi)."\n");
  
@@ -731,7 +749,11 @@ sub SMAEM_DoParse ($) {
     my $rowlist = join('_ESC_', @row_array);
     $rowlist    = encode_base64($rowlist,"");
  
-return "$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles|$smaserial"; 
+    if(AttrVal($name, "noCoprocess", 0)) {
+        return SMAEM_ParseDone ("$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles|$smaserial");
+    } else {
+        return "$name|$rowlist|$gridinsum|$gridoutsum|''|$discycles|$smaserial"; 
+    }
 }
 
 ###############################################################
@@ -759,13 +781,13 @@ sub SMAEM_ParseDone ($) {
 	 delete($hash->{HELPER}{RUNNING_PID});
 	 return;
  }
- 
+
  $hash->{'GRIDIN_SUM_'.$smaserial}  = $gridinsum;
  $hash->{'GRIDOUT_SUM_'.$smaserial} = $gridoutsum;
  Log3($name, 4, "SMAEM $name - wrote new energy values to INTERNALS - GRIDIN_SUM_$smaserial: $gridinsum, GRIDOUT_SUM_$smaserial: $gridoutsum"); 
 
  my @row_array = split("_ESC_", $rowlist);
- 
+  
  readingsBeginUpdate($hash); 
  foreach my $row (@row_array) {
      chomp $row;
@@ -773,7 +795,7 @@ sub SMAEM_ParseDone ($) {
      readingsBulkUpdate($hash, $a[0], $a[1]);
  }
  readingsEndUpdate($hash, 1);
- 
+
  delete($hash->{HELPER}{RUNNING_PID});
  CancelDelayedShutdown($name);
  
@@ -802,7 +824,7 @@ return;
 ###############################################################
 #                  DbLog_splitFn
 ###############################################################
-sub SMAEM_DbLog_splitFn ($) {
+sub SMAEM_DbLogSplit ($) {
   my ($event,$device) = @_;
   my ($reading, $value, $unit) = "";
 
@@ -815,10 +837,10 @@ sub SMAEM_DbLog_splitFn ($) {
       $unit = 'W';
   } elsif($reading =~ m/.*Spannung/) {
       $unit = 'V';
+  } elsif($reading =~ m/.*Strom/) {
+      $unit = 'A';
   } elsif($reading =~ m/.*leistung_Zaehler$/) {
       $unit = 'kWh';
-  } elsif($reading =~ m/.*THD$/) {
-      $unit = '%';
   } else {
       if(!defined($parts[1])) {
 	      $reading = "state";
@@ -830,8 +852,7 @@ sub SMAEM_DbLog_splitFn ($) {
 	  }
   }
 
-  Log3 ($device, 5, "SMAEM $device - splitFn returns Reading: ".$reading.", Value: ".
-       defined($value)?$value:''.", Unit: ".defined($unit)?$unit:'');
+  Log3 ($device, 5, "SMAEM $device - Split for DbLog done -> Reading: ".$reading.", Value: ".(defined($value)?$value:'').", Unit: ".(defined($unit)?$unit:''));
 
 return ($reading, $value, $unit);
 }
@@ -1100,7 +1121,7 @@ return;
 
   <a name="diffAccept"></a>
   <li><b>diffAccept</b> <br>
-  diffAccept determines the threshold,  up to that a calaculated difference between two 
+  The attribute diffAccept determines the threshold,  up to that a calaculated difference between two 
   straight sequently meter readings (Readings with *_Diff) should be commenly accepted (default = 10). <br>
   Hence faulty DB entries with a disproportional high difference values will be eliminated, don't 
   tamper the result and the measure cycles will be discarded.  
@@ -1109,31 +1130,39 @@ return;
   
   <a name="disable"></a>
   <li><b>disable</b> <br>
-  1 = the module is disabled 
+  Disable or enable the device.
   </li>
   <br>
   
   <a name="disableSernoInReading"></a>
   <li><b>disableSernoInReading</b> <br>
-  prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  
+  Prevents the prefix "SMAEM&lt;serialnumber_&gt;....."  
   </li>
   <br>
   
   <a name="feedinPrice"></a>
   <li><b>feedinPrice</b> <br>
-  the individual amount of refund of one kilowatt hour
+  The individual amount of refund of one kilowatt hour
   </li>
   <br>
   
   <a name="interval"></a>
   <li><b>interval</b> <br>
-  evaluation interval in seconds 
+  Evaluation interval in seconds 
+  </li>
+  <br>
+  
+  <a name="noCoprocess"></a>
+  <li><b>noCoprocess</b> <br>
+  If set, the energy evaluation takes place in a separate backround process. At default a
+  parallel background process is started every evaluation period. This attribute can be helpful to optimize 
+  the FHEM system.
   </li>
   <br>
   
   <a name="powerCost"></a>
   <li><b>powerCost</b> <br>
-  the individual amount of power cost per kWh 
+  The individual amount of power cost per kWh 
   </li>
   <br>
   
@@ -1146,31 +1175,12 @@ return;
   
   <a name="timeout"></a>
   <li><b>timeout</b> <br>
-  adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value 
+  Adjustment timeout of backgound processing (default 60s). The value of timeout has to be higher than the value 
   of "interval". 
   </li> 
   <br>
+
 </ul>
-<br>
-
-<a name="SMAEMreadings"></a>
-<b>Readings</b> <br><br>
-
-The created readings of SMAEM mostly are self-explanatory. 
-However there are readings what maybe need some explanation. <br>
-
-<ul>
-  <li><b>&lt;Phase&gt;_THD</b>  : (Total Harmonic Distortion) - Proportion or quota of total effective value 
-                                  of all harmonic component to effective value of fundamental component. 
-								  Total ratio of harmonic component and interference of pure sinusoidal wave 
-								  in %.
-								  It is a rate of interferences. d is 0, if sinusoidal voltage exists and a sinusoidal 
-								  current exists as well. As larger d, as more harmonic component are existing. 
-								  According EN 50160/1999 the value mustn't exceed 8 %. 
-								  If a current interference is so powerful that it is causing a voltage interference of 
-								  more than 5 % (THD), that points to an issue with electrical potential.  </li>
-</ul>
-<br>
 
 =end html
 
@@ -1254,6 +1264,13 @@ However there are readings what maybe need some explanation. <br>
   </li>
   <br>
   
+  <a name="noCoprocess"></a>
+  <li><b>noCoprocess</b> <br>
+  Wenn gesetzt, wird die Energieauswertung nicht in einen Hintergrundprozess ausgelagert. Im Standard wird 
+  dazu ein paralleler Prozess gestartet. Das Attribut kann zur Optimierung des FHEM-Systems hilfreich sein.
+  </li>
+  <br>
+  
   <a name="powerCost"></a>
   <li><b>powerCost</b> <br>
   die individuelle Höhe der Stromkosten pro Kilowattstunde 
@@ -1274,28 +1291,7 @@ However there are readings what maybe need some explanation. <br>
   </li> 
   <br>
 
-  </ul>
-<br>
-
-<a name="SMAEMreadings"></a>
-<b>Readings</b> <br><br>
-
-Die meisten erzeugten Readings von SMAEM sind selbsterklärend. 
-Es gibt allerdings Readings die einer Erläuterung bedürfen. <br>
-
-<ul>
-  <li><b>&lt;Phase&gt;_THD</b>  : (Total Harmonic Distortion) - Verzerrungs- oder Gesamtklirrfaktor - Verhältnis oder 
-                                  Anteil des Gesamteffektivwert aller Oberschwingungen zum Effektivwert der 
-								  Grundschwingung. Gesamtanteil an Oberschwingungen und Störung der reinen Sinuswelle 
-								  in % bzw. Verhältnis vom nutzbaren Grundschwingungsstrom zu den 
-								  nicht nutzbaren Oberschwingungsströmen. Es ist ein Maß für Störungen. d ist 0, wenn bei 
-								  sinusförmiger Spannung ein sinusförmiger Strom fließt. Je größer d, um so mehr 
-								  Oberschwingungen sind vorhanden. Nach EN 50160/1999 z.B. darf der Wert 8 % nicht 
-								  überschreiten. Wenn eine Stromstörung so stark ist, dass sie eine Spannungsstörung 
-								  (THD) von über 5 % verursacht, deutet dies auf ein Potentialproblem hin.  </li>
-
 </ul>
-<br>
 
 =end html_DE
 
