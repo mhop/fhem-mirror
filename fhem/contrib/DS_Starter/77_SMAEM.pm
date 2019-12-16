@@ -366,8 +366,8 @@ sub SMAEM_Read ($) {
   } elsif($dl == 608) {                                             # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
       $model = "HM 2.0 >= 2.03.4.R";
   } else {
-      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is invalid. Don't parse it.");
-      return;
+      $model = "unknown";
+      Log3 ($name, 1, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
   }
 
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
@@ -419,7 +419,7 @@ sub SMAEM_Read ($) {
       }
   
   } else {
-	  Log3 $hash, 5, "SMAEM $name: - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
+	  Log3 $hash, 5, "SMAEM $name - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
   }
   
 return undef;
