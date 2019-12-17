@@ -127,6 +127,7 @@ my %sets = (
     "down"     => "noArg",
     "off"       => "noArg",
     "stop"      => "noArg",
+	"longstop"      => "noArg",
     "on"        => "noArg",
     "fav"       => "noArg",
 	"prog"      => "noArg",
@@ -154,6 +155,7 @@ my %setsstandart = (
     "down"     => "noArg",
     "off"       => "noArg",
     "stop"      => "noArg",
+	"longstop"      => "noArg",
     "on"        => "noArg",
     "fav"       => "noArg",
 	"prog"      => "noArg",
@@ -190,6 +192,7 @@ my %sendCommands = (
 	"level"         => "level",
 	"position"         => "level",
     "stop"         => "stop",
+	"longstop"         => "longstop",
 	"off"          => "off",
     "on"           => "on",
     "open"         => "off",
@@ -363,6 +366,19 @@ sub SendCommand($@) {
     my $command      = $siro_c2b{$cmd};
     my $io           = $hash->{IODev};    # IO-Device (SIGNALduino)
 
+	Log3( $name, 5,"Siro_sendCommand: cmd - $cmd");
+	
+	if ($cmd eq "longstop")
+	{
+	$args[1]="longstop";
+	$cmd="stop";
+	$command      = $siro_c2b{$cmd};
+	}
+	
+	Log3( $name, 5,"Siro_sendCommand: args1 - $args[1]") if defined $args[1];
+
+
+
 	if ( defined($hash->{helper}{exexcmd}) and $hash->{helper}{exexcmd} eq "off") # send kommand blockiert / keine ausf?hrung
 	{
 	Log3( $name, 4,"Siro_sendCommand: ausfuehrung durch helper blockiert ");
@@ -378,7 +394,7 @@ sub SendCommand($@) {
 	
 	 }
 
-	Log3( $name, 4,"Siro_sendCommand: args1 - $args[1]") if defined $args[1];
+	
 
    #if ( (defined($args[1]) and $args[1] eq "longstop" )|| (defined $hash->{helper}{progmode} and $hash->{helper}{progmode} eq "on"))
    if ( (defined($args[1]) and $args[1] eq "longstop" ))
@@ -867,6 +883,8 @@ sub Set($@) {
 	
 	if ($hash->{helper}{progmode} eq "on")
 	{
+	
+		Log3( $name, 5, "Siro-Programmiermodus: ".$sendCommands{$cmd});
 		SendCommand( $hash, $sendCommands{$cmd} );
 		delete( $hash->{Signalduino_RAWMSG} );
 		delete( $hash->{Signalduino_MSGCNT} );
@@ -1586,6 +1604,9 @@ my ( $FW_wname, $d, $room, $pageHash ) =@_;    # pageHash is set for summaryFn.
 		$msg.= "<input  style=\"height: 80px; width: 150px;\" type=\"button\" id=\"siro_prog_down\" value=\"STOP\" onClick=\"javascript:prog('stop');\">";
 		$msg.= "&nbsp;";
 			
+		$msg.= "<input  style=\"height: 80px; width: 150px;\" type=\"button\" id=\"siro_prog_down\" value=\"LONGSTOP\" onClick=\"javascript:prog('longstop');\">";
+		$msg.= "&nbsp;";
+		
 		$msg.= "&nbsp;";
 		$msg.= "&nbsp;";
 		$msg.= "&nbsp;";
