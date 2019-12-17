@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbLog: variable $DEVICE is available in attr DbLogValueFn to 
+                      have readonly access to the source device name
  - feature: 77_SMAEM: use OBIS metrics (Thx to RiG), change Readings Lx_THD 
                       to Lx_Strom, new attribute "noCoprocess", some fixes
  - feature: 49_SSCam: new attributes snapChatTxt and recChatTxt to activate

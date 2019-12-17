@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
   "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
   "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
                            "Forum: https://forum.fhem.de/index.php/topic,65860.msg972352.html#msg972352 ",
@@ -1442,6 +1443,7 @@ sub DbLog_Log($$) {
 			      # Device spezifische DbLogValueFn-Funktion anwenden
  		  	      if($DbLogValueFn ne '') {
  				      my $TIMESTAMP  = $timestamp;
+                      my $DEVICE     = $dev_name;
  				      my $EVENT      = $event;
  				      my $READING    = $reading;
  		  	          my $VALUE 	 = $value;
@@ -6981,7 +6983,8 @@ sub DbLog_showChildHandles ($$$$) {
        The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used. 
 	   This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of 
        reading) and $UNIT (unit of reading value). That means the changed values are logged.
-       You also have readonly-access to $EVENT for evaluation in your expression. <br>
+       You also have readonly access to $DEVICE (the source device name) and $EVENT for evaluation in your expression. <br>
+       $DEVICE and $EVENT cannot be changed. <br>
 	   If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
 	   be changed.
 	   In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
@@ -8370,8 +8373,8 @@ attr SMA_Energymeter DbLogValueFn
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
 	   Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und 
 	   $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
-       Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
-	   $EVENT kann nicht verändert werden. <br>
+       Außerdem hat man lesenden Zugriff auf $DEVICE (den Namen des Devices) und $EVENT für eine Auswertung im Perl-Ausdruck. 
+	   $DEVICE und $EVENT kann nicht verändert werden. <br>
 	   Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
 	   geänderte $timestamp nicht übernommen.
 	   Zusätzlich kann durch Setzen der Variable "$IGNORE=1" der Datensatz vom Logging ausgeschlossen werden. <br> 
