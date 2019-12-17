@@ -1172,7 +1172,7 @@ sub WeekdayTimer_TageAsCondition ($$) {
 ################################################################################
 sub WeekdayTimer_Attr($$$$) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
-
+  return if (!$init_done);
   $attrVal = 0 if(!defined $attrVal);
 
   my $hash = $defs{$name};
@@ -1180,13 +1180,13 @@ sub WeekdayTimer_Attr($$$$) {
     readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
     WeekdayTimer_SetTimerOfDay({ HASH => $hash}) unless $attrVal;
   } elsif ( $attrName eq "enable" ) {
-    WeekdayTimer_SetTimerOfDay({ HASH => $hash}) if $init_done;
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash});
   } elsif ( $attrName eq "weekprofile" ) {
     $attr{$name}{$attrName} = $attrVal;
-    WeekdayTimer_Start($hash) if $init_done;
+    WeekdayTimer_Start($hash);
   } elsif ( $attrName eq "switchInThePast" ) {
     $attr{$name}{$attrName} = $attrVal;
-    WeekdayTimer_SetTimerOfDay({ HASH => $hash}) if $init_done;
+    WeekdayTimer_SetTimerOfDay({ HASH => $hash});
   }
   return undef;
 }
