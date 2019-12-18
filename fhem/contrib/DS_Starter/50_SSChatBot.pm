@@ -276,7 +276,7 @@ sub SSChatBot_Set($@) {
         
   return if(IsDisabled($name));
   
-  my $idxlist = join(",", SSCam_sortVersion("asc",keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}));
+  my $idxlist = join(",", SSChat_sortVersion("asc",keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}));
  
   if(!$hash->{TOKEN}) {
       # initiale setlist für neue Devices
