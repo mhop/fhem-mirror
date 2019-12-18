@@ -9,9 +9,15 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.26
+# Version = 1.27
 #
 # Version  History:
+# - 1.27 - 2019-12-14 Dr. H-J Breymayer
+# -- recognition of orange power LED indicator, new state dormant
+# -- attribute webCmd changed "webCmd on_off"
+# -- replaced in all log3 statements fixed name VIERA with module name
+# -- correction of "define" number of arguments and their test
+#
 # - 1.26 - 2019-11-24 Dr. H-J Breymayer
 # -- problem with unexpected crypted command, correct Session Sequence
 #
@@ -172,9 +178,9 @@ sub VIERA_Define($$) {
   $hash->{helper}{session_id}        = "None";      
   $hash->{helper}{session_seq_num}   = "None";
 
-  if(int(@args) < 3 && int(@args) > 6) {
+  if(int(@args) < 3 || int(@args) > 6) {
     my $msg = "wrong syntax: define <name> VIERA <host> [<interval>] <pincode> <?>";
-    Log3 $name, 2, "VIERA: \"$msg\"";
+    Log3 $name, 2, "$name: \"$msg\"";
     return $msg;
   }
   
@@ -237,7 +243,7 @@ sub VIERA_Define($$) {
      else {$hash->{helper}{session_hmac_key} = "None"}
   
 
-  CommandAttr(undef,$name." webCmd off") if( !defined( AttrVal($hash->{NAME}, "webCmd", undef)) );
+  CommandAttr(undef,$name." webCmd on_off") if( !defined( AttrVal($hash->{NAME}, "webCmd", undef)) );
   
   BlockingKill($hash->{helper}{RUNNING_PID_GET}) if(defined($hash->{helper}{RUNNING_PID_GET}));
   delete($hash->{helper}{RUNNING_PID_GET});
@@ -245,7 +251,7 @@ sub VIERA_Define($$) {
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, "VIERA_GetStatus", $hash, 0);
   
-  Log3 $name, 2, "VIERA: defined with host: $hash->{helper}{HOST} interval: $hash->{helper}{INTERVAL} PIN: $hash->{helper}{pincode} ";
+  Log3 $name, 2, "$name: defined with host: $hash->{helper}{HOST} interval: $hash->{helper}{INTERVAL} PIN: $hash->{helper}{pincode} ";
   readingsSingleUpdate($hash,"state","Initialized",1);
 
   return undef;
@@ -256,15 +262,14 @@ sub VIERA_Define($$) {
 # Param2: String of 'set' command
 # Return: Help text for FHEMWEB
 sub VIERA_Set($@) {
-  my ($hash, @a) = @_;
+  my ($hash, $name, @a) = @_;
   
-  my $name = $hash->{NAME};
   my $host = $hash->{helper}{HOST};
-  my $count = @a;
+  
   my $key = "";
   my $tab = "";
   my $usage = "choose one of ".
-              "off:noArg ".
+              "on_off:noArg ".
               "mute:on,off ".
               "volume:slider,0,1,100 ".
               "channel ".
@@ -272,31 +277,32 @@ sub VIERA_Set($@) {
               "input:hdmi1,hdmi2,hdmi3,hdmi4,sdCard,tv";
   $usage =~ s/(NRC_|-ONOFF)//g;
   
-  my $what = lc($a[1]);
-  return "VIERA: Device is not present or reachable, power on or check ethernet connection" if(ReadingsVal($name,"presence","absent")ne "present" && $what ne "?");
-  return "VIERA: No argument given, $usage" if(!defined($a[1]));
-  my $state = lc($a[2]) if(defined($a[2]));
+  my $what = lc($a[0]); 
+  return "\"set $name\" needs at least one argument" if(!defined($a[0]));
+  return "Unknown value $a[0] Device is not present or reachable (power on or check ethernet connection)" if(ReadingsVal($name,"state","off") eq "off" && $what ne "?");
+  return "Unknown value $a[0] use set $name on_off, choose one of on_off ?"  if(ReadingsVal($name,"state","off") eq "dormant" && $what ne "on_off");
+  my $state = lc($a[1]) if(defined($a[1])); 
   
   if ($what eq "mute"){
-    Log3 $name, 3, "VIERA: Set mute $state";
+    Log3 $name, 3, "$name: Set mute $state";
     if ($state eq "on") {$state = 1;} else {$state = 0;}
     VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Set", "Mute", $state));
     VIERA_GetStatus($hash, 1);
   }
   elsif ($what eq "volume"){
-    return "VIERA: Volume range is too high! Use Value 0 till 100 for volume." if($state < 0 || $state > 100);
-    Log3 $name, 3, "VIERA: Set volume $state";
+    return "$name: Volume range is too high! Use Value 0 till 100 for volume." if($state < 0 || $state > 100);
+    Log3 $name, 3, "$name: Set volume $state";
     VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Set", "Volume", $state));
     VIERA_GetStatus($hash, 1);
   }
-  elsif ($what eq "off"){
-    Log3 $name, 3, "VIERA: Set off";
+  elsif ($what eq "on_off"){
+    Log3 $name, 3, "$name: Set on_off";
     VIERA_Encrypted_Command($hash, "POWER");
     VIERA_Encrypt_Answer($hash);
   }
   elsif ($what eq "channel"){
-    return "VIERA: Channel is too high or low!" if($state < 1 || $state > 9999);
-    Log3 $name, 3, "VIERA: Set channel $state";
+    return "$name: Channel is too high or low!" if($state < 1 || $state > 9999);
+    Log3 $name, 3, "$name: Set channel $state";
     for(my $i = 0; $i <= length($state)-1; $i++) {
       VIERA_Encrypted_Command($hash, "D".substr($state, $i, 1));
       sleep 0.1;
@@ -317,28 +323,28 @@ sub VIERA_Set($@) {
     }
     else{
     $state = uc($state);
-    Log3 $name, 3, "VIERA: Set remoteControl $state";   
+    Log3 $name, 3, "$name: Set remoteControl $state";   
     VIERA_Encrypted_Command($hash, $state);
     VIERA_Encrypt_Answer($hash);
     }
   }
   elsif ($what eq "input"){
     $state = uc($state);
-    return "VIERA: Input $state isn't available." if($state ne "HDMI1" && $state ne "HDMI2" && $state ne "HDMI3" && $state ne "HDMI4" && $state ne "SDCARD" && $state ne "TV");
+    return "$name: Input $state isn't available." if($state ne "HDMI1" && $state ne "HDMI2" && $state ne "HDMI3" && $state ne "HDMI4" && $state ne "SDCARD" && $state ne "TV");
     $state = "SD_CARD" if ($state eq "SDCARD");
-    Log3 $name, 3, "VIERA: Set input $state";
+    Log3 $name, 3, "$name: Set input $state";
     VIERA_Encrypted_Command($hash, $state);
     VIERA_Encrypt_Answer($hash);
   }
   elsif ($what eq "statusrequest"){
-    Log3 $name, 3, "VIERA: Set statusRequest";
+    Log3 $name, 3, "$name: Set statusRequest";
     VIERA_GetStatus($hash, 1);
   }
   elsif ($what eq "?"){
     return "$usage";
   }
   else {
-    Log3 $name, 3, "VIERA: Unknown argument $what, $usage";
+    Log3 $name, 3, "$name: Unknown argument $what, $usage";
     return "Unknown argument $what, $usage";
   }
   return undef;
@@ -355,7 +361,7 @@ sub VIERA_Get($@) {
   my $usage = "choose one of mute:noArg volume:noArg presence:noArg";
   my $name = $hash->{NAME};
 
-  return "VIERA: No argument given, $usage" if(int(@a) != 2);
+  return "$name: No argument given, $usage" if(int(@a) != 2);
 
   $what = lc($a[1]);
 
@@ -408,57 +414,91 @@ sub VIERA_GetStatus($$) {
   VIERA_CeckEncryption($hash) if ($hash->{helper}{ENCRYPTION} eq "?");
 
   if ($blocking == 0) {
-    Log3 $name, 4, "VIERA[VIERA_GetStatus]: Using non blocking...";
+    Log3 $name, 4, "$name [VIERA_GetStatus]: Using non blocking...";
     $hash->{helper}{RUNNING_PID_GET} = BlockingCall("VIERA_GetDoIt", $hash, "VIERA_GetDone", 10, "VIERA_GetAbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID_GET}));
     if($hash->{helper}{RUNNING_PID_GET}) {
-      Log3 $name, 4, "VIERA[VIERA_GetStatus]: VIERA_GetDoIt() BlockingCall process started with PID $hash->{helper}{RUNNING_PID_GET}{pid}"; 
+      Log3 $name, 4, "$name [VIERA_GetStatus]: VIERA_GetDoIt() BlockingCall process started with PID $hash->{helper}{RUNNING_PID_GET}{pid}"; 
     }
     else { 
-      Log3 $name, 3,  "VIERA[VIERA_GetStatus]: BlockingCall process start failed for VIERA_GetDoIt()"; 
+      Log3 $name, 3,  "$name [VIERA_GetStatus]: BlockingCall process start failed for VIERA_GetDoIt()"; 
     }
     return;
   }
-  Log3 $name, 4, "VIERA[VIERA_GetStatus]: Using blocking...";
+  Log3 $name, 4, "$name [VIERA_GetStatus]: Using blocking...";
   my $returnVol = VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Get", "Volume", ""));
-  Log3 $name, 5, "VIERA[VIERA_GetStatus]: Vol-Request returned: $returnVol" if(defined($returnVol));
-  if(not defined($returnVol) or $returnVol eq "") {
-    Log3 $name, 4, "VIERA[VIERA_GetStatus]: Vol-Request NO SOCKET!";
-    if( ReadingsVal($name,"state","off") ne "off") {
+  Log3 $name, 5, "$name [VIERA_GetStatus]: Vol-Request returned: $returnVol" if(defined($returnVol));
+  
+  if ( not defined($returnVol) or $returnVol eq "" )  {
+    Log3 $name, 4, "$name [VIERA_GetStatus]: Vol-Request NO SOCKET!";
+    if (ReadingsVal($name,"state","off") ne "off") {
       $hash->{helper}{session_seq_num} = "None";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, "state", "off");
       readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
       readingsBulkUpdate($hash, "presence", "absent");
+      readingsBulkUpdate($hash, "volume", "?");
+      readingsBulkUpdate($hash, "mute", "?");      
       readingsEndUpdate($hash, 1);
     }
     return;
   }
+    elsif ( index($returnVol, "Bad Request") != -1) {
+    if (ReadingsVal($name,"state","off") ne "dormant") {
+	  Log3 $name, 4, "$name [VIERA_GetStatus()]: TV answered. Seems to be on but delivering no data";
+	  $hash->{helper}{session_seq_num} = "None";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "state", "dormant");
+      readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
+      readingsBulkUpdate($hash, "presence", "absent");
+      readingsBulkUpdate($hash, "volume", "?");
+      readingsBulkUpdate($hash, "mute", "?");
+      readingsEndUpdate($hash, 1);
+    }     		
+    return;
+  }
 
   my $returnMute = VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Get", "Mute", ""));
-  Log3 $name, 5, "VIERA[VIERA_GetStatus]: Mute-Request returned: $returnMute" if(defined($returnMute));
-  if(not defined($returnMute) or $returnMute eq "") {
-    Log3 $name, 4, "VIERA[VIERA_GetStatus]: Mute-Request NO SOCKET!";
+  Log3 $name, 5, "$name [VIERA_GetStatus]: Mute-Request returned: $returnMute" if(defined($returnMute));
+  
+  if( not defined($returnMute) or $returnMute eq "" ) {
+    Log3 $name, 4, "$name [VIERA_GetStatus]: Mute-Request NO SOCKET!";
     if( ReadingsVal($name,"state","off") ne "off") {
 	  $hash->{helper}{session_seq_num} = "None";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, "state", "off");
       readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
       readingsBulkUpdate($hash, "presence", "absent");
+      readingsBulkUpdate($hash, "volume", "?");
+      readingsBulkUpdate($hash, "mute", "?");
       readingsEndUpdate($hash, 1);
     }
+    return;
+  }
+    elsif ( index($returnMute, "Bad Request") != -1) {
+    if (ReadingsVal($name,"state","off") ne "dormant") {
+	  Log3 $name, 4, "$name [VIERA_GetStatus()]: TV answered. Seems to be on but delivering no data";
+	  $hash->{helper}{session_seq_num} = "None";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "state", "dormant");
+      readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
+      readingsBulkUpdate($hash, "presence", "absent");
+      readingsBulkUpdate($hash, "volume", "?");
+      readingsBulkUpdate($hash, "mute", "?");
+      readingsEndUpdate($hash, 1);
+    }     		
     return;
   }
   
   readingsBeginUpdate($hash);
   if($returnVol =~ /<CurrentVolume>(.+)<\/CurrentVolume>/){
-    Log3 $name, 4, "VIERA[VIERA_GetStatus]: Set reading volume to $1";
-    if( $1 != ReadingsVal($name, "volume", "0") ) {readingsBulkUpdate($hash, "volume", $1);}
+    Log3 $name, 4, "$name [VIERA_GetStatus]: Set reading volume to $1";
+    if( $1 ne ReadingsVal($name, "volume", "0") ) {readingsBulkUpdate($hash, "volume", $1);}
   }
   
   if($returnMute =~ /<CurrentMute>(.+)<\/CurrentMute>/){
     my $myMute = $1;
     if ($myMute == 0) { $myMute = "off"; } else { $myMute = "on";}
-    Log3 $name, 4, "VIERA[VIERA_GetStatus]: Set reading mute to $myMute";
+    Log3 $name, 4, "$name [VIERA_GetStatus]: Set reading mute to $myMute";
     if( $myMute ne ReadingsVal($name, "mute", "0") ) {readingsBulkUpdate($hash, "mute", $myMute);}
   }
   if( ReadingsVal($name,"state","off") ne "on") {
@@ -491,20 +531,20 @@ sub VIERA_connection($$) {
   );
 
   if(defined ($sock)) {
-    Log3 $hash, 5, "VIERA[$blocking]: Send Data to $hash->{helper}{HOST}:$hash->{helper}{PORT}:\n$data";
+    Log3 $name, 5, "$name [$blocking]: Send Data to $hash->{helper}{HOST}:$hash->{helper}{PORT}:\n$data";
     print $sock $data;
   
     while ((read $sock, $buff, 1024) > 0){
       $buffer .= $buff;
     }
  
-    Log3 $hash, 5, "VIERA[$blocking]: $hash->{helper}{HOST} buffer response:\n$buffer";
+    Log3 $name, 5, "$name [$blocking]: $hash->{helper}{HOST} buffer response:\n$buffer";
     close($sock);
     $hash->{helper}{BUFFER} = $buffer;
     return $buffer;
   }
   else {
-    Log3 $hash, 4, "VIERA[$blocking]: $hash->{helper}{HOST}: not able to open socket";
+    Log3 $name, 4, "$name [$blocking]: $hash->{helper}{HOST}: not able to open socket";
     return undef;
   }
 }
@@ -547,7 +587,7 @@ sub VIERA_BuildXML_NetCtrl($$) {
 
   $message .= $head;
   $message .= $callsoap;
-# Log3 $hash, 5, "VIERA: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
+# Log3 $name, 5, "$name: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
   return $message;
 }
 
@@ -563,13 +603,14 @@ sub VIERA_BuildXML_RendCtrl($$$$) {
   
   my $host = $hash->{helper}{HOST};
   my $port = $hash->{helper}{PORT};
+  my $name = $hash->{NAME};
   
   my $callsoap = "";
   my $message = "";
   my $head = "";
   my $blen  = "";
   
-# Log3 $hash, 5, "VIERA: $command with $value to $host";
+# Log3 $name, 5, "$name: $command with $value to $host";
 
   $callsoap .= "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n";
   $callsoap .= "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"";
@@ -595,7 +636,7 @@ sub VIERA_BuildXML_RendCtrl($$$$) {
 
   $message .= $head;
   $message .= $callsoap;
-  Log3 $hash, 5, "VIERA: Building XML SOAP (RenderingControl) for command $command with value $value to host $host:\n$message";
+  Log3 $name, 5, "$name: Building XML SOAP (RenderingControl) for command $command with value $value to host $host:\n$message";
   return $message;
 }
 
@@ -685,7 +726,7 @@ sub VIERA_Build_soap_message_Encrypt($$$$) {
 
   $message .= $head;
   $message .= $callsoap;
-# Log3 $hash, 5, "VIERA: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
+# Log3 $name, 5, "$name: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
   
   $hash->{helper}{is_encrypted} = $is_encrypted;
   
@@ -698,15 +739,17 @@ sub VIERA_Build_soap_message_Encrypt($$$$) {
 sub VIERA_GetDoIt($) {
   my ($hash) = @_;
   
+  my $name = $hash->{NAME};
+  
   my $myVol = "";
   my $myMute = "";
   
-  Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: BlockingCall for ".$hash->{NAME}." start...";
+  Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: BlockingCall for ".$hash->{NAME}." start...";
   
   my $returnVol = VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Get", "Volume", ""));
-  Log3 $hash, 5, "VIERA[NonBlocking-VIERA_GetDoIt()]: GetStatusVol-Request returned: $returnVol" if(defined($returnVol));
+  Log3 $name, 5, "$name [NonBlocking-VIERA_GetDoIt()]: GetStatusVol-Request returned: $returnVol" if(defined($returnVol));
   if(not defined($returnVol) or $returnVol eq "") {
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: GetStatusVol-Request NO SOCKET!";
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: GetStatusVol-Request NO SOCKET!";
     
     return $hash->{NAME}. "|". 
     "error-noSocket" . "|".
@@ -714,9 +757,9 @@ sub VIERA_GetDoIt($) {
   }
 
   my $returnMute = VIERA_connection($hash, VIERA_BuildXML_RendCtrl($hash, "Get", "Mute", ""));
-  Log3 $hash, 5, "VIERA[NonBlocking-VIERA_GetDoIt()]: GetStatusMute-Request returned: $returnMute" if(defined($returnMute));
+  Log3 $name, 5, "$name [NonBlocking-VIERA_GetDoIt()]: GetStatusMute-Request returned: $returnMute" if(defined($returnMute));
   if(not defined($returnMute) or $returnMute eq "") {
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: GetStatusMute-Request NO SOCKET!";
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: GetStatusMute-Request NO SOCKET!";
     
     return $hash->{NAME}. "|". 
     "error-noSocket" . "|".
@@ -724,22 +767,22 @@ sub VIERA_GetDoIt($) {
   }
   
   if ($returnVol =~ /HTTP\/1\.1 ([\d]{3}) (.*)/) {
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: Received HTTP Code $1 $2";
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: Received HTTP Code $1 $2";
     $myVol = "error-$1 $2" if ($1 ne "200");
   }
   if($returnVol =~ /<CurrentVolume>(.+)<\/CurrentVolume>/){
   $myVol = $1;
-  Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: Received volume with level $myVol";
+  Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: Received volume with level $myVol";
   }
   
   if ($returnMute =~ /HTTP\/1\.1 ([\d]{3}) (.*)/) {
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: Received HTTP Code $1 $2";
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: Received HTTP Code $1 $2";
     $myMute = "error-$1 $2" if ($1 ne "200");
   }
   if($returnMute =~ /<CurrentMute>(.+)<\/CurrentMute>/){
     $myMute = $1;
     if ($myMute == 0) { $myMute = "off"; } else { $myMute = "on";}
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDoIt()]: Received mute state $myMute";
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDoIt()]: Received mute state $myMute";
   }
   
     return $hash->{NAME}. "|". 
@@ -765,37 +808,49 @@ sub VIERA_GetDone($) {
   my $myMute = shift(@a);
   my $hash = $defs{$name};
   
-  Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDone()]: Param: $string";
+  Log3 $name, 4, "$name [NonBlocking-VIERA_GetDone()]: Param: $string";
   
   if ($myVol =~ /error-(.*)/ || $myMute =~ /error-(.*)/) {
     if ($1 eq "noSocket") {
-      Log3 $name, 4, "VIERA[NonBlocking-VIERA_GetDone()]: Seems to be there is no socket available. Guessing TV is off!";
+      Log3 $name, 4, "$name [NonBlocking-VIERA_GetDone()]: Seems to be there is no socket available. Guessing TV is off!";
       if (ReadingsVal($name,"state","off") ne "off") {
 		$hash->{helper}{session_seq_num} = "None";
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "state", "off");
         readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
         readingsBulkUpdate($hash, "presence", "absent");
+        readingsBulkUpdate($hash, "volume", "?");
+        readingsBulkUpdate($hash, "mute", "?");
         readingsEndUpdate($hash, 1);
       }
       delete($hash->{helper}{RUNNING_PID_GET});
       return;
     }
     else {
-      Log3 $name, 3, "VIERA[NonBlocking-VIERA_GetDone()]: TV answered with $1. Seems to be on but delivering no data";
+       if (ReadingsVal($name,"state","off") ne "dormant") {
+		Log3 $name, 4, "$name [NonBlocking-VIERA_GetDone()]: TV answered with $1. Seems to be on but delivering no data";
+		$hash->{helper}{session_seq_num} = "None";
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "state", "dormant");
+        readingsBulkUpdate($hash, "Sequence", $hash->{helper}{session_seq_num});
+        readingsBulkUpdate($hash, "presence", "absent");
+        readingsBulkUpdate($hash, "volume", "?");
+        readingsBulkUpdate($hash, "mute", "?");
+        readingsEndUpdate($hash, 1);
+      }     
       delete($hash->{helper}{RUNNING_PID_GET});
       return;
     }
   }
   
   readingsBeginUpdate($hash);
-  if ($myVol != ReadingsVal($name, "volume", "0")) {
-    Log3 $hash, 4, "VIERA[NonBlocking-VIERA_GetDone()]: Set reading volume to $myVol";
+  if ($myVol ne ReadingsVal($name, "volume", "0")) {
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDone()]: Set reading volume to $myVol";
     readingsBulkUpdate($hash, "volume", $myVol);
   } 
   
   if ($myMute ne ReadingsVal($name, "mute", "0")) {
-    Log3 $name, 4, "VIERA[NonBlocking-VIERA_GetDone()]: Set reading mute to $myMute";  
+    Log3 $name, 4, "$name [NonBlocking-VIERA_GetDone()]: Set reading mute to $myMute";  
     readingsBulkUpdate($hash, "mute", $myMute);
   }
   
@@ -813,9 +868,11 @@ sub VIERA_GetDone($) {
 # Return: no return code
 sub VIERA_GetAbortFn($) { 
   my ($hash) = @_;
+  
+  my $name = $hash->{NAME};
 
   delete($hash->{helper}{RUNNING_PID_GET});
-  Log3 $hash, 2, "VIERA[NonBlocking-VIERA_GetAbortFn()]: BlockingCall for $hash->{NAME} was aborted, timeout reached";
+  Log3 $name, 2, "$name [NonBlocking-VIERA_GetAbortFn()]: BlockingCall for $hash->{NAME} was aborted, timeout reached";
   return;
 }
 
@@ -865,6 +922,8 @@ sub VIERA_Encrypted_Command($$) {
 sub VIERA_Encrypt_Answer($) {
    my ($hash) = @_;
    
+   my $name = $hash->{NAME};
+   
    my $answer = "";  
    $answer = $hash->{helper}{BUFFER} if ($hash->{helper}{BUFFER} ne "");
   
@@ -872,7 +931,7 @@ sub VIERA_Encrypt_Answer($) {
       if ($hash->{helper}{session_seq_num} ne  "None") {
           $hash->{helper}{session_seq_num} -= 1;
       }
-      Log3 $hash, 3, "wrong encrypted VIERA command:  \r\n\"$answer\"";
+      Log3 $name, 3, "$name wrong encrypted VIERA command:  \r\n\"$answer\"";
       return undef;
   }
 
@@ -1319,6 +1378,8 @@ sub VIERA_RClayout_TV_SVG() {
     If encryption is yes execute any command like "set myTV1 off". A PinCode should be displayed on the TV. Edit the definition
     delete the "?" and replace 0000 with the PinCode. Execute the command again while the PinCode is still displayed on TV.
     You are done.
+    <br>
+    state: Initialized - on (green) - dormant (orange) - off (red)
     <br><br>
     This module may require further PERL libraries. For raspbian you have to enter the following commands in the terminal:<br>
     <b>sudo cpan<br>
@@ -1482,7 +1543,9 @@ sub VIERA_RClayout_TV_SVG() {
     beliebigen Zeitinterval (60 ist ok). Dann den TV einschalten und warten bis die Verschl&uuml;sselung yes/no erkannt wird.
     Wenn der TV nicht verschl&uuml;sselt ist, ist die Einrichtung abgeschlossen. Ist der TV verschl&uuml;sselt, dann bitte ein Kommando
     ausf&uuml;hren (set myTV1 off), danach wird ein PinCode am TV angezeigt. Die Definition editieren den PinCode eintragen und das ? l&ouml;schen.
-    Das Kommando nochmals ausf&uuml;hren, solange der PinCode angezeigt wird. Das wars.  
+    Das Kommando nochmals ausf&uuml;hren, solange der PinCode angezeigt wird. Das wars.
+    <br>
+    state: Initialized - on (gr&uuml;n) - dormant (orange) - off (rot)
     <br><br>
     Diese Modul ben&ouml;tigt evtl. weitere PERL Bibliotheken. F&uuml;r raspbian bitte folgende Kommandos im Terminmal eingeben:<br>
     <b>sudo cpan<br>
