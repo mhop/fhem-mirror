@@ -28,6 +28,7 @@ my $upd_running;
 
 eval "require IO::Socket::SSL";  # Forum #74387
 my $upd_hasSSL = $@ ? 0 : 1;
+my $upd_wantSSL;
 
 ########################################
 sub
@@ -35,8 +36,8 @@ update_Initialize($$)
 {
   my %hash = (
     Fn  => "CommandUpdate",
-    Hlp => "[<fileName>|all|check|checktime|force] [http://.../controlfile],".
-                "update FHEM",
+    Hlp => "[-noSSL] [<fileName>|all|check|checktime|force] ".
+                "[http://.../controlfile],update FHEM",
   );
   $cmds{update} = \%hash;
 }
@@ -50,6 +51,13 @@ CommandUpdate($$)
 
   my $err = upd_metainit(0);
   return $err if($err);
+
+  if($args[0] && $args[0] eq "-noSSL") {
+    shift @args;
+    $upd_wantSSL = 0;
+  } else {
+    $upd_wantSSL = 1;
+  }
 
   if($args[0] &&
      ($args[0] eq "list" ||
@@ -240,6 +248,8 @@ doUpdate($$$$)
   my ($curr, $max, $src, $arg) = @_;
   my ($basePath, $ctrlFileName);
   $src =~ s'^http://fhem\.de'https://fhem.de' if($upd_hasSSL);
+  $src =~ s'^https://'http://' if(!$upd_wantSSL);
+  uLog 1, "Downloading $src";
   if($src !~ m,^(.*)/([^/]*)$,) {
     uLog 1, "Cannot parse $src, probably not a valid http control file";
     return;
@@ -585,7 +595,7 @@ upd_writeFile($$$$)
 <a name="update"></a>
 <h3>update</h3>
 <ul>
-  <code>update [&lt;fileName&gt;|all|check|checktime|force]
+  <code>update [-noSSL] [&lt;fileName&gt;|all|check|checktime|force]
        [http://.../controlfile]</code>
   <br>or<br>
   <code>update [add source|delete source|list|reset]</code>
@@ -596,6 +606,9 @@ upd_writeFile($$$$)
   moddir/FHEM directory, and download each file where the attributes (timestamp
   and filelength) are different. Upon completion it triggers the global:UPDATE
   event.
+  <br>
+  -noSSL will use the http protocol instead of https, which might be necessary
+  for some older distributions with outdated ciphers.
   <br>
   With the commands add/delete/list/reset you can manage the list of
   controlfiles, e.g. for thirdparty packages.
@@ -679,7 +692,7 @@ upd_writeFile($$$$)
 <a name="update"></a>
 <h3>update</h3>
 <ul>
-  <code>update [&lt;fileName&gt;|all|check|checktime|force]
+  <code>update [-noSSL] [&lt;fileName&gt;|all|check|checktime|force]
         [http://.../controlfile]</code>
   <br>oder<br>
   <code>update [add source|delete source|list|reset]</code>
@@ -691,6 +704,9 @@ upd_writeFile($$$$)
   spezifizierten Dateien heruntergeladen, deren Gr&ouml;&szlig;e oder
   Zeitstempel sich unterscheiden. Wenn dieser Ablauf abgeschlossen ist, wird
   das globale UPDATE Ereignis ausgel&ouml;st.
+  <br>
+  Mit -noSSL wird das http Protocol statt https verwendet, was bei bestimmten
+  veralteten Distributionen notwendig sein kann.
   <br>
   Mit den Befehlen add/delete/list/reset kann man die Liste der Kontrolldateien 
   pflegen.
