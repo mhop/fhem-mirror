@@ -1,4 +1,4 @@
-REV 20774
+REV 20780
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -362,7 +362,7 @@ UPD 2019-04-05_07:45:02 52079 FHEM/70_SamsungAV.pm
 UPD 2019-11-26_07:45:03 53721 FHEM/70_SolarEdgeAPI.pm
 UPD 2016-04-26_07:45:11 11536 FHEM/70_TellStick.pm
 UPD 2015-07-28_14:05:31 17835 FHEM/70_USBWX.pm
-UPD 2019-12-02_07:45:03 56646 FHEM/70_VIERA.pm
+UPD 2019-12-19_07:45:02 59439 FHEM/70_VIERA.pm
 UPD 2016-08-21_07:45:14 20340 FHEM/70_VolumeLink.pm
 UPD 2018-03-14_07:45:03 44782 FHEM/70_WINCONNECT.pm
 UPD 2017-03-01_07:45:02 22279 FHEM/70_WS3600.pm
@@ -559,7 +559,7 @@ UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
 UPD 2019-11-15_07:45:03 86458 FHEM/98_todoist.pm
-UPD 2019-11-27_07:45:03 22972 FHEM/98_update.pm
+UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
 UPD 2019-11-24_07:45:05 87524 FHEM/98_vitoconnect.pm
@@ -741,12 +741,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2019-12-18_07:45:06 4196901 docs/commandref.html
-UPD 2019-12-18_07:45:08 2594133 docs/commandref_DE.html
+UPD 2019-12-19_07:45:07 4197126 docs/commandref.html
+UPD 2019-12-19_07:45:09 2594354 docs/commandref_DE.html
 UPD 2019-11-19_07:45:03 79607 docs/commandref_frame.html
 UPD 2019-10-26_07:45:03 89380 docs/commandref_frame_DE.html
-UPD 2019-12-18_07:45:09 229047 docs/commandref_modular.html
-UPD 2019-12-18_07:45:10 240014 docs/commandref_modular_DE.html
+UPD 2019-12-19_07:45:10 229047 docs/commandref_modular.html
+UPD 2019-12-19_07:45:11 240014 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
