@@ -41,6 +41,7 @@ FileLog_Initialize($)
   # logtype is used by the frontend
   no warnings 'qw';
   my @attrList = qw(
+    addLog
     addStateEvent:0,1 
     archiveCompress
     archivecmd
@@ -49,6 +50,7 @@ FileLog_Initialize($)
     disable:0,1
     disabledForIntervals
     eventOnThreshold
+    filelog-event-min-interval
     ignoreRegexp
     label
     logtype
@@ -70,6 +72,12 @@ FileLog_Initialize($)
   InternalTimer(time()+0.1, sub() {      # Forum #39792
     map { HandleArchiving($defs{$_},1) } devspec2array("TYPE=FileLog");
     FileLog_dailySwitch($hash);          # Forum #42415
+    map {
+      FileLog_initEMI($defs{$_}, "filelog-event-min-interval", undef,1);
+      FileLog_initEMI($defs{$_}, "addLog", undef, 1);
+      my $mi = $defs{$_}{addLogMinInterval};
+      InternalTimer(time()+$mi, "FileLog_addLog", $defs{$_}, 0) if($mi);
+    } devspec2array("TYPE=FileLog");
   }, $hash, 0);
 }
 
@@ -85,7 +93,80 @@ FileLog_dailySwitch($)
   InternalTimer($t, "FileLog_dailySwitch", $hash, 0);
 }
 
+# Initialize the filelog-event-min-interval or addLog structures
+sub
+FileLog_initEMI($$$$)
+{
+  my ($hash, $aName, $aVal, $log) = @_;
+  my $name = $hash->{NAME};
+  my @rets;
 
+  $aVal = AttrVal($name, $aName, undef) if(!defined($aVal));
+  delete($hash->{".$aName"});
+  return undef if(!$aVal);
+  $hash->{".$aName"} = ();
+
+  my $mints = 99999999;
+  foreach my $triple (split(",", $aVal)) {
+    my ($devspec, $rere, $ts) = split(":", $triple);
+    if(!defined($ts) || $ts !~ m/^\d+$/) {
+      push(@rets, "$triple => interval is not numeric");
+      next;
+    }
+    $mints = $ts if($mints > $ts);
+    foreach my $sdev (devspec2array($devspec)) {
+      my $dhash = $defs{$sdev};
+      if(!defined($dhash)) {
+        push @rets, "no device $sdev found";
+        next;
+      }
+      my $rh = $dhash->{READINGS};
+      my $match=0;
+      if($rh) {
+        foreach my $r (keys %{$rh}) {
+          if($r =~ m/$rere/) {
+            $hash->{".$aName"}{$sdev}{$r}{LAST} = time_str2num($rh->{$r}{TIME});
+            $hash->{".$aName"}{$sdev}{$r}{MIN} = $ts;
+            $match++;
+          }
+        }
+      }
+      push(@rets, "$triple => no $rere found for $sdev") if(!$match);
+    }
+  }
+  if(@rets) {
+    my $msg = "$name $aName ".join(", ", @rets);
+    Log3 $name, 3, $msg if($log);
+    return $msg;
+  }
+  $hash->{"${aName}MinInterval"} = $mints
+        if($aName eq "addLog" && $mints != 99999999);
+  return undef;
+}
+
+sub
+FileLog_addLog($)
+{
+  my ($log) = @_;
+  my $al = $log->{".addLog"};
+  return if(!$al);
+
+  my $now = time();
+  foreach my $sdev (keys %{$al}) {
+    foreach my $re (keys %{$al->{$sdev}}) {
+      next if($now - $al->{$sdev}{$re}{LAST} < $al->{$sdev}{$re}{MIN});
+      my $rv = ReadingsVal($sdev, $re, undef);
+      return if(!defined($rv));
+      $defs{$sdev}{CHANGED} = ["$re: $rv"];
+      $defs{$sdev}{NTFY_TRIGGERTIME} = FmtDateTime($now);
+      FileLog_Log($log, $defs{$sdev});
+      delete($defs{$sdev}{CHANGED});
+      delete($defs{$sdev}{NTFY_TRIGGERTIME});
+    }
+  }
+  my $mi = $log->{addLogMinInterval};
+  InternalTimer($now+$mi, "FileLog_addLog", $log, 0) if($mi);
+}
 
 #####################################
 sub
@@ -198,6 +279,8 @@ FileLog_Log($$)
   my $switched;
   my $written = 0;
   my $fmt = AttrVal($ln, "outputFormat", undef);
+  my $emi = $log->{".filelog-event-min-interval"};
+  my $al = $log->{".addLog"};
 
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
@@ -205,6 +288,22 @@ FileLog_Log($$)
     my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
       next if($iRe && ($n =~ m/^$iRe$/ || "$n:$s" =~ m/^$iRe$/));
+
+      if($emi && $emi->{$n} && $s =~ m/^([^:]+):/) {
+        my $emie = $emi->{$n}{$1};
+        if($emie) {
+          my $ts = time_str2num($t);
+          if($ts - $emie->{LAST} >= $emie->{MIN}) {
+            $emie->{LAST} = $ts;
+          } else {
+            next;
+          }
+        }
+      }
+      if($al && $al->{$n} && $s =~ m/^([^:]+):/) {
+        my $ale = $al->{$n}{$1};
+        $ale->{LAST} = time_str2num($t) if($ale);
+      }
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
       if(!$switched) {
@@ -246,6 +345,7 @@ FileLog_Attr(@)
 {
   my @a = @_;
   my $do = 0;
+  $a[2] = "" if(!defined($a[2]));
 
   if($a[2] eq "mseclog") {
     $defs{$a[1]}{mseclog} = ($a[0] eq "set" && (!defined($a[3]) || $a[3]) );
@@ -267,6 +367,20 @@ FileLog_Attr(@)
     eval $a[3];
     return $@ if($@);
   }
+
+  if(@a> 2 && $a[2] eq "filelog-event-min-interval" && $init_done) {
+    return FileLog_initEMI($defs{$a[1]}, "filelog-event-min-interval",
+                                $a[0] eq "set" ? join(" ",@a[3..@a-1]) : "", 0);
+  }
+  if(@a> 2 && $a[2] eq "addLog" && $init_done) {
+    my $me = $defs{$a[1]};
+    my $ret = FileLog_initEMI($me, "addLog",
+                                $a[0] eq "set" ? join(" ",@a[3..@a-1]) : "", 0);
+    return $ret if($ret);
+    RemoveInternalTimer($me, "FileLog_addLog");
+    FileLog_addLog($me);
+  }
+
 
   $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
   return if(!$do);
@@ -1303,6 +1417,14 @@ FileLog_regexpFn($$)
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
+    <a name="addLog"></a>
+    <li>addLog<br>
+    This attribute takes a comma-separated list of devspec:reading:maxInterval
+    triples.  You may use regular expressions for reading. The last value of
+    the reading will be written to the logfile, if after maxInterval seconds
+    no event for this device/reading has arrived.
+    </li>
+
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
@@ -1351,6 +1473,14 @@ FileLog_regexpFn($$)
         Note: the counter is only correct for files created after this
         feature was implemented. A FHEM crash or kill will falsify the counter.
         </li><br>
+
+    <a name="filelog-event-min-interval"></a>
+    <li>filelog-event-min-interval<br>
+    This attribute takes a comma-separated list of devspec:reading:minInterval
+    triples.  You may use regular expressions for reading. Events will only be
+    generated, if at least minInterval seconds elapsed since the last reading
+    of the matched type.
+    </li>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
@@ -1601,6 +1731,14 @@ FileLog_regexpFn($$)
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li><br><br>
 
+    <a name="addLog"></a>
+    <li>addLog<br>
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+    "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
+    Falls nach maxInterval (Sekunden) kein passendes Event eingetroffen ist,
+    der letzte Wert wird zum Logfile hinzugefuegt.
+    </li>
+
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
@@ -1653,6 +1791,14 @@ FileLog_regexpFn($$)
         Features angelegt wurden. Ein Absturz/Abschu&szlig; von FHEM
         verf&auml;lscht die Z&auml;hlung.
         </li><br>
+
+    <a name="filelog-event-min-interval"></a>
+    <li>filelog-event-min-interval<br>
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+    "devspec:readings:minInterval" Tripel. readings kann ein regexp sein. Ein
+    Event wird nur dann generiert, falls seit dem letzten Auftreten des
+    gleichen Events mindestens minInterval Sekunden vergangen sind.
+    </li>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
