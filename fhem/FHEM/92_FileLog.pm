@@ -1419,11 +1419,12 @@ FileLog_regexpFn($$)
 
     <a name="addLog"></a>
     <li>addLog<br>
-    This attribute takes a comma-separated list of devspec:reading:maxInterval
-    triples.  You may use regular expressions for reading. The last value of
-    the reading will be written to the logfile, if after maxInterval seconds
-    no event for this device/reading has arrived.
-    </li>
+        This attribute takes a comma-separated list of
+        devspec:reading:maxInterval triples.  You may use regular expressions
+        for reading. The last value of the reading will be written to the
+        logfile, if after maxInterval seconds no event for this device/reading
+        has arrived.
+        </li><br>
 
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
@@ -1476,11 +1477,11 @@ FileLog_regexpFn($$)
 
     <a name="filelog-event-min-interval"></a>
     <li>filelog-event-min-interval<br>
-    This attribute takes a comma-separated list of devspec:reading:minInterval
-    triples.  You may use regular expressions for reading. Events will only be
-    generated, if at least minInterval seconds elapsed since the last reading
-    of the matched type.
-    </li>
+        This attribute takes a comma-separated list of
+        devspec:reading:minInterval triples.  You may use regular expressions
+        for reading. Events will only be generated, if at least minInterval
+        seconds elapsed since the last reading of the matched type.
+        </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
@@ -1733,11 +1734,11 @@ FileLog_regexpFn($$)
 
     <a name="addLog"></a>
     <li>addLog<br>
-    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
-    "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
-    Falls nach maxInterval (Sekunden) kein passendes Event eingetroffen ist,
-    der letzte Wert wird zum Logfile hinzugefuegt.
-    </li>
+        Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+        "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
+        Falls nach maxInterval (Sekunden) kein passendes Event eingetroffen ist,
+        der letzte Wert wird zum Logfile hinzugefuegt.
+        </li><br>
 
     <a name="archivedir"></a>
     <a name="archivecmd"></a>
@@ -1794,11 +1795,11 @@ FileLog_regexpFn($$)
 
     <a name="filelog-event-min-interval"></a>
     <li>filelog-event-min-interval<br>
-    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
-    "devspec:readings:minInterval" Tripel. readings kann ein regexp sein. Ein
-    Event wird nur dann generiert, falls seit dem letzten Auftreten des
-    gleichen Events mindestens minInterval Sekunden vergangen sind.
-    </li>
+        Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+        "devspec:readings:minInterval" Tripel. readings kann ein regexp sein.
+        Ein Event wird nur dann generiert, falls seit dem letzten Auftreten des
+        gleichen Events mindestens minInterval Sekunden vergangen sind.
+        </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
