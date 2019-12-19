@@ -1523,7 +1523,7 @@ sub PRESENCE_setNotfiyDev($)
     <u>Example</u><br><br>
     <code>define iPhone PRESENCE shellscript "/opt/check_device.sh iPhone"</code><br><br>
     <b>Mode: event</b><br><br>
-    <code>define &lt;name&gt; PRESENCE evemt &lt;absent-regexp&gt; &lt;present-regexp&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE event &lt;absent-regexp&gt; &lt;present-regexp&gt;</code><br>
     <br>
     Listens for events of other FHEM definitions to determine a presence state. You must provide two event regexp's in the same style as for the <a href="#notify">notify</a> module.<br><br>
     If an event matches one of the provides regexps, the presence state will be changed.<br><br>
