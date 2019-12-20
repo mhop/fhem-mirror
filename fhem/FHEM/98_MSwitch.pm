@@ -81,7 +81,7 @@ if ( $preconf && $preconf ne "" ) {
 }
   
 my $autoupdate = 'off';    #off/on
-my $version    = '2.92';
+my $version    = '2.93';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 30; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $standartstartdelay = 30; # zeitraum nach fhemstart , in dem alle aktionen geblockt werden. kann durch attribut überschrieben werden .
@@ -226,6 +226,7 @@ sub MSwitch_Initialize($) {
       . "  stateFormat:textField-long"
       . "  MSwitch_Comments:0,1"
       . "  MSwitch_Read_Log:0,1"
+	  . "  MSwitch_Hidecmds"
       . "  MSwitch_Help:0,1"
       . "  MSwitch_Debug:0,1,2,3,4"
       . "  MSwitch_Expert:0,1"
@@ -1459,6 +1460,7 @@ my %setlist;
       . "  stateFormat:textField-long"
       . "  MSwitch_Comments:0,1"
       . "  MSwitch_Read_Log:0,1"
+	  . "  MSwitch_Hidecmds"
       . "  MSwitch_Help:0,1"
       . "  MSwitch_Debug:0,1,2,3,4"
       . "  MSwitch_Expert:0,1"
@@ -2091,12 +2093,27 @@ my %setlist;
             # show
             if ( defined $devicecmds[17] && $devicecmds[17] ne 'undefined' ) 
 			{
-                $savedetails = $savedetails . $devicecmds[17] . '#[ND]';
+                $savedetails = $savedetails . $devicecmds[17] . '#[NF]';
             }
             else 
 			{
-                $savedetails = $savedetails . '1' . '#[ND]';
+                $savedetails = $savedetails . '1' . '#[NF]';
             }
+			
+			
+			 # show
+            if ( defined $devicecmds[18] && $devicecmds[18] ne 'undefined' ) 
+			{
+                $savedetails = $savedetails . $devicecmds[18] . '#[ND]';
+            }
+            else 
+			{
+                $savedetails = $savedetails . '0' . '#[ND]';
+            }
+			
+			
+			
+			
             # $counter++;
         }
         chop($savedetails);
@@ -3779,7 +3796,9 @@ sub MSwitch_fhemwebFn($$$$) {
 	my $ver = ReadingsVal( $Name, '.V_Check', '' );
 
 	my $expertmode = AttrVal( $Name, 'MSwitch_Expert', '0' );
-
+	my $noshow = 0;
+	my @hidecmds = split (/,/,AttrVal( $Name, 'MSwitch_Hidecmds', 'undef' )) ;
+#<option value='$savedetails{ $aktdevice . '_priority' 
 ##### test 
 
 ####################  TEXTSPRACHE
@@ -4142,6 +4161,7 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
     my $anzahl1    = @deftoarray;
     my $anzahl3    = @deftoarray;
     my @testidsdev = split( /#\[ND\]/,  ReadingsVal($Name, '.Device_Affected_Details', 'no_device' ) );
+
 #PRIORITY
 # teste auf grössere PRIORITY als anzahl devices
     foreach (@testidsdev) 
@@ -4167,7 +4187,13 @@ if ( ReadingsVal( $Name, '.First_init', 'undef' ) ne 'done' )
         }
         $reihenfolgehtml .= "</select>";
     }
-
+	
+### display
+my $hidehtml = "";
+    $hidehtml = "<select name = 'hidecmd' id=''>";
+    $hidehtml .= "<option value='0'>0</option>";
+    $hidehtml .= "<option value='1'>1</option>";
+    $hidehtml .= "</select>";
 #########################################
 # SHOW
 # teste auf grössere PRIORITY als anzahl devices
@@ -4453,7 +4479,9 @@ MS-cellhigh=30;
 <!-- 
 start:textersetzung:ger
 Set->Schaltbefehl
+Hidden command branches are available->Ausgeblendete Befehlszweige vorhanden
 condition:->Schaltbedingung
+show hidden cmds->ausgeblendete Befehlszweige anzeigen
 execute and exit if applies->Abbruch nach Ausführung
 Repeats:->Befehlswiederholungen:
 Repeatdelay in sec:->Wiederholungsverzögerung in Sekunden:
@@ -4470,7 +4498,8 @@ device actions sortby:->Sortierung:
 add action for->zusätzliche Aktion für
 delete this action for->lösche diese Aktion für
 priority:->Priorität:
-show:->Anzeigereihenfolge
+displaysequence:->Anzeigereihenfolge:
+display->Anzeige verbergen
 test comand->Befehl testen
 end:textersetzung:ger
 -->
@@ -4908,8 +4937,6 @@ $controlhtml=~ s/#/\n/g;
                 $savedetails{ $aktdevice . '_showreihe' } = '1';
             }
 			
-
-
             $savedetails{ $aktdevice . '_onarg' } =~ s/#\[ti\]/~/g;
             $savedetails{ $aktdevice . '_offarg' } =~ s/#\[ti\]/~/g;
             $savedetails{ $aktdevice . '_onarg' } =~ s/#\[wa\]/|/g;     #neu
@@ -4951,7 +4978,6 @@ $controlhtml=~ s/#/\n/g;
                 my $change ="<option selected value='$savedetails{ $aktdevice . '_priority' }'>$savedetails{ $aktdevice . '_priority' }</option>";
                 $aktfolge =~ s/reihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-				
 				$IDsatz="priority: " . $aktfolge . "&nbsp;";
 
                 # ende
@@ -4964,8 +4990,7 @@ $controlhtml=~ s/#/\n/g;
                 $change ="<option selected value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 $aktfolge =~ s/showreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-
-				$IDsatz.="show: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );
+				$IDsatz.="displaysequence: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );
 ####
 # ID
                 $aktfolge = $idfolgehtml;
@@ -4974,10 +4999,17 @@ $controlhtml=~ s/#/\n/g;
                 $change ="<option selected value='$savedetails{ $aktdevice . '_id' }'>$savedetails{ $aktdevice . '_id' }</option>";
                 $aktfolge =~ s/idreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-	
-				$IDsatz.="ID: " . $aktfolge;			
+				$IDsatz.="ID: " . $aktfolge;		
 
-                # ende
+				$aktfolge = $hidehtml;
+                $newname  = "hidecmd" . $nopoint;
+                $tochange ="<option value='$savedetails{ $aktdevice . '_hidecmd' }'>";
+                $change ="<option selected value='$savedetails{ $aktdevice . '_hidecmd' }'>";
+                $aktfolge =~ s/hidecmd/$newname/g;
+                $aktfolge =~ s/$tochange/$change/g;
+				$IDsatz.="display: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );	
+
+# ende
             }
             else
 			{
@@ -4988,8 +5020,15 @@ $controlhtml=~ s/#/\n/g;
                 my $change ="<option selected value='$savedetails{ $aktdevice . '_showreihe' }'>$savedetails{ $aktdevice . '_showreihe' }</option>";
                 $aktfolge =~ s/showreihe/$newname/g;
                 $aktfolge =~ s/$tochange/$change/g;
-				
-				$IDsatz.= "show : " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );					
+				$IDsatz.= "displaysequence: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );	
+
+				$aktfolge = $hidehtml;
+                $newname  = "hidecmd" . $nopoint;
+                $tochange ="<option value='$savedetails{ $aktdevice . '_hidecmd' }'>";
+                $change ="<option selected value='$savedetails{ $aktdevice . '_hidecmd' }'>";
+                $aktfolge =~ s/hidecmd/$newname/g;
+                $aktfolge =~ s/$tochange/$change/g;
+				$IDsatz.="display: " . $aktfolge . "&nbsp;" if ( $hash->{INIT} ne 'define' );				
 				
             }
  
@@ -5100,7 +5139,7 @@ $controlhtml=~ s/#/\n/g;
 				<input type='$hidden' id='cmdsetoff"
                       . $_
                       . "' name='cmdsetoff"
-                      . $nopoint
+                    . $nopoint
                       . "' size='10'  value ='"
                       . $cmdsatz{$devicenamet} . "'>
 				<input type='$hidden'   id='cmdoffopt"
@@ -5241,9 +5280,6 @@ $COND1check1="<input name='info' type='button' value='check condition' onclick=\
 									  . "</select>";					    
                 }
 
-
-
-
         #### zeitrechner    ABSATZ UAF NOTWENDIGKEIT PRÜF
                 my $delaym = 0;
                 my $delays = 0;
@@ -5255,8 +5291,6 @@ $COND1check1="<input name='info' type='button' value='check condition' onclick=\
                 my $testtimestron = $savedetails{ $aktdevice . '_timeon' };
 				$timestron=$savedetails{ $aktdevice . '_timeon' };
 		#########################################
-
-
 
 				$DELAYset1=	"<select id = '' name='onatdelay". $nopoint . "'>";			
 				
@@ -5428,10 +5462,39 @@ foreach (@translate)
 my($wert1,$wert2) = split (/->/,$_);
 $controlhtmldevice =~ s/$wert1/$wert2/g;
 }
-	$detailhtml.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>".
-		$controlhtmldevice.
-		"</div>";
-		#####
+
+my $aktpriority=$savedetails{ $aktdevice . '_showreihe'};
+if ( grep { $_ eq $aktpriority } @hidecmds) 
+{
+$noshow++;
+$detailhtml.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' name ='noshow' cellpadding='0' style='display: none;border-spacing:0px;'>".
+				$controlhtmldevice.
+				"</div>";
+}
+else
+{
+
+
+if( $savedetails{ $aktdevice . '_hidecmd' } eq "1")
+{
+$noshow++;
+$detailhtml.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' name ='noshow' cellpadding='0' style='display: none;border-spacing:0px;'>".
+				$controlhtmldevice.
+				"</div>";
+}
+else{
+$detailhtml.= "<div id='MSwitchWebTR' nm='$hash->{NAME}' cellpadding='0' style='border-spacing:0px;'>".
+				$controlhtmldevice.
+				"</div>";
+}
+}
+
+
+
+
+
+
+
 # javazeile für übergabe erzeugen
             $javaform = $javaform . "
 			devices += \$(\"[name=devicename$nopoint]\").val();
@@ -5474,11 +5537,30 @@ $controlhtmldevice =~ s/$wert1/$wert2/g;
 			devices += \$(\"[name=exit2$nopoint]\").prop(\"checked\") ? \"1\":\"0\";
 			devices += '#[NF]';
 			devices += \$(\"[name=showreihe$nopoint]\").val();
+			devices += '#[NF]';
+			devices += \$(\"[name=hidecmd$nopoint]\").val();
 			devices += '#[DN]';
 			";
 		}
 
 # textersetzung modify
+
+
+if ($noshow > 0)
+{
+$modify ="<table width = '100%' border='0' class='block wide' name ='noshowtask' id='MSwitchDetails' cellpadding='4' style='border-spacing:0px;' nm='MSwitch'>
+			<tr class='even'><td><br>
+			Hidden command branches are available ($noshow)
+			
+			<input type='button' id='aw_show' value='show hidden cmds' >
+			
+			<br>&nbsp;
+			</td></tr></table><br>
+			".$modify;
+
+}
+
+
 foreach (@translate)
 {
 my($wert1,$wert2) = split (/->/,$_);
@@ -5521,8 +5603,6 @@ $detailhtml .= $modify;
     }
 
     my $ret = '';
-	
-	
 
 ########################
     my $blocking = '';
@@ -7349,6 +7429,17 @@ Increase
 	var  def = nm+\" devices \"+devices+\" \";
 	location = location.pathname+\"?detail=" . $Name . "&cmd=set \"+addcsrf(def);
 	});
+	
+	
+	\$(\"#aw_show\").click(function(){
+	//alert('test');
+	
+	\$(\"[name=noshow]\").css(\"display\",\"block\");
+	\$(\"[name=noshowtask]\").css(\"display\",\"none\");
+	
+	});
+	
+	
 		
 	
 		
@@ -7356,12 +7447,20 @@ Increase
 	var nm = \$(t).attr(\"nm\");
 	devices = '';
 	$javaform
-
+	
+	//alert(devices);
+	//return;
+	
+	
 	devices = devices.replace(/:/g,'#[dp]');
 	devices = devices.replace(/;/g,'#[se]');
 	devices = devices.replace(/ /g,'#[sp]');
 	devices = devices.replace(/%/g,'#[pr]');
 	devices =  encodeURIComponent(devices);
+	
+	
+	
+	
 	var  def = nm+\" details \"+devices+\" \";
 	location = location.pathname+\"?detail=" . $Name . "&cmd=set \"+addcsrf(def);
 	});
@@ -7625,6 +7724,22 @@ sub MSwitch_makeCmdHash($) {
             $savedetails{$key} = 0;
         }
         ###
+		
+		
+		 $key = $detailarray[0] . "_hidecmd";
+        if ( defined $detailarray[19] ) 
+		{
+            $savedetails{$key} = $detailarray[19];
+        }
+        else 
+		{
+            $savedetails{$key} = 0;
+        }
+        ###
+		
+		
+		
+		
 
         $key = $detailarray[0] . "_comment";
         if ( defined $detailarray[15] ) 
@@ -9213,7 +9328,7 @@ m/(.*?)(\[\[[a-zA-Z][a-zA-Z0-9_]{0,30}:[a-zA-Z0-9_]{0,30}\]-\[[a-zA-Z][a-zA-Z0-9
         $condition =~ s/$tmp/$args/ig;
         $count++;
     }
-
+ 
     $finalstring =
       "if (" . $condition . "){\$answer = 'true';} else {\$answer = 'false';} ";
 
