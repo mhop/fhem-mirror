@@ -1479,8 +1479,8 @@ FileLog_regexpFn($$)
     <li>filelog-event-min-interval<br>
         This attribute takes a comma-separated list of
         devspec:reading:minInterval triples.  You may use regular expressions
-        for reading. Events will only be generated, if at least minInterval
-        seconds elapsed since the last reading of the matched type.
+        for reading. The data will only be written, if at least minInterval
+        seconds elapsed since the last event of the matched type.
         </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
@@ -1797,8 +1797,8 @@ FileLog_regexpFn($$)
     <li>filelog-event-min-interval<br>
         Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
         "devspec:readings:minInterval" Tripel. readings kann ein regexp sein.
-        Ein Event wird nur dann generiert, falls seit dem letzten Auftreten des
-        gleichen Events mindestens minInterval Sekunden vergangen sind.
+        Die Daten werden nur dann geschrieben, falls seit dem letzten Auftreten
+        des gleichen Events mindestens minInterval Sekunden vergangen sind.
         </li><br>
 
     <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
