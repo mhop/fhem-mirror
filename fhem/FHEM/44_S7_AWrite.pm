@@ -744,6 +744,8 @@ Note: the required memory area (start &ndash; start + datatypelength) need to be
 <li>value &hellip; an numeric value</li>
 </ul>
 </ul>
-</ul>=end html_DE
+</ul>
+
+=end html_DE
 
 =cut

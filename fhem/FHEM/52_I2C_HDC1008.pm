@@ -687,6 +687,6 @@ sub I2C_HDC1008_Attr(@)
 	</ul><br>
 </ul>
 
-=end html
+=end html_DE
 
 =cut
