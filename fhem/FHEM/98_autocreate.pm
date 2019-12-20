@@ -813,7 +813,7 @@ autocreate_Attr(@)
         attr autocreate ignoreTypes (CUL_HOERMANN.*|FHT_1234|CUL_WS_7)<br>
         The word "Types" is somehow misleading, as it actually checks the
         generated device name.<br>
-        <b>Note</b>: starting with featurelevel 5.9 the regexp is automatically
+        <b>Note</b>: starting with featurelevel 5.8 the regexp is automatically
         extended with ^ and $, so that it must match the whole name (same
         procedure as in notify and FileLog).
         </li><br>
@@ -980,7 +980,7 @@ autocreate_Attr(@)
         attr autocreate ignoreTypes (CUL_HOERMANN.*|FHT_1234|CUL_WS_7)<br>
         Das Wort "Types" ist etwas irref&uuml;hrend, da der Ger&auml;tename
         gepr&uuml;ft wird, und nicht der Typ.<br>
-        <b>Achtung</b>: ab featurelevel 5.9 wird der Regexp automatisch mit
+        <b>Achtung</b>: ab featurelevel 5.8 wird der Regexp automatisch mit
         ^ und $ erg&auml;nzt, muss also den kompletten Namen matchen (genau wie
         bei notify und FileLog).
         </li><br>
