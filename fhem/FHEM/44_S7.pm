@@ -57,7 +57,7 @@ sub S7_Initialize($) {    #S5_OK
 	$hash->{SetFn}   = "S7_Set";
 	
 	$hash->{AttrFn}   = "S7_Attr";
-	$hash->{AttrList} = "MaxMessageLength Intervall receiveTimeoutMs " . $readingFnAttributes;
+	$hash->{AttrList} = "disable:0,1 MaxMessageLength Intervall receiveTimeoutMs " . $readingFnAttributes;
 
 	#	$hash->{AttrList} = join( " ", @areasconfig )." PLCTime";
 }
@@ -248,11 +248,11 @@ sub S7_Define($$) {                  # S5 OK
 	$hash->{STATE} = "disconnected";
 	main::readingsSingleUpdate( $hash, "state", "disconnected", 1 );
 
-	S7_connect($hash);
-
-	InternalTimer( gettimeofday() + $hash->{Interval},
-		"S7_GetUpdate", $hash, 0 );
-
+    if (!S7_isDisabled($hash)) {
+	    S7_connect($hash);
+	    InternalTimer( gettimeofday() + $hash->{Interval},
+		     "S7_GetUpdate", $hash, 0 );
+    }
 	return undef;
 }
 
@@ -339,9 +339,18 @@ sub S7_Attr(@) {
 				$hash->{S7PLCClient}->setRecvTimeout($hash->{receiveTimeoutMs}) if ( defined( $hash->{S7PLCClient} ) );				
 			}			
 		
+		} elsif ($aName eq "disable") {
+			if ($aVal == 1 &&  $attr{$name}{disable}==0) {
+				#disconnection will be done by the update timer
+
+			} elsif ($aVal == 0 &&  $attr{$name}{disable}==1) {
+				#reconnect 
+				S7_reconnect($hash);
+				InternalTimer( gettimeofday() + $hash->{Interval} + 3,
+					"S7_GetUpdate", $hash, 0 );				
+			}
 		}
-		
-		
+				
 		###########
 
 		if (   $aName eq "WriteInputs-Config"
@@ -787,16 +796,18 @@ sub S7_GetUpdate($) {
 
 	my $res = S7_readFromPLC($hash);
 
-	if ( $res == 0 ) {
-		InternalTimer( gettimeofday() + $hash->{Interval},
-			"S7_GetUpdate", $hash, 1 );
-	}
-	else {
+	if (!S7_isDisabled($hash)) {
+		if ( $res == 0 ) {
+			InternalTimer( gettimeofday() + $hash->{Interval},
+				"S7_GetUpdate", $hash, 1 );
+		}else {
 
-		#an error has occoured --> 10sec break
-		InternalTimer( gettimeofday() + 10, "S7_GetUpdate", $hash, 1 );
+			#an error has occoured --> 10sec break
+			InternalTimer( gettimeofday() + 10, "S7_GetUpdate", $hash, 1 );
+		}
+	} else {
+		S7_disconnect($hash);
 	}
-
 }
 
 #####################################
@@ -1112,6 +1123,14 @@ sub S7_readFromPLC($) {    #S5 OK
 
 		return $res if ( $res != 0 );
 	}
+	return 0;
+}
+
+sub S7_isDisabled($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+	
+    return $attr{$name}{disable} == 1 if (defined ($attr{$name}{disable}));
 	return 0;
 }
 
