@@ -138,50 +138,52 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my ($cid, $topic, $value) = split("\0", $msg, 3);
-  my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
-  foreach my $re (keys %{$dp}) {
-    my $reAll = $re;
-    $reAll =~ s/\$DEVICETOPIC/\.\*/g;
+  for my $step (1,2) {
+    next if($step == 1 && !$modules{MQTT2_DEVICE}{defptr}{"re:$cid"});
+    my $dp = $modules{MQTT2_DEVICE}{defptr}{$step==1 ? "re:$cid" : "re"};
+    foreach my $re (keys %{$dp}) {
+      my $reAll = $re;
+      $reAll =~ s/\$DEVICETOPIC/\.\*/g;
 
-    next if(!("$topic:$value" =~ m/^$reAll$/s ||
-              "$cid:$topic:$value" =~ m/^$reAll$/s));
-    foreach my $key (keys %{$dp->{$re}}) {
-      my ($dev, $code2) = split(",",$key,2);
-      my $hash = $defs{$dev};
-      next if(!$hash);
-      next if(IsDisabled($dev));
-      my $reRepl = $re;
-      $reRepl =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
-      next if(!("$topic:$value" =~ m/^$reRepl$/s ||
-                "$cid:$topic:$value" =~ m/^$reRepl$/s));
+      next if(!("$topic:$value" =~ m/^$reAll$/s ||
+                "$cid:$topic:$value" =~ m/^$reAll$/s));
+      foreach my $key (keys %{$dp->{$re}}) { # multiple entries for one topic-re
+        my ($dev, $code) = split(",",$key,2);
+        my $hash = $defs{$dev};
+        next if(!$hash);
+        my $reRepl = $re;
+        $reRepl =~ s/\$DEVICETOPIC/$hash->{DEVICETOPIC}/g;
+        next if(!("$topic:$value" =~ m/^$reRepl$/s ||
+                  "$cid:$topic:$value" =~ m/^$reRepl$/s));
+        next if(IsDisabled($dev));
 
-      my @retData;
-      my $code = $dp->{$re}{$key};
-      Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
+        my @retData;
+        Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
 
-      if($code =~ m/^{.*}$/s) {
-        $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
-                 "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME},
-                 "%CID"=>$cid, "%JSONMAP","\$defs{$dev}{JSONMAP}"));
-        my $ret = AnalyzePerlCommand(undef, $code);
-        if($ret && ref $ret eq "HASH") {
-          readingsBeginUpdate($hash);
-          foreach my $k (keys %{$ret}) {
-            readingsBulkUpdate($hash, $k, $ret->{$k});
-            my $msg = ($ret->{$k} ? $ret->{$k} : "");
-            push(@retData, "$k $msg");
-            checkForGet($hash, $k, $ret->{$k});
+        if($code =~ m/^{.*}$/s) {
+          $code = EvalSpecials($code, ("%TOPIC"=>$topic, "%EVENT"=>$value,
+                   "%DEVICETOPIC"=>$hash->{DEVICETOPIC}, "%NAME"=>$hash->{NAME},
+                   "%CID"=>$cid, "%JSONMAP","\$defs{$dev}{JSONMAP}"));
+          my $ret = AnalyzePerlCommand(undef, $code);
+          if($ret && ref $ret eq "HASH") {
+            readingsBeginUpdate($hash);
+            foreach my $k (keys %{$ret}) {
+              readingsBulkUpdate($hash, $k, $ret->{$k});
+              my $msg = ($ret->{$k} ? $ret->{$k} : "");
+              push(@retData, "$k $msg");
+              checkForGet($hash, $k, $ret->{$k});
+            }
+            readingsEndUpdate($hash, 1);
           }
-          readingsEndUpdate($hash, 1);
+
+        } else {
+          readingsSingleUpdate($hash, $code, $value, 1);
+          push(@retData, "$code $value");
+          checkForGet($hash, $code, $value);
         }
 
-      } else {
-        readingsSingleUpdate($hash, $code, $value, 1);
-        push(@retData, "$code $value");
-        checkForGet($hash, $code, $value);
+        $fnd{$dev} = 1;
       }
-
-      $fnd{$dev} = 1;
     }
   }
 
@@ -513,12 +515,16 @@ sub
 MQTT2_DEVICE_delReading($)
 {
   my ($name) = @_;
-  my $dp = $modules{MQTT2_DEVICE}{defptr}{re};
-  foreach my $re (keys %{$dp}) {
-    foreach my $key (keys %{$dp->{$re}}) {
-      if($key =~ m/^$name,/) {
-        delete($dp->{$re}{$key});
-        delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
+  my $cid = $defs{$name}{CID};
+  for my $step (1,2) {
+    next if($step == 1 && !$modules{MQTT2_DEVICE}{defptr}{"re:$cid"});
+    my $dp = $modules{MQTT2_DEVICE}{defptr}{$step==1 ? "re:$cid" : "re"};
+    foreach my $re (keys %{$dp}) {
+      foreach my $key (keys %{$dp->{$re}}) {
+        if($key =~ m/^$name,/) {
+          delete($dp->{$re}{$key});
+          delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
+        }
       }
     }
   }
@@ -529,14 +535,33 @@ MQTT2_DEVICE_addReading($$)
 {
   my ($name, $param) = @_;
   MQTT2_DEVICE_delReading($name);
+  my $cid = $defs{$name}{CID};
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
     return "Bad line >$line< for $name" if(!defined($re) || !defined($code));
     eval { "Hallo" =~ m/^$re$/ };
     return "Bad regexp: $@" if($@);
-    $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = $code;
+    if($cid && $re =~ m/^$cid:/) {
+      $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
+    } else {
+      $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = 1;
+    }
   }
   return undef;
+}
+
+sub
+MQTT2_DEVICE_dumpInternal()
+{
+  my $dp = $modules{MQTT2_DEVICE}{defptr};
+  my @ret;
+  for my $k1 (sort keys %{$dp}) {
+    push(@ret, $k1);
+    for my $k2 (sort keys %{$dp->{$k1}}) {
+      push(@ret, "  $k2");
+    }
+  }
+  return join("\n", @ret);
 }
 
 
