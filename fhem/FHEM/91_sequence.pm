@@ -100,7 +100,9 @@ sequence_Notify($$)
 
       Log3 $ln, 5, "sequence $ln $tt";
       setReadingsVal($hash, "state", "active", TimeNow());
+      $data{sequence_source} = $dev->{NAME};
       DoTrigger($ln, $tt);
+      delete($data{sequence_source});
       $idx  = 0;
       $hash->{TS} = 0;
 
@@ -199,7 +201,9 @@ sequence_Undef($$)
       define lampseq sequence Btn1:on 2:3 Btn1:off<br>
       </code>
     </ul>
-    sequence will be triggerred if Btn1 is pressed for 2 to 5 seconds.
+    sequence will be triggerred if Btn1 is pressed for 2 to 5 seconds.<br>
+    Note: the global variable $data{sequence_source} is set to the name of the
+    device triggering the last event.
   </ul>
   <br>
 
@@ -289,7 +293,9 @@ sequence_Undef($$)
       </code>
     </ul>
     ist nur erfolgreich, falls Btn1 zwischen 2 und 5 Sekunden lang gedr&uuml;ckt
-    wurde.
+    wurde.<br>
+    Die globale Variable $data{sequence_source} wird auf dem Namen des
+    Ger&auml;tes gesetzt, was den letzten Event ausgel&ouml;st hat.
   </ul>
   <br>
 
