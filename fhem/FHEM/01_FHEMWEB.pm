@@ -1456,7 +1456,7 @@ FW_doDetail($)
       my %extPage = ();
 
       if( $show eq 'iconOnly' ) {
-        my ($allSets, $cmdlist, $txt) = FW_devState($d, $FW_room, \%extPage);
+        my ($allSets, $cmdlist, $txt) = FW_devState($d, "", \%extPage);
         FW_pO "<div informId='$d'".
                 ($FW_tp?"":" style='float:right'").">$txt</div>";
 
@@ -1479,7 +1479,7 @@ FW_doDetail($)
         FW_pO "<div $style id=\"ddtable\" class='makeTable wide'>";
         FW_pO "<span class='mkTitle'>DeviceOverview</span>";
         FW_pO "<table class=\"block wide\">";
-        FW_makeDeviceLine($d,1,\%extPage,$nameDisplay,\%usuallyAtEnd);
+        FW_makeDeviceLine($d,-1,\%extPage,$nameDisplay,\%usuallyAtEnd);
         FW_pO "</table></div>";
       }
     }
@@ -1799,7 +1799,7 @@ FW_makeDeviceLine($$$$$)
     }
   }
 
-  my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, $extPage);
+  my ($allSets, $cmdlist, $txt) = FW_devState($d, $row==-1 ? "":$rf, $extPage);
   if($cmdlist) {
     my $cl2 = $cmdlist; $cl2 =~ s/ [^:]*//g; $cl2 =~ s/:/ /g;  # Forum #74053
     $allSets = "$allSets $cl2";
@@ -3280,7 +3280,7 @@ FW_devState($$@)
        $extPage = \%hash;
     }
     no strict "refs";
-    my $newtxt = &{$sfn}($FW_wname, $d, $FW_room, $extPage);
+    my $newtxt = &{$sfn}($FW_wname, $d, $rf ? $FW_room : "", $extPage);
     use strict "refs";
     $txt = $newtxt if(defined($newtxt)); # As specified
   }
