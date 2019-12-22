@@ -32,10 +32,11 @@
 #
 #	CHANGELOG
 #	
-#	30.12.2018	Added standardized Reading batteryState	
+#	20.12.2019	Added RM174RF 
+#	30.12.2018	Added standardized Reading batteryState
 #	29.03.2018	Summary for Commandref
-#		
-#		
+#
+#
 ##############################################################################
 
 package main;
@@ -53,542 +54,578 @@ my $TRX_SECURITY_type_default = "ds10a";
 
 my $DOT = q{_};
 
-my %security_device_codes = (	# HEXSTRING => "NAME", "name of reading", 
-	# 0x20: X10, KD101, Visonic, Meiantech
-	0x2000 => [ "DS10A", "Window" ],
-	0x2001 => [ "MS10A", "motion" ],
-	0x2002 => [ "KR18", "key" ],
-	0x2003 => [ "KD101", "smoke" ],
-	0x2004 => [ "VISONIC_WINDOW", "window" ],
-	0x2005 => [ "VISONIC_MOTION", "motion" ],
-	0x2006 => [ "VISONIC_REMOTE", "key" ],
-	0x2007 => [ "VISONIC_WINDOW_AUX", "window" ],
-	0x2008 => [ "MEIANTECH", "alarm" ],
-	0x2009 => [ "SA30", "alarm" ],
+my %security_device_codes = (    # HEXSTRING => "NAME", "name of reading",
+                                 # 0x20: X10, KD101, Visonic, Meiantech
+    0x2000 => [ "DS10A",              "Window" ],
+    0x2001 => [ "MS10A",              "motion" ],
+    0x2002 => [ "KR18",               "key" ],
+    0x2003 => [ "KD101",              "smoke" ],
+    0x2004 => [ "VISONIC_WINDOW",     "window" ],
+    0x2005 => [ "VISONIC_MOTION",     "motion" ],
+    0x2006 => [ "VISONIC_REMOTE",     "key" ],
+    0x2007 => [ "VISONIC_WINDOW_AUX", "window" ],
+    0x2008 => [ "MEIANTECH",          "alarm" ],
+    0x2009 => [ "SA30",               "alarm" ],
+    0x200a => [ "RM174RF",            "smoke" ],
 );
 
-my %security_device_commands = (	# HEXSTRING => commands
-	# 0x20: X10, KD101, Visonic, Meiantech
-	0x2000 => [ "Closed", "", "Open", "", "", "", ""], # DS10A
-	0x2001 => [ "", "", "", "", "alert", "normal", ""], # MS10A
-	0x2002 => [ "", "", "", "", "", "", "Panic", "EndPanic", "", "Arm_Away", "Arm_Away_Delayed", "Arm_Home", "Arm_Home_Delayed", "Disarm"], # KR18
-	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair"], # KD101
-	0x2004 => [ "normal", "", "alert"], #VISONIC_WINDOW
-	0x2005 => [ "", "", "", "", "motion", "nomotion", "alert"], #VISONIC_MOTION
-	0x2008 => [  "", "", "", "", "", "", "Panic", "", "IR", "Arm_Away", "", "Arm_Home", "", "Disarm"], #MEIANTECH
- 	0x2009 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair"], #SA30
+my %security_device_commands = (    # HEXSTRING => commands
+                                    # 0x20: X10, KD101, Visonic, Meiantech
+    0x2000 => [ "Closed", "", "Open", "", "",      "",       "" ],    # DS10A
+    0x2001 => [ "",       "", "",     "", "alert", "normal", "" ],    # MS10A
+    0x2002 => [
+        "", "", "", "", "", "", "Panic", "EndPanic", "", "Arm_Away", "Arm_Away_Delayed", "Arm_Home",
+        "Arm_Home_Delayed", "Disarm"
+    ],                                                                # KR18
+    0x2003 =>
+      [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair" ]
+    ,                                                                 # KD101
+    0x2004 => [ "normal", "", "alert" ],                              #VISONIC_WINDOW
+    0x2005 => [ "", "", "", "", "motion", "nomotion", "alert" ],      #VISONIC_MOTION
+    0x2008 => [ "", "", "", "", "", "", "Panic", "", "IR", "Arm_Away", "", "Arm_Home", "", "Disarm" ],    #MEIANTECH
+    0x2009 =>
+      [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair" ], #SA30
+    0x200a => [ "", "", "", "", "", "", "Panic", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "" ]
+    ,    #RM174RF
 
 );
 
-my %security_device_c2b;        # DEVICE_TYPE->hash (reverse of security_device_codes)
+my %security_device_c2b;    # DEVICE_TYPE->hash (reverse of security_device_codes)
 
 #####################################
-sub
-TRX_SECURITY_Initialize($)
-{
-  my ($hash) = @_;
+sub TRX_SECURITY_Initialize($) {
+    my ($hash) = @_;
 
-  foreach my $k (keys %security_device_codes) {
-    $security_device_c2b{$security_device_codes{$k}->[0]} = $k;
-  }
+    foreach my $k ( keys %security_device_codes ) {
+        $security_device_c2b{ $security_device_codes{$k}->[0] } = $k;
+    }
 
-  $hash->{Match}     = "^..(20).*";
-  $hash->{SetFn}     = "TRX_SECURITY_Set";
-  $hash->{DefFn}     = "TRX_SECURITY_Define";
-  $hash->{UndefFn}   = "TRX_SECURITY_Undef";
-  $hash->{ParseFn}   = "TRX_SECURITY_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
-                       $readingFnAttributes;
+    $hash->{Match}    = "^..(20).*";
+    $hash->{SetFn}    = "TRX_SECURITY_Set";
+    $hash->{DefFn}    = "TRX_SECURITY_Define";
+    $hash->{UndefFn}  = "TRX_SECURITY_Undef";
+    $hash->{ParseFn}  = "TRX_SECURITY_Parse";
+    $hash->{AttrList} = "IODev ignore:1,0 do_not_notify:1,0 " . $readingFnAttributes;
 
 }
 
 ###################################
-sub
-TRX_SECURITY_Set($@)
-{
-  my ($hash, @a) = @_;
-  my $ret = undef;
-  my $na = int(@a);
+sub TRX_SECURITY_Set($@) {
+    my ( $hash, @a ) = @_;
+    my $ret = undef;
+    my $na  = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 3);
+    return "no set value specified" if ( $na < 2 || $na > 3 );
 
-  # look for device_type
+    # look for device_type
 
-  my $name = $a[0];
-  my $command = $a[1];
-  my $level;
+    my $name    = $a[0];
+    my $command = $a[1];
+    my $level;
 
-  if ($na == 3) {
-  	$level = $a[2];
-  } else {
-	$level = 0;
-  }
+    if ( $na == 3 ) {
+        $level = $a[2];
+    }
+    else {
+        $level = 0;
+    }
 
-  my $device_type = $hash->{TRX_SECURITY_type};
-  my $deviceid = $hash->{TRX_SECURITY_deviceid};
+    my $device_type = $hash->{TRX_SECURITY_type};
+    my $deviceid    = $hash->{TRX_SECURITY_deviceid};
 
-  if ($device_type ne "KD101" && $device_type ne "DS10A" && $device_type ne "MS10A" && $device_type ne "KR18") {
-	return "No set implemented for $device_type";	
-  }
+    if ( $device_type ne "KD101" && $device_type ne "DS10A" && $device_type ne "MS10A" && $device_type ne "KR18" ) {
+        return "No set implemented for $device_type";
+    }
 
-  my $device_type_num = $security_device_c2b{$device_type};
-  if(!defined($device_type_num)) {
-	return "Unknown device_type, choose one of " .
-                                join(" ", sort keys %security_device_c2b);
-  }
-  my $protocol_type = $device_type_num >> 8; # high bytes
+    my $device_type_num = $security_device_c2b{$device_type};
+    if ( !defined($device_type_num) ) {
+        return "Unknown device_type, choose one of " . join( " ", sort keys %security_device_c2b );
+    }
+    my $protocol_type = $device_type_num >> 8;    # high bytes
 
-  # Now check if the command is valid and retrieve the command id:
-  my $rec = $security_device_commands{$device_type_num};
-  my $i;
-  for ($i=0; $i <= $#$rec && ($rec->[$i] ne $command); $i++) { ;}
+    # Now check if the command is valid and retrieve the command id:
+    my $rec = $security_device_commands{$device_type_num};
+    my $i;
+    for ( $i = 0 ; $i <= $#$rec && ( $rec->[$i] ne $command ) ; $i++ ) { ; }
 
-  if($i > $#$rec) {
-	my $l = join(" ", sort @$rec); 
-	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
-  		$l =~ s/ level / level:slider,0,1,15 /; 
-	}
-  	my $error = "Unknown command $command, choose one of $l"; 
+    if ( $i > $#$rec ) {
+        my $l = join( " ", sort @$rec );
+        if ( $device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT" ) {
+            $l =~ s/ level / level:slider,0,1,15 /;
+        }
+        my $error = "Unknown command $command, choose one of $l";
 
-	Log3 $name, 1, "TRX_SECURITY_Set() ".$error if ($command ne "?" );
-	return $error;
-  }
+        Log3 $name, 1, "TRX_SECURITY_Set() " . $error if ( $command ne "?" );
+        return $error;
+    }
 
-  if ($na == 4 && $command ne "level") {
-	my $error = "Error: level not possible for command $command";
-  }
+    if ( $na == 4 && $command ne "level" ) {
+        my $error = "Error: level not possible for command $command";
+    }
 
-  my $seqnr = 0;
-  my $cmnd = $i;
+    my $seqnr = 0;
+    my $cmnd  = $i;
 
-  my $hex_prefix;
-  my $hex_command;
-  if ($protocol_type == 0x20) {
-  	my $id1;
-  	my $id2;
-  	my $id3;
-  	if ($deviceid =~ /^(..)(..)$/) {
-		$id1 = $2;
-		$id2 = "00";
-		$id3 = $1;
-  	} elsif ($deviceid =~ /^(..)(..)(..)$/) {
-                $id1 = $1;
-                $id2 = $2;
-                $id3 = $3;
-  	} else {
-		Log3 $name, 1,"TRX_SECURITY_Set() security1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
-		return "error set name=$name  deviceid=$deviceid";
-  	}
+    my $hex_prefix;
+    my $hex_command;
+    if ( $protocol_type == 0x20 ) {
+        my $id1;
+        my $id2;
+        my $id3;
+        if ( $deviceid =~ /^(..)(..)$/ ) {
+            $id1 = $2;
+            $id2 = "00";
+            $id3 = $1;
+        }
+        elsif ( $deviceid =~ /^(..)(..)(..)$/ ) {
+            $id1 = $1;
+            $id2 = $2;
+            $id3 = $3;
+        }
+        else {
+            Log3 $name, 1,
+              "TRX_SECURITY_Set() security1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+            return "error set name=$name  deviceid=$deviceid";
+        }
 
-	# security1
-  	$hex_prefix = sprintf "0820";
-  	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
-  	Log3 $name, 5,"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
-  	Log3 $name, 5,"TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
+        # security1
+        $hex_prefix = sprintf "0820";
+        $hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd;
+        Log3 $name, 5,
+"TRX_SECURITY_Set() name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id2=$id2, id3=$id3, command=$command";
+        Log3 $name, 5, "TRX_SECURITY_Set() hexline=$hex_prefix$hex_command";
 
-  	if ($device_type ne "KD101") {
-	  	my $sensor = "";
+        if ( $device_type ne "KD101" ) {
+            my $sensor = "";
 
-  		readingsBeginUpdate($hash);
+            readingsBeginUpdate($hash);
 
-		# Now set the statechange:
-	  	if ($hash->{STATE} ne $command) { 
-			$sensor = "statechange";
-			readingsBulkUpdate($hash, $sensor, $command);
-  		}
+            # Now set the statechange:
+            if ( $hash->{STATE} ne $command ) {
+                $sensor = "statechange";
+                readingsBulkUpdate( $hash, $sensor, $command );
+            }
 
-		# Now set the devicelog:
-	  	$sensor = $hash->{TRX_SECURITY_devicelog};
-		if ($sensor ne "none") { readingsBulkUpdate($hash, $sensor, $command); }
+            # Now set the devicelog:
+            $sensor = $hash->{TRX_SECURITY_devicelog};
+            if ( $sensor ne "none" ) { readingsBulkUpdate( $hash, $sensor, $command ); }
 
-		# Set battery
-	  	#$sensor = "battery";
-		readingsBulkUpdate($hash, "battery", "ok");
-		readingsBulkUpdate($hash, "batteryState", "ok");
-		
-  		readingsEndUpdate($hash, 1);
-	}
+            # Set battery
+            #$sensor = "battery";
+            readingsBulkUpdate( $hash, "battery",      "ok" );
+            readingsBulkUpdate( $hash, "batteryState", "ok" );
 
-  } else {
-	return "No set implemented for $device_type . Unknown protocol type";	
-  }
+            readingsEndUpdate( $hash, 1 );
+        }
 
-  IOWrite($hash, $hex_prefix, $hex_command);
+    }
+    else {
+        return "No set implemented for $device_type . Unknown protocol type";
+    }
 
-  my $tn = TimeNow();
-  $hash->{CHANGED}[0] = $command;
-  $hash->{STATE} = $command;
-  $hash->{READINGS}{state}{TIME} = $tn;
-  $hash->{READINGS}{state}{VAL} = $command;
+    IOWrite( $hash, $hex_prefix, $hex_command );
 
-  return $ret;
+    my $tn = TimeNow();
+    $hash->{CHANGED}[0]            = $command;
+    $hash->{STATE}                 = $command;
+    $hash->{READINGS}{state}{TIME} = $tn;
+    $hash->{READINGS}{state}{VAL}  = $command;
+
+    return $ret;
 }
 
 #####################################
-sub
-TRX_SECURITY_Define($$)
-{
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+sub TRX_SECURITY_Define($$) {
+    my ( $hash, $def ) = @_;
+    my @a = split( "[ \t][ \t]*", $def );
 
-  my $a = int(@a);
+    my $a = int(@a);
 
-  if(int(@a) != 5 && int(@a) != 7) {
-	Log3 $hash, 1,"TRX_SECURITY_Define() wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
-	return "wrong syntax: define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]";
-  }
-	
+    if ( int(@a) != 5 && int(@a) != 7 ) {
+        Log3 $hash, 1,
+"TRX_SECURITY_Define() wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
+        return "wrong syntax: define <name> TRX_SECURITY <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]";
+    }
 
-  my $name = $a[0];
+    my $name = $a[0];
 
-  my $type = lc($a[2]);
-  my $deviceid = $a[3];
-  my $devicelog = $a[4];
+    my $type      = lc( $a[2] );
+    my $deviceid  = $a[3];
+    my $devicelog = $a[4];
 
+    $type = uc($type);
 
-  $type = uc($type);
+    my $my_type;
+    if ( $type eq "WD18" || $type eq "GD18" || $type eq "SD18" || $type eq "COD18" || $type eq "GB10E" ) {
+        $my_type = "DS10A";    # device will be received as DS10A
+    }
+    else {
+        $my_type = $type;
+    }
+    my $device_name = "TRX" . $DOT . $my_type . $DOT . $deviceid;
 
-  my $my_type;
-  if ($type eq "WD18" || $type eq "GD18" || $type eq "SD18" || $type eq "COD18" || $type eq "GB10E" ) {
-	$my_type = "DS10A"; # device will be received as DS10A	
-  } else {
-	$my_type = $type;
-  }
-  my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
+    if (   $type ne "DS10A"
+        && $type ne "SD90"
+        && $type ne "MS10A"
+        && $type ne "MS14A"
+        && $type ne "KR18"
+        && $type ne "KD101"
+        && $type ne "VISONIC_WINDOW"
+        && $type ne "VISONIC_MOTION"
+        && $type ne "VISONIC_WINDOW_AUX"
+        && $type ne "VISONIC_REMOTE"
+        && $type ne "MEIANTECH"
+        && $type ne "SA30"
+        && $type ne "GD18"
+        && $type ne "WD18"
+        && $type ne "SD18"
+        && $type ne "COD18"
+        && $type ne "GB10E"
+        && $type ne "RM174RF" )
+    {
+        Log3 $hash, 1, "TRX_SECURITY_Define() wrong type: $type";
+        return "TRX_SECURITY: wrong type: $type";
+    }
 
-  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" && $type ne "VISONIC_MOTION" && $type ne "VISONIC_WINDOW_AUX" && $type ne "VISONIC_REMOTE" && $type ne "MEIANTECH" && $type ne "SA30" && $type ne "GD18" && $type ne "WD18" && $type ne "SD18" && $type ne "COD18" && $type ne "GB10E") {
-  	Log3 $hash, 1,"TRX_SECURITY_Define() wrong type: $type";
-  	return "TRX_SECURITY: wrong type: $type";
-  }
+    $hash->{TRX_SECURITY_deviceid}  = $deviceid;
+    $hash->{TRX_SECURITY_devicelog} = $devicelog;
+    $hash->{TRX_SECURITY_type}      = $type;
 
-  $hash->{TRX_SECURITY_deviceid} = $deviceid;
-  $hash->{TRX_SECURITY_devicelog} = $devicelog;
-  $hash->{TRX_SECURITY_type} = $type;
-  #$hash->{TRX_SECURITY_CODE} = $deviceid;
-  $modules{TRX_SECURITY}{defptr}{$device_name} = $hash;
+    #$hash->{TRX_SECURITY_CODE} = $deviceid;
+    $modules{TRX_SECURITY}{defptr}{$device_name} = $hash;
 
+    if ( int(@a) == 7 ) {
 
-  if (int(@a) == 7) {
-	# there is a second deviceid:
-	#
-  	my $deviceid2 = $a[5];
-  	my $devicelog2 = $a[6];
+        # there is a second deviceid:
+        #
+        my $deviceid2  = $a[5];
+        my $devicelog2 = $a[6];
 
-  	my $device_name2 = "TRX_SECURITY".$DOT.$deviceid2;
+        my $device_name2 = "TRX_SECURITY" . $DOT . $deviceid2;
 
-  	$hash->{TRX_SECURITY_deviceid2} = $deviceid2;
-  	$hash->{TRX_SECURITY_devicelog2} = $devicelog2;
-  	#$hash->{TRX_SECURITY_CODE2} = $deviceid2;
-  	$modules{TRX_SECURITY}{defptr2}{$device_name2} = $hash;
-  }
+        $hash->{TRX_SECURITY_deviceid2}  = $deviceid2;
+        $hash->{TRX_SECURITY_devicelog2} = $devicelog2;
 
-  AssignIoPort($hash);
+        #$hash->{TRX_SECURITY_CODE2} = $deviceid2;
+        $modules{TRX_SECURITY}{defptr2}{$device_name2} = $hash;
+    }
 
-  return undef;
+    AssignIoPort($hash);
+
+    return undef;
 }
 
 #####################################
-sub
-TRX_SECURITY_Undef($$)
-{
-  my ($hash, $name) = @_;
-  delete($modules{TRX_SECURITY}{defptr}{$name});
-  return undef;
+sub TRX_SECURITY_Undef($$) {
+    my ( $hash, $name ) = @_;
+    delete( $modules{TRX_SECURITY}{defptr}{$name} );
+    return undef;
 }
-
-
 
 #####################################
 sub TRX_SECURITY_parse_X10Sec($$) {
-  my ($hash, $bytes) = @_;
+    my ( $hash, $bytes ) = @_;
 
-  my $error;
+    my $error;
 
-  my $subtype = $bytes->[1];
+    my $subtype = $bytes->[1];
 
-  my $device;
-  if ($subtype >= 3) {
-	$device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
-  } else {
-	# that's how we do it on 43_RFXX10REC.pm
-	$device = sprintf '%02x%02x', $bytes->[5], $bytes->[3];
-  }
-
-  my %security_devtype =
-    (	# HEXSTRING => 
-	0x00 => [ "DS10A", "Window" ], 			# X10 security door/window sensor
-	0x01 => [ "MS10A", "motion" ], 			# X10 security motion sensor
-	0x02 => [ "KR18", "key" ],			# X10 security remote (no alive packets)
-	0x03 => [ "KD101", "smoke" ],			# KD101 (no alive packets)
-	0x04 => [ "VISONIC_WINDOW", "window" ],	# Visonic PowerCode door/window sensor – primary contact (with alive packets)
-	0x05 => [ "VISONIC_MOTION", "motion" ],	# Visonic PowerCode motion sensor (with alive packets)
-	0x06 => [ "VISONIC_REMOTE", "key" ],	# Visonic CodeSecure (no alive packets)
-	0x07 => [ "VISONIC_WINDOW_AUX", "window" ],	# Visonic PowerCode door/window sensor – auxiliary contact (no alive packets)
-  );
-
-  my $dev_type;
-  my $dev_reading;
-  if (exists $security_devtype{$subtype}) {
-    my $rec = $security_devtype{$subtype};
-    if (ref $rec) {
-      ($dev_type, $dev_reading ) = @$rec;
-    } else {
-	$error = "TRX_SECURITY: x10_devtype wrong for subtype=$subtype";
-	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() ".$error;
-  	return "";
+    my $device;
+    if ( $subtype >= 3 ) {
+        $device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
     }
-  } else {
- 	$error = "TRX_SECURITY: error undefined subtype=$subtype";
-	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() ".$error;
-  	return "";
-  }
+    else {
+        # that's how we do it on 43_RFXX10REC.pm
+        $device = sprintf '%02x%02x', $bytes->[5], $bytes->[3];
+    }
 
-  #--------------
-  my $device_name = "TRX".$DOT.$dev_type.$DOT.$device;
-  Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() device_name=$device_name";
+    my %security_devtype = (    # HEXSTRING =>
+        0x00 => [ "DS10A",          "Window" ],    # X10 security door/window sensor
+        0x01 => [ "MS10A",          "motion" ],    # X10 security motion sensor
+        0x02 => [ "KR18",           "key" ],       # X10 security remote (no alive packets)
+        0x03 => [ "KD101",          "smoke" ],     # KD101 (no alive packets)
+        0x04 => [ "VISONIC_WINDOW", "window" ]
+        ,    # Visonic PowerCode door/window sensor – primary contact (with alive packets)
+        0x05 => [ "VISONIC_MOTION",     "motion" ],    # Visonic PowerCode motion sensor (with alive packets)
+        0x06 => [ "VISONIC_REMOTE",     "key" ],       # Visonic CodeSecure (no alive packets)
+        0x07 => [ "VISONIC_WINDOW_AUX", "window" ]
+        ,    # Visonic PowerCode door/window sensor – auxiliary contact (no alive packets)
+        0x0a => [ "RM174RF", "smoke" ],    # RM174RF (no alive packets)
+    );
 
-  my $firstdevice = 1;
-  my $def = $modules{TRX_SECURITY}{defptr}{$device_name};
-  if(!$def) {
-  	$firstdevice = 0;
-	$def = $modules{TRX_SECURITY}{defptr2}{$device_name};
-	if (!$def) {
-	Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
-        	Log3 $hash, 3, "TRX_SECURITY_parse_X10Sec() Unknown device $device_name, please define it";
-       		return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
-	}
-  }
+    my $dev_type;
+    my $dev_reading;
+    if ( exists $security_devtype{$subtype} ) {
+        my $rec = $security_devtype{$subtype};
+        if ( ref $rec ) {
+            ( $dev_type, $dev_reading ) = @$rec;
+        }
+        else {
+            $error = "TRX_SECURITY: x10_devtype wrong for subtype=$subtype";
+            Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() " . $error;
+            return "";
+        }
+    }
+    else {
+        $error = "TRX_SECURITY: error undefined subtype=$subtype";
+        Log3 $hash, 1, "TRX_SECURITY_parse_X10Sec() " . $error;
+        return "";
+    }
 
-  # Use $def->{NAME}, because the device may be renamed:
-  my $name = $def->{NAME};
-  return "" if(IsIgnored($name));
+    #--------------
+    my $device_name = "TRX" . $DOT . $dev_type . $DOT . $device;
+    Log3 $hash, 5, "TRX_SECURITY_parse_X10Sec() device_name=$device_name";
 
-  my $data = $bytes->[6];
+    my $firstdevice = 1;
+    my $def         = $modules{TRX_SECURITY}{defptr}{$device_name};
+    if ( !$def ) {
+        $firstdevice = 0;
+        $def         = $modules{TRX_SECURITY}{defptr2}{$device_name};
+        if ( !$def ) {
+            Log3 $hash, 1,
+              "TRX_SECURITY_parse_X10Sec() UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
+            Log3 $hash, 3, "TRX_SECURITY_parse_X10Sec() Unknown device $device_name, please define it";
+            return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
+        }
+    }
 
-  my $hexdata = sprintf '%02x', $data;
+    # Use $def->{NAME}, because the device may be renamed:
+    my $name = $def->{NAME};
+    return "" if ( IsIgnored($name) );
 
-  my %x10_security =
-    (
-	0x00 => ['X10Sec', 'normal', 'min_delay', '', ''],
-	0x01 => ['X10Sec', 'normal', 'max_delay', '', ''],
+    my $data = $bytes->[6];
 
-	0x02 => ['X10Sec', 'alert', 'min_delay', '', ''],
-	0x03 => ['X10Sec', 'alert', 'max_delay', '', ''],
+    my $hexdata = sprintf '%02x', $data;
 
-	0x04 => ['X10Sec', 'alert', '', '', ''],
-	0x05 => ['X10Sec', 'normal', '', '', ''],
+    my %x10_security = (
+        0x00 => [ 'X10Sec', 'normal', 'min_delay', '', '' ],
+        0x01 => [ 'X10Sec', 'normal', 'max_delay', '', '' ],
 
-	0x06 => ['X10Sec', 'alert', '', '', ''],
-	0x07 => ['X10Sec', 'Security-EndPanic', '', '', ''],
+        0x02 => [ 'X10Sec', 'alert', 'min_delay', '', '' ],
+        0x03 => [ 'X10Sec', 'alert', 'max_delay', '', '' ],
 
-	0x08 => ['X10Sec', 'IR', '', '', ''],
+        0x04 => [ 'X10Sec', 'alert',  '', '', '' ],
+        0x05 => [ 'X10Sec', 'normal', '', '', '' ],
 
-	0x09 => ['X10Sec', 'Security-Arm_Away', 'min_delay', '', ''], # kr18
-	0x0a => ['X10Sec', 'Security-Arm_Away', 'max_delay', '', ''], # kr18
-	0x0b => ['X10Sec', 'Security-Arm_Home', 'min_delay', '', ''], # kr18
-	0x0c => ['X10Sec', 'Security-Arm_Home', 'max_delay', '', ''], # kr18
-	0x0d => ['X10Sec', 'Security-Disarm', 'min_delay', '', ''], # kr18
+        0x06 => [ 'X10Sec', 'alert',             '', '', '' ],
+        0x07 => [ 'X10Sec', 'Security-EndPanic', '', '', '' ],
 
-	0x10 => ['X10Sec', 'ButtonA-off', '', '', ''], # kr18
-	0x11 => ['X10Sec', 'ButtonA-on', '', '', ''], # kr18
-	0x12 => ['X10Sec', 'ButtonB-off', '', '', ''], # kr18
-	0x13 => ['X10Sec', 'ButtonB-on', '', '', ''], # kr18
+        0x08 => [ 'X10Sec', 'IR', '', '', '' ],
 
-	0x14 => ['X10Sec', 'dark', '', '', ''],
-	0x15 => ['X10Sec', 'light', '', '', ''],
-	0x16 => ['X10Sec', 'normal', '', 'batt_low', ''],
+        0x09 => [ 'X10Sec', 'Security-Arm_Away', 'min_delay', '', '' ],    # kr18
+        0x0a => [ 'X10Sec', 'Security-Arm_Away', 'max_delay', '', '' ],    # kr18
+        0x0b => [ 'X10Sec', 'Security-Arm_Home', 'min_delay', '', '' ],    # kr18
+        0x0c => [ 'X10Sec', 'Security-Arm_Home', 'max_delay', '', '' ],    # kr18
+        0x0d => [ 'X10Sec', 'Security-Disarm',   'min_delay', '', '' ],    # kr18
 
-	0x17 => ['X10Sec', 'pair KD101', '', '', ''],
+        0x10 => [ 'X10Sec', 'ButtonA-off', '', '', '' ],                   # kr18
+        0x11 => [ 'X10Sec', 'ButtonA-on',  '', '', '' ],                   # kr18
+        0x12 => [ 'X10Sec', 'ButtonB-off', '', '', '' ],                   # kr18
+        0x13 => [ 'X10Sec', 'ButtonB-on',  '', '', '' ],                   # kr18
 
-	0x80 => ['X10Sec', 'normal', 'max_delay', '', 'tamper'],
-	0x81 => ['X10Sec', 'normal', 'min_delay', '', 'tamper'],
-	0x82 => ['X10Sec', 'alert', 'max_delay', '', 'tamper'],
-	0x83 => ['X10Sec', 'alert', 'min_delay', '', 'tamper'],
-	0x84 => ['X10Sec', 'alert', '', '', 'tamper'],
-	0x85 => ['X10Sec', 'normal', '', '', 'tamper'],
+        0x14 => [ 'X10Sec', 'dark',   '', '',         '' ],
+        0x15 => [ 'X10Sec', 'light',  '', '',         '' ],
+        0x16 => [ 'X10Sec', 'normal', '', 'batt_low', '' ],
+
+        0x17 => [ 'X10Sec', 'pair KD101', '', '', '' ],
+
+        0x80 => [ 'X10Sec', 'normal', 'max_delay', '', 'tamper' ],
+        0x81 => [ 'X10Sec', 'normal', 'min_delay', '', 'tamper' ],
+        0x82 => [ 'X10Sec', 'alert',  'max_delay', '', 'tamper' ],
+        0x83 => [ 'X10Sec', 'alert',  'min_delay', '', 'tamper' ],
+        0x84 => [ 'X10Sec', 'alert',  '',          '', 'tamper' ],
+        0x85 => [ 'X10Sec', 'normal', '',          '', 'tamper' ],
 
     );
 
-  my $command = "";
-  my $type = "";
-  my $delay = "";
-  my $battery = "";
-  my $rssi = "";
-  my $option = "";
-  my @res;
-  if (exists $x10_security{$data}) {
-    my $rec = $x10_security{$data};
-    if (ref $rec) {
-      ($type, $command, $delay, $battery, $option) = @$rec;
-    } else {
-      $command = $rec;
+    my $command = "";
+    my $type    = "";
+    my $delay   = "";
+    my $battery = "";
+    my $rssi    = "";
+    my $option  = "";
+    my @res;
+    if ( exists $x10_security{$data} ) {
+        my $rec = $x10_security{$data};
+        if ( ref $rec ) {
+            ( $type, $command, $delay, $battery, $option ) = @$rec;
+        }
+        else {
+            $command = $rec;
+        }
     }
-  } else {
-    Log3 $name, 1, "TRX_SECURITY_parse_X10Sec() undefined command cmd=$data device-nr=$device, hex=$hexdata";
-    return "";
-  }
+    else {
+        Log3 $name, 1, "TRX_SECURITY_parse_X10Sec() undefined command cmd=$data device-nr=$device, hex=$hexdata";
+        return "";
+    }
 
-  my $battery_level = $bytes->[7] & 0x0f;
-  if (($battery eq "") && ($dev_type ne "KD101")) {
-	if ($battery_level == 0x9) { $battery = 'batt_ok'}
-	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
-	else {
-		Log3 $name, 1,"TRX_SECURITY_parse_X10Sec() unknown battery_level=$battery_level";
-	}
-  }
+    my $battery_level = $bytes->[7] & 0x0f;
+    if ( ( $battery eq "" ) && ( $dev_type ne "KD101" ) ) {
+        if    ( $battery_level == 0x9 ) { $battery = 'batt_ok' }
+        elsif ( $battery_level == 0x0 ) { $battery = 'batt_low' }
+        else {
+            Log3 $name, 1, "TRX_SECURITY_parse_X10Sec() unknown battery_level=$battery_level";
+        }
+    }
 
-  if ($trx_rssi == 1) {
-  	$rssi = sprintf("%d", ($bytes->[7] & 0xf0) >> 4);
-	Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name rssi=$rssi";
-  }
+    if ( $trx_rssi == 1 ) {
+        $rssi = sprintf( "%d", ( $bytes->[7] & 0xf0 ) >> 4 );
+        Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name rssi=$rssi";
+    }
 
-  my $current = "";
+    my $current = "";
 
-  my $n = 0;
-  my $tm = TimeNow();
-  my $val = "";
+    my $n   = 0;
+    my $tm  = TimeNow();
+    my $val = "";
 
-  my $device_type = uc($def->{TRX_SECURITY_type});
+    my $device_type = uc( $def->{TRX_SECURITY_type} );
 
-  Log3 $name, 5, "TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype device_type=$device_type command=$command, delay=$delay, batt=$battery cmd=$hexdata";
+    Log3 $name, 5,
+"TRX_SECURITY_parse_X10Sec() $name devn=$device_name first=$firstdevice subtype=$subtype device_type=$device_type command=$command, delay=$delay, batt=$battery cmd=$hexdata";
 
-  my $sensor = "";
+    my $sensor = "";
 
-  if ($device_type eq "SD90") {
-	$sensor = $firstdevice == 1 ? $def->{TRX_SECURITY_devicelog} : $def->{TRX_SECURITY_devicelog2};
-  } else {
-  	$sensor = $def->{TRX_SECURITY_devicelog};
-  } 
+    if ( $device_type eq "SD90" ) {
+        $sensor = $firstdevice == 1 ? $def->{TRX_SECURITY_devicelog} : $def->{TRX_SECURITY_devicelog2};
+    }
+    else {
+        $sensor = $def->{TRX_SECURITY_devicelog};
+    }
 
-  $current = $command;
-  if (($device_type eq "DS10A") || ($device_type eq "VISONIC_WINDOW") || ($device_type eq "VISONIC_WINDOW_AUX")) {
-	$current = "Error";
-	$current = "Open" if ($command eq "alert");
-	$current = "Closed" if ($command eq "normal");
-  } elsif ($device_type eq "WD18" || $device_type eq "GD18") {
-	$current = "Error";
-	$current = "normal" if ($command eq "alert");
-	$current = "alert" if ($command eq "normal");
-	$delay = "";  
-	$option = "";  
-  }
+    $current = $command;
+    if (   ( $device_type eq "DS10A" )
+        || ( $device_type eq "VISONIC_WINDOW" )
+        || ( $device_type eq "VISONIC_WINDOW_AUX" ) )
+    {
+        $current = "Error";
+        $current = "Open" if ( $command eq "alert" );
+        $current = "Closed" if ( $command eq "normal" );
+    }
+    elsif ( $device_type eq "WD18" || $device_type eq "GD18" ) {
+        $current = "Error";
+        $current = "normal" if ( $command eq "alert" );
+        $current = "alert" if ( $command eq "normal" );
+        $delay   = "";
+        $option  = "";
+    }
 
-  readingsBeginUpdate($def);
+    readingsBeginUpdate($def);
 
-  if (($device_type ne "KR18") && ($device_type ne "VISONIC_REMOTE")) {  
-  	if ($firstdevice == 1) {
-		$val .= $current;
-  	}
-	if ($sensor ne "none") { readingsBulkUpdate($def, $sensor, $current); }
+    if ( ( $device_type ne "KR18" ) && ( $device_type ne "VISONIC_REMOTE" ) ) {
+        if ( $firstdevice == 1 ) {
+            $val .= $current;
+        }
+        if ( $sensor ne "none" ) { readingsBulkUpdate( $def, $sensor, $current ); }
 
-	# KD101 does not show normal, so statechange does not make sense
-  	if (($def->{STATE} ne $val) && ($device_type ne "KD101")) { 
-		$sensor = "statechange";
-		readingsBulkUpdate($def, $sensor, $current);
-  	}
-  } else {
-	# kr18 remote control or VISONIC_REMOTE
-	$current = $command;
+        # KD101 does not show normal, so statechange does not make sense
+        if ( ( $def->{STATE} ne $val ) && ( $device_type ne "KD101" ) ) {
+            $sensor = "statechange";
+            readingsBulkUpdate( $def, $sensor, $current );
+        }
+    }
+    else {
+        # kr18 remote control or VISONIC_REMOTE
+        $current = $command;
 
-	#$sensor = $def->{TRX_SECURITY_devicelog};
-	#$val = $current;
-	#readingsBulkUpdate($def, $sensor, $current);
+        #$sensor = $def->{TRX_SECURITY_devicelog};
+        #$val = $current;
+        #readingsBulkUpdate($def, $sensor, $current);
 
-	$current = "Security-Panic" if ($command eq "alert");
+        $current = "Security-Panic" if ( $command eq "alert" );
 
-	my @cmd_split = split(/-/, $current);
-	$sensor = $cmd_split[0];
-	$current = $cmd_split[1];
-	readingsBulkUpdate($def, $sensor, $current);
+        my @cmd_split = split( /-/, $current );
+        $sensor  = $cmd_split[0];
+        $current = $cmd_split[1];
+        readingsBulkUpdate( $def, $sensor, $current );
 
-	$val .= $current;
-  }
+        $val .= $current;
+    }
 
-  if ($battery ne "") {
-	$sensor = "battery";
-	$current = "Error";
-	$current = "ok" if ($battery eq "batt_ok");
-	$current = "low" if ($battery eq "batt_low");
-	readingsBulkUpdate($def, "battery", $current);
-	readingsBulkUpdate($def, "batteryState", $current);
-  }
+    if ( $battery ne "" ) {
+        $sensor  = "battery";
+        $current = "Error";
+        $current = "ok" if ( $battery eq "batt_ok" );
+        $current = "low" if ( $battery eq "batt_low" );
+        readingsBulkUpdate( $def, "battery",      $current );
+        readingsBulkUpdate( $def, "batteryState", $current );
+    }
 
-  if ($rssi ne "") {
-	$sensor = "rssi";
-	readingsBulkUpdate($def, $sensor, $rssi);
-  }
+    if ( $rssi ne "" ) {
+        $sensor = "rssi";
+        readingsBulkUpdate( $def, $sensor, $rssi );
+    }
 
+    if ( $delay ne '' ) {
+        $sensor  = "delay";
+        $current = "Error";
+        $current = "min" if ( $delay eq "min_delay" );
+        $current = "max" if ( $delay eq "max_delay" );
+        readingsBulkUpdate( $def, $sensor, $current );
+    }
+    if ( $option ne '' ) {
+        $val .= " " . $option;
+    }
 
-  if ($delay ne '') {
-	$sensor = "delay";
-	$current = "Error";
-	$current = "min" if ($delay eq "min_delay");
-	$current = "max" if ($delay eq "max_delay");
-	readingsBulkUpdate($def, $sensor, $current);
-  }
-  if ($option ne '') {
-	$val .= " ".$option;
-  }
+    if ( ( $firstdevice == 1 ) && $val ) {
+        $def->{STATE} = $val;
+        readingsBulkUpdate( $def, "state", $val );
+    }
 
-  if (($firstdevice == 1) && $val) {
-  	$def->{STATE} = $val;
-	readingsBulkUpdate($def, "state", $val);
-  }
+    readingsEndUpdate( $def, 1 );
 
-  readingsEndUpdate($def, 1);
-
-  return $name;
+    return $name;
 }
 
+sub TRX_SECURITY_Parse($$) {
+    my ( $iohash, $hexline ) = @_;
 
-sub
-TRX_SECURITY_Parse($$)
-{
-  my ($iohash, $hexline) = @_;
+    $trx_rssi = 0;
+    if ( defined( $attr{ $iohash->{NAME} }{rssi} ) ) {
+        $trx_rssi = $attr{ $iohash->{NAME} }{rssi};
+        Log3 $iohash, 5, "TRX_SECURITY_Parse() attr rssi = $trx_rssi";
+    }
 
-  $trx_rssi = 0;
-  if (defined($attr{$iohash->{NAME}}{rssi})) {
-  	$trx_rssi = $attr{$iohash->{NAME}}{rssi};
-  	Log3 $iohash, 5,"TRX_SECURITY_Parse() attr rssi = $trx_rssi";
-  }
+    my $time = time();
 
-  my $time = time();
-  # convert to binary
-  my $msg = pack('H*', $hexline);
-  if ($time_old ==0) {
-  	Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=0 hex=$hexline";
-  } else {
-  	my $time_diff = $time - $time_old ;
-  	Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=$time_diff hex=$hexline";
-  }
-  $time_old = $time;
+    # convert to binary
+    my $msg = pack( 'H*', $hexline );
+    if ( $time_old == 0 ) {
+        Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=0 hex=$hexline";
+    }
+    else {
+        my $time_diff = $time - $time_old;
+        Log3 $iohash, 5, "TRX_SECURITY_Parse() decoding delay=$time_diff hex=$hexline";
+    }
+    $time_old = $time;
 
-  # convert string to array of bytes. Skip length byte
-  my @rfxcom_data_array = ();
-  foreach (split(//, substr($msg,1))) {
-    push (@rfxcom_data_array, ord($_) );
-  }
+    # convert string to array of bytes. Skip length byte
+    my @rfxcom_data_array = ();
+    foreach ( split( //, substr( $msg, 1 ) ) ) {
+        push( @rfxcom_data_array, ord($_) );
+    }
 
-  my $num_bytes = ord($msg);
+    my $num_bytes = ord($msg);
 
-  if ($num_bytes < 3) {
+    if ( $num_bytes < 3 ) {
+        return "";
+    }
+
+    my $type = $rfxcom_data_array[0];
+
+    Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline type=$type";
+    my $res = "";
+    if ( $type == 0x20 ) {
+        Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline";
+        $res = TRX_SECURITY_parse_X10Sec( $iohash, \@rfxcom_data_array );
+        Log3 $iohash, 1, "TRX_SECURITY_Parse() unsupported hex=$hexline" if ( $res eq "" );
+        return $res;
+    }
+    else {
+        Log3 $iohash, 1, "TRX_SECURITY_Parse() not implemented num_bytes=$num_bytes hex=$hexline";
+    }
+
     return "";
-  }
-
-  my $type = $rfxcom_data_array[0];
-
-  Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline type=$type";
-  my $res = "";
-  if ($type == 0x20) {
-	Log3 $iohash, 5, "TRX_SECURITY_Parse() X10Sec num_bytes=$num_bytes hex=$hexline";
-        $res = TRX_SECURITY_parse_X10Sec($iohash, \@rfxcom_data_array);
-  	Log3 $iohash, 1, "TRX_SECURITY_Parse() unsupported hex=$hexline" if ($res eq "");
-	return $res;
-  } else {
-	Log3 $iohash, 1, "TRX_SECURITY_Parse() not implemented num_bytes=$num_bytes hex=$hexline";
-  }
-
-  return "";
 }
 
 1;
