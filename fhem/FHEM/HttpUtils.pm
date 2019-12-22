@@ -1,4 +1,4 @@
-﻿##############################################
+##############################################
 # $Id$
 package main;
 
@@ -650,7 +650,7 @@ HttpUtils_Connect2($)
         HttpUtils_Close($hash);
         return $hash->{callback}($hash, "write error: $err", undef)
       }
-      $data = ($ret<=length($data))?substr($data,$ret):"";
+      $data = substr($data,$ret);
       if(length($data) == 0) {
         shutdown($hash->{conn}, 1) if($s);
         delete($hash->{directWriteFn});
