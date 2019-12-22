@@ -39,6 +39,21 @@ my %health_index = (  0 => "healthy",
                       4 => "unhealthy",
                       5 => "unknown", );
 
+my %sd_status = (  0 => "unknown",
+                   1 => "missing card",
+                   2 => "card inserted",
+                   3 => "card formatted",
+                   4 => "working card",
+                   5 => "defective card",
+                   6 => "incompatible speed",
+                   7 => "insufficient space",
+                   'on' => "on", );
+
+my %alim_status = (  0 => "unknown",
+                     1 => "incorrect power adapter",
+                     2 => "correct power adapter",
+                     'on' => "on", );
+
 sub
 netatmo_Initialize($)
 {
@@ -60,6 +75,9 @@ netatmo_Initialize($)
                       "webhookURL webhookPoll:0,1 ".
                       #"serverAPI ".
                       "addresslimit ";
+  $hash->{AttrList} .= "webhookURL webhookPoll:0,1 ";# if($hash->{model} eq "WEBHOOK");
+  $hash->{AttrList} .= "graphReadings:0,1 locale:en-US,en-GB,de-DE,es-ES,fr-FR,it-IT,nl-NL,ru-RU,ja-JP,zh-CN,zh-TW ";# if($hash->{model} eq "FORECAST");
+  $hash->{AttrList} .= "setpoint_duration ";# if($hash->{model} eq "THERMOSTAT");
   $hash->{AttrList} .= $readingFnAttributes;
 }
 
@@ -578,7 +596,6 @@ netatmo_Set($$@)
   $hash->{SUBTYPE} = "unknown" if(!defined($hash->{SUBTYPE}));
   my $list = "";
   $list = "autocreate:noArg autocreate_homes:noArg autocreate_thermostats:noArg autocreate_homecoachs:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
-  #$list .= " unban:noArg" if( $hash->{SUBTYPE} eq "ACCOUNT" );
   $list = "home:noArg away:noArg" if ($hash->{SUBTYPE} eq "PERSON");
   $list = "empty:noArg notify_movements:never,empty,always notify_unknowns:empty,always notify_animals:true,false record_animals:true,false record_movements:never,empty,always record_alarms:never,empty,always presence_record_humans:ignore,record,record_and_notify presence_record_vehicles:ignore,record,record_and_notify presence_record_animals:ignore,record,record_and_notify presence_record_movements:ignore,record,record_and_notify presence_record_alarms:ignore,record,record_and_notify gone_after presence_enable_notify_from_to:empty,always presence_notify_from presence_notify_to smart_notifs:on,off" if ($hash->{SUBTYPE} eq "HOME");
   $list = "enable disable irmode:auto,always,never led_on_live:on,off mirror:off,on audio:on,off" if ($hash->{SUBTYPE} eq "CAMERA");
@@ -590,6 +607,7 @@ netatmo_Set($$@)
     $list = "setpoint_mode:off,hg,away,program,manual,max program:".$hash->{schedulenames}." setpoint_temp:5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10.0,10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0,14.5,15.0,15.5,16.0,16.5,17.0,17.5,18.0,18.5,19.0,19.5,20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5,24.0,24.5,25.0,25.5,26.0,26.5,27.0,27.5,28.0,28.5,29.0,29.5,30.0" if(defined($hash->{schedulenames}));
   }
   $list = "clear:noArg webhook:add,drop" if ($hash->{SUBTYPE} eq "WEBHOOK");
+  #$list .= " checkBan:noArg" if( $hash->{SUBTYPE} eq "WEBHOOK" );
 
   return undef if( $list eq "" );
   $cmd = "(undefined)" if(!defined($cmd));
@@ -705,9 +723,9 @@ netatmo_Set($$@)
     }
     return undef;
   }
-  if( $cmd eq 'unban' )# unban:noArg
+  if( $cmd eq 'checkBan' )# checkBan:noArg
   {
-    return netatmo_Unban($hash); 
+    return netatmo_checkDev($hash);
   }
 
 
@@ -997,116 +1015,114 @@ netatmo_connect($)
 }
 
 sub
-netatmo_Unban($)
+netatmo_checkDev($)
 {
   my ($hash) = @_;
+  my $iohash = $hash->{IODev};
   my $name = $hash->{NAME};
 
+  RemoveInternalTimer($hash,"netatmo_checkDev");
+  InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>0);
+
   HttpUtils_NonblockingGet({
-    url => "https://dev.netatmo.com/",
-    timeout => 20,
-    noshutdown => 1,
+    url => "https://app.netatmo.net/api/createdapplist",
+    timeout => 30,
     hash => $hash,
-    type => 'unban',
-    callback => \&netatmo_parseUnban,
+    type => 'checkdev',
+    method => "POST",
+    #data => $json,
+    header => "Referer: https://dev.netatmo.com/dev/myaccount\r\nAuthorization: Bearer ".$iohash->{access_token_app}."\r\nContent-Type: application/json;charset=utf-8",#\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
+    callback => \&netatmo_parseDev,
   });
+  Log3 $name, 4, "$name: checking for dev apps";
+
 
   return undef;
-
 }
 
 sub
-netatmo_parseUnban($$$)
+netatmo_parseDev($$$)
 {
   my ($param,$err,$data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   
-  #Log3 $name, 1, "$name unban\n".Dumper($param->{httpheader});
-
-  $data =~ /csrf_value: "(.*)"/;
-  my $csrf_token = $1;
-
-  # https://auth.netatmo.com/en-US/access/login?next_url=https://dev.netatmo.com/dev/myaccount
-  Log3 $name, 1, "$name unban ".$csrf_token;
-
-  HttpUtils_NonblockingGet({
-    url => "https://auth.netatmo.com/en-US/access/login?next_url=https://dev.netatmo.com/dev/myaccount",
-    timeout => 30,
-    hash => $hash,
-    ignoreredirects => 1,
-    type => 'unban',
-    header => "Cookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US",
-    data => {ci_csrf_netatmo => $csrf_token, mail => netatmo_decrypt($hash->{helper}{username}), pass => netatmo_decrypt($hash->{helper}{password}), log_submit => 'Log+in', stay_logged => 'accept'},
-    callback => \&netatmo_parseUnban2,
-  });
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: invalid json evaluation on dev apps check ".$@;
+    return undef;
+  }
     
+  my $found = 0;
+  foreach my $devappid ( keys %{$json->{body}}) {
+    my $devapp = $json->{body}{$devappid};
+    if(defined($devapp->{webhook_uri}) && $devapp->{webhook_uri} eq AttrVal($name,"webhookURL","-")){
+      #if(defined($devapp->{activated}) && $devapp->{activated}){
+        netatmo_CheckApp($hash,$devapp->{_id});
+        $found = 1;
+      #}
+    }
+  }
+  Log3 $name, 2, "$name: no active dev apps matching this webhook were found" if($found == 0);
 
   return undef;
 }
 
 sub
-netatmo_parseUnban2($$$)
+netatmo_CheckApp($$)
 {
-  my ($param,$err,$data) = @_;
-  my $hash = $param->{hash};
+  my ($hash,$appid) = @_;
+  my $iohash = $hash->{IODev};
   my $name = $hash->{NAME};
   
-  Log3 $name, 1, "$name header\n".Dumper($param->{httpheader});
-  my $header1 = $param->{httpheader};
-  my $header2 = $param->{httpheader};
-  my $header3 = $param->{httpheader};
-  
-  $header1 =~ s/=deleted/x=deleted/g;
-  $header2 =~ s/=deleted/x=deleted/g;
-  $header3 =~ s/=deleted/x=deleted/g;
-  
-  $header1 =~ /Set-Cookie: netatmocomci_csrf_cookie_na=(.*); expires/;
-  my $csrf_token = $1;
-  $hash->{helper}{csrf_token} = $csrf_token;
-
-  $header2 =~ /Set-Cookie: netatmocomaccess_token=(.*); path/;
-  my $accesstoken = $1;
-  $accesstoken =~ s/%7C/|/g;
-  $hash->{helper}{access_token} = $accesstoken;
-
-  $header3 =~ /Set-Cookie: netatmocomrefresh_token=(.*); expires/;
-  my $refreshtoken = $1;
-  $hash->{helper}{refresh_token} = $refreshtoken;
-
-  Log3 $name, 1, "$name csrftoken ".$csrf_token;
-  Log3 $name, 1, "$name accesstoken ".$accesstoken;
-  Log3 $name, 1, "$name refreshtoken ".$refreshtoken;
-
-  my $json = '{"application_id":"'.$hash->{helper}{client_id}.'"}';
+  my $json = '{"application_id":"'.$appid.'"}';
 
   HttpUtils_NonblockingGet({
-    url => "https://dev.netatmo.com/api/unbanapp",
+    url => "https://app.netatmo.net/api/getapp",
     timeout => 30,
     hash => $hash,
-    type => 'unban',
-    header => "Referer: https://dev.netatmo.com/dev/myaccount\r\nAuthorization: Bearer ".$accesstoken."\r\nContent-Type: application/json;charset=utf-8\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
+    type => 'checkdev',
+    method => "POST",
+    header => "Referer: https://dev.netatmo.com/dev/myaccount/.".$appid."\r\nAuthorization: Bearer ".$iohash->{access_token_app}."\r\nContent-Type: application/json;charset=utf-8",#\r\nCookie: netatmocomci_csrf_cookie_na=".$csrf_token."; netatmocomlocale=en-US; netatmocomacces_token=".$accesstoken,
     data => $json,
-    callback => \&netatmo_parseUnban3,
+    callback => \&netatmo_parseApp,
   });
-    
+  Log3 $name, 4, "$name: checking dev app ".$appid;
 
   return undef;
 }
 
 sub
-netatmo_parseUnban3($$$)
+netatmo_parseApp($$$)
 {
   my ($param,$err,$data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
   
-  Log3 $name, 1, "$name header\n".Dumper($param->{httpheader});
-  Log3 $name, 1, "$name data\n".Dumper($data);
-  Log3 $name, 1, "$name err\n".Dumper($err);
+  Log3 $name, 3, "$name got dev app data to check ban state";
+
+  my $json = eval { JSON->new->utf8(0)->decode($data) };
+  if($@)
+  {
+    Log3 $name, 2, "$name: invalid json evaluation on dev app check ".$@;
+  return undef;
+}
+
+  if(defined($json->{body}) && defined($json->{body}{temporary_ban})) {
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "banned", (($json->{body}{temporary_ban})?"yes":"no") );
+    readingsBulkUpdate( $hash, "activated", (($json->{body}{activated})?"yes":"no") );
+    readingsBulkUpdate( $hash, "usage_1", $json->{body}{usage_1} );
+    readingsBulkUpdate( $hash, "usage_2", $json->{body}{usage_2} );
+    readingsEndUpdate($hash,1);
+  }
+  Log3 $name, 5, "$name app data:\n".Dumper($json);
 
   return undef;
 }
+
+
 
 sub
 netatmo_initDevice($)
@@ -2172,7 +2188,7 @@ netatmo_setNotifications($$$)
   if( !defined($iohash->{csrf_token}) )
   {
     my($err0,$data0) = HttpUtils_BlockingGet({
-      url => "https://dev.netatmo.com/en-US",
+      url => "https://auth.netatmo.com/en-us/access/login",
       timeout => 10,
       noshutdown => 1,
     });
@@ -2181,7 +2197,8 @@ netatmo_setNotifications($$$)
       Log3 $name, 1, "$name: csrf call failed! ".$err0;
       return undef;
     }
-    $data0 =~ /csrf_value: "(.*)",/;
+    #Log3 $name, 1, "$name: CSRF\n".$data0;
+    $data0 =~ /csrf-token" content="(.*)"/;
     my $tmptoken = $1;
     $iohash->{csrf_token} = $tmptoken;
     if(!defined($iohash->{csrf_token})) {
@@ -3858,7 +3875,7 @@ netatmo_parseForecast($$)
         $forecasttime = $json->{body}{time_current_symbol};
       } 
 
-      return undef if($datatime <= $lastupdate);
+      return undef if($datatime <= $lastupdate && (!AttrVal($name,"graphReadings",0) || defined(ReadingsVal($name,"graph01_rain",undef))));
       readingsSingleUpdate($hash, ".lastupdate", $datatime, 0);
 
       if($json->{body}{airqdata})
@@ -4037,6 +4054,78 @@ netatmo_parseForecast($$)
         }#foreach forecast
       }#defined forecastdays
 
+
+      if(AttrVal($name,"graphReadings",0)==1 && defined($json->{body}{forecastGraphs}))
+      {
+        my $i = 0;
+        foreach my $raingraph ( @{$json->{body}{forecastGraphs}{rain}})
+        {
+
+          next if(ref($raingraph) ne "ARRAY");
+
+          if(defined(@{$raingraph}[1]))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime(int(@{$raingraph}[0]));
+            readingsBulkUpdate( $hash, "graph".sprintf("%02d", $i)."_rain", int(@{$raingraph}[1]*1000)/1000, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime(int(@{$raingraph}[0]));
+            readingsEndUpdate($hash,0);
+            $i++;
+          }
+        }#foreach rain
+
+        $i = 0;
+        foreach my $popgraph ( @{$json->{body}{forecastGraphs}{rain_proba}})
+        {
+
+          next if(ref($popgraph) ne "ARRAY");
+
+          if(defined(@{$popgraph}[1]))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime(int(@{$popgraph}[0]));
+            readingsBulkUpdate( $hash, "graph".sprintf("%02d", $i)."_pop", @{$popgraph}[1], 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime(int(@{$popgraph}[0]));
+            readingsEndUpdate($hash,0);
+            $i++;
+          }
+        }#foreach pop
+
+        $i = 0;
+        foreach my $tempgraph ( @{$json->{body}{forecastGraphs}{temperature}})
+        {
+
+          next if(ref($tempgraph) ne "ARRAY");
+
+          if(defined(@{$tempgraph}[1]))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime(int(@{$tempgraph}[0]));
+            readingsBulkUpdate( $hash, "graph".sprintf("%02d", $i)."_temperature", @{$tempgraph}[1], 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime(int(@{$tempgraph}[0]));
+            readingsEndUpdate($hash,0);
+            $i++;
+          }
+        }#foreach temp
+
+        $i = 0;
+        foreach my $humgraph ( @{$json->{body}{forecastGraphs}{humidity}})
+        {
+
+          next if(ref($humgraph) ne "ARRAY");
+
+          if(defined(@{$humgraph}[1]))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime(int(@{$humgraph}[0]));
+            readingsBulkUpdate( $hash, "graph".sprintf("%02d", $i)."_humidity", @{$humgraph}[1], 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime(int(@{$humgraph}[0]));
+            readingsEndUpdate($hash,0);
+            $i++;
+          }
+        }#foreach hum
+      }#defined forecastgraphs
+
     }#ok
   }#json
   else
@@ -4138,8 +4227,9 @@ netatmo_parseHomeReadings($$;$)
             readingsSingleUpdate($camera, "name", encode_utf8($cameradata->{name}), 1) if(defined($cameradata->{name}));
             readingsSingleUpdate($camera, "status", $cameradata->{status}, 1) if(defined($cameradata->{status}));
             #$camera->{STATE} = ($cameradata->{status} eq "on") ? "online" : "offline";
-            readingsSingleUpdate($camera, "sd_status", $cameradata->{sd_status}, 0) if(defined($cameradata->{sd_status}));
-            readingsSingleUpdate($camera, "alim_status", $cameradata->{alim_status}, 0) if(defined($cameradata->{alim_status}));
+            readingsSingleUpdate($camera, "sd_status", $sd_status{$cameradata->{sd_status}}, 0) if(defined($cameradata->{sd_status}));
+            readingsSingleUpdate($camera, "alim_status", $alim_status{$cameradata->{alim_status}}, 0) if(defined($cameradata->{alim_status}));
+            readingsSingleUpdate($camera, "homekit_status", $cameradata->{homekit_status}, 0) if(defined($cameradata->{homekit_status}));
             readingsSingleUpdate($camera, "is_local", $cameradata->{is_local}, 1) if(defined($cameradata->{is_local}));
             readingsSingleUpdate($camera, "vpn_url", $cameradata->{vpn_url}, 1) if(defined($cameradata->{vpn_url}));
             CommandDeleteReading( undef, "$camera->{NAME} vpn_url" ) if(!defined($cameradata->{vpn_url}));
@@ -5415,8 +5505,8 @@ netatmo_parsePublic($$)
         $avgtime_rain = sprintf( "%i", $avgtime_rain );
         $avgtime_wind = sprintf( "%i", $avgtime_wind );
         $avg_altitude = sprintf( "%.2f", $avg_altitude );
-        $avg_latitude = sprintf( "%.8f", $avg_latitude );
-        $avg_longitude = sprintf( "%.8f", $avg_longitude );
+        $avg_latitude = sprintf( "%.5f", $avg_latitude );
+        $avg_longitude = sprintf( "%.5f", $avg_longitude );
 
         if(scalar(@readings_temperature) > 0)
         {
@@ -5689,11 +5779,12 @@ netatmo_pollForecast($)
 
   Log3 $name, 4, "$name: pollForecast (forecastdata)";
 
+  my $locale = AttrVal($name, "locale", "en-US");
   HttpUtils_NonblockingGet({
       url => "https://app.netatmo.net/api/simplifiedfuturemeasure",
       timeout => 60,
       noshutdown => 1,
-      data => { device_id => $hash->{Station}, },
+      data => { device_id => $hash->{Station}, locale => $locale},
       header => "Authorization: Bearer ".$iohash->{access_token_app},
       hash => $hash,
       type => 'forecastdata',
@@ -6132,6 +6223,8 @@ netatmo_registerWebhook($)
   my $webhookurl = AttrVal($name,"webhookURL",undef);
   return undef if(!defined($webhookurl));
   
+  InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>=0);
+
   HttpUtils_NonblockingGet({
     url => "https://".$iohash->{helper}{apiserver}."/api/addwebhook",
     timeout => 30,
@@ -6149,6 +6242,8 @@ netatmo_dropWebhook($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, "netatmo_checkDev");
 
   return undef if( !defined($hash->{IODev}) );
   my $iohash = $hash->{IODev};
@@ -6212,6 +6307,13 @@ sub netatmo_Webhook() {
     Log3 "netatmo", 1, "Netatmo webhook no data received!";
     return ( "text/plain; charset=utf-8",
         "NO" );
+  }
+
+  if(ReadingsVal($name,"banned","-") eq "yes" && ReadingsAge($name,"banned",0) >= AttrVal($name,"interval",0)){
+    netatmo_checkDev($hash);
+  } else {
+    RemoveInternalTimer($hash,"netatmo_checkDev");
+    InternalTimer(gettimeofday()+AttrVal($name,"interval",3600), "netatmo_checkDev", $hash) if(AttrVal($name,"interval",0)>=0);
   }
 
   Log3 $name, 5, "Netatmo webhook JSON:\n".$data;
@@ -6289,6 +6391,12 @@ sub netatmo_Attr($$$)
     } else {
       $attr{$name}{$attrName} = 0;
       netatmo_poll($hash);
+    }
+  } elsif( $attrName eq "graphReadings" ) {
+    if( $cmd eq "set" && $attrVal ne "0" ) {
+    } else {
+      my $hash = $defs{$name};
+      CommandDeleteReading( undef, "$name graph.*" ) if($hash->{SUBTYPE} eq "FORECAST");
     }
   }
 
@@ -6500,7 +6608,8 @@ sub netatmo_weatherIcon()
   <b>Webhook</b><br>
   <ul>
     <code>define &lt;name&gt; netatmo WEBHOOK</code><br><br>
-    Set your URL in attribute webhookURL, events from cameras will be received instantly
+    Set your URL in attribute webhookURL, events from cameras will be received instantly<br>
+    Ports 80 and 443 only, self-signed certificates will fail.
   </ul><br>
 
   <a name="netatmo_Readings"></a>
@@ -6599,7 +6708,7 @@ sub netatmo_weatherIcon()
     <li><a name="videoquality">videoquality</a><br>
       video quality for playlists (HOME - default: medium)</li>
     <li><a name="webhookURL">webhookURL</a><br>
-      webhook URL - can include basic auth and port (80 or 443 only!): http://user:pass@your.url:80/fhem/netatmo (WEBHOOK)</li>
+      webhook URL - can include basic auth and port (80 or 443 only, no self-signed certificates!): http://user:pass@your.url:80/fhem/netatmo (WEBHOOK)</li>
     <li><a name="webhookPoll">webhookPoll</a><br>
       poll home after event from webhook (WEBHOOK - default: 0)</li>
     <li><a name="ignored_device_ids">ignored_device_ids</a><br>
