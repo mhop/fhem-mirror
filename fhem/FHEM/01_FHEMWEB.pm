@@ -1430,6 +1430,7 @@ FW_doDetail($)
 
   return if($FW_hiddenroom{detail});
   return if(!defined($defs{$d}));
+  $FW_room=""; # Do not call summaryFn with a room #106551
   my $h = $defs{$d};
   my $t = $h->{TYPE};
   $t = "MISSING" if(!defined($t));
