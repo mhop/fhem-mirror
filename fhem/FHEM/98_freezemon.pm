@@ -22,6 +22,8 @@
 #
 ##############################################################################
 # 	  Changelog:
+#		0.0.29 (20.12.2019):	Removed remaining "Dumper" code
+#								Few minor fixes 
 #		0.0.28:	Fixed minor bug in regex for statistics
 #				Added Commandref for getFreezes
 #		0.0.27:	Slightly improved device detection
@@ -111,7 +113,7 @@ use B qw(svref_2object);
 use Blocking;
 use vars qw($FW_CSRF);
 
-my $version = "0.0.28";
+my $version = "0.0.29";
 
 my @logqueue = ();
 my @fmCmd    = ();
@@ -737,7 +739,7 @@ sub freezemon_Get($@) {
           sort { $stats{$b}{cnt} <=> $stats{$a}{cnt} or $stats{$b}{time} <=> $stats{$a}{time} } keys %stats;
         my $ret = "<html>";
         $ret .= "<table><tr><th>Device</th><th>Count</th><th>Time</th></tr>";
-        my $i;
+        my $i = 0;
         foreach my $p (@positioned) {
             last if $i > 20;
             $i++;
@@ -1070,7 +1072,7 @@ sub freezemon_getDevice($$) {
     }
     elsif ( ref($shortarg) eq "" ) {
         Log3 $name, 5,
-          "[Freezemon] $name found something that's not a REF $fn " . ref($shortarg) . " " . Dumper($shortarg);
+          "[Freezemon] $name found something that's not a REF $fn " . ref($shortarg) . " " ; #. Dumper($shortarg);
 
         ( undef, $shortarg ) = split( /:|;/, $shortarg, 2 );
     }
@@ -1078,14 +1080,14 @@ sub freezemon_getDevice($$) {
     else {
         Log3 $name, 5,
             "[Freezemon] $name found something that's a REF but not a HASH $fn "
-          . ref($shortarg) . " "
-          . Dumper($shortarg);
+          . ref($shortarg); # . " "
+#          . Dumper($shortarg);
 
         $shortarg = "N/A";
     }
     if ( !defined($shortarg) ) {
 
-        Log3 $name, 5, "Freezemon: something went wrong $fn " . Dumper($arg);
+        Log3 $name, 5, "Freezemon: something went wrong $fn "; # . Dumper($arg);
         $shortarg = "N/A";
     }
     else {
