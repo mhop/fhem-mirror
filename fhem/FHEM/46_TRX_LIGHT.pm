@@ -34,6 +34,11 @@
 ##############################################################################
 #
 #	CHANGELOG
+#	20.12.2019	Fixed ASA (forum #98830)
+#				Added Kangtech (forum #105434)
+#				Minor Adjustment for DC106 Blinds (enable remote?)
+#				Somfy adjusted 
+#				Added missing "RFU"
 #	29.03.2019	Revised log levels 
 #	21.03.2019	Added subtype ASA for RFY
 #	26.12.2018	Support for CUVEO devices
@@ -78,9 +83,9 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
 
     # 0x12: Lighting3
     0x1200 => [ "KOPPLA",       "light" ],    # IKEA Koppla
-                                              # 0x13: Lighting4
+    # 0x13: Lighting4
     0x1300 => [ "PT2262",       "light" ],    # PT2262 raw messages
-                                              # 0x14: Lighting5
+    # 0x14: Lighting5
     0x1400 => [ "LIGHTWAVERF",  "light" ],    # LightwaveRF
     0x1401 => [ "EMW100",       "light" ],    # EMW100
     0x1402 => [ "BBSB",         "light" ],    # BBSB
@@ -88,7 +93,8 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
     0x1404 => [ "RSL2",         "light" ],    # Conrad RSL2
     0x1405 => [ "LIVOLO",       "light" ],    # Livolo
     0x1406 => [ "TRC02",        "light" ],    # RGB TRC02
-                                              # 0x15: Lighting6
+	0x1411 => [ "KANGTAI",		"light" ],	  # Kangtai,Cotech
+    # 0x15: Lighting6
     0x1500 => [ "BLYSS",        "light" ],    # Blyss
     0x1501 => [ "CUVEO",        "light" ],    # Cuveo
                                               # 0x16: Chime
@@ -152,6 +158,7 @@ my %light_device_commands = (                 # HEXSTRING => commands
     0x1404 => [ "off",     "on",     "all_off", "all_on" ],                           # Conrad RSL
     0x1405 => [ "all_off", "on_off", "dim+",    "dim-" ],                             # Livolo
     0x1406 => [ "off",     "on",     "bright",  "dim", "vivid", "pale", "color" ],    # TRC02
+    0x1411 => [ "off", "on", "all_off", "all_on" ],                 	         	  # Kangtai,Cotech
                                                                                       # 0x15: Lighting6
     0x1500 => [ "on",      "off",    "all_on",  "all_off" ],                          # Blyss
     0x1501 => [ "on",      "off",    "all_on",  "all_off" ],                          # Cuveo
@@ -186,7 +193,8 @@ my %light_device_commands = (                 # HEXSTRING => commands
         "stop", "up", "", "down", "", "", "", "program", "", "", "", "", "", "", "", "up<0.5s", "down<0.5s", "up>2s",
         "down>2s", "enable_sun+wind", "disable_sun"
     ],                                                                                #RFY, forum #36451
-    0x1A01 => [ "stop", "up", "", "down", "", "", "", "program" ],                    # RTS RFY ext
+	0x1A01 => [ "stop", "up", "", "down", "", "", "", "program", "", "", "", "", "", "", "", "up_<0.5_seconds", "down_<0.5_seconds", "up_>2_seconds", "down_>2_seconds"], # RTS RFY ext
+	0x1A03 => [ "stop", "up",    "", "down", "", "", "", "program" ],                 # ASA
 );
 
 my %light_device_c2b;    # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -662,6 +670,7 @@ sub TRX_LIGHT_Define($$) {
         && $type ne "TRC02"
         && $type ne "PT2262"
         && $type ne "ENER010"
+		&& $type ne "KANGTAI"
         && $type ne "ENER5"
         && $type ne "COCO_GDR2"
         && $type ne "MDREMOTE"
@@ -682,6 +691,8 @@ sub TRX_LIGHT_Define($$) {
         && $type ne "FOREST"
         && $type ne "RFY"
         && $type ne "RFY_ext"
+		&& $type ne "ASA"
+		&& $type ne "RFU"
         && $type ne "SELECTPLUS" )
     {
         Log3 $name, 1, "TRX_LIGHT_Define() wrong type: $type";
@@ -925,7 +936,7 @@ sub TRX_LIGHT_parse_X10 ($$) {
 
     readingsBeginUpdate($def);
 
-    if ( $type == 0x10 || $type == 0x11 || $type == 0x14 || $type == 0x16 || $type == 0x15 ) {
+    if ( $type == 0x10 || $type == 0x11 || $type == 0x14 || $type == 0x16 || $type == 0x15  || $type == 0x19 ) {
 
         # try to use it for all types:
         $current = $command;
