@@ -1715,8 +1715,8 @@ HUEBridge_HTTP_Call($$$;$)
   } elsif($ret eq '') {
     return undef;
   } elsif($ret =~ /^error:(\d){3}$/) {
-    my %result = { error => "HTTP Error Code $1" };
-    return \%result;
+    my $result = { error => "HTTP Error Code $1" };
+    return $result;
   }
 
   if( !$ret ) {
@@ -2062,8 +2062,8 @@ HUEBridge_HTTP_Request($$$@)
   }
   undef $conn;
   if($header[0] =~ /^[^ ]+ ([\d]{3})/ && $1 != 200) {
-    my %result = { error => "error: $1" };
-    return \%result;
+    my $result = { error => "error: $1" };
+    return $result;
   }
   return $ret;
 }
