@@ -340,7 +340,7 @@ sub DOIF_RegisterCell
   } elsif (($widsty==1) or $trigger) {
       return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style)";
   } else {
-      return $expr;
+      return ("$hash->{$table}{package}".$expr);
   }
   return ""
 }
@@ -5294,7 +5294,7 @@ Anwendungsbeispiele für Fortgeschrittene: <a href="https://wiki.fhem.de/wiki/DO
  &lt;Perlblock für Definition von Template-Attributen, Zellenformatierungen, eigenen Perlfunktionen&gt;<br>
 }<br>
 <br>
-&lt;Template-Methoden&gt;<br>
+&lt;Templates&gt;<br>
 <br>
 &lt;Tabellendefinition&gt;<br>
 <br></code>
@@ -5311,93 +5311,33 @@ usw.<br></code>
 <br>
 Endet eine Zeile mit |, so wird deren Definition in der nächsten Zeile fortgesetzt. Dadurch können längere Zeilendefinition einer Tabelle auf mehrerer Zeilen aufgeteilt werden.<br>
 <br>
-Eine Zellendefinition kann sein:<br>
-<br>
-1) <code>&lt;Perlausdruck mit [DOIF-Syntax]&gt;<br></code>
-<br>
-2) <code>STY(&lt;Perlausdruck mit [DOIF-Syntax]&gt;,&lt;css-Style-Definition mit [DOIF-Syntax]&gt;)<br></code>
-<br>
-3) <code>WID([&lt;DEVICE&gt;:&lt;READING&gt;],&lt;FHEM-Widget-Definition mit [DOIF-Syntax]&gt;,"&lt;set-/setreading-Kommando optional&gt;")<br></code>
-<br>
-4) vordefinierte Perl-Funktionen
-<br>
-Die oberen Definitionen können innerhalb einer Zelle mit Punkt bzw. Komma beliebig kombiniert werden. Beim Punkt werden die Ausdrücke aneinandergereiht, bei Komma werden die Ausdrücke mit Zeilenumbruch untereinander innerhalb einer Zelle angeordnet.<br>
-<br>
-Zu 1)<br>
-<br>
-Diese Definition wird verwendet für: Texte, Inhalte von Readings oder Rechenausdrücke. Angaben, die die Zelle aktualisieren sollen, müssen in gewohnte DOIF-Syntax angegeben werden.
-<br>
-Beispiele:<br>
-<br>
-Einfacher Text: <br>
-<br>
-<code>"Status"<br></code>
-<br>
-Reading:<br>
-<br>
-<code>[outdoor:temperature]<br></code>
-<br>
-Berechnung:<br>
-<br>
-<code>([livingroom:temperature]+[kitchen:temperature])/2<br></code>
-<br>
-Perlfunktion:<br>
-<br>
-<code>min([livingroom:temperature],[ktichen:temperature])<br></code>
-<br>
-Mehrere Angaben einer Zelle können mit einem Punkt, wie auch in Perl bei Zeichenketten üblich, konkateniert werden:<br>
-<br>
-<code>"Temperature: ".[outdoor:temperatur]<br></code>
-<br>
-<code>"Die maximale Temperatur der Kinderzimmer beträgt: ".max([child1:temperature],[child2:temperature])<br></code>
-<br>
-Zu 2)<br>
+Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Einfache_Tabellendefinition_ohne_Funktionen">Tabellendefinition</a><br>
 <br>
 Über die Funktion STY werden Angaben mit Formatierungen über das CSS-Style-Attribut vorgenommen.<br>
 <br>
-Beispiele:<br>
+Syntax:<br>
 <br>
-Formatierter Text:<br>
+<code>STY(&lt;Wert&gt;,&lt;CSS-Style-Attribut&gt;)</code><br>
 <br>
-<code>STY("diningroom","font-weight:bold;font-size:16pt;color:#0000FF")<br></code>
+Die Funktionalität von STY kann durch eine Perl-Funktionen abgedeckt werden, diese muss zwei Rückgabewerte zurückgeben:<br>
 <br>
-Formatiertes Reading:<br>
+<code>return(&lt;Wert&gt;,&lt;CSS-Style-Attribut&gt;)</code><br>
 <br>
-<code>STY([fridge:temperature],"color:#0000FF")<br></code>
-<br>
-Formatiertes Reading mit dynamischer Farbgebung abhängig von der Temperatur<br>
-<br>
-<code>STY([basement:humidity],"color:".DOIF_hsv([basement:humidity],50,75,40,264,60,90))<br></code>
-<br>
-DOIF_hsv ist eine DOIF-Funktion, bei der man den Farbverlauf definieren kann.<br>
-<br>
-Syntax für die  DOIF_hsv Funktion:<br>
-<br>
-<code>DOIF_hsv(&lt;value&gt;,&lt;min_value&gt;,&lt;max_value&gt;,&lt;min_hsv&gt;,&lt;max_hsv&gt;,&lt;saturation&gt;,&lt;lightness&gt;)<br></code>
-<br>
-Es wird durch eine feste Vorgabe von saturation und lightness, linear ein Farbton (Hue) für value errechnet, dabei entspricht min_value min_hsv und max_value max_hsv.<br>
-<br>
-Die gewünschten Werte für &lt;min_hsv&gt;,&lt;max_hsv&gt;,&lt;saturation&gt;,&lt;lightness&gt; können mit Hilfe eines Color-Pickers bestimmt werden.<br>
-<br>
-Weiterhin lässt sich ebenfalls jede andere Perlfunktion verwenden, die eine beliebige css-Style-Formatierung vornimmt.<br>
-<br>
-Zu 3)<br>
+Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Eigene_uiTable-Funktionen_programmieren">uiTable-Funktionen</a><br>
 <br>
 Über die Funktion WID werden FHEM-Widgets definiert. Es können alle in FHEM vorhanden FHEM-Widgets verwendet werden.<br>
 <br>
-Beispiele:<br>
+Syntax<br>
 <br>
-Brennericon<br>
+<code>WID(&lt;Wert&gt;,&lt;FHEM-Widget-Definition&gt;)</code><br>
 <br>
-<code>WID([burner:state],"iconLabel,closed,sani_boiler_temp\@DarkOrange,open,sani_boiler_temp")<br></code>
+Die Funktionalität von WID kann durch eine Perl-Funktionen abgedeckt werden, diese muss drei Rückgabewerte zurückgeben:<br>
 <br>
-Die Widget-Definition entspricht der Syntax der FHEM-Widgets.<br>
+<code>return(&lt;Wert&gt;,"",&lt;FHEM-Widget-Definition&gt;)</code><br>
 <br>
-Thermostatdefinition mit Hilfe des knob-Widgets:<br>
+Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Eigene_uiTable-Funktionen_programmieren">uiTable-Funktionen</a><br>
 <br>
-<code>WID([TH_Bathroom_HM:desired-temp],"knob,min:17,max:25,width:45,height:40,step:0.5,fgColor:DarkOrange,bgcolor:grey,anglearc:270,angleOffset:225,cursor:10,thickness:.3","set")<br></code>
-<br>
-<b>Der Perlblock: Definition von Template-Attributen, Zellenformatierungen und Perl-Funktionen<br></b>
+<b>Der Perlblock: Definition von Template-Attributen, Zellenformatierungen und eigene Perl-Funktionen<br></b>
 <br>
 Im ersten Bereich werden sog. Template-Attribute als Variablen definiert, um wiederholende Zeichenketten in Kurzform anzugeben. Template-Attribute werden intern als hash-Variablen abgelegt. Die Syntax entspricht weitgehend der Perl-Syntax.<br>
 <br>
@@ -5416,7 +5356,7 @@ Damit würde die obige Beispiel-Definition des Thermostat-Widgets wie folgt auss
 <br>
 Weiterhin können die Tabelle, einzelne Zellen-, Zeilen- oder Spaltenformatierungen definiert werden, dazu werden folgende Bezeichner benutzt:<br>
 <br>
-<code>$TABLE="&lt;CSS-Attribute&gt;"<br>
+<code>$TABLE="&lt;CSS-Attribute der Tabelle&gt;"<br>
 $TD{&lt;Zellenbereich für Zeilen&gt;}{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Zellen&gt;"<br>
 $TC{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Spalten&gt;"<br>
 $TR{Zeilenbereich}="&lt;CSS-Attribute der Zeilen&gt;"<br></code>
@@ -5434,19 +5374,6 @@ $TC{1..5} = "align='center'";<br>
 $TC{1,3,5} = "align='center'";<br>
 $TC{last} = "style='font-weight:bold'";<br></code>
 <br>
-Es können ebenfalls beliebige Perl-Funktionen definiert werden, die innerhalb der Tabellendefinition genutzt werden können. Sie sollten mit FUNC_ beginnen. Damit wird sichergestellt, dass die Funktionen systemweit eindeutig sind.<br>
-<br>
-Bsp.<br>
-<br>
-Funktion für temperaturabhängige Farbgebung<br>
-<br>
-<code>
-sub FUNC_temp<br>
- {<br>
-  my ($temp)=@_<br>
-    return ("font-weight:bold;font-size:12pt;color:".DOIF_hsv ($temp,15,35,210,360,60,90));<br>
- }<br>
-<br></code>
 <b>Steuerungsattribute<br></b>
 <br>
 Ausblenden des Status in der Devicezeile:<br>
@@ -5465,9 +5392,9 @@ Die Detailansicht wird umorganisiert, hilfreich beim Editieren längerer uiTable
 <br>
 <code>$ATTRIBUTESFIRST = 1;</code><br>
 <br>
-<b>Template-Methoden<br></b>
+<b>Templates<br></b>
 <br>
-Bei Widgetdefinition, die mehrfach verwendet werden sollen, können Template-Methoden definiert werden. Die Definition beginnt mit dem Schlüsselwort <code>DEF</code>. Die Template_Methode muss mit <code>TPL_</code> beginnen.<br>
+Bei Widgetdefinition, die mehrfach verwendet werden sollen, können Templates definiert werden. Die Definition beginnt mit dem Schlüsselwort <code>DEF</code>. Ein Template muss mit <code>TPL_</code> beginnen.<br>
 <br>
 Syntax<br>
 <br>
@@ -5475,20 +5402,9 @@ Syntax<br>
 <br>
 <code>&lt;name&gt;</code> ist beliebig wählbar.<br>
 <br>
-In der Tabellendefinition können die zuvor definierten Template-Methoden genutzt werden. Die Übergabeparameter werden an Stelle der Platzhalter $1, $2 usw. eingesetzt.<br>
+In der Tabellendefinition können die zuvor definierten Templates genutzt werden. Die Übergabeparameter werden an Stelle der Platzhalter $1, $2 usw. eingesetzt.<br>
 <br>
-Beispiel<br>
-<br>
-Template-Methoden-Definition:<br>
-<br>
-<code>DEF TPL_Thermostat(WID($1,$TPL{HKnob},"set"))<br></code>
-<br>
-Nutzung der Template-Methode in der Tabellendefinition:<br>
-<br>
-<code>
-"Bathroom" | TPL_Thermostat([TH_Bathroom_HM:desired-temp])<br>
-"Kitchen" | TPL_Thermostat([TH_Kitchen_HM:desired-temp])<br>
-"Livingroom" | TPL_Thermostat([TH_Livingroom_HM:desired-temp])<br></code>
+Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#uiTable-Templates">Templates</a><br>
 <br>
 <b>Import von Templates und Funktionen<br></b>
 <br>
