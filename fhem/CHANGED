@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     37_echodevice.pm: new modul
+ - new:     70_OctoPrint.pm: new modul
  - bugfix:  38_netatmo: fixed home settings for recording
  - feature: 93_DbLog: variable $DEVICE is available in attr DbLogValueFn to 
                       have readonly access to the source device name

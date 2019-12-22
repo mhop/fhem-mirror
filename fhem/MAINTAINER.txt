@@ -210,6 +210,7 @@ FHEM/36_Shelly.pm            pahenning            Sonstige Systeme
 FHEM/36_Vallox.pm            Skjall               http://forum.fhem.de/index.php/topic,71325.0.html
 FHEM/36_WMBUS.pm             kaihs                Sonstige Systeme
 FHEM/37_dash_dhcp.pm         justme1968           Sonstige Systeme
+FHEM/37_echodevice.pm        michael.winkler      Multimedia
 FHEM/37_fakeRoku.pm          justme1968           Multimedia
 FHEM/37_harmony.pm           justme1968           Multimedia
 FHEM/37_NotifyAndroidTV.pm   justme1968           Multimedia
@@ -334,6 +335,7 @@ FHEM/70_LaMetric2.pm         loredo               Multimedia
 FHEM/70_MEDIAPORTAL.pm       Reinerlein           Multimedia
 FHEM/70_NEUTRINO.pm          michael.winkler      Multimedia
 FHEM/70_ONKYO_AVR.pm         delmar               Multimedia
+FHEM/70_OctoPrint.pm         michael.winkler      Multimedia
 FHEM/70_PHTV.pm              loredo               Multimedia
 FHEM/70_PIONEERAVR.pm        50watt               Multimedia
 FHEM/70_Pushbullet.pm        fhainz               Unterstützende Dienste
