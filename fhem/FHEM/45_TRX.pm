@@ -29,8 +29,9 @@
 #
 #	CHANGELOG
 #
-#	25.02.2ß19	Fixed missing FW reading for ProXL receivers
-#	ß4.12.2018	Added NotifyDn to catch DISCONNECTED Events	
+#	20.12.2019	Removed "Dumper"
+#	25.02.2019	Fixed missing FW reading for ProXL receivers
+#	04.12.2018	Added NotifyDn to catch DISCONNECTED Events
 #	26.12.2018	RfxMgr-like functionality to enable/disable protocols
 #				Support for Cuveo devices
 #	15.12.2018	added more readings and additional RFX-models
@@ -46,7 +47,6 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
-
 
 my $last_rmsg = "abcd";
 my $last_time = 1;
@@ -129,7 +129,7 @@ sub TRX_Initialize($) {
     $hash->{StateFn}    = "TRX_SetState";
     $hash->{AttrList}   = "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0";
     $hash->{ShutdownFn} = "TRX_Shutdown";
-	$hash->{NotifyFn} 	= "TRX_Notify";
+    $hash->{NotifyFn}   = "TRX_Notify";
 
 }
 
@@ -172,24 +172,25 @@ sub TRX_Define($$) {
 }
 
 sub TRX_Notify ($$) {
-  my ($own_hash, $dev_hash) = @_;
-  my $ownName = $own_hash->{NAME}; # own name / hash
+    my ( $own_hash, $dev_hash ) = @_;
+    my $ownName = $own_hash->{NAME};    # own name / hash
 
-  return "" if(IsDisabled($ownName)); # Return without any further action if the module is disabled
+    return "" if ( IsDisabled($ownName) );    # Return without any further action if the module is disabled
 
-  my $devName = $dev_hash->{NAME}; # Device that created the events
+    my $devName = $dev_hash->{NAME};          # Device that created the events
 
-  return "" if ($devName ne $ownName); # we just want to treat Devio events for own device
-  
-  my $events = deviceEvents($dev_hash,1);
-  return if( !$events );
+    return "" if ( $devName ne $ownName );    # we just want to treat Devio events for own device
 
-  foreach my $event (@{$events}) {
-	#Log3 $ownName, 1, "TRX received $event";
-    if ($event eq "DISCONNECTED") {
-		readingsSingleUpdate( $own_hash, "state", "disconnected", 1 );
-	}
-  }
+    my $events = deviceEvents( $dev_hash, 1 );
+    return if ( !$events );
+
+    foreach my $event ( @{$events} ) {
+
+        #Log3 $ownName, 1, "TRX received $event";
+        if ( $event eq "DISCONNECTED" ) {
+            readingsSingleUpdate( $own_hash, "state", "disconnected", 1 );
+        }
+    }
 }
 
 #####################################
@@ -295,7 +296,7 @@ sub TRX_SetModes($@) {
 
     my ( $b3, $b4, $b5, $b6 ) = "00";
 
-    Log3 $name, 5, "[$name] Setting protocols " . Dumper(@vals);
+    #Log3 $name, 5, "[$name] Setting protocols " . Dumper(@vals);
     foreach my $key ( keys %m3 ) {
         if ( grep ( /$m3{$key}/, @vals ) ) {
             $b3 += $key;
@@ -322,7 +323,7 @@ sub TRX_SetModes($@) {
     }
     my $hex = sprintf( "0D000000035308%02x%02x%02x%02x000000", $b3, $b4, $b5, $b6 );
     DevIo_SimpleWrite( $hash, $hex, 1 );
-    
+
     return undef;
 
 }
@@ -364,12 +365,13 @@ sub TRX_DoInit($) {
         my $init = pack( 'H*', "0D00000000000000000000000000" );
 
         DevIo_SimpleWrite( $hash, $init, 0 );
-		usleep(50000);    # wait 50 ms
-		
+        usleep(50000);    # wait 50 ms
+
         #DevIo_TimeoutRead( $hash, 0.5 );
         #$buf = DevIo_Expect( $hash, $init, 1 );
         sleep(1);
-		#Log3 $name,1,"TRX Expect received $buf";
+
+        #Log3 $name,1,"TRX Expect received $buf";
         TRX_Clear($hash);
 
         sleep(1);
@@ -378,18 +380,20 @@ sub TRX_DoInit($) {
         # Get Status
         $init = pack( 'H*', "0D00000102000000000000000000" );
         DevIo_SimpleWrite( $hash, $init, 0 );
+
         #usleep(50000);    # wait 50 ms
         $buf = unpack( 'H*', DevIo_TimeoutRead( $hash, 1 ) );
-		#$buf = DevIo_Expect( $hash, $init, 1 );
-		
+
+        #$buf = DevIo_Expect( $hash, $init, 1 );
+
         if ( !$buf ) {
             Log3 $name, 1, "TRX: Initialization Error: No character read";
-			readingsSingleUpdate( $hash, "state", "Error", 1 );
+            readingsSingleUpdate( $hash, "state", "Error", 1 );
             return "TRX: Initialization Error $name: no char read";
         }
         elsif ( $buf !~ m/0d0100....................../ && $buf !~ m/140100..................................../ ) {
             Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
-			readingsSingleUpdate( $hash, "state", "Error", 1 );
+            readingsSingleUpdate( $hash, "state", "Error", 1 );
             return "TRX: Initialization Error %name expected 0D010, but buf=$buf received.";
         }
         else {
@@ -408,8 +412,8 @@ sub TRX_DoInit($) {
 }
 
 sub TRX_evaluateResponse($$) {
-    my ($hash, $buf ) = @_;
-	my $name = $hash->{NAME};
+    my ( $hash, $buf ) = @_;
+    my $name = $hash->{NAME};
 
     my $fw = undef;
     if ( $buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/ ) {
@@ -465,7 +469,7 @@ sub TRX_evaluateResponse($$) {
             '4'  => 'Ext2',
             '5'  => 'Pro1',
             '6'  => 'Pro2',
-            '16' => 'ProXL1',				#forum #97873, just wondering why it comes as 16... 
+            '16' => 'ProXL1',                               #forum #97873, just wondering why it comes as 16...
         }->{$msg10}
           || 'unknown FW Type ' . $msg10;
 
@@ -610,7 +614,7 @@ sub TRX_ReadAnswer($$) {
         }
     }
 }
- 
+
 #####################################
 # called from the global loop, when the select for hash->{FD} reports data
 sub TRX_Read($@) {
