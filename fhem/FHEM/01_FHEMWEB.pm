@@ -186,7 +186,7 @@ FHEMWEB_Initialize($)
     ploteditor:always,onClick,never
     plotfork:1,0
     plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
-    plotEmbed:0,1
+    plotEmbed:2,1,0
     plotsize
     plotWeekStartDay:0,1,2,3,4,5,6
     nrAxis
@@ -548,7 +548,8 @@ FW_Read($$)
 
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
-  my $pf = AttrVal($FW_wname, "plotfork", 0);
+  my $pf = AttrVal($FW_wname, "plotfork", undef);
+  $pf = 1 if(!defined($pf) && AttrVal($FW_wname, "plotEmbed", 0) == 2);
   if($pf) {   # 0 disables
     # Process SVG rendering as a parallel process
     my $p = $data{FWEXT};
@@ -3953,9 +3954,11 @@ FW_show($$)
 
     <a name="plotEmbed"></a>
     <li>plotEmbed<br>
-        If set (to 1), SVG plots will be rendered as part of &lt;embed&gt;
+        If set to 1, SVG plots will be rendered as part of &lt;embed&gt;
         tags, as in the past this was the only way to display SVG.  Setting
         plotEmbed to 0 (the default) will render SVG in-place.<br>
+        Setting plotEmbed to 2 will load the SVG via JavaScript, in order to
+        enable parallelization without the embed tag.
     </li><br>
 
     <a name="plotfork"></a>
@@ -4690,11 +4693,13 @@ FW_show($$)
         </li><br>
 
     <a name="plotEmbed"></a>
-    <li>plotEmbed 0<br>
-        Falls gesetzt (auf 1), dann werden SVG Grafiken mit &lt;embed&gt; Tags
+    <li>plotEmbed<br>
+        Falls 1, dann werden SVG Grafiken mit &lt;embed&gt; Tags
         gerendert, da auf &auml;lteren Browsern das die einzige
         M&ouml;glichkeit war, SVG dastellen zu k&ouml;nnen. Falls 0 (die
         Voreinstellung), dann werden die SVG Grafiken "in-place" gezeichnet.
+        Falls 2, dann werden die Grafiken per JavaScript nachgeladen, um eine
+        Parallelisierung auch ohne embed Tags zu erm&ouml;glichen.
     </li><br>
 
     <a name="plotfork"></a>

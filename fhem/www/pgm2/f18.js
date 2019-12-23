@@ -66,7 +66,6 @@ $(document).ready(function(){
   });
   f18_menu();
   f18_tables();
-  f18_svgSetCols();
   if(typeof svgCallback != "undefined")
     svgCallback.f18 = f18_svgSetCols;
   $("[data-name]").each(function(){ f18_setPos(this) });
@@ -798,7 +797,7 @@ f18_svgSetCols(svg)
 {
   function col(n) { return f18_getAttr("cols."+n, true) };
 
-  if(!svg || !svg.getAttribute("data-origin"))
+  if(!svg || !$(svg).attr("data-origin"))
     return;
 
   var style = $(svg).find("> style").first();

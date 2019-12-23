@@ -421,6 +421,19 @@ svg_init(par)    // also called directly from perl, in race condition
       return;
     svg_init_one(e, sTag);
   });
+
+  if(par)
+    return;
+
+  $("svg.plotembed_2[data-src]").each(function(){
+    var svgThis = this;
+    var src = $(this).attr("data-src");
+    var dev = FW_escapeSelector($(this).attr("data-dev"));
+    FW_cmd(src, function(data){
+      $(svgThis).replaceWith(data.substr(data.indexOf('<svg')));
+      svg_init_one(undefined, $("svg#SVGPLOT_"+dev));
+   });
+  });
 }
 
 $(document).ready(function(){

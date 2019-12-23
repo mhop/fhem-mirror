@@ -49,6 +49,9 @@ sub SVG_getControlPoints($);
 sub SVG_calcControlPoints($$$$$$);
 
 my %SVG_devs;       # hash of from/to entries per device
+my $SVG_hdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+              'xmlns:xlink="http://www.w3.org/1999/xlink" '.
+              'data-origin="FHEM"';
 
 
 #####################################
@@ -185,7 +188,7 @@ SVG_getplotsize($)
 }
 
 sub
-SVG_isEmbed($)
+SVG_embed()
 {
   return AttrVal($FW_wname, "plotEmbed", 0);
 }
@@ -238,10 +241,16 @@ SVG_FwFn($$$$)
   if($pm eq "SVG") {
     $ret .= "<div class=\"SVGplot SVG_$d\">";
 
-    if(SVG_isEmbed($FW_wname)) {
+    my $embed = SVG_embed();
+    if($embed) {
       my ($w, $h) = split(",", SVG_getplotsize($d));
-      $ret .= "<embed src=\"$arg\" type=\"image/svg+xml\" " .
-            "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+      if($embed == 1) {
+        $ret .= "<embed src='$arg' type='image/svg+xml' " .
+              "width='$w' height='$h' name='$d'/>\n";
+      } else {
+        $ret .= "<svg $SVG_hdr class='plotembed_2' data-src='$arg' ".
+                  "data-dev='$d' style='width:${w}px; height:${h}px'></svg>\n";
+      }
 
     } else {
       my $oret=$FW_RET; $FW_RET="";
@@ -1081,9 +1090,9 @@ SVG_doShowLog($$$$;$)
 
     if($pm && $pm =~ m/SVG/) { # FW_fatal for SVG:
       $FW_RETTYPE = "image/svg+xml";
-      FW_pO '<svg xmlns="http://www.w3.org/2000/svg">';
-      FW_pO '<text x="20" y="20">'.$msg.'</text>';
-      FW_pO '</svg>';
+      FW_pO "<svg $SVG_hdr>";
+      FW_pO "<text x='20' y='20'>$msg</text>";
+      FW_pO "</svg>";
       return ($FW_RETTYPE, $FW_RET);
 
     } else {
@@ -1389,15 +1398,14 @@ SVG_render($$$$$$$$$$)
 
   ######################
   # SVG Header
-  my $svghdr = 'version="1.1" xmlns="http://www.w3.org/2000/svg" '.
-               'xmlns:xlink="http://www.w3.org/1999/xlink" '.
-               "id='SVGPLOT_$name' $filter data-origin='FHEM'";
+  my $svghdr = "$SVG_hdr id='SVGPLOT_$name' $filter";
+  my $style =  "style='width:${ow}px; height:${oh}px;'";
   if(!$noHeader) {
     SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
     SVG_pO '<!DOCTYPE svg>';
-    SVG_pO "<svg $svghdr width=\"${ow}px\" height=\"${oh}px\">";
+    SVG_pO "<svg $svghdr width='${ow}px' height='${oh}px' $style>";
   } else {
-    SVG_pO "<svg $svghdr style='width:${ow}px; height:${oh}px;'>";
+    SVG_pO "<svg $svghdr $style>";
   }
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
@@ -2218,10 +2226,13 @@ SVG_render($$$$$$$$$$)
     $txtoff2 += $th;
   }
 
-  my $fnName = SVG_isEmbed($FW_wname) ? "parent.window.svg_init" : "svg_init";
-
-  SVG_pO "<script type='text/javascript'>if(typeof $fnName == 'function') ".
+  my $embed = SVG_embed();
+  if($embed != 2) {
+    my $fnName = $embed ? "parent.window.svg_init" : "svg_init";
+    SVG_pO "<script type='text/javascript'>if(typeof $fnName == 'function') ".
                 "$fnName('SVGPLOT_$name')</script>";
+  }
+
   SVG_pO "</svg>";
   return $SVG_RET;
 }
