@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.0.0";
+my $version = "1.1.1";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -151,7 +151,7 @@ sub WS980_Initialize($)
 {
 	my ($hash) = @_;
 
-	Log3 undef, 4, "WS980 - WS980_Initialize() called";
+	Log3 undef, 5, "WS980 - WS980_Initialize() called";
 
 	$hash->{DefFn}     = "WS980_DefFn";
 	$hash->{UndefFn}   = "WS980_UndefFn";
@@ -167,6 +167,7 @@ sub WS980_Initialize($)
 	                     "connection:Keep-Alive,Close ".
 	                     "requests:multiple-strict,".join(",", sort keys %{REQUESTS()})." ".
 	                     "showRawBuffer:1 ".
+	                     "silentReconnect:1 ".
 	                     "disable:1 ".
 	                     WS980_extractAttrsFromUnits() .
 	                     $readingFnAttributes;
@@ -200,7 +201,7 @@ sub WS980_DefFn($$)
 	}
 
 	my ($name, $ip, $interval) = @a;
-	Log3 $name, 4, "WS980 ($name) - WS980_DefFn() called";
+	Log3 $name, 5, "WS980 ($name) - WS980_DefFn() called";
 
 	my $port = 45000;
 	# try to auto-discover the IP
@@ -240,7 +241,7 @@ sub WS980_UndefFn($$)
 	my ($hash, $arg) = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 4, "WS980 ($name) - WS980_UndefFn() called";
+	Log3 $name, 5, "WS980 ($name) - WS980_UndefFn() called";
 
 	delete $modules{WS980}{defptr}{$hash->{IP}};
 
@@ -378,7 +379,7 @@ sub WS980_autodiscoverIP($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 1, "WS980 ($name) - WS980_autodiscoverIP";
+	Log3 $name, 5, "WS980 ($name) - WS980_autodiscoverIP";
 
 	my $socket = IO::Socket::INET->new(
 		PeerAddr => inet_ntoa(INADDR_BROADCAST),
@@ -418,7 +419,7 @@ sub WS980_autodiscoverIP($)
 	my $req = WS980_createRequestRaw("\x12");
 
 	# send request
-	Log3 $name, 5, "WS980 ($name) - broadcasting auto-discovery: " . WS980_hexDump($req);
+	Log3 $name, 4, "WS980 ($name) - broadcasting auto-discovery: " . WS980_hexDump($req);
 	if ($socket->send($req) == 0) {
 		Log3 $name, 1, "WS980 ($name) - autodiscovery failed: cannot send request";
 		return (undef,undef);
@@ -432,11 +433,11 @@ sub WS980_autodiscoverIP($)
 
 	# ffff 12 LLLL ?? ?? ?? ?? ?? ?? I1 I2 I3 I4 PPPP LN NN..NN C2
 	#              84 f3 eb 21 8c d1
-	Log3 $name, 5, "WS980 ($name) - received raw reply: " . WS980_hexDump($rawbuf);
+	Log3 $name, 4, "WS980 ($name) - received raw reply: " . WS980_hexDump($rawbuf);
 
 	my ($typeStr, $buf) = WS980_handleReply($hash, $rawbuf);
 	my ($ip1, $ip2, $ip3, $ip4, $port, $stationName) = unpack("x[6]CCCCnC/A", $buf);
-	Log3 $name, 1, "WS980 ($name) - reply: $ip1, $ip2, $ip3, $ip4, $port, $stationName";
+	Log3 $name, 2, "WS980 ($name) - reply: $ip1, $ip2, $ip3, $ip4, $port, $stationName";
 
 	return (sprintf("%d.%d.%d.%d", $ip1, $ip2, $ip3, $ip4), $port);
 }
@@ -451,7 +452,7 @@ sub WS980_updateValues($)
 	my $name = $hash->{NAME};
 	my $ip = $hash->{IP};
 
-	Log3 $name, 4, "WS980 ($name) - WS980_updateValues called";
+	Log3 $name, 5, "WS980 ($name) - WS980_updateValues called";
 
 	my $interval = $hash->{INTERVAL};
 	RemoveInternalTimer($hash, "WS980_updateValues");
@@ -460,7 +461,8 @@ sub WS980_updateValues($)
 	return undef if (WS980_isDisabled($hash));
 
 	if ($hash->{helper}{requestInProgress} == 1) {
-		Log3 $name, 1, "WS980 ($name) - looks like the last request did not receive an answer, trying to reconnect";
+		my $logLevel = AttrVal($name, "silentReconnect", "") eq "1" ? 4 : 3;
+		Log3 $name, $logLevel, "WS980 ($name) - looks like the last request did not receive an answer, trying to reconnect";
 		WS980_Close($hash);
 	}
 
@@ -485,7 +487,7 @@ sub WS980_writeNextActiveRequest($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 3, "WS980 ($name) - activeRquests: " . join(" ", @{$hash->{helper}{activeRequests}});
+	Log3 $name, 5, "WS980 ($name) - activeRquests: " . join(" ", @{$hash->{helper}{activeRequests}});
 
 	my $valueType = shift(@{$hash->{helper}{activeRequests}});
 	if (!defined($valueType)) {
@@ -500,7 +502,8 @@ sub WS980_writeNextActiveRequest($)
 
 	my $buf = WS980_createRequest($hash, $valueType);
 	if (defined $buf) {
-		Log3 $name, 5, "WS980 ($name) - Sending new request for '$valueType'...";
+		my $logLevel = AttrVal($name, "silentReconnect", "") eq "1" ? 4 : 3;
+		Log3 $name, $logLevel, "WS980 ($name) - Sending new request for '$valueType'...";
 		WS980_WriteFn($hash, $buf);
 	} else {
 		WS980_Close($hash);
@@ -837,7 +840,8 @@ sub WS980_Open($)
 
 	return 1 if ($hash->{CD});
 
-	Log3 $name, 3, "WS980 ($name) - Creating socket connection to $ip:$port";
+	my $logLevel = AttrVal($name, "silentReconnect", "") eq "1" ? 4 : 3;
+	Log3 $name, $logLevel, "WS980 ($name) - Creating socket connection to $ip:$port";
 
 	my $socket = new IO::Socket::INET(
 		PeerAddr => $ip,
@@ -864,7 +868,7 @@ sub WS980_Open($)
 
 	$hash->{ConnectionState} = 'connected';
 
-	Log3 $name, 2, "WS980 ($name) - Socket Connected";
+	Log3 $name, $logLevel, "WS980 ($name) - Socket Connected";
 	return 1;
 }
 
@@ -877,12 +881,12 @@ sub WS980_ReadFn($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 4, "WS980 ($name) - ReadFn started";
+	Log3 $name, 5, "WS980 ($name) - ReadFn started";
 
 	my $rawbuf;
 	my $len = sysread($hash->{CD}, $rawbuf, 10240);
 
-	Log3 $name, 5, "WS980 ($name) - received reply: " . WS980_hexDump($rawbuf);
+	Log3 $name, 4, "WS980 ($name) - received reply: " . WS980_hexDump($rawbuf);
 
 	$hash->{helper}{requestInProgress} = 0;
 
@@ -911,7 +915,7 @@ sub WS980_ReadFn($)
 	}
 	else
 	{
-		Log3 $name, 3, "WS980 ($name) - looks like the reply could not be decoded, skipping";
+		Log3 $name, 1, "WS980 ($name) - looks like the reply could not be decoded, skipping";
 	}
 
 	WS980_writeNextActiveRequest($hash);
@@ -965,7 +969,7 @@ sub WS980_updateRain24h($)
 	my $curTS  = int(gettimeofday() / $interval);
 	return if ($lastTS == $curTS);
 
-	Log3 $name, 3, "WS980 ($name) - updating rain24h ...";
+	Log3 $name, 5, "WS980 ($name) - updating rain24h ...";
 	readingsSingleUpdate($hash, ".rain24h_lastTS", $curTS, 1);
 
 	my $curRainTotal = ReadingsNum($name, "rainTotal", -1);
@@ -1074,7 +1078,7 @@ sub WS980_parseEventsAttr($$)
 	$attrVal =~ s/\s//g;   # " " -> ""
 	$attrVal =~ s/\|+/|/g; # || -> |
 
-	Log3 $name, 3, "WS980 ($name) - WS980_parseEventsAttr for $attrVal";
+	Log3 $name, 5, "WS980 ($name) - WS980_parseEventsAttr for $attrVal";
 
 	# parse attribute
 	my %eventsConfig;
@@ -1089,7 +1093,7 @@ sub WS980_parseEventsAttr($$)
 		$eventsConfig{$eventReading}{"limit"} = $limit;
 		$eventsConfig{$eventReading}{"hyst"}  = int($hysterese);
 
-		Log3 $name, 3, "WS980 ($name) - adding event-configuration for $eventReading: $srcReading, $type, $limit, $hysterese";
+		Log3 $name, 5, "WS980 ($name) - adding event-configuration for $eventReading: $srcReading, $type, $limit, $hysterese";
 	}
 
 	# remember config in $hash->{helper}
@@ -1098,7 +1102,7 @@ sub WS980_parseEventsAttr($$)
 	# delete removed events
 	foreach my $oldReading (keys %oldEventsConfig) {
 		if (!defined($eventsConfig{$oldReading})) {
-			Log3 $name, 3, "WS980 ($name) - removing event-configuration for $oldReading";
+			Log3 $name, 5, "WS980 ($name) - removing event-configuration for $oldReading";
 			CommandDeleteReading( undef, "$name ".    $oldReading);
 			CommandDeleteReading( undef, "$name ".".".$oldReading."_hyst");
 		}
@@ -1118,7 +1122,7 @@ sub WS980_updateEvents($)
 	my ($hash)  = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 4, "WS980 ($name) - WS980_updateEvents";
+	Log3 $name, 5, "WS980 ($name) - WS980_updateEvents";
 	if (!$hash->{helper}{eventsConfig}) {
 		return
 	}
@@ -1142,7 +1146,7 @@ sub WS980_updateEvents($)
 
 		if ($type eq "<") {
 			if ($prevState == -1) {
-				Log3 $name, 3, "WS980 ($name) - adding event $readingName";
+				Log3 $name, 5, "WS980 ($name) - adding event $readingName";
 				readingsBulkUpdate($hash, $readingName,     $srcValue <= $limit ? "1" : "0", 1);
 				readingsBulkUpdate($hash, $hystReadingName, "0",                             0);
 			} else {
@@ -1167,7 +1171,7 @@ sub WS980_updateEvents($)
 		}
 		elsif ($type eq ">") {
 			if ($prevState == -1) {
-				Log3 $name, 3, "WS980 ($name) - adding event $readingName";
+				Log3 $name, 5, "WS980 ($name) - adding event $readingName";
 				readingsBulkUpdate($hash, $readingName,     $srcValue >= $limit ? "1" : "0", 1);
 				readingsBulkUpdate($hash, $hystReadingName, "0",                             0);
 			} else {
@@ -1205,9 +1209,9 @@ sub WS980_WriteFn($$)
 	my ($hash, $buf)  = @_;
 	my $name = $hash->{NAME};
 
-	Log3 $name, 4, "WS980 ($name) - WriteFn called";
+	Log3 $name, 5, "WS980 ($name) - WriteFn called";
 
-	return Log3 $name, 3, "WS980 ($name) - socket not connected" unless($hash->{CD});
+	return Log3 $name, 1, "WS980 ($name) - socket not connected" unless($hash->{CD});
 
 	Log3 $name, 5, "WS980 ($name) - sending " . WS980_hexDump($buf);
 	my $bytes = syswrite($hash->{CD}, $buf);
@@ -1245,7 +1249,8 @@ sub WS980_Close($)
 
 	$hash->{ConnectionState} = 'disconnected';
 
-	Log3 $name, 1, "WS980 ($name) - Socket Disconnected";
+	my $logLevel = AttrVal($name, "silentReconnect", "") eq "1" ? 4 : 3;
+	Log3 $name, $logLevel, "WS980 ($name) - Socket Disconnected";
 }
 
 
@@ -1528,6 +1533,10 @@ sub WS980_checkChecksum($)
 		<li><a name="showRawBuffer"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>showRawBuffer </b>1</code></dt>
 			used for development: show raw data received from the WS980WiFi
+		</li>
+		<li><a name="silentReconnect"></a>
+			<dt><code><b>attr</b> &lt;name&gt; <b>silentReconnect </b>1</code></dt>
+			If set to 1, then it will set the loglevel for connect- and reconnect-messages to 2 instead of 1
 		</li>
 		<li><a name="unit_temperature"></a>
 			<dt><code><b>attr</b> &lt;name&gt; <b>unit_temperature </b>&lt;<b>unit</b>&gt;</code></dt>
