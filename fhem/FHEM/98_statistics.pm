@@ -1164,11 +1164,10 @@ sub statistics_UpdateDevReading($$$$)
 1;
 
 =pod
-=begin html
-
-=item helper
 =item summary Calculates statistical values and adds them to the devices.
 =item summary_DE Berechnet statistische Werte und fügt sie dem Gerät hinzu.
+=item helper
+=begin html
 
 <a name="statistics"></a>
 <h3>statistics</h3>

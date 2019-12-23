@@ -916,11 +916,10 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 1;
 
 =pod
-=begin html
-
-=item device
 =item summary reads OBIS data from measurement devices
 =item summary_DE liest OBIS Daten von Messgeräten
+=item device
+=begin html
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
