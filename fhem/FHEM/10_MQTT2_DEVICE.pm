@@ -516,6 +516,7 @@ MQTT2_DEVICE_delReading($)
 {
   my ($name) = @_;
   my $cid = $defs{$name}{CID};
+  $cid = "" if(!defined($cid));
   for my $step (1,2) {
     next if($step == 1 && !$modules{MQTT2_DEVICE}{defptr}{"re:$cid"});
     my $dp = $modules{MQTT2_DEVICE}{defptr}{$step==1 ? "re:$cid" : "re"};
