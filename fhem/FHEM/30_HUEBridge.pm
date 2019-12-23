@@ -181,7 +181,7 @@ HUEBridge_Detect($)
   Log3 $name, 3, "HUEBridge_Detect";
 
   my ($err,$ret) = HttpUtils_BlockingGet({
-    url => "http://www.meethue.com/api/nupnp",
+    url => "https://discovery.meethue.com/",
     method => "GET",
   });
 
