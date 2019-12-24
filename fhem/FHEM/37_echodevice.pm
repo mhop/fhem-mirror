@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2019.12.24 v0.1.0
+# - FEATURE: Unterstützung A1Z88NGR2BK6A2 ECHO Show 8
+#            Unterstützung A2JKHJ0PX4J3L3 ECHO FireTv Cube 4K
+#
 # 2019.12.22 v0.0.60
 # - FEATURE: Unterstützung A3VRME03NAXFUB ECHO Flex
 #            Unterstützung AKOAGQTKAS9YB ECHO Connect
@@ -360,7 +364,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.0.59";
+my $ModulVersion     = "0.1.0";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -779,7 +783,7 @@ sub echodevice_Set($@) {
 			$usage .= 'volume:slider,0,1,100 play:noArg pause:noArg next:noArg previous:noArg forward:noArg rewind:noArg shuffle:on,off repeat:on,off dnd:on,off volume_alarm:slider,0,1,100 ';
 			$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
 			
-			$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
+			$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
 			
 			# startownplaylist
 			$usage .= echodevice_GetOwnPlaylist($hash);
@@ -4108,6 +4112,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
 	elsif($ModelNumber eq "AWZZ5CVHX2CD"   || $ModelNumber eq "Echo Show")				{return "Echo Show Gen2";}
 	elsif($ModelNumber eq "A4ZP7ZC4PI6TO"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5";}
+	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")				{return "Echo Plus";}
 	elsif($ModelNumber eq "A1JJ0KFC4ZPNJ3" || $ModelNumber eq "Echo Input")				{return "Echo Input";}
 	elsif($ModelNumber eq "A18O6U1UQFJ0XK" || $ModelNumber eq "Echo Plus 2")			{return "Echo Plus 2";}
@@ -4131,6 +4136,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "ADVBD696BHNV5"  || $ModelNumber eq "Fire TV Stick V1")		{return "Fire TV Stick V1";}
 	elsif($ModelNumber eq "A2LWARUGJLBYEW" || $ModelNumber eq "Fire TV Stick V2")		{return "Fire TV Stick V2";}
 	elsif($ModelNumber eq "AKPGW064GI9HE"  || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
+	elsif($ModelNumber eq "A2JKHJ0PX4J3L3" || $ModelNumber eq "ECHO FireTv Cube 4K")	{return "ECHO FireTv Cube 4K";}
 	elsif($ModelNumber eq "A10L5JEZTKKCZ8" || $ModelNumber eq "VOBOT")           		{return "VOBOT";}
 	elsif($ModelNumber eq "A37SHHQ3NUL7B5" || $ModelNumber eq "Bose Home Speaker 500")	{return "Bose Home Speaker 500";}
 	elsif($ModelNumber eq "AVN2TMX8MU2YM"  || $ModelNumber eq "Bose Home Speaker 500")	{return "Bose Home Speaker 500";}
