@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 37_echodevice.pm:
+            add device A1Z88NGR2BK6A2 ECHO Show 8
+            add device A2JKHJ0PX4J3L3 ECHO FireTv Cube 4K
  - new:     37_echodevice.pm: new modul
  - new:     70_OctoPrint.pm: new modul
  - bugfix:  38_netatmo: fixed home settings for recording
