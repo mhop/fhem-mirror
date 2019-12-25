@@ -79,6 +79,7 @@ my %YAMAHA_MC_setCmdswithoutArgs = (
     "on"                       => "/v1/main/setPower?power=on",
     "off"                      => "/v1/main/setPower?power=standby",
     "power"                    => "/v1/main/setPower?power=",
+	"toggle"	               => "/v1/main/setPower?power=toggle",
     "setAutoPowerStandby"      => "/v1/system/setAutoPowerStandby?enable=",
     "volume"                   => "/v1/main/setVolume?volume=",
     "volumeStraight"           => "/v1/main/setVolume?volume=",
@@ -138,7 +139,8 @@ my %YAMAHA_MC_setCmdswithoutArgs = (
 my %YAMAHA_MC_setCmdsWithArgs = (
     "on:noArg"                                                                                                                  => "/v1/main/setPower?power=on",
     "off:noArg"                                                                                                                 => "/v1/main/setPower?power=standby",
-    "power:on,standby"                                                                                                          => "/v1/main/setPower?power=",
+    "power:on,standby,toggle"                                                                                                   => "/v1/main/setPower?power=",
+	"toggle:noArg"			                                                                                                    => "/v1/main/setPower?power=toggle",		
     "setAutoPowerStandby:true,false"                                                                                            => "/v1/system/setAutoPowerStandby?enable=",
     "volume:slider,0,1,100"                                                                                                     => "/v1/main/setVolume?volume=",
     "volumeStraight"                                                                                                            => "/v1/main/setVolume?volume=",
@@ -268,7 +270,7 @@ sub YAMAHA_MC_Define($$)    # only called when defined, not on reload.
     # http://192.168.0.28:49154/MediaRenderer/desc.xml
     $hash->{URLCMD} = "/YamahaExtendedControl";
 
-    my $VERSION = "v2.1.0";
+    my $VERSION = "v2.1.1";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "Yamaha MC : $VERSION";
 
@@ -1542,7 +1544,8 @@ sub YAMAHA_MC_UpdateLists($;$) {
     %YAMAHA_MC_setCmdsWithArgs = (
         "on:noArg"                       => "/v1/main/setPower?power=on",
         "off:noArg"                      => "/v1/main/setPower?power=standby",
-        "power:on,standby"               => "/v1/main/setPower?power=",
+        "power:on,standby,toggle"        => "/v1/main/setPower?power=",
+		"toggle:noArg"		             => "/v1/main/setPower?power=toggle",
         "setAutoPowerStandby:true,false" => "/v1/system/setAutoPowerStandby?enable=",
         "volume:slider,0,1,100"          => "/v1/main/setVolume?volume=",
         "volumeStraight"                 => "/v1/main/setVolume?volume=",
@@ -1711,7 +1714,7 @@ sub YAMAHA_MC_Set($$@) {
     my $deviceList_comma = join( ",", @deviceList );
 
     $cmd = "?" unless defined $cmd;
-    my $usage = "Unknown argument $cmd, choose one of " . "on:noArg " . "off:noArg " . "power:on,standby " . "setAutoPowerStandby:true,false " . "volume:slider,0,1,100 " . "volumeStraight " . "volumeUp:noArg " . "volumeDown:noArg " . "mute:toggle,true,false " . "setSpeakerA:toggle,true,false " . "setSpeakerB:toggle,true,false " . "setToneBass:slider,-10,1,10 " . "setToneMid:slider,-10,1,10 " . "setToneHigh:slider,-10,1,10 " . ( exists( $hash->{helper}{INPUTS} ) ? "input:" . $inputs_comma . " " : "input " ) . ( exists( $hash->{helper}{INPUTS} ) ? "prepareInputChange:" . $inputs_comma . " " : "prepareInputChange " ) . "getStatus:noArg " . "getFeatures:noArg " . "getFuncStatus:noArg " . "selectMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectMenuItem:" . $menuitems_comma . " " : "selectMenuItem " ) . "selectPlayMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectPlayMenuItem:" . $menuitems_comma . " " : "" ) . "getPlayInfo:noArg " . "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end " . "getMenu:noArg " . "getMenuItems:noArg " . "returnMenu:noArg " . "getDeviceInfo:noArg " . "getSoundProgramList:noArg " . ( exists( $hash->{helper}{SOUNDPROGRAMS} ) ? "setSoundProgramList:" . $soundprograms_comma . " " : "" ) . "setFmTunerPreset:slider,0,1,20 " . "setDabTunerPreset:slider,0,1,20 " . "setNetRadioPreset " . "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8 " . "TurnFavServerChannelOn:noArg " . "navigateListMenu " . "NetRadioNextFavChannel:noArg " . "NetRadioPrevFavChannel:noArg " . "sleep:uzsuSelectRadio,0,30,60,90,120 " . "getNetworkStatus:noArg " . "getLocationInfo:noArg " . "getDistributionInfo:noArg " . "getBluetoothInfo:noArg " . "enableBluetooth:true,false " . "setGroupName " . "mcLinkTo:multiple," . $deviceList_comma . " " . "speakfile " . "mcUnLink:multiple," . ReadingsVal( $hash->{NAME}, "linkedClients", "" ) . " " . "setServerInfo " . "setClientInfo " . "startDistribution " . "isNewFirmwareAvailable:noArg " . "statusRequest:noArg ";
+    my $usage = "Unknown argument $cmd, choose one of " . "on:noArg " . "off:noArg " . "power:on,standby,toggle " . "toggle:noArg " . "setAutoPowerStandby:true,false " . "volume:slider,0,1,100 " . "volumeStraight " . "volumeUp:noArg " . "volumeDown:noArg " . "mute:toggle,true,false " . "setSpeakerA:toggle,true,false " . "setSpeakerB:toggle,true,false " . "setToneBass:slider,-10,1,10 " . "setToneMid:slider,-10,1,10 " . "setToneHigh:slider,-10,1,10 " . ( exists( $hash->{helper}{INPUTS} ) ? "input:" . $inputs_comma . " " : "input " ) . ( exists( $hash->{helper}{INPUTS} ) ? "prepareInputChange:" . $inputs_comma . " " : "prepareInputChange " ) . "getStatus:noArg " . "getFeatures:noArg " . "getFuncStatus:noArg " . "selectMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectMenuItem:" . $menuitems_comma . " " : "selectMenuItem " ) . "selectPlayMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectPlayMenuItem:" . $menuitems_comma . " " : "" ) . "getPlayInfo:noArg " . "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end " . "getMenu:noArg " . "getMenuItems:noArg " . "returnMenu:noArg " . "getDeviceInfo:noArg " . "getSoundProgramList:noArg " . ( exists( $hash->{helper}{SOUNDPROGRAMS} ) ? "setSoundProgramList:" . $soundprograms_comma . " " : "" ) . "setFmTunerPreset:slider,0,1,20 " . "setDabTunerPreset:slider,0,1,20 " . "setNetRadioPreset " . "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8 " . "TurnFavServerChannelOn:noArg " . "navigateListMenu " . "NetRadioNextFavChannel:noArg " . "NetRadioPrevFavChannel:noArg " . "sleep:uzsuSelectRadio,0,30,60,90,120 " . "getNetworkStatus:noArg " . "getLocationInfo:noArg " . "getDistributionInfo:noArg " . "getBluetoothInfo:noArg " . "enableBluetooth:true,false " . "setGroupName " . "mcLinkTo:multiple," . $deviceList_comma . " " . "speakfile " . "mcUnLink:multiple," . ReadingsVal( $hash->{NAME}, "linkedClients", "" ) . " " . "setServerInfo " . "setClientInfo " . "startDistribution " . "isNewFirmwareAvailable:noArg " . "statusRequest:noArg ";
 
     # delay in Seks for next request after turning on device
     my $powerCmdDelay = AttrVal( $hash->{NAME}, "powerCmdDelay", 3 );
@@ -1739,12 +1742,7 @@ sub YAMAHA_MC_Set($$@) {
     }
     elsif ( lc($cmd) eq "toggle" ) {
         Log3 $name, 4, "$name : YAMAHA_MC_Set power toggle";
-        if ( ReadingsVal( $name, "power", "off" ) eq "off" ) {
-            YAMAHA_MC_httpRequestQueue( $hash, "power", "on", { options => { at_first => 1, priority => 1, wait_after_response => $powerCmdDelay } } );    # call fn that will do the http request
-        }
-        else {
-            YAMAHA_MC_httpRequestQueue( $hash, "power", "off" );                                                                                           # call fn that will do the http request
-        }
+        YAMAHA_MC_httpRequestQueue($hash, "toggle", "", {options  => {unless_in_queue => 1, priority => 1, wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
     }
     elsif ( $cmd eq "power" ) {
         if ( lc( $a[2] ) eq "on" ) {
@@ -1757,6 +1755,11 @@ sub YAMAHA_MC_Set($$@) {
             YAMAHA_MC_httpRequestQueue( $hash, "power", "standby", { options => { unless_in_queue => 1, wait_after_response => $powerCmdDelay } } );       # call fn that will do the http request
                                                                                                                                                            #YAMAHA_MC_ResetTimer($hash);
         }
+		elsif(lc($a[2]) eq "toggle") {
+            Log3 $name, 4, "$name : YAMAHA_MC_Set power2 toggle";
+		    YAMAHA_MC_httpRequestQueue($hash, "power", "toggle", {options    => { unless_in_queue => 1, wait_after_response => $powerCmdDelay}}); # call fn that will do the http request
+		    #YAMAHA_MC_ResetTimer($hash);
+		}
         else {
             return "invalid parameter $a[2] for set power";
         }
@@ -4902,7 +4905,8 @@ sub YAMAHA_URI_Escape($) {
 <ul>
 <li><b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device</li>
 <li><b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; set the device in standby, real shutdown not possible </li>
-<li><b>power</b> on|standby &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device or sets it to standby</li>
++<li><b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; Toggle between power on and standby </li>
++<li><b>power</b> on|standby|toggle &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device or sets it to standby</li>
 <li><b>input</b> hdm1,hdmX,... &nbsp;&nbsp;-&nbsp;&nbsp; selects the input channel (only the real available inputs were given)</li>
 <li><b>volume</b> 0...100 [direct] &nbsp;&nbsp;-&nbsp;&nbsp; set the volume level in percentage. If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
 <li><b>volumeUp</b> &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by the value of attribute volumeSteps </li>
