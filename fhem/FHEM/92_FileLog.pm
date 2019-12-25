@@ -1064,7 +1064,12 @@ RESCAN:
     my $j = $i+1;
     $data{"min$j"} = $min[$i];
     $data{"max$j"} = $max[$i];
-    $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : 0;
+    if($cnt[$i]) {
+      my $a = $sum[$i]/$cnt[$i];
+      $data{"avg$j"} = sprintf("%0.*f", ($a<=1 ? 3 : ($a <= 10 ? 2 : 1)), $a);
+    } else {
+      $data{"avg$j"} = 0;
+    }
     $data{"sum$j"} = $sum[$i];
     $data{"cnt$j"} = $cnt[$i];
     $data{"currval$j"} = $lastv[$i];
