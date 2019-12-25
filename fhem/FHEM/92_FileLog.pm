@@ -1066,7 +1066,7 @@ RESCAN:
     $data{"max$j"} = $max[$i];
     if($cnt[$i]) {
       my $a = $sum[$i]/$cnt[$i];
-      $data{"avg$j"} = sprintf("%0.*f", ($a<=1 ? 3 : ($a <= 10 ? 2 : 1)), $a);
+      $data{"avg$j"} = sprintf("%0.*f",abs($a)<=1 ? 3 : abs($a)<=10 ? 2 :1,$a);
     } else {
       $data{"avg$j"} = 0;
     }
