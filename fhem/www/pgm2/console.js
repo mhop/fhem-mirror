@@ -241,7 +241,8 @@ consAddRegexpPart()
     var evtDev=ret[3];
     var evt1 = ret[4].replace(/\s/g, ".")
                      .replace(/[\^\$\[\]\(\)\\]/g, function(s){return"\\"+s});
-    var evt2 = evt1.replace(/\b-?\d*\.?\d+\b/g,'.*').replace(/\.\* \.\*/g,'.*');
+    var evt2 = evt1.replace(/\b-?\d*\.?\d+\b/g,'.*')
+                   .replace(/\.+\*(\.+\*)*/g,'.*');
 
     // build the dialog
     var txt = '<style type="text/css">\n'+
