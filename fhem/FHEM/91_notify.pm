@@ -778,8 +778,8 @@ END
     <li>ignoreRegexp regexp<br>
         Es ist nicht immer einfach ein Regexp zu bauen, was etwas _nicht_
         matcht. Dieses Attribu hilft in diesen F&auml;llen: das Event wird
-        ignoriert, falls den angegebenen Regexp. Syntax ist gleich wie in der
-        Definition.
+        ignoriert, falls den angegebenen Regexp matcht. Syntax ist gleich wie
+        in der Definition.
         </li>
 
     <a name="readLog"></a>

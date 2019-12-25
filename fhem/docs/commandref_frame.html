@@ -1567,6 +1567,13 @@ The following local attributes are used by a wider range of devices:
         compression by default. Set httpcompress to 0 to disable this feature.
     </li><br>
 
+    <a name="ignoreRegexp"></a>
+    <li>ignoreRegexp<br>
+        Do not log messages matching the value into the FHEM log.  Note: the
+        usual ^ and $ will be appended to the regexp, like in notify or
+        FileLog.
+    </li><br>
+
     <a name="keyFileName"></a>
     <li>keyFileName<br>
         FHEM modules store passwords and unique IDs in the file

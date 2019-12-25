@@ -303,6 +303,7 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
+my $ignoreRegexp;               # for Log filtering
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -338,6 +339,7 @@ my @globalAttrList = qw(
   genericDisplayType:switch,outlet,light,blind,speaker,thermostat
   holiday2we
   httpcompress:0,1
+  ignoreRegexp
   keyFileName
   language:EN,DE
   lastinclude
@@ -969,6 +971,7 @@ Log3($$$)
     return if($loglevel > $attr{global}{verbose});
 
   }
+  return if($ignoreRegexp && $text =~ m/^$ignoreRegexp$/);
 
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
@@ -2752,6 +2755,7 @@ GlobalAttr($$$$)
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.9 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
+    $ignoreRegexp = 0   if($name eq "ignoreRegexp"); 
     return undef;
   }
 
@@ -2845,6 +2849,11 @@ GlobalAttr($$$$)
     } else {
       $haveInet6 = 0;
     }
+  }
+  elsif($name eq "ignoreRegexp") {
+    eval { "Hallo" =~ m/^$val$/ };
+    return $@ if($@);
+    $ignoreRegexp = $val;
   }
 
   return undef;
