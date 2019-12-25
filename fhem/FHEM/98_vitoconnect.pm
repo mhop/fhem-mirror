@@ -139,6 +139,9 @@
 #					Behoben: vitoconnect bringt FHEM zum Absturz in Zeile 1376 (Forum: #391)
 #					Überwachung der Aktualität: Zeitpunkt des letzten Updates wird in State angezeigt (Forum #397)
 #
+# 2019-12-25		heating.solar.power.cumulativeProduced.value, heating.circuits.X.geofencing.active, heating.circuits.X.geofencing.status hinzugefügt
+#                   Behoben: Readings wurden nicht mehr aktualisiert, wenn Resource an weiteren Stellen nicht als JSON interpretiert werden konnte(Forum: #390)
+#
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
 #                 Nicht bei jedem Lesen neu einloggen (wenn möglich)
@@ -197,7 +200,7 @@ my $RequestList = {
     "heating.burner.current.power.value"                             	=> "Brenner_Leistung", 
     "heating.burner.modulation.value"                                	=> "Brenner_Modulation",
     "heating.burner.statistics.hours"                                	=> "Brenner_Betriebsstunden",
-	 "heating.burner.statistics.starts" 								=> "Brenner_Starts",
+	"heating.burner.statistics.starts" 								=> "Brenner_Starts",
 
     "heating.circuits.enabled" 											=> "Aktive_Heizkreise",
     "heating.circuits.0.active" 										=> "HK1-aktiv",
@@ -205,7 +208,9 @@ my $RequestList = {
     "heating.circuits.0.circulation.schedule.active" 					=> "HK1-Zeitsteuerung_Zirkulation_aktiv",
     "heating.circuits.0.circulation.schedule.entries" 					=> "HK1-Zeitsteuerung_Zirkulation",
     "heating.circuits.0.frostprotection.status" 						=> "HK1-Frostschutz_Status",
-    "heating.circuits.0.heating.curve.shift" 							=> "HK1-Heizkurve-Niveau",
+	"heating.circuits.0.geofencing.active"								=> "HK1-Geofencing",
+	"heating.circuits.0.geofencing.status"								=> "HK1-Geofencing_Status",
+	"heating.circuits.0.heating.curve.shift" 							=> "HK1-Heizkurve-Niveau",
     "heating.circuits.0.heating.curve.slope" 							=> "HK1-Heizkurve-Steigung",
     "heating.circuits.0.heating.schedule.active" 						=> "HK1-Zeitsteuerung_Heizung_aktiv",
     "heating.circuits.0.heating.schedule.entries" 						=> "HK1-Zeitsteuerung_Heizung",
@@ -245,6 +250,8 @@ my $RequestList = {
     "heating.circuits.1.circulation.schedule.active" 					=> "HK2-Zeitsteuerung_Zirkulation_aktiv",
     "heating.circuits.1.circulation.schedule.entries" 					=> "HK2-Zeitsteuerung_Zirkulation",
     "heating.circuits.1.frostprotection.status" 						=> "HK2-Frostschutz_Status",
+	"heating.circuits.1.geofencing.active"								=> "HK2-Geofencing",
+	"heating.circuits.1.geofencing.status"								=> "HK2-Geofencing_Status",
     "heating.circuits.1.heating.curve.shift" 							=> "HK2-Heizkurve-Niveau",
     "heating.circuits.1.heating.curve.slope" 							=> "HK2-Heizkurve-Steigung",
     "heating.circuits.1.heating.schedule.active" 						=> "HK2-Zeitsteuerung_Heizung_aktiv",
@@ -285,6 +292,8 @@ my $RequestList = {
     "heating.circuits.2.circulation.schedule.active" 					=> "HK3-Zeitsteuerung_Zirkulation_aktiv",
     "heating.circuits.2.circulation.schedule.entries" 					=> "HK3-Zeitsteuerung_Zirkulation",
     "heating.circuits.2.frostprotection.status" 						=> "HK3-Frostschutz_Status",
+	"heating.circuits.2.geofencing.active"								=> "HK3-Geofencing",
+	"heating.circuits.2.geofencing.status"								=> "HK3-Geofencing_Status",
     "heating.circuits.2.heating.curve.shift" 							=> "HK3-Heizkurve-Niveau",
     "heating.circuits.2.heating.curve.slope" 							=> "HK3-Heizkurve-Steigung",
     "heating.circuits.2.heating.schedule.active" 						=> "HK3-Zeitsteuerung_Heizung_aktiv",
@@ -333,16 +342,16 @@ my $RequestList = {
     "heating.dhw.charging.level.value"                               	=> "WW-Speicherladung",    
     
     "heating.dhw.oneTimeCharge.active" 									=> "WW-einmaliges_Aufladen",
-  	 "heating.dhw.pumps.circulation.schedule.active"                  	=> "WW-Zirkulationspumpe_Zeitsteuerung_aktiv",
-  	 "heating.dhw.pumps.circulation.schedule.entries"                 	=> "WW-Zirkulationspumpe_Zeitplan",
-  	 "heating.dhw.pumps.circulation.status"                           	=> "WW-Zirkulationspumpe_Status",
-  	 "heating.dhw.pumps.primary.status"                               	=> "WW-Zirkulationspumpe_primaer",
-  	 "heating.dhw.sensors.temperature.outlet.status"                  	=> "WW-Sensoren_Auslauf_Status",
-  	 "heating.dhw.sensors.temperature.outlet.value"                   	=> "WW-Sensoren_Auslauf_Wert",
-  	 "heating.dhw.temperature.main.value"                             	=> "WW-Haupttemperatur",
+  	"heating.dhw.pumps.circulation.schedule.active"                  	=> "WW-Zirkulationspumpe_Zeitsteuerung_aktiv",
+  	"heating.dhw.pumps.circulation.schedule.entries"                 	=> "WW-Zirkulationspumpe_Zeitplan",
+  	"heating.dhw.pumps.circulation.status"                           	=> "WW-Zirkulationspumpe_Status",
+  	"heating.dhw.pumps.primary.status"                               	=> "WW-Zirkulationspumpe_primaer",
+  	"heating.dhw.sensors.temperature.outlet.status"                  	=> "WW-Sensoren_Auslauf_Status",
+  	"heating.dhw.sensors.temperature.outlet.value"                   	=> "WW-Sensoren_Auslauf_Wert",
+  	"heating.dhw.temperature.main.value"                             	=> "WW-Haupttemperatur",
     "heating.dhw.temperature.hysteresis.value"							=> "WW-Hysterese",
-	 "heating.dhw.temperature.temp2.value"								=> "WW-Temperatur_2",
-	 "heating.dhw.sensors.temperature.hotWaterStorage.status" 			=> "WW-Temperatur_aktiv",
+	"heating.dhw.temperature.temp2.value"								=> "WW-Temperatur_2",
+	"heating.dhw.sensors.temperature.hotWaterStorage.status" 			=> "WW-Temperatur_aktiv",
     "heating.dhw.sensors.temperature.hotWaterStorage.value" 			=> "WW-Isttemperatur",
     "heating.dhw.temperature.value" 									=> "WW-Solltemperatur",
     "heating.dhw.schedule.active" 										=> "WW-zeitgesteuert_aktiv",
@@ -386,8 +395,8 @@ my $RequestList = {
     "heating.service.burnerBased.activeBurnerHoursSinceLastService" 	=> "Service_Betriebsstunden_seit_letzten",
     "heating.service.burnerBased.lastService" 							=> "Service_Letzter_brennerbasiert",
     
-    "heating.solar.active" 												=> "Solar_aktiv",	
-    "heating.solar.pumps.circuit.status" 								=> "Solar_Pumpe_Status",	
+    "heating.solar.active" 												=> "Solar_aktiv",
+	"heating.solar.pumps.circuit.status" 								=> "Solar_Pumpe_Status",	
     "heating.solar.rechargeSuppression.status" 							=> "Solar_Aufladeunterdrueckung_Status",	
     "heating.solar.sensors.power.status" 								=> "Solar_Sensor_Power_Status",	
     "heating.solar.sensors.power.value" 								=> "Solar_Sensor_Power",	
@@ -397,6 +406,7 @@ my $RequestList = {
     "heating.solar.sensors.temperature.dhw.value" 						=> "Solar_Sensor_Temperatur_WW",	
     "heating.solar.statistics.hours" 						   			=> "Solar_Sensor_Statistik_Stunden",	
     
+    "heating.solar.power.cumulativeProduced.value"						=> "Solarproduktion_Gesamtertrag",
     "heating.solar.power.production.month"								=> "Solarproduktion/Monat",	
     "heating.solar.power.production.day"								=> "Solarproduktion/Tag",
     "heating.solar.power.production.unit"								=> "Solarproduktion/Einheit",
@@ -1245,6 +1255,7 @@ sub vitoconnect_getAccessTokenCallback($) {
       my $decode_json = eval{decode_json($response_body)};
       if($@) {
         Log3 $name, 1, "$name - JSON error while request: $@";
+		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
         return;
       }  
       my $access_token = $decode_json->{"access_token"};
@@ -1287,17 +1298,18 @@ sub vitoconnect_getGwCallback($) {
 	if ($err eq "") {	
    	Log3 $name, 4, "$name - getGwCallback went ok";
       Log3 $name, 5, "$name: Received response: $response_body\n";
-
       my $decode_json = eval{decode_json($response_body)};
-		if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; } 
-
+		if($@) { 
+			Log3 $name, 1, "$name - JSON error while request: $@";
+			InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
+			return;
+		} 
       if ($hash->{".logResponseOnce"}) {
       	my $dir = path("log"); 
 			my $file = $dir->child("gw.json"); 
 			my $file_handle = $file->openw_utf8();
 			$file_handle->print(Dumper($decode_json));
 		}
-      
       my $aggregatedStatus = $decode_json->{entities}[0]->{properties}->{aggregatedStatus};
       Log3 $name, 5, "$name: aggregatedStatus: $aggregatedStatus";
       readingsSingleUpdate($hash, "state", "$aggregatedStatus (".TimeNow().")", 1);             
@@ -1487,7 +1499,11 @@ sub vitoconnect_action($) {
 	
 	if ($err eq "") {
    	my $decode_json = eval{decode_json($response_body)};
-      if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; }  
+      if($@) {
+		Log3 $name, 1, "$name - JSON error while request: $@";
+		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
+		return;
+	  }  
       $access_token = $decode_json->{access_token}; 
       Log3 $name, 5, "$name - access_token: $access_token"; 
     } else { Log3 $name, 1, "$name: getAccessToken: An error occured: $err"; }
@@ -1503,15 +1519,16 @@ sub vitoconnect_action($) {
    if ($err eq "") {
 		Log3 $name, 5, "$name - action (installation and gw): $response_body";   	
       my $decode_json = eval{decode_json($response_body)};
-      if($@) { Log3 $name, 1, "$name - JSON error while request: $@"; return; } 
+      if($@) {
+		Log3 $name, 1, "$name - JSON error while request: $@";
+		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
+		return;
+      } 
       $installation = $decode_json->{entities}[0]->{properties}->{id};
       $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
       Log3 $name, 4, "$name: installation: $installation :: gw: $gw"
    } else { Log3 $name, 1, "$name: An error occured: $err"; }	
-   
-	   
-    
-	return undef;
+   return undef;
 }
 
 
