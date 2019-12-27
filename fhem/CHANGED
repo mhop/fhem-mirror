@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  70_SolarEdgeAPI: new default behavior, removed parameter "interval"
  - feature: 37_echodevice.pm:
             add device A1Z88NGR2BK6A2 ECHO Show 8
             add device A2JKHJ0PX4J3L3 ECHO FireTv Cube 4K
