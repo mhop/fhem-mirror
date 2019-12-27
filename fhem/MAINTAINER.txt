@@ -520,7 +520,7 @@ FHEM/98_ping                 mattwire             Sonstiges
 FHEM/98_powerMap             igami                Unterstützende Dienste
 FHEM/98_QRCode.pm            Benni                Unterstützende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
-FHEM/98_RandomTimer.pm       igami/Beta-User      Unterstützende Dienste/Kalendermodule
+FHEM/98_RandomTimer.pm       Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_readingsWatcher	     Wzut		  Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
@@ -543,7 +543,7 @@ FHEM/98_Verkehrsinfo.pm      martins              Unterstützende Dienste
 FHEM/98_version.pm           markusbloch          Sonstiges
 FHEM/98_vitoconnect.pm       andreas13            Heizungssteuerung/Raumklima
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
-FHEM/98_WeekdayTimer.pm      igami/Beta-User      Unterstützende Dienste
+FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste
 FHEM/98_weekprofile.pm       risiko               Frontends
 FHEM/98_WOL.pm               KernSani             Unterstützende Dienste
 FHEM/98_XmlList.pm           rudolfkoenig         Automatisierung
