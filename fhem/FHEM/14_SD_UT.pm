@@ -52,8 +52,8 @@
 #     get sduino_dummy raw MU;;P0=-5476;;P1=592;;P2=-665;;P3=1226;;P4=-1309;;D=01232323232323232323232323412323412323414;;CP=3;;R=1;;
 #}    Send Adresse FFF funktioniert nicht 100%ig!
 ###############################################################################################################################################################################
-# - TR-502MSV (LIBRA GmbH) [LIDL] Funk-Steckdosendimmer + Schalter | transmitter TR-502MSV - receiver RC-710DX|RC-710 [Protocol 34]
-#{    nibble 0-1 -> Hauscode | nibble 3 ??? | nibble 3-4 -> Tastencode | repeats 3
+# - TR-502MSV (LIBRA GmbH [LIDL] Funk-Steckdosendimmer + Schalter | transmitter TR-502MSV - receiver RC-710DX|RC-710 [Protocol 34]
+#{    nibble 0-2 -> Hauscode | nibble 3-4 -> Tastencode | repeats 3
 #			get sduino_dummy raw MU;;P0=-12064;;P1=717;;P2=-669;;P3=1351;;P4=-1319;;D=012323414141234123232323232323232323232323;;
 #}    get sduino_dummy raw MU;;P0=697;;P1=-1352;;P2=-679;;P3=1343;;D=01010101010231023232323232323232323232323;CP=0;R=27;;
 ###############################################################################################################################################################################
@@ -103,11 +103,11 @@
 #     Intervall:    1010 0001 0101 00 1101 00   A15 34
 #     ------------------------------------------------
 #     i - ident, b - button, a - appended
-#     get sduino_dummy raw MU;;P0=-707;;P1=332;;P2=-376;;P3=670;;P5=-15243;;D=01012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301;;CP=1;;R=3;;O;;
-#     get sduino_dummy raw MU;;P0=-32001;;P1=348;;P2=-704;;P3=-374;;P4=664;;P5=-15255;;D=01213421343434342134213421343421213434512134213434343421342134213434212134345121342134343434213421342134342121343451213421343434342134213421343421213434512134213434343421342134213434212134345121342134343434213421342134342121343451213421343434342134213421;;CP=1;;R=15;;O;;
-#     get sduino_dummy raw MU;;P0=-32001;;P1=326;;P2=-721;;P3=-385;;P4=656;;P5=-15267;;D=01213421343434342134213421343421342134512134213434343421342134213434213421345121342134343434213421342134342134213451213421343434342134213421343421342134512134213434343421342134213434213421345121342134343434213421342134342134213451213421343434342134213421;;CP=1;;R=10;;O;;
-#     get sduino_dummy raw MU;;P0=-372;;P1=330;;P2=684;;P3=-699;;P4=-14178;;D=010231020202023102310231020231310231413102310202020231023102310202313102314;;CP=1;;R=253;;
-#}    get sduino_dummy raw MU;;P0=-710;;P1=329;;P2=-388;;P3=661;;P4=-14766;;D=01232301410123012323232301230123012323012323014;;CP=1;;R=1;;
+#     plus         | get sduino_dummy raw MU;;P0=-220;;P1=348;;P2=-702;;P3=-381;;P4=662;;P5=-15257;;D=01213421342134342121343451213421343434342134213421343421213434512134213434343421342134213434212134345121342134343434213421342134342121343451213421343434342134213421343421213434512134213434343421342134213434212134345121342134343434213421342134342121343451;;CP=1;;R=6;;O;;
+#     minus        | get sduino_dummy raw MU;;P0=-2112;;P1=340;;P2=-708;;P3=-381;;P4=660;;P5=-15243;;D=01213421343434342134213421343421342134512134213434343421342134213434213421345121342134343434213421342134342134213451213421343434342134213421343421342134512134213434343421342134213434213421345121342134343434213421342134342134213451213421343434342134213421;;CP=1;;R=7;;O;;
+#     light_on_off | get sduino_dummy raw MU;;P0=-707;;P1=332;;P2=-376;;P3=670;;P5=-15243;;D=01012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301;;CP=1;;R=3;;O;;
+#     delay        | get sduino_dummy raw MU;;P0=-944;;P1=341;;P2=-695;;P3=-375;;P4=672;;P5=-15261;;D=01213421343434342134213421343421343421512134213434343421342134213434213434215121342134343434213421342134342134342151213421343434342134213421343421343421512134213434343421342134213434213434215121342134343434213421342134342134342151213421343434342134213421;;CP=1;;R=2;;O;;
+#}    intervall    | get sduino_dummy raw MU;;P0=-372;;P1=330;;P2=684;;P3=-699;;P4=-14178;;D=010231020202023102310231020231310231413102310202020231023102310202313102314;;CP=1;;R=253;;
 ###
 # - Transmitter SF01 01319004 (SF01_01319004_Typ2) 433,92 MHz (BOSCH kitchen) [Protocol 86]
 #{                  iiii iiii iiii ii bbbb aa   hex
@@ -263,6 +263,14 @@
 #		Taste Vol+  MS;P1=-1645;P2=574;P3=-535;P4=-4556;P5=2811;D=24512321212323232323212323232123212123232323;CP=2;SP=4;R=57;m2;#;#;
 #}
 ###############################################################################################################################################################################
+# - Remote control with 4 buttons for diesel heating [Protocol 20]
+#{  https://forum.fhem.de/index.php/topic,58397.msg999475.html#msg999475 @ fhem_user0815 2019-12-04
+#   RCnoName20_17E9 on     MS;P0=-740;P2=686;P3=-283;P5=229;P6=-7889;D=5650505023502323232323235023505023505050235050502323502323505050;CP=5;SP=6;R=67;O;m2;
+#   RCnoName20_17E9 off    MS;P1=-754;P2=213;P4=681;P5=-283;P6=-7869;D=2621212145214545454545452145212145212121212145214521212121452121;CP=2;SP=6;R=69;O;m2;
+#   RCnoName20_17E9 plus   MS;P1=-744;P2=221;P3=679;P4=-278;P5=-7860;D=2521212134213434343434342134212134212121213421212134343434212121;CP=2;SP=5;R=66;O;m2;
+#   RCnoName20_17E9 minus  MS;P0=233;P1=-7903;P3=-278;P5=-738;P6=679;D=0105050563056363636363630563050563050505050505630563050505630505;CP=0;SP=1;R=71;O;m1;
+#}
+###############################################################################################################################################################################
 # !!! ToDo´s !!!
 #     - LED lights, counter battery-h reading --> commandref hour_counter module
 #     -
@@ -401,6 +409,20 @@ my %models = (
 										Protocol		=> "P34",
 										Typ					=> "remote"
 									},
+	"xavax" =>	{	"10000111"	=> "Ch1_on",		# 11011010101010110010010101010100 10000111 
+								"01111000"	=> "Ch1_off",		# 11011010101010110010010101010100 01111000
+								"01001011" 	=> "Ch2_on",		# 11011010101010110010010101010100 01001011
+								"10110100" 	=> "Ch2_off",		# 11011010101010110010010101010100 10110100
+								"11000011" 	=> "Ch3_on",		# 11011010101010110010010101010100 11000011
+								"00111100" 	=> "Ch3_off",		# 11011010101010110010010101010100 00111100
+								"00101101" 	=> "Ch4_on",		# 11011010101010110010010101010100 00101101
+								"11010010" 	=> "Ch4_off",		# 11011010101010110010010101010100 11010010
+								"10100101" 	=> "Master_on",	# 11011010101010110010010101010100 10100101
+								"01011010" 	=> "Master_off",# 11011010101010110010010101010100 01011010
+								hex_lengh		=> "10",
+								Protocol		=> "P26",
+								Typ					=> "remote"
+							},
 	"TR_502MSV" =>	{	"11101110"	=> "Ch1_on",
 										"11111111"	=> "Ch1_off",
 										"01101100" 	=> "Ch2_on",
@@ -564,6 +586,14 @@ my %models = (
 								hex_lengh	=> "9",
 								Typ				=> "remote"
 							},
+	"RCnoName20" =>	{	"000010001111000" => "plus",
+										"000000101000100" => "minus",
+										"000001010000100" => "off",
+										"000100011011000" => "on",
+										hex_lengh	=> "8",
+										Protocol 	=> "P20",
+										Typ				=> "remote"
+									},
 	"unknown" =>	{	Protocol	=> "any",
 									hex_lengh	=> "",
 									Typ				=> "not_exist"
@@ -573,7 +603,7 @@ my %models = (
 #############################
 sub SD_UT_Initialize($) {
 	my ($hash) = @_;
-	$hash->{Match}			= "^P(?:14|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95)#.*";
+	$hash->{Match}			= "^P(?:14|20|26|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95)#.*";
 	$hash->{DefFn}			= "SD_UT_Define";
 	$hash->{UndefFn}		= "SD_UT_Undef";
 	$hash->{ParseFn}		= "SD_UT_Parse";
@@ -586,7 +616,9 @@ sub SD_UT_Initialize($) {
 		"MD_210R.*"	 => {ATTR => "model:MD_210R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"MD_2018R.*"	 => {ATTR => "model:MD_2018R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"OR28V.*"	 => {ATTR => "model:OR28V", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
+		"RCnoName20.*"	 => {ATTR => "model:RCnoName20", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"Techmar.*"	 => {ATTR => "model:Techmar", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
+		"xavax.*"	 => {ATTR => "model:xavax", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"unknown_please_select_model"	=> {ATTR => "model:unknown", FILTER => "%NAME", autocreateThreshold => "5:180", GPLOT => ""},
 	};
 }
@@ -622,17 +654,17 @@ sub SD_UT_Define($$) {
 		}
 	}
 
-	### [2] checks CAME_TOP_432EV & Novy_840029 & Unitec_47031 & TR_502MSV ###
-	if (($a[2] eq "CAME_TOP_432EV" || $a[2] eq "Novy_840029" || $a[2] eq "Unitec_47031" || $a[2] eq "TR_502MSV") && not $a[3] =~ /^[0-9a-fA-F]{2}/s) {
+	### [2] checks CAME_TOP_432EV & Novy_840029 & Unitec_47031 ###
+	if (($a[2] eq "CAME_TOP_432EV" || $a[2] eq "Novy_840029" || $a[2] eq "Unitec_47031") && not $a[3] =~ /^[0-9a-fA-F]{2}/s) {
 		return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}";
 	}
-	### [3] checks SA_434_1_mini & QUIGG_DMV ###
-	if (($a[2] eq "SA_434_1_mini" || $a[2] eq "QUIGG_DMV") && not $a[3] =~ /^[0-9a-fA-F]{3}/s) {
-		return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){3}";
+	### [3] checks SA_434_1_mini & QUIGG_DMV & TR_502MSV ###
+	if (($a[2] eq "SA_434_1_mini" || $a[2] eq "QUIGG_DMV" || $a[2] eq "TR_502MSV") && not $a[3] =~ /^[0-9a-fA-F]{3}/s) {
+		return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}";
 	}
-	### [4] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01###
-	if (($a[2] eq "SF01_01319004" || $a[2] eq "SF01_01319004_Typ2" || $a[2] eq "Chilitec_22640" || $a[2] eq "KL_RF01") && not $a[3] =~ /^[0-9a-fA-F]{4}/s) {
-		return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){4}";
+	### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & xavax ###
+	if (($a[2] eq "SF01_01319004" || $a[2] eq "SF01_01319004_Typ2" || $a[2] eq "Chilitec_22640" || $a[2] eq "KL_RF01" || $a[2] eq "RCnoName20" || $a[2] eq "xavax") && not $a[3] =~ /^[0-9a-fA-F]{4}/s) {
+		return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}";
 	}
 	### [6] checks Manax | mumbi ###
 	if ($a[2] eq "RC_10" && not $a[3] =~ /^[0-9a-fA-F]{4}_([ABCD]|all)$/s) {
@@ -645,8 +677,10 @@ sub SD_UT_Define($$) {
 	return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){7}" if (($a[2] eq "HSM4" || $a[2] eq "Krinner_LUMIX") && not $a[3] =~ /^[0-9a-fA-F]{7}/s);
 	### [7] checks Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx (tristate code)###
 	return "Wrong tristate code! ($a[3]) $a[2] code to short or long (must be 7 chars) or values not 0, 1 or F" if (($a[2] eq "Tedsen_SKX1xx" || $a[2] eq "Tedsen_SKX2xx" || $a[2] eq "Tedsen_SKX4xx" || $a[2] eq "Tedsen_SKX6xx") && not $a[3] =~ /^[01fF]{7}$/s);
-	### [8 nibble] checks Techmar remote control ###
-	return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 8 chars) or not hex (0-9 | a-f | A-F)" if ($a[2] eq "Techmar" && not $a[3] =~ /^[0-9a-fA-F]{8}$/s);
+	### [8 nibble] checks Techmar ###
+	if (($a[2] eq "Techmar") && not $a[3] =~ /^[0-9a-fA-F]{8}$/s) {
+		return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 8 chars) or not hex (0-9 | a-f | A-F)";
+	}
 	### [9] checks Hoermann HS1-868-BS ###
 	return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){9}" if ($a[2] eq "HS1_868_BS" && not $a[3] =~ /^[0-9a-fA-F]{9}/s);
 	### [14] checks LED_XM21_0 ###
@@ -688,139 +722,133 @@ sub SD_UT_Set($$$@) {
 	my $repeats = AttrVal($name,'repeats', '5');
 
 	Log3 $name, 4, "$ioname: SD_UT_Set attr_model=$model name=$name (before check)" if($cmd ne "?");
-	return $ret if ($defs{$name}->{DEF} eq "unknown");		# no setlist
+	return $ret if ($defs{$name}->{DEF} eq "unknown");	# no setlist
 
-	############ Westinghouse_Delancey RH787T ############
-	if ($model eq "RH787T" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%04b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 4 digits
-		$msg = $models{$model}{Protocol} . "#0" . $adr ."1";
-		$msgEnd = "#R" . $repeats;
-	############ Westinghouse Buttons_five ############
-	} elsif ($model eq "Buttons_five" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%04b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 4 digits
-		$msg = $models{$model}{Protocol} . "#";
-		$msgEnd .= "11".$adr."#R" . $repeats;
-	############ SA_434_1_mini ############
-	} elsif ($model eq "SA_434_1_mini" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																		# split adress from def
-		my $bitData = sprintf( "%012b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 12 digits
-		$msg = $models{$model}{Protocol} . "#" . $bitData . "#R" . $repeats;
-	############ Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx ############
-	} elsif (($model eq "Tedsen_SKX1xx" || $model eq "Tedsen_SKX2xx" || $model eq "Tedsen_SKX4xx" || $model eq "Tedsen_SKX6xx") && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = SD_UT_tristate2bin($definition[1]);															# argument 1 - adress tristate to bin with 18 bits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd = "#R" . $repeats;
-	############ QUIGG_DMV ############
-	} elsif ($model eq "QUIGG_DMV" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%012b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 12 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd = "P#R" . $repeats;
-	############ TR_502MSV ############
-	} elsif ($model eq "TR_502MSV" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%08b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 8 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr . "1111";
-		$msgEnd = "P#R" . $repeats;		
-	############ Novy_840029 ############
-	} elsif ($model eq "Novy_840029" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%08b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 8 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd = "#R" . $repeats;
-	############ CAME_TOP_432EV ############
-	} elsif ($model eq "CAME_TOP_432EV" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%08b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 8 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd = "#R" . $repeats;
-	############ NEFF SF01_01319004 || BOSCH SF01_01319004_Typ2 ############
-	} elsif (($model eq "SF01_01319004" || $model eq "SF01_01319004_Typ2") && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%016b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 16 digits
-		$msg = $models{$model}{Protocol} . "#" . substr($adr,0,14);
-		$msgEnd = "#R" . $repeats;
-	############ Hoermann HS1-868-BS ############
-	} elsif ($model eq "HS1_868_BS" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																	# split adress from def
-		my $bitData = "00000000";
-		$bitData .= sprintf( "%036b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 36 digits
-		$msg = $models{$model}{Protocol} . "#" . $bitData . "#R" . $repeats;
-	############ Hoermann HSM4 ############
-	} elsif ($model eq "HSM4" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%028b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 28 digits
-		$msg = $models{$model}{Protocol} . "#00000000" . $adr;
-		$msgEnd .= "1100#R" . $repeats;
-	############ Chilitec 22640 ############
-	} elsif ($model eq "Chilitec_22640" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%016b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 16 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd .= "#R" . $repeats;
-	############ LED_XM21_0 22640 ############
-	} elsif ($model eq "LED_XM21_0" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%014b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 14 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd .= "#R" . $repeats;
-	############ Krinner_LUMIX ############
-	} elsif ($model eq "Krinner_LUMIX" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%028b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 28 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd .= "#R" . $repeats;
-	############ Manax | mumbi ############
-	} elsif ($model eq "RC_10" && $cmd ne "?") {
-		return "ERROR: to send, please push button on and off again on remote" if ( (ReadingsVal($name, "x_n5-8_on", "0") eq "0") || (ReadingsVal($name, "x_n5-8_off", "0") eq "0") || (ReadingsVal($name, "x_n4", "0") eq "0") );
-
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		$definition[1] = substr($definition[1],0,4);
-		my $adr = sprintf( "%016b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 16 digits
-		my $unknown1 = ReadingsVal($name, "x_n4", "0");
-		my $unknown2_btn = "x_n5-8_".$cmd;
-		my $unknown2 = ReadingsVal($name, $unknown2_btn, "0");
-		$msg = $models{$model}{Protocol} . "#" . $adr . $unknown1 . $unknown2;
-		$msgEnd .= "#R" . $repeats;
-
-		### if device _all, set A | B | C | D ### -> RC_10_7869_all (model_device_button)
-		my $device = $model."_".substr($name,6,4);
-		if ($name =~ /^$device.all$/) {
-			foreach my $d (sort keys %defs) {
-				if (defined($defs{$d}) && defined($defs{$d}{NAME}) && $defs{$d}{NAME} =~ /^$device.[ABCD]$/) {
-					readingsSingleUpdate($defs{$d}, "state" , $cmd , 1);
-					Log3 $name, 4, "$ioname: SD_UT_Set attr_model=$model device $name set ".$defs{$d}{NAME}." to $cmd";
+	my @definition = split(" ", $hash->{DEF});					# split adress from def
+	if ($cmd ne "?") {
+		############ Westinghouse_Delancey RH787T ############
+		if ($model eq "RH787T") {
+			my $adr = sprintf( "%04b", hex($definition[1]));	# argument 1 - adress to binary with 4 digits
+			$msg = $models{$model}{Protocol} . "#0" . $adr ."1";
+			$msgEnd = "#R" . $repeats;
+		############ Westinghouse Buttons_five ############
+		} elsif ($model eq "Buttons_five") {
+			my $adr = sprintf( "%04b", hex($definition[1]));	# argument 1 - adress to binary with 4 digits
+			$msg = $models{$model}{Protocol} . "#";
+			$msgEnd .= "11".$adr."#R" . $repeats;
+		############ SA_434_1_mini ############
+		} elsif ($model eq "SA_434_1_mini") {
+			my $bitData = sprintf( "%012b", hex($definition[1]));	# argument 1 - adress to binary with 12 digits
+			$msg = $models{$model}{Protocol} . "#" . $bitData . "#R" . $repeats;
+		############ Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx ############
+		} elsif ($model eq "Tedsen_SKX1xx" || $model eq "Tedsen_SKX2xx" || $model eq "Tedsen_SKX4xx" || $model eq "Tedsen_SKX6xx") {
+			my $adr = SD_UT_tristate2bin($definition[1]);	# argument 1 - adress tristate to bin with 18 bits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
+		############ QUIGG_DMV ############
+		} elsif ($model eq "QUIGG_DMV") {
+			my $adr = sprintf( "%012b", hex($definition[1]));	# argument 1 - adress to binary with 12 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "P#R" . $repeats;
+		############ TR_502MSV ############
+		} elsif ($model eq "TR_502MSV") {
+			my $adr = sprintf( "%012b", hex($definition[1]));	# argument 1 - adress to binary with 12 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "P#R" . $repeats;		
+		############ Novy_840029 ############
+		} elsif ($model eq "Novy_840029") {
+			my $adr = sprintf( "%08b", hex($definition[1]));	# argument 1 - adress to binary with 8 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
+		############ CAME_TOP_432EV ############
+		} elsif ($model eq "CAME_TOP_432EV") {
+			my $adr = sprintf( "%08b", hex($definition[1]));	# argument 1 - adress to binary with 8 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
+		############ NEFF SF01_01319004 || BOSCH SF01_01319004_Typ2 ############
+		} elsif ($model eq "SF01_01319004" || $model eq "SF01_01319004_Typ2") {
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 digits
+			$msg = $models{$model}{Protocol} . "#" . substr($adr,0,14);
+			$msgEnd = "#R" . $repeats;
+		############ Hoermann HS1-868-BS ############
+		} elsif ($model eq "HS1_868_BS") {
+			my $bitData = "00000000";
+			$bitData .= sprintf( "%036b", hex($definition[1]));	# argument 1 - adress to binary with 36 digits
+			$msg = $models{$model}{Protocol} . "#" . $bitData . "#R" . $repeats;
+		############ Hoermann HSM4 ############
+		} elsif ($model eq "HSM4") {
+			my $adr = sprintf( "%028b", hex($definition[1]));	# argument 1 - adress to binary with 28 digits
+			$msg = $models{$model}{Protocol} . "#00000000" . $adr;
+			$msgEnd .= "1100#R" . $repeats;
+		############ Chilitec 22640 ############
+		} elsif ($model eq "Chilitec_22640") {
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd .= "#R" . $repeats;
+		############ LED_XM21_0 22640 ############
+		} elsif ($model eq "LED_XM21_0") {
+			my $adr = sprintf( "%014b", hex($definition[1]));	# argument 1 - adress to binary with 14 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd .= "#R" . $repeats;
+		############ Krinner_LUMIX ############
+		} elsif ($model eq "Krinner_LUMIX") {
+			my $adr = sprintf( "%028b", hex($definition[1]));	# argument 1 - adress to binary with 28 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd .= "#R" . $repeats;
+		############ Manax | mumbi ############
+		} elsif ($model eq "RC_10") {
+			return "ERROR: to send, please push button on and off again on remote" if ( (ReadingsVal($name, "x_n5-8_on", "0") eq "0") || (ReadingsVal($name, "x_n5-8_off", "0") eq "0") || (ReadingsVal($name, "x_n4", "0") eq "0") );
+			$definition[1] = substr($definition[1],0,4);
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 digits
+			my $unknown1 = ReadingsVal($name, "x_n4", "0");
+			my $unknown2_btn = "x_n5-8_".$cmd;
+			my $unknown2 = ReadingsVal($name, $unknown2_btn, "0");
+			$msg = $models{$model}{Protocol} . "#" . $adr . $unknown1 . $unknown2;
+			$msgEnd .= "#R" . $repeats;
+			### if device _all, set A | B | C | D ### -> RC_10_7869_all (model_device_button)
+			if ($hash->{DEF} =~ /_all$/) {	# send button all
+				foreach my $d (keys %defs) {
+					if(defined($defs{$d}) && $defs{$d}{TYPE} eq "SD_UT" && $defs{$d}{DEF} =~ /$definition[1]/ && $defs{$d}{DEF} =~ /[ABCD]$/ && ReadingsVal($d, "state", "") ne $cmd) {
+						readingsSingleUpdate($defs{$d}, "state" , $cmd , 1);	# set A | B | C | D
+						Log3 $name, 3, "$ioname: $d set $cmd";
+					}
 				}
 			}
+		############ ESTO KL_RF01############
+		} elsif ($model eq "KL_RF01") {
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd .= "11110";	# nibble7 every?
+			$msgEnd .= "#R" . $repeats;
+		############ Techmar Garden Lights ############
+		} elsif ($model eq "Techmar") {
+			my $adr = sprintf( "%032b", hex($definition[1]));	# argument 1 - adress to binary with 32 bits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "00#R" . $repeats;	#	Last two bits alternately by transmitter 00, 01 or 02. Receiver also reacts to only 00.
+		############ Medion OR28V ############
+		} elsif ($model eq "OR28V") {
+			$msg = $models{$model}{Protocol} . "#";
+			$msgEnd .= "#R" . $repeats;	# R1 wird vom SIGNALduino nicht als MS erkannt!
+		############ RCnoName20 ############
+		} elsif ($model eq "RCnoName20") {
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 bits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
+		############ xavax ############
+		} elsif ($model eq "xavax") {
+			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 bits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$adr =~ tr/01/10/;						# invert adr
+			$msg .= $adr;									# nibble 5-8 is inverted to nibble 0-3
+			$msgEnd = "0P#R" . $repeats;	# one pulse for end marker, pause, repeats
 		}
-	############ ESTO KL_RF01############
-	} elsif ($model eq "KL_RF01" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%016b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 16 digits
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd .= "11110";	# nibble7 every?
-		$msgEnd .= "#R" . $repeats;
-	############ Techmar Garden Lights ############
-	} elsif ($model eq "Techmar" && $cmd ne "?") {
-		my @definition = split(" ", $hash->{DEF});																# split adress from def
-		my $adr = sprintf( "%032b", hex($definition[1])) if ($name ne "unknown");	# argument 1 - adress to binary with 32 bits
-		
-		$msg = $models{$model}{Protocol} . "#" . $adr;
-		$msgEnd = "00#R" . $repeats;	#	Last two bits alternately by transmitter 00, 01 or 02. Receiver also reacts to only 00.
-	############ Medion OR28V ############
-	} elsif ($model eq "OR28V" && $cmd ne "?") {
-		$msg = $models{$model}{Protocol} . "#";
-		$msgEnd .= "#R" . $repeats;	# R1 wird vom SIGNALduino nicht als MS erkannt!
 	}
-
+	
 	Log3 $name, 4, "$ioname: SD_UT_Set attr_model=$model msg=$msg msgEnd=$msgEnd" if(defined $msgEnd);
 
 	if ($cmd eq "?") {
 		### create setlist ###
-		foreach my $keys (sort keys %{ $models{$model}}) {
+		foreach my $keys (keys %{ $models{$model}}) {
 			if ( $keys =~ /^[0-1]{1,}/s ) {
 				$ret.= $models{$model}{$keys}.":noArg ";
 			}
@@ -828,7 +856,7 @@ sub SD_UT_Set($$$@) {
 	} else {
 		if (defined $msgEnd) {
 			### if cmd, set bits ###
-			foreach my $keys (sort keys %{ $models{$model}}) {
+			foreach my $keys (keys %{ $models{$model}}) {
 				if ( $keys =~ /^[0-1]{1,}/s ) {
 					$save = $keys;
 					$value = $models{$model}{$keys};
@@ -847,7 +875,6 @@ sub SD_UT_Set($$$@) {
 				$msg .= $save.$invert.$msgEnd;
 			############ Medion OR28V ############
 			} elsif ($model eq "OR28V") {
-				my @definition = split(" ", $hash->{DEF});						# split adress from def
 				my $adr = $definition[1] - 1;													# argument 1 - adress
 				my $checksum = ($adr * 16 + oct("0b$save") + 85) & 0x7f;
 				my $laststate = ReadingsVal($name, "state", "fehlt");
@@ -1003,7 +1030,7 @@ sub SD_UT_Parse($$) {
 		}
 		### TR_502MSV [P34] ###
 		if (!$def && $protocol == 34) {
-			$deviceCode = substr($rawData,0,2);
+			$deviceCode = substr($rawData,0,3);
 			$devicedef = "TR_502MSV " . $deviceCode;
 			$def = $modules{SD_UT}{defptr}{$devicedef};
 		}
@@ -1045,11 +1072,21 @@ sub SD_UT_Parse($$) {
 		}
 	}
 
-	if ($hlen == 8 && !$def && $protocol == 92) {
-		### Remote control Krinner_LUMIX [P92] ###
-		$deviceCode = substr($rawData,0,7);
-		$devicedef = "Krinner_LUMIX " . $deviceCode;
-		$def = $modules{SD_UT}{defptr}{$devicedef};
+	if ($hlen == 8) {
+		if (!$def && $protocol == 20) {
+			### Remote control RCnoName20 [P20] ###
+			$deviceCode = substr($rawData,0,4);
+			$devicedef = "RCnoName20 " . $deviceCode;
+			$def = $modules{SD_UT}{defptr}{$devicedef};
+			$model = "RCnoName20";
+			$name = "RCnoName20_" . $deviceCode;
+		}
+		if (!$def && $protocol == 92) {
+			### Remote control Krinner_LUMIX [P92] ###
+			$deviceCode = substr($rawData,0,7);
+			$devicedef = "Krinner_LUMIX " . $deviceCode;
+			$def = $modules{SD_UT}{defptr}{$devicedef};
+		}
 	}
 
 	if ($hlen == 9) {
@@ -1131,6 +1168,27 @@ sub SD_UT_Parse($$) {
 			$deviceCode = substr($rawData,0,4);
 			$devicedef = "KL_RF01 " . $deviceCode;
 			$def = $modules{SD_UT}{defptr}{$devicedef};
+		}
+	}
+
+	if ($hlen == 10) {
+		if (!$def && $protocol == 26) {
+			### Remote control xavax [P26] ###
+			my $check = hex(substr($rawData,0,4)) + hex(substr($rawData,4,4));	# Nibble 0-3 is inverted to nibble 5-8
+			if ($check != 65535) {
+				Log3 $iohash, 3, "$ioname: SD_UT_Parse device xavax - check nibble 0-3 and nibble 5-8 - ERROR";
+				return "";
+			}
+			$check = hex(substr($rawData,8,1)) + hex(substr($rawData,9,1));	# Nibble 8 is inverted to nibble 9
+			if ($check != 15) {
+				Log3 $iohash, 3, "$ioname: SD_UT_Parse device xavax - check nibble 8 and nibble 9 - ERROR";
+				return "";
+			}
+			$deviceCode = substr($rawData,0,4);
+			$devicedef = "xavax " . $deviceCode;
+			$def = $modules{SD_UT}{defptr}{$devicedef};
+			$model = "xavax";
+			$name = "xavax_" . $deviceCode;
 		}
 	}
 
@@ -1281,8 +1339,7 @@ sub SD_UT_Parse($$) {
 	############ TR_502MSV ############ Protocol 34 ############
 	} elsif ($model eq "TR_502MSV" && $protocol == 34) {
 		$state = substr($bitData,12,8);
-		$deviceCode = substr($bitData,0,8);
-		$unknown_bits = substr($bitData,8,4);
+		$deviceCode = substr($bitData,0,12);
 	############ Novy_840029 ############ Protocol 86 ############
 	} elsif ($model eq "Novy_840029" && ($protocol == 86 || $protocol == 81)) {
 		if ($hlen == 3) {		# 12 Bit [3]
@@ -1386,6 +1443,14 @@ sub SD_UT_Parse($$) {
 	} elsif ($model eq "Techmar" && $protocol == 95) {
 		$state = substr($bitData,32,8);
 		$deviceCode = substr($rawData,0,8);
+	### Remote control RCnoName20 [P20] ###
+	} elsif ($model eq "RCnoName20" && $protocol == 20) {
+		$state = substr($bitData,16,15);	# last bit is filled
+		$deviceCode = substr($rawData,0,4);
+	### Remote control xavax [P26] ###
+	} elsif ($model eq "xavax" && $protocol == 26) {
+		$state = substr($bitData,32,8);
+		$deviceCode = substr($rawData,0,4);
 	############ unknown ############
 	} else {
 		readingsBulkUpdate($hash, "state", "???");
@@ -1501,8 +1566,8 @@ sub SD_UT_Attr(@) {
 				$devicename = $devicemodel."_".$deviceCode;
 			############ TR_502MSV ############
 			} elsif ($attrName eq "model" && $attrValue eq "TR_502MSV") {
-				$deviceCode = substr($bitData,0,8);
-				$deviceCode = sprintf("%02X", oct( "0b$deviceCode" ) );
+				$deviceCode = substr($bitData,0,12);
+				$deviceCode = sprintf("%03X", oct( "0b$deviceCode" ) );
 				$devicename = $devicemodel."_".$deviceCode;
 			############ Novy_840029 ############
 			} elsif ($attrName eq "model" && $attrValue eq "Novy_840029") {
@@ -1663,7 +1728,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(module model: HSM4 | protocol 69)</small></ul>
 	 <ul> - Krinner LUMIX X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: Krinner_LUMIX | protocol 92)</small></ul>
 	 <ul> - LED_XM21_0 X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: LED_XM21_0 | protocol 76)</small></ul>
-	 <ul> - LIBRA TR-502MSV (LIDL)&nbsp;&nbsp;&nbsp;<small>(module model: TR_502MSV | protocol 34)</small></ul>
+	 <ul> - TR-502MSV (LIDL, LIBRA, MANDOLYN, QUIGG), compatible GT-7008BS, GT-FSI-04, DMV-7008S, Powerfix RCB-I 3600&nbsp;&nbsp;&nbsp;<small>(module model: TR_502MSV | protocol 34)</small></ul>
 	 <ul> - Manax RCS250&nbsp;&nbsp;&nbsp;<small>(module model: RC_10 | protocol 90)</small></ul>
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(module model: OR28V | protocol 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(module model: RC_10 | protocol 90)</small></ul>
@@ -1672,6 +1737,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - QUIGG DMV-7000&nbsp;&nbsp;&nbsp;<small>(module model: QUIGG_DMV | protocol 34)</small></ul>
 	 <ul> - Remote control SA-434-1 mini 923301&nbsp;&nbsp;&nbsp;<small>(module model: SA_434_1_mini | protocol 81)</small></ul>
 	 <ul> - Remote control for Techmar Garden Lights &nbsp;&nbsp;&nbsp;<small>(Modulmodel: Techmar | Protokoll 95)</small></ul>
+	 <ul> - Remote control with 4 buttons for diesel heating &nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20 | Protokoll 20)</small></ul>
 	 <ul> - Tedsen Teletaster <small>(protocol 46)</small>:
 			<small>
 			<ul>SKX1xx, 1 button - module model: Tedsen_SKX1xx</ul>
@@ -1683,6 +1749,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - unitec remote door reed switch 47031 (Unitec 47121 | Unitec 47125 | Friedland)&nbsp;&nbsp;&nbsp;<small>(module model: Unitec_47031 | protocol 30)</small></ul>
 	 <ul> - Westinghouse Delancey ceiling fan (remote, 5 buttons without SET)&nbsp;&nbsp;&nbsp;<small>(module model: Buttons_five | protocol 29)</small></ul>
 	 <ul> - Westinghouse Delancey ceiling fan (remote, 9 buttons with SET)&nbsp;&nbsp;&nbsp;<small>(module model: RH787T | protocol 83)</small></ul>
+	 <ul> - xavax 00111939 (remote control, 10 buttons)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: xavax | protocol 26)</small></ul>
 	 <br><br>
 	<b>Define</b><br>
 	<ul><code>define &lt;NAME&gt; SD_UT &lt;model&gt; &lt;Hex-address&gt;</code><br><br>
@@ -1956,11 +2023,12 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - CAME Drehtor Antrieb&nbsp;&nbsp;&nbsp;<small>(Modulmodel: CAME_TOP_432EV | Protokoll 86)</small></ul>
 	 <ul> - ChiliTec LED Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Chilitec_22640 | Protokoll 14)</small></ul>
 	 <ul> - ESTO Deckenlampe&nbsp;&nbsp;&nbsp;<small>(Modulmodel: KL_RF01 | Protokoll 93)</small></ul>
+	 <ul> - Fernbedienung mit 4 Tasten f&uuml;r Diesel-Heizung &nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20 | Protokoll 20)</small></ul>
 	 <ul> - Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HS1_868_BS | Protokoll 69)</small></ul>
 	 <ul> - Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HSM4 | Protokoll 69)</small></ul>
 	 <ul> - Krinner LUMIX Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Krinner_LUMIX | Protokol 92)</small></ul>
 	 <ul> - LED_XM21_0 Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: LED_XM21_0 | Protokol 76)</small></ul>
-	 <ul> - LIBRA TR-502MSV (LIDL)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: TR_502MSV | Protokol 34)</small></ul>
+	 <ul> - TR-502MSV (LIDL, LIBRA, MANDOLYN, QUIGG), kompatibel GT-7008BS, GT-FSI-04, DMV-7008S, Powerfix RCB-I 3600&nbsp;&nbsp;&nbsp;<small>(module model: TR_502MSV | protocol 34)</small></ul>
 	 <ul> - Manax RCS250&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10 | Protokoll 90)</small></ul>
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(Modulmodel: OR28V | Protokoll 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10 | Protokoll 90)</small></ul>
@@ -1980,6 +2048,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - unitec remote door reed switch 47031 (Unitec 47121 | Unitec 47125 | Friedland)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Unitec_47031 | Protokoll 30)</small></ul>
 	 <ul> - Westinghouse Deckenventilator (Fernbedienung, 5 Tasten ohne SET)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Buttons_five | Protokoll 29)</small></ul>
 	 <ul> - Westinghouse Delancey Deckenventilator (Fernbedienung, 9 Tasten mit SET)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RH787T | Protokoll 83)</small></ul>
+	 <ul> - xavax 00111939 (Fernbedienung, 10 Tasten)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: xavax | Protokoll 26)</small></ul>
 	 <br><br>
 
 	<b>Define</b><br>
