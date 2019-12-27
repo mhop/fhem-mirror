@@ -49,6 +49,8 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.1.0"  => "27.12.2019  both POST- and GET-method are now valid in CGI ",
+  "1.0.1"  => "11.12.2019  check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
   "1.0.0"  => "29.11.2019  initial "
 );
 
@@ -1572,8 +1574,15 @@ sub SSChatBot_CGI() {
   return ( "text/plain; charset=utf-8", "Booting up" ) unless ($init_done);
 
   # data received
-  if ($request =~ /^\/outchat?.*/) {
-      $args = (split(/outchat\?/, $request))[1];
+  if ($request =~ /^\/outchat(\?|&).*/) {                   # POST- oder GET-Methode empfangen
+      $args = (split(/outchat\?/, $request))[1];            # GET-Methode empfangen 
+      if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
+          $args = (split(/outchat&/, $request))[1];
+          if(!$args) {
+       	      Log 1, "TYPE SSChatBot - ERROR - no expected data received";
+              return ("text/plain; charset=utf-8", "no expected data received");
+          }
+      }
 	  $args =~ s/&/" /g;
 	  $args =~ s/=/="/g;
 	  $args .= "\"";
