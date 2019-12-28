@@ -443,6 +443,12 @@ sub Notify($$) {
           if ( $ascDev->getAutoShuttersControlShading eq 'none' );
         readingsSingleUpdate( $hash, 'ascEnable', 'on', 0 )
           if ( $ascDev->getASCenable eq 'none' );
+        CommandAttr(undef,$name . ' devStateIcon { AutoShuttersControl_DevStateIcon($name) }')
+          unless( AttrVal($name,'devStateIcon','{ AutoShuttersControl_DevStateIcon($name) }') eq '{ AutoShuttersControl_DevStateIcon($name) }' );
+        CommandDeleteAttr(undef,$name . ' event-on-change-reading')
+          unless( AttrVal($name,'event-on-change-reading','none') eq 'none' );
+        CommandDeleteAttr(undef,$name . ' event-on-update-reading')
+          unless( AttrVal($name,'event-on-update-reading','none') eq 'none' );
 
 # Ist der Event ein globaler und passt zum Rest der Abfrage oben wird nach neuen Rolläden Devices gescannt und eine Liste im Rolladenmodul sortiert nach Raum generiert
         ShuttersDeviceScan($hash)
@@ -4266,7 +4272,7 @@ sub DevStateIcon($) {
     elsif ( ReadingsVal( $name, 'state', undef ) =~ /.*asleep$/ ) {
         return '.*:scene_sleeping';
     }
-    elsif ( ReadingsVal( $name, 'state', undef ) =~ /^roommate.(awoken|home)$/ )
+    elsif ( ReadingsVal( $name, 'state', undef ) =~ /^roommate(.come)?.(awoken|home)$/ )
     {
         return '.*:user_available';
     }
@@ -7897,7 +7903,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.7",
+  "version": "v0.8.8",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
