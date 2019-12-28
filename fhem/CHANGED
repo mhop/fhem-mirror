@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: avoid FHEM from crash if SVG requests a wrong date/time 
+                      format, Forum: #101005
  - feature  14_SD_UT: new model remote control with 4 buttons for dieselheating
                       new model for xavax 00111939
  - bugfix:  14_SD_UT: model TR-502MSV, ident was only 8 bit, must be 12 bit long

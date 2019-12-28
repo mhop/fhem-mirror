@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.3"   => "28.12.2019 check date/time format got from SVG, Forum: #101005 ",
   "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
   "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
   "4.9.0"   => "11.11.2019 new attribute defaultMinInterval to set a default minInterval central in dblog for all events ".
@@ -2872,17 +2873,17 @@ sub DbLog_explode_datetime($%) {
   
   my (@datetime, @date, @time);
   @datetime = split(" ", $t); #Datum und Zeit auftrennen
-  @date = split("-", $datetime[0]);
-  @time = split(":", $datetime[1]) if ($datetime[1]);
+  @date     = split("-", $datetime[0]);
+  @time     = split(":", $datetime[1]) if ($datetime[1]);
   
-  if ($date[0]) {$retv{year}  = $date[0];} else {$retv{year}  = $def{year};}
-  if ($date[1]) {$retv{month} = $date[1];} else {$retv{month} = $def{month};}
-  if ($date[2]) {$retv{day}   = $date[2];} else {$retv{day}   = $def{day};}
-  if ($time[0]) {$retv{hour}  = $time[0];} else {$retv{hour}  = $def{hour};}
-  if ($time[1]) {$retv{minute}= $time[1];} else {$retv{minute}= $def{minute};}
-  if ($time[2]) {$retv{second}= $time[2];} else {$retv{second}= $def{second};}
+  if ($date[0]) {$retv{year}   = $date[0];} else {$retv{year}   = $def{year};}
+  if ($date[1]) {$retv{month}  = $date[1];} else {$retv{month}  = $def{month};}
+  if ($date[2]) {$retv{day}    = $date[2];} else {$retv{day}    = $def{day};}
+  if ($time[0]) {$retv{hour}   = $time[0];} else {$retv{hour}   = $def{hour};}
+  if ($time[1]) {$retv{minute} = $time[1];} else {$retv{minute} = $def{minute};}
+  if ($time[2]) {$retv{second} = $time[2];} else {$retv{second} = $def{second};}
 
-  $retv{datetime}=DbLog_implode_datetime($retv{year}, $retv{month}, $retv{day}, $retv{hour}, $retv{minute}, $retv{second});
+  $retv{datetime} = DbLog_implode_datetime($retv{year}, $retv{month}, $retv{day}, $retv{hour}, $retv{minute}, $retv{second});
   
   # Log 1, Dumper(%retv);
   return %retv
@@ -2892,7 +2893,7 @@ sub DbLog_implode_datetime($$$$$$) {
   my ($year, $month, $day, $hour, $minute, $second) = @_;
   my $retv = $year."-".$month."-".$day." ".$hour.":".$minute.":".$second;
 
-  return $retv;
+return $retv;
 }
 
 ###################################################################################
@@ -3125,7 +3126,7 @@ sub DbLog_Get($@) {
   my $utf8    = defined($hash->{UTF8})?$hash->{UTF8}:0;
   my $history = $hash->{HELPER}{TH};
   my $current = $hash->{HELPER}{TC};
-  my $dbh;
+  my ($dbh,$err);
   
   return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
@@ -3178,6 +3179,18 @@ sub DbLog_Get($@) {
   %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", ()));
   $from          = $from_datetime{datetime};
   $to            = $to_datetime{datetime};
+
+  $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  if($err) {
+      Log3($name, 1, "DbLog $name - Wrong date/time format (from: $from) requested by SVG: $err");
+      return;
+  }
+  
+  $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
+  if($err) {
+      Log3($name, 1, "DbLog $name - Wrong date/time format (to: $to) requested by SVG: $err");
+      return;
+  }
   
   if($to =~ /(\d{4})-(\d{2})-(\d{2}) 23:59:59/) {
      # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
@@ -5707,27 +5720,38 @@ return ($desc, \@htmlArr, join("<br>", @example));
 }
 
 ################################################################
-#
-# Charting Specific functions start here
-#
-################################################################
-
-################################################################
-#
-# Error handling, returns a JSON String
-#
+#           Error handling, returns a JSON String
 ################################################################
 sub DbLog_jsonError($) {
   my $errormsg = $_[0]; 
   my $json = '{"success": "false", "msg":"'.$errormsg.'"}';
-  return $json;
+  
+return $json;
 }
 
+################################################################
+#              Check Zeitformat
+#              Zeitformat: YYYY-MM-DD HH:MI:SS
+################################################################
+sub DbLog_checkTimeformat ($) {  
+  my ($t) = @_;
+  
+  my (@datetime, @date, @time);
+  @datetime = split(" ", $t);                                   # Datum und Zeit auftrennen
+  @date     = split("-", $datetime[0]);
+  @time     = split(":", $datetime[1]);
+  
+  eval { timelocal($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
+  
+  if ($@) {
+      return $@;
+  }
+  
+return;
+}
 
 ################################################################
-#
-# Prepare the SQL String
-#
+#                Prepare the SQL String
 ################################################################
 sub DbLog_prepareSql(@) {
     my ($hash, @a) = @_;
