@@ -382,8 +382,8 @@ sub RandomTimer_setState($) {
   my ($hash) = @_;
 
   if (RandomTimer_isDisabled($hash)) {
-    #$hash->{STATE}  = "disabled";
-     readingsSingleUpdate ($hash,  "state",  "disabled", 0);
+     my $dotrigger = ReadingsVal($hash->{NAME},"state","none") ne "disabled" ? 1 : 0;
+     readingsSingleUpdate ($hash,  "state",  "disabled", $dotrigger);
   } else {
      my $state = $hash->{helper}{active} ? "on" : "off";
      readingsSingleUpdate ($hash,  "state", $state,  1);
