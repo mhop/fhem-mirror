@@ -50,11 +50,6 @@ body {
 /* Standard */
 	width:calc(100% - 60px)
 }
-
-.SVGplot {
-	text-align:center
-}
-
 .SVGplot embed {
 	-o-transition:scale(-o-calc(100vw - 260px),100px);
 	-ms-transition:scale(c-ms-alc(100vw - 260px),100px);

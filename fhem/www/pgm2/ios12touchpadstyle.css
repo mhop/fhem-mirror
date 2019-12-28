@@ -51,10 +51,6 @@ body {
 	width:calc(100% - 60px)
 }
 
-.SVGplot {
-	text-align:center
-}
-
 .SVGplot embed {
 	-o-transition:scale(-o-calc(100vw - 260px),100px);
 	-ms-transition:scale(c-ms-alc(100vw - 260px),100px);
@@ -504,7 +500,6 @@ table.room tr.sel a svg {
 
 .devType,.devType a,.makeTable,.makeTable a {
 	font-weight:400;
-	text-transform: uppercase;
 	color:#8A8A8F;
 	font-size:13px;
 	padding:20px 0 0

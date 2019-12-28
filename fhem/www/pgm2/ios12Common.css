@@ -97,14 +97,14 @@ select.svgRegexp  { width:120px; }
 
 /* jQuery-UI mods */
 div.ui-dialog div.ui-dialog-titlebar { display:none; }
-div.ui-widget-content { background:#FFFFE7; }
+div.ui-widget-content { background:#FFF; }
 #fwmenu {
   position: absolute; z-index:1005;
   text-align:left; max-width:600px;
   font-weight: normal; font-size: 100%; 
-  background:#FFFFE7; border:1px solid #278727;
+  background:#FFF; border:1px solid black;
 }
-#fwmenu li a { color:#278727; }
+#fwmenu li a { color:black; }
 
 div#svgmarker {
   position: absolute; z-index:1005; padding: 6px 10px;
