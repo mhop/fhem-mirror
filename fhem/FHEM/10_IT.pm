@@ -20,7 +20,7 @@ use SetExtensions;
 my %codes = (
   "XMIToff" => "off",
   "XMITon"  => "on", # Set to previous dim value (before switching it off)
-  "00" => "off",
+  "00" => "dim00%", # alt off
   "01" => "dim06%",
   "02" => "dim12%",
   "03" => "dim18%",
@@ -184,14 +184,13 @@ IT_Set($@)
   return "Dummydevice $hash->{NAME}: will not set data" if(IsDummy($hash->{NAME}));
 
   my $list = "";
-  $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" && AttrVal($name, "model", "") ne "itswitch_CHN");
-  
-  if ($hash->{userV1setCodes}) {
-     if ($hash->{READINGS}{protocol}{VAL} eq "EV1527" || $hash->{READINGS}{protocol}{VAL} eq "V1") {
-        foreach my $setCode (keys %{$hash->{userV1setCodes}}) {
-           $list .= "$setCode:noArg ";
-        }
-     }
+  if( AttrVal($name, "model", "") ne "itremote" && AttrVal($name, "model", "") ne "itswitch_CHN") {
+    $list .= "off:noArg on:noArg ";
+    if ($hash->{userV1setCodes} && ($hash->{READINGS}{protocol}{VAL} eq "EV1527" || $hash->{READINGS}{protocol}{VAL} eq "V1")) {
+      foreach my $setCode (keys %{$hash->{userV1setCodes}}) {
+        $list .= "$setCode:noArg ";
+      }
+    }
   }
 
   my $c = $it_c2b{$a[0]};
@@ -638,13 +637,17 @@ IT_Set($@)
 	} else {
 		if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
 			$protocolId = 'P17#';
+		} elsif ($hash->{READINGS}{protocol}{VAL} eq "HE800") {	# HomeEasy HE800
+			$protocolId = 'P35#';
+		} elsif ($hash->{READINGS}{protocol}{VAL} eq "HE_EU") {	# HomeEasy HE_EU
+			$protocolId = 'P65#';
 		} else {
 			$protocolId = 'P3#';  # IT V1
 		}
 	}
 	if ($hash->{READINGS}{protocol}{VAL} ne "EV1527" && $hash->{READINGS}{protocol}{VAL} ne "V1" && $hash->{READINGS}{protocol}{VAL} ne 'SBC_FreeTec') {  # bei ITv1, SBC_FreeTec und EV1527 wird das "is" am Anfang nicht entfernt
-		$message = substr($message,2);
-		if (substr($message,0,1) eq "h") {    # h entfernen falls am am Anfang
+		$message =~ s/^is//;
+		if ($message =~ m/^[he]/) {    # h oder e entfernen, falls am Anfang
 			$message = substr($message,1);
 		}
 	}
@@ -771,7 +774,7 @@ IT_Define($$)
     #Log3 $hash,2,"ITdefine 1527: $name a3=" . $a[3];
     $housecode = $a[2];
     if (substr($housecode,0,4) eq '1527') {
-      my $evcode;
+      my $evcode = "";
       my $bincode = sprintf("%020b",hex(substr($housecode,5)));
       for (my $n=0; $n<20; $n=$n+2) {
         $evcode = $evcode . $bintotristate{substr($bincode,$n,2)};
@@ -1152,7 +1155,20 @@ IT_Parse($$)
       $def->{$name}->{READINGS}{protocol}{VAL}  = 'EV1527';
       Log3 $hash,4,"$ioname IT EV1527: " . $def->{$name}{NAME} . ', on code=' . $def->{$name}->{$it_c2b{"on"}} . ", Switch code=$onoffcode";
     }
-    if ($def->{$name}->{READINGS}{protocol}{VAL}  eq 'HE800') {
+    $newstate = "";
+    if ($def->{$name}{userV1setCodes} && ($def->{$name}->{READINGS}{protocol}{VAL} eq "EV1527" || $def->{$name}->{READINGS}{protocol}{VAL} eq "V1")) {
+       foreach my $usercode (keys %{$def->{$name}{userV1setCodes}}) {
+          if ($def->{$name}{userV1setCodes}{$usercode} eq $onoffcode) {
+             $newstate = $usercode;
+             last;
+          }
+      }
+      if ($newstate eq "") {
+         Log3 $def->{$name}{NAME},3,"$ioname IT: Code $onoffcode not found in userV1setCodes, try XMIT";
+      }
+    }
+    if ($newstate eq "") {
+     if ($def->{$name}->{READINGS}{protocol}{VAL}  eq 'HE800') {
 
       my %he800MapingTable = (
        2 => 12,
@@ -1200,7 +1216,7 @@ IT_Parse($$)
             $newstate="off";
         } 
       }
-    } elsif ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
+     } elsif ($def->{$name}->{$it_c2b{"on"}} eq lc($onoffcode)) {
       $newstate="on";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         my $lastDimVal = $def->{$name}->{READINGS}{lastDimValue}{VAL};
@@ -1211,25 +1227,23 @@ IT_Parse($$)
         } else {
             readingsSingleUpdate($def->{$name},"dim",100,1);
         }
-      } elsif ( AttrVal($name, "model", "") eq "itswitch_CHN" ) {
-				$newstate="closed";
-			}
-    } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
+      }
+     } elsif ($def->{$name}->{$it_c2b{"off"}} eq lc($onoffcode)) {
       $newstate="off";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         readingsSingleUpdate($def->{$name},"dim",0,1);
       }
-    } elsif ($def->{$name}->{$it_c2b{"dimup"}} eq lc($onoffcode)) {
+     } elsif ($def->{$name}->{$it_c2b{"dimup"}} eq lc($onoffcode)) {
       $newstate="dimup";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         readingsSingleUpdate($def->{$name},"dim","dimup",1);
       }
-    } elsif ($def->{$name}->{$it_c2b{"dimdown"}} eq lc($onoffcode)) {
+     } elsif ($def->{$name}->{$it_c2b{"dimdown"}} eq lc($onoffcode)) {
       $newstate="dimdown";
       if( AttrVal($name, "model", "") eq "itdimmer" ) {
         readingsSingleUpdate($def->{$name},"dim","dimdown",1);
       }
-    } elsif ('d' eq lc($onoffcode)) {
+     } elsif ('d' eq lc($onoffcode)) {
       # dim
       my $binVal = ((bin2dec($dimCode)+1)*100)/16;
       $binVal =  int($binVal);
@@ -1241,12 +1255,11 @@ IT_Parse($$)
         $newstate="on";
       } elsif ($binVal == 0) {
         $newstate="off";
-      } 
-		} elsif ( AttrVal($name, "model", "") eq "itswitch_CHN" ) {
-				$newstate="open";
-		} else {
+      }
+     } else {
       Log3 $def->{$name}{NAME},3,"$ioname IT: Code $onoffcode not supported by $def->{$name}{NAME}.";
       next;
+     }
     }
     Log3 $def->{$name}{NAME},3,"$ioname IT: $def->{$name}{NAME} ".$def->{$name}->{STATE}."->".$newstate;
     push(@list,$def->{$name}{NAME});
@@ -1264,9 +1277,16 @@ sub IT_Attr(@)
 	
 	#Log3 $hash, 4, "$name IT_Attr: Calling Getting Attr sub with args: $cmd $aName = $aVal";
 		
-	if( $aName eq 'model' && $aVal eq 'ev1527') {
-		#Log3 $hash, 4, "$name IT_Attr: ev1527";
-		$hash->{READINGS}{protocol}{VAL}  = 'EV1527';
+	if( $aName eq 'model') {
+		if ($aVal eq 'ev1527') {
+			#Log3 $hash, 4, "$name IT_Attr: ev1527";
+			$hash->{READINGS}{protocol}{VAL}  = 'EV1527';
+		} elsif ($aVal eq 'itswitch_CHN') {
+			$hash->{userV1setCodes} = undef;
+			$hash->{userV1setCodes}{open} = "1010";
+			$hash->{userV1setCodes}{closed} = "1110";
+			$hash->{userV1setCodes}{tamper} = "0111";
+		}
 	} elsif ( $aName eq 'userV1setCodes') {
 		my @array = split(" ",$aVal);
 		$hash->{userV1setCodes} = undef;
@@ -1351,6 +1371,7 @@ sub IT_Attr(@)
    <li>optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code>  2 numbers in quad state format (0/1/F/D), 
    contains the command for dimming; 
      this number is added to the &lt;housecode&gt; to define tha actual 12-number sending command.</li>
+   <li>If the attribute userV1setCodes exists, these codes are also used for reception, the userV1setCodes have priority over the XMIT Codes.</li>
    <li>Notice: orginal ITv1 devices are only defined using the on command.</li>
    <li>Devices which are nt orignal ITv1 devices cen be defined as follows:</li><br>
        To autocreate press twice "on" within 30 seconds. The Log gives:<br>
@@ -1513,8 +1534,8 @@ Examples:
 
           <b>Dimmer</b>: itdimmer<br>
 
-          <b>door/window contact (china)</b>: itswitch_CHN<br>
-					
+          <b>door/window contact (china)</b>: itswitch_CHN (closed:1110 open:1010 tamper:0111)<br>
+
           <b>Receiver/Actor</b>: itswitch<br>
 
           <b>EV1527</b>: ev1527
@@ -1556,10 +1577,13 @@ Examples:
 
     <a name="userV1setCodes"></a>
      <li>userV1setCodes<br>
-       If an ITv1 protocol is used indivual setcodes can be added. Example:
+       If an ITv1 protocol is used indivual setcodes can be added.<br>
+       The setcodes are also used for reception, the userV1setCodes have priority over the XMIT Codes.<br>
+       Example:
        <ul><code>
        attr lamp userV1setCodes red:FD blue:1F<br>
-       attr lamp userV1setCodes up:1001 down:1000 stop:1011
+       attr lamp userV1setCodes up:1001 down:1000 stop:1011<br>
+       attr IT_1527x12345 userV1setCodes closed:0111 open:1110 tamper:1011 lowVoltage:1111  # Kerui magnetic contact sensors
        </code></ul>
     </li><br>
     
@@ -1645,6 +1669,7 @@ Examples:
    <li>optional <code>&lt;dimup-code&gt; &lt;dimdown-code&gt;</code> jeweils 2 Ziffern lange quad-State-Zahl (0/1/F/D), 
    die den Befehl zum Herauf- und Herunterregeln enth&auml;lt; 
      die Zahl wird an den &lt;housecode&gt; angef&uuml;gt, um den 12-stelligen IT-Sendebefehl zu bilden.</li>
+   <li>Falls es das Attribut userV1setCodes gibt, werden diese Codes auch für den Empfang verwendet, dabei haben die userV1setCodes Vorrang vor den XMIT Codes.</li>
    <li>Hinweis: orginal ITv1 devices werden nur beim on Befehl angelegt.</li>
    <li>Die nicht orginal ITv1 devices k&ouml;nnen wie folgt angelegt werden:</li><br>
        Zum anlegen mit autocreate 2 mal auf "on" dr&uuml;cken:<br>
@@ -1802,8 +1827,8 @@ Beispiele:
 
         <b>Dimmer</b>: itdimmer<br>
 
-        <b>T&uuml;r/Fensterkontakt (China)</b>: itswitch_CHN<br>
-				
+        <b>T&uuml;r/Fensterkontakt (China)</b>: itswitch_CHN (closed:1110 open:1010 tamper:0111)<br>
+
         <b>Empf&auml;nger/Actor</b>: itswitch<br>
 
         <b>EV1527</b>: ev1527
@@ -1845,10 +1870,13 @@ Beispiele:
     
     <a name="userV1setCodes"></a>
     <li>userV1setCodes<br>
-       Damit k&ouml;nnen beim ITv1 Protokoll eigene setcodes zugef&uuml;gt werden. Beispiele:
+       Damit k&ouml;nnen beim ITv1 Protokoll eigene setcodes zugef&uuml;gt werden.<br>
+       Die setcodes werden auch f&uuml;r den Empfang verwendet, dabei haben die userV1setCodes Vorrang vor den XMIT Codes.<br>
+       Beispiele:
        <ul><code>
        attr lamp userV1setCodes rot:FD blau:1F<br>
-       attr lamp userV1setCodes hoch:1001 runter:1000 stop:1011
+       attr lamp userV1setCodes hoch:1001 runter:1000 stop:1011<br>
+       attr IT_1527x12345 userV1setCodes closed:0111 open:1110 tamper:1011 lowVoltage:1111  # Kerui Fensterkontakt
        </code></ul>
     </li><br>
     
