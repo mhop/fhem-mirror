@@ -171,12 +171,13 @@
 #   2019-11-19  little bug fixes
 #   2019-11-20  precompilation of preProcessRegex removed - can't compile a regex inluding a replacement part for s//
 #   2019-11-29  new fix for special compiled regexes with regex options
+#   2019-12-27  delete hash-{method} if not explicitely set
 #
 #
 
 #
 #   Todo:       
-#
+#               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
@@ -242,7 +243,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.19 - 29.11.2019';
+my $HTTPMOD_Version = '3.5.21 - 27.12.2019';
 
 #
 # FHEM module intitialisation
@@ -2675,7 +2676,10 @@ sub HTTPMOD_CheckRedirects($$)
             return;
         } else {
             my $ra;
-            map { $ra=$1 if($_ =~ m/Location:\s*(\S+)$/) } @header;
+            map { $ra=$1 if($_ =~ m/[Ll]ocation:\s*(\S+)$/) } @header;
+            if (!$ra) {
+                Log3 $name, 3, "$name: Error: got Redirect but no Location-Header from server";
+            }
             $ra = "/$ra" if($ra !~ m/^http/ && $ra !~ m/^\//);
             my $rurl = ($ra =~ m/^http/) ? $ra: $hash->{addr}.$ra;
             if ($request->{ignoreredirects}) {
@@ -3017,6 +3021,8 @@ sub HTTPMOD_HandleSendQueue($)
         if($hash->{REQUEST}{method}) {          # check if optional parameter for HTTP Method is set
             $hash->{method}  = $hash->{REQUEST}{method};
             Log3 $name, 5, "$name: HandleSendQueue - call with HTTP METHOD: $hash->{method} ";
+        } else {
+            delete $hash->{method};             # make sure this is not set from a prior request
         }
         my $fDefault = ($featurelevel > 5.9 ? 1 : 0);
         if (AttrVal($name, "handleRedirects", $fDefault)) {
