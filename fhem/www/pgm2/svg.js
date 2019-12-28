@@ -251,9 +251,7 @@ sv_menu(evt, embed)
           $(svg).append(par.circle);
 
           par.div = $('<div id="svgmarker">');
-          par.divoffY = $(embed ? embed : svg).offset().top -
-                       $("#content").offset().top-50 +
-                       $("#content").scrollTop();
+          par.divoffY = -50;
           var parent = (embed ? $(embed).parent() : $(svg).parent()); 
           $(parent).append(par.div);
 
@@ -444,6 +442,7 @@ $(document).ready(function(){
     svg_load("svg_pastedata", function(val) {svg_pastedata = val} );
   });
   $("svg[id]").each(function(){        // <svg> (direct)
+	$(this).parent().css( "position", "relative" );
     if($(this).attr("id").indexOf("SVGPLOT") == 0)
       svg_init_one(undefined, this);
   });
