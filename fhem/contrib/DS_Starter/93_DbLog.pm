@@ -3172,13 +3172,13 @@ sub DbLog_Get($@) {
 
   $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - Wrong date/time format (from: $from) requested by SVG: $err");
+      Log3($name, 1, "DbLog $name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
   
   $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - Wrong date/time format (to: $to) requested by SVG: $err");
+      Log3($name, 1, "DbLog $name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
   }
   
@@ -5734,7 +5734,8 @@ sub DbLog_checkTimeformat ($) {
   eval { timelocal($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
   
   if ($@) {
-      return $@;
+      my $err = (split(" at ", $@))[0];
+      return $err;
   }
   
 return;
