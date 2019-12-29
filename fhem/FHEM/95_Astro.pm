@@ -1174,7 +1174,7 @@ sub SUNRISE_EL_sr_alt($$$$$$$$$) {
   my $tz =
     AttrVal( $name, "timezone", AttrVal( "global", "timezone", undef ) );
   local $ENV{TZ} = $tz if ($tz);
-  tzset() if ( exists &{'tzset'} );
+  eval { tzset() if ( exists &{'tzset'} ) };
 
   #my $nt = time;
   my @lt = localtime($nt);
@@ -3196,7 +3196,7 @@ sub Get($@) {
 =end html_DE
 =for :application/json;q=META.json 95_Astro.pm
 {
-  "version": "v2.1.1",
+  "version": "v2.1.2",
   "author": [
     "Prof. Dr. Peter A. Henning <>",
     "Julian Pawlowski <>",
