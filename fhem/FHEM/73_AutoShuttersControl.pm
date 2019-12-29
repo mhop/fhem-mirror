@@ -2020,7 +2020,7 @@ sub EventProcessingBrightness($@) {
 
                 $shutters->setPrivacyDownStatus(0)
                   if (  $shutters->getPrivacyDownStatus == 2
-                    and $shutters->getSunset );
+                    and $shutters->getSunrise );
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
 
                 ASC_Debug( 'EventProcessingBrightness: '
@@ -7903,7 +7903,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.8",
+  "version": "v0.8.9",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
