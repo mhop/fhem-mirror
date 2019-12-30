@@ -1683,7 +1683,7 @@ sub ToDay() {
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
   </code><br>
-  <br>s
+  <br>
   This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
   Only checking for outdated packages does not require any privileged access at all!<br>
   <br>
