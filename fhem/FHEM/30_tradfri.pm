@@ -665,6 +665,7 @@ tradfri_Attr($$$)
 1;
 
 =pod
+=item protocol:zigbee
 =item summary    Module to control the FHEM/tradfri integration
 =item summary_DE Modul zur Konfiguration der FHEM/tradfri Integration
 =begin html

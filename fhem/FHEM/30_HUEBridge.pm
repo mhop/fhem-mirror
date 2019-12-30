@@ -2112,6 +2112,9 @@ HUEBridge_Attr($$$)
 1;
 
 =pod
+=item tag cloudfree
+=item tag publicAPI
+=item tag protocol:zigbee
 =item summary    module for the phillips hue bridge
 =item summary_DE Modul f&uuml;r die Philips HUE Bridge
 =begin html

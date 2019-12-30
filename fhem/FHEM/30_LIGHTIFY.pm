@@ -987,6 +987,7 @@ LIGHTIFY_Read($)
 1;
 
 =pod
+=item tag protocol:zigbee
 =item summary    module for the osram lightify gateway
 =item summary_DE Modul f&uuml;r das Osram LIGHTFY Gateway
 =begin html

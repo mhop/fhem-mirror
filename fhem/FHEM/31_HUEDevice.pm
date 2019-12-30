@@ -1810,8 +1810,8 @@ HUEDevice_Attr($$$;$)
 1;
 
 =pod
-=item cloudfree
-=item openapi
+=item tag cloudfree
+=item tag publicAPI
 =item summary    Devices connected to a Phillips HUE bridge, an LIGHTIFY or TRADFRI gateway
 =item summary_DE Ger&auml;te an einer Philips HUE Bridge, einem LIGHTIFY oder Tradfri Gateway
 =begin html

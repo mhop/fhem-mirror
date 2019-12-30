@@ -1226,6 +1226,7 @@ alexa_Attr($$$)
 1;
 
 =pod
+=item tag publicAPI
 =item summary    Module to control the FHEM/Alexa integration
 =item summary_DE Modul zur Konfiguration der FHEM/Alexa Integration
 =begin html
