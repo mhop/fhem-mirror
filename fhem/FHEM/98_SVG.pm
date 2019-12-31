@@ -1015,6 +1015,7 @@ SVG_calcOffsets($$)
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
     my @me = (31,28,31,30,31,30,31,31,30,31,30,31);
+    $me[1]++ if(($sy+1900)%4); # leap year. Ignore 1900 and 2100 :)
 
     if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
       $sy = $ey = $l[5];
@@ -1022,12 +1023,12 @@ SVG_calcOffsets($$)
       $sm += 12, $sy-- if($sm < 0);
       $sd = $l[3]+1; $ed = $l[3];
       $sd=1, $sm=$em, $sy=$ey if($sd > $me[$sm]);
+      $ed = $me[$em] if($ed > $me[$em]);
 
     } else {
       $sy = $ey = $l[5];
       $sm = $em = $l[4];
       $sd = 1; $ed = $me[$l[4]];
-      $ed++ if($l[4]==1 && !(($sy+1900)%4)); # leap year
     }
     $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$sd,$sm,$sy);
     $SVG_devs{$d}{to}   = SVG_tspec(59,59,23,$ed,$em,$ey);
