@@ -442,6 +442,8 @@ $(document).ready(function(){
     svg_load("svg_pastedata", function(val) {svg_pastedata = val} );
   });
   $("svg[id]").each(function(){        // <svg> (direct)
+    if($(this).parent().parent('td').length)    // needed in groups
+      $(this).parent().css( "position", "relative" );
     if($(this).attr("id").indexOf("SVGPLOT") == 0)
       svg_init_one(undefined, this);
   });
