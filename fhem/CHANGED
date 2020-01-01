@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbLog: fix behavior if value is empty and attribute 
+                      addStateEvent is set (default), Forum: #106769
  - bugfix:  73_AutoShuttersControl: fix IsDay Bug then use Privacy Down
  - bugfix:  95_Astro: make tzset() more robust, change Version
  - change:  73_AutoShuttersControl: little Bugfix, add devStateIcon Fn

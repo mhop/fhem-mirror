@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2020 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
   "4.9.4"   => "29.12.2019 correct behavior if value is empty and attribute addStateEvent is set (default), Forum: #106769 ",
   "4.9.3"   => "28.12.2019 check date/time format got from SVG, Forum: #101005 ",
   "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
@@ -634,7 +635,8 @@ sub DbLog_Set($@) {
         my $skip_trigger = 1;   # kein Event erzeugen falls addLog device/reading not found aber Abarbeitung erfolgreich
         return undef,$skip_trigger;
 	}
-    elsif ($a[1] eq 'reopen') {		
+    elsif ($a[1] eq 'reopen') {
+        return if(IsDisabled($name));    
 		if ($dbh) {
             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
              if ($@) {

@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2019 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2020 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
+  "4.9.4"   => "29.12.2019 correct behavior if value is empty and attribute addStateEvent is set (default), Forum: #106769 ",
   "4.9.3"   => "28.12.2019 check date/time format got from SVG, Forum: #101005 ",
   "4.9.2"   => "16.12.2019 add \$DEVICE to attr DbLogValueFn for readonly access to the device name ",
   "4.9.1"   => "13.11.2019 escape \ with \\ in DbLog_Push and DbLog_PushAsync ",
@@ -633,7 +635,8 @@ sub DbLog_Set($@) {
         my $skip_trigger = 1;   # kein Event erzeugen falls addLog device/reading not found aber Abarbeitung erfolgreich
         return undef,$skip_trigger;
 	}
-    elsif ($a[1] eq 'reopen') {		
+    elsif ($a[1] eq 'reopen') {
+        return if(IsDisabled($name));    
 		if ($dbh) {
             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
              if ($@) {
@@ -966,8 +969,8 @@ return $ret;
 ################################################################
 # Parsefunktion, abhaengig vom Devicetyp
 ################################################################
-sub DbLog_ParseEvent($$$) {
-  my ($device, $type, $event)= @_;
+sub DbLog_ParseEvent($$$$) {
+  my ($name,$device, $type, $event)= @_;
   my (@result,$reading,$value,$unit);
 
   # Splitfunktion der Eventquelle aufrufen (ab 2.9.1)
@@ -992,16 +995,16 @@ sub DbLog_ParseEvent($$$) {
   #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
-  if( $value eq "" ) {
-    $reading = "state";
-    $value   = $event;
+  if($value eq "" && !AttrVal($name, "addStateEvent", 1)) {
+      $reading = "state";
+      $value   = $event;
   }
 
   #globales Abfangen von 
   # - temperature
   # - humidity
-  if   ($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
-  elsif($reading =~ m(^humidity)) { $unit= "%"; }
+  if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
+  elsif($reading =~ m(^humidity))    { $unit = "%"; }
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -1011,230 +1014,219 @@ sub DbLog_ParseEvent($$$) {
   }
   #OneWire 
   elsif(($type eq "OWMULTI")) {
-    if(int(@parts)>1) {
-      $reading = "data";
-      $value = $event;
-    } else {
-      @parts = split(/\|/, AttrVal($device, $reading."VUnit", ""));
-      $unit = $parts[1] if($parts[1]);
-      if(lc($reading) =~ m/temp/) {
-        $value=~ s/ \(Celsius\)//;
-        $value=~ s/([-\.\d]+).*/$1/;
-        $unit= "°C";
+      if(int(@parts) > 1) {
+          $reading = "data";
+          $value   = $event;
+      } else {
+          @parts = split(/\|/, AttrVal($device, $reading."VUnit", ""));
+          $unit  = $parts[1] if($parts[1]);
+          if(lc($reading) =~ m/temp/) {
+              $value =~ s/ \(Celsius\)//;
+              $value =~ s/([-\.\d]+).*/$1/;
+              $unit  = "°C";
+          } elsif (lc($reading) =~ m/(humidity|vwc)/) { 
+              $value =~ s/ \(\%\)//; 
+             $unit  = "%"; 
+          }
       }
-      elsif(lc($reading) =~ m/(humidity|vwc)/) { 
-        $value=~ s/ \(\%\)//; 
-        $unit= "%"; 
-      }
-    }
   }
   # Onewire
-  elsif(($type eq "OWAD") ||
-        ($type eq "OWSWITCH")) {
+  elsif(($type eq "OWAD") || ($type eq "OWSWITCH")) {
       if(int(@parts)>1) {
         $reading = "data";
-        $value = $event;
+        $value   = $event;
       } else {
         @parts = split(/\|/, AttrVal($device, $reading."Unit", ""));
-        $unit = $parts[1] if($parts[1]);
+        $unit  = $parts[1] if($parts[1]);
       }
   }
   
   # ZWAVE
   elsif ($type eq "ZWAVE") {
-    if ( $value=~/([-\.\d]+)\s([a-z].*)/i ) {
-     $value = $1;
-     $unit  = $2;
-    }
+      if ( $value =~/([-\.\d]+)\s([a-z].*)/i ) {
+          $value = $1;
+          $unit  = $2;
+      }
   }
 
   # FBDECT
   elsif ($type eq "FBDECT") {
-    if ( $value=~/([\.\d]+)\s([a-z].*)/i ) {
-     $value = $1;
-     $unit  = $2;
-    }
+      if ( $value =~/([\.\d]+)\s([a-z].*)/i ) {
+          $value = $1;
+          $unit  = $2;
+      }
   }
   
   # MAX
   elsif(($type eq "MAX")) {
-    $unit= "°C" if(lc($reading) =~ m/temp/);
-    $unit= "%"   if(lc($reading) eq "valveposition");
+      $unit = "°C" if(lc($reading) =~ m/temp/);
+      $unit = "%"   if(lc($reading) eq "valveposition");
   }
 
   # FS20
   elsif(($type eq "FS20") || ($type eq "X10")) {
-    if($reading =~ m/^dim(\d+).*/o) {
-      $value = $1;
-      $reading= "dim";
-      $unit= "%";
-    }
-    elsif(!defined($value) || $value eq "") {
-      $value= $reading;
-      $reading= "data";
-    }
+      if($reading =~ m/^dim(\d+).*/o) {
+          $value   = $1;
+          $reading = "dim";
+          $unit    = "%";
+      } elsif(!defined($value) || $value eq "") {
+          $value   = $reading;
+          $reading = "data";
+      }
   }
 
   # FHT
   elsif($type eq "FHT") {
-    if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
-      @parts= split(/ /,$event);
-      $reading= $parts[0];
-      $value= $parts[1];
-      $unit= "";
-    }
-    elsif($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-    elsif($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-    elsif($reading =~ m(^actuator[0-9]*)) {
-      if($value eq "lime-protection") {
-        $reading= "actuator-lime-protection";
-        undef $value;
+      if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
+          @parts   = split(/ /,$event);
+          $reading = $parts[0];
+          $value   = $parts[1];
+          $unit    = "";
+      } elsif($reading =~ m(-temp)) { 
+          $value =~ s/ \(Celsius\)//; $unit= "°C"; 
+      } elsif($reading =~ m(temp-offset)) { 
+          $value =~ s/ \(Celsius\)//; $unit= "°C"; 
+      } elsif($reading =~ m(^actuator[0-9]*)) {
+          if($value eq "lime-protection") {
+              $reading = "actuator-lime-protection";
+              undef $value;
+          } elsif($value =~ m(^offset:)) {
+              $reading = "actuator-offset";
+              @parts   = split(/: /,$value);
+              $value   = $parts[1];
+              if(defined $value) {
+                  $value =~ s/%//; $value = $value*1.; $unit = "%";
+              }
+          } elsif($value =~ m(^unknown_)) {
+              @parts   = split(/: /,$value);
+              $reading = "actuator-" . $parts[0];
+              $value   = $parts[1];
+              if(defined $value) {
+                  $value =~ s/%//; $value = $value*1.; $unit = "%";
+              }
+          } elsif($value =~ m(^synctime)) {
+              $reading = "actuator-synctime";
+              undef $value;
+          } elsif($value eq "test") {
+              $reading = "actuator-test";
+              undef $value;
+          } elsif($value eq "pair") {
+              $reading = "actuator-pair";
+              undef $value;
+          } else {
+              $value =~ s/%//; $value = $value*1.; $unit = "%";
+          }
       }
-      elsif($value =~ m(^offset:)) {
-        $reading= "actuator-offset";
-        @parts= split(/: /,$value);
-        $value= $parts[1];
-        if(defined $value) {
-          $value=~ s/%//; $value= $value*1.; $unit= "%";
-        }
-      }
-      elsif($value =~ m(^unknown_)) {
-        @parts= split(/: /,$value);
-        $reading= "actuator-" . $parts[0];
-        $value= $parts[1];
-        if(defined $value) {
-          $value=~ s/%//; $value= $value*1.; $unit= "%";
-        }
-      }
-      elsif($value =~ m(^synctime)) {
-        $reading= "actuator-synctime";
-        undef $value;
-      }
-      elsif($value eq "test") {
-        $reading= "actuator-test";
-        undef $value;
-      }
-      elsif($value eq "pair") {
-        $reading= "actuator-pair";
-        undef $value;
-      }
-      else {
-        $value=~ s/%//; $value= $value*1.; $unit= "%";
-      }
-    }
   }
   # KS300
   elsif($type eq "KS300") {
-    if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-    elsif($event =~ m(avg_day)) { $reading= "data"; $value= $event; }
-    elsif($event =~ m(avg_month)) { $reading= "data"; $value= $event; }
-    elsif($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-    elsif($reading eq "wind") { $value=~ s/ \(km\/h\)//; $unit= "km/h"; }
-    elsif($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
-    elsif($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
-    elsif($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-    elsif($reading eq "israining") {
-      $value=~ s/ \(yes\/no\)//;
-      $value=~ s/no/0/;
-      $value=~ s/yes/1/;
-    }
+      if($event =~ m(T:.*))            { $reading = "data"; $value = $event; }
+      elsif($event =~ m(avg_day))      { $reading = "data"; $value = $event; }
+      elsif($event =~ m(avg_month))    { $reading = "data"; $value = $event; }
+      elsif($reading eq "temperature") { $value   =~ s/ \(Celsius\)//; $unit = "°C"; }
+      elsif($reading eq "wind")        { $value   =~ s/ \(km\/h\)//; $unit = "km/h"; }
+      elsif($reading eq "rain")        { $value   =~ s/ \(l\/m2\)//; $unit = "l/m2"; }
+      elsif($reading eq "rain_raw")    { $value   =~ s/ \(counter\)//; $unit = ""; }
+      elsif($reading eq "humidity")    { $value   =~ s/ \(\%\)//; $unit = "%"; }
+      elsif($reading eq "israining") {
+        $value =~ s/ \(yes\/no\)//;
+        $value =~ s/no/0/;
+        $value =~ s/yes/1/;
+      }
   }
   # HMS
-  elsif($type eq "HMS" ||
-        $type eq "CUL_WS" ||
-        $type eq "OWTHERM") {
-    if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-    elsif($reading eq "temperature") {
-      $value=~ s/ \(Celsius\)//; 
-      $value=~ s/([-\.\d]+).*/$1/; #OWTHERM
-      $unit= "°C"; 
-    }
-    elsif($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-    elsif($reading eq "battery") {
-      $value=~ s/ok/1/;
-      $value=~ s/replaced/1/;
-      $value=~ s/empty/0/;
-    }
+  elsif($type eq "HMS" || $type eq "CUL_WS" || $type eq "OWTHERM") {
+      if($event =~ m(T:.*)) { 
+          $reading = "data"; $value= $event; 
+      } elsif($reading eq "temperature") {
+          $value =~ s/ \(Celsius\)//; 
+          $value =~ s/([-\.\d]+).*/$1/; #OWTHERM
+          $unit  = "°C"; 
+      } elsif($reading eq "humidity") { 
+          $value =~ s/ \(\%\)//; $unit= "%"; 
+      } elsif($reading eq "battery") {
+          $value =~ s/ok/1/;
+          $value =~ s/replaced/1/;
+          $value =~ s/empty/0/;
+      }
   }
   # CUL_HM
   elsif ($type eq "CUL_HM") {
-    # remove trailing %  
-    $value=~ s/ \%$//;
+      $value =~ s/ \%$//;                           # remove trailing %  
   }
 
   # BS
   elsif($type eq "BS") {
-    if($event =~ m(brightness:.*)) {
-      @parts= split(/ /,$event);
-      $reading= "lux";
-      $value= $parts[4]*1.;
-      $unit= "lux";
-    }
+      if($event =~ m(brightness:.*)) {
+          @parts   = split(/ /,$event);
+          $reading = "lux";
+          $value   = $parts[4]*1.;
+          $unit    = "lux";
+      }
   }
 
   # RFXTRX Lighting
   elsif($type eq "TRX_LIGHT") {
-    if($reading =~ m/^level (\d+)/) {
-        $value = $1;
-        $reading= "level";
-    }
+      if($reading =~ m/^level (\d+)/) {
+          $value   = $1;
+          $reading = "level";
+      }
   }
 
   # RFXTRX Sensors
   elsif($type eq "TRX_WEATHER") {
-    if($reading eq "energy_current") { $value=~ s/ W//; }
-    elsif($reading eq "energy_total") { $value=~ s/ kWh//; }
-#    elsif($reading eq "temperature") {TODO}
-#    elsif($reading eq "temperature")  {TODO
-    elsif($reading eq "battery") {
-      if ($value=~ m/(\d+)\%/) { 
-        $value= $1; 
+      if($reading eq "energy_current") { 
+          $value =~ s/ W//; 
+      } elsif($reading eq "energy_total") { 
+          $value =~ s/ kWh//; 
+      } elsif($reading eq "battery") {
+          if ($value =~ m/(\d+)\%/) { 
+              $value = $1; 
+          } else {
+              $value = ($value eq "ok");
+          }
       }
-      else {
-        $value= ($value eq "ok");
-      }
-    }
   }
 
   # Weather
   elsif($type eq "WEATHER") {
-    if($event =~ m(^wind_condition)) {
-      @parts= split(/ /,$event); # extract wind direction from event
-      if(defined $parts[0]) {
-        $reading = "wind_condition";
-        $value= "$parts[1] $parts[2] $parts[3]";
+      if($event =~ m(^wind_condition)) {
+          @parts = split(/ /,$event); # extract wind direction from event
+          if(defined $parts[0]) {
+              $reading = "wind_condition";
+              $value   = "$parts[1] $parts[2] $parts[3]";
+          }
       }
-    }
-    if($reading eq "wind_condition") { $unit= "km/h"; }
-    elsif($reading eq "wind_chill") { $unit= "°C"; }
-    elsif($reading eq "wind_direction") { $unit= ""; }
-    elsif($reading =~ m(^wind)) { $unit= "km/h"; } # wind, wind_speed
-    elsif($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
-    elsif($reading =~ m(^humidity)) { $unit= "%"; }
-    elsif($reading =~ m(^pressure)) { $unit= "hPa"; }
-    elsif($reading =~ m(^pressure_trend)) { $unit= ""; }
+      if($reading eq "wind_condition")      { $unit = "km/h"; }
+      elsif($reading eq "wind_chill")       { $unit = "°C"; }
+      elsif($reading eq "wind_direction")   { $unit = ""; }
+      elsif($reading =~ m(^wind))           { $unit = "km/h"; }      # wind, wind_speed
+      elsif($reading =~ m(^temperature))    { $unit = "°C"; }        # wenn reading mit temperature beginnt
+      elsif($reading =~ m(^humidity))       { $unit = "%"; }
+      elsif($reading =~ m(^pressure))       { $unit = "hPa"; }
+      elsif($reading =~ m(^pressure_trend)) { $unit = ""; }
   }
 
   # FHT8V
   elsif($type eq "FHT8V") {
-    if($reading =~ m(valve)) {
-      @parts= split(/ /,$event);
-      $reading= $parts[0];
-      $value= $parts[1];
-      $unit= "%";
-    }
+      if($reading =~ m(valve)) {
+          @parts   = split(/ /,$event);
+          $reading = $parts[0];
+          $value   = $parts[1];
+          $unit    = "%";
+      }
   }
 
   # Dummy
   elsif($type eq "DUMMY")  {
-    if( $value eq "" ) {
-      $reading= "data";
-      $value= $event;
-    }
-    $unit= "";
+      if( $value eq "" ) {
+          $reading = "data";
+          $value   = $event;
+      }
+      $unit = "";
   }
 
-  @result= ($reading,$value,$unit);
+  @result = ($reading,$value,$unit);
   return @result;
 }
 
@@ -1301,7 +1293,7 @@ sub DbLog_Log($$) {
   my $DbLogInclude       = AttrVal($dev_name, "DbLogInclude", undef);
   my $DbLogValueFn       = AttrVal($dev_name, "DbLogValueFn","");
   my $DbLogSelectionMode = AttrVal($name, "DbLogSelectionMode","Exclude");
-  my $value_fn           = AttrVal( $name, "valueFn", "" );  
+  my $value_fn           = AttrVal($name, "valueFn", "");  
   
   # Funktion aus Device spezifischer DbLogValueFn validieren
   if( $DbLogValueFn =~ m/^\s*(\{.*\})\s*$/s ) {
@@ -1331,7 +1323,7 @@ sub DbLog_Log($$) {
               $timestamp = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
               $event =~ s/\|/_ESC_/g;    # escape Pipe "|"
               
-              my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
+              my @r = DbLog_ParseEvent($name,$dev_name, $dev_type, $event);
 			  $reading = $r[0];
               $value   = $r[1];
               $unit    = $r[2];
@@ -3182,13 +3174,13 @@ sub DbLog_Get($@) {
 
   $err = DbLog_checkTimeformat($from);                                     # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - Wrong date/time format (from: $from) requested by SVG: $err");
+      Log3($name, 1, "DbLog $name - wrong date/time format (from: $from) requested by SVG: $err");
       return;
   }
   
   $err = DbLog_checkTimeformat($to);                                       # Forum: https://forum.fhem.de/index.php/topic,101005.0.html
   if($err) {
-      Log3($name, 1, "DbLog $name - Wrong date/time format (to: $to) requested by SVG: $err");
+      Log3($name, 1, "DbLog $name - wrong date/time format (to: $to) requested by SVG: $err");
       return;
   }
   
@@ -4497,7 +4489,7 @@ sub DbLog_AddLog($$$$$) {
 	      $event = $dev_reading.": ".$read_val; 
 
 	      # den zusammengestellten Event parsen lassen (evtl. Unit zuweisen)
-          my @r = DbLog_ParseEvent($dev_name, $dev_type, $event);
+          my @r = DbLog_ParseEvent($name,$dev_name, $dev_type, $event);
           $dev_reading = $r[0];
           $read_val    = $r[1];
           $ut          = $r[2];
@@ -5744,7 +5736,8 @@ sub DbLog_checkTimeformat ($) {
   eval { timelocal($time[2], $time[1], $time[0], $date[2], $date[1]-1, $date[0]-1900); };
   
   if ($@) {
-      return $@;
+      my $err = (split(" at ", $@))[0];
+      return $err;
   }
   
 return;
