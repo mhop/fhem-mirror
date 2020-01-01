@@ -33,6 +33,7 @@ tradfri_Initialize($)
 
   $hash->{ReadFn}   = "tradfri_Read";
   $hash->{WriteFn}  = "tradfri_Write";
+  $hash->{Clients}  = ":HUEDevice:";
 
   $hash->{DefFn}    = "tradfri_Define";
   $hash->{RenameFn} = "tradfri_Rename";
