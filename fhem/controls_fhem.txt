@@ -1,4 +1,4 @@
-REV 20857
+REV 20860
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -511,7 +511,7 @@ UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2019-12-29_07:45:10 27772 FHEM/98_RandomTimer.pm
-UPD 2019-12-24_07:45:11 96462 FHEM/98_SVG.pm
+UPD 2020-01-01_07:45:03 96514 FHEM/98_SVG.pm
 UPD 2019-12-18_07:45:02 71578 FHEM/98_Siro.pm
 UPD 2018-11-12_07:45:03 80535 FHEM/98_SmarterCoffee.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
@@ -748,8 +748,8 @@ UPD 2019-12-31_07:45:09 4202845 docs/commandref.html
 UPD 2019-12-31_07:45:11 2596994 docs/commandref_DE.html
 UPD 2019-12-26_07:45:03 79845 docs/commandref_frame.html
 UPD 2019-12-26_07:45:03 89593 docs/commandref_frame_DE.html
-UPD 2019-12-31_07:45:12 229762 docs/commandref_modular.html
-UPD 2019-12-31_07:45:14 240714 docs/commandref_modular_DE.html
+UPD 2020-01-01_07:45:10 229762 docs/commandref_modular.html
+UPD 2020-01-01_07:45:12 240714 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2262,7 +2262,7 @@ UPD 2017-01-17_07:45:03 18745 www/pgm2/sorttable.js
 UPD 2018-12-17_07:45:02 789397 www/pgm2/sscam_hls.js
 UPD 2018-12-16_07:45:03 36555 www/pgm2/sscam_tooltip.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
-UPD 2019-12-31_07:45:05 14281 www/pgm2/svg.js
+UPD 2020-01-01_07:45:03 14403 www/pgm2/svg.js
 UPD 2019-06-20_10:05:58 6801 www/pgm2/svg_defs.svg
 UPD 2019-06-20_10:05:58 5637 www/pgm2/svg_style.css
 UPD 2019-01-15_07:45:03 14976 www/pgm2/todoist.js
