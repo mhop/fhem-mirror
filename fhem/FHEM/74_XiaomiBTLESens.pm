@@ -5,6 +5,10 @@
 #  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
+#  Special thanks goes to:
+#       -  Charlie71: add special patch
+#
+#
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
@@ -218,6 +222,7 @@ sub Initialize($) {
       . "minLux "
       . "maxLux "
       . "sshHost "
+	  . "psCommand "				
       . "model:flowerSens,thermoHygroSens,clearGrassSens "
       . "blockingCallLoglevel:2,3,4,5 "
       . $readingFnAttributes;
@@ -627,6 +632,10 @@ sub CreateParamGatttool($@) {
     }
 }
 
+sub Gatttool_executeCommand{
+    my $command = join ' ', @_;
+    ($_ = qx{$command 2>&1}, $? >> 8);
+}
 sub ExecGatttool_Run($) {
 
     my $string = shift;
@@ -657,11 +666,12 @@ sub ExecGatttool_Run($) {
         $cmd .= "--char-write-req -a $handle -n $value"
           if ( $gattCmd eq 'write' );
         $cmd .= " --listen" if ($listen);
-        $cmd .= " 2>&1 /dev/null";
+#        $cmd .= " 2>&1 /dev/null";
+        $cmd .= " 2>&1";
         $cmd .= "'"         if ( $sshHost ne 'none' );
 
-        $cmd =
-"ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'"
+#        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'"
+        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 '"
           if (  $sshHost ne 'none'
             and $gattCmd eq 'write'
             and AttrVal( $name, "model", "none" ) eq 'flowerSens' );
@@ -672,11 +682,13 @@ sub ExecGatttool_Run($) {
             my $gatttoolCmdlineStaticEscaped =
               BTLE_CmdlinePreventGrepFalsePositive(
                 "gatttool -i $hci -b $mac");
-
-            $grepGatttool = qx(ps ax| grep -E \'$gatttoolCmdlineStaticEscaped\')
+            my $psCommand =  AttrVal( $name, 'psCommand', 'ps ax' );
+			Log3 $name, 5, 'Execute Command: $psCommand | grep -E "$gatttoolCmdlineStaticEscaped"';
+#            $grepGatttool = qx(ps ax| grep -E \'$gatttoolCmdlineStaticEscaped\')
+            $grepGatttool = qx( $psCommand | grep -E \'$gatttoolCmdlineStaticEscaped\')
               if ( $sshHost eq 'none' );
-            $grepGatttool =
-              qx(ssh $sshHost 'ps ax| grep -E "$gatttoolCmdlineStaticEscaped"')
+#            $grepGatttool =  qx(ssh $sshHost 'ps ax| grep -E "$gatttoolCmdlineStaticEscaped"')
+            $grepGatttool = qx(ssh $sshHost ' $psCommand | grep -E "$gatttoolCmdlineStaticEscaped"')
               if ( $sshHost ne 'none' );
 
             if ( not $grepGatttool =~ /^\s*$/ ) {
@@ -690,22 +702,27 @@ sub ExecGatttool_Run($) {
         }
 
         $loop = 0;
+		my $returnString ="";
+        my $returnCode = "1";
         do {
 
-            Log3 $name, 5,
-"XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command: $cmd and loop $loop";
+            Log3 $name, 5, "XiaomiBTLESens ($name) - ExecGatttool_Run: call gatttool with command: $cmd and loop $loop";
 
-            @gtResult = split( ": ", qx($cmd) );
+            ($returnString, $returnCode) = Gatttool_executeCommand($cmd);
+            @gtResult = split( ": ", $returnString);
+ #           @gtResult = split( ": ", qx($cmd) );
 
             Log3 $name, 5,
               "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool loop result "
               . join( ",", @gtResult );
             $loop++;
 
-            $gtResult[0] = 'connect error'
+            $returnCode = "2"
               unless ( defined( $gtResult[0] ) );
 
-        } while ( $loop < 5 and $gtResult[0] eq 'connect error' );
+#        } while ( $loop < 5 and $gtResult[0] eq 'connect error' );
+        } while ( $loop < 5 and $returnCode ne "0" );
+        Log3 $name, 3,"XiaomiBTLESens ($name) - ExecGatttool_Run: errorcode: \"$returnCode\", ErrorString: \"$returnString\"" if ($returnCode ne "0");
 
         Log3 $name, 4,
           "XiaomiBTLESens ($name) - ExecGatttool_Run: gatttool result "
@@ -1535,7 +1552,7 @@ sub BTLE_CmdlinePreventGrepFalsePositive($) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.8.0",
+  "version": "v2.8.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
