@@ -9,9 +9,13 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.27
+# Version = 1.28
 #
 # Version  History:
+# - 1.28 - 2019-12-14 Dr. H-J Breymayer
+# -- correction of "Rolling Key" in case of bad command
+# -- GetStatus call after on_off command
+#
 # - 1.27 - 2019-12-14 Dr. H-J Breymayer
 # -- recognition of orange power LED indicator, new state dormant
 # -- attribute webCmd changed "webCmd on_off"
@@ -299,6 +303,8 @@ sub VIERA_Set($@) {
     Log3 $name, 3, "$name: Set on_off";
     VIERA_Encrypted_Command($hash, "POWER");
     VIERA_Encrypt_Answer($hash);
+    sleep 0.6;
+    VIERA_GetStatus($hash, 1);
   }
   elsif ($what eq "channel"){
     return "$name: Channel is too high or low!" if($state < 1 || $state > 9999);
@@ -928,19 +934,22 @@ sub VIERA_Encrypt_Answer($) {
    $answer = $hash->{helper}{BUFFER} if ($hash->{helper}{BUFFER} ne "");
   
   if (index($answer, "HTTP/1.1 200 OK") == -1) {
-      if ($hash->{helper}{session_seq_num} ne  "None") {
+     if (index($answer, "Bad Request") != -1) {
+        if ($hash->{helper}{session_seq_num} ne  "None") {
           $hash->{helper}{session_seq_num} -= 1;
-      }
+        }
+      }  
       Log3 $name, 3, "$name wrong encrypted VIERA command:  \r\n\"$answer\"";
       return undef;
   }
 
-  if ($hash->{helper}{is_encrypted}) {
+  if ($hash->{helper}{is_encrypted} == 1) {
       my $iS = index($answer, "<X_EncResult>");
       my $iE = index($answer, "</X_EncResult>");
       $answer = substr($answer, $iS+13, $iE-$iS-13);
         
       $answer = VIERA_decrypt_soap_payload($answer, $hash->{helper}{session_key}, $hash->{helper}{session_IV});
+      Log3 $name, 5, "$name decrypted VIERA answer:  \r\n\"$answer\"";
    }
 
    return $answer;
