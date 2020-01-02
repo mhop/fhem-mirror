@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_BRAVIA: new attribute wolBroadcast used as address for WOL packet
  - change:  74_XiaomiBTLESens: add special patch from charlie71
  - bugfix:  93_DbLog: fix behavior if value is empty and attribute 
                       addStateEvent is set (default), Forum: #106769

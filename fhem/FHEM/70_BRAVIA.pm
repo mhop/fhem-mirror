@@ -30,6 +30,8 @@ package main;
 use strict;
 use warnings;
 
+use vars qw( $readingFnAttributes );
+
 ###################################
 sub BRAVIA_Initialize($) {
     my ($hash) = @_;
@@ -41,7 +43,7 @@ sub BRAVIA_Initialize($) {
     $hash->{DefFn}   = "BRAVIA::Define";
     $hash->{UndefFn} = "BRAVIA::Undefine";
 
-    $hash->{AttrList} = "disable:0,1 macaddr:textField channelsMax:textField " . $::readingFnAttributes;
+    $hash->{AttrList} = "disable:0,1 macaddr:textField channelsMax:textField wolBroadcast:textField " . $readingFnAttributes;
 
     $::data{RC_layout}{BRAVIA_SVG} = "BRAVIA::RClayout_SVG";
     $::data{RC_layout}{BRAVIA}     = "BRAVIA::RClayout";
@@ -453,16 +455,21 @@ sub Set($@) {
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
         Log3($name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2]);
 
-        if ( $presence eq "present" ) {
-            if ( !defined( $a[2] ) ) {
-                my $commandKeys = "";
-                for (sort keys %{GetRemotecontrolCommand("GetRemotecontrolCommands")}) {
-                    $commandKeys = $commandKeys . " " . $_;
-                }
-                return "No argument given, choose one of" . $commandKeys;
+        if ( !defined( $a[2] ) ) {
+            my $commandKeys = "";
+            for (sort keys %{GetRemotecontrolCommand("GetRemotecontrolCommands")}) {
+                $commandKeys = $commandKeys . " " . $_;
             }
+            return "No argument given, choose one of" . $commandKeys;
+        }
+        $cmd = uc( $a[2] );
 
-            $cmd = uc( $a[2] );
+        if ( $cmd eq "WOL" ) {
+          my $macAddr = AttrVal( $name, "macaddr", "" );
+          $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
+          wake( $name, $macAddr ) if ( $macAddr ne "" && $macAddr ne "-" );
+        }
+        elsif ( $presence eq "present" ) {
 
             if ( $cmd eq "MUTE" ) {
                 Set( $hash, $name, "mute" );
@@ -473,11 +480,6 @@ sub Set($@) {
             elsif ( $cmd eq "CHANDOWN" ) {
                 Set( $hash, $name, "channelDown" );
             }
-            elsif ( $cmd eq "WOL" ) {
-              my $macAddr = AttrVal( $name, "macaddr", "" );
-	            $macAddr = ReadingsVal( $name, "macAddr", "") if ($macAddr eq "");
-	            wake( $name, $macAddr ) if ( $macAddr ne "" && $macAddr ne "-" );
-	          }
             elsif ( $cmd ne "" ) {
                 SendCommand( $hash, "ircc", $cmd );
             }
@@ -597,15 +599,15 @@ sub Set($@) {
 
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-		    shift(@a); shift(@a);
-		    my $appStr;
+            shift(@a); shift(@a);
+            my $appStr;
 
         # Resolve app uri + data
         my $app_name;
         my $app_uri;
-		    my $app_data;
-		    while (@a) {
-		        my $arg = shift(@a);
+            my $app_data;
+            while (@a) {
+                my $arg = shift(@a);
             if (defined($appStr)) {
                 $appStr .= "#";
                 $appStr .= $arg;
@@ -617,7 +619,7 @@ sub Set($@) {
                 $app_uri  = $hash->{helper}{device}{appPreset}{ $appStr }{uri};
                 $app_data = join(" ", @a);
             }
-		    }
+            }
 
         return "Unknown app '" . $appStr . "' on that device." unless defined($app_uri);
 
@@ -748,8 +750,8 @@ sub Set($@) {
     elsif ( $a[1] eq "text" ) {
         return "No 2nd argument given" if ( !defined( $a[2] ) );
 
-		shift(@a); shift(@a);
-		my $text = join(" ", @a);
+        shift(@a); shift(@a);
+        my $text = join(" ", @a);
         Log3($name, 2, "BRAVIA set $name text $text");
         
         SendCommand( $hash, "text", $text );
@@ -1197,7 +1199,7 @@ sub ReceiveCommand($$$) {
 ###################################
 sub wake ($$) {
     my ( $name, $mac_addr ) = @_;
-    my $address = '255.255.255.255';
+    my $address = AttrVal($name, 'wolBroadcast', '255.255.255.255');
     my $port = 9;
 
     my $sock = new IO::Socket::INET( Proto => 'udp' )
@@ -1213,7 +1215,7 @@ sub wake ($$) {
     setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
       or die "setsockopt : $!";
 
-    Log3($name, 4, "BRAVIA $name: Waking up by sending Wake-On-Lan magic package to $mac_addr");
+    Log3($name, 4, "BRAVIA $name: Waking up by sending Wake-On-Lan magic packet to $mac_addr");
     send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
     close($sock);
 
@@ -2054,7 +2056,7 @@ sub GetRemotecontrolCommand($) {
         return $commands;
     }
     else {
-    		# return command itself if not mapped
+            # return command itself if not mapped
         return $command;
     }
 }
@@ -2261,7 +2263,7 @@ sub GetNormalizedName($) {
       <li><a name="stop"></a><i>stop</i><br>
         Stops recording, playing of an internal App, etc.</li>
       <li><a name="text"></a><i>text</i><br>
-      	Includes the given text into an input field on display.</li>
+        Includes the given text into an input field on display.</li>
       <li><a name="toggle"></a><i>toggle</i><br>
         Toggles power status of TV.</li>
       <li><a name="tvpause"></a><i>tvpause</i><br>
@@ -2288,7 +2290,9 @@ sub GetNormalizedName($) {
       <li><a name="channelsMax"></a><i>channelsMax</i><br>
         Maximum amount of channels to be displayed, default is 50.</li>
       <li><a name="macaddr"></a><i>macaddr</i><br>
-        Enables power on of TV using WOL.</li>
+        Enables power on of TV using Wake-On-Lan.</li>
+      <li><a name="wolBroadcast"></a><i>wolBroadcast</i><br>
+        Broadcast address for Wake-On-Lan magic packets, default is 255.255.255.255.</li>
     </ul>
   </ul>
 </ul>
@@ -2405,7 +2409,9 @@ sub GetNormalizedName($) {
       <li><a name="channelsMax"></a><i>channelsMax</i><br>
         Maximale Anzahl der im FHEMWEB angezeigten Kanäle. Der Standartwert ist 50.</li>
       <li><a name="macaddr"></a><i>macaddr</i><br>
-        Ermöglicht das Einschalten des TV per WOL.</li>
+        Ermöglicht das Einschalten des TV per Wake-On-Lan.</li>
+      <li><a name="wolBroadcast"></a><i>wolBroadcast</i><br>
+        Broadcast-Adresse für die Wake-On-Lan <i>Magic Packets</i>. Der Standartwert ist 255.255.255.255.</li>
     </ul>
   </ul>
 </ul>
