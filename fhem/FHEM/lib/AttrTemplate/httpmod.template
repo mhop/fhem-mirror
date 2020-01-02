@@ -76,7 +76,7 @@ attr DEVICE enableControlSet 1
 attr DEVICE extractAllJSON 1
 attr DEVICE extractAllJSONFilter REGIONCODE
 attr DEVICE readingEncode UTF-8
-attr DEVICE preProcessRegex s/warnWetter..............|\);;|\t|\n|\r//g
+attr DEVICE preProcessRegex s/warnWetter..............|\);|\t|\n|\r//g
 attr DEVICE room WHICHROOM
 attr DEVICE model DWD_weather_warnings
 
