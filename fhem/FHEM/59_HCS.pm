@@ -459,11 +459,11 @@ HCS_getValues($$) {
   foreach my $d (sort keys %defs) {
     my $t = $defs{$d}{TYPE};
     # skipping unneeded devices
-    next if($t ne "FHT" && $t ne "CUL_HM" && $t ne "HMCCUDEV" && $t ne "MAX" && $t ne "ZWave" && $t ne "PID20");
+    next if($t ne "FHT" && $t ne "CUL_HM" && $t ne "HMCCUDEV" && $t ne "HMCCUCHN" && $t ne "MAX" && $t ne "ZWave" && $t ne "PID20");
     next if($t eq "MAX" && !$defs{$d}{type});
     next if($t eq "MAX" && $defs{$d}{type} !~ m/HeatingThermostat/);
 
-    next if( ($t eq "CUL_HM" || $t eq "HMCCUDEV") && ( !$attr{$d}{model}
+    next if( ($t eq "CUL_HM" || $t eq "HMCCUDEV" || $t eq "HMCCUCHN") && ( !$attr{$d}{model}
                 || !(  ($attr{$d}{model} eq "HM-CC-TC" && !$defs{$d}{device})
                     || ($attr{$d}{model} eq "HM-TC-IT-WM-W-EU" && !$defs{$d}{device})
                     || ($attr{$d}{model} eq "HmIP-WTH-2" && !$defs{$d}{device})
@@ -471,8 +471,9 @@ HCS_getValues($$) {
                     || ($attr{$d}{model} eq "HM-CC-RT-DN" && !$defs{$d}{device}) )) );
     next if($t eq "ZWave" && $attr{$d}{classes} !~ m/THERMOSTAT_SETPOINT/);
 
+    $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a")      if($t =~ m/(HMCCUDEV|HMCCUCHN|FHT|CUL_HM|ZWave)/);
+    $devs{$d}{actuator}     = ReadingsVal($d,"4.VALVE_STATE","n/a") if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{actuator} eq "n/a");
     $devs{$d}{actuator}     = ReadingsVal($d,"valveposition","n/a") if($t =~ m/(MAX)/);
-    $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a")      if($t =~ m/(FHT|CUL_HM|ZWave)/);
     $devs{$d}{actuator}     = ReadingsVal($d,"actuation","n/a")     if($t =~ m/(PID20)/);
 
     if ($devs{$d}{actuator} =~ m/^\d+\s*%?$/) {
@@ -484,17 +485,21 @@ HCS_getValues($$) {
     $devs{$d}{excluded}     = ($exclude =~ m/$d/) ? 1 : 0;
     $devs{$d}{ignored}      = ($attr{$d}{ignore} && $attr{$d}{ignore} == 1) ? 1 : 0;
 
-    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a")       if($t =~ m/(FHT|CUL_HM)/);
-    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired","n/a") 		 if($t =~ m/(PID20)/);
-    $devs{$d}{tempDesired}  = ReadingsVal($d,"1.SET_POINT_TEMPERATURE","n/a")   if($t =~ m/(HMCCUDEV)/);
-    $devs{$d}{tempDesired}  = ReadingsVal($d,"desiredTemperature","n/a") if($t =~ m/(MAX)/);
-    $devs{$d}{tempDesired}  = ReadingsNum($d,"setpointTemp","n/a",1)     if($t =~ m/(ZWave)/);
-    $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a")      if($t =~ m/(FHT|CUL_HM)/);
-    $devs{$d}{tempMeasured} = ReadingsVal($d,"1.ACTUAL_TEMPERATURE","n/a")      if($t =~ m/(HMCCUDEV)/);
-    $devs{$d}{tempMeasured} = ReadingsNum($d,"temperature","n/a",1)      if($t =~ m/(MAX|ZWave)/);
-    $devs{$d}{tempMeasured} = ReadingsNum($d,"measured","n/a")		 if($t =~ m/(PID20)/);
-    $devs{$d}{tempDesired}  = ($t =~ m/(FHT)/) ? 5.5 : 4.5               if($devs{$d}{tempDesired} eq "off");
-    $devs{$d}{tempDesired}  = 30.5                                       if($devs{$d}{tempDesired} eq "on");
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a")            if($t =~ m/(HMCCUDEV|HMCCUCHN|FHT|CUL_HM)/);
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"1.SET_POINT_TEMPERATURE","n/a") if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempDesired} eq "n/a");
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"2.SET_TEMPERATURE","n/a")       if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempDesired} eq "n/a");
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"4.SET_TEMPERATURE","n/a")       if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempDesired} eq "n/a");
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"desired","n/a")                 if($t =~ m/(PID20)/);
+    $devs{$d}{tempDesired}  = ReadingsVal($d,"desiredTemperature","n/a")      if($t =~ m/(MAX)/);
+    $devs{$d}{tempDesired}  = ReadingsNum($d,"setpointTemp","n/a",1)          if($t =~ m/(ZWave)/);
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a")           if($t =~ m/(HMCCUDEV|HMCCUCHN|FHT|CUL_HM)/);
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"1.ACTUAL_TEMPERATURE","n/a")    if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempMeasured} eq "n/a");
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"4.ACTUAL_TEMPERATURE","n/a")    if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempMeasured} eq "n/a");
+    $devs{$d}{tempMeasured} = ReadingsVal($d,"1.TEMPERATURE","n/a")           if($t =~ m/(HMCCUDEV|HMCCUCHN)/ && $devs{$d}{tempMeasured} eq "n/a");
+    $devs{$d}{tempMeasured} = ReadingsNum($d,"temperature","n/a",1)           if($t =~ m/(MAX|ZWave)/);
+    $devs{$d}{tempMeasured} = ReadingsNum($d,"measured","n/a")                if($t =~ m/(PID20)/);
+    $devs{$d}{tempDesired}  = ($t =~ m/(FHT)/) ? 5.5 : 4.5                    if($devs{$d}{tempDesired} eq "off");
+    $devs{$d}{tempDesired}  = 30.5                                            if($devs{$d}{tempDesired} eq "on");
 
     $devs{$d}{type}         = $t;
     $hash->{helper}{device}{$d}{excluded} = $devs{$d}{excluded};
@@ -549,7 +554,8 @@ HCS_getValues($$) {
   my $sumDemand   = 0;
   my $sumExcluded = 0;
   my $sumFHT      = 0;
-  my $sumHMCCTC   = 0;
+  my $sumCULHM    = 0;
+  my $sumHMCCU    = 0;
   my $sumMAX      = 0;
   my $sumZWave    = 0;
   my $sumIdle     = 0;
@@ -571,7 +577,8 @@ HCS_getValues($$) {
     $hash->{helper}{device}{$d}{type}         = $devs{$d}{type};
     $sumMAX++       if(lc($devs{$d}{type}) eq "max");
     $sumFHT++       if(lc($devs{$d}{type}) eq "fht");
-    $sumHMCCTC++    if(lc($devs{$d}{type}) eq "cul_hm");
+    $sumCULHM++     if(lc($devs{$d}{type}) eq "cul_hm");
+    $sumHMCCU++     if(lc($devs{$d}{type}) eq "hmccudev" || lc($devs{$d}{type}) eq "hmccuchn");
     $sumZWave++     if(lc($devs{$d}{type}) eq "zwave");
     $sumPID20++     if(lc($devs{$d}{type}) eq "pid20");
     $sumTotal++;
@@ -722,8 +729,8 @@ HCS_getValues($$) {
     }
 
   }
-  my $str = sprintf("Found %d Device(s): %d FHT, %d HM-CC-TC, %d PID20, %d MAX, %d ZWave, demand: %d, idle: %d, ignored: %d, excluded: %d, unknown: %d",
-                    $sumTotal,$sumFHT,$sumHMCCTC, $sumPID20, $sumMAX, $sumZWave, $sumDemand,$sumIdle,$sumIgnored,$sumExcluded,$sumUnknown);
+  my $str = sprintf("Found %d Device(s): %d FHT, %d CUL_HM, %d HMCCUDEV/HMCCUCHN, %d PID20, %d MAX, %d ZWave, demand: %d, idle: %d, ignored: %d, excluded: %d, unknown: %d",
+                    $sumTotal,$sumFHT, $sumCULHM, $sumHMCCU, $sumPID20, $sumMAX, $sumZWave, $sumDemand,$sumIdle,$sumIgnored,$sumExcluded,$sumUnknown);
   Log3 $name, 3, "$type $name $str, eco: $eco overdrive: $overdrive";
 
   return $heatDemand;
