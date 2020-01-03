@@ -48,6 +48,7 @@
 # 03.01.2019 : A.Goebel : fix change regexp for parsing commands from "/^w$delimiter.{1,7}$delimiter.*/" to "/^w$delimiter[^$delimiter]{1,}$delimiter.*/" to support "feuerung" as class
 # 28.02.2019 : A.Goebel : fix port 8888 was hardcoded in GAEBUS_OpenDev, use $port instead (highlighted by user freetz)
 # 21.03.2019 : A.Goebel : add support for find -p 
+# 03.01.2019 : A.Goebel : add support for $readingFnAttributes as suggested by Hanjo
 
 package main;
 
@@ -91,7 +92,7 @@ my $allGetParams           = "";
 my $allGetParamsForWriting = "";
 my $delimiter              = "~";
 
-my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading event-min-interval ebusWritesEnabled:0,1 valueFormat:textField-long";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes";
 my %ebusCmd  = ();
 
 #####################################
