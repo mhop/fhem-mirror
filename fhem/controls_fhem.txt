@@ -1,4 +1,4 @@
-REV 20869
+REV 20872
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -486,7 +486,7 @@ UPD 2019-12-23_07:45:02 284056 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
-UPD 2019-03-22_07:45:02 41238 FHEM/98_GAEBUS.pm
+UPD 2020-01-04_07:45:03 41301 FHEM/98_GAEBUS.pm
 UPD 2019-03-23_07:45:03 33178 FHEM/98_GEOFANCY.pm
 UPD 2019-08-02_07:45:02 30228 FHEM/98_GOOGLECAST.pm
 UPD 2017-01-21_07:45:02 11576 FHEM/98_GoogleAuth.pm
@@ -718,9 +718,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2019-08-10_07:45:02 2691 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-01-04_07:45:03 4839 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2019-10-04_07:45:03 148192 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-01-04_07:45:03 148289 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2019-09-07_07:45:03 18901 FHEM/msgSchema.pm
@@ -748,8 +748,8 @@ UPD 2020-01-03_07:45:07 4203005 docs/commandref.html
 UPD 2020-01-03_07:45:09 2597175 docs/commandref_DE.html
 UPD 2019-12-26_07:45:03 79845 docs/commandref_frame.html
 UPD 2019-12-26_07:45:03 89593 docs/commandref_frame_DE.html
-UPD 2020-01-03_07:45:11 229775 docs/commandref_modular.html
-UPD 2020-01-03_07:45:12 240727 docs/commandref_modular_DE.html
+UPD 2020-01-04_07:45:11 229775 docs/commandref_modular.html
+UPD 2020-01-04_07:45:12 240727 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
