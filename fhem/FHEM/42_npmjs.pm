@@ -922,6 +922,7 @@ sub ExecuteNpmCommand($) {
     $npm->{npminstall} =
         $cmdPrefix
       . 'echo n | sh -c "'
+      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm install '
@@ -931,6 +932,7 @@ sub ExecuteNpmCommand($) {
     $npm->{npmuninstall} =
         $cmdPrefix
       . 'echo n | sh -c "'
+      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm uninstall '
@@ -940,6 +942,7 @@ sub ExecuteNpmCommand($) {
     $npm->{npmupdate} =
         $cmdPrefix
       . 'echo n | sh -c "'
+      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm update '
@@ -960,6 +963,7 @@ sub ExecuteNpmCommand($) {
       . '--json --silent --depth=0 2>/dev/null); '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
       . 'L2=$('
+      . $locale
       . $sudo
       . $locale
       . ' npm outdated '
@@ -1176,12 +1180,12 @@ sub RetrieveNpmOutput($$) {
                       . "were authorized to access remote host";
                     $h->{error}{detail} = "<pre>$o</pre>";
                 }
-                elsif ( $o =~ m/^sudo: /i ) {
+                elsif ( $o =~ m/(sudo: .+)/i ) {
                     $h->{error}{code} = "E403";
                     $h->{error}{summary} =
                       "Forbidden - " . "passwordless sudo permissions required";
                     $h->{error}{detail} =
-                        $o
+                        $1
                       . "<br /><br />"
                       . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
                       . "<pre>"
@@ -1685,7 +1689,6 @@ sub ToDay() {
   </code><br>
   <br>
   This line may easily be added to a new file in /etc/sudoers.d/fhem and will automatically included to /etc/sudoers from there.<br>
-  Only checking for outdated packages does not require any privileged access at all!<br>
   <br>
   <br>
   <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
@@ -1776,13 +1779,13 @@ sub ToDay() {
   Standardm&auml;&szlig;ig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
   <br>
   <code>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
   </code><br>
   <br>
   Diese Zeile kann einfach in einer neuen Datei unter /etc/sudoers.d/fhem hinzugef&uuml;gt werden und wird von dort automatisch in /etc/sudoers inkludiert.<br>
-  Um nur die zu aktualisierenden Pakete zu &uuml;berpr&uuml;fen wird &uuml;berhaupt kein priviligierter Zugriff ben&ouml;tigt!<br>
   <br>
   <br>
   <a name="npmjsdefine" id="npmjsdefine"></a><b>Define</b><br>
@@ -1869,7 +1872,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.1.3",
+  "version": "v1.1.4",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
@@ -1934,6 +1937,8 @@ sub ToDay() {
       "requires": {
       },
       "recommends": {
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *": 0,
+        "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm outdated *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm update *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *": 0,
