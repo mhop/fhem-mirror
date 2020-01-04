@@ -1798,7 +1798,8 @@ sub SSChatBot_CGI() {
       readingsBulkUpdate  ($hash, "state",             $state);        
 	  readingsEndUpdate   ($hash,1);
 	  
-	  return ("text/plain; charset=utf-8", $ret);
+	  # return ("text/plain; charset=utf-8", $ret);
+      return "";
 		
   } else {
       # no data received
