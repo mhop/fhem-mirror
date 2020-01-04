@@ -30,7 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.9.6"   => "04.01.2020 fix change in 4.9.4 in default splitting. Forum: #106992 ",
+  "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
   "4.9.4"   => "29.12.2019 correct behavior if value is empty and attribute addStateEvent is set (default), Forum: #106769 ",
   "4.9.3"   => "28.12.2019 check date/time format got from SVG, Forum: #101005 ",
