@@ -1669,7 +1669,8 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                        regList    => "",
                        cmdList    => "",
                        saveConfig => "-filename- ...",
-                       deviceInfo => "[short|long]"
+                       deviceInfo => "[short|long]",
+                       tplInfo    => ""
                       );
 %culHmVrtGets       = (
                        param      => "-param-",
