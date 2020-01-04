@@ -1798,8 +1798,7 @@ sub SSChatBot_CGI() {
       readingsBulkUpdate  ($hash, "state",             $state);        
 	  readingsEndUpdate   ($hash,1);
 	  
-	  # return ("text/plain; charset=utf-8", $ret);
-      return "";
+	  return ("text/plain; charset=utf-8", $ret);
 		
   } else {
       # no data received
@@ -1852,7 +1851,7 @@ Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wi
 
 =for :application/json;q=META.json 50_SSChatBot.pm
 {
-  "abstract": "Integration of Synology Chat server into FHEM.",
+  "abstract": "Integration of Synology Chat Server into FHEM.",
   "x_lang": {
     "de": {
       "abstract": "Integration des Synology Chat Servers in FHEM."
