@@ -4,9 +4,9 @@
 #
 #  $Id$
 #
-#  Version 4.3.009
+#  Version 4.3.010
 #
-#  (c) 2019 zap (zap01 <at> t-online <dot> de)
+#  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
 ######################################################################
 #  Client device for Homematic channels.
@@ -116,7 +116,7 @@ sub HMCCUCHN_Define ($@)
 		# CCU not ready during FHEM start
 		if (!defined ($hmccu_hash) || $hmccu_hash->{ccustate} ne 'active') {
 			Log3 $name, 2, "HMCCUCHN: [$devname] Cannot detect IO device, maybe CCU not ready. Trying later ...";
-			readingsSingleUpdate ($hash, "state", "Pending", 1);
+#			readingsSingleUpdate ($hash, "state", "Pending", 1);
 			$hash->{ccudevstate} = 'pending';
 			return undef;
 		}
@@ -155,7 +155,7 @@ sub HMCCUCHN_InitDevice ($$) {
 	$dev_hash->{ccuname} = $dn;
 	$dev_hash->{ccutype} = $dt;
 
-	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
+#	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
 	$dev_hash->{ccudevstate} = 'active';
 	
 	return 0;
