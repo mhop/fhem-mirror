@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
-#       (c) 2019 by Heiko Maaz
+#       (c) 2019-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate as Bot for Synology Chat.
@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.2.0"  => "04.01.2020  check that Botname with type SSChatBot does exist and write Log if not ",
   "1.1.0"  => "27.12.2019  both POST- and GET-method are now valid in CGI ",
   "1.0.1"  => "11.12.2019  check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
   "1.0.0"  => "29.11.2019  initial "
@@ -1596,8 +1597,12 @@ sub SSChatBot_CGI() {
 	  
 	  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
 	  $name = $h->{botname};                                # das SSChatBot Device
-	  return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" ) unless (IsDevice($name, 'SSChatBot'));
-	  $hash = $defs{$name};                                 # hash des SSChatBot Devices
+	  unless (IsDevice($name, 'SSChatBot')) {
+          Log 1, "ERROR - No SSChatBot device \"$name\" of Type \"SSChatBot\" exists";
+          return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" );
+      }
+	  
+      $hash = $defs{$name};                                 # hash des SSChatBot Devices
 	  
       if (!defined($h->{token})) {
             Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
