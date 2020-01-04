@@ -3988,6 +3988,41 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
     $info .= join("\n",sort @arr1);
+    my $a = CUL_HMTmplSetCmd($name)." ";
+    $a =~ s/:.*? /:\[template\]\n/g;
+    $info .= $a;
+    $info .= join("\n",split(" ",CUL_HMTmplSetParam($name)));
+    return $info;
+  }
+  elsif($cmd eq "tplInfo"){  ##################################################
+    my $info;
+    my @tplCmd = split(" ",CUL_HMTmplSetCmd($name));
+    my %tplH;
+    my %tplTyp = (dev  =>"device templates"
+                 ,ls   =>"templates for peerings serving short OR long press"
+                 ,both =>"templates for peerings serving short AND long press"
+    );
+    foreach my $tplSet (split(" ",CUL_HMTmplSetCmd($name))){
+      my ($tplDst,$tplOpt) = split(":",$tplSet);
+      my @tplLst = sort split(",",$tplOpt);
+      if ($tplDst eq "tplSet_0"){#none peer template
+        @{$tplH{dev}} = @tplLst;
+      }
+      else{
+        @{$tplH{both}} = grep!/(.*)_(short|long)/,@tplLst;
+        @{$tplH{ls}}   = map{(my $foo = $_) =~ s/_(short|long)//; $foo;}
+                         grep/(.*)_(short|long)/,@tplLst;
+      }
+    }
+    foreach my $tt (sort keys %tplTyp){
+      if (defined $tplH{$tt}){
+        $info .= "\n$tplTyp{$tt}:";
+        foreach (@{$tplH{$tt}}){
+          my ($r)=split("\n",HMinfo_templateList($_));
+          $info .= "\n   ".$r;
+        }
+      }
+    }
     return $info;
   }
   elsif($cmd eq "saveConfig"){  ###############################################
