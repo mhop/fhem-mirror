@@ -2197,9 +2197,7 @@ AssignIoPort($;$)
     }
   }
   if($hash->{IODev}) {
-    # See CUL_WS_Attr() for details
-    $attr{$hn}{IODev} = $hash->{IODev}{NAME}
-      if($hasIODevAttr && $hash->{TYPE} ne "CUL_WS");
+    $attr{$hn}{IODev} = $hash->{IODev}{NAME} if($hasIODevAttr);
 
   } else {
     if($init_done) {
@@ -3997,6 +3995,7 @@ Dispatch($$;$$)
             return undef;
 
           }
+          delete($hash->{".clientArray"});
         }
       }
     }
