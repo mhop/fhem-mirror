@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 51_MOBILEALERTS.pm: Added batteryState
  - bugfix:  93_DbLog: fix change off V4.9.4 in default splitting. Forum:#106992
  - bugfix:  88_HMCCU: Do not touch state during device definition
  - bugfix: 70_VIERA: correction of "Rolling Key" 
