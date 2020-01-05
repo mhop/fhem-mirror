@@ -363,6 +363,25 @@ deletereading -q DEVICE_CH2 (?!associatedWith).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH2 model zigbee2mqtt_2channel_split
 
+# zigbee2mqtt 2 channel device with buttons, forum #102866
+name:zigbee2mqtt_2channel_split_w_buttons
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+desc:For zigbee2mqtt 2 channel device with 2 buttons. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested version, should work with Xiaomi QBKG12LM
+order:L_05d
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
+set DEVICE attrTemplate zigbee2mqtt_2channel_split
+attr DEVICE setList \
+  on:noArg BASE_TOPIC/DEV_ID/left/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/left/set {"state":"OFF"}
+attr DEVICE jsonMap state:availability state_left:state state_right:0
+attr DEVICE_CH2 setList \
+  on:noArg BASE_TOPIC/DEV_ID/right/set {"state":"ON"}\
+  off:noArg BASE_TOPIC/DEV_ID/right/set {"state":"OFF"}
+attr DEVICE_CH2 jsonMap state_left:0 state_right:state state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_split_w_buttons
+
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*

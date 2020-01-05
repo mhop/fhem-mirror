@@ -9,7 +9,7 @@
 # If undef, the user has to specify them (the comment is shown to the user)
 
 ###########################################
-name:General_Info
+name:General_Info_httpmod.template
 filter:TYPE=HTTPMOD
 desc: Forum <a href="https://forum.fhem.de/index.php/topic,97694.0.html">link</a> for suggestions or bug reports on httpmod-template.<br>For changes and updates on this file, see <a href="https://svn.fhem.de/trac/log/trunk/fhem/FHEM/lib/AttrTemplate/httpmod.template">svn changelog</a>. In most cases, major changes will be mentionned there.
 order:00000000
@@ -78,6 +78,8 @@ attr DEVICE extractAllJSONFilter REGIONCODE
 attr DEVICE readingEncode UTF-8
 attr DEVICE preProcessRegex s/warnWetter..............|\);|\t|\n|\r//g
 attr DEVICE room WHICHROOM
+attr DEVICE readingMaxAge 10
+attr DEVICE readingMaxAgeReplacementMode delete
 attr DEVICE model DWD_weather_warnings
 
 #German river water levels, Wiki: https://wiki.fhem.de/wiki/Flusspegel
