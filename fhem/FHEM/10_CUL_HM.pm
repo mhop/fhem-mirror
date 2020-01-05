@@ -3815,7 +3815,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
   my $devName = InternalVal($name,"device",$name);
   my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
-  my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
+  my $md      = CUL_HM_getAliasModel($hash);
 
   my $cmd   = $a[1];
   
@@ -4750,7 +4750,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
     $state = "";
-    my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
+    my $mdAl  = CUL_HM_getAliasModel($hash);
+    my @regArr = CUL_HM_getRegN($st,$mdAl,($roleD?"00":""),($roleC?$chn:""));
     
     return "$regName failed: supported register are ".join(" ",sort @regArr)
             if (!grep /^$regName$/,@regArr );
@@ -7906,6 +7907,13 @@ sub CUL_HM_getmIdFromModel($){ # enter model and receive the corresponding ID
   }
   return $mId;
 }
+sub CUL_HM_getAliasModel($){ # 
+  my $hash = shift;
+  my $dHash = CUL_HM_getDeviceHash($hash);
+  return "" if(!defined $dHash || !defined $dHash->{helper}|| !defined $dHash->{helper}{mId});
+  return $culHmModel->{$dHash->{helper}{mId}}{name};
+}
+
 sub CUL_HM_getRxType($) {      #in:hash(chn or dev) out:binary coded Rx type
  # Will store result in device helper
   my ($hash) = @_;
@@ -8442,7 +8450,7 @@ sub CUL_HM_updtRegDisp($$$) {
   $pReg = "R-".$pReg;
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
   my $st = $attr{$devName}{subType} ?$attr{$devName}{subType} :"";
-  my $md = $attr{$devName}{model}   ?$attr{$devName}{model}   :"";
+  my $md = CUL_HM_getAliasModel($hash);
   my $chn = $hash->{DEF};
   $chn = (length($chn) == 8)?substr($chn,6,2):"";
   my @regArr = CUL_HM_getRegN($st,$md,$chn);
@@ -8694,7 +8702,7 @@ sub CUL_HM_getRegInfo($) { #
   my $hash = $defs{$name};
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
-  my $md  = AttrVal    ($devHash->{NAME},"model"  , "" );
+  my $md  = CUL_HM_getAliasModel($hash);#AttrVal    ($devHash->{NAME},"model"  , "" );
   my $roleD  = $hash->{helper}{role}{dev};
   my $roleC  = $hash->{helper}{role}{chn};
   my $chn = $roleD ? "00" : InternalVal($hash->{NAME}   ,"chanNo" ,"00");
@@ -8734,6 +8742,7 @@ sub CUL_HM_getRegN($$@){ # get list of register for a model
   my @regArr = keys %{$culHmRegGeneral};
   push @regArr, keys %{$culHmRegType->{$st}}      if($culHmRegType->{$st});
   push @regArr, keys %{$culHmRegModel->{$md}}     if($culHmRegModel->{$md});
+ 
   foreach (@chn){
     push @regArr, keys %{$culHmRegChan->{$md.$_}} if($culHmRegChan->{$md.$_});
   }
