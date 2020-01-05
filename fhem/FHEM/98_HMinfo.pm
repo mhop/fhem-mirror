@@ -205,9 +205,7 @@ sub HMinfo_Notify(@){##########################################################
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
   if (grep /INITIALIZED/,@{$events}){
-    HMinfo_SetFn($hash,$name,"loadConfig") 
-         if (  grep (/INITIALIZED/,@{$events})
-             && (substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0));
+    HMinfo_SetFn($hash,$name,"loadConfig") if ( substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0);
     
   }
   return undef;
@@ -1938,7 +1936,7 @@ sub HMinfo_loadConfig($@) {####################################################
   my @entryNF = ();
   my %changes;
   my @rUpdate;
-  my @tmplList = (); #collect templates
+  my @tmplList = (); #collect template definitions
   while(<rFile>){
     chomp;
     my $line = $_;
@@ -1965,12 +1963,14 @@ sub HMinfo_loadConfig($@) {####################################################
       if ($eN eq "templateStart"){#if new block we remove all old templates
         @tmplList = ();
       }
-      push @tmplList,$line;
+      else {
+        push @tmplList,$line;
+      }
     }
     elsif($cmd1 eq "templateSet"){
       my (undef,$eNt,$tpl,$param) = split("=>",$line);
       if (defined($defs{$eNt})){
-        if($tpl eq "start"){
+        if($tpl eq "start"){ # no template defined, or deleted - remove it.
           delete $defs{$eNt}{helper}{tmpl};
         }
         else{
@@ -1978,7 +1978,7 @@ sub HMinfo_loadConfig($@) {####################################################
         }
       }
     }
-    elsif($cmd eq "peerBulk"){
+    elsif($cmd  eq "peerBulk"){
       next if(!$param);
       $param =~ s/ //g;
       if ($param !~ m/00000000/){
@@ -1992,7 +1992,7 @@ sub HMinfo_loadConfig($@) {####################################################
         $defs{$eN}{READINGS}{".peerListRDate"}{VAL} = $defs{$eN}{READINGS}{".peerListRDate"}{TIME} = $timeStamp;
       }
     }
-    elsif($cmd eq "regBulk"){
+    elsif($cmd  eq "regBulk"){
       next if($param !~ m/RegL_0[0-9][:\.]/);#allow . and : for the time to convert to . only
       $param =~ s/\.RegL/RegL/;
       $param = ".".$param if (!$defs{$eN}{helper}{expert}{raw});
