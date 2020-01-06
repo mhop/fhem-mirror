@@ -207,7 +207,7 @@ HUEDevice_devStateIcon($)
   my $name = $hash->{NAME};
 
   return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
-  return ".*:light_question:toggle" if( defined($hash->{mode}) && $hash->{mode} ne 'homeautomation' );
+  return ".*:light_question:toggle" if( ReadingsVal($name, 'mode', 'homeautomation') ne 'homeautomation' );
 
   my $pct = ReadingsVal($name, 'pct', 100);
   my $subtype = AttrVal($name, 'subType', 'extcolordimmer' );
@@ -394,6 +394,8 @@ sub HUEDevice_Define($$)
     $hash->{helper}{rgb} = "";
 
     $hash->{helper}{battery} = -1;
+
+    $hash->{helper}{mode} = '';
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
@@ -1683,10 +1685,8 @@ HUEDevice_Parse($$)
   my $battery   = undef;
      $battery   = $config->{battery} if( defined($config->{battery}) );
 
-  if( defined($hash->{mode})
-      || ( defined($state->{mode}) && $state->{mode} ne 'homeautomation' ) ) {
-    $hash->{mode} = $state->{mode};
-  }
+  my $mode   = undef;
+     $mode   = $state->{mode} if( $hash->{helper}{mode} || defined($state->{mode} && $state->{mode} ne 'homeautomation') );
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -1708,6 +1708,8 @@ HUEDevice_Parse($$)
   if( defined($rgb) && $rgb ne $hash->{helper}{rgb} ) {readingsBulkUpdate($hash,"rgb",$rgb);}
 
   if( defined($battery) && $battery ne $hash->{helper}{battery} ) {readingsBulkUpdate($hash,"battery",$battery);}
+
+  if( defined($mode) && $mode ne $hash->{helper}{mode} ) {readingsBulkUpdate($hash,"mode",$mode);}
 
   my $s = '';
   my $pct = -1;
@@ -1759,6 +1761,8 @@ HUEDevice_Parse($$)
   $hash->{helper}{rgb} = $rgb if( defined($rgb) );
 
   $hash->{helper}{battery} = $battery if( defined($battery) );
+
+  $hash->{helper}{mode} = $mode if( defined($mode) );
 
   $hash->{helper}{pct} = $pct;
 
