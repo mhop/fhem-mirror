@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix SelfDefense then drive day open
  - bugfix:  73_AutoShuttersControl: fix adv icon for devStateIcon
  - feature: 51_MOBILEALERTS.pm: Added batteryState
  - bugfix:  93_DbLog: fix change off V4.9.4 in default splitting. Forum:#106992
