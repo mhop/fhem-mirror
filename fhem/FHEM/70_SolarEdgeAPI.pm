@@ -152,12 +152,14 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 #               - "disabled" if the device is disabled
 #               - "active" otherwise
 #
+# 2.0.1     tolerate empty field in energyDetails response
+#
 ###############################################################################
 
 sub SolarEdgeAPI_SetVersion($)
 {
   my ($hash) = @_;
-  $hash->{VERSION} = "2.0.0";
+  $hash->{VERSION} = "2.0.1";
 }
 
 ###############################################################################
@@ -969,8 +971,11 @@ sub SolarEdgeAPI_ReadingsProcessing_Aggregates($$)
     foreach my $meterData (@{$meter -> {'values'}})
     {
       my $value = $meterData->{'value'};
-      $meterCum = $meterCum + $value;
-      $meterRecent15Min = $value;
+      if (defined $value)
+      {
+        $meterCum = $meterCum + $value;
+        $meterRecent15Min = $value;
+      }
     }
     $readings{$meterType . "-cumToday"} = $meterCum;
     $readings{$meterType . "-recent15min"} = $meterRecent15Min;
