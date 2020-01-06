@@ -221,6 +221,16 @@ sub Pushover_CGI() {
             $webArgs->{$p} = $v;
         }
 
+        return ( "text/plain; charset=utf-8",
+            "NOK " . $receipt . ": invalid argument 'receipt'" )
+          if ( defined( $webArgs->{receipt} )
+            && $webArgs->{receipt} !~ /^[A-Za-z0-9]{30}$/ );
+
+        return ( "text/plain; charset=utf-8",
+            "NOK " . $receipt . ": invalid argument 'FhemCallbackId'" )
+          if ( defined( $webArgs->{FhemCallbackId} )
+            && $webArgs->{FhemCallbackId} !~ /^\d{1,10}$/ );
+
         if ( defined( $webArgs->{receipt} ) ) {
             $receipt = $webArgs->{receipt};
         }
@@ -235,8 +245,10 @@ sub Pushover_CGI() {
         # search for existing receipt
         keys %{ $hash->{READINGS} };
         while ( my ( $key, $value ) = each %{ $hash->{READINGS} } ) {
-            $revReadings{ $value->{VAL} } = $1
-              if ( defined( $value->{VAL} ) && $key =~ /^cb_(\d+)$/ );
+            if ( defined( $value->{VAL} ) && $key =~ /^cb_(\d+)$/ ) {
+                $revReadings{ $value->{VAL} } = $1;
+                $revReadings{ $1 } = $1;
+            }
         }
 
         if ( defined( $revReadings{$receipt} ) ) {
@@ -244,71 +256,89 @@ sub Pushover_CGI() {
             my $rAck      = "cbAck_" . $revReadings{$receipt};
             my $rAckAt    = "cbAckAt_" . $revReadings{$receipt};
             my $rAckBy    = "cbAckBy_" . $revReadings{$receipt};
+            my $rAckByDev = "cbAckByDev_" . $revReadings{$receipt};
             my $rCancelId = "cbCancelId_" . $revReadings{$receipt};
             my $rDev      = "cbDev_" . $revReadings{$receipt};
 
             return ( "text/plain; charset=utf-8",
                 "NOK " . $receipt . ": invalid argument 'acknowledged'" )
-              if ( !defined( $webArgs->{acknowledged} )
-                || $webArgs->{acknowledged} ne "1" );
+              if ( defined( $webArgs->{acknowledged} )
+                && $webArgs->{acknowledged} !~ /^[01]$/ );
 
             return ( "text/plain; charset=utf-8",
                 "NOK " . $receipt . ": invalid argument 'acknowledged_by'" )
-              if ( !defined( $webArgs->{acknowledged_by} )
-                || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
+              if ( defined( $webArgs->{acknowledged_by} )
+                && $webArgs->{acknowledged_by} !~ /^[A-Za-z0-9]{30}$/ );
 
-            if ( ReadingsVal( $name, $rAck, "1" ) eq "0"
-                && $revReadings{$receipt} > int( time() ) )
+            return ( "text/plain; charset=utf-8",
+                "NOK " . $receipt . ": invalid argument 'acknowledged_by_device'" )
+              if ( defined( $webArgs->{acknowledged_by_device} )
+                && $webArgs->{acknowledged_by_device} !~ /^[A-Za-z0-9_-]{1,25}$/ );
+
+            return ( "text/plain; charset=utf-8",
+                "NOK " . $receipt . ": invalid argument 'acknowledged_at'" )
+              if ( defined( $webArgs->{acknowledged_at} )
+                && $webArgs->{acknowledged_at} !~ /^\d{1,10}$/ );
+
+            if ( $revReadings{$receipt} > int( time() ) )
             {
                 delete $hash->{READINGS}{$rCancelId}
                   if ( defined( $hash->{READINGS}{$rCancelId} ) );
 
                 readingsBeginUpdate($hash);
 
-                readingsBulkUpdate( $hash, $rAck, "1" );
-                readingsBulkUpdate( $hash, $rAckBy,
-                    $webArgs->{acknowledged_by} );
+                if ( defined( $webArgs->{acknowledged} ) ) {
+                    readingsBulkUpdate( $hash, $rAck, $webArgs->{acknowledged} );
 
-                if ( defined( $webArgs->{acknowledged_at} )
-                    && $webArgs->{acknowledged_at} ne "" )
-                {
-                    readingsBulkUpdate( $hash, $rAckAt,
-                        $webArgs->{acknowledged_at} );
+                    if ( defined( $webArgs->{acknowledged_by} ) ) {
+                        readingsBulkUpdate( $hash, $rAckBy, $webArgs->{acknowledged_by} );
+                    }
+                    if ( defined( $webArgs->{acknowledged_by_device} ) ) {
+                        readingsBulkUpdate( $hash, $rAckByDev, $webArgs->{acknowledged_by_device} );
+                    }
+
+                    if ( defined( $webArgs->{acknowledged_at} ) ) {
+                        readingsBulkUpdate( $hash, $rAckAt, $webArgs->{acknowledged_at} );
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
+                    }
                 }
                 else {
-                    readingsBulkUpdate( $hash, $rAckAt, int( time() ) );
+
+                    my $redirect = "";
+
+                    # run FHEM command if desired
+                    if ( ReadingsVal( $name, $rAct, "pushover://" ) !~
+                        /^[\w-]+:\/\/.*$/ )
+                    {
+                        $redirect = "pushover://";
+
+                        if (ReadingsVal( $name, $rAct, "" ) !~ /^executed: |^$/) {
+                            fhem ReadingsVal( $name, $rAct, "" );
+                            readingsBulkUpdate( $hash, $rAct,
+                                "executed: " . ReadingsVal( $name, $rAct, "" ) );
+                        }
+                    }
+
+                    # redirect to presented URL
+                    if ( ReadingsVal( $name, $rAct, "none" ) =~ /^[\w-]+:\/\/.*$/ )
+                    {
+                        $redirect = ReadingsVal( $name, $rAct, "" );
+                    }
+
+                    readingsEndUpdate( $hash, 1 );
+
+                    return (
+                        "text/html; charset=utf-8",
+                        "<html><head><meta http-equiv=\"refresh\" content=\"0;url="
+                          . $redirect
+                          . "\"></head><body><a href=\""
+                          . $redirect
+                          . "\">Click here to get redirected to your destination"
+                          . "</a></body></html>"
+                    ) if ( $redirect ne "" );
                 }
-
-                my $redirect = "";
-
-                # run FHEM command if desired
-                if ( ReadingsVal( $name, $rAct, "pushover://" ) !~
-                    /^[\w-]+:\/\/.*$/ )
-                {
-                    $redirect = "pushover://";
-
-                    fhem ReadingsVal( $name, $rAct, "" );
-                    readingsBulkUpdate( $hash, $rAct,
-                        "executed: " . ReadingsVal( $name, $rAct, "" ) );
-                }
-
-                # redirect to presented URL
-                if ( ReadingsVal( $name, $rAct, "none" ) =~ /^[\w-]+:\/\/.*$/ )
-                {
-                    $redirect = ReadingsVal( $name, $rAct, "" );
-                }
-
-                readingsEndUpdate( $hash, 1 );
-
-                return (
-                    "text/html; charset=utf-8",
-                    "<html><head><meta http-equiv=\"refresh\" content=\"0;url="
-                      . $redirect
-                      . "\"></head><body><a href=\""
-                      . $redirect
-                      . "\">Click here to get redirected to your destination"
-                      . "</a></body></html>"
-                ) if ( $redirect ne "" );
 
             }
             else {
@@ -1233,14 +1263,14 @@ sub Pushover_SetMessage2 ($$$$) {
           )
         {
             $url = $values{action};
-            $values{expire} = undef;
+            if ( $values{priority} < 2 ) {
+                $values{expire} = undef;
+            }
         }
         else {
             $url =
                 $callback
-              . "?acknowledged=1&acknowledged_by="
-              . $hash->{USER_KEY}
-              . "&FhemCallbackId="
+              . "?FhemCallbackId="
               . $values{cbNr};
         }
 
@@ -1300,6 +1330,7 @@ sub Pushover_SetMessage2 ($$$$) {
             my $rAck      = "cbAck_" . $1;
             my $rAckAt    = "cbAckAt_" . $1;
             my $rAckBy    = "cbAckBy_" . $1;
+            my $rAckByDev = "cbAckByDev_" . $1;
             my $rCancelId = "cbCancelId_" . $1;
             my $rDev      = "cbDev_" . $1;
 
@@ -1313,6 +1344,7 @@ sub Pushover_SetMessage2 ($$$$) {
               . int( time() );
 
             if ( ReadingsVal( $name, $rAck, "0" ) eq "1"
+                && ReadingsVal( $name, $rAct, "" ) =~ /^[\w-]+:\/\/.*$|^executed: |^$/
                 || $1 <= int( time() ) )
             {
                 delete $hash->{READINGS}{$key};
@@ -1330,6 +1362,8 @@ sub Pushover_SetMessage2 ($$$$) {
                   if ( defined( $hash->{READINGS}{$rAckBy} ) );
                 delete $hash->{READINGS}{$rCancelId}
                   if ( defined( $hash->{READINGS}{$rCancelId} ) );
+                delete $hash->{READINGS}{$rAckByDev}
+                  if ( defined( $hash->{READINGS}{$rAckByDev} ) );
 
                 Log3 $name, 4,
                   "Pushover $name: cleaned up expired receipt " . $1;
@@ -1460,7 +1494,7 @@ sub Pushover_HttpUri ($$;$) {
 
 =pod
 =item device
-=item summary text message push functionality using the Pushover smartphone app
+=item summary Text message push functionality using the Pushover smartphone app
 =item summary_DE Push Funktion f&uuml;r Textnachrichten &uuml;ber die Pushover Smartphone App
 =begin html
 
@@ -1840,6 +1874,14 @@ sub Pushover_HttpUri ($$;$) {
 
 =for :application/json;q=META.json 70_Pushover.pm
 {
+  "abstract": "Text message push functionality using the Pushover smartphone app",
+  "x_lang": {
+    "de": {
+      "abstract": "Push Funktion für Textnachrichten über die Pushover Smartphone App"
+    }
+  },
+  "version": "v2.2.0",
+  "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
@@ -1853,7 +1895,31 @@ sub Pushover_HttpUri ($$;$) {
     "messaging",
     "messenger",
     "push"
-  ]
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "Data::Dumper": 0,
+        "Encode": 0,
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON::PP": 0
+      },
+      "recommends": {
+        "JSON": 0
+      },
+      "suggests": {
+        "Cpanel::JSON::XS": 0,
+        "JSON::XS": 0
+      }
+    }
+  },
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/fhem/mod-Pushover/issues"
+    }
+  }
 }
 =end :application/json;q=META.json
 
