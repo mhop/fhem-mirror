@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2018-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -3091,10 +3091,12 @@ sub SunRiseShuttersAfterTimerFn($) {
         and (
                $ascDev->getSelfDefense eq 'off'
             or $shutters->getSelfDefenseMode eq 'off'
-            or (    $ascDev->getSelfDefense eq 'on'
-                and ($shutters->getSelfDefenseMode eq 'gone'
-                  or $shutters->getSelfDefenseMode eq 'absent')
-                and $ascDev->getResidentsStatus ne 'gone' )
+            or (
+                $ascDev->getSelfDefense eq 'on'
+                and (  $shutters->getSelfDefenseMode eq 'gone'
+                    or $shutters->getSelfDefenseMode eq 'absent' )
+                and $ascDev->getResidentsStatus ne 'gone'
+            )
             or (    $ascDev->getSelfDefense eq 'on'
                 and $shutters->getSelfDefenseMode eq 'absent'
                 and $ascDev->getResidentsStatus ne 'absent' )
