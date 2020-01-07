@@ -613,8 +613,9 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
 
-    if( $name && ( !defined( AttrVal($name, "model", undef) )
-                   || AttrVal($name, "model", undef) eq 'LLC020') ) {
+    if( $name && ( !AttrVal($name, "model", undef)
+                   || AttrVal($name, "model", undef) eq 'LLC020'
+                   || ($hash->{IODev} &&  $hash->{IODev}{TYPE} eq 'tradfri' ) ) ) {
       my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
       $obj->{'on'}  = JSON::true;
