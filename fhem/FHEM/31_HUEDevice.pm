@@ -1364,6 +1364,10 @@ HUEDevice_Parse($$)
     if( ref($result->{state}) eq 'HASH' ) {
       my %readings;
 
+      if( $result->{stream}
+          && (defined($hash->{helper}{stream}) || $result->{stream}{active}) ) {
+        $readings{stream_active} = $result->{stream}{active}?1:0;
+      }
       if( $result->{state} ) {
         $readings{all_on} = $result->{state}{all_on};
         $readings{any_on} = $result->{state}{any_on};
