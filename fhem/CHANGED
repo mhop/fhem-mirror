@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     98_MAX_Temperature.pm: new modul
  - bugfix:  73_AutoShuttersControl: fix SelfDefense then drive day open
  - bugfix:  73_AutoShuttersControl: fix adv icon for devStateIcon
  - feature: 51_MOBILEALERTS.pm: Added batteryState
