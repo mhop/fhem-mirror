@@ -503,6 +503,7 @@ FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_livetracking.pm      markus-m             Unterstützende Dienste
 FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_search.pm            loredo               Unterstützende Dienste
+FHEM/98_MAX_Temperature.pm   Wzut/Bismosa	  MAX
 FHEM/98_MaxScanner.pm        john                 MAX
 FHEM/98_MediaList.pm         Tobias               Multimedia
 FHEM/98_Modbus.pm            StefanStrobel        Sonstiges
