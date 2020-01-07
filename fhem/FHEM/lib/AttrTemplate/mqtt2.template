@@ -728,13 +728,7 @@ attr DEVICE_CH2 setList \
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
   white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }
 attr DEVICE_CH2 readingList \
-  TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/POWER2:.* state
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0
 attr DEVICE_CH2 webCmd pct:white:Color
 attr DEVICE_CH2 webCmdLabel Helligkeit\
@@ -1421,8 +1415,8 @@ name:shelly25_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2.5 using original firmware. <br>NOTE: a second device will be created for the second channel
 order:A_11a1
-set DEVICE attrTemplate shellyplug
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+set DEVICE attrTemplate shellyplug
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
 attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
@@ -1453,6 +1447,7 @@ setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_1_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
 attr DEVICE model shelly25_split
 
 # shelly4pro using original firmware
@@ -1591,6 +1586,26 @@ attr DEVICE setList \
 attr DEVICE stateFormat T: temperature °C H: humidity % B: battery %
 set DEVICE x_mqttcom announce
 attr DEVICE model shellyht
+
+# shellyflood using original firmware
+name:shellyflood
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shellyht using original firmware <br>Just adds stateFormat and icon
+order:A_16a
+par:ICON;ICON as set, defaults to humidity;{ AttrVal("DEVICE","icon","humidity") }
+attr DEVICE icon ICON
+attr DEVICE setList \
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE readingList \
+  shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/sensor/temperature:.* temperature\
+  shellies/DEVNAME/sensor/flood:.* flood\
+  shellies/DEVNAME/sensor/battery:.* batteryPercent
+attr DEVICE stateFormat flood (bat batteryPercent%)
+deletereading -q DEVICE (?!associatedWith).*
+set DEVICE x_mqttcom announce
+attr DEVICE model shellyflood
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
@@ -2073,6 +2088,25 @@ attr DEVICE setList irsend:textField BASE_ID/DEVNAME/IRtoMQTT {"value":$EVTPART2
 attr DEVCID comment irsend needs Infos about protocol and value (n decimal), so e.g."IR_NEC 1587664935" should be fine...
 attr DEVICE model OpenMQTTGateway_ir
 
+name:OpenMQTTGateway_BT_temp_hum_sensor
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your sensor. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+order:X_02d
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
+par:BT_ID;Pls. enter your bluetooth device ID; {undef}
+#par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+defmod OMG_BT_ID MQTT2_\DEVICE oMQTTgw_BT
+deletereading -q OMG_BT_ID (?!associatedWith).*
+attr OMG_BT_ID autocreate 0
+attr OMG_BT_ID readingList\
+  BASE_ID/OpenMQTTGateway[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr OMG_BT_ID event-min-interval 300
+attr OMG_BT_ID event-on-change-reading batteryPercent,temperature:0.2,humidity:0.2,rssi:5,distance:5
+attr OMG_BT_ID icon temperature_humidity
+attr OMG_BT_ID jsonMap batt:batteryPercent tem:temperature hum:humidity servicedatauuid:0 servicedata:0
+attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
+attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+
 name:roborock
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*valetudo[/].*
 desc:use this to control a rooted Xiamoni Vacuum / Roborock. For further details visit https://github.com/Hypfer/Valetudo<br><br>NOTE: Initial version, not yet fully tested, just build according to https://forum.fhem.de/index.php/topic,104804.0.html<br>
@@ -2080,7 +2114,7 @@ order:X_03
 par:BASE_ID;BASE_ID typically is valetudo;{ AttrVal("DEVICE","readingList","") =~ m,(valetudo)[/].*:, ? $1 : undef }
 par:DEVNAME;DEVNAME typically is rockrobo;{ AttrVal("DEVICE","readingList","") =~ m,valetudo[/]([^/]+)[/].*:, ? $1 : undef }
 deletereading -q DEVICE (?!associatedWith).*
-defmod DEVICE MQTT2_DEVICE DEVNAME
+defmod DEVICE MQTT2_\DEVICE DEVNAME
 attr DEVICE icon vacuum_top
 attr DEVICE readingList homeassistant/vacuum/valetudo_DEVNAME/config:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/state:.* { json2nameValue($EVENT) }\
@@ -2180,3 +2214,33 @@ attr DEVICE devStateIcon ALW.1:status_open:Activation+0 ALW.0:status_locked:Acti
 attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car","none");; my %rets = ("none" => "-1","1" => "Ready","2" => "Charging","3" => "waiting for car","4" => "Charging finished",);; $rets{$val}}, energy_total:eto.* { ReadingsVal($name,"eto",0)*0.1 }, energy_akt:dws.* { ReadingsVal($name,"dws",0)*2.77 }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model go_eCharger
+
+###########################################
+# ems-esp
+# The ems-esp device
+name:ems-esp_heater_device
+filter:TYPE=MQTT2_DEVICE
+desc:EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
+order:E_02a
+par:BASE_ID;base topic set, default is "home";{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?[/]?([^/])+[/][^/]+[/].*:, ? $1 : "home" }
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?[/]?BASE_ID[/]([^/]+)[/].*:, ? $1 : "ems-esp" }
+par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
+attr DEVICE icon ICON
+modify DEVICE DEV_ID
+attr DEVICE bridgeRegexp \
+  BASE_ID/DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
+  BASE_ID/DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"
+attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
+attr DEVICE  readingList BASE_ID/DEV_ID/start:.* LWT\
+  BASE_ID/DEV_ID/heartbeat:.* { json2nameValue($EVENT) }
+attr DEVICE stateFormat Interface: \
+LWT\
+Signal: \
+rssid %\
+<br>Uptime: formatedUptime\
+<br>IPAddress : <a href="http://IP" target="_blank">IP</a>
+attr DEVICE setList restart:noArg BASE_ID/DEV_ID/restart
+attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
+attr DEVICE autocreate 1
+attr DEVICE webCmd restart
+attr DEVICE model ems-esp_heater_device
