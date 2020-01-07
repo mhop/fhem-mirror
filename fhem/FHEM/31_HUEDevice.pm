@@ -613,9 +613,10 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
 
+    my $hash = $defs{$name};
     if( $name && ( !AttrVal($name, "model", undef)
                    || AttrVal($name, "model", undef) eq 'LLC020'
-                   || ($hash->{IODev} &&  $hash->{IODev}{TYPE} eq 'tradfri' ) ) ) {
+                   || ($hash && $hash->{IODev} &&  $hash->{IODev}{TYPE} eq 'tradfri' ) ) ) {
       my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
       $obj->{'on'}  = JSON::true;
@@ -1338,8 +1339,6 @@ HUEDevice_Parse($$)
   $hash->{class} = $result->{class} if( defined($result->{class}) );
   $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
 
-  $hash->{helper}{scenes} = $result->{scenes} if( defined($result->{scenes}) );
-
   $hash->{helper}{json} = $result;
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
@@ -1352,6 +1351,8 @@ HUEDevice_Parse($$)
     #    $attr{$name}{subType} = 'lightgroup';
     #  }
     #}
+
+    $hash->{helper}{scenes} = $result->{scenes} if( defined($result->{scenes}) );
 
     if( $result->{lights} ) {
       $hash->{helper}{lights} = {map {$_=>1} @{$result->{lights}}};
@@ -1385,6 +1386,18 @@ HUEDevice_Parse($$)
         $readings{effect} = $state->{effect};
 
         $readings{reachable} = $state->{reachable}?1:0 if( defined($state->{reachable}) );
+
+        $readings{scene} = $state->{scene};
+        if( defined($readings{scene}) ) {
+          if( my $scenes = $hash->{helper}{scenes} ) {
+            for my $scene (@{$scenes}) {
+              if( $readings{scene} == $scene->{id} ) {
+                $readings{scene} = $scene->{name};
+                last;
+              }
+            }
+          }
+        }
 
         my $s = '';
         my $pct = -1;
