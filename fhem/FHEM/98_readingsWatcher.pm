@@ -163,11 +163,22 @@ sub Set($@)
  my $name= $hash->{NAME};
  
  return join(' ', sort keys %sets) if((@a < 2) || ($a[1] eq '?'));
- readingsSingleUpdate($hash, 'state', 'inactive', 1) if ($a[1] eq 'inactive');
- readingsSingleUpdate($hash, 'state', 'active', 1)   if ($a[1] eq 'active');
+ if ($a[1] eq 'inactive')
+ {
+  readingsSingleUpdate($hash, 'state', 'inactive', 1);
+  RemoveInternalTimer($hash);
+  $hash->{INTERVAL}=0;
+  return undef;
+ }
+ elsif ($a[1] eq 'active')
+ {
+  readingsSingleUpdate($hash, 'state', 'active', 1);
+  $hash->{INTERVAL} = AttrVal($name,'interval',60);
+ }
+
  return undef if(IsDisabled($name));
 
- OnTimer($hash) if ($a[1] eq 'checkNow') || ($a[1] eq 'active');
+ OnTimer($hash) if (($a[1] eq 'checkNow') || ($a[1] eq 'active'));
 
  if  ($a[1] eq 'clearReadings')
  {
@@ -312,7 +323,7 @@ sub OnTimer($)
   InternalTimer(gettimeofday()+$interval, 'FHEM::readingsWatcher::OnTimer', $hash, 0);
 
   readingsSingleUpdate($hash, 'state', 'disabled', 0) if (IsDisabled($name));
-  return if(IsDisabled($name) || !$init_done);
+  return if(IsDisabled($name) || !$init_done );
 
   my ($timeOutState, $errorValue, $timeout, $associated, $error, $readingsList);
   my ($deviceName, $rSA, $age, @devices, $rts, @parts, @devs);
@@ -325,8 +336,8 @@ sub OnTimer($)
   @devs = devspec2array("readingsWatcher!=");
 
   my ($areading,$dead,$alive) = split(":",AttrVal($name,'readingActivity','none:dead:alive'));
-  $dead = 'dead'  if(!$dead);
-  $alive= 'alive' if(!$alive);
+  $dead = 'dead'  if(!defined($dead));
+  $alive= 'alive' if(!defined($alive));
   $areading = ''  if ($areading eq 'none');
 
   readingsBeginUpdate($hash);
