@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+   height="100" width="100" viewBox="0 0 100 100"
+   preserveAspectRatio="xMidYMid meet" >
+     pagecolor="#ffffff" />
+  <g
+     stroke="none" fill="#000000" />
+  <path
+     d="M 5 5 L 5 95 L 95 95 95 5 L 5 5 z M 15 15 L 85 15 L 85 85 L 15 85 L 15 15 z
+"
+     style="fill:#000000;fill-rule:evenodd" />
+  <rect y="18" x="18" height="64" width="64" style="fill:#000000" />
+</svg>
