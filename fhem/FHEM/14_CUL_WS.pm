@@ -20,7 +20,7 @@ CUL_WS_Initialize($)
   # Message is like
   # K41350270
 
-  $hash->{Match}     = "^K.....";
+  $hash->{Match}     = "^K[A-Fa-f0-9]{5,}";
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{AttrFn}    = "CUL_WS_Attr";
