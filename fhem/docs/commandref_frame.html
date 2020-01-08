@@ -1798,7 +1798,7 @@ The following local attributes are used by a wider range of devices:
       { `ls /etc` }<br>
       { Log 1, "Hello" }<br>
     </ul>
-    <br>
+    </li><br>
 
   <li>
     Perl expressions are separated by ;, in FHEM oneliners they have to
@@ -1806,7 +1806,7 @@ The following local attributes are used by a wider range of devices:
     <ul>
       { my $a = 1+1;; Log 1, "Hello $a" }
     </ul>
-    <br>
+    </li><br>
 
   <li>To use FHEM commands from the perl expression, use the function fhem(),
     which takes a string argument, this string will be evaluated as a FHEM
@@ -1818,8 +1818,7 @@ The following local attributes are used by a wider range of devices:
     Note: if this function returns a value, it will also be logged into the
     global FHEM log. Use 1 as a second argument to disable this logging, this
     makes sense when obtainig some values via FHEM "get...".
-    <br>
-    <br>
+    </li><br>
 
   <li>Notify can be used to store macros for manual execution. Use the <a
     href="#trigger">trigger</a> command to execute the macro:<br>
@@ -1829,7 +1828,7 @@ The following local attributes are used by a wider range of devices:
       define MacroWithArg notify MyMacro { Log 1, "Hello %"}<br>
       trigger MyMacro MyArg<br>
     </ul>
-    <br>
+    </li><br>
 
 
   <li>To make date and time handling easier, the variables $sec, $min, $hour,
@@ -1850,20 +1849,12 @@ The following local attributes are used by a wider range of devices:
     </ul>
     $we is equivalent to calling IsWe(), which optionally takes the arguments
     "today", "yesterday", "tomorrow", MM-DD or YYYY-MM-DD. Note: for everything
-    else "today" is assumed without an error message.<br>
-    <br>
+    else "today" is assumed without an error message.
+    </li><br>
 
   <li>
-    The following helper functions are defined in 99_Util.pm (which will
-    be loaded automatically, as every module with prefix 99):
-    <ul>
-      <li>min(a,b), max(a,b)</li>
-      <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
-          which makes computation of time differences easier</li>
-      <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one
-          </li>
-    </ul>
-    </li>
+    All helper functions defined in <a href="#Utils">99_Utils.pm</a><br>
+    </li><br>
 
   <li>
     To access the device states/attributes, use the following functions:
@@ -1939,7 +1930,7 @@ The following local attributes are used by a wider range of devices:
         Round id to &lt;round&gt; devimal places (optional parameter).
         </li><br>
       </ul>
-
+      </li><br>
 
   <li>
     By using the 99_SUNRISE_EL.pm module, you have access to the following
@@ -1951,9 +1942,8 @@ The following local attributes are used by a wider range of devices:
     </ul>
     offset is in seconds, and the format of min/max is "HH:MM" or "HH:MM:SS".
     isday returns 1 if the sun is visible, and 0 else.
-    </li>
+    </li><br>
 
-  <br>
   <br>
 <!-- perl end - diese Zeile nicht entfernen! -->
 
