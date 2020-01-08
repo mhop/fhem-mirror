@@ -1366,7 +1366,7 @@ HUEDevice_Parse($$)
       my %readings;
 
       if( $result->{stream}
-          && (defined($hash->{helper}{stream}) || $result->{stream}{active}) ) {
+          && (defined($hash->{helper}{stream_active}) || $result->{stream}{active}) ) {
         $readings{stream_active} = $result->{stream}{active}?1:0;
       }
       if( $result->{state} ) {
@@ -1704,7 +1704,7 @@ HUEDevice_Parse($$)
      $battery   = $config->{battery} if( defined($config->{battery}) );
 
   my $mode   = undef;
-     $mode   = $state->{mode} if( $hash->{helper}{mode} || defined($state->{mode} && $state->{mode} ne 'homeautomation') );
+     $mode   = $state->{mode} if( defined($state->{mode}) && ($hash->{helper}{mode} || $state->{mode} ne 'homeautomation') );
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
