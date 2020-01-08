@@ -1334,7 +1334,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature
-attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 0:fts_shutter_100 100:fts_shutter_10 9\d:fts_shutter_10 8\d:fts_shutter_20 7\d:fts_shutter_30 6\d:fts_shutter_40 5\d:fts_shutter_50 4\d:fts_shutter_60 3\d:fts_shutter_70 2\d:fts_shutter_80 1\d:fts_shutter_90 0\d:fts_shutter_100 set_.*:fts_shutter_updown
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; $con = 100 - $con if $con =~ /\d+/;; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE stateFormat <a href="http://ip" target="_blank">\
@@ -1377,7 +1377,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature
-attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d:fts_shutter_90 8\d:fts_shutter_80 7\d:fts_shutter_70 6\d:fts_shutter_60 5\d:fts_shutter_50 4\d:fts_shutter_40 3\d:fts_shutter_30 2\d:fts_shutter_20 1\d:fts_shutter_10 0\d.*:fts_shutter_10 set_.*:fts_shutter_updown
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 attr DEVICE stateFormat <a href="http://ip" target="_blank">\
@@ -1426,7 +1426,7 @@ attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/relay/0/power:.* relay_0_power\
-  shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
+  shellies/DEVNAME/relay/0/energy:.* {'relay_0_energy' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/longpush/0:.* longpush_0
@@ -1438,7 +1438,7 @@ attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
   shellies/DEVNAME/relay/1/power:.* relay_1_power\
-  shellies/DEVNAME/relay/1/energy:.* relay_1_energy\
+  shellies/DEVNAME/relay/1/energy:.* {'relay_1_energy' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/longpush/1:.* longpush_1
