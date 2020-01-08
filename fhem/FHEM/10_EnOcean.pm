@@ -474,6 +474,7 @@ my %EnO_extendedRemoteFunctionCode = (
 
 my %EnO_models = (
   "Eltako_FAE14" => {attr => {manufID => "00D"}},
+  "Eltako_FAH60" => {attr => {manufID => "00D"}},
   "Eltako_FHK14" => {attr => {manufID => "00D"}},
   "Eltako_FHK61" => {attr => {manufID => "00D"}},
   "Eltako_FSA12" => {attr => {manufID => "00D"}},
@@ -9570,7 +9571,7 @@ sub EnOcean_Parse($$)
       push @event, "3:state:T: $temp H: $humi B: $battery";
       push @event, "3:humidity:$humi";
       push @event, "3:temperature:$temp";
-      CommandDeleteReading(undef, "$name alarm");
+      readingsDelete($hash, "alarm");
       if (AttrVal($name, "signOfLife", 'off') eq 'on') {
         RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
@@ -9615,14 +9616,18 @@ sub EnOcean_Parse($$)
       my $lux;
       my $voltage = "unknown";
       if ($manufID eq "00D") {
-        if($db[2] == 0) {
-          $lux = sprintf "%d", $db[3] * 100 / 255;
+        if ($db[2] == 0) {
+          if ($model eq 'Eltako_FAH60') {
+            $lux = $db[3];
+          } else {
+            $lux = sprintf "%d", $db[3] * 100 / 255;
+          }
         } else {
           $lux = sprintf "%d", $db[2] * 116.48 + 300;
         }
       } else {
         $voltage = sprintf "%0.1f", $db[3] * 0.02;
-        if($db[0] & 1) {
+        if ($db[0] & 1) {
           $lux = sprintf "%d", $db[2] * 116.48 + 300;
         } else {
           $lux = sprintf "%d", $db[1] * 232.94 + 600;
@@ -12955,7 +12960,7 @@ sub EnOcean_Parse($$)
       $data = $2;
       while (length($data) > 0) {
         $data =~ m/^(..)(........)(..)(..)(..)(..)(.*)$/;
-        push @event, "3:remoteLinkTableDesc" . $direction . "$1:S2:S3-S4-$5:$6";
+        push @event, "3:remoteLinkTableDesc" . $direction . "$1:$2:$3-$4-$5:$6";
         $data = $7;
       }
       $remoteLastStatusReturnCode = '00';
@@ -13070,7 +13075,7 @@ sub EnOcean_Parse($$)
         $valueLen = hex($2) * 2;
         $data = $3;
         $data =~ m/^(.{$valueLen})(.*)$/;
-        push @event, "3:remoteDevCfg$idx:S1";
+        push @event, "3:remoteDevCfg$idx:$1";
         $data = $2;
       }
       $remoteLastStatusReturnCode = '00';
@@ -13093,7 +13098,7 @@ sub EnOcean_Parse($$)
         $valueLen = hex($2) * 2;
         $data = $3;
         $data =~ m/^(.{$valueLen})(.*)$/;
-        push @event, "3:remoteLinkCfg$direction$linkTableIdx:$idx:S1";
+        push @event, "3:remoteLinkCfg$direction$linkTableIdx:$idx:$1";
         $data = $2;
       }
       $remoteLastStatusReturnCode = '00';
@@ -20604,6 +20609,7 @@ EnOcean_Delete($$)
        <li>state: E/lx</li>
      </ul><br>
         Eltako devices only support Brightness.<br>
+        Please set the attribute model to Eltako_FAH60 if the sensor is from the production year 2015 or later.<br>
         The attr subType must be lightSensor.01 and attr manufID must be 00D
         for Eltako Devices. This is done if the device was created by
         autocreate.
