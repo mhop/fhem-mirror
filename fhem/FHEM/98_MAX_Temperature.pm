@@ -91,7 +91,7 @@ sub MAX_Temperature_Define($$){
 	$attr{$name}{room} = "MAX" if( not defined( $attr{$name}{room} ) );
 	$attr{$name}{SendButton} = "audio_play" if( not defined( $attr{$name}{SendButton} ) );
 	$attr{$name}{ResetButton} = "control_x" if( not defined( $attr{$name}{ResetButton} ) );
-	$attr{$name}{Layout} = "[DEVICE][MODE][TEMP][SEND][DATE][CLOCK][SEND]<br>\n[STATE]" if( not defined( $attr{$name}{Layout} ) );
+	$attr{$name}{Layout} = "[DEVICE][MODE][TEMP][SEND][DATE][CLOCK][SEND]<br>[STATE]" if( not defined( $attr{$name}{Layout} ) );
     } else {
 	#Log3 $name, 1, "$name: already defined";
     }
@@ -414,7 +414,7 @@ sub MAX_Temperature_HTML($){
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    my $Layout = AttrVal($name, "Layout", "[DEVICE][MODE][TEMP][SEND][DATE][CLOCK][SEND]<br>\n[STATE]");
+    my $Layout = AttrVal($name, "Layout", "[DEVICE][MODE][TEMP][SEND][DATE][CLOCK][SEND]<br>[STATE]");
 	
     #Log3 $name,1,"$name, $Layout";
     
@@ -536,7 +536,7 @@ sub MAX_Temperature_GetHTMLSelectMaxDevice($){
     my $Reading = "Selected_Device";
     my $DDSelected = ReadingsVal($name, $Reading, "");
     $DDSelected =~ s/ /&nbsp;/g;
-    $DDSelected =~ s/ /&nbsp;/g; #ACHTUNG! Kein richtiges leerzeichen!!! Siehe http://www.fileformat.info/info/unicode/char/00a0/index.htm
+    $DDSelected =~ s/\xC2\xA0/&nbsp;/g; #non-page-breaking-space
     my $html="";
     
     
@@ -674,8 +674,7 @@ sub MAX_Temperature_GetDeviceFromName($$){
     
     my $MaxDevice = $caption; #ggf. bereits das Device
     $caption =~ s/ /&nbsp;/g;
-    $caption =~ s/ /&nbsp;/g; #ACHTUNG! Kein richtiges leerzeichen!!! Siehe http://www.fileformat.info/info/unicode/char/00a0/index.htm
-    
+    $caption =~ s/\xC2\xA0/&nbsp;/g; #non-page-breaking-space
     #Gruppe?
     my $AddGroup = AttrVal($name,"addGroups","");
     my @AddGroups = split(/ /, $AddGroup);
@@ -684,7 +683,7 @@ sub MAX_Temperature_GetDeviceFromName($$){
 	my @split=split(/:/, $Grp);
 	my $GrpName=$split[0];
 	$GrpName =~ s/ /&nbsp;/g;
-	$GrpName =~ s/ /&nbsp;/g; #ACHTUNG! Kein richtiges leerzeichen!!! Siehe http://www.fileformat.info/info/unicode/char/00a0/index.htm
+        $GrpName =~ s/\xC2\xA0/&nbsp;/g; #non-page-breaking-space
 	#my @GrpDevices=split(/,/, $split[1]);
 	#Log3 $name,1,"$name $caption $GrpName";
 	if ($caption eq $GrpName){
@@ -699,7 +698,7 @@ sub MAX_Temperature_GetDeviceFromName($$){
 	my $AliasDevice=$list[0];
 	my $AliasDeviceName=$list[1];
 	$AliasDeviceName =~ s/ /&nbsp;/g;
-	$AliasDeviceName =~ s/ /&nbsp;/g; #ACHTUNG! Kein richtiges leerzeichen!!! Siehe http://www.fileformat.info/info/unicode/char/00a0/index.htm
+        $AliasDeviceName =~ s/\xC2\xA0/&nbsp;/g; #non-page-breaking-space
 	#Log3 $name,1,"$name $dev $AliasDeviceName";
 	if ($caption eq $AliasDeviceName){
 	    $MaxDevice = $AliasDevice;
@@ -923,10 +922,10 @@ sub MAX_Temperature_GetHTMLReset($){
             <br><br>
             
             Without setting the Holiday mode:<br>
-            [STATE]&lt;br&gt;\n[DEVICE][MODE][TEMP][SEND]<br><br>
+            [STATE]&lt;br&gt; [DEVICE][MODE][TEMP][SEND]<br><br>
             
             Holiday mode setting only:<br>
-            [STATE]&lt;br&gt;\n[DEVICE][TEMP][DATE][CLOCK][SEND]<br><br>
+            [STATE]&lt;br&gt; [DEVICE][TEMP][DATE][CLOCK][SEND]<br><br>
             
             All entries one below the other:<br>
             [STATE]&lt;br&gt;<br>
@@ -1125,10 +1124,10 @@ sub MAX_Temperature_GetHTMLReset($){
             <br><br>
             
             Ohne Einstellung des Urluabsmodus:<br>
-            [STATE]&lt;br&gt;\n[DEVICE][MODE][TEMP][SEND]<br><br>
+            [STATE]&lt;br&gt; [DEVICE][MODE][TEMP][SEND]<br><br>
             
             Nur Einstellung des Urlaubsmodus:<br>
-            [STATE]&lt;br&gt;\n[DEVICE][TEMP][DATE][CLOCK][SEND]<br><br>
+            [STATE]&lt;br&gt; [DEVICE][TEMP][DATE][CLOCK][SEND]<br><br>
             
             Alle Einträge untereinander:
             [STATE]&lt;br&gt;<br>
