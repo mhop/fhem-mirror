@@ -9,9 +9,13 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.28
+# Version = 1.30
 #
 # Version  History:
+# - 1.30 - 2020-01-10 Dr. H-J Breymayer
+# -- implemented additional commands, changed definition of commands
+# -- bugfix patch from Nestor
+#
 # - 1.28 - 2019-12-14 Dr. H-J Breymayer
 # -- correction of "Rolling Key" in case of bad command
 # -- GetStatus call after on_off command
@@ -87,66 +91,93 @@ sub VIERA_RClayout_TV();
 sub VIERA_RClayout_TV_SVG();
 
 my %VIERA_remoteControl_args = (
-  "NRC_CH_DOWN-ONOFF"   => "Channel down",
-  "NRC_CH_UP-ONOFF"     => "Channel up",
-  "NRC_VOLUP-ONOFF"     => "Volume up",
-  "NRC_VOLDOWN-ONOFF"   => "Volume down",
-  "NRC_MUTE-ONOFF"      => "Mute",
-  "NRC_TV-ONOFF"        => "TV",
-  "NRC_CHG_INPUT-ONOFF" => "AV",
-  "NRC_RED-ONOFF"       => "Red",
-  "NRC_GREEN-ONOFF"     => "Green",
-  "NRC_YELLOW-ONOFF"    => "Yellow",
-  "NRC_BLUE-ONOFF"      => "Blue",
-  "NRC_VTOOLS-ONOFF"    => "VIERA tools",
-  "NRC_CANCEL-ONOFF"    => "Cancel / Exit",
-  "NRC_SUBMENU-ONOFF"   => "Option",
-  "NRC_RETURN-ONOFF"    => "Return",
-  "NRC_ENTER-ONOFF"     => "Control Center click / enter",
-  "NRC_RIGHT-ONOFF"     => "Control RIGHT",
-  "NRC_LEFT-ONOFF"      => "Control LEFT",
-  "NRC_UP-ONOFF"        => "Control UP",
-  "NRC_DOWN-ONOFF"      => "Control DOWN",
-  "NRC_3D-ONOFF"        => "3D button",
-  "NRC_SD_CARD-ONOFF"   => "SD-card",
-  "NRC_DISP_MODE-ONOFF" => "Display mode / Aspect ratio",
-  "NRC_MENU-ONOFF"      => "Menu",
-  "NRC_INTERNET-ONOFF"  => "VIERA connect",
-  "NRC_VIERA_LINK-ONOFF"=> "VIERA link",
-  "NRC_EPG-ONOFF"       => "Guide / EPG",
-  "NRC_TEXT-ONOFF"      => "Text / TTV",
-  "NRC_STTL-ONOFF"      => "STTL / Subtitles",
-  "NRC_INFO-ONOFF"      => "Info",
-  "NRC_INDEX-ONOFF"     => "TTV index",
-  "NRC_HOLD-ONOFF"      => "TTV hold / image freeze",
-  "NRC_R_TUNE-ONOFF"    => "Last view",
-  "NRC_POWER-ONOFF"     => "Power off",
-  "NRC_REW-ONOFF"       => "Rewind",
-  "NRC_PLAY-ONOFF"      => "Play",
-  "NRC_FF-ONOFF"        => "Fast forward",
-  "NRC_SKIP_PREV-ONOFF" => "Skip previous",
-  "NRC_PAUSE-ONOFF"     => "Pause",
-  "NRC_SKIP_NEXT-ONOFF" => "Skip next",
-  "NRC_STOP-ONOFF"      => "Stop",
-  "NRC_REC-ONOFF"       => "Record",
-  "NRC_D1-ONOFF"        => "Digit 1",
-  "NRC_D2-ONOFF"        => "Digit 2",
-  "NRC_D3-ONOFF"        => "Digit 3",
-  "NRC_D4-ONOFF"        => "Digit 4",
-  "NRC_D5-ONOFF"        => "Digit 5",
-  "NRC_D6-ONOFF"        => "Digit 6",
-  "NRC_D7-ONOFF"        => "Digit 7",
-  "NRC_D8-ONOFF"        => "Digit 8",
-  "NRC_D9-ONOFF"        => "Digit 9",
-  "NRC_D0-ONOFF"        => "Digit 0",
-  "NRC_P_NR-ONOFF"      => "P-NR (Noise reduction)",
-  "NRC_R_TUNE-ONOFF"    => "Seems to do the same as INFO",
-  "NRC_HDMI1"           => "Switch to HDMI input 1",
-  "NRC_HDMI2"           => "Switch to HDMI input 2",
-  "NRC_HDMI3"           => "Switch to HDMI input 3",
-  "NRC_HDMI4"           => "Switch to HDMI input 4",
+   channel_down         => "CH_DOWN",
+   channel_up           => "CH_UP",
+   volume_up            => "VOLUP",
+   volume_down          => "VOLDOWN",
+   mute                 => "MUTE",
+   TV                   => "TV",
+   AV                   => "CHG_INPUT",
+   red_button           => "RED",
+   green_button         => "GREEN",
+   yellow_button        => "YELLOW",
+   blue_button          => "BLUE",
+   VIERA_tools          => "VTOOLS",
+   cancel               => "CANCEL",
+   exit                 => "CANCEL",
+   option               => "SUBMENU",
+   return               => "RETURN",
+   home                 => "HOME",
+   program              => "PROG",
+   enter                => "ENTER",
+   right                => "RIGHT",
+   left                 => "LEFT",
+   up                   => "UP",
+   down                 => "DOWN",
+   "3D_button"          => "3D",
+   SD_card              => "SD_CARD",
+   display_mode         => "DISP_MODE",
+   menu                 => "MENU",
+   VIERA_connect        => "INTERNET",
+   VIERA_link           => "VIERA_LINK",
+   EPG                  => "EPG",
+   guide                => "GUIDE",
+   videotext            => "TEXT",
+   subtitle             => "STTL",
+   info                 => "INFO",
+   index                => "INDEX",
+   hold                 => "HOLD",
+   last_view            => "R_TUNE",
+   on_off               => "POWER",
+   rewind               => "REW",
+   play                 => "PLAY",
+   fast_forward         => "FF",
+   skip_previous        => "SKIP_PREV",
+   pause                => "PAUSE",
+   skip_next            => "SKIP_NEXT",
+   stop                 => "STOP",
+   record               => "REC",
+   apps                 => "APPS",
+   aspect               => "ASPECT",
+   favorite             => "FAVORITE",
+   game                 => "GAME",
+   digit_1	            => "D1", 
+   digit_2	            => "D2",
+   digit_3	            => "D3",
+   digit_4	            => "D4",
+   digit_5	            => "D5",
+   digit_6	            => "D6",
+   digit_7	            => "D7",
+   digit_8	            => "D8",
+   digit_9	            => "D9",
+   digit_0	            => "D0",
+   noise_reduction      => "P_NR",
+   tune                 => "R_TUNE",
+   HDMI_1               => "HDMI1",
+   HDMI_2               => "HDMI2",
+   HDMI_3               => "HDMI3",
+   HDMI_4               => "HDMI4",
 );
 
+my %VIERA_remoteControl_apps = (
+   netflix              => "0010000200000001",
+   youtube              => "0070000200180001",
+   shoutcast            => "0070000400000001",
+   calendar             => "0387878700150020",
+   browser              => "0077777700160002",
+   amazonprime          => "0010000100180001",
+   iplayer              => "0020000A00000010",
+   bbc_iplayer          => "0020000A00000010",
+   itv                  => "0387878700000124",
+   all_4                => "0387878700000125",
+   demand_5             => "0387878700000125",
+   recorded_tv          => "0387878700000013",
+   multi_window         => "0387878700000050",
+   bbc_news             => "0020000A00000006",
+   bbc_sport            => "0020000A00000007",
+   weather              => "0070000C00000001",
+   developer            => "0077777777777778",
+);
 
 # Initialize the module and tell FHEM name of additional functions
 # Param1: Hash of FHEM-Device
@@ -278,14 +309,16 @@ sub VIERA_Set($@) {
               "volume:slider,0,1,100 ".
               "channel ".
               "remoteControl:" . join(",", sort keys %VIERA_remoteControl_args) . " " .
-              "input:hdmi1,hdmi2,hdmi3,hdmi4,sdCard,tv";
+              "remoteControlApp:" . join(",", sort keys %VIERA_remoteControl_apps) . " " .
+              "input:HDMI_1,HDMI_2,HDMI_3,HDMI_4,SD_card,TV ".
+              "statusRequest:noArg  ";
   $usage =~ s/(NRC_|-ONOFF)//g;
   
-  my $what = lc($a[0]); 
+  my $what = $a[0]; 
   return "\"set $name\" needs at least one argument" if(!defined($a[0]));
   return "Unknown value $a[0] Device is not present or reachable (power on or check ethernet connection)" if(ReadingsVal($name,"state","off") eq "off" && $what ne "?");
   return "Unknown value $a[0] use set $name on_off, choose one of on_off ?"  if(ReadingsVal($name,"state","off") eq "dormant" && $what ne "on_off");
-  my $state = lc($a[1]) if(defined($a[1])); 
+  my $state = $a[1] if(defined($a[1])); 
   
   if ($what eq "mute"){
     Log3 $name, 3, "$name: Set mute $state";
@@ -301,7 +334,7 @@ sub VIERA_Set($@) {
   }
   elsif ($what eq "on_off"){
     Log3 $name, 3, "$name: Set on_off";
-    VIERA_Encrypted_Command($hash, "POWER");
+    VIERA_Encrypted_Command($hash, "POWER", "key");
     VIERA_Encrypt_Answer($hash);
     sleep 0.6;
     VIERA_GetStatus($hash, 1);
@@ -310,39 +343,49 @@ sub VIERA_Set($@) {
     return "$name: Channel is too high or low!" if($state < 1 || $state > 9999);
     Log3 $name, 3, "$name: Set channel $state";
     for(my $i = 0; $i <= length($state)-1; $i++) {
-      VIERA_Encrypted_Command($hash, "D".substr($state, $i, 1));
+      VIERA_Encrypted_Command($hash, "D".substr($state, $i, 1), "key");
       sleep 0.1;
       VIERA_Encrypt_Answer($hash);
     }
-    VIERA_Encrypted_Command($hash, "ENTER");
+    VIERA_Encrypted_Command($hash, "ENTER", "key");
     VIERA_Encrypt_Answer($hash);
   }
-  elsif ($what eq "remotecontrol"){
-    if($state eq "?"){
-    $usage = "choose one of the states:\n";
-    foreach $key (sort keys %VIERA_remoteControl_args){
-      if(length($key) < 17){ $tab = "\t\t"; }else{ $tab = "\t"; }
-      $usage .= "$key $tab=> $VIERA_remoteControl_args{$key}\n";
+  elsif ($what eq "remoteControl"){
+    Log3 $name, 3, "$name: Set remoteControl $state";
+    
+    if( defined($VIERA_remoteControl_args{$state}) ) {
+       $state =  $VIERA_remoteControl_args{$state};  
+       Log3 $name, 4, "$name: Set remoteControl $state";
     }
-    $usage =~ s/(NRC_|-ONOFF)//g;
-    return $usage;
-    }
-    else{
-    $state = uc($state);
-    Log3 $name, 3, "$name: Set remoteControl $state";   
-    VIERA_Encrypted_Command($hash, $state);
+    else {return "Unknown argument $what, $usage"}
+    
+    VIERA_Encrypted_Command($hash, $state, "key");
     VIERA_Encrypt_Answer($hash);
+  }
+  elsif ($what eq "remoteControlApp"){
+    Log3 $name, 3, "$name: Set remoteControlApp $state";
+    
+    if( defined($VIERA_remoteControl_apps{$state}) ) {
+       $state =  $VIERA_remoteControl_apps{$state};
+       Log3 $name, 4, "$name: Set remoteControlApp $state";
     }
+    else {return "Unknown argument $what, $usage"}
+    
+    VIERA_Encrypted_Command($hash, $state, "app");
+    VIERA_Encrypt_Answer($hash);
   }
   elsif ($what eq "input"){
-    $state = uc($state);
-    return "$name: Input $state isn't available." if($state ne "HDMI1" && $state ne "HDMI2" && $state ne "HDMI3" && $state ne "HDMI4" && $state ne "SDCARD" && $state ne "TV");
-    $state = "SD_CARD" if ($state eq "SDCARD");
-    Log3 $name, 3, "$name: Set input $state";
-    VIERA_Encrypted_Command($hash, $state);
+	Log3 $name, 3, "$name: Set input $state";
+    if( defined($VIERA_remoteControl_args{$state}) ) {
+       $state =  $VIERA_remoteControl_args{$state};  
+       Log3 $name, 4, "$name: Set remoteControl $state";
+    }
+    else {return "Unknown argument $what, $usage"}
+    
+    VIERA_Encrypted_Command($hash, $state, "key");
     VIERA_Encrypt_Answer($hash);
   }
-  elsif ($what eq "statusrequest"){
+  elsif ($what eq "statusRequest"){
     Log3 $name, 3, "$name: Set statusRequest";
     VIERA_GetStatus($hash, 1);
   }
@@ -369,7 +412,7 @@ sub VIERA_Get($@) {
 
   return "$name: No argument given, $usage" if(int(@a) != 2);
 
-  $what = lc($a[1]);
+  $what = $a[1];
 
   if($what =~ /^(volume|mute|presence)$/) {
     if (defined($hash->{READINGS}{$what})) {
@@ -540,7 +583,9 @@ sub VIERA_connection($$) {
     Log3 $name, 5, "$name [$blocking]: Send Data to $hash->{helper}{HOST}:$hash->{helper}{PORT}:\n$data";
     print $sock $data;
   
-    while ((read $sock, $buff, 1024) > 0){
+    while (1){
+	  my $res = read $sock, $buff, 1024;
+      last if (not defined($res) or $res == 0);
       $buffer .= $buff;
     }
  
@@ -553,48 +598,6 @@ sub VIERA_connection($$) {
     Log3 $name, 4, "$name [$blocking]: $hash->{helper}{HOST}: not able to open socket";
     return undef;
   }
-}
-
-
-# Create RAW Data to sent pressed keys of remoteControl to device.
-# Param1: Hash of FHEM-Device
-# Param2: Name of key to send
-# Return: RAW html request for xml soap
-sub VIERA_BuildXML_NetCtrl($$) {
-  my ($hash, $command) = @_;
-  
-  my $host = $hash->{helper}{HOST};
-  my $port = $hash->{helper}{PORT};
-  
-  my $callsoap = "";
-  my $message = "";
-  my $head = "";
-  my $blen  = "";
-  
-  $callsoap .= "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n";
-  $callsoap .= "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"";
-  $callsoap .= " s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\r\n";
-
-  $callsoap .= "<s:Body>\r\n";
-  $callsoap .= "<u:X_SendKey xmlns:u=\"urn:panasonic-com:service:p00NetworkControl:1\">\r\n";
-  $callsoap .= "<X_KeyEvent>NRC_$command-ONOFF</X_KeyEvent>\r\n";
-  $callsoap .= "</u:X_SendKey>\r\n";
-  $callsoap .= "</s:Body>\r\n";
-  $callsoap .= "</s:Envelope>\r\n";
-
-  $blen = length($callsoap);
-
-  $head .= "POST /nrc/control_0 HTTP/1.1\r\n";
-  $head .= "Host: $host:$port\r\n";
-  $head .= "Content-Type: text/xml; charset=\"utf-8\"\r\n";
-  $head .= "SOAPAction: \"urn:panasonic-com:service:p00NetworkControl:1#X_SendKey\"\r\n";
-  $head .= "Content-Length: $blen\r\n";
-  $head .= "\r\n";
-
-  $message .= $head;
-  $message .= $callsoap;
-# Log3 $name, 5, "$name: Building XML SOAP (NetworkControl) for command $command to host $host:\n$message";
-  return $message;
 }
 
 
@@ -887,11 +890,13 @@ sub VIERA_GetAbortFn($) {
 ######################################################################################################################
 
 
-sub VIERA_Encrypted_Command($$) {
-   my ($hash, $command) = @_;
+sub VIERA_Encrypted_Command($$$) {
+   my ($hash, $command, $type) = @_;
    
    my $i = 0;
    my $message = "";
+   my $params  = "";
+   my $task    = "";
    
    if ($hash->{helper}{ENCRYPTION} eq "yes") {
       
@@ -900,26 +905,27 @@ sub VIERA_Encrypted_Command($$) {
       if ($hash->{helper}{stop} eq "yes") {return 0 if (!VIERA_authorize_pin_code($hash))};
       
       if ($hash->{helper}{session_seq_num} eq "None") {return 0 if (!VIERA_request_session_id($hash))};
+   }
 		 
-      
-      my $params = "<X_KeyEvent>NRC_$command-ONOFF</X_KeyEvent>";
-      $message   = VIERA_Build_soap_message_Encrypt($hash, "X_SendKey", $params, "u");
-      $hash->{helper}{BUFFER} = "";
-      if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
-		  sleep (0.1);
-		  $i += 1;
-	  }
-      VIERA_connection($hash, $message);
+   if ( $type eq "key" ) {
+      $params = "<X_KeyEvent>NRC_$command-ONOFF</X_KeyEvent>";
+      $task = "X_SendKey";
+    }
+    elsif ( $type eq "app" ) {
+	  $params  = "<X_AppType>vc_app</X_AppType><X_LaunchKeyword>";
+	  $params .= "product_id=$command</X_LaunchKeyword>";
+	  $task = "X_LaunchApp";
+    }
+    else {return};   
+   
+   $message   = VIERA_Build_soap_message_Encrypt($hash, $task, $params, "u");
+   $hash->{helper}{BUFFER} = "";
+   if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
+	  sleep (0.1);
+	  $i += 1;
    }
-   else {
-	  $message = VIERA_BuildXML_NetCtrl($hash, $command);
-	  $hash->{helper}{BUFFER} = "";
-	  if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
-		  sleep (0.1);
-		  $i += 1;
-	  }
-      VIERA_connection($hash, $message);
-   }
+   VIERA_connection($hash, $message);
+   
 
    return;
 }
@@ -937,8 +943,15 @@ sub VIERA_Encrypt_Answer($) {
      if (index($answer, "Bad Request") != -1) {
         if ($hash->{helper}{session_seq_num} ne  "None") {
           $hash->{helper}{session_seq_num} -= 1;
+          readingsSingleUpdate($hash, "Sequence", $hash->{helper}{session_seq_num},1);
         }
       }  
+      elsif (index($answer, "Internal Server Error") != -1) {
+		 $hash->{helper}{session_seq_num} = "None";
+		 readingsSingleUpdate($hash, "Sequence", $hash->{helper}{session_seq_num},1);
+		 Log3 $name, 4, "$name reset of Rolling Key";
+	  }
+	  	  
       Log3 $name, 3, "$name wrong encrypted VIERA command:  \r\n\"$answer\"";
       return undef;
   }
@@ -966,9 +979,8 @@ sub VIERA_CeckEncryption($) {
 
 
   $hash->{helper}{BUFFER} = "";
-  VIERA_connection($hash, VIERA_BuildXML_NetCtrl($hash, "INFO"));
+  VIERA_Encrypted_Command($hash, "INFO", "key");
   
-
     if ($hash->{helper}{BUFFER} ne "") {
       $answer = $hash->{helper}{BUFFER} ;
       $iS = index($answer, "<errorCode>401</errorCode>");
@@ -1296,26 +1308,26 @@ sub VIERA_RClayout_TV() {
   my @row;
   my $i = 0;
 
-  $row[$i++]="power:POWEROFF2,  TV,                 CHG_INPUT:HDMI";
-  $row[$i++]="MENU,             disp_mode:ASPECT,   epg:GUIDE";
-  $row[$i++]="VIERA_LINK,       VTOOLS,             INTERNET";
-  $row[$i++]=":blank,           :blank,             :blank";
-  $row[$i++]="INFO:INFO2,       UP,                 cancel:EXIT";
-  $row[$i++]="LEFT,             ENTER,              RIGHT";
-  $row[$i++]="SUBMENU,          DOWN,               RETURN";
-  $row[$i++]="red:RED,          :blank,             green:GREEN";
-  $row[$i++]="yellow:YELLOW,    :blank,             blue:BLUE";
-  $row[$i++]="d1:1,             d2:2,               d3:3";
-  $row[$i++]="d4:4,             d5:5,               d6:6";
-  $row[$i++]="d7:7,             d8:8,               d9:9";
-  $row[$i++]="MUTE,             d0:0,               r_tune:PRECH";
-  $row[$i++]=":blank,           :blank,             :blank";
-  $row[$i++]="VOLUP,            :blank,             ch_up:CHUP";
-  $row[$i++]=":VOL,             :blank,             :PROG";
-  $row[$i++]="VOLDOWN,          :blank,             ch_down:CHDOWN";
-  $row[$i++]=":blank,           :blank,             :blank";
-  $row[$i++]="rew:REWIND,       PLAY,               FF";
-  $row[$i++]="STOP,             PAUSE,              REC";
+  $row[$i++]="on_off:POWEROFF2,      TV:TV,                 AV:HDMI";
+  $row[$i++]="menu:MENU,             display_mode:ASPECT,   EPG:GUIDE";
+  $row[$i++]="VIERA_link:VIERA_LINK, VIERA_tools:VTOOLS,    VIERA_connect:INTERNET";
+  $row[$i++]=":blank,                :blank,                :blank";
+  $row[$i++]="info:INFO2,            up:UP,                 cancel:EXIT";
+  $row[$i++]="left:LEFT,             enter:ENTER,           right:RIGHT";
+  $row[$i++]="option:SUBMENU,        down:DOWN,             return:RETURN";
+  $row[$i++]="red:RED,              :blank,                 green:GREEN";
+  $row[$i++]="yellow:YELLOW,        :blank,                 blue:BLUE";
+  $row[$i++]="digit_1:1,            digit_2:2,              digit_3:3";
+  $row[$i++]="digit_4:4,            digit_5:5,              digit_6:6";
+  $row[$i++]="digit_7:7,            digit_8:8,              digit_9:9";
+  $row[$i++]="mute:MUTE,            digit_0:0,              tune:PRECH";
+  $row[$i++]=":blank,               :blank,                 :blank";
+  $row[$i++]="volume_up:VOLUP,      :blank,                 channel_up:CHUP";
+  $row[$i++]=":VOL,                 :blank,                 :PROG";
+  $row[$i++]="volume_down:VOLDOWN,  :blank,                 channel_down:CHDOWN";
+  $row[$i++]=":blank,               :blank,                 :blank";
+  $row[$i++]="rewind:REWIND,        play:PLAY,              fast_foreward:FF";
+  $row[$i++]="stop:STOP,            pause:PAUSE,            record:REC";
 
 # Replace spaces with no space
   for (@row)  {tr/ //d}
@@ -1331,29 +1343,30 @@ sub VIERA_RClayout_TV_SVG() {
   my @row;
   my $i = 0;
   
-  $row[$i++]="power:rc_POWER.svg,             TV:rc_TV2.svg,              CHG_INPUT:rc_AV.svg";
-  $row[$i++]="MENU:rc_MENU.svg,               disp_mode:rc_ASPECT.svg,    epg:rc_EPG.svg";
-  $row[$i++]="VIERA_LINK:rc_VIERA_LINK.svg,   VTOOLS:rc_VIERA_TOOLS.svg,  INTERNET:rc_WEB.svg";
-  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,              :rc_BLANK.svg";
-  $row[$i++]="INFO:rc_INFO2.svg,              UP:rc_UP.svg,               cancel:rc_EXIT.svg";
-  $row[$i++]="LEFT:rc_LEFT.svg,               ENTER:rc_dot.svg,           RIGHT:rc_RIGHT.svg";
-  $row[$i++]="SUBMENU:rc_OPTIONS.svg,         DOWN:rc_DOWN.svg,           RETURN:rc_BACK.svg";
-  $row[$i++]="red:rc_RED.svg,                 :rc_BLANK.svg,              green:rc_GREEN.svg";
-  $row[$i++]="yellow:rc_YELLOW.svg,           :rc_BLANK.svg,              blue:rc_BLUE.svg";
-  $row[$i++]="d1:rc_1.svg,                    d2:rc_2.svg,                d3:rc_3.svg";
-  $row[$i++]="d4:rc_4.svg,                    d5:rc_5.svg,                d6:rc_6.svg";
-  $row[$i++]="d7:rc_7.svg,                    d8:rc_8.svg,                d9:rc_9.svg";
-  $row[$i++]="MUTE:rc_MUTE.svg,               d0:rc_0.svg,                r_tune:rc_BACK.svg";
-  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,              :rc_BLANK.svg";
-  $row[$i++]="VOLUP:rc_UP.svg,                :rc_BLANK.svg,              ch_up:rc_UP.svg";
-  $row[$i++]=":rc_VOL.svg,                    :rc_BLANK.svg,              :rc_PROG.svg";
-  $row[$i++]="VOLDOWN:rc_DOWN.svg,            :rc_BLANK.svg,              ch_down:rc_DOWN.svg";
-  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,              :rc_BLANK.svg";
-  $row[$i++]="rew:rc_REW.svg,                 PLAY:rc_PLAY.svg,           FF:rc_FF.svg";
-  $row[$i++]="STOP:rc_STOP.svg,               PAUSE:rc_PAUSE.svg,         REC:rc_REC.svg";
+  $row[$i++]="on_off:rc_POWER.svg,            TV:rc_TV2.svg,                  AV:rc_AV.svg";
+  $row[$i++]="menu:rc_MENU.svg,               display_mode:rc_ASPECT.svg,     EPG:rc_EPG.svg";
+  $row[$i++]="VIERA_link:rc_VIERA_LINK.svg,   VIERA_tools:rc_VIERA_TOOLS.svg, VIERA_connect:rc_WEB.svg";
+  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,                  :rc_BLANK.svg";
+  $row[$i++]="info:rc_INFO2.svg,              up:rc_UP.svg,                   cancel:rc_EXIT.svg";
+  $row[$i++]="left:rc_LEFT.svg,               enter:rc_dot.svg,               right:rc_RIGHT.svg";
+  $row[$i++]="option:rc_OPTIONS.svg,          down:rc_DOWN.svg,               return:rc_BACK.svg";
+  $row[$i++]="red:rc_RED.svg,                 :rc_BLANK.svg,                  green:rc_GREEN.svg";
+  $row[$i++]="yellow:rc_YELLOW.svg,           :rc_BLANK.svg,                  blue:rc_BLUE.svg";
+  $row[$i++]="digit_1:rc_1.svg,               digit_2:rc_2.svg,               digit_3:rc_3.svg";
+  $row[$i++]="digit_4:rc_4.svg,               digit_5:rc_5.svg,               digit_6:rc_6.svg";
+  $row[$i++]="digit_7:rc_7.svg,               digit_8:rc_8.svg,               digit_9:rc_9.svg";
+  $row[$i++]="mute:rc_MUTE.svg,               digit_0:rc_0.svg,               tune:rc_BACK.svg";
+  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,                 :rc_BLANK.svg";
+  $row[$i++]="volume_up:rc_UP.svg,            :rc_BLANK.svg,                 channel_up:rc_UP.svg";
+  $row[$i++]=":rc_VOL.svg,                    :rc_BLANK.svg,                 :rc_PROG.svg";
+  $row[$i++]="volume_down:rc_DOWN.svg,        :rc_BLANK.svg,                 channel_down:rc_DOWN.svg";
+  $row[$i++]=":rc_BLANK.svg,                  :rc_BLANK.svg,                :rc_BLANK.svg";
+  $row[$i++]="rewind:rc_REW.svg,              play:rc_PLAY.svg,             fast_foreward:rc_FF.svg";
+  $row[$i++]="stop:rc_STOP.svg,               pause:rc_PAUSE.svg,           record:rc_REC.svg";
 
 # Replace spaces with no space
   for (@row) {tr/ //d}
+  
 
   return @row;
 }
@@ -1431,61 +1444,100 @@ sub VIERA_RClayout_TV_SVG() {
   <ul>
     <br>
        Remote control commands, depending on your TV<br>
-       For this application the following commands are available:<br>
+       For this application the following commands are available:<br><br>
+       
+		set &lt;name&gt; remoteControl .........<br><br>
+       
     <ul><code>
-      3D 				=> 3D button<br>
-      BLUE				=> Blue<br>
-      CANCEL			=> Cancel / Exit<br>
-      CHG_INPUT			=> AV<br>
-      CH_DOWN 	        => Channel down<br>
-      CH_UP 			=> Channel up<br>
-      D0 				=> Digit 0<br>
-      D1 				=> Digit 1<br>
-      D2 				=> Digit 2<br>
-      D3 				=> Digit 3<br>
-      D4 				=> Digit 4<br>
-      D5 				=> Digit 5<br>
-      D6 				=> Digit 6<br>
-      D7 				=> Digit 7<br>
-      D8 				=> Digit 8<br>
-      D9 				=> Digit 9<br>
-      DISP_MODE 		=> Display mode / Aspect ratio<br>
-      DOWN 				=> Control DOWN<br>
-      ENTER 			=> Control Center click / enter<br>
-      EPG 				=> Guide / EPG<br>
-      FF 				=> Fast forward<br>
-      GREEN 			=> Green<br>
-      HOLD 				=> TTV hold / image freeze<br>
-      INDEX 			=> TTV index<br>
-      INFO 				=> Info<br>
-      INTERNET 			=> VIERA connect<br>
-      LEFT 				=> Control LEFT<br>
-      MENU 				=> Menu<br>
-      MUTE 				=> Mute<br>
-      PAUSE 			=> Pause<br>
-      PLAY 				=> Play<br>
-      POWER 			=> Power off<br>
-      P_NR 				=> P-NR (Noise reduction)<br>
-      REC 				=> Record<br>
-      RED 				=> Red<br>
-      RETURN 			=> Return<br>
-      REW 				=> Rewind<br>
-      RIGHT 			=> Control RIGHT<br>
-      R_TUNE 			=> Seems to do the same as INFO<br>
-      SD_CARD 			=> SD-card<br>
-      SKIP_NEXT 		=> Skip next<br>
-      SKIP_PREV 		=> Skip previous<br>
-      STOP 				=> Stop<br>
-      STTL 				=> STTL / Subtitles<br>
-      SUBMENU 			=> Option<br>
-      TEXT 				=> Text / TTV<br>
-      TV 				=> TV<br>
-      UP 				=> Control UP<br>
-      VIERA_LINK 		=> VIERA link<br>
-      VOLDOWN 			=> Volume down<br>
-      VOLUP 			=> Volume up<br>
-      VTOOLS 			=> VIERA tools<br>
-      YELLOW 			=> Yellow<br>
+		3D_button				=> switch to 3D mode<br>
+		apps					=> show apps<br>
+		aspect					=> change aspect<br>
+		AV						=> switch input to AV<br>
+		blue_button				=> blue button<br>
+		cancel					=> cancel or clear<br>
+		channel_down			=> one channel down<br>
+		channel_up				=> one channel up<br>
+		digit_0					=> Digit 0<br>
+		digit_1					=> Digit 1<br>
+		digit_2					=> Digit 2<br>
+		digit_3					=> Digit 3<br>
+		digit_4					=> Digit 4<br>
+		digit_5					=> Digit 5<br>
+		digit_6					=> Digit 6<br>
+		digit_7					=> Digit 7<br>
+		digit_8					=> Digit 8<br>
+		digit_9					=> Digit 9<br>
+		display_mode			<br>
+		down					=> cursor down<br>
+		enter					=> enter<br>
+		EPG						=> program guide<br>
+		exit					=> exit<br>
+		fast_forward			=> fast foreward<br>
+		favorite				=> favorites<br>
+		game					<br>
+		green_button			=> green button<br>
+		guide					=> guide<br>
+		HDMI_1					=> input HDMI 1<br>
+		HDMI_2					=> input HDMI 2<br>
+		HDMI_3					=> input HDMI 3<br>
+		HDMI_4					=> input HDMI 4<br>
+		hold					=> hold<br>
+		home					=> home<br>
+		index					=> index<br>
+		info					=> info<br>
+		last_view				=> last view<br>
+		left					=> cursor left<br>
+		menu					=> menu<br>
+		mute					=> mute<br>
+		noise_reduction			=> noise reduction<br>
+		on_off					=> on off switch<br>
+		option					=> option<br>
+		pause					=> pause<br>
+		play					=> play<br>
+		program					=> program<br>
+		record					=> record<br>
+		red_button				=> red button<br>
+		return					=> return<br>
+		rewind					=> rewind<br>
+		right					=> cursor right<br>
+		SD_card					=> SD card<br>
+		skip_next				=> skip to next<br>
+		skip_previous			=> skip to previous<br>
+		stop					=> stop<br>
+		subtitle				=> subtitle<br>
+		tune					=> tune<br>
+		TV						=> TV<br>
+		up						=> cursor up<br>
+		videotext				=> videotext<br>
+		VIERA_connect			<br>
+		VIERA_link				<br>
+		VIERA_tools				<br>
+		volume_down				=> volume down<br>
+		volume_up				=> volume up<br>
+		yellow_button			=> yellow button<br>
+   </code></ul>
+        
+	    <br><br>
+		set &lt;name&gt; remoteControlApp ......<br><br>
+
+    <ul><code>	   	
+		netflix              	<br>
+		youtube              	<br>
+		shoutcast            	<br>
+		calendar             	<br>
+		browser              	<br>
+		amazonprime          	<br>
+		iplayer              	<br>
+		bbc_iplayer          	<br>
+		itv                  	<br>
+		all_4                	<br>
+		demand_5             	<br>
+		recorded_tv          	<br>
+		multi_window         	<br>
+		bbc_news             	<br>
+		bbc_sport            	<br>
+		weather              	<br>
+		developer            	<br>
     </code></ul>
     
     <br>
@@ -1595,61 +1647,101 @@ sub VIERA_RClayout_TV_SVG() {
   <ul>
   <br>
      Fernbedienung (Kann vielleicht nach Modell variieren).<br>
-     Das Modul hat die folgenden Fernbedienbefehle implementiert:<br>
+     Das Modul hat die folgenden Fernbedienbefehle implementiert:<br><br>
+     
+     set &lt;name&gt; remoteControl .........<br><br>     
+     
     <ul><code>
-      3D 				=> 3D Knopf<br>
-      BLUE 				=> Blau<br>
-      CANCEL 			=> Cancel / Exit<br>
-      CHG_INPUT 		=> AV<br>
-      CH_DOWN 			=> Kanal runter<br>
-      CH_UP 			=> Kanal hoch<br>
-      D0 				=> Ziffer 0<br>
-      D1 				=> Ziffer 1<br>
-      D2 				=> Ziffer 2<br>
-      D3 				=> Ziffer 3<br>
-      D4 				=> Ziffer 4<br>
-      D5 				=> Ziffer 5<br>
-      D6 				=> Ziffer 6<br>
-      D7 				=> Ziffer 7<br>
-      D8 				=> Ziffer 8<br>
-      D9 				=> Ziffer 9<br>
-      DISP_MODE 		=> Anzeigemodus / Seitenverh&auml;ltnis<br>
-      DOWN 				=> Navigieren runter<br>
-      ENTER 			=> Navigieren enter<br>
-      EPG 				=> Guide / EPG<br>
-      FF 				=> Vorspulen<br>
-      GREEN 			=> Gr&uuml;n<br>
-      HOLD 				=> Bild einfrieren<br>
-      INDEX 			=> TTV index<br>
-      INFO 				=> Info<br>
-      INTERNET 			=> VIERA connect<br>
-      LEFT 				=> Navigieren links<br>
-      MENU 				=> Men&uuml;<br>
-      MUTE 				=> Mute<br>
-      PAUSE 			=> Pause<br>
-      PLAY 				=> Play<br>
-      POWER 			=> Power off<br>
-      P_NR 				=> P-NR (Ger&auml;uschreduzierung)<br>
-      REC 				=> Aufnehmen<br>
-      RED 				=> Rot<br>
-      RETURN 			=> Enter<br>
-      REW 				=> Zur&uuml;ckspulen<br>
-      RIGHT 			=> Navigieren Rechts<br>
-      R_TUNE 			=> Vermutlich die selbe Funktion wie INFO<br>
-      SD_CARD 			=> SD-card<br>
-      SKIP_NEXT 		=> Skip next<br>
-      SKIP_PREV 		=> Skip previous<br>
-      STOP 				=> Stop<br>
-      STTL 				=> Untertitel<br>
-      SUBMENU 			=> Option<br>
-      TEXT 				=> TeleText<br>
-      TV 				=> TV<br>
-      UP 				=> Navigieren Hoch<br>
-      VIERA_LINK 		=> VIERA link<br>
-      VOLDOWN 			=> Lauter<br>
-      VOLUP 			=> Leiser<br>
-      VTOOLS 			=> VIERA tools<br>
-      YELLOW 			=> Gelb<br>
+		3D_button				=> in 3D Modus schalten<br>
+		apps					=> apps anzeigen<br>
+		aspect					=> Aspekt aendern<br>
+		AV						=> Eingang auf AV umschalten<br>
+		blue_button				=> blaue Taste<br>
+		cancel					=> loeschen<br>
+		channel_down			=> Kanal nach unten schalten<br>
+		channel_up				=> Kanal nach oben schalten<br>
+		digit_0					=> Zahl 0<br>
+		digit_1					=> Zahl 1<br>
+		digit_2					=> Zahl 2<br>
+		digit_3					=> Zahl 3<br>
+		digit_4					=> Zahl 4<br>
+		digit_5					=> Zahl 5<br>
+		digit_6					=> Zahl 6<br>
+		digit_7					=> Zahl 7<br>
+		digit_8					=> Zahl 8<br>
+		digit_9					=> Zahl 9<br>
+		display_mode			<br>
+		down					=> Pfeil nach unten<br>
+		enter					=> Eingabe<br>
+		EPG						=> elektronische Programmzeitschrift<br>
+		exit					=> beenden<br>
+		fast_forward			=> vorspulen<br>
+		favorite				=> Favoriten<br>
+		game					<br>
+		green_button			=> gruene Taste<br>
+		guide					=> Programmzeitschrift<br>
+		HDMI_1					=> Eingang HDMI 1<br>
+		HDMI_2					=> Eingang HDMI 2<br>
+		HDMI_3					=> Eingang HDMI 3<br>
+		HDMI_4					=> Eingang HDMI 4<br>
+		hold					=> <br>
+		home					=> Startbildschirm<br>
+		index					=> Index<br>
+		info					=> Info<br>
+		last_view				=> letzte Ansicht<br>
+		left					=> Pfeil nach unten<br>
+		menu					=> Menue<br>
+		mute					=> Ton aus<br>
+		noise_reduction			=> Rauschreduzierung<br>
+		on_off					=> Ein- / Ausschalter<br>
+		option					=> Option<br>
+		pause					=> Pause<br>
+		play					=> Abspielen<br>
+		program					=> Programm<br>
+		record					=> Aufnahme<br>
+		red_button				=> rote Taste<br>
+		return					=> zurueck<br>
+		rewind					=> zurueckspulen<br>
+		right					=> Pfeil nach rechts<br>
+		SD_card					=> => SD Karte<br>
+		skip_next				=> springe vorwaerts<br>
+		skip_previous			=> springe zurueck<br>
+		stop					=> Stop<br>
+		subtitle				=> Untertitel<br>
+		tune					=> Suchlauf<br>
+		TV						=> TV<br>
+		up						=> Pfeil nach oben<br>
+		videotext				=> Videotext<br>
+		VIERA_connect			<br>
+		VIERA_link				<br>
+		VIERA_tools				<br>
+		volume_down				=> Lautstaerke leiser<br>
+		volume_up				=> Lautstaerke lauter<br>
+		yellow_button			=> gelbe Taste<br>
+    </code></ul>
+	
+	    <br><br>
+	    set &lt;name&gt; remoteControlApp ......<br><br>	
+
+    <ul><code>	
+		netflix              	<br>
+		youtube              	<br>
+		shoutcast            	<br>
+		calendar             	<br>
+		browser              	<br>
+		amazonprime          	<br>
+		iplayer              	<br>
+		bbc_iplayer          	<br>
+		itv                  	<br>
+		all_4                	<br>
+		demand_5             	<br>
+		recorded_tv          	<br>
+		multi_window         	<br>
+		bbc_news             	<br>
+		bbc_sport            	<br>
+		weather              	<br>
+		developer            	<br>
+
     </code></ul>
     
     <br>

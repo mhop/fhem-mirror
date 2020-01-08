@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_VIERA: new commands, direct access to apps, commands had
+                      to be changed, if necessary reload RC layout
+ - bugfix: 70_VIERA: patch by nestor
  - new:     98_MAX_Temperature.pm: new modul
  - bugfix:  73_AutoShuttersControl: fix SelfDefense then drive day open
  - bugfix:  73_AutoShuttersControl: fix adv icon for devStateIcon
