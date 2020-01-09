@@ -922,7 +922,6 @@ sub ExecuteNpmCommand($) {
     $npm->{npminstall} =
         $cmdPrefix
       . 'echo n | sh -c "'
-      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm install '
@@ -932,7 +931,6 @@ sub ExecuteNpmCommand($) {
     $npm->{npmuninstall} =
         $cmdPrefix
       . 'echo n | sh -c "'
-      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm uninstall '
@@ -942,7 +940,6 @@ sub ExecuteNpmCommand($) {
     $npm->{npmupdate} =
         $cmdPrefix
       . 'echo n | sh -c "'
-      . $locale
       . $sudo
       . $locale
       . ' NODE_ENV=${NODE_ENV:-production} npm update '
@@ -957,13 +954,13 @@ sub ExecuteNpmCommand($) {
       . $locale
       . ' node -e "console.log(JSON.stringify(process.versions));"; '
       . 'L1=$('
+      . $sudo
       . $locale
       . ' npm list '
       . $global
       . '--json --silent --depth=0 2>/dev/null); '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
       . 'L2=$('
-      . $locale
       . $sudo
       . $locale
       . ' npm outdated '
@@ -1189,6 +1186,7 @@ sub RetrieveNpmOutput($$) {
                       . "<br /><br />"
                       . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
                       . "<pre>"
+                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm list *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *\n"
@@ -1682,6 +1680,7 @@ sub ToDay() {
   Global installations will be controlled by default and running update/install/uninstall require sudo permissions like this:<br>
   <br>
   <code>
+    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm list *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
@@ -1872,7 +1871,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.1.4",
+  "version": "v1.1.5",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
