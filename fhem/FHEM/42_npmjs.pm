@@ -954,14 +954,12 @@ sub ExecuteNpmCommand($) {
       . $locale
       . ' node -e "console.log(JSON.stringify(process.versions));"; '
       . 'L1=$('
-      . $sudo
       . $locale
       . ' npm list '
       . $global
       . '--json --silent --depth=0 2>/dev/null); '
       . '[ "$L1" != "" ] && [ "$L1" != "\n" ] && echo ", \"listed\": $L1"; '
       . 'L2=$('
-      . $sudo
       . $locale
       . ' npm outdated '
       . $global
@@ -1091,6 +1089,10 @@ sub NpmUninstall($) {
 
 sub NpmUpdate($) {
     my $cmd = shift;
+    eval {
+        umask 0022;
+        1;
+    };
     my $p   = `$cmd->{npmupdate}`;
     my $ret = RetrieveNpmOutput( $cmd, $p );
 
@@ -1099,6 +1101,10 @@ sub NpmUpdate($) {
 
 sub NpmInstall($) {
     my $cmd = shift;
+    eval {
+        umask 0022;
+        1;
+    };
     my $p   = `$cmd->{npminstall}`;
     my $ret = RetrieveNpmOutput( $cmd, $p );
 
@@ -1186,8 +1192,6 @@ sub RetrieveNpmOutput($$) {
                       . "<br /><br />"
                       . "You may add the following lines to /etc/sudoers.d/$runningUser:\n"
                       . "<pre>"
-                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm list *\n"
-                      . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *\n"
                       . "  $runningUser ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *"
@@ -1680,8 +1684,6 @@ sub ToDay() {
   Global installations will be controlled by default and running update/install/uninstall require sudo permissions like this:<br>
   <br>
   <code>
-    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm list *<br>
-    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
@@ -1871,7 +1873,7 @@ sub ToDay() {
       "abstract": "Modul zur Bedienung der Node.js Installation und Updates"
     }
   },
-  "version": "v1.1.5",
+  "version": "v1.1.6",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
