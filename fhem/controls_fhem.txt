@@ -1,4 +1,4 @@
-REV 20911
+REV 20919
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-01-08_07:45:52 321709 ./CHANGED
+UPD 2020-01-09_07:45:02 321885 ./CHANGED
 UPD 2020-01-08_07:45:52 42435 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -110,7 +110,7 @@ UPD 2016-10-27_07:45:10 29342 FHEM/14_CUL_MAX.pm
 UPD 2019-01-21_07:45:02 10452 FHEM/14_CUL_REDIRECT.pm
 UPD 2019-12-29_07:45:10 84740 FHEM/14_CUL_TCM97001.pm
 UPD 2018-08-08_07:45:02 5776 FHEM/14_CUL_TX.pm
-UPD 2020-01-06_07:45:06 15570 FHEM/14_CUL_WS.pm
+UPD 2020-01-09_07:45:02 15580 FHEM/14_CUL_WS.pm
 UPD 2019-02-20_07:45:03 13627 FHEM/14_FLAMINGO.pm
 UPD 2019-02-21_07:45:03 19756 FHEM/14_Hideki.pm
 UPD 2019-09-10_07:45:02 23464 FHEM/14_SD_BELL.pm
@@ -186,7 +186,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2020-01-02_07:45:04 17558 FHEM/30_tradfri.pm
 UPD 2019-10-05_07:45:03 29783 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2020-01-08_07:45:52 77657 FHEM/31_HUEDevice.pm
+UPD 2020-01-09_07:45:02 77666 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -365,7 +365,7 @@ UPD 2019-04-05_07:45:02 52079 FHEM/70_SamsungAV.pm
 UPD 2020-01-07_07:45:02 55327 FHEM/70_SolarEdgeAPI.pm
 UPD 2016-04-26_07:45:11 11536 FHEM/70_TellStick.pm
 UPD 2015-07-28_14:05:31 17835 FHEM/70_USBWX.pm
-UPD 2020-01-03_07:45:03 59762 FHEM/70_VIERA.pm
+UPD 2020-01-09_07:45:02 62345 FHEM/70_VIERA.pm
 UPD 2016-08-21_07:45:14 20340 FHEM/70_VolumeLink.pm
 UPD 2018-03-14_07:45:03 44782 FHEM/70_WINCONNECT.pm
 UPD 2017-03-01_07:45:02 22279 FHEM/70_WS3600.pm
@@ -499,7 +499,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2019-05-31_07:45:02 188325 FHEM/98_Installer.pm
 UPD 2019-11-23_07:45:02 4884 FHEM/98_JsonList2.pm
-UPD 2020-01-08_07:45:52 44151 FHEM/98_MAX_Temperature.pm
+UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
 UPD 2019-12-20_07:45:03 406721 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
@@ -647,7 +647,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-01-05_07:45:02 50321 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-01-08_07:45:52 149125 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-01-09_07:45:02 150063 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -745,12 +745,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-01-08_07:45:56 4211698 docs/commandref.html
-UPD 2020-01-08_07:45:58 2606128 docs/commandref_DE.html
-UPD 2019-12-26_07:45:03 79845 docs/commandref_frame.html
-UPD 2019-12-26_07:45:03 89593 docs/commandref_frame_DE.html
-UPD 2020-01-08_07:46:00 230172 docs/commandref_modular.html
-UPD 2020-01-08_07:46:01 241134 docs/commandref_modular_DE.html
+UPD 2020-01-09_07:45:06 4212272 docs/commandref.html
+UPD 2020-01-09_07:45:09 2606783 docs/commandref_DE.html
+UPD 2020-01-09_07:45:02 79525 docs/commandref_frame.html
+UPD 2020-01-09_07:45:02 89239 docs/commandref_frame_DE.html
+UPD 2020-01-09_07:45:10 229852 docs/commandref_modular.html
+UPD 2020-01-09_07:45:11 240780 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1651,6 +1651,7 @@ UPD 2019-02-14_07:45:03 807 www/images/fhemSVG/telegram.svg
 UPD 2019-06-02_07:45:03 1591 www/images/fhemSVG/telescope.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
+UPD 2020-01-09_07:45:02 600 www/images/fhemSVG/tradfri_filled_floalt.svg
 UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
 UPD 2019-12-12_07:45:03 3216 www/images/fhemSVG/tuer_fenster_kontakt_closed.svg
 UPD 2019-12-12_07:45:03 3318 www/images/fhemSVG/tuer_fenster_kontakt_opened.svg
