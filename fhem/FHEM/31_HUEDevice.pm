@@ -1007,8 +1007,9 @@ HUEDevice_Set($@)
          push(@names, $scene->{name});
       }
       # my $s_scenes = join (",",(my $names = map { $_->{name}} @$scenes));
-      my $s_scenes = join (',', @names);
-      $list .= " scene:".$s_scenes;
+      my $scenes = join (',', @names);
+      $scenes =~ s/ /#/g;
+      $list .= " scene:". $scenes;
     }
 
   } elsif( my $scenes = $hash->{IODev}{helper}{scenes} ) {
