@@ -701,7 +701,7 @@ sub HMCCUDEV_Get ($@)
 
 	# Log commands
 	HMCCU_Log ($hash, 3, "get $name $opt ".join (' ', @$a))
-		if ($ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
+		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
 
 	if ($opt eq 'devstate') {
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');

@@ -404,13 +404,13 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	}
 	
 	# Read RPC device descriptions
-	if ($dev_hash->{rpcinterface} ne 'CUxD') {
-		HMCCU_Log ($dev_hash, 1, "Updating internal device tables");
-		HMCCU_ResetDeviceTables ($hmccu_hash, $dev_hash->{rpcinterface});
-		my $cd = HMCCURPCPROC_GetDeviceDesc ($dev_hash);
-		my $cm = HMCCURPCPROC_GetParamsetDesc ($dev_hash);
-		HMCCU_Log ($dev_hash, 1, "Read $cd channel and device descriptions and $cm device models from CCU");
-	}
+# 	if ($dev_hash->{rpcinterface} ne 'CUxD') {
+# 		HMCCU_Log ($dev_hash, 1, "Updating internal device tables");
+# 		HMCCU_ResetDeviceTables ($hmccu_hash, $dev_hash->{rpcinterface});
+# 		my $cd = HMCCURPCPROC_GetDeviceDesc ($dev_hash);
+# 		my $cm = HMCCURPCPROC_GetParamsetDesc ($dev_hash);
+# 		HMCCU_Log ($dev_hash, 1, "Read $cd channel and device descriptions and $cm device models from CCU");
+# 	}
 	
 	# RPC device ready
 	HMCCURPCPROC_ResetRPCState ($dev_hash);
@@ -639,8 +639,21 @@ sub HMCCURPCPROC_Get ($@)
 	my $rc;
 
 	if ($opt eq 'deviceDesc') {
-		my $address = shift @$a;
-		HMCCU_ResetDeviceTables ($ioHash, $hash->{rpcinterface});
+		my $address;
+		my $object = shift @$a;
+		if (defined($object)) {
+			if (exists($defs{$object})) {
+				my $clHash = $defs{$object};
+				my $clType = $clHash->{TYPE};
+				return HMCCURPCPROC_SetError ($hash, "Illegal device type $clType", 2)
+					if ($clType ne 'HMCCUCHN' && $clType ne 'HMCCUDEV');
+				$address = $clHash->{ccuaddr};
+			}
+			else {
+				$address = $object;
+			}
+		}
+		HMCCU_ResetDeviceTables ($ioHash, $hash->{rpcinterface}, $address);
 		my $cd = HMCCURPCPROC_GetDeviceDesc ($hash, $address);
 		my $cm = HMCCURPCPROC_GetParamsetDesc ($hash, $address);
 		return "Read $cd channel and device descriptions and $cm device models from CCU";
@@ -1184,7 +1197,7 @@ sub HMCCURPCPROC_GetParamsetDesc ($;$)
 	my $c = 0;
 	
 	if (defined($address)) {
-		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $hash->{rpcinterface}, $address);
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $address, $hash->{rpcinterface});
 		return 0 if (!defined($devDesc) || !defined($devDesc->{PARAMSETS}) || $devDesc->{PARAMSETS} eq '' ||
 			!exists($devDesc->{_fw_ver}));
 		
@@ -1823,6 +1836,7 @@ sub HMCCURPCPROC_StopRPCServer ($$)
 #   "BASE64"  = $BINRPC_BASE64
 #   "ARRAY"   = $BINRPC_ARRAY
 #   "STRUCT"  = $BINRPC_STRUCT
+# The default parameter type is "STRING".
 # Return response or undef on error.
 ######################################################################
 
@@ -3104,9 +3118,12 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	<a name="HMCCURPCPROCget"></a>
 	<b>Get</b><br/><br/>
 	<ul>
-		<li><b>get &lt;name&gt; devicedesc [&lt;address&gt;]</b><br/>
-			Read device descriptions from CCU. If no <i>address</i> is specified, all devices are
-			read. Parameter <i>address</i> can be a device or a channel address.
+		<li><b>get &lt;name&gt; devicedesc [&lt;fhem-device&gt;|&lt;address&gt;]</b><br/>
+			Read device and paramset descriptions for current RPC interface from CCU and
+			store the information in I/O device. The device description is always read from 
+			CCU. The paramset description is only read if it doesn't exist in IO device.
+			If a HMCCUCHN device or a channel address is specified, the description of the
+			corresponding device address with all channels is read.
 		</li><br/>
 		<li><b>get &lt;name&gt; rpcevent</b><br/>
 			Show RPC server events statistics. If attribute ccuflags contains flag 'statistics'

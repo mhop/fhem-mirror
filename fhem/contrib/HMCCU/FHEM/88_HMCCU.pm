@@ -293,8 +293,8 @@ sub HMCCU_GetClientDeviceModel ($;$);
 sub HMCCU_GetDefaultInterface ($);
 sub HMCCU_GetDeviceAddresses ($;$$);
 sub HMCCU_GetDeviceChannels ($$$);
-sub HMCCU_GetDeviceDesc ($;$$);
-sub HMCCU_GetDeviceInfo ($$$);
+sub HMCCU_GetDeviceDesc ($$;$);
+sub HMCCU_GetDeviceInfo ($$;$);
 sub HMCCU_GetDeviceInterface ($$$);
 sub HMCCU_GetDeviceList ($);
 sub HMCCU_GetDeviceModel ($$$;$);
@@ -303,10 +303,12 @@ sub HMCCU_GetDeviceType ($$$);
 sub HMCCU_GetFirmwareVersions ($$);
 sub HMCCU_GetGroupMembers ($$);
 sub HMCCU_GetMatchingDevices ($$$$);
+sub HMCCU_GetParamDef ($$$$);
+sub HMCCU_GetParamValue ($$$$$);
 sub HMCCU_IsValidChannel ($$$);
 sub HMCCU_IsValidDevice ($$$);
 sub HMCCU_IsValidDeviceOrChannel ($$$);
-sub HMCCU_ResetDeviceTables ($$);
+sub HMCCU_ResetDeviceTables ($;$$);
 sub HMCCU_UpdateDeviceTable ($$);
 
 # Handle datapoints
@@ -3320,18 +3322,22 @@ sub HMCCU_UpdateDeviceTable ($$)
 # Delete device table entries
 ######################################################################
 
-sub HMCCU_ResetDeviceTables ($$)
+sub HMCCU_ResetDeviceTables ($;$$)
 {
-	my ($hash, $iface) = @_;
+	my ($hash, $iface, $address) = @_;
 	
 	if (defined($iface)) {
-		$hash->{hmccu}{device}{$iface} = ();
+		if (defined($address)) {
+			$hash->{hmccu}{device}{$iface}{$address} = ();
+		}
+		else {
+			$hash->{hmccu}{device}{$iface} = ();
+		}
 	}
 	else {
 		$hash->{hmccu}{device} = ();
+		$hash->{hmccu}{model} = ();
 	}
-	
-	$hash->{hmccu}{model} = ();
 }
 
 ######################################################################
@@ -3358,7 +3364,7 @@ sub HMCCU_AddDeviceDesc ($$$$)
 		if (ref($desc->{$p}) eq 'ARRAY') {
 			$hash->{hmccu}{device}{$iface}{$k}{$p} = join(',', @{$desc->{$p}});
 		}
-		elsif ($p ne $key) {
+		else {
 			$hash->{hmccu}{device}{$iface}{$k}{$p} = $desc->{$p};
 		}
 	}
@@ -3383,31 +3389,32 @@ sub HMCCU_AddDeviceDesc ($$$$)
 }
 
 ######################################################################
-# Get device description
+# Get device description.
 # Parameters:
-#   $hash - Hash reference of IO device or client device. For client
-#      devices the parameters $iface and $address are taken from
-#      client device hash if set to undef.
-#   $iface - Interface name.
+#   $hash - Hash reference of IO device.
 #   $address - Address of device or channel.
+#   $iface - Interface name.
 # Return hash reference for device description or undef on error.
 ######################################################################
 
-sub HMCCU_GetDeviceDesc ($;$$)
+sub HMCCU_GetDeviceDesc ($$;$)
 {
-	my ($hash, $iface, $address) = @_;
-	my $ioHash = HMCCU_GetHash ($hash);
-	
-	if ($hash->{TYPE} eq 'HMCCUDEV' || $hash->{TYPE} eq 'HMCCUCHN') {
-		$iface = $hash->{ccuif} if (!defined($iface));
-		$address = $hash->{ccuaddr} if (!defined($address));
+	my ($hash, $address, $iface) = @_;
+
+	my @ifaceList = ();
+	if (defined($iface)) {
+		push (@ifaceList, $iface);
 	}
 	else {
-		return undef if (!defined($iface) || !defined($address));
+		push (@ifaceList, keys %${$hash->{hmccu}{device}});	
 	}
-
-	return (exists ($ioHash->{hmccu}{device}{$iface}{$address}) ?
-		$ioHash->{hmccu}{device}{$iface}{$address} : undef);
+	
+	foreach my $i (@ifaceList) {
+		return $hash->{hmccu}{device}{$i}{$address}
+			if (exists($hash->{hmccu}{device}{$i}{$address}));
+	}
+	
+	return undef;
 }
 
 ######################################################################
@@ -3555,15 +3562,92 @@ sub HMCCU_GetDeviceModel ($$$;$)
 
 sub HMCCU_GetClientDeviceModel ($;$)
 {
-	my ($hash, $chnNo) = @_;
+	my ($clHash, $chnNo) = @_;
 	
-	return undef if ($hash->{TYPE} ne 'HMCCUCHN' && $hash->{TYPE} ne 'HMCCUDEV');
+	return undef if ($clHash->{TYPE} ne 'HMCCUCHN' && $clHash->{TYPE} ne 'HMCCUDEV');
 	
-	my $ioHash = HMCCU_GetHash ($hash);
-	my $devDesc = HMCCU_GetDeviceDesc ($hash);
+	my $ioHash = HMCCU_GetHash ($clHash);
+	my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $clHash->{ccuaddr}, $clHash->{ccuif});
 	
 	return defined($devDesc) ? 
 		HMCCU_GetDeviceModel ($ioHash, $devDesc->{_model}, $devDesc->{_fw_ver}, $chnNo) : undef;
+}
+
+######################################################################
+# Get parameter defintion of device model
+# Parameters:
+#   $hash - Hash reference of IO device.
+#   $object - Device or channel address or device description
+#      reference.
+#   $paramset - Valid paramset for device or channel.
+#   $parameter - Parameter name.
+# Returns undef on error. Otherwise a reference to the parameter
+# definition.
+######################################################################
+
+sub HMCCU_GetParamDef ($$$$)
+{
+	my ($hash, $object, $paramset, $parameter) = @_;
+
+	my $devDesc;
+	if (ref($object) eq 'HASH') {
+		$devDesc = $object;
+	}
+	else {
+		$devDesc = HMCCU_GetDeviceDesc ($hash, $object);
+	}
+		
+	if (defined($devDesc)) {
+		# Build device address and channel number
+		my $address = $devDesc->{ADDRESS};
+		my ($devAddr, $chnNo) = ($address =~ /:[0-9]{1,2}$/) ?
+			HMCCU_SplitChnAddr ($address) : ($address, 'd');
+
+		my $model = HMCCU_GetDeviceModel ($hash, $devDesc->{_model}, $devDesc->{_fw_ver}, $chnNo);
+		if (defined($model) && exists($model->{$paramset}) && exists($model->{$paramset}{$parameter})) {
+			return $model->{$paramset}{$parameter};
+		}
+	}
+	
+	return undef;
+}
+
+######################################################################
+# Convert parameter value
+# Parameters:
+#  $hash - Hash reference of IO device.
+#  $object - Device or channel address.
+#  $paramset - Parameter set.
+#  $parameter - Parameter name.
+#  $value - Parameter value.
+# Return converted or original value.
+######################################################################
+
+sub HMCCU_GetParamValue ($$$$$)
+{
+	my ($hash, $object, $paramset, $parameter, $value) = @_;
+	
+	# Conversion table
+	my %ct = (
+		'BOOL' => { 0 => 'false', 1 => 'true' }
+	);
+	
+	my $paramDef = HMCCU_GetParamDef ($hash, $object, $paramset, $parameter);
+	if (defined($paramDef)) {
+		my $type = $paramDef->{TYPE};
+		HMCCU_Log ($hash, 2, "Checking type $type");
+
+		return $ct{$type}{$value} if (exists($ct{$type}) && exists($ct{$type}{$value}));
+
+		if ($type eq 'ENUM' && exists($paramDef->{VALUE_LIST})) {
+			my @vl = split(',', $paramDef->{VALUE_LIST});
+			return $vl[$value] if ($value =~ /^[0-9]+$/ && $value < scalar(@vl));
+		}
+		
+		return $value*100.0 if ($parameter eq 'LEVEL');
+	}
+	
+	return $value;
 }
 
 #######################################################################
@@ -3574,7 +3658,8 @@ sub HMCCU_GetClientDeviceModel ($;$)
 #   $value - Value of parameter.
 #   $sep - String separator. Default = ''.
 #   $default - Default value is returned if no bit is set.
-# Return empty string on error or if no bit set.
+# Return empty string on error. Return $default if no bit set.
+# Return $value if $flag is not a bitmask.
 ######################################################################
 
 sub HMCCU_FlagsToStr ($$$;$$)
@@ -3596,7 +3681,7 @@ sub HMCCU_FlagsToStr ($$$;$$)
 		}
 	);
 	
-	return '' if (!exists($bitmasks{$set}{$flag}));
+	return $value if (!exists($bitmasks{$set}{$flag}));
 	
 	my @list = ();
 	foreach my $b (sort keys %{$bitmasks{$set}{$flag}}) {
@@ -4530,7 +4615,7 @@ sub HMCCU_IsRPCServerRunning ($$$)
 # Get channels and datapoints of CCU device
 ######################################################################
 
-sub HMCCU_GetDeviceInfo ($$$)
+sub HMCCU_GetDeviceInfo ($$;$)
 {
 	my ($hash, $device, $ccuget) = @_;
 	my $name = $hash->{NAME};
@@ -4540,6 +4625,8 @@ sub HMCCU_GetDeviceInfo ($$$)
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return '' if (!defined ($hmccu_hash));
 
+	$ccuget = 'Value' if (!defined($ccuget));
+	
 	my @devlist;
 	if ($hash->{ccuif} eq 'fhem' && exists ($hash->{ccugroup})) {
 		push @devlist, split (",", $hash->{ccugroup}); 
@@ -7298,8 +7385,8 @@ sub HMCCU_UpdateCB ($$$)
 ######################################################################
 # Execute RPC request
 # Parameters:
-#  $method - RPC request method. Use listParamset as an alias for
-#     getParamset if readings should not be updated.
+#  $method - RPC request method. Use listParamset or listRawParamset
+#     as an alias for getParamset if readings should not be updated.
 #  $address  - Device address.
 #  $paramset - paramset name: VALUE, MASTER, LINK, ...
 #  $parref   - Hash reference with parameter/value pairs (optional).
@@ -7316,7 +7403,7 @@ sub HMCCU_RPCRequest ($$$$$;$)
 	my $type = $clHash->{TYPE};
 	my $fnc = "RPCRequest";
 
-	my $reqMethod = $method eq 'listParamset' ? 'getParamset' : $method;
+	my $reqMethod = $method eq 'listParamset' || $method eq 'listRawParamset' ? 'getParamset' : $method;
 	$filter = '.*' if (!defined ($filter));
 	my $addr = '';
 	my $result = '';
@@ -7381,6 +7468,9 @@ sub HMCCU_RPCRequest ($$$$$;$)
 
 	if ($method eq 'listParamset') {
 		$result = join ("\n", map { $_ =~ /$filter/ ? $_.'='.$reqResult->{$_} : () } keys %$reqResult);
+	}
+	elsif ($method eq 'listRawParamset') {
+		$result = $reqResult;
 	}
 	elsif ($method eq 'getDeviceDescription') {
 		$result = '';
