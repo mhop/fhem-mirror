@@ -1780,7 +1780,6 @@ sub ToDay() {
   Standardm&auml;&szlig;ig werden globale Installationen bedient und das Ausf&uuml;hren von update/install/uninstall erfordert sudo Berechtigungen wie diese:<br>
   <br>
   <code>
-    fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *<br>
     fhem ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm uninstall *
@@ -1938,8 +1937,6 @@ sub ToDay() {
       "requires": {
       },
       "recommends": {
-        "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm outdated *": 0,
-        "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm outdated *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm update *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/local/bin/npm update *": 0,
         "ALL=(ALL) NOPASSWD:SETENV: /usr/bin/npm install *": 0,
