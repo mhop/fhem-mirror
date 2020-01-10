@@ -1461,8 +1461,8 @@ sub EventProcessingResidents($@) {
                 and $shutters->getRoommatesStatus eq 'none'
                 and (  $getModeDown eq 'home'
                     or $getModeDown eq 'always' )
-                and (  $getResidentsLastStatus ne 'asleep'
-                    or $getResidentsLastStatus ne 'awoken' )
+                and $getResidentsLastStatus ne 'asleep'
+                and $getResidentsLastStatus ne 'awoken'
                 and IsAfterShuttersTimeBlocking($shuttersDev)
                 and not $shutters->getSelfDefenseState
               )
@@ -7923,7 +7923,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.11",
+  "version": "v0.8.12",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
