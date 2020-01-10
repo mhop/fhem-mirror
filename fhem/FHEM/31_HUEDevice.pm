@@ -1255,7 +1255,7 @@ HUEDevice_GetUpdate($)
       return;
     }
 
-    HUEDevice_Parse($hash,$result);
+    HUEDevice_Parse($hash, $result);
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
   }
@@ -1278,7 +1278,7 @@ HUEDevice_GetUpdate($)
     return;
   }
 
-  HUEDevice_Parse($hash,$result);
+  HUEDevice_Parse($hash, $result);
   HUEBridge_updateGroups($hash->{IODev}, $hash->{ID}) if( $hash->{IODev} && ( $hash->{IODev}{TYPE} eq 'HUEBridge'
                                                                               || $hash->{IODev}{TYPE} eq 'tradfri' ) );
 }
