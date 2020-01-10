@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.8";
+my $version = "1.2.9";
 
 my $srandUsed;
 
@@ -1283,6 +1283,7 @@ sub todoist_GetProjectsCallback($$$){
           my $new_name = encode_utf8($project->{name});
           # new title
           my $title = $name."_".$new_name;
+          $title =~ s!\s!!g;
           # is this parent_id equal to id of current project?
           if ($pid == $parent_id) {
             # push to deletion array
