@@ -1823,13 +1823,13 @@ sub ToDay() {
   <br>
   <a name="npmjsset" id="npmjsset"></a><b>Set</b>
   <ul>
+    <li>statusRequest - Node.js Installationsstatus aktualisieren
+    </li>
     <li>outdated - Holt aktuelle Informationen &uuml;ber den Updatestatus
     </li>
     <li>update - F&uuml;hrt ein komplettes oder selektives Update aus (nutzt 'npm update' Kommando). FHEM relevante Pakete werden immer auf die neuste Major Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'). <a href="https://semver.org/">Semantische Versionierung</a> wird bei anderen Paketen weiterhin respektiert und es werden keine Major Upgrades durchgef&uuml;hrt.
     </li>
     <li>upgrade - F&uuml;hrt ein komplettes oder selektives Upgrade aus (nutzt 'npm install' Kommando). ACHTUNG! Jedes Paket wird auf die neuste und gr&ouml;&szlig;te Version upgegraded (nutzt 'npm install' Kommando anstatt von 'npm update'), ganz egal ob der Paket Maintainer eine Inkompatibilit&auml;t zwischen der aktuell installierten und der neusten Version definiert hat. Im Zweifel sollte besser stattdessen das Update set Kommando benutzt werden.
-    </li>
-    <li>install - installiert ein oder mehrere NPM Pakete
     </li>
     <li>install - Installiert ein oder mehrere NPM Pakete. Wenn Node.js nicht installiert ist, wird die erstmalige
         Installation von Node.js angeboten (nur für APT kompatible Linux Distributionen). Node.js kann weiterhin
