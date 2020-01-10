@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.7";
+my $version = "1.2.8";
 
 my $srandUsed;
 
@@ -378,7 +378,7 @@ sub todoist_UpdateTask($$$) {
         $args{'assigned_by_uid'} = $h->{"assignedByUid"} if ($h->{"assignedByUid"});
         $args{'assigned_by_uid'} = $h->{"assignedBy"} if ($h->{"assignedByUid"});
         ## order of the task
-        $args{'item_order'} = $h->{"order"} if ($h->{"order"});
+        $args{'child_order'} = $h->{"order"} if ($h->{"order"});
         ## indent of the task
         $args{'child_order'} = $h->{"child_order"} if ($h->{"child_order"});
         ## parent_id
@@ -1302,9 +1302,8 @@ sub todoist_GetProjectsCallback($$$){
                 $i++;
                 Log3 $name,4, "todoist ($name): new project $title, defined by cChildProjects";
                 $new_hash->{PROJECT_NAME}=$project->{name};
-                $new_hash->{PROJECT_INDENT}=$project->{indent};
                 $new_hash->{PROJECT_COLOR}=$project->{color};
-                $new_hash->{PROJECT_ORDER}=$project->{item_order};
+                $new_hash->{PROJECT_ORDER}=$project->{child_order};
                 if ($project->{user_id}) {
                   $new_hash->{PROJECT_USER}=$project->{user_id};
                 }
