@@ -377,6 +377,7 @@ sub parse_tpl
   $wcmd =~ s/\$TABLE/\$hash->{$table}{tablestyle}/;
 
   $wcmd =~ s/\$VAR/\$hash->{var}/g;
+  $wcmd =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
   $wcmd =~ s/\$SELF/$d/g;
   $wcmd =~ s/FUNC_/::DOIF_FUNC_$d\_/g;
   $wcmd =~ s/PUP[ \t]*\(/::DOIF_tablePopUp(\"$d\",/g;
@@ -402,17 +403,22 @@ sub parse_tpl
     }
   }
   
+  ($err,$wcmd)=DOIF_uiTable_FOR($hash,$wcmd,$table);
+  if ($err) {
+    return($err,"");
+  }
+   
   $wcmd =~ s/^\s*//;
   $wcmd =~ s/[ \t]*\n/\n/g;
   $wcmd =~ s/,[ \t]*[\n]+/,/g;
   $wcmd =~ s/\.[ \t]*[\n]+/\./g;
   $wcmd =~ s/\|[ \t]*[\n]+/\|/g;
   $wcmd =~ s/>[ \t]*[\n]+/>/g;
-  
+   
   my $tail=$wcmd;
   my $beginning;
   my $currentBlock;
-  
+
   while($tail =~ /(?:^|\n)\s*DEF\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
     ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
     if ($err) {
@@ -440,6 +446,46 @@ sub import_tpl
   return "";
 }
 
+sub DOIF_uiTable_FOR
+{
+  my ($hash,$wcmd,$table)=@_;
+  my $err="";
+  my $tail=$wcmd;
+  my $beginning;
+  my $currentBlock;
+  my $output="";
+
+  while ($tail ne "") {
+    if ($tail =~ /FOR/g) {
+      my $prefix=substr($tail,0,pos($tail));
+      my $begin=substr($tail,0,pos($tail)-3);
+      $tail=substr($tail,pos($tail)-3);
+      if ($tail =~ /^FOR\s*\(/) {
+        ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+        if ($err) {
+          return ("error in $table: $err $currentBlock","");
+        } elsif ($currentBlock ne "") {
+          my ($array,$command) = SplitDoIf(',',$currentBlock);
+          my $commandoutput="";
+          for (eval($array)) {
+            my $temp=$command;
+            $temp =~ s/\$_/$_/g;
+            $commandoutput.=$temp."\n";
+          }
+          $output.=($begin.$commandoutput);
+        }
+      } else {
+        $tail=substr($tail,3);
+        $output.=$prefix;
+      }
+    } else {
+      $output.=$tail;
+      $tail="";
+    }
+  }
+  return ("",$output);
+}
+
 sub DOIF_uiTable_def 
 {
   my ($hash,$wcmd,$table) = @_;
@@ -449,13 +495,14 @@ sub DOIF_uiTable_def
   delete ($hash->{$table});
   ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
   return $err if ($err);
-  
-  my $tail=$wcmd;
   my $beginning;
   my $currentBlock;
   my $output="";
+  
+  #$wcmd=DOIF_uiTable_FOR($wcmd,$table);
 
-  #while ($wcmd =~ /^\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+  my $tail=$wcmd;
+
   while ($tail ne "") {
     if ($tail =~ /TPL_/g) {
       my $prefix=substr($tail,0,pos($tail));
@@ -488,7 +535,6 @@ sub DOIF_uiTable_def
       $tail="";
     }
   }
-
   $wcmd=$output;
 
   my @rcmd = split(/\n/,$wcmd);
@@ -4015,7 +4061,7 @@ Eine ausführliche Erläuterung der obigen Anwendungsbeispiele kann hier nachgel
   <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
   <a href="#DOIF_setList__readingList">Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</a><br>
   <a href="#DOIF_cmdState">Status des Moduls</a><br>
-  <a href="#DOIF_uiTable">uiTable, das User Interface</a><br>
+  <a href="#DOIF_uiTable">uiTable, DOIF Web-Interface</a><br>
   <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
   <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
   <a href="#DOIF_DOIF_Readings">Erzeugen berechneter Readings<br>
@@ -5232,7 +5278,7 @@ Zu beachten ist, dass bei einer wahren Bedingung die dazugehörigen Befehle ausg
 <b>Darstellungselement mit Eingabemöglichkeit im Frontend und Schaltfunktion</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <a name="setList"></a>
-Die unter <i>Dummy</i> beschriebenen Attribute <i>readingList</i> und <i>setList</i> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im WEB-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <i>setList</i>, die in <i>FHEMWEB</i> angegebenen Modifier des Attributs <i>widgetOverride</i> verwendet werden.<br>
+Die unter <i>Dummy</i> beschriebenen Attribute <i>readingList</i> und <i>setList</i> stehen auch im DOIF zur Verf&uuml;gung. Damit wird erreicht, dass DOIF im Web-Frontend als Eingabeelement mit Schaltfunktion dienen kann. Zus&auml;tzliche Dummys sind nicht mehr erforderlich. Es k&ouml;nnen im Attribut <i>setList</i>, die in <i>FHEMWEB</i> angegebenen Modifier des Attributs <i>widgetOverride</i> verwendet werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Eine Schaltuhr mit time-Widget f&uuml;r die Ein- u. Ausschaltzeiten und der M&ouml;glichkeit &uuml;ber eine Auswahlliste manuell ein und aus zu schalten.<br>
 <br>
@@ -5265,184 +5311,14 @@ attr di_web setList myInput:first,second</code><br>
 <a href="#DOIF_setcmd">Bedingungsloses Ausf&uuml;hren von Befehlen</a><br>
 <br>
 </li><li><a name="DOIF_uiTable"></a>
-<b>uiTable, das User Interface</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>uiTable, DOIF Web-Interface</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <a name="uiTable"></a>
-Mit dem Attribut uiTable kann innerhalb eines DOIF-Moduls ein User Interface in Form einer Tabelle erstellt werden. Die Definition der Tabelle wird mit Hilfe von Perl sowie FHEM-Widgets kombiniert mit DOIF-Syntax vorgenommen.<br> 
-<br>
-Features:<br>
-<br>
-- pro DOIF eine beliebige UI-Tabelle definierbar<br>
-- alle FHEM-Widgets nutzbar<br>
-- alle FHEM-Icons nutzbar<br>
-- DOIF-Syntax verwendbar<br>
-- alle Devices und Readings in FHEM direkt darstellbar und ansprechbar<br>
-- dynamische Styles (z. B. Temperaturfarbe abhängig vom Temperaturwert)<br> 
-- es brauchen keine eigenen CSS- oder js-Dateien definiert werden<br>
-- Nutzung vordefinierter Templates aus Template-Dateien<br>
-- vordefinierte Perl-Funktionen für Standardwidgets oder Styles<br>
-<br>
-Ein guter Einblick in die uiTable-Benutzerschnittstelle lässt sich am besten mit Hilfe von Bildern über entsprechende Wiki-Seiten verschaffen:<br>
-<br>
-Schnelleinstieg in uiTable mit bebilderten Beispielen: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable für Beginner im FHEM-Wiki</a><br>
+Mit dem Attribut uiTable kann innerhalb eines DOIF-Moduls ein Web-Interface zur Visualisierung und Steuerung von Geräten in Form einer Tabelle erstellt werden.<br> 
+<br> 
+Die Dokumentation zu diesem Attribut wurde mit bebilderten Beispielen im FHEM-Wiki erstellt: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable Dokumentation</a><br>
 <br>
 Anwendungsbeispiele für Fortgeschrittene: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable">uiTable für Fortgeschrittene im FHEM-Wiki</a><br>
-<br>
-<b>Aufbau des uiTable-Attributs<br></b>
-<br>
-<code>{<br>
- &lt;Perlblock für Definition von Template-Attributen, Zellenformatierungen, eigenen Perlfunktionen&gt;<br>
-}<br>
-<br>
-&lt;Templates&gt;<br>
-<br>
-&lt;Tabellendefinition&gt;<br>
-<br></code>
-<br>
-Der Perlblock ist optional. Er wird in geschweiften Klammern mit wenigen Ausnahmen in Perl definiert. Hier können Template-Attribute für Zeichenketten, das Layout der Tabelle über HMTL-Zellenformatierungen sowie eigene Perlfunktionen definiert werden.
-Im Anschluß an den Perlblock können optional Template-Methoden definiert werden, um komplexere wiederverwendbare Widget-Definitionen zu formulieren. Diese werden in der Tabellendefinition benutzt.
-Die eigentliche Tabellendefinition wird über die Definition von Zellen vorgenommen. Zellen werden mit | voneinander abgegrenzt. Kommentare können an beliebiger Stelle beginnend mit ## bis zum Zeilenende eingefügt werden.<br>
-<br>
-<b>Die Tabellendefinition</b><br>
-<br><code>
-&lt;Zellendefinition erste Zeile erste Spalte&gt;  | &lt;Zellendefinition erste Zeile zweite Spalte  | ... # Definition der ersten Tabellenzeile<br>
-&lt;Zellendefinition zweite Zeile erste Spalte&gt; | &lt;Zellendefinition zweite Zeile zweite Spalte | ... # Definition der zweiten Tabellenzeile<br>
-usw.<br></code>
-<br>
-Endet eine Zeile mit |, so wird deren Definition in der nächsten Zeile fortgesetzt. Dadurch können längere Zeilendefinition einer Tabelle auf mehrerer Zeilen aufgeteilt werden.<br>
-<br>
-Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Einfache_Tabellendefinition_ohne_Funktionen">Tabellendefinition</a><br>
-<br>
-Über die Funktion STY werden Angaben mit Formatierungen über das CSS-Style-Attribut vorgenommen.<br>
-<br>
-Syntax:<br>
-<br>
-<code>STY(&lt;Wert&gt;,&lt;CSS-Style-Attribut&gt;)</code><br>
-<br>
-Die Funktionalität von STY kann durch eine Perl-Funktionen abgedeckt werden, diese muss zwei Rückgabewerte zurückgeben:<br>
-<br>
-<code>return(&lt;Wert&gt;,&lt;CSS-Style-Attribut&gt;)</code><br>
-<br>
-Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Eigene_uiTable-Funktionen_programmieren">uiTable-Funktionen</a><br>
-<br>
-Über die Funktion WID werden FHEM-Widgets definiert. Es können alle in FHEM vorhanden FHEM-Widgets verwendet werden.<br>
-<br>
-Syntax<br>
-<br>
-<code>WID(&lt;Wert&gt;,&lt;FHEM-Widget-Definition&gt;)</code><br>
-<br>
-Die Funktionalität von WID kann durch eine Perl-Funktionen abgedeckt werden, diese muss drei Rückgabewerte zurückgeben:<br>
-<br>
-<code>return(&lt;Wert&gt;,"",&lt;FHEM-Widget-Definition&gt;)</code><br>
-<br>
-Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#Eigene_uiTable-Funktionen_programmieren">uiTable-Funktionen</a><br>
-<br>
-<b>Der Perlblock: Definition von Template-Attributen, Zellenformatierungen und eigene Perl-Funktionen<br></b>
-<br>
-Im ersten Bereich werden sog. Template-Attribute als Variablen definiert, um wiederholende Zeichenketten in Kurzform anzugeben. Template-Attribute werden intern als hash-Variablen abgelegt. Die Syntax entspricht weitgehend der Perl-Syntax.<br>
-<br>
-Die Syntax lautet:<br>
-<br>
-<code>$TPL{&lt;name&gt;}=&lt;Perlsyntax für Zeichenketten&gt;<br></code>
-<br>
-<code>&lt;name&gt;</code> ist beliebig wählbar. <br>
-<br>
-Bsp.<br>
-<code>$TPL{HKnob}="knob,min:17,max:25,width:45,height:40,step:0.5,fgColor:DarkOrange,bgcolor:grey,anglearc:270,angleOffset:225,cursor:10,thickness:.3";<br></code>
-<br>
-Damit würde die obige Beispiel-Definition des Thermostat-Widgets wie folgt aussehen:<br>
-<br>
-<code>WID([TH_Bad_HM:desired-temp],$TPL{HKnob},"set")<br></code>
-<br>
-Weiterhin können die Tabelle, einzelne Zellen-, Zeilen- oder Spaltenformatierungen definiert werden, dazu werden folgende Bezeichner benutzt:<br>
-<br>
-<code>$TABLE="&lt;CSS-Attribute der Tabelle&gt;"<br>
-$TD{&lt;Zellenbereich für Zeilen&gt;}{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Zellen&gt;"<br>
-$TC{&lt;Zellenbereich für Spalten&gt;}="&lt;CSS-Attribute der Spalten&gt;"<br>
-$TR{Zeilenbereich}="&lt;CSS-Attribute der Zeilen&gt;"<br></code>
-<br>
-mit <br>
-<br>
-<code>&lt;Zellen/Spalten/Zeilen-Bereich&gt;: Zahl|kommagetrennte Aufzählung|Bereich von..bis<br></code>
-<br>
-Beispiele:<br>
-<code>
-$TABLE = "width:300px; height:300px; background-image:url(/fhem/www/pgm2/images/Grundriss.png); background-size: 300px 300px;";<br>
-$TD{0}{0} = "style='border-right-style:solid; border-right-width:10px'";<br>
-$TR{0} = "class='odd' style='font-weight:bold'";<br>
-$TC{1..5} = "align='center'";<br>
-$TC{1,3,5} = "align='center'";<br>
-$TC{last} = "style='font-weight:bold'";<br></code>
-<br>
-<b>Steuerungsattribute<br></b>
-<br>
-Ausblenden des Status in der Devicezeile:<br>
-<br>
-<code>$SHOWNOSTATE=1;</code><br>
-<br>
-Standardmäßig werden Texte innerhalb der Tabelle, die einem vorhandenen FHEM-Device entsprechen als Link zur Details-Ansicht dargestellt. Soll diese Funktionalität unterbunden werden, so kann man dies über folgendes Attribut unterbinden:<br> 
-<br>
-<code>$SHOWNODEVICELINK=1;</code><br>
-<br>
-Die Gerätezeile wird ausgeblendet, wenn der "Reguläre Ausdruck" &lt;regex room&gt; zum Raumnamen passt, gilt nicht für den Raum <i>Everything</i>.<br>
-<br>
-<code>$SHOWNODEVICELINE = "&lt;regex room&gt;";</code><br>
-<br>
-Die Detailansicht wird umorganisiert, hilfreich beim Editieren längerer uiTable-Definitionen.<br>
-<br>
-<code>$ATTRIBUTESFIRST = 1;</code><br>
-<br>
-<b>Templates<br></b>
-<br>
-Bei Widgetdefinition, die mehrfach verwendet werden sollen, können Templates definiert werden. Die Definition beginnt mit dem Schlüsselwort <code>DEF</code>. Ein Template muss mit <code>TPL_</code> beginnen.<br>
-<br>
-Syntax<br>
-<br>
-<code>DEF TPL_&lt;name&gt;(&lt;Definition mit Platzhaltern $1,$2 usw.&gt;)<br></code>
-<br>
-<code>&lt;name&gt;</code> ist beliebig wählbar.<br>
-<br>
-In der Tabellendefinition können die zuvor definierten Templates genutzt werden. Die Übergabeparameter werden an Stelle der Platzhalter $1, $2 usw. eingesetzt.<br>
-<br>
-Beispiele: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg#uiTable-Templates">Templates</a><br>
-<br>
-<b>Import von Templates und Funktionen<br></b>
-<br>
-Mit Hilfe des Befehls IMPORT können Definitionen aus Dateien importiert werden. Damit kann der Perlblock sowie Template-Methoden in eine Datei ausgelagert werden. Der Aufbau der Datei entspricht dem des uiTable-Attributes. Tabellendefinitionen selbst können nicht importiert werden.
-Der IMPORT-Befehl kann vor dem Perlblock oder vor dem Tabellendefintionsbereich angegeben werden. Ebenso können mehrere IMPORT-Befehle angegeben werden. Gleiche Definitionen von Funktionen, Templates usw. aus einer IMPORT-Datei überlagern die zuvor definierten.
-Der IMPORT-Befehl kann ebenfalls innerhalb einer Import-Datei angegeben werden.<br>
-<br>
-Syntax<br>
-<br>
-<code>IMPORT &lt;Pfad mit Dateinamen&gt<br></code>
-<br>
-Bespiel:<br>
-<br>
-in uiTable<br> 
-<br>
-<code>IMPORT /fhem/contrib/DOIF/mytemplates.tpl<br>
-<br>
-## table definition<br>
-<br>
-"outdoor" | TPL_temp([outdoor:temperature])<br>
-<br></code>
-in mytemplates.tpl<br>
-<br>
-<code>## templates and functions<br>
-{<br>
- $TPL{unit}="°C";<br>
- sub FUNC_temp<br>
- {
-     my ($temp)=@_;<br>
-     return ("height:6px;font-weight:bold;font-size:16pt;color:".DOIF_hsv ($temp,-10,30,210,360,60,90));<br>
- }<br>
-}<br>
-<br>
-## template methode<br>
-DEF TPL_temp(STY($1.$TPL{unit},FUNC_temp($1)))<br></code>
-<br>
-<u>Links</u><br>
-<a href="https://wiki.fhem.de/wiki/FHEMWEB/Widgets">FHEMWEB-Widgets</a><br>
 <br>
 </li><li><a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -5497,6 +5373,7 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
 </li><li><a name="DOIF_DOIF_Readings"></a>
+<a name="DOIF_Readings"></a>
 <b>Erzeugen berechneter Readings ohne Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Mit Hilfe des Attributes DOIF_Readings können eigene Readings innerhalb des DOIF definiert werden, auf die man im selben DOIF-Device zugreifen kann.
@@ -5527,6 +5404,7 @@ Hierbei wird der aufwändig berechnete Durchschnittswert nur einmal berechnet, s
 <br>
 </li><li>
 <a name="DOIF_event_Readings"></a>
+<a name="event_Readings"></a>
 <b>Erzeugen berechneter Readings mit Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 Mit Hilfe des Attributes event_Readings können eigene Readings innerhalb des DOIF definiert werden. Dieses Atrribut hat die gleiche Syntax wie <a href="#DOIF_DOIF_Readings">DOIF_Readings</a>. Der Unterschied besteht darin, dass event_Readings im Gegensatz zu DOIF_Readings beim Setzen der definierten Readings jedes mal Events produziert.
