@@ -830,9 +830,7 @@ sub todoist_GetTasksCallback($$$){
     if ((ref($decoded_json) eq "HASH" && !$decoded_json->{items}) || $decoded_json eq "") {
       $hash->{helper}{errorData} = Dumper($data);
       $hash->{helper}{errorMessage} = "GetTasks: Response was damaged or empty. See log for details.";
-      if (!$decoded_json->{items} && $decoded_json ne "") {
-        
-      }
+
       InternalTimer(gettimeofday()+0.2, "todoist_ErrorReadings",$hash, 0); 
     }
     # got project
