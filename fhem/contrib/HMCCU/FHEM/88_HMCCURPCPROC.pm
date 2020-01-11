@@ -404,13 +404,13 @@ sub HMCCURPCPROC_InitDevice ($$) {
 	}
 	
 	# Read RPC device descriptions
-# 	if ($dev_hash->{rpcinterface} ne 'CUxD') {
-# 		HMCCU_Log ($dev_hash, 1, "Updating internal device tables");
-# 		HMCCU_ResetDeviceTables ($hmccu_hash, $dev_hash->{rpcinterface});
-# 		my $cd = HMCCURPCPROC_GetDeviceDesc ($dev_hash);
-# 		my $cm = HMCCURPCPROC_GetParamsetDesc ($dev_hash);
-# 		HMCCU_Log ($dev_hash, 1, "Read $cd channel and device descriptions and $cm device models from CCU");
-# 	}
+ 	if ($dev_hash->{rpcinterface} ne 'CUxD') {
+ 		HMCCU_Log ($dev_hash, 1, "Updating internal device tables");
+ 		HMCCU_ResetDeviceTables ($hmccu_hash, $dev_hash->{rpcinterface});
+ 		my $cd = HMCCURPCPROC_GetDeviceDesc ($dev_hash);
+ 		my $cm = HMCCURPCPROC_GetParamsetDesc ($dev_hash);
+ 		HMCCU_Log ($dev_hash, 1, "Read $cd channel and device descriptions and $cm device models from CCU");
+ 	}
 	
 	# RPC device ready
 	HMCCURPCPROC_ResetRPCState ($dev_hash);
