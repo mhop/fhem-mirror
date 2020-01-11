@@ -2279,8 +2279,8 @@ sub todoist_genUUID() {
         Needs Task-ID or todoist-Task-ID as parameter<br /><br />
         Possible additional parameters are:<br />
           <ul>
-             <li>parentID=parent_id of the parent task.</li>
-             <li>projectID=project_id of the parent task.</li>
+             <li>parentID=todoist-ID of the new parent task.</li>
+             <li>projectID=todoist-ID of the receiving project.</li>
             </ul><br /><br /></li>
         <li><b>completeTask</b> - completes a task. Needs number of task (reading 'Task_NUMBER'), the title (TITLE:&lt;TITLE&gt;) or the 
         todoist-Task-ID (ID:&lt;ID&gt;) as parameter<br /><br />
