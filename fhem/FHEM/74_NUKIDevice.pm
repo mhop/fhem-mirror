@@ -29,6 +29,9 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
+
+main::LoadModule('NUKIBridge');
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -101,7 +104,6 @@ if ($@) {
     }
 }
 
-my $version = '1.8.0';
 
 # Declare functions
 sub NUKIDevice_Initialize($);
@@ -195,15 +197,15 @@ sub NUKIDevice_Initialize($) {
       . 'disable:1 '
       . $readingFnAttributes;
 
-    foreach my $d ( sort keys %{ $modules{NUKIDevice}{defptr} } ) {
-        my $hash = $modules{NUKIDevice}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub NUKIDevice_Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( '[ \t][ \t]*', $def );
+    
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'too few parameters: define <name> NUKIDevice <nukiId> <deviceType>'
       if ( @a != 4 );
@@ -214,7 +216,7 @@ sub NUKIDevice_Define($$) {
 
     $hash->{NUKIID}     = $nukiId;
     $hash->{DEVICETYPE} = ( defined $deviceType ) ? $deviceType : 0;
-    $hash->{VERSION}    = $version;
+    $hash->{VERSION}    = version->parse($VERSION)->normal;
     $hash->{STATE}      = 'Initialized';
 
     my $iodev = AttrVal( $name, 'IODev', 'none' );
@@ -230,6 +232,8 @@ sub NUKIDevice_Define($$) {
     }
 
     $iodev = $hash->{IODev}->{NAME};
+    
+    $hash->{BRIDGEAPI} = $defs{$iodev}->{BRIDGEAPI};
 
     my $d = $modules{NUKIDevice}{defptr}{$nukiId};
 
@@ -667,4 +671,50 @@ sub NUKIDevice_WriteReadings($$) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 74_NUKIDevice.pm
+{
+  "abstract": "Modul to control the Nuki Smartlock's over the Nuki Bridge",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul to control the Nuki Smartlock's over the Nuki Bridge"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Smartlock",
+    "Nuki",
+    "Control"
+  ],
+  "release_status": "under develop",
+  "license": "GPL_2",
+  "version": "v1.9.1",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 0,
+        "JSON": 0,
+        "Date::Parse": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut

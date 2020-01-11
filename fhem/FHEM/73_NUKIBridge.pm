@@ -41,6 +41,7 @@ package main;
 use strict;
 use warnings;
 use HttpUtils;
+use FHEM::Meta;
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -113,8 +114,6 @@ if ($@) {
     }
 }
 
-my $version   = '1.8.0';
-my $bridgeapi = '1.9';
 
 my %bridgeType = (
     '1' => 'Hardware',
@@ -156,9 +155,8 @@ sub NUKIBridge_ResponseProcessing($$$);
 sub NUKIBridge_CGI();
 sub NUKIBridge_Autocreate($$;$);
 sub NUKIBridge_InfoProcessing($$);
-sub NUKIBridge_getLogfile($);
-sub NUKIBridge_getCallbackList($);
-sub NUKIBridge_CallBlocking($@);
+sub NUKIBridge_getLogfile($$);
+sub NUKIBridge_getCallbackList($$);
 
 sub NUKIBridge_Initialize($) {
     my ($hash) = @_;
@@ -184,16 +182,16 @@ sub NUKIBridge_Initialize($) {
       . 'webhookHttpHostname '
       . $readingFnAttributes;
 
-    foreach my $d ( sort keys %{ $modules{NUKIBridge}{defptr} } ) {
-        my $hash = $modules{NUKIBridge}{defptr}{$d};
-        $hash->{VERSION} = $version;
-    }
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub NUKIBridge_Define($$) {
     my ( $hash, $def ) = @_;
 
     my @a = split( "[ \t][ \t]*", $def );
+    
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return ('too few parameters: define <name> NUKIBridge <HOST> <TOKEN>')
       if ( @a != 4 );
@@ -206,8 +204,8 @@ sub NUKIBridge_Define($$) {
     $hash->{HOST}                  = $host;
     $hash->{PORT}                  = $port;
     $hash->{TOKEN}                 = $token;
-    $hash->{VERSION}               = $version;
-    $hash->{BRIDGEAPI}             = $bridgeapi;
+    $hash->{VERSION}               = version->parse($VERSION)->normal;
+    $hash->{BRIDGEAPI}             = FHEM::Meta::Get( $hash, 'x_apiversion' );;
     $hash->{helper}->{aliveCount}  = 0;
     $hash->{helper}->{actionQueue} = [];
     $hash->{helper}->{iowrite}     = 0;
@@ -481,12 +479,12 @@ sub NUKIBridge_Get($@) {
     if ( lc($cmd) eq 'logfile' ) {
         return 'usage: logFile' if ( @args != 0 );
 
-        NUKIBridge_getLogfile($hash) if ( !IsDisabled($name) );
+        NUKIBridge_Write($hash,'log',undef,undef,undef);
     }
     elsif ( lc($cmd) eq 'callbacklist' ) {
         return 'usage: callbackList' if ( @args != 0 );
 
-        NUKIBridge_getCallbackList($hash) if ( !IsDisabled($name) );
+        NUKIBridge_Write($hash,'callback/list',undef,undef,undef);
     }
     else {
         my $list = '';
@@ -607,8 +605,7 @@ sub NUKIBridge_Call($) {
         if ( defined($uri) and $uri ) {
             $hash->{helper}->{iowrite} = 1;
 
-            HttpUtils_NonblockingGet(
-                {
+            my $param = {
                     url      => $uri,
                     timeout  => 30,
                     hash     => $hash,
@@ -617,9 +614,14 @@ sub NUKIBridge_Call($) {
                     header   => 'Accept: application/json',
                     method   => 'GET',
                     callback => \&NUKIBridge_Distribution,
-                }
-            );
+                };
 
+            $param->{cl} = $hash->{CL}
+              if (  ($endpoint eq 'callback/list'
+                  or $endpoint eq 'log')
+                and ref( $hash->{CL} ) eq 'HASH' );
+
+            HttpUtils_NonblockingGet($param);
             Log3( $name, 4, "NUKIBridge ($name) - Send HTTP POST with URL $uri" );
         }
     }
@@ -671,6 +673,10 @@ sub NUKIBridge_Distribution($$$) {
             Log3( $name, 4,
                 "NUKIBridge ($name) - error while requesting: $err" );
             readingsEndUpdate( $hash, 1 );
+
+            asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
+              if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
+            
             return $err;
         }
     }
@@ -694,6 +700,9 @@ sub NUKIBridge_Distribution($$$) {
                 );
                 delete $hash->{helper}->{lastDeviceAction};
             }
+            
+            asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
+              if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
 
             return;
         }
@@ -709,6 +718,9 @@ sub NUKIBridge_Distribution($$$) {
         return ('received http code '
               . $param->{code}
               . ' without any data after requesting' );
+
+        asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
+              if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
     }
 
     if ( ( $json =~ /Error/i ) and exists( $param->{code} ) ) {
@@ -726,6 +738,10 @@ sub NUKIBridge_Distribution($$$) {
           if ( $param->{code} == 400 and $hash == $dhash );
 
         readingsEndUpdate( $hash, 1 );
+
+        asyncOutput( $param->{cl}, "Request Error: $err\r\n" )
+              if ( $param->{cl} && $param->{cl}{canAsyncOutput} );
+
         return $param->{code};
     }
 
@@ -734,6 +750,15 @@ sub NUKIBridge_Distribution($$$) {
         and $hash->{helper}->{lastDeviceAction} );
 
     readingsEndUpdate( $hash, 1 );
+    
+    if ( $param->{endpoint} eq 'callback/list' ) {
+        NUKIBridge_getCallbackList($param,$json);
+        return undef;
+    }
+    elsif ( $param->{endpoint} eq 'log' ) {
+        NUKIBridge_getLogfile($param,$json);
+        return undef;
+    }
 
     if ( $hash == $dhash ) {
         NUKIBridge_ResponseProcessing( $hash, $json, $param->{endpoint} );
@@ -938,150 +963,112 @@ sub NUKIBridge_InfoProcessing($$) {
     readingsEndUpdate( $hash, 1 );
 }
 
-sub NUKIBridge_getLogfile($) {
-    my ($hash) = @_;
+sub NUKIBridge_getLogfile($$) {
+    my ($param,$json) = @_;
 
+    my $hash = $param->{hash};
     my $name = $hash->{NAME};
-    my $decode_json = NUKIBridge_CallBlocking( $hash, 'log', undef );
 
-    Log3( $name, 4,
-        "NUKIBridge ($name) - Log data are collected and processed" );
-
-    if ( ref($decode_json) eq 'ARRAY' and scalar( @{$decode_json} ) > 0 ) {
-        Log3( $name, 4, "NUKIBridge ($name) - created Table with log file" );
-
-        my $ret = '<html><table width=100%><tr><td>';
-        $ret .= '<table class="block wide">';
-
-        foreach my $logs ( @{$decode_json} ) {
-            $ret .= '<tr class="odd">';
-
-            if ( $logs->{timestamp} ) {
-                $ret .= '<td><b>timestamp:</b> </td>';
-                $ret .= '<td>' . $logs->{timestamp} . '</td>';
-                $ret .= '<td> </td>';
-            }
-
-            if ( $logs->{type} ) {
-                $ret .= '<td><b>type:</b> </td>';
-                $ret .= '<td>' . $logs->{type} . '</td>';
-                $ret .= '<td> </td>';
-            }
-
-            foreach my $d ( reverse sort keys %{$logs} ) {
-                next if ( $d eq 'type' );
-                next if ( $d eq 'timestamp' );
-
-                $ret .= '<td><b>' . $d . ':</b> </td>';
-                $ret .= '<td>' . $logs->{$d} . '</td>';
-                $ret .= '<td> </td>';
-            }
-
-            $ret .= '</tr>';
-        }
-
-        $ret .= '</table></td></tr>';
-        $ret .= '</table></html>';
-
-        return $ret;
-    }
-}
-
-sub NUKIBridge_getCallbackList($) {
-    my ($hash) = @_;
-
-    my $name = $hash->{NAME};
-    my $decode_json = NUKIBridge_CallBlocking( $hash, 'callback/list', undef );
-
-    return
-      unless ( ref($decode_json) eq 'HASH' );
-
-    Log3(
-        $name, 4, "NUKIBridge ($name) - Callback data is collected and 
-processed"
-    );
-
-    if ( ref( $decode_json->{callbacks} ) eq 'ARRAY'
-        and scalar( @{ $decode_json->{callbacks} } ) > 0 )
-    {
-        Log3( $name, 4, "NUKIBridge ($name) - created Table with log file" );
-
-        my $ret = '<html><table width=100%><tr><td>';
-
-        $ret .= '<table class="block wide">';
-
-        $ret .= '<tr class="odd">';
-        $ret .= '<td><b>Callback-ID</b></td>';
-        $ret .= '<td> </td>';
-        $ret .= '<td><b>Callback-URL</b></td>';
-        $ret .= '</tr>';
-
-        foreach my $cb ( @{ $decode_json->{callbacks} } ) {
-
-            $ret .= '<td>' . $cb->{id} . '</td>';
-            $ret .= '<td> </td>';
-            $ret .= '<td>' . $cb->{url} . '</td>';
-            $ret .= '</tr>';
-        }
-
-        $ret .= '</table></td></tr>';
-        $ret .= '</table></html>';
-        return $ret;
-    }
-
-    return "No callback data available or error during processing";
-}
-
-sub NUKIBridge_CallBlocking($@) {
-    my ( $hash, $endpoint, $obj ) = @_;
-
-    my $name  = $hash->{NAME};
-    my $host  = $hash->{HOST};
-    my $port  = $hash->{PORT};
-    my $token = $hash->{TOKEN};
-
-    my $url = 'http://' . $hash->{HOST} . ':' . $port;
-    $url .= '/' . $endpoint
-      if ( defined $endpoint );
-    $url .= '?token=' . $token
-      if ( defined($token) );
-    $url .= '&' . $obj
-      if ( defined($obj) );
-
-    my ( $err, $data ) = HttpUtils_BlockingGet(
-        {
-            url     => $url,
-            timeout => 3,
-            method  => "GET",
-            header  => "Content-Type: application/json",
-        }
-    );
-
-    if ( !$data ) {
-        Log3( $name, 3, "NUKIDevice ($name) - empty answer received for $url" );
-        return undef;
-    }
-    elsif ( $data =~ m'HTTP/1.1 200 OK' ) {
-        Log3( $name, 4, "NUKIDevice ($name) - empty answer received for $url" );
-        return undef;
-    }
-    elsif ( $data !~ m/^[\[{].*[}\]]$/ and $endpoint ne "log" ) {
-        Log3( $name, 3,
-            "NUKIDevice ($name) - invalid json detected for $url: $data" );
-        return ("NUKIDevice ($name) - invalid json detected for $url: $data");
-    }
-
-    my $decode_json = eval { decode_json($data) };
+    my $decode_json = eval { decode_json($json) };
     if ($@) {
         Log3( $name, 3, "NUKIBridge ($name) - JSON error while request: $@" );
         return;
     }
 
-    return undef if ( !$decode_json );
+    Log3( $name, 4,
+        "NUKIBridge ($name) - Log data are collected and processed" );
+        
+    if ( $param->{cl} and $param->{cl}->{TYPE} eq 'FHEMWEB' ) {
+        if ( ref($decode_json) eq 'ARRAY' and scalar( @{$decode_json} ) > 0 ) {
+            Log3( $name, 4, "NUKIBridge ($name) - created Table with log file" );
 
-    Log3( $name, 5, "NUKIBridge ($name) - Data: $data" );
-    Log3( $name, 4, "NUKIBridge ($name) - Blocking HTTP Query finished" );
-    return ($decode_json);
+            my $ret = '<html><table width=100%><tr><td>';
+            $ret .= '<table class="block wide">';
+
+            foreach my $logs ( @{$decode_json} ) {
+                $ret .= '<tr class="odd">';
+
+                if ( $logs->{timestamp} ) {
+                    $ret .= '<td><b>timestamp:</b> </td>';
+                    $ret .= '<td>' . $logs->{timestamp} . '</td>';
+                    $ret .= '<td> </td>';
+                }
+
+                if ( $logs->{type} ) {
+                    $ret .= '<td><b>type:</b> </td>';
+                    $ret .= '<td>' . $logs->{type} . '</td>';
+                    $ret .= '<td> </td>';
+                }
+
+                foreach my $d ( reverse sort keys %{$logs} ) {
+                    next if ( $d eq 'type' );
+                    next if ( $d eq 'timestamp' );
+
+                    $ret .= '<td><b>' . $d . ':</b> </td>';
+                    $ret .= '<td>' . $logs->{$d} . '</td>';
+                    $ret .= '<td> </td>';
+                }
+
+                $ret .= '</tr>';
+            }
+
+            $ret .= '</table></td></tr>';
+            $ret .= '</table></html>';
+
+            asyncOutput( $param->{cl}, $ret )
+              if ( $param->{cl} and $param->{cl}{canAsyncOutput} );
+            return;
+        }
+    }
+}
+
+sub NUKIBridge_getCallbackList($$) {
+    my ($param,$json) = @_;
+
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    my $decode_json = eval { decode_json($json) };
+    if ($@) {
+        Log3( $name, 3, "NUKIBridge ($name) - JSON error while request: $@" );
+        return;
+    }
+
+    Log3( $name, 4,
+        "NUKIBridge ($name) - Callback data are collected and processed" );
+        
+    if ( $param->{cl} and $param->{cl}->{TYPE} eq 'FHEMWEB' ) {
+        if ( ref( $decode_json->{callbacks} ) eq 'ARRAY'
+            and scalar( @{ $decode_json->{callbacks} } ) > 0 )
+        {
+            Log3( $name, 4, "NUKIBridge ($name) - created Table with log file" );
+
+            my $ret = '<html><table width=100%><tr><td>';
+
+            $ret .= '<table class="block wide">';
+
+            $ret .= '<tr class="odd">';
+            $ret .= '<td><b>Callback-ID</b></td>';
+            $ret .= '<td> </td>';
+            $ret .= '<td><b>Callback-URL</b></td>';
+            $ret .= '</tr>';
+
+            foreach my $cb ( @{ $decode_json->{callbacks} } ) {
+
+                $ret .= '<td>' . $cb->{id} . '</td>';
+                $ret .= '<td> </td>';
+                $ret .= '<td>' . $cb->{url} . '</td>';
+                $ret .= '</tr>';
+            }
+
+            $ret .= '</table></td></tr>';
+            $ret .= '</table></html>';
+            
+            asyncOutput( $param->{cl}, $ret )
+              if ( $param->{cl} and $param->{cl}{canAsyncOutput} );
+            return;
+        }
+    }
 }
 
 sub NUKIBridge_ParseJSON($$) {
@@ -1285,4 +1272,51 @@ sub NUKIBridge_ParseJSON($$) {
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 73_NUKIBridge.pm
+{
+  "abstract": "Modul to control the Nuki Smartlock's over the Nuki Bridge",
+  "x_lang": {
+    "de": {
+      "abstract": "Modul to control the Nuki Smartlock's over the Nuki Bridge"
+    }
+  },
+  "keywords": [
+    "fhem-mod-device",
+    "fhem-core",
+    "Smartlock",
+    "Nuki",
+    "Control"
+  ],
+  "release_status": "under develop",
+  "license": "GPL_2",
+  "version": "v1.9.3",
+  "x_apiversion": "1.9",
+  "author": [
+    "Marko Oldenburg <leongaultier@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "CoolTux"
+  ],
+  "x_fhem_maintainer_github": [
+    "LeonGaultier"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.016, 
+        "Meta": 0,
+        "JSON": 0,
+        "Date::Parse": 0
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
