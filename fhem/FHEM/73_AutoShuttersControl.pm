@@ -294,9 +294,6 @@ sub ascAPIget($@) {
 sub Initialize($) {
     my ($hash) = @_;
 
-    ### alte Attribute welche entfernt werden
-    my $oldAttr = 'ASC_shuttersDriveOffset ';
-
 ## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
     #  und davor mit :: getrennt der eigentliche package Name des Modules
     $hash->{SetFn}    = 'FHEM::AutoShuttersControl::Set';
@@ -324,7 +321,6 @@ sub Initialize($) {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
-      . $oldAttr
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
 
@@ -7923,7 +7919,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v0.8.12",
+  "version": "v0.8.13",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

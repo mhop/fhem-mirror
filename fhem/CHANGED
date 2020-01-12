@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_AutoShuttersControl: remove old Attribut
  - feature: 73_NUKIBridge: change Code for outputAsync
  - bugfix:  Tag.pm: fix warnings, Forum: 106763
  - feature: 73_NUKIBridge: 74_NUKIDevice change Code to 2 step modul
