@@ -358,8 +358,8 @@ sub OnTimer($)
     {
      push @devices, $deviceName if  !grep {/$deviceName/} @devices; # keine doppelten Namen
 
-     $or_and = 1 if (index($_,'+') != -1); # Readings beim auswerten AND
-    $_ =~ s/\+/,/g; # eventuell vorhandene + auch in Komma wandeln
+     $or_and = 1 if (index($rSA,'+') != -1); # Readings beim auswerten AND
+     $rSA =~ s/\+/,/g ; # eventuell vorhandene + auch in Komma wandeln
 
      # rSA: timeout, errorValue, reading1, reading2, reading3, ...
      #      120,---,temperature,humidity,battery
