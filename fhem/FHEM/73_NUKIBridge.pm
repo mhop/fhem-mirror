@@ -140,7 +140,6 @@ my %lockActionsOpener = (
 sub NUKIBridge_Initialize ($);
 sub NUKIBridge_Define ($$);
 sub NUKIBridge_Undef ($$);
-sub NUKIBridge_Read($@);
 sub NUKIBridge_Attr(@);
 sub NUKIBridge_addExtension($$$);
 sub NUKIBridge_removeExtension($);
@@ -153,7 +152,6 @@ sub NUKIBridge_Call($);
 sub NUKIBridge_Distribution($$$);
 sub NUKIBridge_ResponseProcessing($$$);
 sub NUKIBridge_CGI();
-sub NUKIBridge_Autocreate($$;$);
 sub NUKIBridge_InfoProcessing($$);
 sub NUKIBridge_getLogfile($$);
 sub NUKIBridge_getCallbackList($$);
@@ -404,63 +402,68 @@ sub NUKIBridge_Set($@) {
     if ( lc($cmd) eq 'getdevicelist' ) {
         return 'usage: getDeviceList' if ( @args != 0 );
 
-        NUKIBridge_Write( $hash, "list", undef, undef, undef )
+        NUKIBridge_Write( $hash, 'list', undef, undef, undef )
           if ( !IsDisabled($name) );
         return undef;
     }
     elsif ( $cmd eq 'info' ) {
         return 'usage: statusRequest' if ( @args != 0 );
 
-        NUKIBridge_Write( $hash, "info", undef, undef, undef )
+        NUKIBridge_Write( $hash, 'info', undef, undef, undef )
           if ( !IsDisabled($name) );
         return undef;
     }
     elsif ( lc($cmd) eq 'fwupdate' ) {
         return 'usage: fwUpdate' if ( @args != 0 );
 
-        NUKIBridge_CallBlocking( $hash, "fwupdate", undef )
+        NUKIBridge_Write( $hash, 'fwupdate', undef, undef, undef )
           if ( !IsDisabled($name) );
         return undef;
     }
     elsif ( $cmd eq 'reboot' ) {
         return 'usage: reboot' if ( @args != 0 );
 
-        NUKIBridge_CallBlocking( $hash, "reboot", undef )
+        NUKIBridge_Write( $hash, 'reboot', undef, undef, undef )
           if ( !IsDisabled($name) );
         return undef;
     }
     elsif ( lc($cmd) eq 'clearlog' ) {
         return 'usage: clearLog' if ( @args != 0 );
 
-        NUKIBridge_CallBlocking( $hash, "clearlog", undef )
+        NUKIBridge_Write( $hash, 'clearlog', undef, undef, undef )
           if ( !IsDisabled($name) );
     }
     elsif ( lc($cmd) eq 'factoryreset' ) {
         return 'usage: clearLog' if ( @args != 0 );
 
-        NUKIBridge_CallBlocking( $hash, "factoryReset", undef )
+        NUKIBridge_Write( $hash, 'factoryReset', undef, undef, undef )
           if ( !IsDisabled($name) );
     }
     elsif ( lc($cmd) eq 'callbackremove' ) {
         return 'usage: callbackRemove' if ( @args > 1 );
 
-        my $id = "id=" . ( @args > 0 ? join( ' ', @args ) : 0 );
-        my $resp = NUKIBridge_CallBlocking( $hash, 'callback/remove', $id )
+        my $id = ( @args > 0 ? join( ' ', @args ) : 0 );
+        
+        NUKIBridge_Write( $hash, 'callback/remove', $id, undef, undef )
           if ( !IsDisabled($name) );
 
-        if (
-            (
-                   $resp->{success} eq 'true'
-                or $resp->{success} == 1
-            )
-            and !IsDisabled($name)
-          )
-        {
-            return ( 'Success Callback ' . $id . ' removed' );
-        }
-        else {
-            return ('remove Callback failed');
-        }
+        
+#         my $resp = NUKIBridge_CallBlocking( $hash, 'callback/remove', $id )
+#           if ( !IsDisabled($name) );
+# 
+#         if (
+#             (
+#                    $resp->{success} eq 'true'
+#                 or $resp->{success} == 1
+#             )
+#             and !IsDisabled($name)
+#           )
+#         {
+#             return ( 'Success Callback ' . $id . ' removed' );
+#         }
+#         else {
+#             return ('remove Callback failed');
+#         }
     }
     else {
         my $list = '';
@@ -558,6 +561,7 @@ sub NUKIBridge_Write($@) {
 sub NUKIBridge_CreateUri($$) {
     my ( $hash, $obj ) = @_;
 
+    my $name       = $hash->{NAME};
     my $host       = $hash->{HOST};
     my $port       = $hash->{PORT};
     my $token      = $hash->{TOKEN};
@@ -569,25 +573,33 @@ sub NUKIBridge_CreateUri($$) {
     my $uri = 'http://' . $host . ':' . $port;
     $uri .= '/' . $endpoint    if ( defined $endpoint );
     $uri .= '?token=' . $token if ( defined($token) );
-    $uri .= '&action=' . $lockActionsSmartLock{$param}
-      if (  defined($param)
-        and $param ne 'callback/add'
-        and $deviceType == 0 );
 
-    $uri .= '&action=' . $lockActionsOpener{$param}
-      if (  defined($param)
-        and $param ne 'callback/add'
-        and $deviceType == 2 );
+    if (  defined($param)
+      and defined($deviceType) )
+    {
+        $uri .= '&action=' . $lockActionsSmartLock{$param}
+          if (  $endpoint ne 'callback/add'
+            and $deviceType == 0 );
+
+        $uri .= '&action=' . $lockActionsOpener{$param}
+          if (  $endpoint ne 'callback/add'
+            and $deviceType == 2 );
+    }
+
+    $uri .= '&id=' . $param
+      if ( defined($param)
+        and $endpoint eq 'callback/remove' );
 
     $uri .= '&url=' . $param
       if ( defined($param)
-        and $param eq 'callback/add' );
+        and $endpoint eq 'callback/add' );
 
     $uri .= '&nukiId=' . $nukiId
       if ( defined($nukiId) );
     $uri .= '&deviceType=' . $deviceType
       if ( defined($deviceType) );
 
+    Log3( $name, 4, "NUKIBridge ($name) - created uri: $uri" );
     return $uri;
 }
 
@@ -647,9 +659,9 @@ sub NUKIBridge_Distribution($$$) {
 
     my $dname = $dhash->{NAME};
 
-    Log3( $name, 5, "NUKIBridge ($name) - Response JSON: $json" );
-    Log3( $name, 5, "NUKIBridge ($name) - Response ERROR: $err" );
-    Log3( $name, 5, "NUKIBridge ($name) - Response CODE: $param->{code}" )
+    Log3( $name, 4, "NUKIBridge ($name) - Response JSON: $json" );
+    Log3( $name, 4, "NUKIBridge ($name) - Response ERROR: $err" );
+    Log3( $name, 4, "NUKIBridge ($name) - Response CODE: $param->{code}" )
       if ( defined( $param->{code} ) and ( $param->{code} ) );
       
     $hash->{helper}->{iowrite} = 0
@@ -1290,7 +1302,7 @@ sub NUKIBridge_ParseJSON($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v1.9.3",
+  "version": "v1.9.4",
   "x_apiversion": "1.9",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

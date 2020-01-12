@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_NUKIBridge: fix bridge endpoint setter
  - bugfix:  73_AutoShuttersControl: fix ExternalTrigger
  - change:  73_AutoShuttersControl: remove old Attribut
  - feature: 73_NUKIBridge: change Code for outputAsync
