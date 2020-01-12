@@ -23,7 +23,9 @@
   <Manufacturer id="0022" name="A-1 Components"></Manufacturer>
   <Manufacturer id="0117" name="Abilia"></Manufacturer>
   <Manufacturer id="0400" name="Abode"></Manufacturer>
-  <Manufacturer id="0409" name="ABUS August Bremicker Sohne KG"></Manufacturer>
+  <Manufacturer id="0409" name="ABUS August Bremicker Sohne KG">
+    <Product config="abus/cfa3010.xml" id="0003" name="HomeTec Pro CFA3010" type="0005" forumNr="106068"/>
+  </Manufacturer>
   <Manufacturer id="0403" name="ABUS Security-Center GmbH Co. KG"></Manufacturer>
   <Manufacturer id="034A" name="AcroComm Corp"></Manufacturer>
   <Manufacturer id="0001" name="ACT">
