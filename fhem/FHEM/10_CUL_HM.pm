@@ -3931,12 +3931,13 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         }
       }
       my $addInfo = "";
-      if    ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02"){$addInfo = CUL_HM_TCtempReadings($hash)}
+      if    ($md =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $chn eq "02")
+                                                    {$addInfo = CUL_HM_TCtempReadings($hash)}
       elsif ($md =~ m/^HM-CC-RT-DN/ && $chn eq "04"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7)}
       elsif ($md =~ m/^HM-TC-IT/    && $chn eq "02"){$addInfo = CUL_HM_TCITRTtempReadings($hash,$md,7,8,9)}
-      elsif ($md =~ m/^(^HM-PB-4DIS-WM|HM-DIS-WM55|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)/)
-                                                   {$addInfo = CUL_HM_4DisText($hash)}
-      elsif ($md eq "HM-SYS-SRP-PL")               {$addInfo = CUL_HM_repReadings($hash)}
+      elsif (ReadingsVal($name,".RegL_01.",ReadingsVal($name,"RegL_01.","")) =~ m / 36:/){#add text
+                                                    $addInfo = CUL_HM_4DisText($hash)}
+      elsif ($md eq "HM-SYS-SRP-PL")                {$addInfo = CUL_HM_repReadings($hash)}
 
       return $name." type:".$st." - \n".
              $regHeader.join("",sort(@regValList)).
@@ -8439,7 +8440,7 @@ sub CUL_HM_setTmplDisp($){ # remove register if outdated
 }
 sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
-  my $listNo = $list+0;
+  my $listNo = $list + 0;
   my $name = $hash->{NAME};
   my $devId = substr(CUL_HM_name2Id($name),0,6);
   my $ioId = CUL_HM_IoId(CUL_HM_id2Hash($devId));
@@ -8485,8 +8486,8 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md =~ m/^HM-TC-IT-WM-W-EU/){#handle temperature readings
     CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
-  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-DIS-WM55|HM-DIS-EP-WM55|HM-RC-DIS-H-X-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
-   CUL_HM_4DisText($hash)  if ($list == 1) ;
+  elsif (ReadingsVal($name,".RegL_01.",ReadingsVal($name,"RegL_01.","")) =~ m / 36:/){#add text
+    CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
     CUL_HM_repReadings($hash) if ($list == 2);
