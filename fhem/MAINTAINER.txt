@@ -490,7 +490,6 @@ FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          loredo               Unterstützende Dienste
 FHEM/98_GoogleAuth.pm        betateilchen         Unterstützende Dienste
 FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
-FHEM/98_Heating_Control.pm   Beta-User            Unterstützende Dienste
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
 FHEM/98_HourCounter.pm       john                 MAX
@@ -608,6 +607,7 @@ contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
 contrib/98_exportdevice.pm   loredo               (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
+contrib/98_Heating_Control.pm Beta-User           Unterstützende Dienste
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
