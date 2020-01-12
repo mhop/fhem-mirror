@@ -3175,7 +3175,7 @@ sub CreateNewNotifyDev($) {
             $_, 'ASC_BrightnessSensor' )
           if ( AttrVal( $_, 'ASC_BrightnessSensor', 'none' ) ne 'none' );
         AddNotifyDev( $hash, AttrVal( $_, 'ASC_ExternalTrigger', 'none' ),
-            $_, 'ASC_BrightnessSensor' )
+            $_, 'ASC_ExternalTrigger' )
           if ( AttrVal( $_, 'ASC_ExternalTrigger', 'none' ) ne 'none' );
 
         $shuttersList = $shuttersList . ',' . $_;
