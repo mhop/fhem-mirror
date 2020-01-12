@@ -778,17 +778,6 @@ sub ShuttersDeviceScan($) {
         }
     }
 
-    ####
-    CommandAttr( undef,
-            $name
-          . ' ASC_shuttersDriveDelay '
-          . AttrVal( $name, 'ASC_shuttersDriveOffset', -1 ) )
-      if ( AttrVal( $name, 'ASC_shuttersDriveOffset', 'none' ) ne 'none' );
-    CommandDeleteAttr( undef, $name . ' ASC_shuttersDriveOffset' )
-      if ( AttrVal( $name, 'ASC_shuttersDriveOffset', 'none' ) ne 'none' );
-
-    ####
-
     $hash->{NOTIFYDEV} = "global," . $name . $shuttersList;
 
     if ( $ascDev->getMonitoredDevs ne 'none' ) {
@@ -7187,8 +7176,8 @@ sub getblockAscDrivesAfterManual {
                 <em>DEVICENAME</em> which contains a presence state, e.g. <em>rgr_Residents:state</em>. The target
                 should contain values alike the <em>RESIDENTS</em> family.
             </li>
-            <a name="ASC_shuttersDriveOffset"></a>
-            <li><strong>ASC_shuttersDriveOffset</strong> - Maximum random drive delay in seconds for calculating
+            <a name="ASC_shuttersDriveDelay"></a>
+            <li><strong>ASC_shuttersDriveDelay</strong> - Maximum random drive delay in seconds for calculating
                 the operating time. <em>0</em> equals to no delay.
             </li>
             <a name="ASC_tempSensor"></a>
@@ -7275,12 +7264,6 @@ sub getblockAscDrivesAfterManual {
             </li>
             <li><strong>ASC_DriveUpMaxDuration</strong> - Drive up duration of the shutter plus 5 seconds. Defaults
                 to 60 seconds if not set.
-            </li>
-            <li><strong>ASC_Drive_Offset</strong> - Maximum <strong>random</strong> drive delay in seconds for calculating the
-                driving time. 0 equals to no delay, -1 <em>ASC_shuttersDriveOffset</em> is used. Defaults to -1.
-            </li>
-            <li><strong>ASC_Drive_OffsetStart</strong> - <strong>Fixed</strong> drive delay in seconds for calculating the
-                driving time. -1 or 0 equals to no delay. Defaults to -1 (no offset).
             </li>
             <li><strong>ASC_LockOut soft|hard|off</strong> - Configures the lock out protection for the current
                 shutter. Values are:
@@ -7752,7 +7735,7 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_rainSensor - DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS]</strong> - der Inhalt ist eine Kombination aus Devicename, Readingname, Wert ab dem getriggert werden soll, Hysterese Wert ab dem der Status Regenschutz aufgehoben werden soll und der "wegen Regen geschlossen Position".</li>
             <a name="ASC_residentsDev"></a>
             <li><strong>ASC_residentsDev - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Devicenamen und Readingnamen des Residents-Device der obersten Ebene (z.B. rgr_Residents:state)</li>
-            <a name="ASC_shuttersDriveOffset"></a>
+            <a name="ASC_shuttersDriveDelay"></a>
             <li><strong>ASC_shuttersDriveDelay</strong> - maximale Zufallsverz&ouml;gerung in Sekunden bei der Berechnung der Fahrzeiten. 0 bedeutet keine Verz&ouml;gerung</li>
             <a name="ASC_tempSensor"></a>
             <li><strong>ASC_tempSensor - DEVICENAME[:READINGNAME]</strong> - der Inhalt ist eine Kombination aus Device und Reading f&uuml;r die Au&szlig;entemperatur</li>
@@ -7762,11 +7745,6 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_windSensor - DEVICE[:READING]</strong> - Sensor f&uuml;r die Windgeschwindigkeit. Kombination aus Device und Reading.</li>
         </ul>
         <br />
-        <ul>
-            <u>Folgende Attribute sind obsolet und sollten nicht mehr verwendet werden.</u>
-            <a name="ASC_shuttersDriveOffset"></a>
-            <li>ASC_shuttersDriveOffset - <em>WARNUNG!!! OBSOLET !!! NICHT VERWENDEN!!!</em></li>
-        </ul>
         <br />
         <u> In den Rolll&auml;den-Ger&auml;ten</u>
         <ul>
