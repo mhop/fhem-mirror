@@ -562,7 +562,8 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
 attr DEVICE icon ICON
-attr DEVICE stateFormat POWER1
+#attr DEVICE stateFormat POWER1
+attr DEVICE jsonMap POWER1:state
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
@@ -572,10 +573,11 @@ attr DEVICE setList \
   upgrade:noArg   CMNDTOPIC/upgrade 1
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add on-for-timer option running on the device. The following is limited to 1h max duration, but will not affect future simple "on" commands:<br>on-for-timer {my $duration = $EVTPART1*10; 'cmnd/CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}<br>See the "Praxisbeispiele" in the wiki for "pulseTime1" alternative option and it's restrictions.
@@ -599,11 +601,11 @@ par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingLi
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 deletereading -q DEVICE (?!associatedWith).*
 set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
@@ -632,7 +634,7 @@ attr DEVICE setList \
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
 attr DEVICE stateFormat {\
-  ReadingsVal($name, "POWER1", "off") . " "\
+  ReadingsVal($name, "state", "off") . " "\
   ReadingsVal($name, "POWER2", "off") . " "\
   . sprintf("%.1f°C ",ReadingsVal($name,"SI7021_Temperature",0))\
   . sprintf("%.0f%%",ReadingsVal($name,"SI7021_Humidity",0))\
@@ -643,7 +645,7 @@ attr DEVICE devStateIcon {\
   if ($state eq "on") {\
     $devStateIcon = 'building_security@red';\
   }\
-  "<div>" . FW_makeImage(lc ReadingsVal($name, "POWER1", "off"))\
+  "<div>" . FW_makeImage(lc ReadingsVal($name, "state", "off"))\
     . FW_makeImage($devStateIcon) . sprintf(\
     "&nbsp;&nbsp;[Temp: %.1f°C / Feucht: %.0f%%]",\
     ReadingsVal($name,"SI7021_Temperature",0),\
@@ -700,25 +702,12 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 attr DEVICE comment Mains channel for DEVICE, see also DEVICE_CH2 for rgb LED
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");;"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef)}
-deleteattr DEVICE stateFormat
-attr DEVICE setList \
-  off:noArg    CMNDTOPIC/POWER1 0\
-  on:noArg     CMNDTOPIC/POWER1 1\
-  toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE readingList \
-  TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:state Dimmer:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER2:0
 setreading DEVICE associatedWith DEVICE_CH2
 deletereading -q DEVICE (?!associatedWith).*
 copy DEVICE DEVICE_CH2
 deleteattr DEVICE_CH2 stateFormat
-attr DEVICE_CH2 comment RGB channel for DEVICE
+attr DEVICE_CH2 comment RGBW channel for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    CMNDTOPIC/POWER2 0\
@@ -801,7 +790,7 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
   TELETOPIC/RESULT:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
-  TELETOPIC/RESULT:.* { json2nameValue($EVENT) }
+  TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries. 
 attr DEVICE model tasmota_use_DS18x20_id
 
@@ -811,6 +800,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings
 order:A_02a
 set DEVICE attrTemplate tasmota_basic_state_power1
+deleteAttr DEVICE jsonMap
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -846,7 +836,9 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 setreading DEVICE associatedWith DEVICE_CH2
 copy DEVICE DEVICE_CH2
-attr DEVICE_CH2 stateFormat POWER2
+attr DEVICE_CH2 readingList \
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
@@ -928,24 +920,16 @@ name:tasmota_4channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 4 channel device flashed with Tasmota. <br>NOTE: a second, third and fourth device will be created for each additional channel
 order:A_04
-set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+set DEVICE attrTemplate tasmota_2channel_split
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
-#create device for CH2
-copy DEVICE DEVICE_CH2
-attr DEVICE_CH2 stateFormat POWER2
 setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
-attr DEVICE_CH2 setList \
-  off:noArg    CMNDTOPIC/POWER2 0\
-  on:noArg     CMNDTOPIC/POWER2 1\
-  toggle:noArg CMNDTOPIC/POWER2 2
-attr DEVICE_CH2 setStateList on off toggle
+attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct POWER1:0 POWER3:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
 #create device for CH3
 copy DEVICE DEVICE_CH3
-attr DEVICE_CH3 stateFormat POWER3
-setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
+attr DEVICE_CH2 jsonMap POWER3:state Dimmer:pct POWER1:0 POWER2:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg    CMNDTOPIC/POWER3 0\
@@ -954,7 +938,7 @@ attr DEVICE_CH3 setList \
 attr DEVICE_CH3 setStateList on off toggle
 #create device for CH4
 copy DEVICE DEVICE_CH4
-attr DEVICE_CH4 stateFormat POWER4
+attr DEVICE_CH2 jsonMap POWER4:state Dimmer:pct POWER1:0 POWER2:0 POWER3:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
 setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE_CH4 setList \
@@ -985,11 +969,11 @@ attr DEVICE setList \
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot 1.on:on:POWER1+off 1.off:off:POWER1+on 2.on:on:POWER2+off 2.off:off:POWER2+on 3.on:on:POWER3+off 3.off:off:POWER3+on 4.on:on:POWER4+off 4.off:off:POWER4+on
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
-  TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* POWER1\
   STATTOPIC/POWER2:.* POWER2\
   STATTOPIC/POWER3:.* POWER3\
@@ -1015,10 +999,10 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   POWER1:on,off,toggle CMNDTOPIC/POWER1 $EVTPART1\
   POWER2:on,off,toggle CMNDTOPIC/POWER2 $EVTPART1\
@@ -1046,17 +1030,9 @@ attr DEVICE setList\
   toggle:noArg CMNDTOPIC/POWER1 2\
   Color:colorpicker,RGB CMNDTOPIC/COLOR\
   Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
-attr DEVICE readingList \
-  TELETOPIC/LWT:.* LWT\
-  STATTOPIC/POWER:.* POWER\
-  STATTOPIC/POWER1:.* POWER1\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
-attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","POWER1")}
-attr DEVICE stateFormat POWER1
+attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","state")}
 attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
 attr DEVICE model tasmota_rgb_led_controller
 
@@ -1136,17 +1112,9 @@ attr DEVICE setList\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
   Dimmer:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
-attr DEVICE readingList \
-  TELETOPIC/LWT:.* LWT\
-  STATTOPIC/POWER:.* POWER\
-  STATTOPIC/POWER1:.* POWER1\
-  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
 attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
-attr DEVICE stateFormat POWER1
 attr DEVICE webCmd Dimmer
 attr DEVICE comment After applying the template, the device to be controlled needs further configuration. For the necessary steps see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
 farewell:template has been applied successfully. Now it's recommended to do some configruation, see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
