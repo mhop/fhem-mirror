@@ -1,4 +1,4 @@
-REV 20936
+REV 20943
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-01-10_07:45:03 322010 ./CHANGED
+UPD 2020-01-12_07:45:03 322235 ./CHANGED
 UPD 2020-01-08_07:45:52 42435 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -391,7 +391,7 @@ UPD 2019-11-26_07:45:03 89343 FHEM/73_ElectricityCalculator.pm
 UPD 2019-06-19_07:45:02 42826 FHEM/73_GardenaSmartBridge.pm
 UPD 2019-11-26_07:45:03 81632 FHEM/73_GasCalculator.pm
 UPD 2018-01-09_07:45:03 87372 FHEM/73_MPD.pm
-UPD 2019-08-21_07:45:02 30863 FHEM/73_NUKIBridge.pm
+UPD 2020-01-12_07:45:03 40041 FHEM/73_NUKIBridge.pm
 UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2019-11-26_07:45:03 84652 FHEM/73_WaterCalculator.pm
 UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
@@ -399,7 +399,7 @@ UPD 2019-10-25_07:45:03 69268 FHEM/74_AMADDevice.pm
 UPD 2019-06-19_07:45:02 45636 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
-UPD 2019-08-21_07:45:02 22747 FHEM/74_NUKIDevice.pm
+UPD 2020-01-12_07:45:03 20738 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2019-03-23_07:45:03 64637 FHEM/74_THINKINGCLEANER.pm
 UPD 2019-08-13_07:45:03 124361 FHEM/74_Unifi.pm
@@ -562,7 +562,7 @@ UPD 2019-11-05_07:45:02 32880 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
-UPD 2020-01-11_07:45:04 87032 FHEM/98_todoist.pm
+UPD 2020-01-12_07:45:03 86334 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
@@ -661,7 +661,7 @@ UPD 2018-04-14_07:45:02 1576 FHEM/lib/Device/MySensors/Message.pm
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
 UPD 2015-07-28_14:05:30 75542 FHEM/lib/MP3/Info.pm
-UPD 2018-02-27_07:45:03 115017 FHEM/lib/MP3/Tag.pm
+UPD 2020-01-12_07:45:03 115019 FHEM/lib/MP3/Tag.pm
 UPD 2015-07-28_14:05:30 8987 FHEM/lib/MP3/Tag/CDDB_File.pm
 UPD 2015-07-28_14:05:30 7343 FHEM/lib/MP3/Tag/Cue.pm
 UPD 2015-07-28_14:05:30 10815 FHEM/lib/MP3/Tag/File.pm
@@ -745,12 +745,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-01-10_07:45:06 4212208 docs/commandref.html
-UPD 2020-01-11_07:45:11 2598552 docs/commandref_DE.html
+UPD 2020-01-12_07:45:07 4211870 docs/commandref.html
+UPD 2020-01-12_07:45:10 2598409 docs/commandref_DE.html
 UPD 2020-01-09_07:45:02 79525 docs/commandref_frame.html
 UPD 2020-01-09_07:45:02 89239 docs/commandref_frame_DE.html
-UPD 2020-01-11_07:45:12 229881 docs/commandref_modular.html
-UPD 2020-01-11_07:45:13 240809 docs/commandref_modular_DE.html
+UPD 2020-01-12_07:45:11 229881 docs/commandref_modular.html
+UPD 2020-01-12_07:45:12 240809 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
