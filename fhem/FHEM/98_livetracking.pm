@@ -641,11 +641,11 @@ sub livetracking_ParseLife360($$) {
 
 
     if($accurate){
-      readingsBulkUpdate($hash, "latitude", $dataset->{latitude});
+      readingsBulkUpdate($hash, "latitude", sprintf("%.5f", $dataset->{latitude}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
-      readingsBulkUpdate($hash, "longitude", $dataset->{longitude});
+      readingsBulkUpdate($hash, "longitude", sprintf("%.5f", $dataset->{longitude}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
-      readingsBulkUpdate($hash, "location", $dataset->{latitude}.",".$dataset->{longitude});
+      readingsBulkUpdate($hash, "location", sprintf("%.5f", $dataset->{latitude}).",".sprintf("%.5f", $dataset->{longitude}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
     }
 
@@ -683,7 +683,7 @@ sub livetracking_ParseLife360($$) {
 
     if(defined($dataset->{battery}))
     {
-      readingsBulkUpdate($hash, "batteryPercent", $dataset->{battery});
+      readingsBulkUpdate($hash, "batteryPercent", int($dataset->{battery}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
       readingsBulkUpdate($hash, "batteryState", (int($dataset->{battery}) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{endTimestamp});
@@ -701,7 +701,7 @@ sub livetracking_ParseLife360($$) {
   {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = FmtDateTime($tst);
-    readingsBulkUpdate($hash, "batteryPercent", $battery);
+    readingsBulkUpdate($hash, "batteryPercent", int($battery));
     $hash->{CHANGETIME}[0] = FmtDateTime($tst);
     readingsBulkUpdate($hash, "batteryState", (int($battery) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
     $hash->{CHANGETIME}[1] = FmtDateTime($tst);
@@ -747,22 +747,22 @@ sub livetracking_ParseOpenPaths($$) {
     my $changeindex = 0;
 
 
-    readingsBulkUpdate($hash, "latitude", $dataset->{lat});
+    readingsBulkUpdate($hash, "latitude", sprintf("%.5f", $dataset->{lat}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-    readingsBulkUpdate($hash, "longitude", $dataset->{lon});
+    readingsBulkUpdate($hash, "longitude", sprintf("%.5f", $dataset->{lon}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
-    readingsBulkUpdate($hash, "location", $dataset->{lat}.",".$dataset->{lon});
+    readingsBulkUpdate($hash, "location", sprintf("%.5f", $dataset->{lat}).",".sprintf("%.5f", $dataset->{lon}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
 
 
-    if(defined($dataset->{alt}) && $dataset->{alt} ne '0')
+    if(defined($dataset->{alt}) && $dataset->{alt} ne '')
     {
       my $newaltitude = livetracking_roundfunc($dataset->{alt}/$altitudeRound)*$altitudeRound;
       #Log3 ($name, 0, "$name SwarmRound: ".$dataset->{alt}."/".$altitudeRound." = ".livetracking_roundfunc($dataset->{alt}/$altitudeRound)." *".$altitudeRound);
 
       if($altitude ne $newaltitude)
       {
-        readingsBulkUpdate($hash, "altitude", $newaltitude);
+        readingsBulkUpdate($hash, "altitude", int($newaltitude));
         $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{t});
         $altitude = $newaltitude;
       }
@@ -833,7 +833,7 @@ sub livetracking_ParseSwarm($$) {
 
     Log3 ($name, 4, "$name Swarm: ".$place." at ".FmtDateTime($dataset->{createdAt})." / ".$dataset->{venue}->{location}->{lat}.",".$dataset->{venue}->{location}->{lng});
 
-    my $loc = $dataset->{venue}->{location}->{lat}.",".$dataset->{venue}->{location}->{lng};
+    my $loc = sprintf("%.5f", $dataset->{venue}->{location}->{lat}).",".sprintf("%.5f", $dataset->{venue}->{location}->{lng});
 
     if(defined($attr{$name}{swarmHome}) and defined($attr{$name}{home}))
     {
@@ -842,9 +842,9 @@ sub livetracking_ParseSwarm($$) {
       $loc =~ s/$shl/$home/g;
     }
 
-    readingsBulkUpdate($hash, "latitude", $dataset->{venue}->{location}->{lat});
+    readingsBulkUpdate($hash, "latitude", sprintf("%.5f", $dataset->{venue}->{location}->{lat}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
-    readingsBulkUpdate($hash, "longitude", $dataset->{venue}->{location}->{lng});
+    readingsBulkUpdate($hash, "longitude", sprintf("%.5f", $dataset->{venue}->{location}->{lng}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
     readingsBulkUpdate($hash, "location", $loc);
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{createdAt});
@@ -980,11 +980,11 @@ sub livetracking_ParseOwnTracks
 
   if($accurate)
   {
-      readingsBulkUpdate($hash, "latitude", $dataset->{lat});
+    readingsBulkUpdate($hash, "latitude", sprintf("%.5f", $dataset->{lat}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-      readingsBulkUpdate($hash, "longitude", $dataset->{lon});
+    readingsBulkUpdate($hash, "longitude", sprintf("%.5f", $dataset->{lon}));
       $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
-    readingsBulkUpdate($hash, "location", $dataset->{lat}.",".$dataset->{lon});
+    readingsBulkUpdate($hash, "location", sprintf("%.5f", $dataset->{lat}).",".sprintf("%.5f", $dataset->{lon}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   }
   else
@@ -998,7 +998,7 @@ sub livetracking_ParseOwnTracks
     my $altitudeRound = AttrVal($hash->{NAME}, "roundAltitude", 1);
     my $newaltitude = livetracking_roundfunc($dataset->{alt}/$altitudeRound)*$altitudeRound;
     #Log3 ($name, 0, "$name OTRound: ".$dataset->{alt}."/".$altitudeRound." = ".livetracking_roundfunc($dataset->{alt}/$altitudeRound)."*".$altitudeRound);
-    readingsBulkUpdate($hash, "altitude", $newaltitude);
+    readingsBulkUpdate($hash, "altitude", int($newaltitude));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
   }
   if(defined($dataset->{tid}) and $dataset->{tid} ne "")
@@ -1040,7 +1040,7 @@ sub livetracking_ParseOwnTracks
   #}
   if(defined($dataset->{batt}))
   {
-    readingsBulkUpdate($hash, "batteryPercent", $dataset->{batt});
+    readingsBulkUpdate($hash, "batteryPercent", int($dataset->{batt}));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
     readingsBulkUpdate($hash, "batteryState", (int($dataset->{batt}) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($dataset->{tst});
@@ -1057,7 +1057,6 @@ sub livetracking_ParseOwnTracks
   }
   if(defined($dataset->{desc}) and defined($dataset->{event}))
   {
-    DoTrigger($name, $dataset->{event}.": ".$dataset->{desc});
     Log3 ($name, 4, "$name OwnTracks Zone Event: ".$dataset->{event}." ".$dataset->{desc});
 
     my $place = livetracking_utf8clean($dataset->{desc});
@@ -1149,6 +1148,12 @@ sub livetracking_ParseOwnTracks
   }
 
   readingsEndUpdate($hash, 1);
+
+  if(defined($dataset->{desc}) and defined($dataset->{event})) #DoTrigger after readingsEndUpdate!
+  {
+    DoTrigger($name, $dataset->{event}.": ".$dataset->{desc});
+    Log3 ($name, 4, "$name OwnTracks Zone Event Trigger: ".$dataset->{event}." ".$dataset->{desc});
+  }
 
   readingsSingleUpdate($hash,".lastOwnTracks",$dataset->{tst},1);
 
@@ -1601,11 +1606,11 @@ sub livetracking_Webcall() {
 
   if($accurate && defined($lat) && defined($lon))
   {
-    readingsBulkUpdate($hash, "latitude", $lat);
+    readingsBulkUpdate($hash, "latitude", sprintf("%.5f", $lat));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
-    readingsBulkUpdate($hash, "longitude", $lon);
+    readingsBulkUpdate($hash, "longitude", sprintf("%.5f", $lon));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
-    readingsBulkUpdate($hash, "location", $lat.",".$lon);
+    readingsBulkUpdate($hash, "location", sprintf("%.5f", $lat).",".sprintf("%.5f", $lon));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
   }
   else
@@ -1627,7 +1632,7 @@ sub livetracking_Webcall() {
   {
     my $altitudeRound = AttrVal($hash->{NAME}, "roundAltitude", 1);
     my $newaltitude = livetracking_roundfunc($altitude/$altitudeRound)*$altitudeRound;
-    readingsBulkUpdate($hash, "altitude", $newaltitude);
+    readingsBulkUpdate($hash, "altitude", int($newaltitude));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
   }
   if(defined($hdop) && $hdop > 0)
@@ -1637,7 +1642,7 @@ sub livetracking_Webcall() {
   }
   if(defined($battery))
   {
-    readingsBulkUpdate($hash, "batteryPercent", $battery);
+    readingsBulkUpdate($hash, "batteryPercent", int($battery));
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
     readingsBulkUpdate($hash, "batteryState", (int($battery) <= int(AttrVal($name, "batteryWarning" , "20")))?"low":"ok");
     $hash->{CHANGETIME}[$changeindex++] = FmtDateTime($tst);
