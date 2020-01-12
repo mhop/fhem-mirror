@@ -1092,6 +1092,10 @@ sub CpanInstall($) {
     my $cmd = shift;
     my $h   = {};
     local $ENV{PATH} = __GetExtendedEnvPath();
+    eval {
+        umask 0022;
+        1;
+    };
     my $p = `$cmd->{installperl}`;
 
     if ( $p && $p ne '' ) {
@@ -5537,8 +5541,8 @@ sub __list_module {
       "abstract": "Modul zum Update von FHEM, zur Installation von Drittanbieter FHEM Modulen und der Verwaltung von Systemvoraussetzungen"
     }
   },
-  "version": "v0.5.6",
-  "release_status": "testing",
+  "version": "v0.5.7",
+  "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>"
   ],
