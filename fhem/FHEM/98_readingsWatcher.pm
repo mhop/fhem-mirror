@@ -98,6 +98,7 @@ BEGIN {
 # Versions History intern
 our %vNotesIntern = 
 (
+ "1.7.0"  =>  "12.01.20 add OR / AND watching",
  "1.6.0"  =>  "27.08.19 package, Meta",
  "1.5.0"  =>  "18.02.19",
  "1.3.0"  =>  "26.01.18 use ReadingsAge",
@@ -204,7 +205,7 @@ sub Get($@)
  return join(' ', sort keys %gets) if(@a < 2);
 
  my $name = $hash->{NAME};
- my ($dw,$rw,$tw,$sw,$aw) = (1,1,1,1,1);
+ my ($dw,$rw,$tw,$sw,$aw) = (6,7,7,5,3);
 
  if ($a[1] eq 'devices')
  {
@@ -231,6 +232,7 @@ sub Get($@)
 
        foreach (@r)
        {
+       $_ =~ s/\+/,/g;
        @parts = split(',', $_);
        if (@parts > 2) 
        { 
@@ -285,23 +287,25 @@ sub Get($@)
   {
    $dw += 2;
    $rw += 2;
-   $sw += 4;
+   $sw += 2;
    $aw += 2;
 
-   my $s  = 'Device'.(' ' x ($dw-6)).'Reading'.(' ' x ($rw-7)).(' ' x ($tw-2)).'TO'.(' ' x ($sw-5)).'State'.(' ' x ($aw-3)).'Age';
-   $s    .= "\n".('-' x length($s))."\n"; # --------------------------
+   my $s  = 'Device'.(' ' x ($dw-6)).'| Reading'.(' ' x ($rw-7)).'|'.(' ' x ($tw-6)).'Timeout |'.(' ' x ($sw-5)).'State |'.(' ' x ($aw-3)).'Age';
+   my $line = ('-'x(length($s)));
+   while ( $s =~ m/\|/g ) { substr($line,(pos($s)-1),1) = '+'; }
+   $s .= "\n".$line."\n";
 
    foreach(@devs) 
    { 
       @a  = split(',',$_);
       $s .= $a[0] . (' ' x ($dw - length$a[0])); # linksbündig
-      $s .= $a[1] . (' ' x ($rw - length$a[1])); # linksbündig
-      $s .= (' ' x ($tw - length$a[2])).$a[2];   # rechtsbündig
-      $s .= (' ' x ($sw - length$a[3])).$a[3];   # rechtsbündig
+      $s .= '| '.$a[1] . (' ' x ($rw - length$a[1])); # linksbündig
+      $s .= '| '.(' ' x ($tw - length$a[2])).$a[2];   # rechtsbündig
+      $s .= ' |'.(' ' x ($sw - length$a[3])).$a[3].' |';   # rechtsbündig
       $s .= (' ' x ($aw - length$a[4])).$a[4];   # rechtsbündig
       $s .= "\n";
    }
-   return $s;
+   return $s.$line;
   }
   return 'Sorry, no devices with valid attribute readingsWatcher found !';
  } # get devices
@@ -327,8 +331,8 @@ sub OnTimer($)
 
   my ($timeOutState, $errorValue, $timeout, $associated, $error, $readingsList);
   my ($deviceName, $rSA, $age, @devices, $rts, @parts, @devs);
-  my ($alives, $deads, $state, $readings) = (0, 0, '', 0);
-  my @timeOutdevs = ();
+  my ($alives, $deads, $state, $readings, $skipped, $timeouts) = (0, 0, '', 0, 0, 0);
+  my @timeOutdevs = (); my @deadDevs = (); my @skipDevs = ();
 
   foreach (keys %{$defs{$name}{READINGS}}) # alle eignen Readings 
   { $readingsList .=  $_ .',' if ($_ =~ /_/); }# nur die mit _ im Namen
@@ -336,40 +340,47 @@ sub OnTimer($)
   @devs = devspec2array("readingsWatcher!=");
 
   my ($areading,$dead,$alive) = split(":",AttrVal($name,'readingActivity','none:dead:alive'));
-  $dead = 'dead'  if(!defined($dead));
-  $alive= 'alive' if(!defined($alive));
+  $dead = 'dead'  if (!defined($dead));
+  $alive= 'alive' if (!defined($alive));
   $areading = ''  if ($areading eq 'none');
 
   readingsBeginUpdate($hash);
 
   foreach  $deviceName (@devs) 
   {
+    my $or_and = 0; # Readings beim auswerten OR
+    my ($d_a,$d_d,$ok_device) = (0,0,0); 
+    $timeOutState = '';
 
     $rSA = ($deviceName eq  $name) ? '' : AttrVal($deviceName, 'readingsWatcher', undef);
 
     if(defined($rSA) && !IsDisabled($deviceName) && !IsIgnored($deviceName)) 
     {
-      push @devices, $deviceName if  !grep {/$deviceName/} @devices; # keine doppelten Namen
+     push @devices, $deviceName if  !grep {/$deviceName/} @devices; # keine doppelten Namen
 
-      # rSA: timeout, errorValue, reading1, reading2, reading3, ...
-      #      120,---,temperature,humidity,battery
-      # or   900,,current,eState / no errorValue = do not change reading
+     $or_and = 1 if (index($_,'+') != -1); # Readings beim auswerten AND
+    $_ =~ s/\+/,/g; # eventuell vorhandene + auch in Komma wandeln
 
-      my @r = split(';', $rSA);
-      foreach (@r)
-      {
+     # rSA: timeout, errorValue, reading1, reading2, reading3, ...
+     #      120,---,temperature,humidity,battery
+     # or   900,,current,eState / no errorValue = do not change reading
+
+     my @r = split(';', $rSA);
+     foreach (@r)
+     {
         @parts = split(',', $_);
+
         if (@parts > 2)
         {
-        $timeout    = int($parts[0]);
-        $errorValue = $parts[1]; # = leer, Readings des Device nicht anfassen !
+         $ok_device  = 1;
+         $timeout    = int($parts[0]);
+         $errorValue = $parts[1]; # = leer, Readings des Device nicht anfassen !
 
-        # die ersten beiden brauchen wir nicht mehr
-        shift @parts;
-        shift @parts;
+         # die ersten beiden brauchen wir nicht mehr
+         shift @parts; shift @parts;
 
-        foreach (@parts) # alle zu überwachenden Readings
-        {
+         foreach (@parts) # alle zu überwachenden Readings
+         { 
           $_ =~ s/^\s+|\s+$//g; # $_ = Reading Name
 
           $state = 0;
@@ -388,20 +399,17 @@ sub OnTimer($)
            {
              push @timeOutdevs, $deviceName if  !grep {/$deviceName/} @timeOutdevs;
              $timeOutState = "timeout";
-             $deads++; 
+             $d_d++; # Device Tote
+             $timeouts++;
              $rts = ReadingsTimestamp($deviceName, $_,0);
              setReadingsVal($defs{$deviceName},$_,$errorValue,$rts) if ($errorValue && $rts); # leise setzen ohne Event
-             $error = CommandSetReading(undef, "$deviceName $areading $dead") if ($areading); # und das mit Event
              $defs{$deviceName}->{STATE} = $errorValue if ($errorValue && $state);
            }
            else
            {
-            $alives++;
+            $d_a++; # Device Lebende
             $timeOutState = "ok";
-            $error = CommandSetReading(undef, "$deviceName $areading $alive") if ($areading);
            }
-
-           Log3 $name,2,$name.', '.$error if ($error);
 
            my $r = $deviceName.'_'.$_;
 
@@ -410,46 +418,66 @@ sub OnTimer($)
 
            if ($timeout < 1)
            {
-            $alives--;
             $error = 'Invalid timeout value '.$timeout.' for reading '.$deviceName.'.'.$_;
             Log3 $name,2,$name.', '.$error;
            }
           }#age
           else
-          {  
-            $error = 'Timestamp for '.$_.' not found on device '.$deviceName;
-            Log3 $name,3,$name.', reading '.$error;
+          {
+            Log3 $name,3,$name.', reading Timestamp for '.$_.' not found on device '.$deviceName;
             readingsBulkUpdate($hash, $deviceName.'_'.$_, 'no Timestamp');
           }
-        }# foreach @parts
+         }# foreach @parts , Reading
        }# parts > 2 
-       else 
-       { 
-         $error = 'insufficient parameters for device '.$deviceName;
-         Log3 $name,2,$name.', '.$error.' - skipped !';
-       }
-      }# if $readingsWatcherAttribute
-    }
-   }# foreach $deviceName
+     } # Anzahl Readings Sätze im Device, meist nur einer
 
-   readingsBulkUpdate($hash,'readings'       , $readings);
-   readingsBulkUpdate($hash,'devices'        , int(@devices));
-   readingsBulkUpdate($hash,'alive'          , $alives);
-   readingsBulkUpdate($hash,'timeouts'       , $deads);
-   readingsBulkUpdate($hash,'state'          , ($deads) ? 'timeout' : 'ok');
- 
-   # nicht aktualisierte Readings markieren oder löschen
-   if ($readingsList) 
-   { 
-     my @a = split(",",$readingsList); 
+     if ($ok_device && $timeOutState)
+     {
+      if ((!$or_and && $d_d) || ($or_and && !$d_a)) # tot bei OR und mindestens einem Toten ||  AND aber kein noch Lebender
+      {
+       $error = CommandSetReading(undef, "$deviceName $areading $dead") if ($areading);
+       $deads++; # dead devices
+       push @deadDevs, $deviceName;
+      }
+      else  # wenn es nicht tot ist muss es eigentlich noch leben ....
+      {
+       $error = CommandSetReading(undef, "$deviceName $areading $alive") if ($areading);
+       $alives++; # alive devices
+      }
+      Log3 $name,2,$name.', '.$error if ($error);
+     }
+     else
+     {
+      Log3 $name,2,$name.', insufficient parameters for device '.$deviceName.' - skipped !';
+      $skipped++;
+      CommandSetReading(undef, "$deviceName $areading unkown") if ($areading);
+      push @skipDevs, $deviceName;
+     }
+    } # defined($rSA) && !IsDisabled($deviceName) && !IsIgnored($deviceName)
+  } # foreach $deviceName
+
+  readingsBulkUpdate($hash,'readings'       , $readings);
+  readingsBulkUpdate($hash,'devices'        , int(@devices));
+  readingsBulkUpdate($hash,'alive'          , $alives);
+  readingsBulkUpdate($hash,'dead'           , $deads);
+  readingsBulkUpdate($hash,'skipped'        , $skipped) if ($skipped);
+  readingsBulkUpdate($hash,'timeouts'       , $timeouts);
+  readingsBulkUpdate($hash,'state'          , ($timeouts) ? 'timeout' : 'ok');
+
+  readingsDelete($hash, 'skipped') if (!$skipped && AttrNum($name,'deleteUnusedReadings','1'));
+
+  # nicht aktualisierte Readings markieren oder löschen
+  if ($readingsList) 
+  { 
+    my @a = split(",",$readingsList); 
      foreach (@a) 
      {
        if ($_)
        {
         if (AttrNum($name,'deleteUnusedReadings','1'))
         {
-          readingsDelete($hash, $_);
-          Log3 $name,3,$name.', delete unused reading '.$_;
+         readingsDelete($hash, $_);
+         Log3 $name,3,$name.', delete unused reading '.$_;
         }
          else 
         { 
@@ -457,22 +485,32 @@ sub OnTimer($)
          Log3 $name,4,$name.', unused reading '.$_;
         }
        }
-     } 
-   }
+     }
+  }
 
-   if (int(@devices))
-   { readingsBulkUpdate($hash,'.associatedWith' , join(',',@devices)); }
-   else
-   { readingsDelete($hash, '.associatedWith'); }
+  if (int(@devices))
+  { readingsBulkUpdate($hash,'.associatedWith' , join(',',@devices)); }
+  else
+  { readingsDelete($hash, '.associatedWith'); }
 
-   if (int(@timeOutdevs))
-   { readingsBulkUpdate($hash,'timeoutdevs',join(',',@timeOutdevs));}
-   else
-   { readingsBulkUpdate($hash,'timeoutdevs','none');}
+  if (int(@timeOutdevs))
+  { readingsBulkUpdate($hash,'timeoutdevs',join(',',@timeOutdevs));}
+  else
+  { readingsBulkUpdate($hash,'timeoutdevs','none');}
 
-   readingsEndUpdate($hash, 1);
+  if (int(@deadDevs))
+  { readingsBulkUpdate($hash,'deadDevs',join(',',@deadDevs));}
+  else
+  { readingsBulkUpdate($hash,'deadDevs','none');}
 
-   return undef;
+  if (int(@skipDevs))
+  { readingsBulkUpdate($hash,'skippedDevs',join(',',@skipDevs));}
+  else
+  { readingsBulkUpdate($hash,'skippedDevs','none');}
+
+  readingsEndUpdate($hash, 1);
+
+  return undef;
 }
 
 sub Attr (@) 
@@ -542,6 +580,9 @@ sub Attr (@)
     If readings are only to be monitored for their update and should <b>not</b> be overwritten<br>
     so the replacement string must be <b>empty</b><br><br>
     Example : <code>attr myThermo readingsWatcher 300,,temperature,humidity</code><br><br>
+    other examples :<br>
+    <code>attr weather readingsWatcher 300,,temperature+humidity</code> (new)<br>
+    <code>attr weather readingsWatcher 300,,temperature,humidity;3600,???,battery</code>
   </ul>
  
   <a name="readingsWatcherSet"></a>
@@ -610,6 +651,10 @@ sub Attr (@)
     Sollen Readings nur auf ihre Aktualiesierung &uuml;berwacht, deren Wert aber <b>nicht</b> &uuml;berschrieben werden,<br>
     so  mu&szlig; der Ersatzsstring <b>leer</b> gelassen werden :<br>
     Bsp : <code>attr AussenTemp readingsWatcher 300,,temperature,humidity</code><br><br>
+    <br>
+    weitere Beispiele :<br>
+    <code>attr wetter readingsWatcher 300,,temperature+humidity</code> (neu)<br>
+    <code>attr wetter readingsWatcher 300,,temperature,humidity;3600,???,battery</code>
   </ul>
 
   <a name="readingsWatcherSet"></a>
