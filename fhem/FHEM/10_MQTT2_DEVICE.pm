@@ -249,6 +249,7 @@ MQTT2_DEVICE_Parse($$)
       }
 
       $topic =~ s,([\^\$\[\]()\.\\]),\\$1,g;
+      $topic =~ s,\s,.,g;
 
       for my $ch (@{$cidArr}) {
         my $nn = $ch->{NAME};
