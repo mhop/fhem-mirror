@@ -49,6 +49,9 @@
 # 28.02.2019 : A.Goebel : fix port 8888 was hardcoded in GAEBUS_OpenDev, use $port instead (highlighted by user freetz)
 # 21.03.2019 : A.Goebel : add support for find -p 
 # 03.01.2019 : A.Goebel : add support for $readingFnAttributes as suggested by Hanjo
+# 05.01.2020 : A.Goebel : fix supress sprintf warnings in valueFormat evaluation
+# 09.01.2020 : A.Goebel : fix to skip readings named "dummy"
+# 09.01.2020 : A.Goebel : fix handling for valueFormat, give exact number of parameters to sprintf and shift all of them
 
 package main;
 
@@ -1076,21 +1079,15 @@ GAEBUS_doEbusCmd($$$$$$$)
   {
     $actMessage = "";
 
-#    for (my $i=0; $i <= $#targetreading; $i++)
-#    {
-#      next if ($targetreading[$i] eq "dummy");
-#      my $v = defined($values[$i]) ? $values[$i] : "";
-#
-#      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
-#      $actMessage .= $targetreading[$i]."|".$v."|";
-#    }
-
     foreach my $r (@targetreading)
     {
-      next if ($r eq "dummy");
-      my $v = GAEBUS_valueFormat ($hash, $r, \@values);
-      shift @values;
-      $actMessage .= $r."|".$v."|";
+      if ($r eq "dummy") {
+        shift @values;
+      } else {
+        # shift is done in GAEBUS_valueFormat
+        my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+        $actMessage .= $r."|".$v."|";
+      }
     }
 
     $actMessage =~ s/\|$//;
@@ -1102,22 +1099,17 @@ GAEBUS_doEbusCmd($$$$$$$)
   if ($action eq "r")
   {
     readingsBeginUpdate ($hash);
-#    for (my $i=0; $i <= $#targetreading; $i++)
-#    {
-#      next if ($targetreading[$i] eq "dummy");
-#      my $v = defined($values[$i]) ? $values[$i] : "";
-#
-#      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
-#
-#      readingsBulkUpdate ($hash, $targetreading[$i], $v);
-#    }
 
     foreach my $r (@targetreading)
     {
-      next if ($r eq "dummy");
-      my $v = GAEBUS_valueFormat ($hash, $r, \@values);
-      shift @values;
-      readingsBulkUpdate ($hash, $r, $v);
+      if ($r eq "dummy") {
+        shift @values;
+      } else {
+        # shift is done in GAEBUS_valueFormat
+        my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+        readingsBulkUpdate ($hash, $r, $v);
+      }
+      #shift @values;
     }
 
     readingsEndUpdate($hash, 1);
@@ -1291,18 +1283,37 @@ sub
 GAEBUS_valueFormat(@)
 {
   my ($hash, $reading, $values_ref) = @_;
+  my $rv = ""; 
 
   if (ref($hash->{helper}{valueFormat}) eq 'HASH' and defined ($reading))
   {
 
     if (exists($hash->{helper}{valueFormat}->{$reading})) {
-
+      #no warnings qw( redundant );
       my $vf = $hash->{helper}{valueFormat}->{$reading};
-      return sprintf ("$vf", @{$values_ref});
+
+      #local $SIG{__WARN__} = sub {
+      #  Log3 ($hash->{NAME}, 2, "$hash->{NAME} valueFormat reading $reading: argument missmatch ($vf) (".join(",", @{$values_ref}).")");
+      #};
+      #
+      my $count  = 0;
+      my $count1 = () = $vf =~ /%/g;
+      my $count2 = () = $vf =~ /%%/g;
+      my @values = ();
+      $count = $count1 - 2 * $count2;
+
+      for (my $i=0; $i<$count; $i++) {
+        push @values, ${$values_ref}[0];
+        shift @{$values_ref};
+      }
+
+      return sprintf ("$vf", @values);
     }
   }
 
-  return (defined(${$values_ref}[0]) ? ${$values_ref}[0] : "");
+  $rv = (defined(${$values_ref}[0]) ? ${$values_ref}[0] : "");
+  shift @{$values_ref};
+  return $rv;
 
 }
 
