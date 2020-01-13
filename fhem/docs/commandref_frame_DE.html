@@ -1393,6 +1393,10 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   <ul>
     setstate lampe An
   </ul>
+  Achtung: setstate wird verwendet, um Readings im statefile zu speichern, in
+  diesem Fall wird vor dem Wert ein Zeitstempel geschrieben. Als Seiteneffekt
+  ist es nicht m&ouml;glich, ein Status, was mit einem Zeitstempel der Form
+  YYYY-MM-DD HH:MM:SS beginnt, korrekt zu speichern.
 </ul>
 <!-- setstate end -->
 

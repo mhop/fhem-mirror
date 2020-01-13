@@ -1310,6 +1310,10 @@ The following local attributes are used by a wider range of devices:
   <ul>
     setstate lamp on
   </ul>
+  Note: this command is also used to store the readings in the statefile, in
+  this case the timestamp will preceed the value. As a side-effect there is no
+  way to save a state correctly if it starts with a timestamp in the YYYY-MM-DD
+  HH:MM:SS form.
 </ul>
 <!-- setstate end -->
 
