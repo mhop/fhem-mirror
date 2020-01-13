@@ -53,15 +53,21 @@ if (typeof todoist_checkVar === 'undefined') {
   
   function todoist_refreshTable(name,sortit) {
     var i=1;
+    var order = "";
     $('#todoistTable_' + name).find('tr.todoist_data').each(function() {
       // order
       var tid = $(this).attr("data-line-id");
       $(this).removeClass("odd even");
       if (i%2==0) $(this).addClass("even");
       else $(this).addClass("odd");
-      if (typeof sortit != 'undefined') todoist_sendCommand('set ' + name + ' updateTask ID:'+ tid + ' order="' + i + '"');
+    
+      if (typeof sortit != 'undefined') {
+        if (i>1) order = order + ",";
+        order = order + tid;
+      }
       i++;
     });
+    if (order!="") todoist_sendCommand('set ' + name + ' reorderTasks '+ order);
     if (i!=1) $('#todoistTable_' + name).find("tr.todoist_ph").hide();
     if (i==1) $('#todoistTable_' + name).find("tr.todoist_ph").show();
     refreshInput(name);

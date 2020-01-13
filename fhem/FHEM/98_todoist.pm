@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.2.13";
+my $version = "1.3.0";
 
 my $srandUsed;
 
@@ -249,6 +249,111 @@ sub todoist_ErrorReadings($;$$) {
   return undef;
 }
 
+
+# reorderTasks
+sub todoist_ReorderTasks ($$) {
+  my ($hash,$cmd) = @_;
+  
+  my $name=$hash->{NAME};
+  
+  Log3 $name,4, "$name: cmd: ".$cmd;
+  
+  my $pwd="";
+  
+  my $param;
+  
+  my %commands=();
+  
+  # some random string for UUID
+  my $uuid = todoist_genUUID();
+  
+  # JSON String start- and endpoint
+  my $commandsStart="[{";
+  my $commandsEnd="}]";
+  
+  my $tType;
+  
+  my $argsStart = "{\"items\": [";
+  my $argsEnd   = "]}";
+  
+  my $args = "";
+  
+  ## if no token is needed and device is not disabled, check token and get list vom todoist
+  if (!$hash->{helper}{PWD_NEEDED} && !IsDisabled($name)) {
+    
+    ## get password
+    $pwd=todoist_GetPwd($hash);
+    
+    if ($pwd) {
+      Log3 $name,5, "$name: hash: ".Dumper($hash);
+      
+      # get Task - IDs in order
+      my $tids = $cmd;
+      my @taskIds = split(",",$tids);
+      
+      $tType = "item_reorder";
+      
+      my $i=0;
+      
+      foreach my $taskId (@taskIds) { 
+        $i++;
+        $args .= "," if ($i>1);
+        $args .= "{\"id\":".$taskId.",\"child_order\":".$i."}";
+      }
+      
+      $args = $argsStart.$args.$argsEnd;
+      
+      Log3 $name,5, "todoist ($name): Data sent to todoist API: ".$args;
+      
+      my $dataArr=$commandsStart.'"type":"'.$tType.'","uuid":"'.$uuid.'","args":'.$args.$commandsEnd;
+      
+      Log3 $name,4, "todoist ($name): Data Array sent to todoist API: ".$dataArr;
+    
+      my $data= {
+        token     =>    $pwd,
+        commands  =>    $dataArr
+      };
+      
+      Log3 $name,4, "todoist ($name): JSON sent to todoist API: ".Dumper($data);
+      
+      my $method="POST";
+      
+      $param = {
+        url        => "https://api.todoist.com/sync/v8/sync",
+        data       => $data,
+        method     => $method,
+        wType      => "reorder",
+        timeout    => 7,
+        header     => "Content-Type: application/x-www-form-urlencoded",
+        hash       => $hash,
+        callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
+      };
+      
+      Log3 $name,5, "todoist ($name): Param: ".Dumper($param);
+      
+      ## non-blocking access to todoist API
+      InternalTimer(gettimeofday()+0.1, "HttpUtils_NonblockingGet", $param, 0);
+      
+      
+    }  
+    else {
+      todoist_ErrorReadings($hash,"access token empty");
+    }
+  }
+  else {
+    if (!IsDisabled($name)) {
+      todoist_ErrorReadings($hash,"no access token set");
+    }
+    else {
+      todoist_ErrorReadings($hash,"device is disabled");
+    }
+  
+  }
+  
+  
+  
+  return undef;
+}
 
 # update Task
 sub todoist_UpdateTask($$$) {
@@ -1679,6 +1784,7 @@ sub todoist_Set ($@) {
     push @sets, "getTasks:noArg";
     push @sets, "cChildProjects:noArg";
     push @sets, "getUsers:noArg";
+    push @sets, "reorderTasks";
   }
   push @sets, "accessToken" if ($hash->{helper}{PWD_NEEDED});
   push @sets, "newAccessToken" if (!$hash->{helper}{PWD_NEEDED});
@@ -1752,6 +1858,14 @@ sub todoist_Set ($@) {
       todoist_UpdateTask ($hash,$exp,$term);
     }
     return "in order to complete a task, we need it's ID" if ($count==0);
+  }
+  elsif ($cmd eq "reorderTasks") {
+    my $count=@args;
+    if ($count!=0) {
+      my $exp=$args[0];
+      todoist_ReorderTasks ($hash,$exp);
+    }
+    return "in order to delete a task, we need it's ID" if ($count==0);
   }
   elsif ($cmd eq "deleteTask") {
     my $count=@args;
@@ -2364,6 +2478,18 @@ sub todoist_genUUID() {
         <ul>
         <li>0: don't show order no. of the task (default)</li>
         <li>1: show order number</li>
+        </ul></li>
+        <br />
+        <li>showParent
+        <ul>
+        <li>0: don't show parent_id of the task</li>
+        <li>1: show parent_id (default)</li>
+        </ul></li>
+        <br />
+        <li>showSection
+        <ul>
+        <li>0: don't show section_id of the task</li>
+        <li>1: show section_id (default)</li>
         </ul></li>
         <br />
         <li>showChecked

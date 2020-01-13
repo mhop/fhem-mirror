@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_todoist: reorder tasks - widget reorder
  - change:  73_NUKIBridge: 74_NUKIDevice use packages
  - change:  98_Heating_Control: move to contrib
  - bugfix:  98_livetracking: DoTrigger after readingsEndUpdate, decimals
