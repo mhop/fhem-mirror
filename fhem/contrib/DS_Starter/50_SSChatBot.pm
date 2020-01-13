@@ -1897,8 +1897,8 @@ Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wi
   },
   "resources": {
     "x_wiki": {
-      "web": "https://wiki.fhem.de/wiki/SSChatBot_-_Integration des Synology Chat Servers in FHEM",
-      "title": "SSChatBot - Integration des Synology Chat Servers in FHEM"
+      "web": "https://wiki.fhem.de/wiki/SSChatBot - Integration des Synology Chat Servers",
+      "title": "SSChatBot - Integration des Synology Chat Servers"
     },
     "repository": {
       "x_dev": {
