@@ -235,7 +235,6 @@ sub Define($$) {
     $hash->{NOTIFYDEV}             = 'global,' . $name;
     $hash->{VERSION}               = version->parse($VERSION)->normal;
     $hash->{BRIDGEAPI}             = FHEM::Meta::Get( $hash, 'x_apiversion' );
-    $hash->{helper}->{aliveCount}  = 0;
     $hash->{helper}->{actionQueue} = [];
     $hash->{helper}->{iowrite}     = 0;
     my $infix = 'NUKIBridge';
@@ -397,10 +396,14 @@ sub Notify($$) {
     FirstRun($hash)
       if (
         (
-            grep /^INITIALIZED$/, @{$events}
-            or grep /^REREADCFG$/, @{$events}
-            or grep /^MODIFIED.$name$/, @{$events}
-            or grep /^DEFINED.$name$/, @{$events}
+            grep /^INITIALIZED$/,
+            @{$events}
+            or grep /^REREADCFG$/,
+            @{$events}
+            or grep /^MODIFIED.$name$/,
+            @{$events}
+            or grep /^DEFINED.$name$/,
+            @{$events}
         )
         and $devname eq 'global'
         and $init_done
@@ -573,10 +576,11 @@ sub Write($@) {
     };
 
     $hash->{helper}->{lastDeviceAction} = $obj
-      if ( (  defined($param)
-          and $param)
-        or (defined($nukiId)
-          and $nukiId) );
+      if (
+        ( defined($param) and $param )
+        or ( defined($nukiId)
+            and $nukiId )
+      );
 
     unshift( @{ $hash->{helper}->{actionQueue} }, $obj );
 
@@ -703,9 +707,7 @@ sub Distribution($$$) {
         if ( $err ne '' ) {
             if ( $param->{endpoint} eq 'info' ) {
                 readingsBulkUpdate( $hash, 'state', 'not connected' );
-#                   if ( $hash->{helper}{aliveCount} > 1 );
                 Log3( $name, 5, "NUKIBridge ($name) - Bridge ist offline" );
-#                 $hash->{helper}{aliveCount} = $hash->{helper}{aliveCount} + 1;
             }
 
             readingsBulkUpdate( $hash, 'lastError', $err )
@@ -794,7 +796,7 @@ sub Distribution($$$) {
         and $hash->{helper}->{lastDeviceAction} );
 
     readingsEndUpdate( $hash, 1 );
-    
+
     readingsSingleUpdate( $hash, 'state', 'connected', 1 );
     Log3( $name, 5, "NUKIBridge ($name) - Bridge ist online" );
 
@@ -909,8 +911,6 @@ sub ResponseProcessing($$$) {
 
         InfoProcessing( $hash, $decode_json )
           if ( $endpoint eq 'info' );
-
-        $hash->{helper}{aliveCount} = 0;
     }
     else {
         Log3(
@@ -1336,7 +1336,7 @@ sub ParseJSON($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v1.9.13",
+  "version": "v1.9.14",
   "x_apiversion": "1.9",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"

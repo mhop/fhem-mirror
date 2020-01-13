@@ -30,7 +30,6 @@ package main;
 use strict;
 use warnings;
 
-
 package FHEM::NUKIDevice;
 
 use strict;
@@ -217,14 +216,14 @@ sub Initialize($) {
 
     $hash->{Match} = '^{.*}$';
 
-    $hash->{SetFn}      = 'FHEM::NUKIDevice::Set';
-    $hash->{DefFn}      = 'FHEM::NUKIDevice::Define';
-    $hash->{UndefFn}    = 'FHEM::NUKIDevice::Undef';
-    $hash->{NotifyFn}   = 'FHEM::NUKIDevice::Notify';
-    $hash->{AttrFn}     = 'FHEM::NUKIDevice::Attr';
-    $hash->{ParseFn}    = 'FHEM::NUKIDevice::Parse';
+    $hash->{SetFn}    = 'FHEM::NUKIDevice::Set';
+    $hash->{DefFn}    = 'FHEM::NUKIDevice::Define';
+    $hash->{UndefFn}  = 'FHEM::NUKIDevice::Undef';
+    $hash->{NotifyFn} = 'FHEM::NUKIDevice::Notify';
+    $hash->{AttrFn}   = 'FHEM::NUKIDevice::Attr';
+    $hash->{ParseFn}  = 'FHEM::NUKIDevice::Parse';
 
-    $hash->{AttrList}   =
+    $hash->{AttrList} =
         'IODev '
       . 'model:opener,smartlock '
       . 'disable:1 '
@@ -236,7 +235,7 @@ sub Initialize($) {
 sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( '[ \t][ \t]*', $def );
-    
+
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
@@ -266,7 +265,7 @@ sub Define($$) {
     }
 
     $iodev = $hash->{IODev}->{NAME};
-    
+
     $hash->{BRIDGEAPI} = $defs{$iodev}->{BRIDGEAPI};
 
     my $d = $modules{NUKIDevice}{defptr}{$nukiId};
@@ -291,9 +290,9 @@ sub Define($$) {
     $modules{NUKIDevice}{defptr}{$nukiId} = $hash;
 
     GetUpdate($hash)
-      if (  ReadingsVal($name,'success','none') eq 'none'
+      if ( ReadingsVal( $name, 'success', 'none' ) eq 'none'
         and $init_done );
-    
+
     return undef;
 }
 
@@ -363,10 +362,14 @@ sub Notify($$) {
     GetUpdate($hash)
       if (
         (
-            grep /^INITIALIZED$/, @{$events}
-            or grep /^REREADCFG$/, @{$events}
-            or grep /^MODIFIED.$name$/, @{$events}
-            or grep /^DEFINED.$name$/, @{$events}
+            grep /^INITIALIZED$/,
+            @{$events}
+            or grep /^REREADCFG$/,
+            @{$events}
+            or grep /^MODIFIED.$name$/,
+            @{$events}
+            or grep /^DEFINED.$name$/,
+            @{$events}
         )
         and $devname eq 'global'
         and $init_done
@@ -430,7 +433,8 @@ sub GetUpdate($) {
     my $name = $hash->{NAME};
 
     if ( !IsDisabled($name) ) {
-        IOWrite( $hash, 'lockState', undef, $hash->{NUKIID}, $hash->{DEVICETYPE} );
+        IOWrite( $hash, 'lockState', undef, $hash->{NUKIID},
+            $hash->{DEVICETYPE} );
         Log3( $name, 2, "NUKIDevice ($name) - GetUpdate Call IOWrite" );
     }
 
