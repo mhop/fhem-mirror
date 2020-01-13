@@ -29,7 +29,14 @@ package main;
 
 use strict;
 use warnings;
+
+
+package FHEM::NUKIDevice;
+
+use strict;
+use warnings;
 use FHEM::Meta;
+use GPUtils qw(GP_Import GP_Export);
 
 main::LoadModule('NUKIBridge');
 
@@ -104,16 +111,41 @@ if ($@) {
     }
 }
 
+## Import der FHEM Funktionen
+#-- Run before package compilation
+BEGIN {
 
-# Declare functions
-sub NUKIDevice_Initialize($);
-sub NUKIDevice_Define($$);
-sub NUKIDevice_Undef($$);
-sub NUKIDevice_Attr(@);
-sub NUKIDevice_Set($$@);
-sub NUKIDevice_GetUpdate($);
-sub NUKIDevice_Parse($$);
-sub NUKIDevice_WriteReadings($$);
+    # Import from main context
+    GP_Import(
+        qw(
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBeginUpdate
+          readingsEndUpdate
+          readingFnAttributes
+          makeDeviceName
+          defs
+          modules
+          Log3
+          CommandAttr
+          AttrVal
+          IsDisabled
+          deviceEvents
+          init_done
+          InternalVal
+          ReadingsVal
+          AssignIoPort
+          IOWrite
+          data)
+    );
+}
+
+#-- Export to main context with different name
+GP_Export(
+    qw(
+      Initialize
+      )
+);
 
 my %deviceTypes = (
     0 => 'smartlock',
@@ -180,18 +212,19 @@ my %lockStates = (
 
 my %deviceTypeIds = reverse(%deviceTypes);
 
-sub NUKIDevice_Initialize($) {
+sub Initialize($) {
     my ($hash) = @_;
 
     $hash->{Match} = '^{.*}$';
 
-    $hash->{SetFn}   = 'NUKIDevice_Set';
-    $hash->{DefFn}   = 'NUKIDevice_Define';
-    $hash->{UndefFn} = 'NUKIDevice_Undef';
-    $hash->{AttrFn}  = 'NUKIDevice_Attr';
-    $hash->{ParseFn} = 'NUKIDevice_Parse';
+    $hash->{SetFn}      = 'FHEM::NUKIDevice::Set';
+    $hash->{DefFn}      = 'FHEM::NUKIDevice::Define';
+    $hash->{UndefFn}    = 'FHEM::NUKIDevice::Undef';
+    $hash->{NotifyFn}   = 'FHEM::NUKIDevice::Notify';
+    $hash->{AttrFn}     = 'FHEM::NUKIDevice::Attr';
+    $hash->{ParseFn}    = 'FHEM::NUKIDevice::Parse';
 
-    $hash->{AttrList} =
+    $hash->{AttrList}   =
         'IODev '
       . 'model:opener,smartlock '
       . 'disable:1 '
@@ -200,7 +233,7 @@ sub NUKIDevice_Initialize($) {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub NUKIDevice_Define($$) {
+sub Define($$) {
     my ( $hash, $def ) = @_;
     my @a = split( '[ \t][ \t]*', $def );
     
@@ -218,6 +251,7 @@ sub NUKIDevice_Define($$) {
     $hash->{DEVICETYPE} = ( defined $deviceType ) ? $deviceType : 0;
     $hash->{VERSION}    = version->parse($VERSION)->normal;
     $hash->{STATE}      = 'Initialized';
+    $hash->{NOTIFYDEV}  = 'global,autocreate,' . $name;
 
     my $iodev = AttrVal( $name, 'IODev', 'none' );
 
@@ -254,27 +288,20 @@ sub NUKIDevice_Define($$) {
     CommandAttr( undef, $name . ' model ' . $deviceTypes{$deviceType} )
       if ( AttrVal( $name, 'model', 'none' ) eq 'none' );
 
-    if ($init_done) {
-        InternalTimer( gettimeofday() + int( rand(10) ),
-            "NUKIDevice_GetUpdate", $hash );
-    }
-    else {
-        InternalTimer( gettimeofday() + 15 + int( rand(5) ),
-            "NUKIDevice_GetUpdate", $hash );
-    }
-
     $modules{NUKIDevice}{defptr}{$nukiId} = $hash;
 
+    GetUpdate($hash)
+      if (  ReadingsVal($name,'success','none') eq 'none'
+        and $init_done );
+    
     return undef;
 }
 
-sub NUKIDevice_Undef($$) {
+sub Undef($$) {
     my ( $hash, $arg ) = @_;
 
     my $nukiId = $hash->{NUKIID};
     my $name   = $hash->{NAME};
-
-    RemoveInternalTimer($hash);
 
     Log3( $name, 3, "NUKIDevice ($name) - undefined with NukiId: $nukiId" );
     delete( $modules{NUKIDevice}{defptr}{$nukiId} );
@@ -282,7 +309,7 @@ sub NUKIDevice_Undef($$) {
     return undef;
 }
 
-sub NUKIDevice_Attr(@) {
+sub Attr(@) {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
 
     my $hash  = $defs{$name};
@@ -322,7 +349,33 @@ sub NUKIDevice_Attr(@) {
     return undef;
 }
 
-sub NUKIDevice_Set($$@) {
+sub Notify($$) {
+
+    my ( $hash, $dev ) = @_;
+    my $name = $hash->{NAME};
+    return if ( IsDisabled($name) );
+
+    my $devname = $dev->{NAME};
+    my $devtype = $dev->{TYPE};
+    my $events  = deviceEvents( $dev, 1 );
+    return if ( !$events );
+
+    GetUpdate($hash)
+      if (
+        (
+            grep /^INITIALIZED$/, @{$events}
+            or grep /^REREADCFG$/, @{$events}
+            or grep /^MODIFIED.$name$/, @{$events}
+            or grep /^DEFINED.$name$/, @{$events}
+        )
+        and $devname eq 'global'
+        and $init_done
+      );
+
+    return;
+}
+
+sub Set($$@) {
     my ( $hash, $name, @aa ) = @_;
 
     my ( $cmd, @args ) = @aa;
@@ -331,7 +384,7 @@ sub NUKIDevice_Set($$@) {
     if ( lc($cmd) eq 'statusrequest' ) {
         return ('usage: statusRequest') if ( @args != 0 );
 
-        NUKIDevice_GetUpdate($hash);
+        GetUpdate($hash);
         return undef;
     }
     elsif ($cmd eq 'lock'
@@ -371,22 +424,20 @@ sub NUKIDevice_Set($$@) {
     return undef;
 }
 
-sub NUKIDevice_GetUpdate($) {
+sub GetUpdate($) {
     my $hash = shift;
 
     my $name = $hash->{NAME};
 
-    RemoveInternalTimer($hash);
-
-    IOWrite( $hash, 'lockState', undef, $hash->{NUKIID}, $hash->{DEVICETYPE} )
-      if ( !IsDisabled($name) );
-    Log3( $name, 5, "NUKIDevice ($name) - NUKIDevice_GetUpdate Call IOWrite" )
-      if ( !IsDisabled($name) );
+    if ( !IsDisabled($name) ) {
+        IOWrite( $hash, 'lockState', undef, $hash->{NUKIID}, $hash->{DEVICETYPE} );
+        Log3( $name, 2, "NUKIDevice ($name) - GetUpdate Call IOWrite" );
+    }
 
     return undef;
 }
 
-sub NUKIDevice_Parse($$) {
+sub Parse($$) {
     my ( $hash, $json ) = @_;
 
     my $name = $hash->{NAME};
@@ -420,7 +471,7 @@ sub NUKIDevice_Parse($$) {
     if ( my $hash = $modules{NUKIDevice}{defptr}{$nukiId} ) {
         my $name = $hash->{NAME};
 
-        NUKIDevice_WriteReadings( $hash, $decode_json );
+        WriteReadings( $hash, $decode_json );
         Log3( $name, 4,
             "NUKIDevice ($name) - find logical device: $hash->{NAME}" );
 
@@ -455,10 +506,10 @@ sub NUKIDevice_Parse($$) {
 
     Log3( $name, 5, "NUKIDevice ($name) - parse status message for $name" );
 
-    NUKIDevice_WriteReadings( $hash, $decode_json );
+    WriteReadings( $hash, $decode_json );
 }
 
-sub NUKIDevice_WriteReadings($$) {
+sub WriteReadings($$) {
     my ( $hash, $decode_json ) = @_;
 
     my $name = $hash->{NAME};
@@ -689,7 +740,7 @@ sub NUKIDevice_WriteReadings($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v1.9.1",
+  "version": "v1.9.10",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
