@@ -270,9 +270,9 @@ HUEDevice_summaryFn($$$$)
 }
 
 sub
-HUEDevice_IODevChanged($$$)
+HUEDevice_IODevChanged($$$;$)
 {
-  my ($hash,$old,$new) = @_;
+  my ($hash,$old,$new, $new_id) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   my $name = $hash->{NAME};
 
@@ -295,6 +295,8 @@ HUEDevice_IODevChanged($$$)
     Log3 $name, 1, "$name: no I/O device";
   }
   $new = $hash->{IODev}->{NAME} if( defined($hash->{IODev}) );
+
+  $hash->{ID} = $new_id if( defined($new_id) );
 
   $code = $hash->{ID};
   $code = $new ."-". $code if( $new );
