@@ -323,8 +323,37 @@ HUEDevice_IODevChanged($$$;$)
   return $new;
 }
 
-sub HUEDevice_Define($$)
-{
+sub
+HUEDevice_moveToBridge($$$) {
+  my ($serial, $new, $new_id) = @_;
+
+  my $found;
+
+  return $found if( !$serial );
+  return $found if( !$new_id );
+
+  foreach my $hash ( values %{$modules{HUEDevice}{defptr}} ) {
+    next if( !$hash->{uniqueid} );
+    next if( $hash->{helper}{devtype} );
+    next if( $serial ne $hash->{uniqueid} );
+
+    my $name = $hash->{NAME};
+    my $old = AttrVal( $name, 'IODev', '<unknown>' );
+
+    Log3 $name, 2, "moving $name [$serial] from $old to $new";
+
+    HUEDevice_IODevChanged($hash, undef, $new, $new_id);
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+    $found = 1;
+    last;
+    }
+
+  return $found;
+}
+
+sub
+HUEDevice_Define($$) {
   my ($hash, $def) = @_;
 
   return $@ unless ( FHEM::Meta::SetInternals($hash) );

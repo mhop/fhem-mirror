@@ -96,23 +96,28 @@ HUEBridge_Read($)
           Log3 $name, 5, "$name: websocket data: ". Dumper $obj;
         } else {
           Log3 $name, 2, "$name: unhandled websocket text $data";
+        }
 
+        my $code;
+        my $id = $obj->{id};
+        $code = $name ."-". $id if( $obj->{r} eq 'lights' );
+        $code = $name ."-S". $id if( $obj->{r} eq 'sensors' );
+        $code = $name ."-G". $id if( $obj->{r} eq 'groups' );
+        if( !$code ) {
+          Log3 $name, 5, "$name: ignoring event: $code";
+          return;
         }
 
         if( $obj->{t} eq 'event' && $obj->{e} eq 'changed' ) {
-          my $code;
-          my $id = $obj->{id};
-          $code = $name ."-". $id if( $obj->{r} eq 'lights' );
-          $code = $name ."-S". $id if( $obj->{r} eq 'sensors' );
-          $code = $name ."-G". $id if( $obj->{r} eq 'groups' );
-          if( !$code ) {
-            Log3 $name, 5, "$name: ignoring event: $code";
-            return;
-          }
-
           if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
             HUEDevice_Parse($chash, $obj);
             HUEBridge_updateGroups($hash, $chash->{ID}) if( !$chash->{helper}{devtype} );
+
+          } elsif( HUEDevice_moveToBridge( $obj->{uniqueid}, $name, $obj->{id} ) ) {
+            if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+              HUEDevice_Parse($chash, $obj);
+            }
+
           } else {
             Log3 $name, 4, "$name: message for unknown device received: $code";
           }
@@ -123,7 +128,13 @@ HUEBridge_Read($)
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'added' ) {
           Log3 $name, 5, "$name: websocket add: $data";
-          HUEBridge_Autocreate($hash);
+          if( !HUEDevice_moveToBridge( $obj->{uniqueid}, $name, $obj->{id} ) ) {
+            HUEBridge_Autocreate($hash);
+          }
+
+          if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+            HUEDevice_Parse($chash, $obj);
+          }
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'deleted' ) {
           Log3 $name, 5, "$name: todo: handle websocket delete $data";
@@ -1907,31 +1918,13 @@ HUEBridge_dispatch($$$;$)
               $changed .= "," if( $changed );
               $changed .= $chash->{ID};
             }
+
+          } elsif( HUEDevice_moveToBridge( $lights->{$id}{uniqueid}, $name, $id ) ) {
+            HUEDevice_Parse($hash, $lights->{$id});
+
           } else {
-             my $found;
-             if( my $serial =  $lights->{$id}{uniqueid} ) {
-               foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
-                  next if( !$chash->{uniqueid} );
-                  next if( $chash->{helper}{devtype} );
-                  next if( $serial ne $chash->{uniqueid} );
+            Log3 $name, 3, "$name: message for unknown device received: $code";
 
-                 my $cname = $chash->{NAME};
-                 my $old = AttrVal( $cname, 'IODev', '<unknown>' );
-
-                 Log3 $name, 2, "moving $cname [$serial] from $old to $name";
-
-                 HUEDevice_IODevChanged($chash, undef, $name, $id);
-
-                 HUEDevice_Parse($chash, $lights->{$id});
-
-                 $found = 1;
-                 last;
-               }
-             }
-
-             if( !$found ) {
-              Log3 $name, 3, "$name: message for unknown device received: $code";
-             }
           }
         }
         HUEBridge_updateGroups($hash, $changed) if( $changed );
