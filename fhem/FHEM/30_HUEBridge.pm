@@ -133,6 +133,14 @@ HUEBridge_Read($)
           }
 
           if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+            if( $obj->{r} eq 'lights' ) {
+              $obj = $obj->{light};
+            } elsif( $obj->{r} eq 'sensors' ) {
+              $obj = $obj->{sensor};
+            } elsif( $obj->{r} eq 'goups' ) {
+              $obj = $obj->{group};
+            }
+
             HUEDevice_Parse($chash, $obj);
           }
 
