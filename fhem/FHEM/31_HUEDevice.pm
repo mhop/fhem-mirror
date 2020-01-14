@@ -320,6 +320,8 @@ HUEDevice_IODevChanged($$$;$)
 
   $hash->{DEF} =~ s/  / /g;
 
+  addStructChange( 'modify', $name, "$name $hash->{DEF}");
+
   return $new;
 }
 
