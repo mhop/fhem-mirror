@@ -1,8 +1,6 @@
 ##############################################
 # $Id$
 # todo:
-# holen von status nach sets nicht wenn ws verbindung
-# ao funktioniert nicht
 
 package main;
 
@@ -20,20 +18,20 @@ my %rsets = reverse %sets;
 sub NeuronPin_Initialize($) {
 	my ($hash) = @_;
 
-	$hash->{DefFn}    		= 'NeuronPin_Define';
-	$hash->{InitFn}  	 	= 'NeuronPin_Init';
-	$hash->{StateFn}        = "NeuronPin_State";
-	$hash->{AttrFn}   		= 'NeuronPin_Attr';
-	$hash->{SetFn}    		= 'NeuronPin_Set';
-	$hash->{GetFn}    		= 'NeuronPin_Get';
-	$hash->{UndefFn}  		= 'NeuronPin_Undef';
-	$hash->{AttrList} 		= 'IODev do_not_notify:0,1 showtime:0,1 '.
-							  'disable:0,1 disabledForIntervals'.
-							  'poll_interval:1,2,5,10,20,30 restoreOnStartup:on,off,last '.
-							  'aomax skipreadings ownsets autoalias '.
+	$hash->{DefFn}			= 'NeuronPin_Define';
+	$hash->{InitFn}		 	= 'NeuronPin_Init';
+	$hash->{StateFn}		= 'NeuronPin_State';
+	$hash->{AttrFn}			= 'NeuronPin_Attr';
+	$hash->{SetFn}	 		= 'NeuronPin_Set';
+	$hash->{GetFn}			= 'NeuronPin_Get';
+	$hash->{UndefFn}		= 'NeuronPin_Undef';
+	$hash->{AttrList}		= 'IODev do_not_notify:0,1 showtime:0,1 '.
+					  'disable:0,1 disabledForIntervals '.
+					  'poll_interval:1,2,5,10,20,30 restoreOnStartup:on,off,last '.
+					  'aomax skipreadings ownsets autoalias '.
 								$readingFnAttributes;
-	$hash->{Match} 			= ".*";
-	$hash->{ParseFn}   		= "NeuronPin_Parse";
+	$hash->{Match}			= ".*";
+	$hash->{ParseFn}		= "NeuronPin_Parse";
 #	$hash->{DbLog_splitFn} 	= "NeuronPin_DbLog_splitFn";
 	$hash->{AutoCreate} 	= {"NeuronPin_.*"  => { ATTR   => "room:Neuron" } };
 	$hash->{noAutocreatedFilelog} = 1;
@@ -171,7 +169,7 @@ sub NeuronPin_Parse ($$) {
 		return $hash->{NAME}; 
 	} 	else {
 		Log3 ($hash, 4, "NeuronPin_Parse von $io_hash->{NAME} nix gefunden...anlegen");
-		return "UNDEFINED NeuronPin_".$message->{dev}."_".$message->{circuit}." NeuronPin " . $port;
+		return "UNDEFINED $io_hash->{NAME}_Pin_".$message->{dev}."_".$message->{circuit}." NeuronPin " . $port;
 	}
 }
 
