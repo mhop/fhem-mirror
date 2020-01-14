@@ -949,7 +949,7 @@ sub ONKYO_AVR_Set($$$) {
                   ONKYO_AVR_SendCommand( $hash, "net-usb", lc( @$a[2] ) );
             }
             elsif ( lc( @$a[2] ) eq "prev" ) {
-                $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trdown" );
+                $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trdn" );
             }
             elsif ( lc( @$a[2] ) eq "next" ) {
                 $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trup" );
@@ -1041,7 +1041,7 @@ sub ONKYO_AVR_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
         }
         else {
-            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trdown" );
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trdn" );
         }
     }
 

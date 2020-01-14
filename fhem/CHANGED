@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_ONKYO_AVR: fixed command for previous title (thx Fusssel)
  - feature: 70_ONKYO_AVR: introduced 'set rawCommand'
  - change:  98_todoist: removed Attribute "sortTasks" / better commandref
                         better move in widget (not delete and add)
