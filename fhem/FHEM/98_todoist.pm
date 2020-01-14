@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.1";
+my $version = "1.3.2";
 
 my $srandUsed;
 
@@ -2136,14 +2136,14 @@ sub todoist_Html(;$$$) {
         
         $ret .= "<tr class=\"devTypeTr\">\n".
                 " <td colspan=\"3\">\n".
-                "   <div class=\"todoist_devType todoist_devType_".$name." col_header\">\n".
+                "   <div class=\"todoist_devType todoist_devType_".$name." col_header\" data-id=\"".$hash->{PID}."\">\n".
                     (!$FW_hiddenroom{detail}?"<a title=\"".$todoist_tt->{'gotodetail'}."\" href=\"/fhem?detail=".$name."\">":"").
                       AttrVal($name,"alias",$name).
                     (!$FW_hiddenroom{detail}?"</a>":"").
                 "   </div>\n".
                 " </td>\n".
                 "</tr>\n";
-        $ret .= "<tr><td colspan=\"3\"><table class=\"block wide sortable\" id=\"todoistTable_".$name."\">\n"; 
+        $ret .= "<tr><td colspan=\"3\"><table class=\"block wide sortable\" id=\"todoistTable_".$name."\"  data-project-name=\"".$name."\" data-project-id=\"".$hash->{PID}."\">\n"; 
       
       }
       
@@ -2166,7 +2166,7 @@ sub todoist_Html(;$$$) {
 
 
         
-        $ret .= "<tr id=\"".$name."_".$_."\" data-data=\"true\" data-line-id=\"".$_."\" class=\"sortit todoist_data ".$eo."\">\n".
+        $ret .= "<tr id=\"".$name."_".$_."\" data-data=\"true\" data-project-name=\"".$name."\" data-project-id=\"".$hash->{PID}."\" data-line-id=\"".$_."\" class=\"sortit todoist_data ".$eo."\">\n".
                 " <td class=\"col1 todoist_col1\">\n".
                 "   <div class=\"todoist_move\"></div>\n".
                 "   <input title=\"".$todoist_tt->{'check'}."\" class=\"todoist_checkbox_".$name."\" type=\"checkbox\" id=\"check_".$_."\" data-id=\"".$_."\" />\n".
@@ -2333,12 +2333,13 @@ sub todoist_genUUID() {
         <code>set &lt;DEVICE&gt; updateTask ID:12345678 dueDate=2017-01-15 priority=1</code><br />
         <code>set &lt;DEVICE&gt; updateTask 1 dueDate=übermorgen</code><br />
         <code>set &lt;DEVICE&gt; updateTask TITLE:Brot dueDate=übermorgen</code><br /><br /></li>
-        <li><b>moveTask</b> - move a task to another parent or project. 
+        <li><b>moveTask</b> - move a task to another parent, section or project. 
         Expects Task-ID or todoist-Task-ID as parameter<br /><br />
         Possible additional parameters are:<br />
           <ul>
              <li>parentID=todoist-ID of the new parent task.</li>
              <li>projectID=todoist-ID of the receiving project.</li>
+             <li>sectionID=todoist-ID of the receiving section.</li>
             </ul><br /><br /></li>
         <li><b>completeTask</b> - completes a task. Needs number of task (reading 'Task_NUMBER'), the title (TITLE:&lt;TITLE&gt;) or the 
         todoist-Task-ID (ID:&lt;ID&gt;) as parameter<br /><br />
