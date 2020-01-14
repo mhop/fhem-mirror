@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.0";
+my $version = "1.3.1";
 
 my $srandUsed;
 
@@ -76,7 +76,6 @@ sub todoist_Initialize($) {
   $hash->{AttrList}     = "disable:1,0 ".
                           "pollInterval ".
                           "do_not_notify ".
-                          "sortTasks:1,0 ".
                           "getCompleted:1,0 ".
                           "showPriority:1,0 ".
                           "showAssignedBy:1,0 ".
@@ -937,7 +936,7 @@ sub todoist_GetTasksCallback($$$){
   else {
     my $decoded_json="";
     
-    # checl for correct JSON
+    # check for correct JSON
     if (eval{decode_json($data)}) {
     
       $decoded_json = decode_json($data);
@@ -1134,11 +1133,7 @@ sub todoist_GetTasksCallback($$$){
   
   
   readingsEndUpdate( $hash, 1 );
-  
-  ## sort Tasks alphabetically if set
-  todoist_sort($hash) if (AttrVal($name,"sortTasks",0) == 1);
-  
-  
+    
   RemoveInternalTimer($hash,"todoist_GetTasks");
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "todoist_GetTasks", $hash, 0); ## loop with Interval
   
@@ -1466,73 +1461,6 @@ sub todoist_GetProjectsCallback($$$){
   return "Got $i new projects: ".$return;
 }
 
-# sort alphabetically (probably deprecated)
-sub todoist_sort($) {
-  my ($hash) = @_;
-  
-  my $name=$hash->{NAME};
-  
-  my $lText="";
-  
-  my %list;
-  
-  
-  ## get all Readings
-  my $readings = $hash->{READINGS};
-  ## prepare Hash for sorting
-  foreach my $key (keys %{$readings}) {
-    if ($key =~ m/^Task_\d\d\d$/) {
-      my @temp = split("_",$key);
-      my $tid = int($temp[1]);
-      my $val = $readings->{$key}{VAL};
-      my $id = $hash->{helper}{IDS}{'Task_'.$tid};
-      $list{$tid} = {content => $val, ID => $id};
-    }
-  }
-  
-  CommandDeleteReading(undef, "$hash->{NAME} (T|t)ask_.*");
-  
-  readingsBeginUpdate($hash);
-  
-  delete($hash->{helper}{"IDS"});
-  
-  ## sort Tasks and write them back
-  my $i = 0;
-  foreach my $key (sort {lc($list{$a}->{content}) cmp lc($list{$b}->{content})} keys(%list)) {
-    my $data = $list{$key};
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i),$data->{content});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_dueDate",$hash->{helper}{"DUE_DATE"}{$data->{ID}}) if ($hash->{helper}{"DUE_DATE"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_responsibleUid",$hash->{helper}{"RESPONSIBLE_UID"}{$data->{ID}}) if ($hash->{helper}{"RESPONSIBLE_UID"}{$data->{ID}} && AttrVal($name,"showResponsible",0)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_assignedByUid",$hash->{helper}{"ASSIGNEDBY_UID"}{$data->{ID}}) if ($hash->{helper}{"ASSIGNEDBY_UID"}{$data->{ID}} && AttrVal($name,"showAssignedBy",0)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_priority",$hash->{helper}{"PRIORITY"}{$data->{ID}}) if ($hash->{helper}{"PRIORITY"}{$data->{ID}} && AttrVal($name,"showPriority",0)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_recurrenceType",$hash->{helper}{"RECURRENCE_TYPE"}{$data->{ID}}) if ($hash->{helper}{"RECURRENCE_TYPE"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_completedAt",$hash->{helper}{"COMPLETED_AT"}{$data->{ID}}) if ($hash->{helper}{"COMPLETED_AT"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_completedById",$hash->{helper}{"COMPLETED_BY_ID"}{$data->{ID}}) if ($hash->{helper}{"COMPLETED_BY_ID"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_order",$hash->{helper}{"ORDER"}{$data->{ID}}) if ($hash->{helper}{"ORDER"}{$data->{ID}} && AttrVal($name,"showOrder",0)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_parentID",$hash->{helper}{"PARENT_ID"}{$data->{ID}}) if ($hash->{helper}{"PARENT_ID"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_sectionID",$hash->{helper}{"SECTION_ID"}{$data->{ID}}) if ($hash->{helper}{"SECTION_ID"}{$data->{ID}});
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_checked",$hash->{helper}{"CHECKED"}{$data->{ID}}) if ($hash->{helper}{"CHECKED"}{$data->{ID}} && AttrVal($name,"showChecked",1)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_isDeleted",$hash->{helper}{"ISDELETED"}{$data->{ID}}) if ($hash->{helper}{"ISDELETED"}{$data->{ID}} && AttrVal($name,"showDeleted",1)==1);
-    readingsBulkUpdate($hash,"Task_".sprintf("%03s",$i)."_ID",$data->{ID}) if (AttrVal($name,"hideId",0)!=1);
-    
-    $hash->{helper}{"IDS"}{"Task_".$i} = $data->{ID};
-    $hash->{helper}{"WID"}{$data->{ID}} = $i;
-    
-    if (!$hash->{helper}{"COMPLETED_AT"}{$data->{ID}}) {
-      $lText.=", " if ($i != 0);
-      $lText.=$data->{content};
-    }
-    $i++;
-  }
-  
-  ## list Text for TTS, Text-Message...
-  $lText="-" if ($lText eq "");
-  readingsBulkUpdate($hash,"listText",$lText) if ($lText ne "");
-  
-  readingsEndUpdate( $hash, 1 );
-  return undef;
-}
-
 
 #################################################
 # delete all Tasks from list
@@ -1751,7 +1679,7 @@ sub todoist_Attr($@) {
     }
   }
   
-  if ( $attrName eq "sortTasks" ||  $attrName =~ /(show(Priority|AssignedBy|Responsible|Order|DetailWidget|Section|Parent)|getCompleted|hide(Id|ListIfEmpty)|autoGetUsers|avoidDuplicates|delDeletedLists)/) {
+  if ( $attrName =~ /(show(Priority|AssignedBy|Responsible|Order|DetailWidget|Section|Parent)|getCompleted|hide(Id|ListIfEmpty)|autoGetUsers|avoidDuplicates|delDeletedLists)/) {
     if ( $cmd eq "set" ) {
       return "$name: $attrName has to be 0 or 1" if ($attrVal !~ /^(0|1)$/);
       Log3 $name, 4, "todoist ($name): set attribut $attrName to $attrVal";
@@ -2406,7 +2334,7 @@ sub todoist_genUUID() {
         <code>set &lt;DEVICE&gt; updateTask 1 dueDate=übermorgen</code><br />
         <code>set &lt;DEVICE&gt; updateTask TITLE:Brot dueDate=übermorgen</code><br /><br /></li>
         <li><b>moveTask</b> - move a task to another parent or project. 
-        Needs Task-ID or todoist-Task-ID as parameter<br /><br />
+        Expects Task-ID or todoist-Task-ID as parameter<br /><br />
         Possible additional parameters are:<br />
           <ul>
              <li>parentID=todoist-ID of the new parent task.</li>
@@ -2432,7 +2360,11 @@ sub todoist_genUUID() {
         <li><b>sortTasks</b> - sort Tasks alphabetically<br /><br /></li>
         <li><b>clearList</b> - <b><u>deletes</u></b> all Tasks from the list (only FHEM listed Tasks can be deleted)<br /><br /></li>
         <li><b>cChildProjects</b> - searches for children and defines them if possible, deletes lists that are deleted 
-        in todoist (Attribut delDeletedLists)<br /></li>
+        in todoist (Attribut delDeletedLists)<br /><br /></li>
+        <li><b>reorderTasks</b> - expects a comma seperated list of todoist-IDs. Tasks will be reorders in the given order<br />
+        Example: <br /><br />
+            <code>set &lt;DEVICE&gt; reorderTasks 12345678,23456789,34567890</code><br /><br />
+        </li>
     </ul>
     <br />
     <a name="todoist_Attributes"></a>
@@ -2443,12 +2375,6 @@ sub todoist_genUUID() {
         <li><a name="#disable">disable</a></li>
         <li>pollInterval
         get the list every pollInterval seconds. Default is 1800. Smallest possible value is 20.<br /><br /></li>
-        <li>sortTasks
-        <ul>
-        <li>0: don't sort the tasks (default)</li>
-        <li>1: sorts Tasks alphabetically after every update</li>
-        <!--<li>2: sorts Tasks in todoist order</li>-->
-        </ul></li>
         <br />
         <li>hideId
         <ul>
@@ -2623,7 +2549,7 @@ sub todoist_genUUID() {
           <li>Update a task by clicking it's text. You can edit the task in an input field. Leaving the field or pressing enter triggers updateTask.</li>
           <li>You can use parameters like "dueDate" in the input fields like this:
             <ul>
-              <code>Milch -dueDate=morgen</code>
+              <code>Milch dueDate=morgen</code>
             </ul>
           </li>
           <li>Clicking the cross behind every task deletes this one for good.</li>
