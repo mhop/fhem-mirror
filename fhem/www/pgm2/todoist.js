@@ -322,6 +322,7 @@ if (typeof todoist_checkVar === 'undefined') {
         var nameHT = tid.split("_");
         var lastVal = nameHT.pop();       // Get last element
         var nameH = nameHT.join("_"); 
+        todoist_refreshTable(nameH);
         //todoist_sendCommand('set ' + nameH + ' deleteTask ID:'+ id);
       },
       over: function (event,ui) {
@@ -349,6 +350,7 @@ if (typeof todoist_checkVar === 'undefined') {
         var pid = parent.data('project-id');
         var value = ui.item.find('span').html();
         todoist_sendCommand('set '+ nameF +' moveTask ID:' + id + ' projectID=' + pid);
+        todoist_refreshTable(nameR,1);
         ui.item.attr('data-remove','1');
       }
     }).disableSelection();
