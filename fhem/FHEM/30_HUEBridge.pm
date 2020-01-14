@@ -1908,7 +1908,30 @@ HUEBridge_dispatch($$$;$)
               $changed .= $chash->{ID};
             }
           } else {
-            Log3 $name, 2, "$name: message for unknown device received: $code";
+             my $found;
+             if( my $serial =  $lights->{$id}{uniqueid} ) {
+               foreach my $chash ( values %{$modules{HUEDevice}{defptr}} ) {
+                  next if( !$chash->{uniqueid} );
+                  next if( $chash->{helper}{devtype} );
+                  next if( $serial ne $chash->{uniqueid} );
+
+                 my $cname = $chash->{NAME};
+                 my $old = AttrVal( $cname, 'IODev', '<unknown>' );
+
+                 Log3 $name, 2, "moving $cname [$serial] from $old to $name";
+
+                 HUEDevice_IODevChanged($chash, undef, $name, $id);
+
+                 HUEDevice_Parse($chash, $lights->{$id});
+
+                 $found = 1;
+                 last;
+               }
+             }
+
+             if( !$found ) {
+              Log3 $name, 3, "$name: message for unknown device received: $code";
+             }
           }
         }
         HUEBridge_updateGroups($hash, $changed) if( $changed );

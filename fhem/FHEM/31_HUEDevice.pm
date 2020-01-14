@@ -280,6 +280,10 @@ HUEDevice_IODevChanged($$$;$)
     Log3 $name, 1, "$name: can't change IODev for TYPE $hash->{TYPE}";
     return undef;
   }
+  if( $new_id && $hash->{helper}->{devtype} ) {
+    Log3 $name, 1, "$name: can't change IODev for groups and sensors";
+    return undef;
+  }
 
   $old = AttrVal($name, "IODev", undef) if( !$old );
 
@@ -311,6 +315,9 @@ HUEDevice_IODevChanged($$$;$)
   } elsif( $new ) {
     $hash->{DEF} .= " IODev=$new"
   }
+
+  $hash->{DEF} =~ s/[^\s]+/$new_id/ if( $new_id );
+
   $hash->{DEF} =~ s/  / /g;
 
   return $new;
