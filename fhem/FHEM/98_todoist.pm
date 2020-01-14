@@ -787,7 +787,7 @@ sub todoist_HandleTaskCallback($$$){
         # remove line in possible webling widget
         map {FW_directNotify("#FHEMWEB:$_", "if (typeof todoist_removeLine === \"function\") todoist_removeLine('$name','$taskId')", "")} devspec2array("TYPE=FHEMWEB");
       }
-      if ($param->{wType} eq "create" || $param->{wType} eq "move") {
+      if ($param->{wType} eq "create") {
         if ($param->{parentId}) {
           # set parent id with additional updateTask command / API cannot add it in create
           CommandSet(undef, "$name moveTask ID:$taskId parent_id=".$param->{parentId});

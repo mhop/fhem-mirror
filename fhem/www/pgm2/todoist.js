@@ -312,8 +312,8 @@ if (typeof todoist_checkVar === 'undefined') {
         var parent = ui.item.parent().parent();
         var id = $(parent).attr('id');
         var name = id.split(/_(.+)/)[1];
-        if (ui.item.attr('data-remove')==1) ui.item.remove();
-        todoist_refreshTable(name,1);
+        //if (ui.item.attr('data-remove')==1) ui.item.remove();
+        //todoist_refreshTable(name,1);
         todoist_refreshTableWidth();
       },
       remove: function (event,ui) {
@@ -322,7 +322,7 @@ if (typeof todoist_checkVar === 'undefined') {
         var nameHT = tid.split("_");
         var lastVal = nameHT.pop();       // Get last element
         var nameH = nameHT.join("_"); 
-        todoist_refreshTable(nameH);
+        //todoist_refreshTable(nameH);
         //todoist_sendCommand('set ' + nameH + ' deleteTask ID:'+ id);
       },
       over: function (event,ui) {
@@ -338,7 +338,7 @@ if (typeof todoist_checkVar === 'undefined') {
         var name = id.split(/_(.+)/)[1];
         $(parent).css('width','');
         refreshInput(name);
-        todoist_refreshTable(name);
+        //todoist_refreshTable(name);
         todoist_refreshTableWidth();
       },
       receive: function (event,ui) {
@@ -350,7 +350,9 @@ if (typeof todoist_checkVar === 'undefined') {
         var pid = parent.data('project-id');
         var value = ui.item.find('span').html();
         todoist_sendCommand('set '+ nameF +' moveTask ID:' + id + ' projectID=' + pid);
-        todoist_refreshTable(nameR,1);
+        setTimeout(function(){ 
+          todoist_refreshTable(nameR,1);
+        },100);
         ui.item.attr('data-remove','1');
       }
     }).disableSelection();
