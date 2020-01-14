@@ -4,6 +4,7 @@
  - feature: 70_ONKYO_AVR: introduced 'set rawCommand'
  - change:  98_todoist: removed Attribute "sortTasks" / better commandref
                         better move in widget (not delete and add)
+                        alarm clock icon for due dates
  - change:  93_DbLog: change datetime pattern in valueFn of addCacheLine 
                       Forum: #107285
  - change:  98_todoist: reorder tasks - widget reorder

@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.2";
+my $version = "1.3.3";
 
 my $srandUsed;
 
@@ -2100,7 +2100,10 @@ sub todoist_Html(;$$$) {
                     height: 12px!important;
                     width: 12px!important;
                   }
-    ";
+                  .todoist_dueDateButton svg {
+                    margin-top:-2px!important;
+                  }
+    ";            
     
     if (!$detail) {
       $rot.="     .todoist_table {
@@ -2164,16 +2167,19 @@ sub todoist_Html(;$$$) {
         my $ind=0;
         
 
-
+        my $dueDate = defined($hash->{helper}{DUE_DATE}{$_})?$hash->{helper}{DUE_DATE}{$_}:"";
         
-        $ret .= "<tr id=\"".$name."_".$_."\" data-data=\"true\" data-project-name=\"".$name."\" data-project-id=\"".$hash->{PID}."\" data-line-id=\"".$_."\" class=\"sortit todoist_data ".$eo."\">\n".
+        my $dueDateClass = $dueDate!=""?" todoist_dueDate":"";
+        
+        $ret .= "<tr id=\"".$name."_".$_."\" data-due-date=\"".$dueDate."\" data-data=\"true\" data-project-name=\"".$name."\" data-project-id=\"".$hash->{PID}."\" data-line-id=\"".$_."\" class=\"sortit todoist_data ".$eo."\">\n".
                 " <td class=\"col1 todoist_col1\">\n".
                 "   <div class=\"todoist_move\"></div>\n".
                 "   <input title=\"".$todoist_tt->{'check'}."\" class=\"todoist_checkbox_".$name."\" type=\"checkbox\" id=\"check_".$_."\" data-id=\"".$_."\" />\n".
                 " </td>\n".
-                " <td class=\"col1 todoist_input\">\n".
+                " <td class=\"col1 todoist_input".$dueDateClass."\">\n".
                 "   <span class=\"todoist_task_text\" data-id=\"".$_."\">".$hash->{helper}{TITLE}{$_}."</span>\n".
                 "   <input type=\"text\" data-id=\"".$_."\" style=\"display:none;\" class=\"todoist_input_".$name."\" value=\"".$hash->{helper}{TITLE}{$_}."\" />\n".
+                "   <div class='todoist_dueDateButton todoist_icon' title='".$dueDate."'> </div>".
                 " </td>\n";
         
         $ret .= "<td class=\"col2 todoist_delete\">\n".
