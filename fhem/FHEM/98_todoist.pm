@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.3";
+my $version = "1.3.4";
 
 my $srandUsed;
 
@@ -654,6 +654,8 @@ sub todoist_CreateTask($$) {
         
         ## if someone uses due_date - no problem
         $data->{'date_string'} = $h->{"due_date"} if ($h->{"due_date"});
+        
+        $data->{'date_string'} = encode_utf8($data->{'date_string'});
         
         ## Task parent_id
         $data->{'parent_id'} = int($h->{"parent_id"}) if ($h->{"parent_id"});
