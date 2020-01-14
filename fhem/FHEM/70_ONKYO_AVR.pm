@@ -1,5 +1,34 @@
+##############################################################################
+#
+#     70_ONKYO_AVR.pm
+#
+#     This file is part of Fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with Fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+#  
+# ONKYO_AVR (c) Martin Gutenbrunner / https://github.com/delmar43/FHEM
+# original credits to Loredo
+#
+# This module enables FHEM to interact with Onkyo and newer Pioneer audio devices.
+#
+# Discussed in FHEM Forum: https://forum.fhem.de/index.php/topic,15024.0.html
+#
 ###############################################################################
 # $Id$
+
 package main;
 use strict;
 use warnings;
@@ -416,7 +445,7 @@ sub ONKYO_AVR_Set($$$) {
     my $usage =
         "Unknown argument '"
       . @$a[1]
-      . "', choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg mute:off,on muteT:noArg play:noArg pause:noArg stop:noArg previous:noArg next:noArg shuffleT:noArg repeatT:noArg remoteControl:play,pause,repeat,stop,top,down,up,right,delete,display,ff,left,mode,return,rew,select,setup,0,1,2,3,4,5,6,7,8,9,prev,next,shuffle,menu channelDown:noArg channelUp:noArg inputDown:noArg inputUp:noArg internet-radio-preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 input:"
+      . "', choose one of rawCommand toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeDown:noArg volumeUp:noArg mute:off,on muteT:noArg play:noArg pause:noArg stop:noArg previous:noArg next:noArg shuffleT:noArg repeatT:noArg remoteControl:play,pause,repeat,stop,top,down,up,right,delete,display,ff,left,mode,return,rew,select,setup,0,1,2,3,4,5,6,7,8,9,prev,next,shuffle,menu channelDown:noArg channelUp:noArg inputDown:noArg inputUp:noArg internet-radio-preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 input:"
       . $inputs_txt;
     $usage .= " channel:$channels_txt";
     $usage .= " presetDown:noArg presetUp:noArg $preset_txt";
@@ -454,8 +483,17 @@ sub ONKYO_AVR_Set($$$) {
             && ReadingsVal( $name, "channelList", "-" ) ne $channels_txt )
       );
 
+    if ( lc( @$a[1] ) eq "rawcommand" ) {
+
+      Log3 $name, 3,
+                  "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2] . " " . @$a[3]
+                  if ( !@$a[4] || @$a[4] ne "quiet" );
+
+                $return = ONKYO_AVR_SendRawCommand( $hash, @$a[2] . @$a[3] );
+    }
+
     # channel
-    if ( lc( @$a[1] ) eq "channel" ) {
+    elsif ( lc( @$a[1] ) eq "channel" ) {
         if ( !defined( @$a[2] ) ) {
             $return = "Syntax: CHANNELNAME [USERNAME PASSWORD]";
         }
@@ -3040,6 +3078,18 @@ sub ONKYO_AVR_SendCommand($$$) {
     return;
 }
 
+sub ONKYO_AVR_SendRawCommand ($$) {
+    my ( $hash, $rawCmd ) = @_;
+    my $name = $hash->{NAME};
+    my $zone = $hash->{ZONE};
+
+    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_SendRawCommand()";
+
+    ONKYO_AVR_Write( $hash, $rawCmd );
+
+    return;
+}
+
 sub ONKYO_AVR_connectionCheck ($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -3332,6 +3382,9 @@ sub ONKYO_AVR_RClayout() {
           </li>
           <li>
             <b>previous</b> &nbsp;&nbsp;-&nbsp;&nbsp; back to previous track
+          </li>
+          <li>
+            <b>rawCommand</b> Send raw command to device. No space between command and value (eg. TFRB+9 to set bass level to +9)
           </li>
           <li>
             <b>remoteControl</b> Send specific remoteControl command to device
