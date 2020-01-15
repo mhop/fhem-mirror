@@ -135,13 +135,8 @@ sub ONKYO_AVR_Define($$$) {
         return "Invalid protocol, choose one of 2013 pre2013";
     }
 
-    if (
-        $hash->{PROTOCOLVERSION} eq "pre2013"
-        && ( !exists( $attr{$name}{model} )
-            || $attr{$name}{model} ne $hash->{PROTOCOLVERSION} )
-      )
-    {
-        $attr{$name}{model} = $hash->{PROTOCOLVERSION};
+    if ( $hash->{PROTOCOLVERSION} eq "pre2013" ) {
+        $hash->{model} = 'pre2013';
     }
 
     # set default settings on first define

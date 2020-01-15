@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_ONKYO_AVR: fixed attribute model warning for pre2013
  - feature: 70_VIERA: new command display web page on TV's browser
                       web address has to start with https://
  - feature: 30_HUEBridge, 31_HUEDevice: try to move fhem device to new
