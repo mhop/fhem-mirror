@@ -320,7 +320,7 @@ if (typeof todoist_checkVar === 'undefined') {
         var id = $(parent).attr('id');
         var name = id.split(/_(.+)/)[1];
         //if (ui.item.attr('data-remove')==1) ui.item.remove();
-        //todoist_refreshTable(name,1);
+        todoist_refreshTable(name,1);
         todoist_refreshTableWidth();
       },
       remove: function (event,ui) {
@@ -359,7 +359,7 @@ if (typeof todoist_checkVar === 'undefined') {
         todoist_sendCommand('set '+ nameF +' moveTask ID:' + id + ' projectID=' + pid);
         setTimeout(function(){ 
           todoist_refreshTable(nameR,1);
-        },100);
+        },200);
         ui.item.attr('data-remove','1');
       }
     }).disableSelection();
