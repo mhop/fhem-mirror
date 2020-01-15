@@ -23,6 +23,7 @@ use Time::Local;
 #require "30_HUEBridge.pm";
 #require "$attr{global}{modpath}/FHEM/30_HUEBridge.pm";
 
+use vars qw($devcount);   # Maximum device number, used for storing
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my %hueModels = (
@@ -316,6 +317,7 @@ HUEDevice_IODevChanged($$$;$)
     $hash->{DEF} .= " IODev=$new"
   }
 
+  $hash->{NR} = $devcount++ if( $new_id && $new && $defs{$new}->{NR} > $hash->{NR} );
   $hash->{DEF} =~ s/[^\s]+/$new_id/ if( $new_id );
 
   $hash->{DEF} =~ s/  / /g;
