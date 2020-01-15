@@ -1335,7 +1335,7 @@ sub ParseJSON($$) {
     "Nuki",
     "Control"
   ],
-  "release_status": "under develop",
+  "release_status": "stable",
   "license": "GPL_2",
   "version": "v1.9.15",
   "x_apiversion": "1.9",

@@ -742,9 +742,9 @@ sub WriteReadings($$) {
     "Nuki",
     "Control"
   ],
-  "release_status": "under develop",
+  "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.9.10",
+  "version": "v1.9.11",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
