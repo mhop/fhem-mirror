@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 30_HUEBridge, 31_HUEDevice: try to move fhem device to new
+                                        bridge if 'real' light is moved
  - bugfix:  73_NUKIBridge: fix FHEM crashed if json empty Array
  - bugfix:  70_ONKYO_AVR: fixed command for previous title (thx Fusssel)
  - feature: 70_ONKYO_AVR: introduced 'set rawCommand'
