@@ -866,7 +866,8 @@ sub ResponseProcessing($$$) {
                 and scalar( @{$decode_json} ) > 0
                 and $endpoint eq 'list'
             )
-            or (    ref( $decode_json->{scanResults} ) eq 'ARRAY'
+            or (    ref($decode_json) eq 'HASH'
+                and ref( $decode_json->{scanResults} ) eq 'ARRAY'
                 and scalar( @{ $decode_json->{scanResults} } ) > 0
                 and $endpoint eq 'info' )
           )
@@ -1336,7 +1337,7 @@ sub ParseJSON($$) {
   ],
   "release_status": "under develop",
   "license": "GPL_2",
-  "version": "v1.9.14",
+  "version": "v1.9.15",
   "x_apiversion": "1.9",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
