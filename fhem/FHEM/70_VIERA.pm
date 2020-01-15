@@ -9,9 +9,12 @@
 # since version 1.25 modified by mabula
 #
 #
-# Version = 1.30
+# Version = 1.31
 #
 # Version  History:
+# - 1.31 - 2020-01-15 Dr. H-J Breymayer
+# -- new command display web page on TV
+#
 # - 1.30 - 2020-01-10 Dr. H-J Breymayer
 # -- implemented additional commands, changed definition of commands
 # -- bugfix patch from Nestor
@@ -311,7 +314,8 @@ sub VIERA_Set($@) {
               "remoteControl:" . join(",", sort keys %VIERA_remoteControl_args) . " " .
               "remoteControlApp:" . join(",", sort keys %VIERA_remoteControl_apps) . " " .
               "input:HDMI_1,HDMI_2,HDMI_3,HDMI_4,SD_card,TV ".
-              "statusRequest:noArg  ";
+              "statusRequest:noArg  ".
+              "web ";
   $usage =~ s/(NRC_|-ONOFF)//g;
   
   my $what = $a[0]; 
@@ -388,6 +392,10 @@ sub VIERA_Set($@) {
   elsif ($what eq "statusRequest"){
     Log3 $name, 3, "$name: Set statusRequest";
     VIERA_GetStatus($hash, 1);
+  }
+  elsif ($what eq "web"){
+    Log3 $name, 3, "$name: Set web $state";
+    VIERA_webpage($hash, $state);
   }
   elsif ($what eq "?"){
     return "$usage";
@@ -572,11 +580,11 @@ sub VIERA_connection($$) {
   my $blocking = "NonBlocking-VIERA_connection()" if (AttrVal($name, "blocking", 0) == 0);
      $blocking = "Blocking-VIERA_connection()" if (AttrVal($name, "blocking", 0) == 1);
 
-  my $sock = new IO::Socket::INET (
-    PeerAddr => $hash->{helper}{HOST},
-    PeerPort => $hash->{helper}{PORT},
-    Proto => "tcp",
-    Timeout => 2
+  my $sock = new IO::Socket::INET ( 
+             PeerAddr => $hash->{helper}{HOST},
+             PeerPort => $hash->{helper}{PORT},
+             Proto    => "tcp",
+             Timeout  => 2
   );
 
   if(defined ($sock)) {
@@ -885,6 +893,141 @@ sub VIERA_GetAbortFn($) {
   return;
 }
 
+# open web page on the TV
+
+sub VIERA_webpage($$) {
+	  my ($hash, $url) = @_;
+	  
+	  my $name = $hash->{NAME};
+	  
+      my $i = 0;
+	  my $params = "";
+	  my $message = "";
+	  my $answer = "";
+	  my @msg ;
+	  my $iS ;
+	  my $iE ;
+	  my $sock ;
+	  my $clientsock ;
+	
+# check if Encryption is ready
+      VIERA_Encrypted_Command($hash, "" , "web");
+      
+#start Web Browser and open url"""
+      $params = "<X_AppType>vc_app</X_AppType><X_LaunchKeyword>resource_id=1063</X_LaunchKeyword>";
+      $message   = VIERA_Build_soap_message_Encrypt($hash, "X_LaunchApp", $params, "s");
+       
+      $hash->{helper}{BUFFER} = "";
+      if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
+	     sleep (0.1);
+	  $i += 1;
+      }
+      VIERA_connection($hash, $message);
+      
+      $answer = VIERA_Encrypt_Answer($hash);
+      if (!defined($answer)) {
+		  Log3 $name, 3, "$name cannot start web browser"; 
+		  return;
+	  }
+ 
+      $iS = index($answer, "<X_SessionId>");
+      $iE = index($answer, "</X_SessionId>");
+      my $sessionId = substr($answer, $iS+13, $iE-$iS-13);
+        
+# setup a server socket where URL will be served
+
+      my $localip   = $hash->{helper}{mylocalIP} ;
+      my $localport = 56000 + int(rand(9000));
+      
+      $sock = new IO::Socket::INET ( 
+              LocalAddr => $localip,
+              LocalPort => $localport,
+              Proto     => 'tcp',
+              Listen    => 5,
+              Reuse     => 1
+  );
+
+      if(defined ($sock)) {
+         Log3 $name, 4, "$name: open socket for web page address: $localip:$localport"; 
+      }     
+      else {
+         Log3 $name, 3, "$name: not able to open socket for web page address";
+         return undef;
+      }	 
+       
+      $params  = "<X_AppType>vc_app</X_AppType><X_SessionId>$sessionId</X_SessionId>\r\n";
+      $params .= "<X_ConnectKeyword>panasonic-viera 0.2</X_ConnectKeyword>\r\n";
+      $params .= "<X_ConnectAddr>$localip:$localport</X_ConnectAddr>";
+      $message  = VIERA_Build_soap_message_Encrypt($hash, "X_ConnectApp", $params, "s");
+
+      $hash->{helper}{BUFFER} = "";
+      if (exists($hash->{helper}{RUNNING_PID_GET}) and $i < 5) { 
+	     sleep (0.1);
+	  $i += 1;
+      }
+      VIERA_connection($hash, $message);
+       
+      $answer = VIERA_Encrypt_Answer($hash); 
+      if (!defined($answer)) {
+		  Log3 $name, 3, "$name: cannot transmit web address"; 
+		  return;
+	  }  
+
+      $i = 0;
+      $clientsock = $sock -> accept();
+      if(!defined ($clientsock) and $i < 5) {
+		  sleep 0.1;
+		  $i += 1;
+          $clientsock = $sock -> accept();
+      }
+      
+      if(!defined ($clientsock)) {
+		 Log3 $name, 3, "$name: not able to open new socket for web page address";
+         return undef;
+      }
+      
+      my $client_address = $clientsock -> peerhost();
+      my $client_port = $clientsock -> peerport();
+      Log3 $name, 3, "$name: connection from $client_address:$client_port established";
+      
+      my $l1 = length($url) & 0xFF;
+      @msg = (0xf4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, $l1);
+      
+      my $l2 = @msg;
+      for($i = 0; $i < $l1; $i++) {$msg[$l2+$i] = ord(substr($url, $i, 1))}; # get unicode for characters
+      $msg[$l2+$l1] = 0x00;
+       
+      my $msgH = "";
+      for ($i = 0; $i <= $l1+$l2; $i++) {$msgH .= chr($msg[$i])};
+
+#      print $clientsock $msgH;
+      $clientsock->send($msgH);  
+        
+      shutdown($clientsock, 1);
+      close($clientsock);
+      close($sock);
+        
+      return;
+}
+
+sub VIERA_get_local_ip_address ($) {
+	my ($hash) = @_;
+	
+    my $socket = IO::Socket::INET->new(
+                 Proto       => "tcp",
+                 PeerAddr    => $hash->{helper}{HOST},   #  "google.com",
+                 PeerPort    => $hash->{helper}{PORT},   #  "80", 
+    );
+
+    # A side-effect of making a socket connection is that our IP address
+    # is available from the 'sockhost' method
+    my $local_ip_address = $socket->sockhost;
+
+    close($socket);
+
+    return $local_ip_address;
+}
+
 ################ special encryption ###########################################################
 
 ######################################################################################################################
@@ -916,6 +1059,9 @@ sub VIERA_Encrypted_Command($$$) {
 	  $params .= "product_id=$command</X_LaunchKeyword>";
 	  $task = "X_LaunchApp";
     }
+    elsif ( $type eq "web" ) {
+	  return;
+	}
     else {return};   
    
    $message   = VIERA_Build_soap_message_Encrypt($hash, $task, $params, "u");
@@ -1082,7 +1228,6 @@ sub VIERA_encrypt_soap_payload($$$$) {
   
   $len = length($message);
   $payload .= pack("N", $len);  # make big endian  
-#  $payload .= pack("NA*", $len, $message);
 #  $len = (($len & 0x000000FF) + ($len & 0x0000FF00) * 2**8 + ($len & 0x00FF0000) * 2**16 + ($len & 0xFF000000) * 2**24);
   $payload .= $message;
 
@@ -1252,6 +1397,8 @@ sub VIERA_request_session_id($) {
         my $session_key      = $hash->{helper}{session_key};
         my $session_IV       = $hash->{helper}{session_IV};
         my $session_hmac_key = $hash->{helper}{session_hmac_key};
+        
+        $hash->{helper}{mylocalIP} = VIERA_get_local_ip_address($hash); 
         
         my $encinfo = VIERA_encrypt_soap_payload("<X_ApplicationId>$app_id</X_ApplicationId>", $session_key, $session_IV, $session_hmac_key);
 
@@ -1433,13 +1580,17 @@ sub VIERA_RClayout_TV_SVG() {
     Currently, the following commands are defined.
     <ul>
       <code>
-        off<br>
+        on_off<br>
         mute [on|off]<br>
         volume [0-100]<br>
         channel [1-9999]<br>
         input [hdmi1|hdmi2|hdmi3|hdmi4|sdCard|tv]<br>
+        statusRequest<br>
+        web<br>
       </code>
     </ul>
+    For the web command, please use <b>https://</b> up front. Example:<br>
+    set &lt;name&gt; web https://google.de<br><br>
   </ul>
   <ul>
     <br>
@@ -1637,12 +1788,16 @@ sub VIERA_RClayout_TV_SVG() {
     <br><br>
     Zur Zeit sind die folgenden Befehle implementiert:
     <ul><code>
-        off<br>
+        on_off<br>
         mute [on|off]<br>
         volume [0-100]<br>
         channel [1-9999]<br>
         input [hdmi1|hdmi2|hdmi3|hdmi4|sdCard|tv]<br>
+        statusRequest<br>
+        web<br>
     </code></ul>
+    Beim Kommando web, bitte immer <b>https://</b> voranstellen. Beispiel:<br>
+    set &lt;name&gt; web https://google.de<br><br>
   </ul>
   <ul>
   <br>
