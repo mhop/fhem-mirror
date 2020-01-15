@@ -12178,6 +12178,10 @@ sub EnOcean_Parse($$)
     } elsif ($signalMID == 13) {
       my @harvester = ('very_good', 'good', 'average', 'bad', 'very_bad');
       push @event, "3:harvester:" . $harvester[$db[0]];
+    } elsif ($signalMID == 14) {
+      DoTrigger($name, "SIGNAL: TX_MODE_OFF", 1);
+    } elsif ($signalMID == 15) {
+      DoTrigger($name, "SIGNAL: TX_MODE_ON", 1);
     }
 
   } elsif ($rorg eq "B2") {
