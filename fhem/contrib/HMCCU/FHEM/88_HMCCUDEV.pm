@@ -83,7 +83,7 @@ sub HMCCUDEV_Define ($@)
 	my $devtype = shift @$a;
 	my $devspec = shift @$a;
 
-	my $hmccu_hash = undef;
+	my $ioHash = undef;
 	
 	# Store some definitions for delayed initialization
 	$hash->{hmccu}{devspec}  = $devspec;
@@ -120,16 +120,16 @@ sub HMCCUDEV_Define ($@)
 		return "Specified IO Device ".$h->{iodev}." does not exist" if (!exists ($defs{$h->{iodev}}));
 		return "Specified IO Device ".$h->{iodev}." is not a HMCCU device"
 			if ($defs{$h->{iodev}}->{TYPE} ne 'HMCCU');
-		$hmccu_hash = $defs{$h->{iodev}};
+		$ioHash = $defs{$h->{iodev}};
 	}
 	else {
 		# The following call will fail for non virtual devices during FHEM start if CCU is not ready
-		$hmccu_hash = $devspec eq 'virtual' ? HMCCU_GetHash (0) : HMCCU_FindIODevice ($devspec);
+		$ioHash = $devspec eq 'virtual' ? HMCCU_GetHash (0) : HMCCU_FindIODevice ($devspec);
 	}
 
 	if ($init_done) {
 		# Interactive define command while CCU not ready
-		if (!defined ($hmccu_hash)) {
+		if (!defined ($ioHash)) {
 			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
 			if ($ccuinactive > 0) {
 				return "CCU and/or IO device not ready. Please try again later";
@@ -141,7 +141,7 @@ sub HMCCUDEV_Define ($@)
 	}
 	else {
 		# CCU not ready during FHEM start
-		if (!defined ($hmccu_hash) || $hmccu_hash->{ccustate} ne 'active') {
+		if (!defined ($ioHash) || $ioHash->{ccustate} ne 'active') {
 			Log3 $name, 2, "HMCCUDEV: [$devname] Cannot detect IO device, maybe CCU not ready. Trying later ...";
 #			readingsSingleUpdate ($hash, "state", "Pending", 1);
 			$hash->{ccudevstate} = 'pending';
@@ -150,7 +150,7 @@ sub HMCCUDEV_Define ($@)
 	}
 
 	# Initialize FHEM device, set IO device
-	my $rc = HMCCUDEV_InitDevice ($hmccu_hash, $hash);
+	my $rc = HMCCUDEV_InitDevice ($ioHash, $hash);
 	return $errmsg[$rc] if ($rc > 0);
 
 	return undef;
@@ -171,7 +171,7 @@ sub HMCCUDEV_Define ($@)
 
 sub HMCCUDEV_InitDevice ($$)
 {
-	my ($hmccu_hash, $dev_hash) = @_;
+	my ($ioHash, $dev_hash) = @_;
 	my $name = $dev_hash->{NAME};
 	my $devspec = $dev_hash->{hmccu}{devspec};
 	my $gdcount = 0;
@@ -187,7 +187,7 @@ sub HMCCUDEV_InitDevice ($$)
 			# Search for free address. Maximum of 10000 virtual devices allowed.
 			for (my $i=1; $i<=10000; $i++) {
 				my $va = sprintf ("VIR%07d", $i);
-				if (!HMCCU_IsValidDevice ($hmccu_hash, $va, 1)) {
+				if (!HMCCU_IsValidDevice ($ioHash, $va, 1)) {
 					$no = $i;
 					last;
 				}
@@ -200,9 +200,9 @@ sub HMCCUDEV_InitDevice ($$)
 		$dev_hash->{ccuname} = $name;
 	}
 	else {
-		return 1 if (!HMCCU_IsValidDevice ($hmccu_hash, $devspec, 7));
+		return 1 if (!HMCCU_IsValidDevice ($ioHash, $devspec, 7));
 
-		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($hmccu_hash, $devspec);
+		my ($di, $da, $dn, $dt, $dc) = HMCCU_GetCCUDeviceParam ($ioHash, $devspec);
 		return 1 if (!defined ($da));
 		$gdname = $dn;
 
@@ -218,7 +218,7 @@ sub HMCCUDEV_InitDevice ($$)
 		my @devlist = ();
 		if (exists ($dev_hash->{hmccu}{groupexp})) {
 			# Group devices specified by name expression
-			$gdcount = HMCCU_GetMatchingDevices ($hmccu_hash, $dev_hash->{hmccu}{groupexp}, 'dev', \@devlist);
+			$gdcount = HMCCU_GetMatchingDevices ($ioHash, $dev_hash->{hmccu}{groupexp}, 'dev', \@devlist);
 			return 4 if ($gdcount == 0);
 		}
 		elsif (exists ($dev_hash->{hmccu}{group})) {
@@ -228,9 +228,9 @@ sub HMCCUDEV_InitDevice ($$)
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
-				return 1 if (!HMCCU_IsValidDevice ($hmccu_hash, $gd, 7));
+				return 1 if (!HMCCU_IsValidDevice ($ioHash, $gd, 7));
 
-				($gda, $gdc) = HMCCU_GetAddress ($hmccu_hash, $gd, '', '');
+				($gda, $gdc) = HMCCU_GetAddress ($ioHash, $gd, '', '');
 				$gdo = $gda;
 				$gdo .= ':'.$gdc if ($gdc ne '');
 				push @devlist, $gdo;
@@ -239,7 +239,7 @@ sub HMCCUDEV_InitDevice ($$)
 		}
 		else {
 			# Group specified by CCU virtual group name
-			@devlist = HMCCU_GetGroupMembers ($hmccu_hash, $gdname);
+			@devlist = HMCCU_GetGroupMembers ($ioHash, $gdname);
 			$gdcount = scalar (@devlist);
 		}
 
@@ -248,10 +248,10 @@ sub HMCCUDEV_InitDevice ($$)
 		$dev_hash->{ccugroup} = join (',', @devlist);
 		if ($devspec eq 'virtual') {
 			my $dev = shift @devlist;
-			my $devtype = HMCCU_GetDeviceType ($hmccu_hash, $dev, 'n/a');
+			my $devtype = HMCCU_GetDeviceType ($ioHash, $dev, 'n/a');
 			my $devna = $devtype eq 'n/a' ? 1 : 0;
 			for my $d (@devlist) {
-				if (HMCCU_GetDeviceType ($hmccu_hash, $d, 'n/a') ne $devtype) {
+				if (HMCCU_GetDeviceType ($ioHash, $d, 'n/a') ne $devtype) {
 					$devna = 1;
 					last;
 				}
@@ -261,11 +261,11 @@ sub HMCCUDEV_InitDevice ($$)
 			if ($devna) {
 				$dev_hash->{ccutype} = 'n/a';
 				$dev_hash->{statevals} = 'readonly';
-				$rc = HMCCU_CreateDevice ($hmccu_hash, $dev_hash->{ccuaddr}, $name, undef, $dev); 
+				$rc = HMCCU_CreateDevice ($ioHash, $dev_hash->{ccuaddr}, $name, undef, $dev); 
 			}
 			else {
 				$dev_hash->{ccutype} = $devtype;
-				$rc = HMCCU_CreateDevice ($hmccu_hash, $dev_hash->{ccuaddr}, $name, $devtype, $dev); 
+				$rc = HMCCU_CreateDevice ($ioHash, $dev_hash->{ccuaddr}, $name, $devtype, $dev); 
 			}
 			return $rc+4 if ($rc > 0);
 						
@@ -275,7 +275,7 @@ sub HMCCUDEV_InitDevice ($$)
 	}
 
 	# Inform HMCCU device about client device
-	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $hmccu_hash->{NAME}, undef));
+	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $ioHash->{NAME}, undef));
 	
 #	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
 	$dev_hash->{ccudevstate} = 'active';
@@ -347,8 +347,8 @@ sub HMCCUDEV_Set ($@)
 	# Get I/O device, check device state
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
-	my $hmccu_hash = $hash->{IODev};
-	my $hmccu_name = $hmccu_hash->{NAME};
+	my $ioHash = $hash->{IODev};
+	my $hmccu_name = $ioHash->{NAME};
 
 	# Handle read only and disabled devices
 	return undef if ($hash->{statevals} eq 'readonly' && $opt ne '?'
@@ -357,7 +357,7 @@ sub HMCCUDEV_Set ($@)
 	return undef if ($disable == 1);
 
 	# Check if CCU is busy
-	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
+	if (HMCCU_IsRPCStateBlocking ($ioHash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUDEV: CCU busy";
 	}
@@ -670,15 +670,15 @@ sub HMCCUDEV_Get ($@)
 	# Get I/O device
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
-	my $hmccu_hash = $hash->{IODev};
-	my $hmccu_name = $hmccu_hash->{NAME};
+	my $ioHash = $hash->{IODev};
+	my $hmccu_name = $ioHash->{NAME};
 
 	# Handle disabled devices
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);	
 
 	# Check if CCU is busy
-	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
+	if (HMCCU_IsRPCStateBlocking ($ioHash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUDEV: CCU busy";
 	}
@@ -816,43 +816,55 @@ sub HMCCUDEV_Get ($@)
 		}
 		return $res;
 	}
-	elsif ($opt eq 'configdesc') {
-		my $ccuobj = $ccuaddr;
-		my $par = shift @$a;
-		if (defined ($par)) {
-			if ($par =~ /^([0-9]{1,2})$/) {
-				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
-				$ccuobj .= ':'.$1;
-			}
-			else {
-				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
+	elsif ($opt eq 'paramsetdesc') {
+		my ($devAddr, $chnNo) = HMCCU_SplitChnAddr ($ccuaddr);
+		my $model = HMCCU_GetClientDeviceModel ($hash);
+		return HMCCU_SetError ($hash, "Can't get device model") if (!defined($model));
+		
+		my $res = '';
+		my @chnList = sort keys %{$model};
+		unshift (@chnList, pop(@chnList)) if (exists($model->{'d'}));
+		foreach my $c (@chnList) {
+			$res .= $c eq 'd' ? "Device\n" : "Channel $c\n";
+			foreach my $ps (sort keys %{$model->{$c}}) {
+				$res .= "  Paramset $ps\n";
+				$result = join ("\n", map {
+					"    ".$_.": ".
+					$model->{$c}{$ps}{$_}{TYPE}.
+					" [".HMCCU_FlagsToStr ('model', 'OPERATIONS', $model->{$c}{$ps}{$_}{OPERATIONS}, ',', '')."]".
+					" [".HMCCU_FlagsToStr ('model', 'FLAGS', $model->{$c}{$ps}{$_}{FLAGS}, ',', '')."]".
+					" RANGE=".$model->{$c}{$ps}{$_}{MIN}."-".$model->{$c}{$ps}{$_}{MAX}.
+					" DFLT=".$model->{$c}{$ps}{$_}{DEFAULT}.
+					" UNIT=".$model->{$c}{$ps}{$_}{UNIT}
+				} sort keys %{$model->{$c}{$ps}});
+				$res .= "$result\n";
 			}
 		}
-
-		my $res = "MASTER:\n";
-		($rc, $result) = HMCCU_RPCRequest ($hash, "getParamsetDescription", $ccuobj, "MASTER", undef);
-		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		$res .= "$result\nLINK:\n";
-		($rc, $result) = HMCCU_RPCRequest ($hash, "getParamsetDescription", $ccuobj, "MASTER", undef);
-		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
-		return $res.$result;
+		return $res;
 	}
 	elsif ($opt eq 'devicedesc') {
-		my $ccuobj = $ccuaddr;
-		my $par = shift @$a;
-		if (defined ($par)) {
-			if ($par =~ /^([0-9]{1,2})$/) {
-				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
-				$ccuobj .= ':'.$1;
-			}
-			else {
-				return HMCCU_SetError ($hash, -7) if ($1 >= $hash->{channels});
-			}
-		}
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $ccuaddr, $ccuif);
+		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($devDesc));
+
+		my @addList = ();
+		push (@addList, split (',', $devDesc->{CHILDREN}))
+			if (defined($devDesc->{CHILDREN}) && $devDesc->{CHILDREN} ne '');
 		
-		($rc, $result) = HMCCU_RPCRequest ($hash, "getDeviceDescription", $ccuobj, "MASTER", undef);
-		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+		my $a = $ccuaddr;
+		$result = '';
+		while (1) {
+			$result .= $a eq $ccuaddr ? "Device $a" : "Channel $a";
+			$result .= " $devDesc->{_name} [$devDesc->{TYPE}]\n";
+			foreach my $n (sort keys %{$devDesc}) {
+				next if ($n =~ /^_/ || $n eq 'ADDRESS' || $n eq 'TYPE' ||
+					!defined($devDesc->{$n}) || $devDesc->{$n} eq '');
+				$result .= "  $n: ".HMCCU_FlagsToStr ('device', $n, $devDesc->{$n}, ',', '')."\n";
+			}
+			$a = shift (@addList);
+			last if (!defined($a));
+			$devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $ccuif);
+			return HMCCU_SetError ($hash, "Can't get device description") if (!defined($devDesc));
+		}
 		return $result;
 	}
 	elsif ($opt eq 'defaults') {
@@ -866,7 +878,7 @@ sub HMCCUDEV_Get ($@)
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $ccutype, -1, 1, \@valuelist);
 		   
 		$retmsg .= ":".join(",", @valuelist) if ($valuecount > 0);
-		$retmsg .= " defaults:noArg update:noArg config configlist configdesc devicedesc".
+		$retmsg .= " defaults:noArg update:noArg config configlist paramsetdesc:noArg devicedesc:noArg".
 			" deviceinfo:noArg";
 		$retmsg .= ' devstate:noArg' if ($sc ne '');
 			
