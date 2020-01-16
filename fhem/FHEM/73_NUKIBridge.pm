@@ -495,7 +495,7 @@ sub Set($@) {
     }
     else {
         my $list = '';
-        $list .= 'info:noArg getDeviceList:noArg callbackRemove:noArg ';
+        $list .= 'info:noArg getDeviceList:noArg ';
         $list .= 'clearLog:noArg fwUpdate:noArg reboot:noArg factoryReset:noArg'
           if ( ReadingsVal( $name, 'bridgeType', 'Software' ) eq 'Hardware' );
         return ( 'Unknown argument ' . $cmd . ', choose one of ' . $list );
@@ -1028,7 +1028,10 @@ sub getLogfile($$) {
             Log3( $name, 4,
                 "NUKIBridge ($name) - created Table with log file" );
 
-            my $ret = '<html><table width=100%><tr><td>';
+            my $header = '<html>'
+                . '<div style="float: left">Log List</div>';
+
+            my $ret = $header.'<table width=100%><tr><td>';
             $ret .= '<table class="block wide">';
 
             foreach my $logs ( @{$decode_json} ) {
@@ -1084,27 +1087,43 @@ sub getCallbackList($$) {
         "NUKIBridge ($name) - Callback data are collected and processed" );
 
     if ( $param->{cl} and $param->{cl}->{TYPE} eq 'FHEMWEB' ) {
-        if ( ref( $decode_json->{callbacks} ) eq 'ARRAY'
-            and scalar( @{ $decode_json->{callbacks} } ) > 0 )
-        {
+        if ( ref( $decode_json->{callbacks} ) eq 'ARRAY' ) {
             Log3( $name, 4,
                 "NUKIBridge ($name) - created Table with log file" );
 
-            my $ret = '<html><table width=100%><tr><td>';
+            my $space = '&nbsp;';
+            my $aHref;
+            my $header = '<html>'
+                . '<div style="float: left">Callback List</div>';
 
+            my $ret = $header.'<table width=100%><tr><td>';
             $ret .= '<table class="block wide">';
-
             $ret .= '<tr class="odd">';
-            $ret .= '<td><b>Callback-ID</b></td>';
-            $ret .= '<td> </td>';
-            $ret .= '<td><b>Callback-URL</b></td>';
+            $ret .= '<td><b>URL</b></td>';
+            $ret .= '<td><b>Remove</b></td>';
             $ret .= '</tr>';
 
-            foreach my $cb ( @{ $decode_json->{callbacks} } ) {
+            if ( scalar( @{ $decode_json->{callbacks} } ) > 0 ) {
+                foreach my $cb ( @{ $decode_json->{callbacks} } ) {
+                    $aHref =
+                        "<a href=\""
+                    . $::FW_httpheader->{host}
+                    . "/fhem?cmd=set+"
+                    . $name
+                    . "+callbackRemove+"
+                    . $cb->{id}
+                    . $::FW_CSRF
+                    . "\"><font color=\"red\"><b>X</b></font></a>";
 
-                $ret .= '<td>' . $cb->{id} . '</td>';
+                    $ret .= '<td>' . $cb->{url} . '</td>';
+                    $ret .= '<td>'.$aHref.'</td>';
+                    $ret .= '</tr>';
+                }
+            }
+            else {
+                $ret .= '<td>none</td>';
+                $ret .= '<td>none</td>';
                 $ret .= '<td> </td>';
-                $ret .= '<td>' . $cb->{url} . '</td>';
                 $ret .= '</tr>';
             }
 
@@ -1337,7 +1356,7 @@ sub ParseJSON($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.9.15",
+  "version": "v1.9.16",
   "x_apiversion": "1.9",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
