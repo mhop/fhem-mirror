@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.30.4"  => "16.01.2020  correction writeToDB ",
+  "8.30.4"  => "16.01.2020  attribute timeAdjust for correction OutputWriteToDB ",
   "8.30.3"  => "28.11.2019  countEntries encode \$device, change count_ParseDone for \"countEntriesDetail\" ",
   "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
   "8.30.1"  => "22.11.2019  commandref revised ",
@@ -10659,10 +10659,10 @@ sub DbRep_OutputWriteToDB($$$$$) {
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
                   $time = "23:59:58";
-                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");
+                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");            # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
               } elsif ($aggr =~ /hour/) {
                   $time = "$time:59:58";
-                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");
+                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");         # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
               }
           }
           if ($value) {
@@ -10685,10 +10685,10 @@ sub DbRep_OutputWriteToDB($$$$$) {
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
                   $time = "23:59:58";
-                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");
+                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");           # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
               } elsif ($aggr =~ /hour/) {
                   $time = "$time:59:58";
-                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");
+                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");        # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
               }
           }
           if ($value) {
