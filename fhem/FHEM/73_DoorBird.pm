@@ -79,8 +79,6 @@ sub DoorBird_Initialize($)
 							   "MaxHistory:slider,0,1,50 " .
 							   "KeepAliveTimeout " .
 							   "UdpPort:6524,35344 " .
-							   "SipDevice:" . join(",", devspec2array("TYPE=SIP")) . " " .
-							   "SipNumber " .
 							   "ImageFileDir " .
 							   "AudioFileDir " .
 							   "VideoFileDir " .
@@ -170,8 +168,6 @@ sub DoorBird_Define($$)
 	  $hash->{RevisonAPI}								= "0.26";
 	  $hash->{helper}{SOX}	  							= "/usr/bin/sox"; #On Windows systems use "C:\Programme\sox\sox.exe"
 	  $hash->{helper}{URL}	  							= $url;
-	  $hash->{helper}{SipDevice}						= AttrVal($name,"SipDevice","");
-	  $hash->{helper}{SipNumber}						= AttrVal($name, "SipNumber", "**620");
 	  $hash->{helper}{PollingTimeout}					= AttrVal($name,"PollingTimeout",5);
 	  $hash->{helper}{KeepAliveTimeout}					= AttrVal($name, "KeepAliveTimeout", 30);
 	  $hash->{helper}{MaxHistory}						= AttrVal($name, "MaxHistory", 50);
@@ -211,7 +207,6 @@ sub DoorBird_Define($$)
 	Log3 $name, 5, $name. " : DoorBird - Define D                               : " . $def;
 	Log3 $name, 5, $name. " : DoorBird - Define A                               : " . @a;
 	Log3 $name, 5, $name. " : DoorBird - Define Name                            : " . $name;
-	Log3 $name, 5, $name. " : DoorBird - Define SipDevice                       : " . $hash->{helper}{SipDevice};
 	Log3 $name, 5, $name. " : DoorBird - Define OpsModeList                     : " . Dumper(@{$hash->{helper}{OpsModeList}});
 	Log3 $name, 5, $name. " : DoorBird - Define OpsModeListBackup[0]            : " . ${$hash->{helper}{OpsModeListBackup}}[0];
 	
@@ -302,36 +297,6 @@ sub DoorBird_Attr(@)
 		if ($a[3] == int($a[3])) {
 			### Set helper in hash
 			$hash->{helper}{UdpPort} = $a[3];
-		}
-	}
-	### Check whether SipDevice attribute has been provided
-	elsif ($a[2] eq "SipDevice") {
-		### Check whether SipDevice is defined as fhem device
-		if (defined($defs{$a[3]})) {
-			### Set helper in hash
-			$hash->{helper}{SipDevice} = $a[3];
-			
-			### Log Entry for debugging purposes
-			Log3 $name, 5, $name. " : DoorBird_Attr - SipDevice set to                  : " . $hash->{helper}{SipDevice};
-		}
-		else {
-			### Set helper in hash
-			$hash->{helper}{SipDevice} = "";
-			
-			### Log Entry for debugging purposes
-			Log3 $name, 5, $name. " : DoorBird_Attr - SipDevice reset to                : " . $hash->{helper}{SipDevice};
-		}
-	}
-		### Check whether SipNumber attribute has been provided
-	elsif ($a[2] eq "SipNumber") {
-		### Check whether SipNumber is defined
-		if (defined($a[3])) {
-			### Set helper in hash
-			$hash->{helper}{SipNumber} = $a[3];
-		}
-		else {
-			### Set helper in hash
-			$hash->{helper}{SipNumber} = "**620";
 		}
 	}
 	### Check whether PollingTimeout attribute has been provided
@@ -2939,107 +2904,110 @@ sub DoorBird_Transmit_Audio($$) {
 	my $Password			= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
 	my $Url 				= $hash->{helper}{URL};
 	my $Sox					= $hash->{helper}{SOX};
-	my $SipDevice			= $hash->{helper}{SipDevice};
-	my $SipNumber			= $hash->{helper}{SipNumber};
 	my $AudioDataPathOrig	= $option;
-	my @ListSipDevices		= devspec2array("TYPE=SIP");
-	my $err;
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Transmit_Audio  - ---------------------------------------------------------------";
 	
-	### If device of TYPE = SIP exists
-	if (@ListSipDevices > 0) {
-		### If file exists
-		if (-e $AudioDataPathOrig) {
-			### Create new filepath from old filepath
-			my $AudioDataNew;
-			my $AudioDataSizeNew;
-			my $AudioDataPathNew  = $AudioDataPathOrig;
-			   $AudioDataPathNew  =~ s/\..*//;
-			my $AudioDataPathTemp = $AudioDataPathNew . "_tmp.wav";
-			   $AudioDataPathNew .= ".ulaw";
+	### If file exists
+	if (-e $AudioDataPathOrig) {
+		### Create new filepath from old filepath
+		my $AudioDataNew;
+		my $AudioDataSizeNew;
+		my $AudioDataPathNew  = $AudioDataPathOrig;
+		   $AudioDataPathNew  =~ s/\..*//;
+		   $AudioDataPathNew .= ".wav";
 
-			### Delete future new file and temporary file if exist
-			unlink($AudioDataPathTemp);
-			unlink($AudioDataPathNew);
+		### If the respective .wav file already exists
+		if (-e $AudioDataPathNew) {
+		
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - wav file already exists : " . $AudioDataPathNew;
+			
+		}
+		### If the respective .wav file does not exists
+		else {
 			
 			### Create Sox - command
-			my $SoxCmd = $Sox . " -V " . $AudioDataPathOrig . " -r 8000 -b 8 -c 1 -e u-law " . $AudioDataPathTemp;
+			my $SoxCmd = $Sox . " -V " . $AudioDataPathOrig . " " . $AudioDataPathNew;
 			
 			### Log Entry for debugging purposes
 			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - Original Path exists    : " . $AudioDataPathOrig;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - Temp Path created       : " . $AudioDataPathTemp;
 			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - New  Path created       : " . $AudioDataPathNew;
 			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - Sox System-Command      : " . $SoxCmd;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SipDeviceAttribute      : " . $SipDevice;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SipNumber               : " . $SipNumber;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ListSipDevices          : " . Dumper(@ListSipDevices);
-				
+
 			### Convert file
 			system ($SoxCmd);
-
-			### Rename temporary file in .ulaw
-			$err = rename($AudioDataPathTemp, $AudioDataPathNew);
-			
-			### Get new filesize
-			$AudioDataSizeNew = -s $AudioDataPathNew;
-
-			### Log Entry for debugging purposes		
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - New Filesize            : " . $AudioDataSizeNew;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - rename response message : " . $err;
-			
-			### If the a name for a SIP - TYPE device has been provided as per attribute
-			if (defined($SipDevice)) {
-				### Log Entry for debugging purposes		
-				Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - Attribute for SIP device: " . $SipDevice;
-			
-				### If SIP device provided in attribute exists
-				if (defined($defs{$SipDevice})) {
-					### Log Entry for debugging purposes		
-					Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SIP device in Attribute exists";
-				}
-				### If SIP device provided in attribute does NOT exists
-				else {
-					### Take the first available SIP device
-					$SipDevice= $ListSipDevices[0];
-
-					### Log Entry for debugging purposes		
-					Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SIP device in Attribute does NOT exist";
-					Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SipDevice chosen        : " . $SipDevice;
-				}
-			}
-			### If the a name for a SIP - TYPE device has NOT been provided as per attribute
-			else {
-				### Take the first available SIP device
-				$SipDevice= $ListSipDevices[0];
-				
-				### Log Entry for debugging purposes		
-				Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SIP device has not been provided in Attribute";
-				Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - SipDevice chosen        : " . $SipDevice;
-			}
-			
-			
-			### Use SIP device and transfer filepath
-			my $FhemCommand = "set " . $SipDevice . " call " . $SipNumber . " 30 " . $AudioDataPathNew;
-			fhem($FhemCommand);
-			
-			return "The audio file: " . $AudioDataPathOrig . " has been passed to the fhem device " . $SipDevice;
 		}
-		### If Filepath does not exist
+		
+		### Get filesize of wav file
+		$AudioDataSizeNew = -s $AudioDataPathNew;
+
+		### Get FileInfo and extract the length of wav file in seconds
+		my $SoxCmd = $Sox . " " . $AudioDataPathNew . " -n stat stats";
+
+		my @FileInfo = qx($SoxCmd 2>&1);
+		my $AudioLength = $FileInfo[1];
+		   $AudioLength =~ s/Length \(seconds\)\://;
+		   $AudioLength =~ s/\s+//g;
+		   $AudioLength = int($AudioLength);
+
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - AudioLength in seconds  : " . $AudioLength;
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - New Filesize            : " . $AudioDataSizeNew;
+
+		### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
+		my $UrlPrefix 		= "http://" . $Url . "/bha-api/";
+		my $UrlPostfix;
+		
+		### If the Session ID has been activated
+		if ($hash->{helper}{SessionIdSec} > 0) {
+			$UrlPostfix 	= " sessionid=" . $hash->{helper}{SessionId} . " content-type=\"audio/basic\" use-content-length=true";			
+		}
+		### If the Session ID has NOT been activated use username and password instead
 		else {
-			### Log Entry
-			Log3 $name, 3, $name. " : DoorBird_Transmit_Audio - Path doesn't exist      : " . $AudioDataPathOrig;
-			Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ---------------------------------------------------------------";
-			return "The audio file: " . $AudioDataPathOrig . " does not exist!"
+			my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+			my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+			$UrlPostfix 	= " content-type=\"audio/basic\" use-content-length=true user=". $username . " passwd=" . $password;
 		}
+		my $CommandURL 		= $UrlPrefix . "audio-transmit.cgi" . $UrlPostfix;
+
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - CommandURL              : " . $CommandURL ;
+
+		### Create the gst-lauch command
+		my $GstCommand  = "gst-launch-1.0 filesrc location="; 
+		   $GstCommand .= $AudioDataPathNew;
+		   $GstCommand .=  " ! wavparse ! audioconvert ! audioresample ! \"audio/x-raw,format=S16LE,rate=8000,channels=1\" ! mulawenc ! \"audio/x-mulaw,rate=8000,channels=1\" ! curlhttpsink location=";
+		   $GstCommand .= $CommandURL;
+
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - GstCommand              : " . $GstCommand ;
+
+		### Create command for shell
+		my $ShellCommand  = "timeout " . ($AudioLength + 3) . " " . $GstCommand . " &";
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ShellCommand            : " . $ShellCommand;
+
+		### Pass shell command to shell and continue with the code below
+		eval {
+						system($ShellCommand) or die "Could not execute" . $ShellCommand . " ". $@;
+		};
+		### If error message appered
+		if ( $@ ) {
+		#				$ErrorMessage = $@;
+			}
+
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ---------------------------------------------------------------";
+		return "The audio file: " . $AudioDataPathOrig . " has been streamed to the DoorBird";
 	}
-	### If no device TYPE = SIP exists
+	### If Filepath does not exist
 	else {
 		### Log Entry
-		Log3 $name, 3, $name. " : DoorBird_Transmit_Audio - No device with TYPE=SIP exists. Install SIP device first";
+		Log3 $name, 3, $name. " : DoorBird_Transmit_Audio - Path doesn't exist      : " . $AudioDataPathOrig;
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ---------------------------------------------------------------";
-		return "No device with TYPE=SIP exists. Install SIP device first"
+		return "The audio file: " . $AudioDataPathOrig . " does not exist!"
 	}
 }
 ####END####### Define Subfunction for LIVE AUDIO TRANSMIT ######################################################END#####
@@ -4186,22 +4154,9 @@ sub DoorBird_BlockGet($$$$) {
 			</tr>
 			<tr>
 				<td>
-					<code>SipDevice</code> : </td><td>Name of the fhem SIP device which is registered in the DoorBird unit as those ones who are allowed to call the DoorBird. Refer to <a href="#SIP">SIP</a>.<BR>
-																   The default value is the first SIP device in fhem.<BR>
-
-				</td>
-			</tr>
-			<tr>
-				<td>
 					<code>SessionIdSec</code> : </td><td>Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>
 																   The default value is 540s = 9min.<BR>
 
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<code>SipNumber</code> : </td><td>The telephone number under which the DoorBird unit is registered and can be called.<BR>
-																   The default value is <code>**620</code><BR>
 				</td>
 			</tr>
 			<tr>
@@ -4391,18 +4346,6 @@ sub DoorBird_BlockGet($$$$) {
 				<td>
 					<code>SessionIdSec</code> : </td><td>Zeit in Sekunden nach welcher die Session Id erneuert werden soll. Diese ist f&uuml;r die sichere &Uuml;bertragung der Video und Audio Verbindungsdaten notwendig. Die DoorBird-Unit devalidiert die Session Id automatisch nach 10min. F&uuml;r den Fall, dass die DoorBird Kamera an ein &Uuml;berwachungssystem angebunden werden soll, muss diese Funktion ausser Betrieb genommen werden indem man den Wert auf 0 setzt 0.<BR>
 																   Der Default Wert ist 540s = 9min.<BR>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<code>SipDevice</code> : </td><td>Name des fhem SIP Device mit wessen Nummer in der DoorBird - Anlage hinterlegt wurde die die DoorBird - Anlage  anrufen d&uuml;rfen. Refer to <a href="#SIP">SIP</a>.<BR>
-																   Der Default Wert ist das erste SIP device in fhem.<BR>
-				</td>
-			</tr>
-			<tr>
-				<td>
-					<code>SipNumber</code> : </td><td>Die Telefonnummer unter der die DoorBird / Anlage registriert und erreicht werden kann.<BR>
-																   Der Default Wert ist <code>**620</code><BR>
 				</td>
 			</tr>
 			<tr>
