@@ -264,6 +264,31 @@ sortTopicNum(@)
   return @sorted;
 }
 
+sub
+Svn_GetFile($$)
+{
+  my ($from, $to) = @_;
+  require HttpUtils;
+  return "Missing argument from or to" if(!$from || !$to);
+  return "Forbidden characters in from/to"
+                  if($from =~ m/\.\./ || $to =~ m/\.\./);
+  HttpUtils_NonblockingGet({
+    url=>"https://svn.fhem.de/trac/browser/trunk/fhem/$from?format=txt",
+    callback=>sub($$$){ 
+      if($_[1]) {
+        Log 1, "ERROR Svn_GetFile $from: $_[1]";
+        return;
+      }
+      if(!open(FH,">$to")) {
+        Log 1, "ERROR Svn_GetFile $to: $!";
+        return;
+      }
+      print FH $_[2];
+      close(FH);
+      Log 1, "SVN download of $from to $to finished";
+    }});
+  return "Download started, check the FHEM-log";
+}
 
 1;
 
@@ -356,6 +381,15 @@ sortTopicNum(@)
     <li><b>sortTopicNum("asc"|"desc",&lt;list of numbers&gt;)</b><br>
       sort an array of numbers like x.x.x<br>
       (Forum #98578)
+      </li></br>
+
+    <li><b>Svn_GetFile(from, to)</b><br>
+      Retrieve a file diretly from the fhem.de SVN server.<br>
+      Example:
+      <ul>
+        <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm") }</code>
+      </ul>
+      
       </li></br>
 
   </ul>
