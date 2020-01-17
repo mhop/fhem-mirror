@@ -265,9 +265,9 @@ sortTopicNum(@)
 }
 
 sub
-Svn_GetFile($$)
+Svn_GetFile($$;$)
 {
-  my ($from, $to) = @_;
+  my ($from, $to, $finishFn) = @_;
   require HttpUtils;
   return "Missing argument from or to" if(!$from || !$to);
   return "Forbidden characters in from/to"
@@ -286,6 +286,8 @@ Svn_GetFile($$)
       print FH $_[2];
       close(FH);
       Log 1, "SVN download of $from to $to finished";
+      &$finishFn if($finishFn);
+      Log 1, $@ if($@);
     }});
   return "Download started, check the FHEM-log";
 }
@@ -383,13 +385,15 @@ Svn_GetFile($$)
       (Forum #98578)
       </li></br>
 
-    <li><b>Svn_GetFile(from, to)</b><br>
+    <li><b>Svn_GetFile(from, to, [finishFn])</b><br>
       Retrieve a file diretly from the fhem.de SVN server.<br>
+      If the third (optional) parameter is set, it must be a function, which is
+      executed after the file is saved.
       Example:
       <ul>
         <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm") }</code>
+        <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm", sub(){CommandReload(undef, "86_FS10")}) }</code>
       </ul>
-      
       </li></br>
 
   </ul>
