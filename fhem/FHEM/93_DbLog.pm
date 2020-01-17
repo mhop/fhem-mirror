@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
@@ -3760,7 +3761,7 @@ sub DbLog_configcheck($) {
   }
   if($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
-	  $check .= "<b>Recommendation:</b> You should update FHEM to get the freshest DbLog version ! <br><br>";
+	  $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! <br><br>";
   } else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
 	  $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
@@ -3877,22 +3878,32 @@ sub DbLog_configcheck($) {
   ### Check Plot Erstellungsmodus
   #######################################################################
       $check .= "<u><b>Result of plot generation method check</u></b><br><br>";
-	  my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-	  my $forks = 1;
-	  my $wall;
+	  my @webdvs       = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+	  my ($forks,$emb) = (1,1);
+	  my $wall         = "";
       foreach (@webdvs) {
 	      my $web = $_;
-		  $wall  .= $web.": plotfork=".AttrVal($web,"plotfork",0)."<br>";
-		  $forks  = 0 if(!AttrVal($web,"plotfork",0));
+		  my $pf  = AttrVal($web,"plotfork",0);
+		  my $pe  = AttrVal($web,"plotEmbed",0);
+		  $forks  = 0 if(!$pf);
+		  $emb    = 0 if($pe =~ /[01]/);
+		  if(!$pf || $pe =~ /[01]/) {
+		      $wall  .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe."</b><br>";
+		  } else {
+		      $wall  .= $web.": plotfork=".$pf." / plotEmbed=".$pe."<br>";
+		  }
 	  }
-      if(!$forks) {
-	      $check .= "WARNING - at least one of your FHEMWEB devices have attribute \"plotfork = 1\" not set. This may cause blocking situations when creating plots. <br>";
+      if(!$forks || !$emb) {
+	      $check .= "WARNING - at least one of your FHEMWEB devices has attribute \"plotfork = 1\" and/or attribute \"plotEmbed = 2\" not set. <br><br>";
 		  $check .= $wall;
-		  $rec    = "You should set attribute \"plotfork = 1\" in relevant devices";
+		  $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
+                    "If these attributes are not set, blocking situations may occure when creating plots. ".
+					"<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
 	  } else {
 		  $check .= $wall;
 	      $rec = "settings o.k.";
 	  }	         
+	  $check .= "<br>";
 	  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
   
   ### Check Spaltenbreite history
