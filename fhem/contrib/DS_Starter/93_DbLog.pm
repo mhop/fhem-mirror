@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20863 2020-01-01 16:37:35Z DS_Starter $
+# $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.8"   => "17.01.2020 extend configCheck with plotEmbed check. Forum: #107383 ",
+  "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
   "4.9.4"   => "29.12.2019 correct behavior if value is empty and attribute addStateEvent is set (default), Forum: #106769 ",
@@ -3876,22 +3878,32 @@ sub DbLog_configcheck($) {
   ### Check Plot Erstellungsmodus
   #######################################################################
       $check .= "<u><b>Result of plot generation method check</u></b><br><br>";
-	  my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-	  my $forks = 1;
-	  my $wall;
+	  my @webdvs       = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
+	  my ($forks,$emb) = (1,1);
+	  my $wall         = "";
       foreach (@webdvs) {
 	      my $web = $_;
-		  $wall  .= $web.": plotfork=".AttrVal($web,"plotfork",0)."<br>";
-		  $forks  = 0 if(!AttrVal($web,"plotfork",0));
+		  my $pf  = AttrVal($web,"plotfork",0);
+		  my $pe  = AttrVal($web,"plotEmbed",0);
+		  $forks  = 0 if(!$pf);
+		  $emb    = 0 if($pe =~ /[01]/);
+		  if(!$pf || $pe =~ /[01]/) {
+		      $wall  .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe."</b><br>";
+		  } else {
+		      $wall  .= $web.": plotfork=".$pf." / plotEmbed=".$pe."<br>";
+		  }
 	  }
-      if(!$forks) {
-	      $check .= "WARNING - at least one of your FHEMWEB devices have attribute \"plotfork = 1\" not set. This may cause blocking situations when creating plots. <br>";
+      if(!$forks || !$emb) {
+	      $check .= "WARNING - at least one of your FHEMWEB devices has attribute \"plotfork = 1\" and/or attribute \"plotEmbed = 2\" not set. <br><br>";
 		  $check .= $wall;
-		  $rec    = "You should set attribute \"plotfork = 1\" in relevant devices";
+		  $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
+                    "If these attributes are not set, blocking situations may occure when creating plots. ".
+					"<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
 	  } else {
 		  $check .= $wall;
 	      $rec = "settings o.k.";
 	  }	         
+	  $check .= "<br>";
 	  $check .= "<b>Recommendation:</b> $rec <br><br>"; 
   
   ### Check Spaltenbreite history
@@ -4620,8 +4632,15 @@ sub DbLog_addCacheLine($$$$$$$$) {
 		  Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit";
 		  next;  
 	  }
-					  
-	  $i_timestamp = $TIMESTAMP  if($TIMESTAMP =~ /(19[0-9][0-9]|2[0-9][0-9][0-9])-(0[1-9]|1[1-2])-(0[1-9]|1[0-9]|2[0-9]|3[0-1]) (0[0-9]|1[1-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])/);
+      
+      my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+      eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+      if (!$@) {
+          $i_timestamp = $TIMESTAMP;
+      } else {
+          Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
+      }
+
  	  $i_dev       = $DEVICE     if($DEVICE ne '');
  	  $i_type      = $DEVICETYPE if($DEVICETYPE ne '');
  	  $i_reading   = $READING    if($READING ne '');
@@ -6065,12 +6084,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20863 2020-01-01 16:37:35Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20863 2020-01-01 16:37:35Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
