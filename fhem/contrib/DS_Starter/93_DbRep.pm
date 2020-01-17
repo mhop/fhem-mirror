@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 20610 2019-11-28 20:20:46Z DS_Starter $
+# $Id: 93_DbRep.pm 20571 2019-11-24 19:17:33Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.30.4"  => "16.01.2020  attribute timeAdjust for correction OutputWriteToDB ",
+  "8.30.4"  => "17.01.2020  adjust timestamp in OutputWriteToDB, Forum: https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920 ",
   "8.30.3"  => "28.11.2019  countEntries encode \$device, change count_ParseDone for \"countEntriesDetail\" ",
   "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
   "8.30.1"  => "22.11.2019  commandref revised ",
@@ -406,7 +406,6 @@ sub DbRep_Initialize($) {
                        "sqlCmdVars ".
 					   "sqlResultFormat:separated,mline,sline,table,json ".
 					   "sqlResultFieldSep:|,:,\/ ".
-                       "timeAdjust:beginDay,endDay ".
 					   "timeYearPeriod ".
                        "timestamp_begin ".
                        "timestamp_end ".
@@ -10653,16 +10652,13 @@ sub DbRep_OutputWriteToDB($$$$$) {
           $value             = defined($a[1])?sprintf("%.4f",$a[1]):undef;
           $rsf               = $a[2];                             # Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
-          Log3 ($name, 1, "DbRep $name - row: $row ,rsf: $rsf, date: $date, time: $time");
           $time              =~ s/-/:/g if($time);
           
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
-                  $time = "23:59:58";
-                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");            # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
+                  $time = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
               } elsif ($aggr =~ /hour/) {
-                  $time = "$time:59:58";
-                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");         # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
+                  $time = "$time:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
               }
           }
           if ($value) {
@@ -10684,11 +10680,9 @@ sub DbRep_OutputWriteToDB($$$$$) {
       
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
-                  $time = "23:59:58";
-                  $time = "00:00:01" if AttrVal($name, "timeAdjust", "beginDay");           # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
+                  $time = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
               } elsif ($aggr =~ /hour/) {
-                  $time = "$time:59:58";
-                  $time = "$time:00:01" if AttrVal($name, "timeAdjust", "beginDay");        # Forum: https://forum.fhem.de/index.php/topic,105787.msg1013892.html#msg1013892
+                  $time = "$time:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
               }
           }
           if ($value) {
@@ -11070,12 +11064,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20610 2019-11-28 20:20:46Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 20571 2019-11-24 19:17:33Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20610 2019-11-28 20:20:46Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 20571 2019-11-24 19:17:33Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
