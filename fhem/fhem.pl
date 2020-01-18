@@ -4,8 +4,8 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2019
-#  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
+#  (c) 2005-2020
+#  Copyright: Rudolf Koenig (rudolf dot koenig at fhem dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -303,7 +303,6 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
-my $ignoreRegexp;               # for Log filtering
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -971,7 +970,8 @@ Log3($$$)
     return if($loglevel > $attr{global}{verbose});
 
   }
-  return if($ignoreRegexp && $text =~ m/^$ignoreRegexp$/);
+  return if(defined($defs{global}{ignoreRegexpObj}) &&
+            $text =~ $defs{global}{ignoreRegexpObj});
 
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
@@ -2753,7 +2753,7 @@ GlobalAttr($$$$)
     return "The global attribute $name cannot be deleted" if($noDel{$name});
     $featurelevel = 5.9 if($name eq "featurelevel");
     $haveInet6    = 0   if($name eq "useInet6"); # IPv6
-    $ignoreRegexp = 0   if($name eq "ignoreRegexp"); 
+    delete($defs{global}{ignoreRegexpObj}) if($name eq "ignoreRegexp");
     return undef;
   }
 
@@ -2849,9 +2849,11 @@ GlobalAttr($$$$)
     }
   }
   elsif($name eq "ignoreRegexp") {
-    eval { "Hallo" =~ m/^$val$/ };
+    return "Incorrect regexp (starts with *)" if($val =~ m/^\*/);
+    my $reObj;
+    eval { $reObj = qr/^$val$/; "Hallo" =~ $reObj ; };
     return $@ if($@);
-    $ignoreRegexp = $val;
+    $defs{global}{ignoreRegexpObj} = $reObj;
   }
 
   return undef;
