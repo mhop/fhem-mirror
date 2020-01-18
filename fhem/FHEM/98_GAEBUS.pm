@@ -52,6 +52,7 @@
 # 05.01.2020 : A.Goebel : fix supress sprintf warnings in valueFormat evaluation
 # 09.01.2020 : A.Goebel : fix to skip readings named "dummy"
 # 09.01.2020 : A.Goebel : fix handling for valueFormat, give exact number of parameters to sprintf and shift all of them
+# 16.01.2020 : A.Goebel : add ignore error messages returned by ebusd
 
 package main;
 
@@ -1077,26 +1078,34 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   if ($inBlockingCall)
   {
-    $actMessage = "";
+    if ($actMessage =~ /^ERR: /) {
+      # readings will be updated in main fhem process
+      # really need to return nothing!
+      return "lasterror|$actMessage";
 
-    foreach my $r (@targetreading)
-    {
-      if ($r eq "dummy") {
-        shift @values;
-      } else {
-        # shift is done in GAEBUS_valueFormat
-        my $v = GAEBUS_valueFormat ($hash, $r, \@values);
-        $actMessage .= $r."|".$v."|";
+    } else {
+      $actMessage = "";
+
+      foreach my $r (@targetreading)
+      {
+        if ($r eq "dummy") {
+          shift @values;
+        } else {
+          # shift is done in GAEBUS_valueFormat
+          my $v = GAEBUS_valueFormat ($hash, $r, \@values);
+          $actMessage .= $r."|".$v."|";
+        }
       }
+
+      $actMessage =~ s/\|$//;
+
+      # readings will be updated in main fhem process
+Log3 ($name, 3, "$name returns actMessage as $actMessage");
+      return $actMessage;
     }
-
-    $actMessage =~ s/\|$//;
-
-    # readings will be updated in main fhem process
-    return $actMessage;
   }
 
-  if ($action eq "r")
+  if ($action eq "r" and not $actMessage =~ /^ERR: /)
   {
     readingsBeginUpdate ($hash);
 
@@ -1115,21 +1124,6 @@ GAEBUS_doEbusCmd($$$$$$$)
     readingsEndUpdate($hash, 1);
   }
 
-  
-  #if ($inBlockingCall) {
-  #  $actMessage = $readingname."|".$actMessage;
-  #}
-  #else {
-  #
-  #  if ($action eq "r") {
-  #    if (defined ($readingname)) {
-  #      #  BlockingCall changes
-  #      readingsSingleUpdate ($hash,  $readingname, "$actMessage", 1);
-  #    }
-  #  }
-  #}
-
- 
   return $actMessage;
 
 }
