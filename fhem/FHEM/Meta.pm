@@ -1991,12 +1991,12 @@ m/(^#\s+(?:\d{1,2}\.\d{1,2}\.(?:\d{2}|\d{4})\s+)?[^v\d]*(v?(?:\d{1,3}\.\d{1,3}(?
         }
     }
 
+    push @{ $modMeta->{x_file} }, $versionFrom;
+    push @{ $modMeta->{x_file} }, $version;
+
     # Standardize version number
     $modMeta->{version} = version->parse( $modMeta->{version} )->numify
       if ( defined( $modMeta->{version} ) );
-
-    push @{ $modMeta->{x_file} }, $versionFrom;
-    push @{ $modMeta->{x_file} }, $modMeta->{version};
 
     $@ .=
       $modMeta->{x_file}[2] . ": Invalid version format '$modMeta->{version}'"
@@ -3301,15 +3301,9 @@ sub __SetXVersion {
       "abstract": "FHEM Entwickler Paket, um Metadaten Unterstützung zu aktivieren"
     }
   },
-  "version": "v0.6.6",
+  "version": "v0.6.5",
   "release_status": "testing",
   "x_changelog": {
-    "v0.6.6": {
-      "date": "2020-01-18",
-      "bugfixes": [
-        "version number in x_file descriptor"
-      ]
-    },
     "v0.6.0": {
       "date": "2019-04-18",
       "changes": [
