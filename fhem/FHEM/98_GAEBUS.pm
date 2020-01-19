@@ -1100,7 +1100,6 @@ GAEBUS_doEbusCmd($$$$$$$)
       $actMessage =~ s/\|$//;
 
       # readings will be updated in main fhem process
-Log3 ($name, 3, "$name returns actMessage as $actMessage");
       return $actMessage;
     }
   }
