@@ -296,13 +296,13 @@ sub Initialize($) {
 
 ## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
     #  und davor mit :: getrennt der eigentliche package Name des Modules
-    $hash->{SetFn}    = 'FHEM::AutoShuttersControl::Set';
-    $hash->{GetFn}    = 'FHEM::AutoShuttersControl::Get';
-    $hash->{DefFn}    = 'FHEM::AutoShuttersControl::Define';
-    $hash->{NotifyFn} = 'FHEM::AutoShuttersControl::Notify';
-    $hash->{UndefFn}  = 'FHEM::AutoShuttersControl::Undef';
-    $hash->{AttrFn}   = 'FHEM::AutoShuttersControl::Attr';
-    $hash->{AttrList} =
+    $hash->{SetFn}              = 'FHEM::AutoShuttersControl::Set';
+    $hash->{GetFn}              = 'FHEM::AutoShuttersControl::Get';
+    $hash->{DefFn}              = 'FHEM::AutoShuttersControl::Define';
+    $hash->{NotifyFn}           = 'FHEM::AutoShuttersControl::Notify';
+    $hash->{UndefFn}            = 'FHEM::AutoShuttersControl::Undef';
+    $hash->{AttrFn}             = 'FHEM::AutoShuttersControl::Attr';
+    $hash->{AttrList}           =
         'ASC_tempSensor '
       . 'ASC_brightnessDriveUpDown '
       . 'ASC_autoShuttersControlMorning:on,off '
@@ -322,7 +322,8 @@ sub Initialize($) {
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
       . $readingFnAttributes;
-    $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
+    $hash->{NotifyOrderPrefix}  = '51-';    # Order Nummer für NotifyFn
+    $hash->{FW_detailFn}        = 'FHEM::AutoShuttersControl::ShuttersInformation';
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
@@ -680,20 +681,13 @@ sub Get($$@) {
 
     my ( $cmd, @args ) = @aa;
 
-    if ( lc $cmd eq 'showshuttersinformations' ) {
-        return "usage: $cmd" if ( @args != 0 );
-        my $ret = GetShuttersInformation($hash);
-        return $ret;
-    }
-    elsif ( lc $cmd eq 'shownotifydevsinformations' ) {
+    if ( lc $cmd eq 'shownotifydevsinformations' ) {
         return "usage: $cmd" if ( @args != 0 );
         my $ret = GetMonitoredDevs($hash);
         return $ret;
     }
     else {
         my $list = "";
-        $list .= " showShuttersInformations:noArg"
-          if ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out' );
         $list .= " showNotifyDevsInformations:noArg"
           if (  ReadingsVal( $name, 'userAttrList', 'none' ) eq 'rolled out'
             and AttrVal( $name, 'ASC_expert', 0 ) == 1 );
@@ -3197,9 +3191,12 @@ sub CreateNewNotifyDev($) {
     $hash->{NOTIFYDEV} = $hash->{NOTIFYDEV} . $shuttersList;
 }
 
-sub GetShuttersInformation($) {
-    my $hash = shift;
-    my $ret  = '<html><table><tr><td>';
+sub ShuttersInformation($@) {
+
+    my ($FW_wname, $d, $room, $pageHash) = @_;
+    my $hash = $defs{$d};
+
+    my $ret  = '<html><table><tr><h3>ASC Configuration and Information Summary</h3><td>';
     $ret .= '<table class="block wide">';
     $ret .= '<tr class="even">';
     $ret .= "<td><b>Shutters</b></td>";
@@ -3275,7 +3272,8 @@ sub GetShuttersInformation($) {
         $linecount++;
     }
     $ret .= '</table></td></tr>';
-    $ret .= '</table></html>';
+    $ret .= '</table></html><br /><br />';
+
     return $ret;
 }
 
@@ -7895,9 +7893,9 @@ sub getblockAscDrivesAfterManual {
     "Rollo",
     "Control"
   ],
-  "release_status": "under develop",
+  "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.13",
+  "version": "v0.8.14",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
