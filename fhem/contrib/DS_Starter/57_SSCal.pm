@@ -2724,7 +2724,7 @@ return;
 <h3>SSCal</h3>
 <ul>
 
-The guide for this module is currently only available in the german <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendars">Wiki</a>.
+The guide for this module is currently only available in the german <a href="https://wiki.fhem.de/wiki/SSCal - Integration des Synology Calendar Servers">Wiki</a>.
 
 </ul>
 
@@ -2736,7 +2736,7 @@ The guide for this module is currently only available in the german <a href="htt
 <h3>SSCal</h3>
 <ul>
 
-Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendars">Wiki</a> vorhanden.
+Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wiki/SSCal - Integration des Synology Calendar Servers">Wiki</a> vorhanden.
  
 </ul>
 
