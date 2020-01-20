@@ -151,7 +151,8 @@ my %zwave_class = (
                rgb         => '05050000010002%02x03%02x04%02x', # Forum #44014
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
     parse => { "043302(..)(..)"=> 'ZWave_ccCapability($1,$2)',
-               "043304(..)(.*)"=> '"ccStatus_".hex($1).":".hex($2)' } },
+               "0.3304(..)(..)(.*)"=> '"ccStatus_".hex($1).":".hex($2)',
+               "..3304(..)(..)(.*)"=> 'ZWave_ccParse(hex($1),hex($2))' } },
   ZIP_ADV_CLIENT           => { id => '34' },
   METER_PULSE              => { id => '35' },
   BASIC_TARIFF_INFO        => { id => '36' },
@@ -2545,6 +2546,15 @@ ZWave_doorLLRParse($$)
   }
 }
 
+sub
+ZWave_ccParse($$)
+{
+  my ($ch,$val) = @_;
+  my @ccLabel = ("WarmWhite","ColdWhite","Red","Green","Blue",
+                 "Amber","Cyan","Purple","Indexed");
+  my $l = ($ch > @ccLabel-1 ? "unknown":$ccLabel[$ch]);
+  return "cc$l:$val";
+}
 
 sub
 ZWave_ccColorSet($)
@@ -7111,6 +7121,9 @@ ZWave_firmwareUpdateParse($$$)
   <br><br><b>Class COLOR_CONTROL</b>
   <li>ccCapability:XY</li>
   <li>ccStatus_X:Y</li>
+  <li>cc&lt;Col&gt;:Y<br>
+    where &lt;col&gt; is one of WarmWhite, ColdWhite, Red, Green, Blue, Amber,
+    Cyan, Purple, Indexed</li>
 
   <br><br><b>Class CONFIGURATION</b>
   <li>config_X:Y<br>
