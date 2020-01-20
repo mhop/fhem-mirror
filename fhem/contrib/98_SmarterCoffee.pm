@@ -24,7 +24,7 @@
 #
 #  This copyright notice MUST APPEAR in all copies of the script!
 #
-# $Id$
+# $Id: 98_SmarterCoffee.pm 17728 2018-11-11 11:01:55Z CoolTux $
 #
 #############################################################
 #

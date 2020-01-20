@@ -175,7 +175,6 @@ FHEM/31_HUEDevice.pm         justme1968           Zigbee
 FHEM/31_LightScene.pm        justme1968           Automatisierung
 FHEM/31_MilightDevice.pm     mattwire             Beleuchtung
 FHEM/31_Nello.pm             neumann              Sonstige Systeme
-FHEM/31_PLAYBULB.pm          CoolTux              Beleuchtung
 FHEM/32_mailcheck.pm         justme1968           Automatisierung
 FHEM/32_speedtest.pm         justme1968           Sonstiges
 FHEM/32_SYSSTAT.pm           justme1968           Unterstützende Dienste
@@ -526,7 +525,6 @@ FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
 FHEM/98_Siro.pm              Byte09 / Dr. Smag    Sonstige Systeme
-FHEM/98_SmarterCoffee        CoolTux              Sonstige Systeme
 FHEM/98_statistics.pm        tupol                Unterstützende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
