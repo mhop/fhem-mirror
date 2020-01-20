@@ -7096,9 +7096,6 @@ sub getblockAscDrivesAfterManual {
     <a name="AutoShuttersControlGet"></a>
     <strong>Get</strong>
     <ul>
-        <li><strong>showShuttersInformations</strong> - shows an information for all associated shutter devices with
-            next activation time, mode and several other state informations.
-        </li>
         <li><strong>showNotifyDevsInformations</strong> - shows the generated <em>NOTIFYDEV</em> structure. Useful for
             debugging and only shown if the <em>ASC_expert</em> attribute is set to 1.
         </li>
@@ -7696,7 +7693,6 @@ sub getblockAscDrivesAfterManual {
     <a name="AutoShuttersControlGet"></a>
     <strong>Get</strong>
     <ul>
-        <li><strong>showShuttersInformations</strong> - zeigt eine &Uuml;bersicht aller Rolll&auml;den mit den Fahrzeiten, Modus und diverse weitere Statusanzeigen.</li>
         <li><strong>showNotifyDevsInformations</strong> - zeigt eine &Uuml;bersicht der abgelegten NOTIFYDEV Struktur. Diese Funktion wird prim&auml;r f&uuml;rs Debugging genutzt. Hierzu ist das Attribut <em>ASC_expert = 1</em> zu setzen.</li>
     </ul>
     <br /><br />
