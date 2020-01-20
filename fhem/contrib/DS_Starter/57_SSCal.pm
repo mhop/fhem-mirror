@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.1.13" => "20.01.2020  change save and read credentials routine ",
   "1.1.12" => "19.01.2020  add attribute interval, automatic event fetch ",
   "1.1.11" => "18.01.2020  status information added: upcoming, alarmed, started, ended ",
   "1.1.10" => "17.01.2020  attribute asyncMode for parsing events in BlockingCall, some fixes ",
@@ -2240,7 +2241,7 @@ sub SSCal_setcredentials ($@) {
     my (@key,$len,$i);   
     
     my $ao   = "credentials";
-    $credstr = encode_base64(join(':', @credentials));
+    $credstr = encode_base64(join('!_ESC_!', @credentials));
     
     # Beginn Scramble-Routine
     @key = qw(1 3 4 5 6 3 2 1 9);
@@ -2307,7 +2308,7 @@ sub SSCal_getcredentials ($$$) {
             split //, $credstr;   
             # Ende Descramble-Routine
             
-            ($username, $passwd) = split(":",decode_base64($credstr));
+            ($username, $passwd) = split("!_ESC_!",decode_base64($credstr));
             
             my $logcre = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
         
