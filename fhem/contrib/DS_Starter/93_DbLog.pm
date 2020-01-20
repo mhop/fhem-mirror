@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $
+# $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.9.8"   => "17.01.2020 extend configCheck with plotEmbed check. Forum: #107383 ",
+  "4.9.9"   => "21.01.2020 default ParseEvent ",
+  "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
   "4.9.5"   => "01.01.2020 do not reopen database connection if device is disabled (fix) ",
@@ -999,7 +1000,7 @@ sub DbLog_ParseEvent($$$$) {
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($reading =~ /:$/) {
+      if($reading =~ /^.*:\s+$/) {                                       # und 21.01.20 Forum: 106769
           $reading = (split(":", $reading))[0];
       } else {
           $reading = "state";
@@ -3761,7 +3762,7 @@ sub DbLog_configcheck($) {
   }
   if($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
-	  $check .= "<b>Recommendation:</b> You should update FHEM to get the freshest DbLog version ! <br><br>";
+	  $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! <br><br>";
   } else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
 	  $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
@@ -6084,12 +6085,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 20966 2020-01-13 21:13:47Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
