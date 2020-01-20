@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  74_NUKIDevice: fix FHEM Crash 
+                          Undefined subroutine &FHEM::NUKIDevice::CommandDefMod
  - change:  73_AutoShuttersControl: change commandref
  - feature: 73_AutoShuttersControl: add SummaryFn
  - change:  93_DbLog: adjust configCheck with plotEmbed check. Forum: #107383

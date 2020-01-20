@@ -127,6 +127,7 @@ BEGIN {
           modules
           Log3
           CommandAttr
+          CommandDefMod
           AttrVal
           IsDisabled
           deviceEvents
@@ -744,7 +745,7 @@ sub WriteReadings($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v1.9.11",
+  "version": "v1.9.12",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
