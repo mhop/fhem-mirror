@@ -1756,7 +1756,7 @@ ZWave_assocGroupCmdList($$)
 }
 
 my %zwm_unit = (
-  energy  => ["kWh", "kVAh", "W", "pulseCount", "V", "A", "PowerFactor", "undef",
+  energy  => ["kWh", "kVAh", "W", "pulseCount", "V", "A", "PowerFactor","undef",
               "kVar", "kVarh"],
   gas     => ["m3", "feet3", "undef", "pulseCount"],
   water   => ["m3", "feet3", "USgallons", "pulseCount"],
@@ -1780,7 +1780,7 @@ ZWave_meterParse($$)
                         "undef" : $rate_type_text[$rate_type]);
 
   my $meter_type = ($v1 & 0x1f);
-  my @meter_type_text =("undef", "energy", "gas", "water", "heating", "cooling");
+  my @meter_type_text =("undef", "energy", "gas", "water", "heating","cooling");
   my $meter_type_text = ($meter_type > $#meter_type_text ?
                         "undef" : $meter_type_text[$meter_type]);
 
@@ -1798,8 +1798,14 @@ ZWave_meterParse($$)
   $meter_type_text = "current" if ($unit_text eq "A");
 
   my $mv = hex(substr($v3, 0, 2*$size));
+  $mv = ($mv >> 31 ? $mv - 2 ** 32 : $mv) if($size == 4);
+  $mv = ($mv >> 24 ? $mv - 2 ** 24 : $mv) if($size == 3);
+  $mv = ($mv >> 16 ? $mv - 2 ** 16 : $mv) if($size == 2);
+  $mv = ($mv >>  8 ? $mv - 2 **  8 : $mv) if($size == 1);
+
   $mv = $mv / (10 ** $precision);
   $mv -= (2 ** ($size*8)) if $mv >= (2 ** ($size*8-1));
+  # Log 1, "$v1 $v2 $v3 precision:$precision size:$size scale:$scale val:$mv";
   $v3 = substr($v3, 2*$size, length($v3)-(2*$size));
 
   if (length($v3) < 4) { # V1 report
