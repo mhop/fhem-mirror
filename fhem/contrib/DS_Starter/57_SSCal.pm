@@ -503,7 +503,7 @@ sub SSCal_Get($@) {
     
 	} elsif ($opt eq "getCalendars") {                                                         # Liste aller Kalender abrufen
         # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-	    SSChatBot_getclhash($hash,1);
+	    SSCal_getclhash($hash,1);
 		
 		SSCal_addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
         SSCal_getapisites($name);
