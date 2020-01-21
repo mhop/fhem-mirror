@@ -53,6 +53,7 @@
 # 20.11.18 GA add integrate $init_done into PWMR_Define to supress error messages during startup
 # 20.11.18 GA add change default for w_regexp from ".*Open.*" to ".*[Oo]pen.*" to fit for MAX window contacts
 # 11.02.19 GA add redesign of maxOffTime
+# 21.01.20 GA fix remove default tempRule if only tempRule1 or tempRule2 is defined
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -1634,10 +1635,26 @@ PWMR_Attr(@)
     return PWMR_CheckTemp($hash, "c_tempFrostProtect", $attrval);
 
   } elsif ($attrname eq "tempRule1") {                         # tempRule1
-    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule1", $attrval);
+    my $ruleError = PWMR_CheckTempRule($hash, $attrname, "c_tempRule1", $attrval);
+    if (not defined $ruleError) {
+      # attr for tempRule1 is valid
+      if (not defined ($attr{$name}{tempRule2})) {
+        $hash->{c_tempRule2} = "";
+        PWMR_NormalizeRules($hash);
+      }
+    }
+    return $ruleError;
 
   } elsif ($attrname eq "tempRule2") {                         # tempRule2
-    return PWMR_CheckTempRule($hash, $attrname, "c_tempRule2", $attrval);
+    my $ruleError = PWMR_CheckTempRule($hash, $attrname, "c_tempRule2", $attrval);
+    if (not defined $ruleError) {
+      # attr for tempRule2 is valid
+      if (not defined ($attr{$name}{tempRule1})) {
+        $hash->{c_tempRule1} = "";
+        PWMR_NormalizeRules($hash);
+      }
+    }
+    return $ruleError;
 
   } elsif ($attrname eq "tempRule3") {                         # tempRule3
     return PWMR_CheckTempRule($hash, $attrname, "c_tempRule3", $attrval);
