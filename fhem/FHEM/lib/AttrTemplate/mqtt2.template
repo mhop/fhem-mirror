@@ -35,8 +35,8 @@ attr DEVCID bridgeRegexp \
   valetudo[/]([^/]+)[/].*:.* "$1"\
   [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
   wallpanel[/]([^/]+)[/].*:.* "$1"\
-  (wled)[/]([^/]+)[/].*::.* "$1_$2"\
-  (go-eCharger)[/]([^/]+)[/].*::.* "go_eCharger_$2"
+  (wled)[/]([^/]+)[/].*:.* "$1_$2"\
+  (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -611,7 +611,7 @@ set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
 
 name:tasmota_prefix_clearing_and_reboot
-filter:TYPE=MQTT2_DEVICE::FILTER=readingList=.*(tele|cmnd|stat).*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
 order:A_01x1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
@@ -1711,6 +1711,8 @@ order:E_01a
 par:DEVTYPE;Internal TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEV_ID;base topic set ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?(ebus[a-zA-Z])[^/]*[/].*:, ? $1 : "ebusd" }
 par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
+{ Svn_GetFile("contrib/AttrTemplate/99_attrTmqtt2_ebus_Utils.pm", "FHEM/99_attrTmqtt2_ebus_Utils.pm", sub(){ CommandReload(undef, "99_attrTmqtt2_ebus_Utils") }) }
+{ Svn_GetFile("contrib/AttrTemplate/mqtt2.ebus.template", "FHEM/lib/AttrTemplate/mqtt2.ebus.template", sub(){ AttrTemplate_Initialize() }) }
 attr DEVICE icon ICON
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
@@ -1726,12 +1728,86 @@ attr DEVICE devStateIcon 1.true:it_net 1.false:it_net@red  2.true:lan_rs485 2.fa
 attr DEVICE setList getKnown:noArg DEV_ID/list onlyknown\
   getAll:noArg DEV_ID/list
 set DEVICE getKnown
+attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).
+farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>.
 attr DEVICE model eBus_daemon_splitter
 
-###############
-#ems-esp
-#
+
+###########################################
+# ems-esp
+# The ems-esp device
+name:ems-esp_heater_device
+filter:TYPE=MQTT2_DEVICE
+desc:EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
+order:E_02a
+par:BASE_ID;base topic set, default is "home";{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/, ? $1 : "home" }
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
+par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
+attr DEVICE icon ICON
+modify DEVICE DEV_ID
+attr DEVICE bridgeRegexp \
+  BASE_ID/DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
+  BASE_ID/DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"
+attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
+attr DEVICE  readingList BASE_ID/DEV_ID/start:.* LWT\
+  BASE_ID/DEV_ID/heartbeat:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE stateFormat Interface: \
+LWT\
+Signal: \
+rssid %\
+<br>Uptime: formatedUptime\
+<br>IPAddress : <a href="http://IP" target="_blank">IP</a>
+attr DEVICE setList restart:noArg BASE_ID/DEV_ID/restart
+attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
+attr DEVICE autocreate 1
+attr DEVICE webCmd restart
+attr DEVICE model ems-esp_heater_device
+
+name:ems-esp_boiler
+filter:TYPE=MQTT2_DEVICE
+desc:To configure a boiler device for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a><br>.<a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
+order:E_02b
+par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/boiler_data:, ? "$1" : undef }
+attr DEVICE readingList BASEPATH/boiler_data { json2nameValue($EVENT,'',$JSONMAP) }\
+  BASEPATH/shower_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  BASEPATH/mixing_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  BASEPATH/tapwater_active:.* tapwater_active\
+  BASEPATH/heating_active:.* heating_active
+attr DEVICE model ems-esp_boiler
+
 #ems-esp thermostat device
+name:ems-esp_thermostat_simple
+filter:TYPE=MQTT2_DEVICE
+desc:To configure a simple thermostat (e.g. RC300) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a>.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
+order:E_02c
+par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon set.auto:edit_settings:mode+manual set.manual:edit_settings:mode+auto auto:time_automatic:mode+manual manual:time_manual_mode:mode+auto  set.*°C:edit_settings
+attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
+attr DEVICE readingList BASEPATH/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }
+attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mode1 $EVTPART1\
+  desired-temp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_temp1 $EVTPART1
+attr DEVICE setStateList on off
+attr DEVICE stateFormat mode\
+desired-temp °C
+attr DEVICE webCmd mode:desired-temp
+attr DEVICE model ems-esp_thermostat_simple
+
+name:ems-esp_thermostat_RC35_type
+filter:TYPE=MQTT2_DEVICE
+desc:To configure a thermostat comparable to RC35 for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a><br>.<a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>
+order:E_02c1
+par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
+set DEVICE attrTemplate ems-esp_thermostat_simple
+attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mode1 $EVTPART1\
+  desired-temp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_temp1 $EVTPART1\
+  daytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_daytemp1 $EVTPART1\
+  nighttemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_nighttemp1 $EVTPART1\
+  holidaytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_holidayttemp1 $EVTPART1
+attr DEVICE model ems-esp_thermostat_RC35_type
+
+
 
 
 
@@ -1757,9 +1833,12 @@ status\
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
 attr DEVICE model esp_milight_hub_bridge
+{ AttrTemplate_Initialize() }
+
 
 #rgbw-bulb
 name:esp_milight_hub_rgbw_bulb
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
 order:X_011
@@ -1792,6 +1871,7 @@ attr DEVICE model esp_milight_hub_rgbw_bulb
 
 #rgbw-group
 name:esp_milight_hub_make_rgbw_group
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
 order:X_01a
@@ -1820,6 +1900,7 @@ attr milight_REMOTE_ID_0 model esp_milight_hub_make_rgbw_group
 
 #rgbw_cct-bulb
 name:esp_milight_hub_rgb_cct_bulb
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br><a href="https://forum.fhem.de/index.php/topic,86932.msg877986.html#msg877986">Source: Forum</a>
 order:X_01a1
@@ -1861,6 +1942,7 @@ attr DEVICE model esp_milight_hub_rgb_cct_bulb
 
 #cct-only-bulb
 name:esp_milight_hub_cct_only_bulb
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br>simple CCT device
 order:X_01b
@@ -1895,6 +1977,7 @@ attr DEVICE model esp_milight_hub_cct_only_bulb
 
 #rgbw-bulb
 name:esp_milight_hub_max_features_bulb
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
 order:X_01x
@@ -1936,6 +2019,7 @@ attr DEVICE model esp_milight_hub_max_features_bulb
 
 #remote for event generation only
 name:esp_milight_hub_remote_events_only
+prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE
 desc:For use with X_01_esp_milight_hub_bridge <br>See <a href="https://forum.fhem.de/index.php/topic,103493.0.html">Forum Thread</a> for examples how to control a MPD, HUEDevice bulbs or shutters by a MiLight remote.
 order:X_01y
@@ -1982,8 +2066,11 @@ LWT\
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
+{ AttrTemplate_Initialize() }
+
 
 name:OpenMQTTGateway_BT_scanner
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.
 order:X_02b
@@ -2002,6 +2089,7 @@ attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
 
 name:OpenMQTTGateway_simple_RF433_switch
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02a
@@ -2029,6 +2117,7 @@ attr OMG_DEVCID room NEWDEVROOM
 attr OMG_DEVCID model OpenMQTTGateway_simple_RF433_switch
 
 name:OpenMQTTGateway_bme
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02b
@@ -2043,6 +2132,7 @@ attr DEVICE userReadings hpa:BME_pa.* {ReadingsVal($name,"BME_pa",0)/100}
 attr DEVICE model OpenMQTTGateway_bme
 
 name:OpenMQTTGateway_ir
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02c
@@ -2057,6 +2147,7 @@ attr DEVCID comment irsend needs Infos about protocol and value (n decimal), so 
 attr DEVICE model OpenMQTTGateway_ir
 
 name:OpenMQTTGateway_BT_temp_hum_sensor
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your sensor. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02d
@@ -2081,13 +2172,14 @@ desc:use this to control a rooted Xiamoni Vacuum / Roborock. For further details
 order:X_03
 par:BASE_ID;BASE_ID typically is valetudo;{ AttrVal("DEVICE","readingList","") =~ m,(valetudo)[/].*:, ? $1 : undef }
 par:DEVNAME;DEVNAME typically is rockrobo;{ AttrVal("DEVICE","readingList","") =~ m,valetudo[/]([^/]+)[/].*:, ? $1 : undef }
+{ Svn_GetFile("contrib/AttrTemplate/99_attrTmqtt2_roborock_Utils.pm", "FHEM/99_attrTmqtt2_roborock_Utils.pm", sub(){CommandReload(undef, "99_attrTmqtt2_roborock_Utils")}) }
 deletereading -q DEVICE (?!associatedWith).*
 defmod DEVICE MQTT2_\DEVICE DEVNAME
 attr DEVICE icon vacuum_top
 attr DEVICE readingList homeassistant/vacuum/valetudo_DEVNAME/config:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/state:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/attributes:.* { json2nameValue($EVENT) }\
-  BASE_ID/DEVNAME/map_data:.* {valetudo2svg("map_data",$EVENT,"www/images/valetudo_map.svg")}
+  BASE_ID/DEVNAME/map_data:.* {attrTmqtt2_roborock_valetudo2svg("map_data",$EVENT,"www/images/valetudo_map.svg")}
 attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   charge:noArg BASE_ID/DEVNAME/command return_to_base\
   stop:noArg BASE_ID/DEVNAME/command stop\
@@ -2100,8 +2192,8 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   load_map BASE_ID/DEVNAME/custom_command {"command":"load_map","name":"$EVTPART1"}\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
-attr DEVCID comment For code "valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
-farewell:template has been applied successfully. For map generation you'll need additional code to myUtils, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a> for details.
+attr DEVCID comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>To display generated map, define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
 attr DEVICE model roborock
 
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
@@ -2183,32 +2275,3 @@ attr DEVICE userReadings charger_state:car.* { my $val = ReadingsVal($name,"car"
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model go_eCharger
 
-###########################################
-# ems-esp
-# The ems-esp device
-name:ems-esp_heater_device
-filter:TYPE=MQTT2_DEVICE
-desc:EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
-order:E_02a
-par:BASE_ID;base topic set, default is "home";{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?[/]?([^/])+[/][^/]+[/].*:, ? $1 : "home" }
-par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^:]+:?[/]?BASE_ID[/]([^/]+)[/].*:, ? $1 : "ems-esp" }
-par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
-attr DEVICE icon ICON
-modify DEVICE DEV_ID
-attr DEVICE bridgeRegexp \
-  BASE_ID/DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
-  BASE_ID/DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"
-attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
-attr DEVICE  readingList BASE_ID/DEV_ID/start:.* LWT\
-  BASE_ID/DEV_ID/heartbeat:.* { json2nameValue($EVENT) }
-attr DEVICE stateFormat Interface: \
-LWT\
-Signal: \
-rssid %\
-<br>Uptime: formatedUptime\
-<br>IPAddress : <a href="http://IP" target="_blank">IP</a>
-attr DEVICE setList restart:noArg BASE_ID/DEV_ID/restart
-attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
-attr DEVICE autocreate 1
-attr DEVICE webCmd restart
-attr DEVICE model ems-esp_heater_device

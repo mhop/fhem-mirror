@@ -609,6 +609,7 @@ contrib/98_Heating_Control.pm Beta-User           Unterstützende Dienste
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
+contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
 contrib/commandref*          rudolfkoenig         Sonstiges
 contrib/pre-commit           rudolfkoenig         Sonstiges
 contrib/DEBIAN/*             betateilchen         Sonstiges

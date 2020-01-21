@@ -1,0 +1,447 @@
+###########################################
+# $Id: mqtt2.ebus.template 2019-04-03 21:00:00 Reinhart $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the userbridgeRegexp)
+# when changed the template reread " { AttrTemplate_Initialize() } "
+# save this template in /opt/fhem/FHEM/lib/AttrTemplate
+###########################################
+
+# changelog
+# 01.04.19 added TimeProg for Calormatic
+# 03.04.19 corrected Errors in jsonMap and valuesuffix
+# 18.01.20 prepare for svn distribution, see https://forum.fhem.de/index.php/topic,97989.msg1014104.html#msg1014104
+
+ 
+name:eBus_bai_jsonMap_Status01
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a1
+attr DEVICE readingList \
+ebusd/DEV_ID/Status01:.* { json2nameValue($EVENT, 'Status01_', $JSONMAP) }\
+ebusd/DEV_ID/Status02:.* { json2nameValue($EVENT, 'Status02_', $JSONMAP) }
+attr DEVICE jsonMap Status01_0_value:_Vorlauf Status01_1_value:_Ruecklauf Status01_2_value:_Aussentemp Status01_3_value:_Warmwasser Status01_4_value:_WWSpeicher Status01_5_value:_Pumpenstatus Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+#attr DEVICE stateFormat {sprintf("Vorlauf: %.1f <br>Ruecklauf: %.1f <br>Warmwasser: %.1f <br>Aussentemp.: %.1f <br>Pumpe: %s", ReadingsVal($name,"_Vorlauf",0), ReadingsVal($name,"_Ruecklauf",0), ReadingsVal($name,"_Warmwasser",0), ReadingsVal($name,"_Aussentemp",0), ReadingsVal($name,"S_Pumpenstatus",0))}
+attr DEVICE icon sani_boiler_temp
+deletereading DEVICE Status.*
+attr DEVICE model eBus_bai_jsonmap
+
+name:eBus_4xx_devStateIcon_HeatCurve_HwcTemp
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+order:E_01a2
+attr DEVICE setList Hc1HeatCurve_curve_value:uzsuDropDown,0.20,0.70,0.90,1.00,1.10,1.20,1.30,1.40,1.50,1.60,1.70 ebusd/BASE_DEV/Hc1HeatCurve/set $EVTPART1\
+HwcTempDesired_temp1_value:uzsuDropDown,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0 ebusd/BASE_DEV/HwcTempDesired/set $EVTPART1
+attr DEVICE getList Hc1HeatCurve:noArg Hc1HeatCurve_curve_value ebusd/BASE_DEV/Hc1HeatCurve/get \
+HwcTempDesired:noArg HwcTempDesired_temp1_value ebusd/BASE_DEV/HwcTempDesired/get
+attr DEVICE devStateIcon {my $vC = ReadingsVal($name, "Hc1HeatCurve_curve_value", "10")*10; my $colCur = substr(Color::pahColor(5,10,15,$vC,0),0,6); my $iconCur = 'time_graph@'.$colCur; my $vH = ReadingsVal($name, "HwcTempDesired_temp1_value", "30"); my $colHot = substr(Color::pahColor(20,40,60,$vH,0),0,6); my $iconHot = 'sani_water_hot@'.$colHot; ; "<div style=\"text-align:right\" >  " . FW_makeImage("$iconCur",'file_unknown@grey') . "<br> " . FW_makeImage("$iconHot",'sani_water_hot@red') . "</div>"}
+attr DEVICE webCmd Hc1HeatCurve_curve_value:HwcTempDesired_temp1_value
+attr DEVICE webCmdLabel Heizkurve \
+:Warmwasser
+attr DEVICE room MQTT2_\DEVICE
+attr DEVICE group eBus_Hcurve
+attr DEVICE icon message_tendency_steady
+attr DEVICE model eBus_4xx_HeatCurve_HwcTemp
+
+name:eBus_430_devStateIcon_Pump_Fan_HeatCurve_HwcTemp
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+order:E_01a3
+attr DEVICE devStateIcon {my $vC = ReadingsVal($name, "Hc1HeatCurve_curve_value", "10")*10; my $colCur = substr(Color::pahColor(5,10,15,$vC,0),0,6); my $iconCur = 'time_graph@'.$colCur; my $vH = ReadingsVal($name, "HwcTempDesired_temp1_value", "30"); my $colHot = substr(Color::pahColor(0,30,60,$vH,0),0,6); my $iconHot = 'sani_water_hot@'.$colHot; ; "<div style=\"text-align:right\" > " . FW_makeImage("$iconCur",'file_unknown@grey') . "<br> " . FW_makeImage("$iconHot",'sani_water_hot@red') . "</div>"}
+attr DEVICE setList Hc1HeatCurve_curve_value:uzsuDropDown,0.20,0.70,0.90,1.00,1.10,1.20,1.30,1.40,1.50,1.60,1.70 ebusd/430/Hc1HeatCurve/set $EVTPART1\
+HwcTempDesired_temp1_value:uzsuDropDown,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0 ebusd/430/HwcTempDesired/set $EVTPART1
+attr DEVICE getList Hc1HeatCurve:noArg Hc1HeatCurve_curve_value ebusd/430/Hc1HeatCurve/get \
+HwcTempDesired:noArg HwcTempDesired_temp1_value ebusd/430/HwcTempDesired/get
+attr DEVICE webCmd Hc1HeatCurve_curve_value:HwcTempDesired_temp1_value
+attr DEVICE webCmdLabel Heizkurve \
+:Warmwasser
+attr DEVICE room MQTT2_\DEVICE
+attr DEVICE group eBus_Hcurve
+attr DEVICE icon message_tendency_steady
+attr DEVICE model eBus_430_Pump_Fan_HeatCurve_HwcTemp
+
+name:eBus_bai_devStateIcon_Fan_Pump
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:IODEVROOM;Room of the IOdevice; {AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) ? AttrVal(AttrVal("DEVICE","IODev",""),"room","" ) : undef } 
+order:E_01a4
+# create in a new Reading
+defmod MQTT2_ebusd_pump MQTT2_\DEVICE ebusd_pump
+attr MQTT2_ebusd_pump IODev ebusMQTT
+attr MQTT2_ebusd_pump devStateIcon { my $vP = ReadingsVal("MQTT2_ebusd_bai", "WPPWMPower_percent0_value", "100"); my $colPower = substr(Color::pahColor(0,50,100,$vP,0),0,6); my $iconPower = 'sani_pump@'.$colPower; my $vFS = ReadingsVal("MQTT2_ebusd_bai", "FanSpeed_0_value", "3001"); my $colFSpeed = substr(Color::pahColor(0,1500,4000,$vFS,0),0,6); my $iconFSpeed =  'vent_ventilation_level_'; $iconFSpeed .=  $vFS < 499 ? '0@' : $vFS <1699 ? '1@' : $vFS <3001 ? '2@' : '3@'; $iconFSpeed .= $colFSpeed; "<div style=\"text-align:right\" > Heizungspumpe: " . FW_makeImage("$iconPower",'file_unknown@grey') . " ($vP Watt)<br>Ventilatordrehzahl: " . FW_makeImage("$iconFSpeed",'vent_ventilation_level_3@red') . " ($vFS Upm)</div>"}
+attr MQTT2_ebusd_pump icon Ventilator_fett
+attr MQTT2_ebusd_pump room MQTT2_\DEVICE
+attr MQTT2_ebusd_pump group eBus_Pumpe
+attr MQTT2_ebusd_pump model eBus_bai_Fan_Pump
+
+name:eBus_bai_devStateIcon_Flow_Return_Hotwater_Temp
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a5
+# create in a new Reading
+defmod MQTT2_ebusd_status MQTT2_\DEVICE ebusd_status
+attr MQTT2_ebusd_status IODev ebusMQTT
+attr DEVICE readingList \
+ebusd/DEV_ID/Status01:.* { json2nameValue($EVENT, 'Status01_', $JSONMAP) }\
+ebusd/DEV_ID/Status02:.* { json2nameValue($EVENT, 'Status02_', $JSONMAP) }
+attr DEVICE jsonMap Status01_0_value:_Vorlauf Status01_1_value:_Ruecklauf Status01_2_value:_Aussentemp Status01_3_value:_Warmwasser Status01_4_value:_WWSpeicher Status01_5_value:_Pumpenstatus Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+attr MQTT2_ebusd_status devStateIcon {my $vV = ReadingsVal("MQTT2_ebusd_bai", "_Vorlauf", "30"); my $colVor = substr(Color::pahColor(20,40,60,$vV,0),0,6); my $iconVor = 'sani_supply_temp@'.$colVor; my $vR = ReadingsVal("MQTT2_ebusd_bai", "_Ruecklauf", "30"); my $colRueck = substr(Color::pahColor(20,40,60,$vR,0),0,6); my $iconRueck = 'sani_return_temp@'.$colRueck; my $vW = ReadingsVal("MQTT2_ebusd_bai", "_Warmwasser", "30"); my $colWarm = substr(Color::pahColor(20,40,60,$vW,0),0,6); my $iconWarm = 'sani_water_hot@'.$colWarm; my $vA = ReadingsVal("MQTT2_ebusd_bai", "_Aussentemp", "30"); my $colAussen = substr(Color::pahColor(-10,10,30,$vA,0),0,6); my $iconAussen = 'temp_outside@'.$colAussen; ; "<div style=\"text-align:right\" > Vorlauf: " . FW_makeImage("$iconVor",'file_unknown@grey') . " $vV °C<br>Ruecklauf: " . FW_makeImage("$iconRueck",'file_unknown@grey') . " $vR °C<br>Warmwasser: " . FW_makeImage("$iconWarm",'file_unknown@grey') . " $vW °C<br>Aussentemp: " . FW_makeImage("$iconAussen",'file_unknown@grey') . " " . int($vA*10)/10 . " °C</div>"}
+# {my $vV = ReadingsVal("MQTT2_ebusd_bai", "_Vorlauf", "30"); my $colVor = substr(Color::pahColor(0,35,70,$vV,0),0,6); my $iconVor = 'sani_supply_temp@'.$colVor; my $vR = ReadingsVal("MQTT2_ebusd_bai", "_Ruecklauf", "30"); my $colRueck = substr(Color::pahColor(0,35,70,$vR,0),0,6); my $iconRueck = 'sani_return_temp@'.$colRueck; ; "<div style=\"text-align:right\" > Vorlauf: " . FW_makeImage("$iconVor",'file_unknown@grey') . " ($vV Grad)<br>Ruecklauf: " . FW_makeImage("$iconRueck",'sani_return_temp@red') . " ($vR Grad)</div>"}
+# {my $vV = ReadingsVal("MQTT2_ebusd_bai", "_Vorlauf", "30"); my $colVor = substr(Color::pahColor(0,35,70,$vV,0),0,6); my $iconVor = 'sani_supply_temp@'.$colVor; my $vR = ReadingsVal("MQTT2_ebusd_bai", "_Ruecklauf", "30"); my $colRueck = substr(Color::pahColor(0,35,70,$vR,0),0,6); my $iconRueck = 'sani_return_temp@'.$colRueck; my $vW = ReadingsVal("MQTT2_ebusd_bai", "_Warmwasser", "30"); my $colWarm = substr(Color::pahColor(0,35,70,$vR,0),0,6); my $iconWarm = 'sani_water_hot@'.$colWarm; ; "<div style=\"text-align:right\" > Vorlauf: " . FW_makeImage("$iconVor",'file_unknown@grey') . " $vV °C<br>Ruecklauf: " . FW_makeImage("$iconRueck",'file_unknown@grey') . " $vR °C<br>Warmwasser: " . FW_makeImage("$iconWarm",'file_unknown@grey') . " $vW °C</div>"}
+attr MQTT2_ebusd_status  icon sani_boiler_temp
+attr MQTT2_ebusd_status room MQTT2_\DEVICE
+attr MQTT2_ebusd_status group eBus_Temperatur
+attr MQTT2_ebusd_status model eBus_bai_Flow_Return
+
+name:eBus_bai_devStateIcon_Waterpressure
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a6
+defmod MQTT2_ebusd_pressure MQTT2_\DEVICE ebusd_pressure
+attr MQTT2_ebusd_pressure IODev ebusMQTT
+attr MQTT2_ebusd_pressure devStateIcon {my $vD = ReadingsVal("MQTT2_ebusd_bai", "WaterPressure_press_value", "30"); my $colDruck = substr(Color::pahColor(0,1,2,$vD,0),0,6); my $iconDruck = 'weather_barometric_pressure@'.$colDruck; ; "<div style=\"text-align:right\" > Wasserdruck: " . FW_makeImage("$iconDruck",'file_unknown@grey') . int($vD*100)/100 . " Bar</div>"}
+attr MQTT2_ebusd_pressure icon vacuum_bold
+attr MQTT2_ebusd_pressure room MQTT2_\DEVICE
+attr MQTT2_ebusd_pressure model eBus_bai_Pressure
+
+
+name:eBus_bai_Status01+Status02_HWC
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Status Messages01 + Status02 Hotwater comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a7
+attr DEVICE stateFormat {sprintf("Vorlauf: %.1f <br>Ruecklauf: %.1f <br>Warmwasser: %.1f <br>Aussentemp.: %.1f <br>Pumpe: %s <br>HWC-maxTemp: %.1f <br>HWC-Regler_Max: %.1f <br>HWC-CurrentTemp: %.1f <br>HWC-Mode: %s", ReadingsVal($name,"_Vorlauf",0), ReadingsVal($name,"_Ruecklauf",0), ReadingsVal($name,"_Warmwasser",0), ReadingsVal($name,"_Aussentemp",0), ReadingsVal($name,"_Pumpenstatus",0), ReadingsVal($name,"_Maximaltemperatur",0), ReadingsVal($name,"_ReglerMaxTEMP",0), ReadingsVal($name,"_ReglerCurrentTemp",0), ReadingsVal($name,"_HWCMode",0))}
+attr DEVICE icon icoTempHeizung
+attr DEVICE jsonMap Status01_0_value:_Vorlauf Status01_1_value:_Ruecklauf Status01_2_value:_Aussentemp Status01_3_value:_Warmwasser Status01_4_value:_WWSpeicher Status01_5_value:_Pumpenstatus Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+attr DEVICE devStateStyle style="text-align:right"
+deletereading DEVICE Status.*
+attr DEVICE model eBus_Status
+
+name:eBus_SetMode
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus setmode messages comming from broadcast
+order:E_01a8
+attr DEVICE stateFormat {sprintf("Flowtempdesired: %.1f <br>Hcmode: %s", ReadingsVal($name,"SetMode_flowtempdesired_value",0), ReadingsVal($name,"SetMode_hcmode_value",0))}
+attr DEVICE icon icoTempHeizung
+attr DEVICE devStateStyle style="text-align:right"
+attr DEVICE model eBus_SetMode
+
+#ebus Hcurve+HwcTempDesired Messages.
+name:eBus_Hc1HeatCurve+HwcTempDesired
+filter:TYPE=MQTT2_DEVICE
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+desc:Applies settings to ebus Heatingcurve and Hotwater
+order:E_01a9
+attr DEVICE icon message_tendency_steady
+attr DEVICE webCmd curve_value:temp1_value
+attr DEVICE webCmdLabel Hc1HeatCurve:HwcTempDesired
+attr DEVICE setList Hc1HeatCurve_curve_value:0.20,0.70,0.90,1.00,1.10,1.20,1.30,1.40,1.50,1.60,1.70 ebusd/BASE_DEV/Hc1HeatCurve/set $EVTPART1\
+HwcTempDesired_temp1_value:50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0 ebusd/BASE_DEV/HwcTempDesired/set $EVTPART1
+deletereading DEVICE .*
+attr DEVICE model eBus_Hc1HeatCurve+HwcTempDesired
+
+  
+  
+# ebus Status Messages.
+name:eBus_bai_readingsgroup_Status01
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a9
+define eBusTemperaturen readingsGroup MQTT2_ebusd_bai:<%sani_supply_temp>,<Vorlauf>,_Vorlauf\
+ MQTT2_ebusd_bai:<%sani_return_temp>,<Ruecklauf>,_Ruecklauf\
+ MQTT2_ebusd_bai:<%sani_water_hot>,<Warmwasser>,_Warmwasser\
+ MQTT2_ebusd_bai:<%sani_buffer_temp_down>,<Speichertemperatur>,_WWSpeicher\
+ MQTT2_ebusd_bai:<%temp_outside>,<Aussentemperatur>,_Aussentemp
+attr eBusTemperaturen nameStyle style="color:yellow"
+attr eBusTemperaturen room eBus
+attr DEVICE jsonMap Status01_0_value:_Vorlauf Status01_1_value:_Ruecklauf Status01_2_value:_Aussentemp Status01_3_value:_Warmwasser Status01_4_value:_WWSpeicher Status01_5_value:_Pumpenstatus Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+deletereading DEVICE Status.*
+attr eBusTemperaturen valueFormat {'_Vorlauf' => "%.0f °C",\
+'_Ruecklauf' => "%.0f °C",\
+'_Warmwasser' =>"%.0f °C",\
+'_WWSpeicher' =>"%.0f °C",\
+'_Aussentemp' =>"%.1f °C" }
+attr eBusTemperaturen valueStyle {'_Vorlauf' =>  '{"style=\"color:\x23".substr(Color::pahColor(0,25,50,$VALUE,0),0,6)."\""}' ,  \
+'_Ruecklauf' =>  '{"style=\"color:\x23".substr(Color::pahColor(0,15,30,$VALUE,0),0,6)."\""}' , \
+'_Warmwasser' =>  '{"style=\"color:\x23".substr(Color::pahColor(0,25,50,$VALUE,0),0,6)."\""}' , \
+'_WWSpeicher' =>  '{"style=\"color:\x23".substr(Color::pahColor(0,25,50,$VALUE,0),0,6)."\""}' , \
+'_Aussentemp' => '{"style=\"color:\x23".substr(Color::pahColor(-10,0,10,$VALUE,0),0,6)."\""}'}
+attr eBusTemperaturen model eBus_bai_readingsgroup_Status01
+
+name:eBus_bai_readingsgroup_Status01_Balken
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a10
+define eBusTemperaturBalken readingsGroup MQTT2_ebusd_bai:<%sani_supply_temp>,<Vorlauf>,_Vorlauf\
+ MQTT2_ebusd_bai:<%sani_return_temp>,<Ruecklauf>,_Ruecklauf\
+ MQTT2_ebusd_bai:<%sani_water_hot>,<Warmwasser>,_Warmwasser\
+ MQTT2_ebusd_bai:<%sani_buffer_temp_down>,<Speichertemperatur>,_WWSpeicher\
+ MQTT2_ebusd_bai:<%temp_outside>,<Aussentemperatur>,_Aussentemp
+attr eBusTemperaturBalken nameStyle style="color:yellow"
+attr DEVICE jsonMap Status01_0_value:_Vorlauf Status01_1_value:_Ruecklauf Status01_2_value:_Aussentemp Status01_3_value:_Warmwasser Status01_4_value:_WWSpeicher Status01_5_value:_Pumpenstatus Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+deletereading DEVICE Status.*
+attr eBusTemperaturBalken room eBus
+attr eBusTemperaturBalken valueStyle { attrTmqtt2_ebus_createBarView($VALUE,70,"red") }
+attr eBusTemperaturBalken model eBus_bai_readingsgroup_Status01Balken
+
+ 
+name:eBus_bai_readingsgroup_Status02
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a11
+define eBusWarmwasser readingsGroup MQTT2_ebusd_bai:<%time_automatic>,<HWCMode>,_HWCMode\
+ MQTT2_ebusd_bai:<%temp_temperature_max>,<Maximaltemperatur>,Maximaltemperatur\
+ MQTT2_ebusd_bai:<%sani_earth_source_heat_pump>,<ReglerMaxTEMP>,_ReglerMaxTEMP\
+ MQTT2_ebusd_bai:<%sani_earth_source_heat_pump>,<ReglerCurrentTemp>,_ReglerCurrentTemp
+attr eBusWarmwasser nameStyle style="color:yellow"
+attr eBusWarmwasser room eBus
+attr eBusWarmwasser valueFormat {'_HWCMode' => "%s ",\
+'_Maximaltemperatur' => "%.0f \°C",\
+'_ReglerMaxTEMP' =>"%.0f \°C",\
+'_ReglerCurrentTemp' =>"%.0f \°C" }
+attr eBusWarmwasser valueStyle {'_Maximaltemperatur' =>  '{"style=\"color:\x23".substr(Color::pahColor(20,45,70,$VALUE,0),0,6)."\""}' , \
+'_ReglerMaxTEMP' =>  '{"style=\"color:\x23".substr(Color::pahColor(20,45,70,$VALUE,0),0,6)."\""}' , \
+'_ReglerCurrentTemp' =>  '{"style=\"color:\x23".substr(Color::pahColor(20,45,70,$VALUE,0),0,6)."\""}' ,\
+'_HWCMode' =>  '{"style="color:green" " }' }
+attr MQTT2_ebusd_bai jsonMap Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+deletereading DEVICE Status.*
+attr eBusWarmwasser model eBus_bai_readingsgroup_Status02
+
+name:eBus_bai_readingsgroup_Status02_Balken
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a12
+define eBusWarmwasserBalken readingsGroup MQTT2_ebusd_bai:<%time_automatic>,<HWCMode>,_HWCMode\
+ MQTT2_ebusd_bai:<%temp_temperature_max>,<Maximaltemperatur>,_Maximaltemperatur\
+ MQTT2_ebusd_bai:<%sani_earth_source_heat_pump>,<ReglerMaxTEMP>,_ReglerMaxTEMP\
+ MQTT2_ebusd_bai:<%sani_earth_source_heat_pump>,<ReglerCurrentTemp>,_ReglerCurrentTemp
+attr eBusWarmwasserBalken nameStyle style="color:yellow"
+attr eBusWarmwasserBalken room eBus
+attr eBusWarmwasserBalken valueStyle { attrTmqtt2_ebus_createBarView($VALUE,70,"red") }
+attr MQTT2_ebusd_bai jsonMap Status02_0_value:_HWCMode Status02_1_value:_Maximaltemperatur Status02_2_value:_ReglerMaxTEMP Status02_3_value:_ReglerCurrentTemp
+deletereading DEVICE Status.*
+attr eBusWarmwasserBalken model eBus_bai_readingsgroup_Status02_Balken
+
+name:eBus_Calormatic_readingsgroup_Set_Hcurve_Hotwater
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+order:E_01a13
+define eBusSet readingsGroup <>,<Name>,<&nbsp;Ist>,<&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Soll>\
+MQTT2_ebusd_BASE_DEV:<%message_tendency_steady>,<Heizkurve>,Hc1HeatCurve_curve_value,<sollcurve>\
+MQTT2_ebusd_BASE_DEV:<%sani_water_hot>,<Warmwasser>,HwcTempDesired_temp1_value,<sollwater>
+attr eBusSet nameStyle style="color:yellow"
+attr eBusSet room eBus
+attr eBusSet valueStyle {'Hc1HeatCurve_curve_value' => '{"style=\"color:\x23".substr(Color::pahColor(5,10,15,$VALUE*10,0),0,6)."\""}', \
+'HwcTempDesired_temp1_value' => '{"style=\"color:\x23".substr(Color::pahColor(20,40,60,$VALUE,0),0,6)."\""}'}
+attr eBusSet commands {'eBusSet.sollcurve'=>'Hc1HeatCurve_curve_value:uzsuDropDown,0.20,0.70,0.90,1.00,1.10,1.20,1.30,1.40,1.50,1.60,1.70',\
+'eBusSet.sollwater'=>'HwcTempDesired_temp1_value:uzsuDropDown,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0'}
+attr eBusSet model eBus_Calormatic_readingsgroup_Set_Hcurve_Hotwater
+     
+ 
+name:Bus_bai_readingsgroup_eBusCounter
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a14
+define eBusCounter readingsGroup <>,<Gerät>,<&nbsp;Zähler>\
+MQTT2_ebusd_bai:<%Ventilator_fett>,<Ventilator>,FanHours_hoursum2_value \
+MQTT2_ebusd_bai:<%sani_boiler_temp>,<Wärmetauscher>,HcHours_hoursum2_value \
+MQTT2_ebusd_bai:<%sani_water_hot>,<Heißwasser-Dauer>,HwcHours_hoursum2_value \
+MQTT2_ebusd_bai:<%sani_water_tap>,<Heißwasser-Entnahme>,HwcStarts_0_value
+attr eBusCounter cellStyle { "r:1" => 'style="font-weight:bold;;font-size:16px"',"r:2,c:3" => 'style="color:lightgreen;;font-size:18px;;text-align:right"',"r:3,c:3" => 'style="color:green;;font-size:18px;;text-align:right"',"r:4,c:3" => 'style="color:lightgreen;;font-size:18px;;text-align:right"',"r:5,c:3" => 'style="color:green;;font-size:18px;;text-align:right"' }
+attr eBusCounter nameStyle style="color:yellow"
+attr eBusCounter room eBus
+attr eBusCounter valueFormat {'FanHours_hoursum2_value' => "%0#6i",\
+'HcHours_hoursum2_value' => "%0#6i",\
+'HwcHours_hoursum2_value' =>"%0#6i",\
+'HwcStarts_0_value' =>"%0#6i"}
+attr eBusCounter model eBus_bai_readingsgroup_eBusCounter
+
+name:eBus_bai_readingsgroup_eBusPumpe
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:DEV_ID;name of the device ebus;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+order:E_01a15
+define eBusPumpe readingsGroup <>,<Vaillant>,<&nbsp;Leistung> MQTT2_ebusd_bai:<%measure_power>,<Heizungspumpe>,WPPWMPower_percent0_value MQTT2_ebusd_bai:<%vent_ventilation_level_automatic>,<Ventilatordrehzahl>,FanSpeed_0_value
+attr eBusPumpe cellStyle { "r:1"=>'style="font-weight:bold;;font-size:16px"'}
+attr eBusPumpe nameStyle style="color:yellow"
+attr eBusPumpe room eBus
+attr eBusPumpe valueIcon { if($READING eq "WPPWMPower_percent0_value" &&  $VALUE >= 10 &&  $VALUE <= 60){ 'sani_pump@lightgreen' }elsif($READING eq "WPPWMPower_percent0_value" && $VALUE >= 0 && $VALUE <= 9){ 'sani_pump@gray' }elsif($READING eq "WPPWMPower_percent0_value" && $VALUE >= 61 && $VALUE <= 449){ 'sani_pump@green' }elsif($READING eq "WPPWMPower_percent0_value" && $VALUE >= 500 && $VALUE <= 4449){ 'sani_pump@orange' }elsif( $READING eq "FanSpeed_0_value" && $VALUE >= 0 && $VALUE <= 10){ 'vent_ventilation_level_0@grey' }elsif( $READING eq "FanSpeed_0_value" && $VALUE >= 11 && $VALUE <= 500){ 'vent_ventilation_level_0@lightgreen' }elsif( $READING eq "FanSpeed_0_value" && $VALUE >= 501 && $VALUE <= 1699){ 'vent_ventilation_level_1@green' }elsif( $READING eq "FanSpeed_0_value" && $VALUE >= 1700 && $VALUE <= 3000){ 'vent_ventilation_level_2@orange' }elsif( $READING eq "FanSpeed_0_value" && $VALUE >= 3001){ 'vent_ventilation_level_3@red' }else{ 'file_unknown@grey' } }
+attr eBusPumpe valueSuffix {"WPPWMPower_percent0_value"=>" &nbsp;&nbsp;&nbsp;&nbsp;(".ReadingsVal($\DEVICE,$READING,0)."  Watt)", "FanSpeed_0_value"=>" &nbsp;&nbsp;&nbsp;&nbsp;(".ReadingsVal($\DEVICE,$READING,0)."  Upm)" }
+attr eBusPumpe model eBus_bai_readingsgroup_eBusPumpe
+
+
+name:eBus_Calormatic_readingsgroup_Set_Hcurve_Hotwater
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+order:E_01a16
+define eBusSet readingsGroup <>,<Name>,<&nbsp;Ist>,<&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Soll>\
+MQTT2_ebusd_BASE_DEV:<%message_tendency_steady>,<Heizkurve>,Hc1HeatCurve_curve_value,<sollcurve>\
+MQTT2_ebusd_BASE_DEV:<%sani_water_hot>,<Warmwasser>,HwcTempDesired_temp1_value,<sollwater>
+attr eBusSet nameStyle style="color:yellow"
+attr eBusSet room eBus
+attr eBusSet valueStyle {'Hc1HeatCurve_curve_value' => '{"style=\"color:\x23".substr(Color::pahColor(0.1,1.0,1.5,$VALUE,0),0,6)."\""}',\
+'HwcTempDesired_temp1_value' => '{"style=\"color:\x23".substr(Color::pahColor(0.1,1.0,1.5,$VALUE,0),0,6)."\""}'}
+attr eBusSet commands {'eBusSet.sollcurve'=>'Hc1HeatCurve_curve_value:uzsuDropDown,0.20,0.70,0.90,1.00,1.10,1.20,1.30,1.40,1.50,1.60,1.70',\
+'eBusSet.sollwater'=>'HwcTempDesired_temp1_value:uzsuDropDown,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0'}
+attr eBusSet model E_105_eBus_Calormatic_readingsgroup_Set_Hcurve_Hotwater
+
+name:eBus_Calormatic_TimeProgramm
+filter:TYPE=MQTT2_DEVICE
+desc:Format ebus Statusmessages comming from broadcast
+par:BASE_DEV;base topic set in config;{ AttrVal("DEVICE","readingList","") =~ m,ebusd/([^/]*)/, ? $1 : undef }
+order:E_01a17
+define TimeMo dummy
+attr TimeMo alias 1 Montag
+attr TimeMo group Zeiteingabe
+attr TimeMo readingList HHMM1m HHMM2m HHMM3m HHMM4m HHMM5m HHMM6m HHMM7m
+attr TimeMo room ZeitProgramm
+attr TimeMo setList HHMM1m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6m:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7m:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeMo stateFormat =
+attr TimeMo webCmd HHMM1m: bis :HHMM2m: von :HHMM3m: bis :HHMM4m: von :HHMM5m: bis :HHMM6m: daysel :HHMM7m
+define TimeDi dummy
+attr TimeDi alias 2 Dienstag
+attr TimeDi group Zeiteingabe
+attr TimeDi readingList HHMM1t HHMM2t HHMM3t HHMM4t HHMM5t HHMM6t HHMM7t
+attr TimeDi room ZeitProgramm
+attr TimeDi setList HHMM1t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6t:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7t:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeDi stateFormat =
+attr TimeDi webCmd HHMM1t: bis :HHMM2t: von :HHMM3t: bis :HHMM4t: von :HHMM5t: bis :HHMM6t: daysel :HHMM7t
+define TimeMi dummy
+attr TimeMi alias 3 Mittwoch
+attr TimeMi group Zeiteingabe
+attr TimeMi readingList HHMM1w HHMM2w HHMM3w HHMM4w HHMM5w HHMM6w HHMM7w
+attr TimeMi room ZeitProgramm
+attr TimeMi setList HHMM1w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6w:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7w:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeMi stateFormat =
+attr TimeMi webCmd HHMM1w: bis :HHMM2w: von :HHMM3w: bis :HHMM4w: von :HHMM5w: bis :HHMM6w: daysel :HHMM7w
+define TimeDo dummy
+attr TimeDo alias 4 Donnerstag
+attr TimeDo group Zeiteingabe
+attr TimeDo readingList HHMM1th HHMM2th HHMM3th HHMM4th HHMM5th HHMM6th HHMM7th
+attr TimeDo room ZeitProgramm
+attr TimeDo setList HHMM1th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6th:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7th:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeDo stateFormat =
+attr TimeDo webCmd HHMM1th: bis :HHMM2th: von :HHMM3th: bis :HHMM4th: von :HHMM5th: bis :HHMM6th: daysel :HHMM7th
+define TimeFr dummy
+attr TimeFr alias 5 Freitag
+attr TimeFr group Zeiteingabe
+attr TimeFr readingList HHMM1f HHMM2f HHMM3f HHMM4f HHMM5f HHMM6f HHMM7t
+attr TimeFr room ZeitProgramm
+attr TimeFr setList HHMM1f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6f:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7f:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeFr stateFormat =
+attr TimeFr webCmd HHMM1f: bis :HHMM2f: von :HHMM3f: bis :HHMM4f: von :HHMM5f: bis :HHMM6f: daysel :HHMM7f
+define TimeSa dummy
+attr TimeSa alias 6 Samstag
+attr TimeSa group Zeiteingabe
+attr TimeSa readingList HHMM1sa HHMM2sa HHMM3sa HHMM4sa HHMM5sa HHMM6sa HHMM7sa
+attr TimeSa room ZeitProgramm
+attr TimeSa setList HHMM1sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6sa:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7sa:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeSa stateFormat =
+attr TimeSa webCmd HHMM1sa: bis :HHMM2sa: von :HHMM3sa: bis :HHMM4sa: von :HHMM5sa: bis :HHMM6sa: daysel :HHMM7sa
+define TimeSu dummy
+attr TimeSu alias 7 Sonntag
+attr TimeSu group Zeiteingabe
+attr TimeSu readingList HHMM1sa HHMM2sa HHMM3sa HHMM4sa HHMM5sa HHMM6sa HHMM7t
+attr TimeSu room ZeitProgramm
+attr TimeSu setList HHMM1su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM2su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM3su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM4su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM5su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM6su:-,00:00,00:30,01:00,01:30,02:00,02:30,03:00,03:30,04:00,04:30,05:00,05:30,06:00,06:30,07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00,21:30,22:00,22:30,23:00,23:30,24:00 HHMM7su:selected,Mo-Fr,Mo-So,Sa-So
+attr TimeSu stateFormat =
+attr TimeSu webCmd HHMM1su: bis :HHMM2su: von :HHMM3su: bis :HHMM4su: von :HHMM5su: bis :HHMM6su: daysel :HHMM7su
+define einlesen dummy
+attr einlesen alias Zeitprogramm auslesen
+attr einlesen devStateIcon einlesen:control_arrow_downward:einlesen
+attr einlesen eventMap on:einlesen off:einlesen
+attr einlesen group Zeiteingabe
+attr einlesen room ZeitProgramm
+define DayRead notify einlesen {\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Monday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Tuesday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Wednesday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Thursday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Friday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Saturday/get";;\
+  fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Sunday/get";;\
+  fhem "setreading TimeMo HHMM1m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_0_value]";;\
+  fhem "setreading TimeMo HHMM2m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_1_value]";;\
+  fhem "setreading TimeMo HHMM3m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_2_value]";;\
+  fhem "setreading TimeMo HHMM4m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_3_value]";;\
+  fhem "setreading TimeMo HHMM5m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_4_value]";;\
+  fhem "setreading TimeMo HHMM6m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_5_value]";;\
+  fhem "setreading TimeMo HHMM7m [MQTT2_ebusd_BASE_DEV:hcTimer.Monday_6_value]";;\
+  fhem "setreading TimeDi HHMM1t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_0_value]";;\
+  fhem "setreading TimeDi HHMM2t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_1_value]";;\
+  fhem "setreading TimeDi HHMM3t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_2_value]";;\
+  fhem "setreading TimeDi HHMM4t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_3_value]";;\
+  fhem "setreading TimeDi HHMM5t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_4_value]";;\
+  fhem "setreading TimeDi HHMM6t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_5_value]";;\
+  fhem "setreading TimeDi HHMM7t [MQTT2_ebusd_BASE_DEV:hcTimer.Tuesday_6_value]";;\
+  fhem "setreading TimeMi HHMM1w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_0_value]";;\
+  fhem "setreading TimeMi HHMM2w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_1_value]";;\
+  fhem "setreading TimeMi HHMM3w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_2_value]";;\
+  fhem "setreading TimeMi HHMM4w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_3_value]";;\
+  fhem "setreading TimeMi HHMM5w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_4_value]";;\
+  fhem "setreading TimeMi HHMM6w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_5_value]";;\
+  fhem "setreading TimeMi HHMM7w [MQTT2_ebusd_BASE_DEV:hcTimer.Wednesday_6_value]";;\
+  fhem "setreading TimeDo HHMM1th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_0_value]";;\
+  fhem "setreading TimeDo HHMM2th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_1_value]";;\
+  fhem "setreading TimeDo HHMM3th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_2_value]";;\
+  fhem "setreading TimeDo HHMM4th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_3_value]";;\
+  fhem "setreading TimeDo HHMM5th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_4_value]";;\
+  fhem "setreading TimeDo HHMM6th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_5_value]";;\
+  fhem "setreading TimeDo HHMM7th [MQTT2_ebusd_BASE_DEV:hcTimer.Thursday_6_value]";;\
+  fhem "setreading TimeFr HHMM1f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_0_value]";;\
+  fhem "setreading TimeFr HHMM2f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_1_value]";;\
+  fhem "setreading TimeFr HHMM3f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_2_value]";;\
+  fhem "setreading TimeFr HHMM4f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_3_value]";;\
+  fhem "setreading TimeFr HHMM5f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_4_value]";;\
+  fhem "setreading TimeFr HHMM6f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_5_value]";;\
+  fhem "setreading TimeFr HHMM7f [MQTT2_ebusd_BASE_DEV:hcTimer.Friday_6_value]";;\
+  fhem "setreading TimeSa HHMM1sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_0_value]";;\
+  fhem "setreading TimeSa HHMM2sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_1_value]";;\
+  fhem "setreading TimeSa HHMM3sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_2_value]";;\
+  fhem "setreading TimeSa HHMM4sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_3_value]";;\
+  fhem "setreading TimeSa HHMM5sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_4_value]";;\
+  fhem "setreading TimeSa HHMM6sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_5_value]";;\
+  fhem "setreading TimeSa HHMM7sa [MQTT2_ebusd_BASE_DEV:hcTimer.Saturday_6_value]";;\
+  fhem "setreading TimeSu HHMM1su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_0_value]";;\
+  fhem "setreading TimeSu HHMM2su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_1_value]";;\
+  fhem "setreading TimeSu HHMM3su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_2_value]";;\
+  fhem "setreading TimeSu HHMM4su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_3_value]";;\
+  fhem "setreading TimeSu HHMM5su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_4_value]";;\
+  fhem "setreading TimeSu HHMM6su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_5_value]";;\
+  fhem "setreading TimeSu HHMM7su [MQTT2_ebusd_BASE_DEV:hcTimer.Sunday_6_value]";;\
+}
+attr DayRead room ZeitProgramm
+define DayWrite notify schreiben {fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Monday/set " . ReadingsVal("TimeMo","HHMM1m",0) . chr(59) . chr(59) . ReadingsVal("TimeMo","HHMM2m",0) . chr(59) . chr(59) . ReadingsVal("TimeMo","HHMM3m",0) . chr(59) . chr(59) . ReadingsVal("TimeMo","HHMM4m",0) . chr(59) . chr(59) . ReadingsVal("TimeMo","HHMM5m",0) . chr(59) . chr(59). ReadingsVal("TimeMo","HHMM6m",0) . chr(59) . chr(59) . ReadingsVal("TimeMo","HHMM7m",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Tuesday/set " . ReadingsVal("TimeDi","HHMM1t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM2t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM3t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM4t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM5t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM6t",0) . chr(59) . chr(59) . ReadingsVal("TimeDi","HHMM7t",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Wednesday/set " . ReadingsVal("TimeMi","HHMM1w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM2w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM3w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM4w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM5w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM6w",0) . chr(59) . chr(59) . ReadingsVal("TimeMi","HHMM7w",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Thursday/set " . ReadingsVal("TimeDo","HHMM1th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM2th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM3th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM4th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM5th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM6th",0) . chr(59) . chr(59) . ReadingsVal("TimeDo","HHMM7th",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Friday/set " . ReadingsVal("TimeFr","HHMM1f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM2f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM3f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM4f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM5f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM6f",0) . chr(59) . chr(59) . ReadingsVal("TimeFr","HHMM7f",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Saturday/set " . ReadingsVal("TimeSa","HHMM1sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM2sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM3sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM4sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM5sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM6sa",0) . chr(59) . chr(59) . ReadingsVal("TimeSa","HHMM7sa",0);;\
+fhem "set ebusMQTT publish ebusd/BASE_DEV/hcTimer.Sunday/set " . ReadingsVal("TimeSo","HHMM1su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM2su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM3su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM4su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM5su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM6su",0) . chr(59) . chr(59) . ReadingsVal("TimeSo","HHMM7su",0);;\
+Log 1, "Zeitprog=" . ReadingsVal("TimeMo","HHMM1m",0) . ";;" . ReadingsVal("TimeMo","HHMM2m",0) . ";;" . ReadingsVal("TimeMo","HHMM3m",0) . ";;" . ReadingsVal("TimeMo","HHMM4m",0) . ";;" . ReadingsVal("TimeMo","HHMM5m",0) . ";;" . ReadingsVal("TimeMo","HHMM6m",0) . ";;" . ReadingsVal("TimeMo","HHMM7m",0);;}
+attr DayWrite room ZeitProgramm
+define schreiben dummy
+attr schreiben alias Zeitprogramm schreiben
+attr schreiben devStateIcon schreiben:rc_PROG:schreiben
+attr schreiben eventMap on:schreiben off:schreiben
+attr schreiben group Zeiteingabe
+attr schreiben room ZeitProgramm
