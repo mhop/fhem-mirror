@@ -988,7 +988,7 @@ sub VIERA_webpage($$) {
       
       my $client_address = $clientsock -> peerhost();
       my $client_port = $clientsock -> peerport();
-      Log3 $name, 3, "$name: connection from $client_address:$client_port established";
+      Log3 $name, 4, "$name: connection from $client_address:$client_port established";
       
       my $l1 = length($url) & 0xFF;
       @msg = (0xf4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, $l1);
