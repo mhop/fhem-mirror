@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2019 by Heiko Maaz
+#       (c) 2016-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -58,7 +58,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.30.4"  => "17.01.2020  adjust timestamp in OutputWriteToDB, Forum: https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920 ",
+  "8.30.4"  => "22.01.2020  adjust behavior of OutputWriteToDB (averageValue,sumValue) - write value at every begin and also at every end of period ".
+                            "Forum: https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920 ".
+                            "fix Warning when Agent has detected a renamed device",
   "8.30.3"  => "28.11.2019  countEntries encode \$device, change count_ParseDone for \"countEntriesDetail\" ",
   "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
   "8.30.1"  => "22.11.2019  commandref revised ",
@@ -175,6 +177,8 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = (
+  "8.30.4"  => "22.01.2020  The behavior of write back values to database is changed for functions averageValue and sumValue. The solution values of that functions now are ".
+                            "written at every begin and also at every end of specified aggregation period. ",
   "8.30.0"  => "14.11.2019 A new command \"set <name> adminCredentials\" and \"get <name> storedCredentials\" ist provided. ".
                            "Use it to store a database priviledged user. This user DbRep can utilize for several operations which are need more (administative) ".
 						   "user rights (e.g. index, sqlCmd). ",
@@ -1451,7 +1455,7 @@ sub DbRep_Notify($$) {
          
          my $strucChanged;
          # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
-         my $dblog_name = $own_hash->{dbloghash}{NAME};            # Name des an den DbRep-Agenten angeschlossenen DbLog-Dev
+         my $dblog_name = $own_hash->{HELPER}{DBLOGDEVICE};            # Name des an den DbRep-Agenten angeschlossenen DbLog-Dev
          my $dblog_hash = $defs{$dblog_name};
          
          if ( $dblog_hash->{DEF} =~ m/( |\(|\|)$evl[1]( |\)|\||:)/ ) {
@@ -2718,7 +2722,7 @@ sub averval_DoParse($) {
  my $st = [gettimeofday];
       
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
- my $arrstr;
+ my ($arrstr,$wrstr,@rsf,@rsn);
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
@@ -2748,13 +2752,17 @@ sub averval_DoParse($) {
          my @line = $sth->fetchrow_array();
      
          Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
-	 
+         
          if(AttrVal($name, "aggregation", "") eq "hour") {
-             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
+             $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
-             my @rsf = split(" ",$runtime_string_first);
-             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
+             @rsf     = split(" ",$runtime_string_first);
+             @rsn     = split(" ",$runtime_string_next);
+             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
+             $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
          }
      
      } elsif ($acf eq "avgDailyMeanGWS") {
@@ -2804,14 +2812,18 @@ sub averval_DoParse($) {
          } else {
              $sum = "insufficient values";
          }
- 
+
          if(AttrVal($name, "aggregation", "") eq "hour") {
-             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";  
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
-             my @rsf = split(" ",$runtime_string_first);
-             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|"; 
-         }      
+             @rsf     = split(" ",$runtime_string_first);
+             @rsn     = split(" ",$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
+             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
+         }         
      
      } elsif ($acf eq "avgTimeWeightMean") {
          # zeitgewichteten Mittelwert berechnen
@@ -2888,13 +2900,17 @@ sub averval_DoParse($) {
                  Log3 ($name, 5, "DbRep $name - data element: $twmrow");
                  Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".$val1*($dt/$tsum));                 
              }             
-         }              
+         }               
          if(AttrVal($name, "aggregation", "") eq "hour") {
-             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";  
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
-             my @rsf = split(" ",$runtime_string_first);
-             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|"; 
+             @rsf     = split(" ",$runtime_string_first);
+             @rsn     = split(" ",$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
+             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
          } 
      }
  }   
@@ -2908,7 +2924,7 @@ sub averval_DoParse($) {
  # Ergebnisse in Datenbank schreiben
  my ($wrt,$irowdone);
  if($prop =~ /writeToDB/) {
-     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,$qlf);
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$wrstr,$qlf);
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
@@ -3252,7 +3268,7 @@ sub maxval_DoParse($) {
          
      if(!@array) {
          if(AttrVal($name, "aggregation", "") eq "hour") {
-             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             my @rsf = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
          } else {
              my @rsf = split(" ",$runtime_string_first);
@@ -3479,11 +3495,11 @@ sub minval_DoParse($) {
          return "$name|''|$device|$reading|''|$err|''";
      } 
          
-     my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+     my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."\n" } @{ $sth->fetchall_arrayref() };
          
      if(!@array) {
          if(AttrVal($name, "aggregation", "") eq "hour") {
-             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             my @rsf = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
          } else {
              my @rsf = split(" ",$runtime_string_first);
@@ -3522,7 +3538,6 @@ sub minval_DoParse($) {
       
      # Test auf $value = "numeric"
      if (!looks_like_number($value)) {
-         # $a[-1] =~ s/\s+$//g;
          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in minValue function. Faulty dataset was \nTIMESTAMP: $timestamp, DEVICE: $device, READING: $reading, VALUE: $value.");
          $err = encode_base64("Value isn't numeric. Faulty dataset was - TIMESTAMP: $timestamp, VALUE: $value", "");
          return "$name|''|$device|$reading|''|$err|''";
@@ -3534,15 +3549,15 @@ sub minval_DoParse($) {
       
      if ($runtime_string eq $lastruntimestring) {
          if (!defined($min_value) || $value < $min_value) {
-             $min_value    = $value;
-             $row_min_time = $timestamp;
+             $min_value           = $value;
+             $row_min_time        = $timestamp;
              $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time;            
          }
      } else {
          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
-         $lastruntimestring = $runtime_string;
-         $min_value         = $value;
-         $row_min_time      = $timestamp;
+         $lastruntimestring   = $runtime_string;
+         $min_value           = $value;
+         $row_min_time        = $timestamp;
          $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time; 
      }
      $i++;
@@ -3761,11 +3776,11 @@ sub diffval_DoParse($) {
 		 
          if(!@array) {
              if(AttrVal($name, "aggregation", "") eq "hour") {
-                 my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-                 @array = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
+                 my @rsf = split(/[ :]/,$runtime_string_first);
+                 @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
              } else {
                  my @rsf = split(" ",$runtime_string_first);
-                 @array = ($runtime_string." ".$rsf[0]."\n");
+                 @array  = ($runtime_string." ".$rsf[0]."\n");
              }
          }
          push(@row_array, @array);
@@ -3803,13 +3818,7 @@ sub diffval_DoParse($) {
       $lastruntimestring = $runtime_string if ($i == 1);
       my $timestamp      = $a[2]?$a[1]."_".$a[2]:$a[1];
       my $value          = $a[3]?$a[3]:0;  
-      my $diff           = $a[4]?sprintf("%.4f",$a[4]):0;   
-
-#      if ($uediff)	  {
-#	      $diff = $diff + $uediff;
-#		  Log3 ($name, 4, "DbRep $name - balance difference of $uediff between $rslval and $runtime_string");
-#		  $uediff = 0;
-#	  } 
+      my $diff           = $a[4]?sprintf("%.4f",$a[4]):0;
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
@@ -3884,7 +3893,7 @@ sub diffval_DoParse($) {
      foreach my $key (sort(keys%{$ncp})) {
          Log3 ($name, 3, $key) ;
      }
- $ncps = join('§', %$ncp);	
+ $ncps     = join('§', %$ncp);	
  $ncpslist = encode_base64($ncps,""); 
  }
   
@@ -4058,7 +4067,7 @@ sub sumval_DoParse($) {
  my $st = [gettimeofday];  
 
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
- my $arrstr;
+ my ($arrstr,$wrstr,@rsf,@rsn);
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
@@ -4088,11 +4097,15 @@ sub sumval_DoParse($) {
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);     
 	 
      if(AttrVal($name, "aggregation", "") eq "hour") {
-         my @rsf = split(/[" "\|":"]/,$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";  
+         @rsf     = split(/[ :]/,$runtime_string_first);
+         @rsn     = split(/[ :]/,$runtime_string_next);
+         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
+         $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
      } else {
-         my @rsf = split(" ",$runtime_string_first);
-         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|"; 
+         @rsf     = split(" ",$runtime_string_first);
+         @rsn     = split(" ",$runtime_string_next);
+         $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
+         $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."#".$rsn[0]."|";    # Kombi zum Rückschreiben in die DB
      }
  }
 
@@ -4105,7 +4118,7 @@ sub sumval_DoParse($) {
  # Ergebnisse in Datenbank schreiben
  my ($wrt,$irowdone);
  if($prop =~ /writeToDB/) {
-     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$arrstr,"sum");
+     ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$wrstr,"sum");
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
@@ -10613,7 +10626,7 @@ return \%ncp;
 #                         Funktionsergebnisse in Datenbank schreiben
 ####################################################################################################
 sub DbRep_OutputWriteToDB($$$$$) {
-  my ($name,$device,$reading,$arrstr,$optxt) = @_;
+  my ($name,$device,$reading,$wrstr,$optxt) = @_;
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
@@ -10631,7 +10644,8 @@ sub DbRep_OutputWriteToDB($$$$$) {
   my $unit       = "";
   my $wrt        = 0;
   my $irowdone   = 0;
-  my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$timestamp,$value,$date,$time,$rsf,$aggr,@row_array);
+  my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$timestamp,$value,$date,$time,$hour,$ndate,$ntime,$rsf,$rsn,$aggr,@row_array);
+  my ($year,$mon,$mday,$t1,$corr);
   
   if(!$dbloghash->{HELPER}{COLSET}) {
       $err = "No result of \"$hash->{LASTCMD}\" to database written. Cause: column width in \"$hash->{DEF}\" isn't set";
@@ -10645,32 +10659,65 @@ sub DbRep_OutputWriteToDB($$$$$) {
   $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
   
   if($optxt =~ /avg|sum/) {
-      my @arr = split("\\|", $arrstr);
+      my @arr = split("\\|", $wrstr);
+      my $ele = $#arr;                                            # Nr des letzten Elements
+      my $i   = 0;
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
           $value             = defined($a[1])?sprintf("%.4f",$a[1]):undef;
-          $rsf               = $a[2];                             # Datum / Zeit für DB-Speicherung
+          $rsf               = $a[2];                             # Runtime String first - Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
+          $rsn               = $a[3];                             # Runtime String next - Datum / Zeit für DB-Speicherung
+          ($ndate,$ntime)    = split("_",$rsn);
+          $ntime             =~ s/-/:/g if($ntime);
           
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
-              if($aggr =~ /no|day|week|month/) {
-                  $time = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+              if($aggr =~ /no|day|week|month|year/) {
+                  $time  = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "23:59:59";
+                  ($year,$mon,$mday) = split("-", $ndate);
+                  $corr              = ($i != $ele) ? 86400 : 0;
+                  $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-$corr;
+                  ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
               } elsif ($aggr =~ /hour/) {
-                  $time = "$time:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $hour  = $time;
+                  $time  = "$hour:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "$hour:59:59";
+                  if ($ntime eq "23:59:59") {
+                      ($year,$mon,$mday) = split("-", $ndate);
+                      $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-86400;
+                      ($ndate,undef)     = split(" ",FmtDateTime($t1));
+                  }
               }
           }
-          if ($value) {
+          if (defined $value) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
-              push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
+              if($i == 0) {              
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");    
+              } else {
+                  if ($aggr =~ /no|day|week|month|year/) {
+                      ($year,$mon,$mday) = split("-", $date);
+                      $t1                = fhemTimeLocal(01, 00, 00, $mday, $mon-1, $year-1900);   
+                      ($date,$time)      = split(" ",FmtDateTime($t1));
+                  } elsif ($aggr =~ /hour/) {
+                      ($year,$mon,$mday) = split("-", $date);
+                      $t1                = fhemTimeLocal(01, 00, $hour, $mday, $mon-1, $year-1900);
+                      ($date,$time)      = split(" ",FmtDateTime($t1));                 
+                  }
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");                   
+              }              
           } 
+          $i++;
       }
   }
 
   if($optxt =~ /min|max|diff/) { 
-      my %rh = split("§", $arrstr);
+      my %rh = split("§", $wrstr);
       foreach my $key (sort(keys(%rh))) {
           my @k         = split("\\|",$rh{$key});
           $rsf          = $k[2];                               # Datum / Zeit für DB-Speicherung
@@ -10680,9 +10727,9 @@ sub DbRep_OutputWriteToDB($$$$$) {
       
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
-                  $time = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time = "23:59:58";
               } elsif ($aggr =~ /hour/) {
-                  $time = "$time:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time = "$time:59:58";
               }
           }
           if ($value) {
@@ -10691,7 +10738,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
               push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");             
           } 
       }
-  }  
+  }   
   
   if (@row_array) {
       # Schreibzyklus aktivieren
@@ -11008,8 +11055,8 @@ sub DbRep_checkUsePK ($$$){
   $pkc =~ tr/"//d;
   $upkh = 1 if(@pkh && @pkh ne "none");
   $upkc = 1 if(@pkc && @pkc ne "none");
-  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.history: $pkh";
-  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.current: $pkc";
+  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.history: $upkh ($pkh)";
+  Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key used in $db.current: $upkc ($pkc)";
 
 return ($upkh,$upkc,$pkh,$pkc);
 }
