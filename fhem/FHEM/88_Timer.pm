@@ -9,7 +9,7 @@
 # https://forum.fhem.de/index.php/board,20.0.html
 # https://forum.fhem.de/index.php/topic,103848.html | https://forum.fhem.de/index.php/topic,103986.0.html
 #
-# 2019 - HomeAuto_User & elektron-bbs
+# 2019 | 2020 - HomeAuto_User, elektron-bbs
 #################################################################
 # notes:
 # - module mit package umsetzen
@@ -804,6 +804,27 @@ sub FW_pushed_savebutton {
 	readingsBulkUpdate($hash, "state" , $state, 1);
 	readingsEndUpdate($hash, 1);
 
+	## Probably associated with - added to list ##
+	### check must work after changed setreadings to new value ###
+	## all device must check, for right value in .associatedWith
+	my $associatedWith = ReadingsVal($name, ".associatedWith", "");
+
+	foreach my $d (sort keys %{$hash->{READINGS}}) {
+		if ($d =~ /^Timer_(\d+)$/) {
+			my @values = split("," , ReadingsVal($name, $d, ""));
+			if ($values[7] ne "DEF") {
+				#Log3 $name, 5, "$name: FW_pushed_savebutton | Reading .associatedWith check: ".$values[6]." with ".$values[7];
+				if (not grep /$values[6]/, $associatedWith) {
+					#Log3 $name, 5, "$name: FW_pushed_savebutton | Reading .associatedWith added ".$values[6];
+					$associatedWith = $associatedWith eq "" ? $values[6] : $associatedWith.",".$values[6];
+				}
+			}
+		}
+	}
+	Log3 $name, 5, "$name: FW_pushed_savebutton | Reading .associatedWith is: ".$associatedWith;
+	CommandSetReading(undef, "$name .associatedWith $associatedWith");
+	## current list "Probably associated with" finish ##
+
 	## popup user message (jump to javascript) ##
 	if ($popup != 0) {
 		FW_directNotify("FILTER=(room=)?$name", "#FHEMWEB:WEB", "show_popup(".$selected_buttons[0].")", "");
@@ -907,7 +928,8 @@ sub Timer_Check($) {
 				if ($set == 1) {
 					Log3 $name, 4, "$name: $d - set $values[6] $values[7] ($dayOfWeek, $values[0]-$values[1]-$values[2] $values[3]:$values[4]:$values[5])";
 					CommandSet($hash, $values[6]." ".$values[7]) if ($values[7] ne "DEF");
-					$state = "$d set $values[6] $values[7] accomplished";
+					# $state = "$d set $values[6] $values[7] accomplished";
+					readingsSingleUpdate($hash, "state" , "$d set $values[6] $values[7] accomplished", 1);
 					if ($values[7] eq "DEF") {
 						if (AttrVal($name, $d."_set", undef)) {
 							Log3 $name, 5, "$name: $d - exec at command: ".AttrVal($name, $d."_set", undef);
