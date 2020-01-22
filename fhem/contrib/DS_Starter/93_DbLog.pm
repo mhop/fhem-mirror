@@ -1000,8 +1000,8 @@ sub DbLog_ParseEvent($$$$) {
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($reading =~ /^.*:\s+$/) {                                       # und 21.01.20 Forum: 106769
-          $reading = (split(":", $reading))[0];
+      if($event =~ /^.*:\s$/) {                                       # und 21.01.20 Forum: 106769
+          $reading = (split(":", $event))[0];
       } else {
           $reading = "state";
           $value   = $event;
