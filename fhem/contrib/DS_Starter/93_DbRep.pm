@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.30.6"  => "23.01.2020  delDoublets now are working also for PostgreSQL, calculation of number_fetched_rows corrected ",
+  "8.30.5"  => "23.01.2020  remove adminCredentials from set of device type \"Agent\" ",
   "8.30.4"  => "22.01.2020  adjust behavior of OutputWriteToDB (averageValue,sumValue) - write value at every begin and also at every end of period ".
                             "Forum: https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920 ".
                             "fix Warning when Agent has detected a renamed device",
@@ -549,7 +551,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
-                (($dbmodel =~ /MYSQL/)?"adminCredentials ":"").
+                (($hash->{ROLE} ne "Agent" && $dbmodel =~ /MYSQL/)?"adminCredentials ":"").
                 (($hash->{ROLE} ne "Agent")?"insert ":"").
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
@@ -1048,7 +1050,7 @@ sub DbRep_Get($@) {
         if($success) {
             $atxt = "Username: $admusername, Password: $admpassword\n";
         } else {
-            $atxt = "Credentials of $name couldn't be read - make sure you've set it with \"set $name adminCredentials username password\"";        
+            $atxt = "Credentials of $name couldn't be read. Make sure you've set it with \"set $name adminCredentials username password\" (only valid for DbRep device type \"Client\")";        
         }
         
         return "Stored Credentials for database default access:\n".
@@ -1196,6 +1198,7 @@ sub DbRep_Attr($$$$) {
                          timeDiffToNow
                          timeOlderThan
 						 sqlResultFormat
+                         useAdminCredentials
                          );
     
     if ($aName eq "disable") {
@@ -5176,7 +5179,7 @@ sub deldoublets_DoParse($) {
  my $dbpassword = $attr{"sec$dblogname"}{secret};
  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
  my $limit      = AttrVal($name, "limit", 1000);
- my ($err,$dbh,$sth,$sql,$rowlist,$selspec,$st,$table,$addon);
+ my ($err,$dbh,$sth,$sql,$rowlist,$selspec,$st,$table,$addon,$dsql);
  
  # Background-Startzeit
  my $bst = [gettimeofday];
@@ -5241,18 +5244,19 @@ sub deldoublets_DoParse($) {
      # SQL-Laufzeit ermitteln
      $rt = $rt+tv_interval($st);
         
-     # Beginn Löschlogik, Zusammenstellen der löschenden DS (warping)
+     # Beginn Löschlogik, Zusammenstellen der zu löschenden DS (warping)
 	 # Array @warp -> die zu löschenden Datensätze
      my (@warp);
      my $i = 0;
      foreach my $nr (map { $_->[1]."_ESC_".$_->[2]."_ESC_".($_->[0] =~ s/ /_ESC_/r)."_ESC_".$_->[3]."_|_".($_->[4]-1) } @{$sth->fetchall_arrayref()}) {     
          # Reihenfolge geändert in: DEVICE,READING,DATE,TIME,VALUE,count(*)
          if($opt =~ /adviceDelete/) {
-             push(@warp,$nr) if($#todel+1 < $limit);                   # die zu löschenden Datensätze (nur zur Anzeige) 
+             push(@warp,$i."_".$nr) if($#todel+1 < $limit);                   # die zu löschenden Datensätze (nur zur Anzeige) 
          } else {        
-             push (@warp,$nr);                                         # Array der zu löschenden Datensätze
+             push(@warp,$i."_".$nr);                                          # Array der zu löschenden Datensätze
          }
-         my $c = (split("|",$nr))[-1];
+         my $c   = (split("|",$nr))[-1];
+         Log3 ($name, 4, "DbRep $name - WARP: $nr, ntodel: $ntodel, c: $c");
          $ntodel = $ntodel + $c;
          
          if ($opt =~ /delete/) {                                       # delete Datensätze
@@ -5264,9 +5268,12 @@ sub deldoublets_DoParse($) {
              $val  =~ s/'/''/g;                                 # escape ' with ''
 			 $val  =~ s/\\/\\\\/g if($model eq "MYSQL");        # escape \ with \\ für MySQL
              $st = [gettimeofday];
-             my $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
-             my $sthd = $dbh->prepare($dsql); 
-             Log3 ($name, 4, "DbRep $name - SQL execute: $dsql"); 
+             if($model =~ /MYSQL|SQLITE/) {
+                 $dsql = "delete FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' limit $limit;";
+             } elsif ($model eq "POSTGRESQL") {
+                 $dsql = "DELETE FROM $table WHERE ctid = any (array(SELECT ctid FROM $table WHERE TIMESTAMP = '$dt' AND DEVICE = '$dev' AND READING = '$read' AND VALUE = '$val' ORDER BY timestamp LIMIT $limit));";
+             }
+             my $sthd = $dbh->prepare($dsql);  
                  
              eval {$sthd->execute();};
              if ($@) {
@@ -11617,7 +11624,7 @@ return;
 	                           - Save a user / password for the privileged respectively administrative database access. 
                                The user is required for database operations which has to be executed by a privileged user. 
                                Please see also attribute <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
-                               (only valid if database type is MYSQL)
+                               (only valid if database type is MYSQL and DbRep-type "Client")
                                
                                </li> <br>
  
@@ -13771,7 +13778,7 @@ sub bdump {
   <li><b>useAdminCredentials </b>         
                                 - If set, a before with "set &lt;aame&gt; adminCredentials" saved privileged user is used
                                   for particular database operations. <br>
-                                  (only valid if database type is MYSQL)
+                                  (only valid if database type is MYSQL and DbRep-type "Client")
                                   </li> <br>
                                   
   <a name="userExitFn"></a>
@@ -14105,7 +14112,7 @@ sub bdump {
 	                           - Speichert einen User / Passwort für den privilegierten bzw. administrativen 
                                Datenbankzugriff. Er wird bei Datenbankoperationen benötigt, die mit einem privilegierten User 
                                ausgeführt werden müssen. Siehe auch Attribut <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
-                               (nur gültig bei Datenbanktyp MYSQL)
+                               (nur gültig bei Datenbanktyp MYSQL und DbRep-Typ "Client")
                                
                                </li> <br>
                                
@@ -16299,7 +16306,7 @@ sub bdump {
   <li><b>useAdminCredentials </b>         
                                 - Wenn gesetzt, wird ein zuvor mit "set &lt;Name&gt; adminCredentials" gespeicherter 
                                   privilegierter User für bestimmte Datenbankoperationen verwendet. <br>
-                                  (nur gültig für Datenbanktyp MYSQL)
+                                  (nur gültig für Datenbanktyp MYSQL und DbRep-Typ "Client")
                                   </li> <br>
 
   <a name="userExitFn"></a> 								
