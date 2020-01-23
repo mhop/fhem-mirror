@@ -32,7 +32,7 @@ attr DEVICE reading02Name SuperE10
 attr DEVICE reading02Regex <div class=\"price-type-name\">Super E10</div>[\S\s\r\n]*?<span id=\"current-price-\d+\">(\d.\d{2}</span>[\S\s\r\n]*?<sup id=\"suffix-price-\d\">[\d]+)</sup>
 attr DEVICE reading03Name SuperE5
 attr DEVICE reading03Regex <div class=\"price-type-name\">Super E5</div>[\S\s\r\n]*?<span id="current-price-\d+">(\d.\d{2}</span>[\S\s\r\n]*?<sup id=\"suffix-price-\d\">[\d]+)</sup>
-attr DEVICE readingOExpr $val =~ s/<[\d\D]+>//;;;;$val
+attr DEVICE readingOExpr $val =~ s/<[\d\D]+>//;;$val
 attr DEVICE stateFormat E5: SuperE5 € / E10: SuperE10 € / D: Diesel €
 attr DEVICE timeout 10
 attr DEVICE verbose 2
@@ -75,6 +75,7 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 attr DEVICE enableControlSet 1
 attr DEVICE extractAllJSON 1
 attr DEVICE extractAllJSONFilter REGIONCODE
+attr DEVICE readingOExpr $val = FmtDateTime($val/1000) if $val =~ m/^[\d]+$/g && $val > 10000;;$val
 attr DEVICE readingEncode UTF-8
 attr DEVICE preProcessRegex s/warnWetter..............|\);|\t|\n|\r//g
 attr DEVICE room WHICHROOM

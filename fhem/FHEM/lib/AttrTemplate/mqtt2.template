@@ -664,7 +664,7 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");;"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef).sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef).sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
@@ -1220,7 +1220,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
   shellies/DEVNAME/relay/0/energy:.* {'relay_0_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/longpush/0:.* longpush_0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $total = ReadingsVal($name,"relay_0_kWh","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Total: $total/ Temp: $temp °C</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $total = ReadingsVal($name,"relay_0_kWh","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Total: $total/ Temp: $temp °C</div>"}
 attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs.
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
@@ -1386,7 +1386,7 @@ order:A_11a1
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 set DEVICE attrTemplate shellyplug
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C</div>"}
 attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/relay/0:.* relay_0\
   shellies/DEVNAME/input/0:.* input_0\
@@ -1776,10 +1776,25 @@ attr DEVICE readingList BASEPATH/boiler_data { json2nameValue($EVENT,'',$JSONMAP
 attr DEVICE model ems-esp_boiler
 
 #ems-esp thermostat device
+name:ems-esp_thermostat_read-only
+filter:TYPE=MQTT2_DEVICE
+desc:To configure a simple read-only thermostat (e.g. CT200) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a>.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
+order:E_02c
+par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon auto:time_automatic manual:time_manual_mode
+attr DEVICE jsonMap hc1_mode:mode hc1_seltemp:desired-temp hc1_daytemp:daytemp hc1_nighttemp:nighttemp hc1_holidayttemp:holidaytemp
+attr DEVICE readingList BASEPATH/thermostat_data:.* { json2nameValue($EVENT, '', $JSONMAP) }
+attr DEVICE stateFormat mode\
+desired-temp °C
+attr DEVICE webCmd :
+attr DEVICE model ems-esp_thermostat_read-only
+
 name:ems-esp_thermostat_simple
 filter:TYPE=MQTT2_DEVICE
 desc:To configure a simple thermostat (e.g. RC300) for use with an <a href="https://github.com/proddy/EMS-ESP">EMS-ESP</a>.<br><a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a><br>
-order:E_02c
+order:E_02c1
 par:BASEPATH;base topic set in the ESP including "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,([^:]*ems-esp)/thermostat_data:, ? "$1" : undef }
 par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
 attr DEVICE icon ICON
