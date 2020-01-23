@@ -1595,6 +1595,7 @@ HUEDevice_Parse($$)
       $readings{water} = $state->{water} if( defined($state->{water}) );
       $readings{fire} = $state->{fire} if( defined($state->{fire}) );
       $readings{tampered} = $state->{tampered} if( defined($state->{tampered}) );
+      $readings{battery} = $state->{battery} if( defined($state->{battery}) );
       $readings{batteryState} = $state->{lowbattery}?'low':'ok' if( defined($state->{lowbattery}) );
 
       #Xiaomi Aqara Vibrationsensor (lumi.vibration.aq1)
