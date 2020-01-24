@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.4";
+my $version = "1.3.5";
 
 my $srandUsed;
 
@@ -39,6 +39,10 @@ my %todoist_transtable_EN = (
   "newentry"          =>  "Add new task to list",
   "nolistdata"        =>  "No data for this list",
   "idnotfound"        =>  "Could not find the task",
+  "today"             =>  "today",
+  "tomorrow"          =>  "tomorrow",
+  "dayaftertomorrow"   =>  "the day after tomorrow",
+  "yesterday"         =>  "yesterday",
 );
 
 my %todoist_transtable_DE = ( 
@@ -54,6 +58,10 @@ my %todoist_transtable_DE = (
   "newentry"          =>  "Neuen Eintrag zur Liste hinzufügen",
   "nolistdata"        =>  "List ist leer",
   "idnotfound"        =>  "Task konnte nicht gefundern werden",
+  "today"             =>  "heute",
+  "tomorrow"          =>  "morgen",
+  "dayaftertomorrow"   =>  "übermorgen",
+  "yesterday"         =>  "gestern",
 );
 
 my $todoist_tt;
@@ -461,6 +469,17 @@ sub todoist_UpdateTask($$$) {
       }
       ## move a task
       elsif ($type eq "move") {
+        
+        
+        # we can avoid duplicates in FHEM. There may still come duplicates coming from another app
+        if ($h->{"parent_id"}) {
+          #if (AttrVal($name,"avoidDuplicates",0) == 1 && todoist_inArray(\@{$hash->{helper}{"TITS"}},$title)) {
+          #  map {FW_directNotify("#FHEMWEB:$_", "if (typeof todoist_ErrorDialog === \"function\") todoist_ErrorDialog('$name','$title ".$todoist_tt->{"alreadythere"}."','".$todoist_tt->{"error"}."')", "")} devspec2array("TYPE=FHEMWEB");
+          #  todoist_ErrorReadings($hash,"duplicate detected","duplicate detected");
+          #  return undef;
+          #}
+        }
+        
         $tType = "item_move";
         %args = (
           id => $taskId,
@@ -902,7 +921,7 @@ sub todoist_GetTasks($;$) {
   if (AttrVal($name,"getCompleted",0)==1 && $completed != 1) {    
     InternalTimer(gettimeofday()+0.5, "todoist_doGetCompTasks", $hash, 0);
   }
-  InternalTimer(gettimeofday()+2, "todoist_GetUsers", $hash, 0) if ($completed != 1 && AttrVal($name,"autoGetUsers",1) == 1);
+  InternalTimer(gettimeofday()+0.3, "todoist_GetUsers", $hash, 0) if ($completed != 1 && AttrVal($name,"autoGetUsers",1) == 1);
   
   return undef;
 }
@@ -1278,6 +1297,7 @@ sub todoist_GetUsersCallback($$$){
       }
     }
     readingsEndUpdate( $hash, 1 );
+    todoist_ReloadTable($name);
   }
     
   
@@ -2015,6 +2035,10 @@ sub todoist_Html(;$$$) {
                 todoist_tt.delconfirm='".$todoist_tt->{'delconfirm'}."';
                 todoist_tt.check='".$todoist_tt->{'check'}."';
                 todoist_tt.delete='".$todoist_tt->{'delete'}."';
+                todoist_tt.today='".$todoist_tt->{'today'}."';
+                todoist_tt.tomorrow='".$todoist_tt->{'tomorrow'}."';
+                todoist_tt.dayaftertomorrow='".$todoist_tt->{'dayaftertomorrow'}."';
+                todoist_tt.yesterday='".$todoist_tt->{'yesterday'}."';
               </script>";
     # Javascript and CSS
     $rot .= " <script type=\"text/javascript\" src=\"$FW_ME/www/pgm2/todoist.js?version=".$version."\"></script>
@@ -2102,7 +2126,8 @@ sub todoist_Html(;$$$) {
                     height: 12px!important;
                     width: 12px!important;
                   }
-                  .todoist_dueDateButton svg {
+                  .todoist_dueDateButton svg,
+                  .todoist_responsibleUidButton svg {
                     margin-top:-2px!important;
                   }
     ";            
@@ -2169,19 +2194,24 @@ sub todoist_Html(;$$$) {
         my $ind=0;
         
 
-        my $dueDate = defined($hash->{helper}{DUE_DATE}{$_})?$hash->{helper}{DUE_DATE}{$_}:"";
+        my $dueDate = defined($hash->{helper}{DUE_DATE}{$_})?$hash->{helper}{DUE_DATE}{$_}:"";       
+        my $responsibleUid = defined($hash->{helper}{RESPONSIBLE_UID}{$_})?$hash->{helper}{RESPONSIBLE_UID}{$_}:"";
         
-        my $dueDateClass = $dueDate!=""?" todoist_dueDate":"";
+        $responsibleUid = $hash->{helper}{USER}{NAME}{$responsibleUid} if ($responsibleUid ne "");
+        
+        my $dueDateClass = $dueDate ne ""?" todoist_dueDate":"";
+        my $responsibleUidClass = $responsibleUid ne ""?" todoist_responsibleUid":"";
         
         $ret .= "<tr id=\"".$name."_".$_."\" data-due-date=\"".$dueDate."\" data-data=\"true\" data-project-name=\"".$name."\" data-project-id=\"".$hash->{PID}."\" data-line-id=\"".$_."\" class=\"sortit todoist_data ".$eo."\">\n".
                 " <td class=\"col1 todoist_col1\">\n".
                 "   <div class=\"todoist_move\"></div>\n".
                 "   <input title=\"".$todoist_tt->{'check'}."\" class=\"todoist_checkbox_".$name."\" type=\"checkbox\" id=\"check_".$_."\" data-id=\"".$_."\" />\n".
                 " </td>\n".
-                " <td class=\"col1 todoist_input".$dueDateClass."\">\n".
+                " <td class=\"col1 todoist_input".$dueDateClass.$responsibleUidClass."\">\n".
                 "   <span class=\"todoist_task_text\" data-id=\"".$_."\">".$hash->{helper}{TITLE}{$_}."</span>\n".
                 "   <input type=\"text\" data-id=\"".$_."\" style=\"display:none;\" class=\"todoist_input_".$name."\" value=\"".$hash->{helper}{TITLE}{$_}."\" />\n".
                 "   <div class='todoist_dueDateButton todoist_icon' title='".$dueDate."'> </div>".
+                "   <div class='todoist_responsibleUidButton todoist_icon' title='".$responsibleUid."'> </div>".
                 " </td>\n";
         
         $ret .= "<td class=\"col2 todoist_delete\">\n".
