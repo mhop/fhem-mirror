@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.30.7"  => "24.01.2020  corrected count of inserted rows into standby database (DbRep_WriteToDB) ",
   "8.30.6"  => "23.01.2020  delDoublets now are working also for PostgreSQL, calculation of number_fetched_rows corrected ",
   "8.30.5"  => "23.01.2020  remove adminCredentials from set of device type \"Agent\" ",
   "8.30.4"  => "22.01.2020  adjust behavior of OutputWriteToDB (averageValue,sumValue) - write value at every begin and also at every end of period ".
@@ -2073,7 +2074,7 @@ sub DbRep_createTimeArray($$$) {
 
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  if($hash->{HELPER}{MINTS} && $hash->{HELPER}{MINTS} =~ m/0000-00-00/) {
-     Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it !");
+     Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it with 'set $name sqlCmd delete from history where TIMESTAMP=\"0000-00-00 00:00:00\";' ");
      delete $hash->{HELPER}{MINTS};
  }
  
@@ -10908,6 +10909,7 @@ sub DbRep_WriteToDB($$$@) {
   my $supk      = AttrVal($dblogname, "noSupportPK", 0);
   my $wrt       = 0;
   my $irowdone  = 0;
+  my $totrows   = 0;
   my ($sth_ih,$sth_uh,$sth_ic,$sth_uc,$err);
          
   # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK 
@@ -10989,8 +10991,7 @@ sub DbRep_WriteToDB($$$@) {
   # SQL-Startzeit
   my $wst = [gettimeofday]; 
       
-  my $ihs = 0;
-  my $uhs = 0;
+  my ($ihs,$uhs) = (0,0);
   foreach my $row (@row_array) {
       my ($date,$time,$device,$type,$event,$reading,$value,$unit) = ($row =~ /^(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)_ESC_(.*)$/);
       Log3 $hash->{NAME}, 5, "DbRep $name - $row";     
@@ -11004,10 +11005,10 @@ sub DbRep_WriteToDB($$$@) {
                   $rv_uh = $sth_uh->execute($type,$event,$value,$unit,$timestamp,$device,$reading); 
               }
 			  if ($rv_uh == 0) {
-			      $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
-				  $ihs++; 
+			      $ihs      += $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);          # V8.30.7
+				  # $ihs++;                                                                                      # V8.30.7
 			  } else {
-			      $uhs++;
+			      $uhs      += $rv_uh;                                                                           # V8.30.7
 			  }
           }
           # update oder insert current
@@ -11023,18 +11024,18 @@ sub DbRep_WriteToDB($$$@) {
           $err = $@;
           Log3 ($name, 2, "DbRep $name - $@");
           $dbh->rollback;
-          $ihs = 0;
-          $uhs = 0;
           return ($wrt,0,$err);
       } else {
-          $irowdone++;
-      }
+	      $totrows++;                                                                                            # V8.30.7
+	  }
   }    
       
   eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-      
-  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs" if($uhs); 
-  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs" if($ihs); 
+  
+  Log3 ($name, 3, "DbRep $name - total lines transfered to standby database: $totrows");                         # V8.30.7
+  Log3 ($name, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs") if($uhs); 
+  Log3 ($name, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs") if($ihs);
+  $irowdone = $ihs + $uhs; 
       
   # SQL-Laufzeit ermitteln
   $wrt = tv_interval($wst);
@@ -16534,4 +16535,4 @@ sub bdump {
 }
 =end :application/json;q=META.json
 
-=cut
+=cutt
