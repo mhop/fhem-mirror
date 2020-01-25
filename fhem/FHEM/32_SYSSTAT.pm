@@ -41,7 +41,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
+  $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user armbiantemperature:0,1,2";
   $hash->{AttrList} .= " snmp:1 mibs:textField-long snmpVersion:1,2 snmpCommunity" if( $SYSSTAT_hasSNMP );
   $hash->{AttrList} .= " filesystems showpercent";
   $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
@@ -245,6 +245,7 @@ SYSSTAT_Attr($$$)
 
 sub SYSSTAT_getLoadAVG($);
 sub SYSSTAT_getPiTemp($);
+sub SYSSTAT_getArmbianTemp($);
 sub SYSSTAT_getUptime($);
 sub
 SYSSTAT_GetUpdate($)
@@ -356,6 +357,14 @@ SYSSTAT_GetUpdate($)
     my $temp = SYSSTAT_getSynoTemp($hash);
     if( $temp && $temp > 0 && $temp < 200  ) {
       if( AttrVal($name, "synologytemperature", 0) eq 2 ) {
+          $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
+        }
+      readingsBulkUpdate($hash,"temperature",$temp);
+    }
+  } elsif( AttrVal($name, "armbiantemperature", 0) > 0 ) {
+    my $temp = SYSSTAT_getArmbianTemp($hash);
+    if( $temp && $temp > 0 && $temp < 200  ) {
+      if( AttrVal($name, "armbiantemperature", 0) eq 2 ) {
           $temp = sprintf( "%.1f", (3 * ReadingsVal($name,"temperature",$temp) + $temp ) / 4 );
         }
       readingsBulkUpdate($hash,"temperature",$temp);
@@ -574,6 +583,15 @@ SYSSTAT_getPiTemp($)
   my ($hash) = @_;
 
   my $temp = SYSSTAT_readFile($hash,"/sys/class/thermal/thermal_zone0/temp",-1);
+
+  return $temp / 1000;
+}
+sub
+SYSSTAT_getArmbianTemp($)
+{
+  my ($hash) = @_;
+
+  my $temp = SYSSTAT_readFile($hash,"/etc/armbianmonitor/datasources/soctemp",-1);
 
   return $temp / 1000;
 }
@@ -851,6 +869,9 @@ SYSSTAT_getStat($)
     <li>synologytemperature<br>
       If set and > 0 the main temperaure of a synology diskstation is read. requires snmp.<br>
       If set to 2 a geometric average over the last 4 values is created.</li>
+    <li>armbiantemperature<br>
+      If set and > 0 the armbian based SOC on chip termal sensor is read.<br>
+      If set to 2 a geometric average over the last 4 values is created.</li>
     <li>raspberrycpufreq<br>
       If set and > 0 the raspberry pi on chip termal sensor is read.</li>
     <li>uptime<br>
@@ -980,6 +1001,9 @@ SYSSTAT_getStat($)
       Wenn Wert 2 ist, wird ein geometrischer Durchschnitt der letzten 4 Werte dargestellt.</li>
     <li>synologytemperature<br>
       Wenn gesetzt und  > 0 wird die Temperatur einer Synology Diskstation ausgelesen (erfordert snmp).<br>
+      Wenn Wert 2 ist, wird ein geometrischer Durchschnitt der letzten 4 Werte dargestellt.</li>
+    <li>armbiantemperature<br>
+      Wenn gesetzt und  > 0 wird der Temperatursensor auf Armbian basierten Board ausgelesen.<br>
       Wenn Wert 2 ist, wird ein geometrischer Durchschnitt der letzten 4 Werte dargestellt.</li>
     <li>raspberrycpufreq<br>
       Wenn gesetzt und > 0 wird die Raspberry Pi CPU Frequenz ausgelesen.</li>
