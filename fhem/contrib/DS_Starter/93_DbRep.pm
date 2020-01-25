@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.30.8"  => "25.01.2020  adjust SQL-Statements in OutputWriteToDB to avoid Duplicate entry errors and other fixes ",
   "8.30.7"  => "24.01.2020  corrected count of inserted rows into standby database (DbRep_WriteToDB) ",
   "8.30.6"  => "23.01.2020  delDoublets now are working also for PostgreSQL, calculation of number_fetched_rows corrected ",
   "8.30.5"  => "23.01.2020  remove adminCredentials from set of device type \"Agent\" ",
@@ -2074,7 +2075,7 @@ sub DbRep_createTimeArray($$$) {
 
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  if($hash->{HELPER}{MINTS} && $hash->{HELPER}{MINTS} =~ m/0000-00-00/) {
-     Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it with 'set $name sqlCmd delete from history where TIMESTAMP=\"0000-00-00 00:00:00\";' ");
+     Log3 ($name, 1, "DbRep $name - ERROR - wrong timestamp \"$hash->{HELPER}{MINTS}\" found in database. Please delete it !");
      delete $hash->{HELPER}{MINTS};
  }
  
@@ -10766,7 +10767,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       }
       
       if (lc($DbLogType) =~ m(history)) {
-          # insert history mit/ohne primary key
+          # INSERT history mit/ohne primary key
           if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
               eval { $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
@@ -10781,22 +10782,10 @@ sub DbRep_OutputWriteToDB($$$$$) {
               Log3 ($name, 2, "DbRep $name - $@");
               return ($wrt,$irowdone,$err);
           }
-		  # update history mit/ohne primary key
-          if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
-		      $sth_uh = $dbh->prepare("REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
-	      } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {  
-		      $sth_uh = $dbh->prepare("INSERT OR REPLACE INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-	      } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
-		      $sth_uh = $dbh->prepare("INSERT INTO history (TYPE, EVENT, VALUE, UNIT, TIMESTAMP, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
-		                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
-								       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-	      } else {
-	          $sth_uh = $dbh->prepare("UPDATE history SET TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (TIMESTAMP=?) AND (DEVICE=?) AND (READING=?)");
-	      }
       }
       
       if (lc($DbLogType) =~ m(current) ) {
-          # insert current mit/ohne primary key
+          # INSERT current mit/ohne primary key
 	      if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };	  
 	      } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
@@ -10812,26 +10801,12 @@ sub DbRep_OutputWriteToDB($$$$$) {
               Log3 ($name, 2, "DbRep $name - $@");
               return ($wrt,$irowdone,$err);
           }
-	      # update current mit/ohne primary key
-          if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
-		      $sth_uc = $dbh->prepare("REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); 
-	      } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
-		      $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
-	      } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
-		      $sth_uc = $dbh->prepare("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
-		                               DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
-								       VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-	      } else {
-	          $sth_uc = $dbh->prepare("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
-	      }
       }
       
       eval { $dbh->begin_work() if($dbh->{AutoCommit}); };
       if ($@) {
           Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
       }
-      
-      Log3 $hash->{NAME}, 4, "DbRep $name - data prepared to db write:"; 
       
       # SQL-Startzeit
       my $wst = [gettimeofday]; 
@@ -10847,46 +10822,44 @@ sub DbRep_OutputWriteToDB($$$$$) {
           $reading   = $a[4];
           $value     = $a[5];
           $unit      = $a[6];
-          Log3 $hash->{NAME}, 4, "DbRep $name - $row";
           
           eval {
               # update oder insert history
               if (lc($DbLogType) =~ m(history) ) {
-                  my $rv_uh = $sth_uh->execute($type,$event,$value,$unit,$timestamp,$device,$reading); 
+                  my $rv_uh = $dbh->do("UPDATE history SET TIMESTAMP=\"$timestamp\", DEVICE=\"$device\", READING=\"$reading\", TYPE=\"$type\", EVENT=\"$event\", VALUE=\"$value\", UNIT=\"$unit\" WHERE TIMESTAMP=\"$timestamp\" AND DEVICE=\"$device\" AND READING=\"$reading\"");  
+                  $uhs += $rv_uh if($rv_uh);
+                  Log3 $hash->{NAME}, 4, "DbRep $name - UPDATE history: $row, RESULT: $rv_uh";
 				  if ($rv_uh == 0) {
-				      $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
-					  $ihs++; 
-				  } else {
-				      $uhs++;
+				      my $rv_ih = $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
+                      $ihs += $rv_ih if($rv_ih); 
+                      Log3 $hash->{NAME}, 4, "DbRep $name - INSERT history: $row, RESULT: $rv_ih";
 				  }
               }
               # update oder insert current
               if (lc($DbLogType) =~ m(current) ) {
-                  my $rv_uc = $sth_uc->execute($timestamp,$type,$event,$value,$unit,$device,$reading);
+                  my $rv_uc = $dbh->do("UPDATE current SET TIMESTAMP=\"$timestamp\", DEVICE=\"$device\", READING=\"$reading\", TYPE=\"$type\", EVENT=\"$event\", VALUE=\"$value\", UNIT=\"$unit\" WHERE DEVICE=\"$device\" AND READING=\"$reading\""); 
                   if ($rv_uc == 0) {
                       $sth_ic->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
                   }
-              }
+              }              
           };
- 
+          
           if ($@) {
               $err = $@;
               Log3 ($name, 2, "DbRep $name - $@");
               $dbh->rollback;
               $dbh->disconnect;
-	          $ihs = 0;
-	          $uhs = 0;
               return ($wrt,0,$err);
-          } else {
-              $irowdone++;
-          }
+          }          
       }    
       
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      
       $dbh->disconnect;
       
 	  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs"; 
       Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs"; 
+      $irowdone = $ihs + $uhs; 
       
       # SQL-Laufzeit ermitteln
       $wrt = tv_interval($wst);

@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: adjust behavior of writeToDB - write value at every begin
+                      and also at every end of period, fix Warning when Agent 
+                      has detected a renamed device, remove adminCredentials 
+                      from set of DbRep device type "Agent", delDoublets now 
+                      are working for PostgreSQL, calculation of 
+                      number_fetched_rows corrected, count of inserted rows 
+                      into standby database corrected, avoid Duplicate entry 
+                      errors in writeToDB
  - change:  98_todoist: user information in FHEMWEB widget
  - change:  72_TA_CMI_JSON: added new API versions
  - bugfix:  88_Timer: fix list "Probably associated with" Forum: #1015549
