@@ -98,6 +98,7 @@ BEGIN {
 # Versions History intern
 our %vNotesIntern = 
 (
+ "1.7.1"  =>  "25.01.20 fix ErrorValue 0", 
  "1.7.0"  =>  "12.01.20 add OR / AND watching",
  "1.6.0"  =>  "27.08.19 package, Meta",
  "1.5.0"  =>  "18.02.19",
@@ -402,8 +403,8 @@ sub OnTimer($)
              $d_d++; # Device Tote
              $timeouts++;
              $rts = ReadingsTimestamp($deviceName, $_,0);
-             setReadingsVal($defs{$deviceName},$_,$errorValue,$rts) if ($errorValue && $rts); # leise setzen ohne Event
-             $defs{$deviceName}->{STATE} = $errorValue if ($errorValue && $state);
+             setReadingsVal($defs{$deviceName},$_,$errorValue,$rts) if (($errorValue ne'')&& $rts); # leise setzen ohne Event
+             $defs{$deviceName}->{STATE} = $errorValue if (($errorValue ne'') && $state);
            }
            else
            {
@@ -424,6 +425,8 @@ sub OnTimer($)
           }#age
           else
           {
+            setReadingsVal($defs{$deviceName},$_,'unknown',TimeNow()) if ($errorValue); # leise setzen ohne Event
+            $defs{$deviceName}->{STATE} = 'unknown' if ($errorValue && $state);
             Log3 $name,3,$name.', reading Timestamp for '.$_.' not found on device '.$deviceName;
             readingsBulkUpdate($hash, $deviceName.'_'.$_, 'no Timestamp');
           }
