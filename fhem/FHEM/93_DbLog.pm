@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.9"   => "21.01.2020 default ParseEvent changed again, Forum: #106769 ",
   "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
@@ -994,13 +995,15 @@ sub DbLog_ParseEvent($$$$) {
     $value = join(": ", @parts);
     $unit  = "";
   } 
+  
+  # Log3 $name, 2, "DbLog $name -> ParseEvent - Event: $event, Reading: $reading, Value: $value, Unit: $unit";
 
   #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($reading =~ /:$/) {
-          $reading = (split(":", $reading))[0];
+      if($event =~ /^.*:\s$/) {                                          # und 21.01.20 Forum: #106769
+          $reading = (split(":", $event))[0];
       } else {
           $reading = "state";
           $value   = $event;
