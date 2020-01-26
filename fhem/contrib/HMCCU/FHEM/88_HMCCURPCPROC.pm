@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.000
+#  Version 4.4.002
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -38,7 +38,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.000';
+my $HMCCURPCPROC_VERSION = '4.4.001';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -143,6 +143,7 @@ sub HMCCURPCPROC_ProcessEvent ($$);
 # RPC information
 sub HMCCURPCPROC_GetDeviceDesc ($;$);
 sub HMCCURPCPROC_GetParamsetDesc ($;$);
+sub HMCCURPCPROC_GetPeers ($);
 
 # RPC server control functions
 sub HMCCURPCPROC_CheckProcessState ($$);
@@ -403,15 +404,6 @@ sub HMCCURPCPROC_InitDevice ($$) {
 		$attr{$name}{verbose} = 2;
 	}
 	
-	# Read RPC device descriptions
-	if ($dev_hash->{rpcinterface} ne 'CUxD') {
-		HMCCU_Log ($dev_hash, 1, "Updating internal device tables");
-		HMCCU_ResetDeviceTables ($hmccu_hash, $dev_hash->{rpcinterface});
-		my $cd = HMCCURPCPROC_GetDeviceDesc ($dev_hash);
-		my $cm = HMCCURPCPROC_GetParamsetDesc ($dev_hash);
-		HMCCU_Log ($dev_hash, 1, "Read $cd channel and device descriptions and $cm device models from CCU");
-	}
-	
 	# RPC device ready
 	HMCCURPCPROC_ResetRPCState ($dev_hash);
 	HMCCURPCPROC_SetState ($dev_hash, 'Initialized');
@@ -630,7 +622,7 @@ sub HMCCURPCPROC_Get ($@)
 	return "No get command specified" if (!defined ($opt));
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $options = "deviceDesc rpcevents:noArg rpcstate:noArg";
+	my $options = "deviceDesc rpcevents:noArg rpcstate:noArg peers:noArg";
 
 	return "HMCCURPCPROC: CCU busy, choose one of rpcstate:noArg"
 		if ($opt ne 'rpcstate' && HMCCURPCPROC_IsRPCStateBlocking ($hash));
@@ -657,6 +649,10 @@ sub HMCCURPCPROC_Get ($@)
 		my $cd = HMCCURPCPROC_GetDeviceDesc ($hash, $address);
 		my $cm = HMCCURPCPROC_GetParamsetDesc ($hash, $address);
 		return "Read $cd channel and device descriptions and $cm device models from CCU";
+	}
+	elsif ($opt eq 'peers') {
+		my $cp = HMCCURPCPROC_GetPeers ($hash);
+		return "Read $cp links from CCU";
 	}
 	elsif ($opt eq 'rpcevents') {
 		my @eventtypes = ("EV", "ND", "DD", "RD", "RA", "UD", "IN", "EX", "SL", "TO");
@@ -1133,6 +1129,33 @@ sub HMCCURPCPROC_GetAttribute ($$$$)
 	}
 	
 	return $default;
+}
+
+######################################################################
+# Get links (sender and receiver) from CCU.
+######################################################################
+
+sub HMCCURPCPROC_GetPeers ($)
+{
+	my ($hash) = @_;
+	my $ioHash = $hash->{IODev};
+
+	my $c = 0;
+		
+	my $rd = HMCCURPCPROC_SendRequest ($hash, "getLinks");
+	return HMCCU_Log ($hash, 2, "Can't get peers", 0) if (!defined($rd));
+
+	if (ref($rd) eq 'HASH' && exists($rd->{faultString})) {
+		return HMCCU_Log ($hash, 2, "Can't get peers. ".$rd->{faultString}, 0);
+	}
+	elsif (ref($rd) eq 'ARRAY') {
+		$c = HMCCU_AddPeers ($ioHash, $rd, $hash->{rpcinterface});
+	}
+	else {
+		return HMCCU_Log ($hash, 2, "Unexpected response from getLinks", 0);
+	}
+
+	return $c;
 }
 
 ######################################################################
@@ -1876,7 +1899,7 @@ sub HMCCURPCPROC_SendRequest ($@)
 			if ($RPC_METHODS{$request} == 1) {
 				# Build a parameter hash
 				while (my $p = shift @param) {
-					my $pt = "STRING";
+					my $pt;
 					if ($p =~ /${re}/) {
 						$pt = $1;
 						$p =~ s/${re}//;
@@ -1903,7 +1926,7 @@ sub HMCCURPCPROC_SendRequest ($@)
 
 			# Build a parameter array
 			while (my $p = shift @param) {
-				my $pt = "STRING";
+				my $pt;
 				if ($p =~ /${re}/) {
 					$pt = $1;
 					$p =~ s/${re}//;

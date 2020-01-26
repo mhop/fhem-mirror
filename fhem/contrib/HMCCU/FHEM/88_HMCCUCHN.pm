@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.002
+#  Version 4.4.004
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -18,6 +18,7 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
+# use Data::Dumper;
 
 require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 
@@ -43,10 +44,10 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "IODev ccucalculate ".
-		"ccuflags:multiple-strict,ackState,logCommand,nochn0,trace ccureadingfilter ".
+		"ccuflags:multiple-strict,ackState,logCommand,nochn0,noReadings,trace ccureadingfilter ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
-		"ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix".
-		"ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
+		"ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix ".
+		"ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
 		"disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long ".
 		"substexcl stripnumber peer:textField-long ". $readingFnAttributes;
 }
@@ -73,7 +74,7 @@ sub HMCCUCHN_Define ($@)
 	$hash->{hmccu}{devspec} = $devspec;
 	
 	# Defaults
-	$hash->{channels} = 1;
+	$hash->{hmccu}{channels} = 1;
 	$hash->{statevals} = 'devstate';
 	
 	# Parse optional command line parameters
@@ -221,6 +222,7 @@ sub HMCCUCHN_Set ($@)
 	my $opt = shift @$a;
 
 	return "No set command specified" if (!defined ($opt));
+	$opt = lc($opt);
 
 	my $rocmds = "clear defaults:noArg";
 	my $rwcmds = "clear config control datapoint defaults:noArg paramset link devstate values";
@@ -496,6 +498,7 @@ sub HMCCUCHN_Get ($@)
 	my $opt = shift @$a;
 
 	return "No get command specified" if (!defined ($opt));
+	$opt = lc($opt);
 
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
@@ -515,7 +518,6 @@ sub HMCCUCHN_Get ($@)
 	my $ccuif = $hash->{ccuif};
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 
 	my $result = '';
 	my $rc;
@@ -532,7 +534,7 @@ sub HMCCUCHN_Get ($@)
 		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		return $ccureadings ? undef : $result;
+		return $result;
 	}
 	elsif ($opt eq 'datapoint') {
 		my $objname = shift @$a;
@@ -545,7 +547,7 @@ sub HMCCUCHN_Get ($@)
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		return $ccureadings ? undef : $result;
+		return $result;
 	}
 	elsif ($opt eq 'update') {
 		my $ccuget = shift @$a;
@@ -563,11 +565,9 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_SetError ($hash, -2) if ($result eq '');
 		return HMCCU_FormatDeviceInfo ($result);
 	}
-	elsif ($opt =~ /^(paramset|paramsetlist|config|links|values)$/) {
+	elsif ($opt =~ /^(paramset|config|values)$/) {
 		my $defParamset = '';
-		my $method = $opt =~ /list$/ ? 'listRawParamset' : 'getRawParamset';
-		my %parSets = ('config' => 'MASTER', 'links' => 'LINK', 'values' => 'VALUES',
-			'configlist' => 'MASTER');
+		my %parSets = ('config' => 'MASTER,LINK', 'values' => 'VALUES');
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);
 		my $par = shift @$a;
@@ -584,7 +584,6 @@ sub HMCCUCHN_Get ($@)
 		
 		$par = '.*' if (!defined ($par));
 
-		my $res = '';
 		my %objects;
 		foreach my $a (@addList) {
 			my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $ccuif);
@@ -594,85 +593,41 @@ sub HMCCUCHN_Get ($@)
 			my ($da, $dc) = HMCCU_SplitChnAddr ($a);
 			$dc = 'd' if ($dc eq '');
 
-			$res .= $a eq $devAddr ? "Device $a\n" : "Channel $a\n";
 			foreach my $ps (split (',', $paramset)) {
 				next if ($devDesc->{PARAMSETS} !~ /$ps/);
 
-				$res .= "  Paramset $ps\n";
-				($rc, $result) = HMCCU_RPCRequest ($hash, $method, $a, $ps, undef, $par);
+				($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $ps, undef, $par);
 				return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-				
-				if ($opt =~ /list$/) {
-					$res .= join ("\n", map { $_ =~ /$par/ ?
-						"    ".$_.' = '.HMCCU_GetParamValue ($ioHash, $devDesc, $ps, $_, $result->{$_}) : ()
-					} sort keys %$result)."\n";
-				}
-				else {
-					foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
-				}
+
+				foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
 			}
 		}
-		
-		if ($opt !~ /list$/ && scalar(keys %objects) > 0) {
-			my $convRes = HMCCU_UpdateParamsetReadings ($ioHash, $hash, \%objects);
-			if (defined($convRes)) {
-				$res .= join ("\n", map { $_ =~ /$par/ ?
-					"    ".$_.' = '.$convRes->{$_} : ()
-				} sort keys %$convRes)."\n";
-			}
-		}
-		
-		return (!$ccureadings || $opt =~ /list$/) ? $res : undef;
-	}
-	elsif ($opt eq 'paramsetdesc') {
-		my ($devAddr, $chnNo) = HMCCU_SplitChnAddr ($ccuaddr);
-		my $model = HMCCU_GetClientDeviceModel ($hash);
-		return HMCCU_SetError ($hash, "Can't get device model") if (!defined($model));
 		
 		my $res = '';
-#		my @chnList = sort keys %{$model};
-		my @chnList = ('d', 0, $chnNo);
-#		unshift (@chnList, pop(@chnList)) if (exists($model->{'d'}));
-		foreach my $c (@chnList) {
-			$res .= $c eq 'd' ? "Device\n" : "Channel $c\n";
-			foreach my $ps (sort keys %{$model->{$c}}) {
-				$res .= "  Paramset $ps\n";
-				$result = join ("\n", map {
-					"    ".$_.": ".
-					$model->{$c}{$ps}{$_}{TYPE}.
-					" [".HMCCU_FlagsToStr ('model', 'OPERATIONS', $model->{$c}{$ps}{$_}{OPERATIONS}, ',', '')."]".
-					" [".HMCCU_FlagsToStr ('model', 'FLAGS', $model->{$c}{$ps}{$_}{FLAGS}, ',', '')."]".
-					" RANGE=".$model->{$c}{$ps}{$_}{MIN}."-".$model->{$c}{$ps}{$_}{MAX}.
-					" DFLT=".$model->{$c}{$ps}{$_}{DEFAULT}.
-					" UNIT=".$model->{$c}{$ps}{$_}{UNIT}
-				} sort keys %{$model->{$c}{$ps}});
-				$res .= "$result\n";
+		if (scalar(keys %objects) > 0) {
+			my $convRes = HMCCU_UpdateParamsetReadings ($ioHash, $hash, \%objects);
+			if (defined($convRes)) {
+				foreach my $da (sort keys %$convRes) {
+					$res .= "Device $da\n";
+					foreach my $dc (sort keys %{$convRes->{$da}}) {
+						$res .= "  Channel $dc\n";
+						$res .= join ("\n", map { $_ =~ /$par/ ?
+							"    ".$_.' = '.$convRes->{$da}{$dc}{$_} : ()
+						} sort keys %{$convRes->{$da}{$dc}})."\n";
+					}
+				}
 			}
 		}
-		return $res;
+		
+		return $res eq '' ? "No data found" : $res;
+	}
+	elsif ($opt eq 'paramsetdesc') {
+		$result = HMCCU_ParamsetDescToStr ($hash);
+		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
 	elsif ($opt eq 'devicedesc') {
-		my $ccuobj = $ccuaddr;
-		my $par = shift @$a;
-		my ($devAddr, $chnNo) = HMCCU_SplitChnAddr ($ccuaddr);
-		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);
-		
-		$result = '';
-		foreach my $a (@addList) {
-			my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $ccuif);
-			return HMCCU_SetError ($hash, "Can't get device description")
-				if (!defined($devDesc));
-
-			$result .= $a eq $devAddr ? "Device $a" : "Channel $a";
-			$result .= " $devDesc->{_name} [$devDesc->{TYPE}]\n";
-			foreach my $n (sort keys %{$devDesc}) {
-				next if ($n =~ /^_/ || $n eq 'ADDRESS' || $n eq 'TYPE' ||
-					!defined($devDesc->{$n}) || $devDesc->{$n} eq '');
-				$result .= "  $n: ".HMCCU_FlagsToStr ('device', $n, $devDesc->{$n}, ',', '')."\n";
-			}
-		}
-		
-		return $result;
+		$result = HMCCU_DeviceDescToStr ($hash);
+		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device description");
 	}
 	elsif ($opt eq 'defaults') {
 		return HMCCU_GetDefaults ($hash, 0);
@@ -684,8 +639,8 @@ sub HMCCUCHN_Get ($@)
 		my @valuelist;
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
 		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
-		$retmsg .= " update:noArg deviceinfo:noArg config links".
-			" devicedesc:noArg paramset paramsetlist paramsetdesc:noArg values";
+		$retmsg .= " update:noArg deviceInfo:noArg config:noArg".
+			" deviceDesc:noArg paramset paramsetDesc:noArg values:noArg";
 		
 		return $retmsg;
 	}
@@ -871,7 +826,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>get &lt;name&gt; paramset [&lt;paramset&gt;[,...]] [&lt;filter-expr&gt;]</b><br/>
          Get parameters from all or specific parameter sets of device and channel.
-         If attribute 'ccureadings' is 0 results are displayed in browser window. Otherwise
+         If ccuflag noReadings is set results are displayed in browser window. Otherwise
          they are stored as readings beginning with "R-" for MASTER parameters and "L-" for
          LINK parameters. Values from other parameter sets are stored without prefix.
          Prefixes can be modified with attribute 'ccuReadingPrefix'. If no <i>paramset</i>
@@ -882,8 +837,12 @@ sub HMCCUCHN_Get ($@)
       <li><b>get &lt;name&gt; paramsetdesc</b><br/>
          Display description of parameter sets of channel and device.
       </li><br/>
-      <li><b>get &lt;name&gt; paramsetlist [&lt;paramset&gt;[,...]] [&lt;filter-expr&gt;]</b><br/>
-   		Same as 'get paramset' without storing parameters as readings.
+		<li><b>get &lt;name&gt; peers</b><br/>
+			Read links for current channel and store them as readings beginning with "P-".
+			This prefix can be modified with attribut 'ccuReadingPrefix'.
+		</li><br/>
+		<li><b>get &lt;name&gt; peerlist</b><br/>
+			Read links for current channel and list them in browser window.
 		</li><br/>
       <li><b>get &lt;name&gt; update [{State | <u>Value</u>}]</b><br/>
          Update all datapoints / readings of channel. With option 'State' the device is queried.
@@ -919,20 +878,18 @@ sub HMCCUCHN_Get ($@)
       	Example:<br/>
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
-      <li><b>ccuflags {ackState, logCommand, nochn0, trace}</b><br/>
+      <li><b>ccuflags {ackState, logCommand, nochn0, noReadings, trace}</b><br/>
       	Control behaviour of device:<br/>
       	ackState: Acknowledge command execution by setting STATE to error or success.<br/>
       	logCommand: Write get and set commands to FHEM log with verbose level 3.<br/>
       	nochn0: Prevent update of status channel 0 datapoints / readings.<br/>
+      	noReadings: Do not update readings<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>
          Set read access method for CCU channel datapoints. Method 'State' is slower than 'Value'
          because each request is sent to the device. With method 'Value' only CCU is queried.
          Default is 'Value'.
-      </li><br/>
-      <li><b>ccureadings {0 | <u>1</u>}</b><br/>
-         If set to 1 values read from CCU will be stored as readings. Default is 1.
       </li><br/>
       <li><b>ccureadingfilter &lt;filter-rule[;...]&gt;</b><br/>
          Only datapoints matching specified expression <i>RegExp</i> are stored as readings.<br/>
@@ -991,7 +948,8 @@ sub HMCCUCHN_Get ($@)
          </code>
       </li><br/>
       <li><b>ccuReadingPrefix &lt;paramset&gt;:&lt;prefix&gt;[,...]</b><br/>
-      	Set reading name prefix for parameter sets. 
+      	Set reading name prefix for parameter sets. The special parameter set 'peer' can
+      	be used for link readings.
       </li><br/>
       <li><b>ccuscaleval &lt;[channelno.]datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
       <b>ccuscaleval &lt;[!][channelno.]datapoint&gt;:&lt;min&gt;:&lt;max&gt;:&lt;minn&gt;:&lt;maxn&gt;[,...]
