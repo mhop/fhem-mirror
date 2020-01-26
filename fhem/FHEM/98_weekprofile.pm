@@ -814,6 +814,50 @@ sub weekprofile_Get($$@)
     }
     return $names;
   }
+
+  #-----------------------------------------------------------------------------
+  $list .= ' associations:0,1' if ($useTopics);
+  if($cmd eq "associations") {
+    my $retType = 1; 
+    $retType = $params[0] if(@params >= 1);
+    my @not_asso = ();
+    my @json_arr = ();
+	  my $retHTML = "<table><thead><tr>";
+    $retHTML .= "<th width='150'><b>Device</b></th><th width='150'><b>Profile</b></th></tr>";
+    $retHTML .= "<th>&nbsp;</th><th></th></tr>";
+    $retHTML .= "</thead><tbody>"; 
+    foreach my $dev (@{$hash->{SNDDEVLIST}}) {
+      my $entry = {};
+      $entry->{DEVICE}->{NAME} = $dev->{NAME};
+      $entry->{PROFILE}->{NAME} = "";
+      my $prfName = AttrVal($dev->{NAME},"weekprofile",undef);       
+      if (!defined($prfName)) {
+        push @not_asso, $dev->{NAME};
+        push @json_arr , $entry;
+        next;
+      }
+      my ($prf,$idx) = weekprofile_findPRF($hash, $prfName, undef, 0);
+      my $color = defined($prf) ? "" : "color:red" ;
+      
+      $entry->{PROFILE}->{NAME} = $prfName;
+      $entry->{PROFILE}->{EXISTS} = defined($prf) + 0;
+      push @json_arr , $entry;       
+	    $retHTML .= "<tr><td style='text-align:left'>$dev->{NAME}</td><td style='text-align:center;$color'>$prfName</td></tr>";
+    }
+    $retHTML .= "<tr><td colspan='2'><i>Not associated devices</i></td></tr>" if (scalar(@not_asso));
+    foreach my $devname (@not_asso) {      
+      $retHTML .= "<tr><td style='text-align:left'>$devname</td><td style='text-align:center'></td></tr>";
+    }
+    $retHTML.= "</tbody></table>";
+    my $ret = $retHTML;
+    if ($retType == 1) {
+      my $json_text = undef;
+      my $json = JSON->new->allow_nonref;
+      eval { $json_text = $json->encode(\@json_arr) };
+      $ret = $json_text;
+    }
+	  return $ret;
+  }
   
   if($cmd eq "sndDevList") {
     my $json = JSON->new->allow_nonref;
@@ -842,9 +886,11 @@ sub weekprofile_findPRF($$$$)
   
   my $found = undef;
   my $idx = 0;
+  my $topicOk = 0;
     
   foreach my $prf (@{$hash->{PROFILES}}){
-    if ( ($prf->{NAME} eq $name) && ($prf->{TOPIC} eq $topic) ){
+    $topicOk =  defined($topic) ? ($prf->{TOPIC} eq $topic) : 1;
+    if ( ($prf->{NAME} eq $name) && $topicOk ){
       $found = $prf;
       last;
     }
@@ -1587,6 +1633,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>topic_names<br>
      Return a comma seperated list of topic names.
     </li>
+    <li>associations [ReturnType (0|1)]<br>
+    Returns a list of supported devices with the associated profile.<br>
+    ReturnType 0: HTML table</br>
+    ReturnType 1: json list</br>
+    </li>
   </ul>
   
   <a name="weekprofilereadings"></a>
@@ -1758,6 +1809,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
       ref_topic:ref_profile>dest_topic:dest_profile
       </code>
       Ist name 'topicname:profilename' wird  '0' der Name der Referenz zurück gegeben.
+    </li>
+    <li>associations [Rückgabetyp (0|1)]<br>
+      Gibt eine Liste der unterstützten Geräte mit dem verbundenen\zugeordnetem Profilnamen zurück.<br>
+      Rückgabetyp 0: HTML Tabelle</br>
+      Rückgabetyp 1: json Liste</br>
     </li>
   </ul>
   
