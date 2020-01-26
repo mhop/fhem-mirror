@@ -1513,7 +1513,7 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
     for(var j=min; j <= max; j+=stp) {
       var o = document.createElement('option');
       o.text = o.value = j.toFixed(dp);
-      vHash[j.toString()] = 1;
+      vHash[o.text] = 1;
       newEl.options[k] = o;
       k++;
     }
@@ -1540,7 +1540,11 @@ FW_createSelectNumbers(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).attr('name', elName);
   if(cmd)
     $(newEl).change(function(arg) { cmd($(newEl).val()) });
-  newEl.setValueFn = function(arg) { if(vHash[arg]) $(newEl).val(arg); };
+  newEl.setValueFn = function(arg) { 
+    arg = parseFloat(arg).toFixed(dp);
+    if(vHash[arg]) 
+      $(newEl).val(arg);
+  };
   return newEl;
 }
 
