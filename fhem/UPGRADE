@@ -33,6 +33,7 @@ enable the old feature.
     FLORRPLAN users
   - the default fhem.cfg does not contain a telnet definition
 
-- XXXX-XX-XX (6.0)
+- 2020-01-26 (6.0)
   - attribute names can only consist of the character A-Za-z/\d_\.-
-  - the length of attribute and reading names must be 64 or less
+  - 98_structure: propagateAttr defaults to empty and not to all => setting
+    attributes on structure wont be set automatically on the members.

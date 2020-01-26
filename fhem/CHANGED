@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 6.0 released
+
+- 2020-01-26 (6.0)
  - new:     MSwitch_Wizard: preparation for Mswitch V3.0
  - change:  93_DbLog: default Event parsing changed again, Forum: #106769
  - change:  93_DbRep: adjust behavior of writeToDB - write value at every begin

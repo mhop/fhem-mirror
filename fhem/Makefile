@@ -1,7 +1,7 @@
 # $Id$
 
-VERS=5.9
-DATE=2018-10-07
+VERS=6.0
+DATE=2020-01-26
 
 # used for nightly build
 DATEN=$(shell date +"%Y-%m-%d")
