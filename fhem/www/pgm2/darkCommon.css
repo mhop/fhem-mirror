@@ -24,3 +24,4 @@ svg.zw_nr { height:auto; width:auto; margin:0; }
 #errmsg { background-color: #000000; color: #FFFFFF;
           position:fixed; top:0px; left:40px; z-index: 10; }
 
+.SVGplot { position:relative;} 

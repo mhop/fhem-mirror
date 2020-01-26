@@ -153,3 +153,5 @@ svg.zw_nr { height:auto; width:auto; margin:0; }
 .col_header  { background: #E0E0C8; fill:#E0E0C8; }
 .col_menu    { background: #D7FFFF; fill:#D7FFFF; }
 .col_sel     { background: #A0FFFF; fill:#A0FFFF; }
+
+.SVGplot { position:relative;} 
