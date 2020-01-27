@@ -1076,7 +1076,7 @@ HUEBridge_Get($@)
     my $ret = "";
     foreach my $key ( sort {$result->{$a}{name} cmp $result->{$b}{name}} keys %{$result} ) {
       $ret .= sprintf( "%-20s %-25s %-10s", $key, $result->{$key}{name}, $result->{$key}{type} );
-      $ret .= sprintf( "%i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
+      $ret .= sprintf( " %i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
       my $lights = "";
       $lights = join( ",", @{$result->{$key}{lights}} ) if( $result->{$key}{lights} );
       my $group = HUEbridge_groupOfLights($hash,$lights);
@@ -1092,7 +1092,7 @@ HUEBridge_Get($@)
     }
     if( $ret ) {
       my $header = sprintf( "%-20s %-25s %-10s", "ID", "NAME", "TYPE" );
-      $header .= sprintf( "%s %s %s %-40s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg && $arg eq 'detail' );
+      $header .= sprintf( " %s %s %s %-40s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg && $arg eq 'detail' );
       $header .= sprintf( " %s\n", "LIGHTS" );
       $ret = $header . $ret;
     }
