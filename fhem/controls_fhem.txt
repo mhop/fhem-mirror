@@ -1,4 +1,4 @@
-REV 21051
+REV 21060
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-01-26_07:45:03 324735 ./CHANGED
+UPD 2020-01-27_07:45:02 324894 ./CHANGED
 UPD 2020-01-22_07:45:06 42382 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-01-25_07:45:11 159742 ./fhem.pl
+UPD 2020-01-27_07:45:11 159742 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-01-05_07:45:02 57916 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -65,7 +65,7 @@ UPD 2018-06-04_07:45:02 52079 FHEM/02_RSS.pm
 UPD 2018-03-11_07:45:03 4860 FHEM/09_BS.pm
 UPD 2019-01-24_07:45:02 21854 FHEM/09_CUL_FHTTK.pm
 UPD 2018-03-11_07:45:03 6824 FHEM/09_USF1000.pm
-UPD 2020-01-13_07:45:03 615643 FHEM/10_CUL_HM.pm
+UPD 2020-01-27_07:45:02 615644 FHEM/10_CUL_HM.pm
 UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
@@ -565,7 +565,7 @@ UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
 UPD 2019-12-26_07:45:03 88679 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
-UPD 2019-11-30_07:45:03 59900 FHEM/98_weekprofile.pm
+UPD 2020-01-27_07:45:02 62161 FHEM/98_weekprofile.pm
 UPD 2019-02-26_07:45:02 21036 FHEM/99_SUNRISE_EL.pm
 UPD 2020-01-18_07:45:03 11097 FHEM/99_Utils.pm
 UPD 2019-10-31_07:45:03 7952 FHEM/AttrTemplate.pm
@@ -742,12 +742,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-01-26_07:45:08 4179596 docs/commandref.html
-UPD 2020-01-26_07:45:10 2582460 docs/commandref_DE.html
+UPD 2020-01-27_07:45:06 4179790 docs/commandref.html
+UPD 2020-01-27_07:45:09 2582701 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-01-26_07:45:11 229336 docs/commandref_modular.html
-UPD 2020-01-26_07:45:12 240325 docs/commandref_modular_DE.html
+UPD 2020-01-27_07:45:10 229336 docs/commandref_modular.html
+UPD 2020-01-27_07:45:11 240325 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2167,12 +2167,13 @@ UPD 2015-07-28_14:05:34 2684 www/jscolor/hs.png
 UPD 2015-07-28_14:05:34 590 www/jscolor/hue_background.svg
 UPD 2015-07-28_14:05:34 2865 www/jscolor/hv.png
 UPD 2015-07-28_14:05:34 29813 www/jscolor/jscolor.js
+UPD 2020-01-27_07:45:02 36848 www/pgm2/MSwitch_Wizard.js
 UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
 UPD 2019-12-26_07:45:03 10270 www/pgm2/console.js
-UPD 2017-02-18_07:45:02 1064 www/pgm2/darkCommon.css
+UPD 2020-01-27_07:45:02 1096 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2018-10-08_07:45:02 5419 www/pgm2/darksmallscreenstyle.css
 UPD 2018-11-17_07:45:02 5751 www/pgm2/darkstyle.css
@@ -2183,13 +2184,13 @@ UPD 2019-09-28_07:45:02 41657 www/pgm2/dashboard.js
 UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
-UPD 2018-03-26_07:45:02 5908 www/pgm2/defaultCommon.css
+UPD 2020-01-27_07:45:02 5941 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2019-12-24_07:45:11 30834 www/pgm2/f18.js
 UPD 2019-06-26_07:45:02 9996 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2019-11-21_07:45:03 61294 www/pgm2/fhemweb.js
+UPD 2020-01-27_07:45:02 61341 www/pgm2/fhemweb.js
 UPD 2019-11-26_07:45:03 13796 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
