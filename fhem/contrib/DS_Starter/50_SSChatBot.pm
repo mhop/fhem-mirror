@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.2.1"  => "27.01.2020  replace \" H\" with \"%20H\" in payload due to problem in HttpUtils ",
   "1.2.0"  => "04.01.2020  check that Botname with type SSChatBot does exist and write Log if not ",
   "1.1.0"  => "27.12.2019  both POST- and GET-method are now valid in CGI ",
   "1.0.1"  => "11.12.2019  check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
@@ -1448,7 +1449,7 @@ sub SSChatBot_formText ($) {
   
   %replacements = (
       '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
-      " H" => " h",                             # Bug im Chat wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+      " H" => "%20H",                           # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
       "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
       "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
       "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
