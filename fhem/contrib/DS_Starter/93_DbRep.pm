@@ -774,6 +774,9 @@ sub DbRep_Set($@) {
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
+      if ($prop =~ /deleteOther/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
+          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
+      } 
       if ($prop && $prop =~ /writeToDB/) {
           if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
               return "<html>If you want write results back to database, attributes \"device\" and \"reading\" must be set.<br>
