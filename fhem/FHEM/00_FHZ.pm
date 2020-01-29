@@ -517,7 +517,7 @@ FHZ_ReadAnswer($$$)
       my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        die("Select error $nfound / $!\n");
+        return "FHZ_ReadAnswer select error: $nfound / $!";
       }
       return "Timeout reading answer for get $arg"
         if($nfound == 0);
