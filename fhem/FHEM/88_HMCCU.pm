@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.020
+#  Version 4.3.021
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.020';
+my $HMCCU_VERSION = '4.3.021';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -3383,7 +3383,7 @@ sub HMCCU_UpdateSingleDevice ($$$$)
 	# Check if update of device allowed
 	my $disable = AttrVal ($cltname, 'disable', 0);
 	my $update = AttrVal ($cltname, 'ccureadings', 1);
-	next if ($update == 0 || $disable == 1 || $clthash->{ccudevstate} ne 'active');
+	return 0 if ($update == 0 || $disable == 1 || $clthash->{ccudevstate} ne 'active');
 
 	# Get device parameters and attributes
 	my $ccuflags = HMCCU_GetFlags ($ccuname);
