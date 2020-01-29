@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.32.0"  => "29.01.2020  new option \"deleteOther\" for minValue ",
+  "8.31.0"  => "26.01.2020  new option \"deleteOther\" for maxValue ",
   "8.30.8"  => "25.01.2020  adjust SQL-Statements in OutputWriteToDB to avoid Duplicate entry errors and other fixes ",
   "8.30.7"  => "24.01.2020  corrected count of inserted rows into standby database (DbRep_WriteToDB) ",
   "8.30.6"  => "23.01.2020  delDoublets now are working also for PostgreSQL, calculation of number_fetched_rows corrected ",
@@ -180,9 +182,11 @@ our %DbRep_vNotesIntern = (
 );
 
 # Version History extern:
-our %DbRep_vNotesExtern = (
-  "8.30.4"  => "22.01.2020  The behavior of write back values to database is changed for functions averageValue and sumValue. The solution values of that functions now are ".
-                            "written at every begin and also at every end of specified aggregation period. ",
+our %DbRep_vNotesExtern = ( 
+  "8.32.0"  => "29.01.2020 A new option \"deleteOther\" is available for commands \"maxValue\" and \"minValue\". Now it is possible to delete all values except the ".
+                           "extreme values (max/min) from the database within the specified limits of time, device, reading and so on. ",
+  "8.30.4"  => "22.01.2020 The behavior of write back values to database is changed for functions averageValue and sumValue. The solution values of that functions now are ".
+                           "written at every begin and also at every end of specified aggregation period. ",
   "8.30.0"  => "14.11.2019 A new command \"set <name> adminCredentials\" and \"get <name> storedCredentials\" ist provided. ".
                            "Use it to store a database priviledged user. This user DbRep can utilize for several operations which are need more (administative) ".
 						   "user rights (e.g. index, sqlCmd). ",
@@ -548,8 +552,8 @@ sub DbRep_Set($@) {
 				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
                 (($hash->{ROLE} ne "Agent")?"exportToFile ":"").
                 (($hash->{ROLE} ne "Agent")?"importFromFile ":"").
-                (($hash->{ROLE} ne "Agent")?"maxValue:display,writeToDB ":"").
-                (($hash->{ROLE} ne "Agent")?"minValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"maxValue:display,writeToDB,deleteOther ":"").
+                (($hash->{ROLE} ne "Agent")?"minValue:display,writeToDB,deleteOther ":"").
                 (($hash->{ROLE} ne "Agent")?"fetchrows:history,current ":"").  
                 (($hash->{ROLE} ne "Agent")?"diffValue:display,writeToDB ":"").   
                 (($hash->{ROLE} ne "Agent")?"index:list_all,recreate_Search_Idx,drop_Search_Idx,recreate_Report_Idx,drop_Report_Idx ":"").
@@ -773,6 +777,9 @@ sub DbRep_Set($@) {
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
       }
+      if ($prop && $prop =~ /deleteOther/ && !AttrVal($hash->{NAME}, "allowDeletion", 0)) {
+          return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
+      } 
       if ($prop && $prop =~ /writeToDB/) {
           if (!AttrVal($hash->{NAME}, "device", "") || AttrVal($hash->{NAME}, "device", "") =~ /[%*:=,]/ || AttrVal($hash->{NAME}, "reading", "") =~ /[,\s]/) {
               return "<html>If you want write results back to database, attributes \"device\" and \"reading\" must be set.<br>
@@ -3269,15 +3276,15 @@ sub maxval_DoParse($) {
          return "$name|''|$device|$reading|''|$err|''";
      } 
          
-     my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+     my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next } @{ $sth->fetchall_arrayref() };
          
      if(!@array) {
          if(AttrVal($name, "aggregation", "") eq "hour") {
              my @rsf = split(/[ :]/,$runtime_string_first);
-             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          } else {
              my @rsf = split(" ",$runtime_string_first);
-             @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+             @array = ($runtime_string." "."0"." ".$rsf[0]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          }
      } 
      push(@row_array, @array);  
@@ -3297,10 +3304,12 @@ sub maxval_DoParse($) {
  my ($lastruntimestring,$row_max_time,$max_value);
   
  foreach my $row (@row_array) {
-     my @a = split("[ \t][ \t]*", $row);
+     my ($r,$t)         = split("!_ESC_!", $row);               # $t enthält $runtime_string_first."|".$runtime_string_next
+     my @a              = split("[ \t][ \t]*", $r);
      my $runtime_string = decode_base64($a[0]);
      $lastruntimestring = $runtime_string if ($i == 1);
      my $value          = $a[1];
+     
      $a[-1]             =~ s/:/-/g if($a[-1]);          # substituieren unsupported characters -> siehe fhem.pl
      my $timestamp      = ($a[-1]&&$a[-2])?$a[-2]."_".$a[-1]:$a[-1];
       
@@ -3318,18 +3327,18 @@ sub maxval_DoParse($) {
             
      if ($runtime_string eq $lastruntimestring) {
          if (!defined($max_value) || $value >= $max_value) {
-             $max_value    = $value;
-             $row_max_time = $timestamp;
-             $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time;            
+             $max_value           = $value;
+             $row_max_time        = $timestamp;
+             $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time."|".$t;            
          }
      } else {
          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
          $lastruntimestring = $runtime_string;
          undef $max_value;
          if (!defined($max_value) || $value >= $max_value) {
-             $max_value    = $value;
-             $row_max_time = $timestamp;
-             $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time; 
+             $max_value           = $value;
+             $row_max_time        = $timestamp;
+             $rh{$runtime_string} = $runtime_string."|".$max_value."|".$row_max_time."|".$t; 
          }
      }
      $i++;
@@ -3348,6 +3357,17 @@ sub maxval_DoParse($) {
  my ($wrt,$irowdone);
  if($prop =~ /writeToDB/) {
      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"max");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+ 
+ # andere Werte als "MAX" aus Datenbank löschen
+ if($prop =~ /deleteOther/) {
+     ($wrt,$irowdone,$err) = DbRep_deleteOtherFromDB($name,$device,$reading,$rows);
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
@@ -3413,7 +3433,7 @@ sub maxval_ParseDone($) {
   no warnings 'uninitialized'; 
  
   foreach my $key (sort(keys(%rh))) {
-      my @k = split("\\|",$rh{$key});
+      my @k    = split("\\|",$rh{$key});
       my $rsf  = $k[2]."__" if($k[2]);
       
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
@@ -3428,9 +3448,9 @@ sub maxval_ParseDone($) {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv)?sprintf("%.4f",$rv):"-");
   }
   
-  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+  readingsEndUpdate           ($hash, 1);
   
 return;
 }
@@ -3500,15 +3520,15 @@ sub minval_DoParse($) {
          return "$name|''|$device|$reading|''|$err|''";
      } 
          
-     my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."\n" } @{ $sth->fetchall_arrayref() };
+     my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next } @{ $sth->fetchall_arrayref() };
          
      if(!@array) {
          if(AttrVal($name, "aggregation", "") eq "hour") {
              my @rsf = split(/[ :]/,$runtime_string_first);
-             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          } else {
              my @rsf = split(" ",$runtime_string_first);
-             @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+             @array = ($runtime_string." "."0"." ".$rsf[0]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          }
      }      
      push(@row_array, @array);  
@@ -3526,16 +3546,16 @@ sub minval_DoParse($) {
  my $i = 1;
  my %rh = ();
  my $lastruntimestring;
- my $row_min_time; 
- my ($min_value,$value);
+ my ($row_min_time,$min_value,$value); 
   
  foreach my $row (@row_array) {
-     my @a = split("[ \t][ \t]*", $row);
+     my ($r,$t)         = split("!_ESC_!", $row);               # $t enthält $runtime_string_first."|".$runtime_string_next
+     my @a              = split("[ \t][ \t]*", $r);
      my $runtime_string = decode_base64($a[0]);
      $lastruntimestring = $runtime_string if ($i == 1);
      $value             = $a[1];
      $min_value         = $a[1] if ($i == 1);
-     $a[-1]             =~ s/:/-/g if($a[-1]);          # substituieren unsupported characters -> siehe fhem.pl
+     $a[-1]             =~ s/:/-/g if($a[-1]);                  # substituieren unsupported characters -> siehe fhem.pl
      my $timestamp      = ($a[-1]&&$a[-2])?$a[-2]."_".$a[-1]:$a[-1];
       
      # Leerzeichen am Ende $timestamp entfernen
@@ -3550,20 +3570,20 @@ sub minval_DoParse($) {
       
      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
       
-     $rh{$runtime_string} = $runtime_string."|".$min_value."|".$timestamp if ($i == 1);  # minValue des ersten SQL-Statements in hash einfügen
+     $rh{$runtime_string} = $runtime_string."|".$min_value."|".$timestamp."|".$t if ($i == 1);     # minValue des ersten SQL-Statements in hash einfügen
       
      if ($runtime_string eq $lastruntimestring) {
          if (!defined($min_value) || $value < $min_value) {
              $min_value           = $value;
              $row_min_time        = $timestamp;
-             $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time;            
+             $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time."|".$t;             
          }
      } else {
          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
          $lastruntimestring   = $runtime_string;
          $min_value           = $value;
          $row_min_time        = $timestamp;
-         $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time; 
+         $rh{$runtime_string} = $runtime_string."|".$min_value."|".$row_min_time."|".$t;   
      }
      $i++;
  }
@@ -3581,6 +3601,17 @@ sub minval_DoParse($) {
  my ($wrt,$irowdone);
  if($prop =~ /writeToDB/) {
      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$rows,"min");
+     if ($err) {
+         Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
+         $err = encode_base64($err,"");
+         return "$name|''|$device|$reading|''|$err|''";
+     }
+     $rt = $rt+$wrt;
+ }
+ 
+ # andere Werte als "MIN" aus Datenbank löschen
+ if($prop =~ /deleteOther/) {
+     ($wrt,$irowdone,$err) = DbRep_deleteOtherFromDB($name,$device,$reading,$rows);
      if ($err) {
          Log3 $hash->{NAME}, 2, "DbRep $name - $err"; 
          $err = encode_base64($err,"");
@@ -3661,9 +3692,9 @@ sub minval_ParseDone($) {
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv)?sprintf("%.4f",$rv):"-");
   }
   
-  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
+  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
+  ReadingsBulkUpdateTimeState ($hash,$brt,$rt,$state);
+  readingsEndUpdate           ($hash, 1);
   
 return;
 }
@@ -10729,8 +10760,9 @@ sub DbRep_OutputWriteToDB($$$$$) {
       my %rh = split("§", $wrstr);
       foreach my $key (sort(keys(%rh))) {
           my @k         = split("\\|",$rh{$key});
-          $rsf          = $k[2];                               # Datum / Zeit für DB-Speicherung
           $value        = defined($k[1])?sprintf("%.4f",$k[1]):undef;
+          $rsf          = $k[2];                                          # Datum / Zeit für DB-Speicherung
+          
           ($date,$time) = split("_",$rsf);
           $time         =~ s/-/:/g if($time);
       
@@ -10860,6 +10892,105 @@ sub DbRep_OutputWriteToDB($$$$$) {
 	  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs"; 
       Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs"; 
       $irowdone = $ihs + $uhs; 
+      
+      # SQL-Laufzeit ermitteln
+      $wrt = tv_interval($wst);
+  } 
+  
+return ($wrt,$irowdone,$err);
+}
+
+#######################################################################################################
+# Werte außer dem Extremwert (MAX/$max_value, MIN/$mix_value) aus Datenbank im Zeitraum x für 
+# Device / Reading löschen
+#
+# Struktur $rh{$key} -> 
+# $runtime_string."|".$max_value."|".$row_max_time."|".$runtime_string_first."|".$runtime_string_next
+#
+#######################################################################################################
+sub DbRep_deleteOtherFromDB($$$$) {
+  my ($name,$device,$reading,$rows) = @_;
+  my $hash       = $defs{$name};
+  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+  my $dbconn     = $dbloghash->{dbconn};
+  my $dbuser     = $dbloghash->{dbuser};
+  my $dblogname  = $dbloghash->{NAME};
+  my $dbmodel    = $dbloghash->{MODEL};
+  my $dbpassword = $attr{"sec$dblogname"}{secret};
+  my $wrt        = 0;
+  my $irowdone   = 0;
+  my $table      = "history";
+  my ($dbh,$sth,$err,$timestamp,$value,$addon,$row_extreme_time,$runtime_string_first,$runtime_string_next,@row_array);
+  
+  my %rh = split("§", $rows);
+  foreach my $key (sort(keys(%rh))) {
+      # Inhalt $rh{$key} -> $runtime_string."|".$max_value."|".$row_max_time."|".$runtime_string_first."|".$runtime_string_next
+      my @k                 = split("\\|",$rh{$key});
+      $value                = defined($k[1])?$k[1]:undef;
+	  $row_extreme_time     = $k[2];
+      $runtime_string_first = $k[3];  
+      $runtime_string_next  = $k[4];        
+      
+      if ($value) {
+          # den Extremwert von Device/Reading und die Zeitgrenzen in Array speichern -> alle anderen sollen gelöscht werden
+          push(@row_array, "$device|$reading|$value|$row_extreme_time|$runtime_string_first|$runtime_string_next");             
+      } 
+  }
+  
+  if (@row_array) {                               # Löschzyklus
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $@");
+          return ($wrt,$irowdone,$err);
+      }   
+      
+      eval { $dbh->begin_work() if($dbh->{AutoCommit}); };
+      if ($@) {
+          Log3($name, 2, "DbRep $name -> Error start transaction for history - $@");
+      }
+      
+      # SQL-Startzeit
+      my $wst = [gettimeofday]; 
+      
+	  my $dlines = 0;
+      foreach my $row (@row_array) {
+          my @a = split("\\|",$row);
+          $device               = $a[0];
+          $reading              = $a[1];
+          $value                = $a[2];
+		  $row_extreme_time     = $a[3];
+          $runtime_string_first = $a[4];
+          $runtime_string_next  = $a[5];
+          
+          $addon = "AND (TIMESTAMP,VALUE) != ('$row_extreme_time','$value')";             # (a, b) <> (x, y)
+          
+          my $sql = DbRep_createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,$addon);    
+     
+          Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
+          
+          eval { 
+              $sth = $dbh->prepare($sql);
+              $sth->execute();
+              $dlines += $sth->rows;              
+          };
+          
+          if ($@) {
+              $err = $@;
+              Log3 ($name, 2, "DbRep $name - $@");
+              $dbh->rollback;
+              $dbh->disconnect;
+              return ($wrt,0,$err);
+          }          
+      }    
+      
+      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      
+      $dbh->disconnect;
+      
+	  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines deleted in \"$dblogname\": $dlines"; 
+ 
+      $irowdone = $dlines; 
       
       # SQL-Laufzeit ermitteln
       $wrt = tv_interval($wst);
@@ -12400,22 +12531,25 @@ return;
                                  </ul>  
                                  <br>                                  
     
-    <li><b> maxValue [display | writeToDB]</b>     
+    <li><b> maxValue [display | writeToDB | deleteOther]</b>     
                                  - calculates the maximum value of database column "VALUE" between period given by 
-                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
-                                 The reading to evaluate must be defined using attribute "reading". 
+                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" / "timeDiffToNow / timeOlderThan" and so on. 
+                                 The reading to evaluate must be defined using attribute <a href="#reading">reading</a>. 
                                  The evaluation contains the timestamp of the <b>last</b> appearing of the identified maximum value 
-                                 within the given period.  <br>
+                                 within the given period.  <br><br>
                                  
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculated results are stored in the database with a new reading
+                                 If no option or the option <b>display</b> is specified, the results are only displayed. Using 
+                                 option <b>writeToDB</b> the calculated results are stored in the database with a new reading
                                  name. <br>
+								 
                                  The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	 
+                                 in which the original reading name can be replaced by the value of attribute <a href="#readingNameMap">readingNameMap</a>.	 
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 The field "EVENT" will be filled with "calculated". <br><br>
+								 
+								 With option <b>deleteOther</b> all datasets except the dataset with the maximum value are deleted. <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -12442,22 +12576,25 @@ return;
                                  
                                  </li><br>
                                  
-    <li><b> minValue [display | writeToDB]</b>     
+    <li><b> minValue [display | writeToDB | deleteOther]</b>     
                                  - calculates the minimum value of database column "VALUE" between period given by 
-                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow / timeOlderThan". 
-                                 The reading to evaluate must be defined using attribute "reading". 
+                                 <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" / "timeDiffToNow / timeOlderThan" and so on. 
+                                 The reading to evaluate must be defined using attribute <a href="#reading">reading</a>.  
                                  The evaluation contains the timestamp of the <b>first</b> appearing of the identified minimum 
-                                 value within the given period.  <br>
+                                 value within the given period.  <br><br>
                                  
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculated results are stored in the database with a new reading
+                                 If no option or the option <b>display</b> is specified, the results are only displayed. Using 
+                                 option <b>writeToDB</b> the calculated results are stored in the database with a new reading
                                  name. <br>
+								 
                                  The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	
+                                 in which the original reading name can be replaced by the value of attribute <a href="#readingNameMap">readingNameMap</a>.
                                  The prefix is made up of the creation function and the aggregation. <br>
                                  The timestamp of the new stored readings is deviated from aggregation period, 
                                  unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 The field "EVENT" will be filled with "calculated". <br><br>
+								 
+								 With option <b>deleteOther</b> all datasets except the dataset with the maximum value are deleted. <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -13424,7 +13561,7 @@ sub bdump {
                                 </li>
 
   <a name="readingNameMap"></a>
-  <li><b>readingNameMap </b>  - the name of the analyzed reading can be overwritten for output  </li> <br>
+  <li><b>readingNameMap </b>  - A part of the created reading name will be replaced by the specified string  </li> <br>
 
   <a name="role"></a>
   <li><b>role </b>            - the role of the DbRep-device. Standard role is "Client". <br>
@@ -14899,25 +15036,28 @@ sub bdump {
                                  </ul>  
                                  <br>                                 
     
-    <li><b> maxValue [display | writeToDB] </b>     
+    <li><b> maxValue [display | writeToDB | deleteOther] </b>     
                                  - berechnet den Maximalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan" etc. 
+                                 Es muss das auszuwertende Reading über das Attribut <a href="#reading">reading</a>
 								 angegeben sein. 
                                  Die Auswertung enthält den Zeitstempel des ermittelten Maximumwertes innerhalb der 
 								 Aggregation bzw. Zeitgrenzen.  
-                                 Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben
-								 falls dieser Wert im Intervall mehrfach erreicht wird. <br>
+                                 Im Reading wird der Zeitstempel des <b>letzten</b> Auftretens vom Maximalwert ausgegeben,
+								 falls dieser Wert im Intervall mehrfach erreicht wird. <br><br>
                                  
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option <b>writeToDB</b> werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
-								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
+								 wobei der originale Readingname durch das Attribut <a href="#readingNameMap">readingNameMap</a> ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
-                                 Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
-                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 Der Timestamp des neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
+                                 abgeleitet. 
                                  Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+								 
+								 Wird die Option <b>deleteOther</b> verwendet, werden alle Datensätze außer dem Datensatz mit dem
+                                 ermittelten Maximalwert aus der Datenbank innerhalb der definierten Grenzen gelöscht. <br><br>							 
                                  
                                  <ul>
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
@@ -14946,25 +15086,28 @@ sub bdump {
                                  </li> <br>
                                                                 
                                  
-    <li><b> minValue [display | writeToDB]</b>     
+    <li><b> minValue [display | writeToDB | deleteOther]</b>     
                                  - berechnet den Minimalwert des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
+	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan" etc.
+                                 Es muss das auszuwertende Reading über das Attribut <a href="#reading">reading</a> 
 								 angegeben sein. 
                                  Die Auswertung enthält den Zeitstempel des ermittelten Minimumwertes innerhalb der 
 								 Aggregation bzw. Zeitgrenzen.  
                                  Im Reading wird der Zeitstempel des <b>ersten</b> Auftretens vom Minimalwert ausgegeben 
-								 falls dieser Wert im Intervall mehrfach erreicht wird. <br>
+								 falls dieser Wert im Intervall mehrfach erreicht wird. <br><br>
                                  
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 der Option <b>writeToDB</b> werden die Berechnungsergebnisse mit einem neuen Readingnamen
                                  in der Datenbank gespeichert. <br>
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
-								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
+								 wobei der originale Readingname durch das Attribut <a href="#readingNameMap">readingNameMap</a> ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
                                  Der Timestamp der neuen Readings in der Datenbank wird von der eingestellten Aggregationsperiode 
-                                 abgeleitet, sofern kein eindeutiger Zeitpunkt des Ergebnisses bestimmt werden kann. 
+                                 abgeleitet. 
                                  Das Feld "EVENT" wird mit "calculated" gefüllt.<br><br>
+								 
+								 Wird die Option <b>deleteOther</b> verwendet, werden alle Datensätze außer dem Datensatz mit dem
+                                 ermittelten Maximalwert aus der Datenbank innerhalb der definierten Grenzen gelöscht. <br><br>							 
                                  
                                  <ul>
                                  <b>Beispiel neuer Readingname gebildet aus dem Originalreading "totalpac":</b> <br>
@@ -15948,7 +16091,7 @@ sub bdump {
                                 </li>
 
   <a name="readingNameMap"></a>								
-  <li><b>readingNameMap </b>  - der Name des ausgewerteten Readings wird mit diesem String für die Anzeige überschrieben  </li> <br>
+  <li><b>readingNameMap </b>  - ein Teil des erstellten Readingnamens wird mit dem angegebenen String ersetzt.  </li> <br>
   
   <a name="readingPreventFromDel"></a>
   <li><b>readingPreventFromDel </b>  - Komma separierte Liste von Readings die vor einer neuen Operation nicht gelöscht 
