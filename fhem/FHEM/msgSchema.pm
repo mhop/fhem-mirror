@@ -342,7 +342,7 @@ my $db = {
             },
         },
 
-        'LGTV_WEBOS' => {
+        'LGTV_WebOS' => {
             'Normal' => 'set %DEVICE% screenMsg %MSG%',
             'High'   => 'set %DEVICE% screenMsg %MSG%',
             'Low'    => 'set %DEVICE% screenMsg %MSG%',
