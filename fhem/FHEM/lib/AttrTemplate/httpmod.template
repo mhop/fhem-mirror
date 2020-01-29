@@ -492,7 +492,7 @@ attr DEVICE reading02RegOpt g
 attr DEVICE reading02Regex (?si)(.{300})<a.href="\/downloads\/software\/firmware\/hm[^"]+
 attr DEVICE readingMaxAge 10
 attr DEVICE readingMaxAgeReplacementMode delete
-attr DEVICE requestData.* suchbegriff=&quelle=29&suchkategorie=3&themenbereich=1
+attr DEVICE requestData suchbegriff=&quelle=29&suchkategorie=3&themenbereich=1
 attr DEVICE room WHICHROOM
 attr DEVICE showError 1
 attr DEVICE showMatched 1
