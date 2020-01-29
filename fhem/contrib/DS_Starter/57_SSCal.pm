@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.1.14" => "29.01.2020  ignore calendars of type ne \"Event\" for set calEventList ",
   "1.1.13" => "20.01.2020  change save and read credentials routine ",
   "1.1.12" => "19.01.2020  add attribute interval, automatic event fetch ",
   "1.1.11" => "18.01.2020  status information added: upcoming, alarmed, started, ended ",
@@ -432,7 +433,11 @@ sub SSCal_Set($@) {
 	  my $oids;
       foreach (@ca) {                                         
           my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
-          next if(!$oid); 
+          next if(!$oid);
+          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "Event") {
+              Log3($name, 2, "$name - WARNING - The Calendar \"$_\" is not of type \"Event\" and will be ignored.");
+              next;
+          }          
 		  $oids .= "," if($oids);
 		  $oids .= '"'.$oid.'"';
 		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
