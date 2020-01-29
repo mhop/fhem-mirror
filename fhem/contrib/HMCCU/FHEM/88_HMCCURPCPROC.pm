@@ -644,6 +644,7 @@ sub HMCCURPCPROC_Get ($@)
 			else {
 				$address = $object;
 			}
+			($address, undef) = HMCCU_SplitChnAddr ($address);
 		}
 		HMCCU_ResetDeviceTables ($ioHash, $hash->{rpcinterface}, $address);
 		my $cd = HMCCURPCPROC_GetDeviceDesc ($hash, $address);

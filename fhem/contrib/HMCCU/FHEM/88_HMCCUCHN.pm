@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.004
+#  Version 4.4.005
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -25,6 +25,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 sub HMCCUCHN_Initialize ($);
 sub HMCCUCHN_Define ($@);
 sub HMCCUCHN_InitDevice ($$);
+sub HMCCUCHN_Undef ($$);
 sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
 sub HMCCUCHN_Attr ($@);
@@ -38,6 +39,7 @@ sub HMCCUCHN_Initialize ($)
 	my ($hash) = @_;
 
 	$hash->{DefFn} = "HMCCUCHN_Define";
+	$hash->{UndefFn} = "HMCCUCHN_Undef";
 	$hash->{SetFn} = "HMCCUCHN_Set";
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
@@ -156,11 +158,28 @@ sub HMCCUCHN_InitDevice ($$)
 	$devHash->{ccuaddr} = $da;
 	$devHash->{ccuname} = $dn;
 	$devHash->{ccutype} = $dt;
+	
+	if ($init_done) {
+		# Interactive device definition
+		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
+	}
 
-#	readingsSingleUpdate ($devHash, "state", "Initialized", 1);
 	$devHash->{ccudevstate} = 'active';
 	
 	return 0;
+}
+
+######################################################################
+# Delete device
+######################################################################
+
+sub HMCCUCHN_Undef ($$)
+{
+	my ($hash, $arg) = @_;
+
+	if (defined($hash->{IODev})) {
+		HMCCU_RemoveDevice ($hash->{IODev}, $hash->{ccuif}, $hash->{ccuaddr}, $hash->{NAME});
+	}
 }
 
 ######################################################################
@@ -173,8 +192,8 @@ sub HMCCUCHN_Attr ($@)
 	my $hash = $defs{$name};
 	
 	my %resetReadings = (
-		'ccureadingfilter' => 1, 'ccureadingname' => 1, 'substitute' => 1,
-		'ccuscaleval' => 1
+		'ccureadingfilter' => 1, 'ccureadingformat' => 1, 'ccureadingname' => 1,
+		'substitute' => 1, 'ccuscaleval' => 1
 	);
 
 	if ($cmd eq "set") {
@@ -204,7 +223,6 @@ sub HMCCUCHN_Attr ($@)
 		if (defined($ioHash) && !HMCCU_IsFlag ($ioHash->{NAME}, 'noResetReadings') &&
 			exists($resetReadings{$attrname}) && $resetReadings{$attrname} == 1) {
 			HMCCU_DeleteReadings ($hash, '.*');
-			HMCCU_GetUpdate ($hash, $hash->{ccuaddr}, 'Value');
 		}
 	}
 

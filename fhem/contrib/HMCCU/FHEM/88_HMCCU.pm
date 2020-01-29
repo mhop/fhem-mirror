@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCU.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.005
+#  Version 4.4.006
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.4.005';
+my $HMCCU_VERSION = '4.4.006';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -221,6 +221,7 @@ sub HMCCU_SetState ($@);
 sub HMCCU_SetRPCState ($@);
 
 # Filter and modify readings
+sub HMCCU_CalculateScaleValue ($$$$;$$$);
 sub HMCCU_FilterReading ($$$);
 sub HMCCU_FormatReadingValue ($$$);
 sub HMCCU_GetReadingName ($$$$$$$;$);
@@ -280,6 +281,7 @@ sub HMCCU_IODeviceStates ();
 sub HMCCU_IsFlag ($$);
 
 # Handle interfaces, devices and channels
+sub HMCCU_AddDevice ($$$;$);
 sub HMCCU_AddDeviceDesc ($$$$);
 sub HMCCU_AddDeviceModel ($$$$$$);
 sub HMCCU_AddPeers ($$$);
@@ -299,7 +301,7 @@ sub HMCCU_GetDeviceAddresses ($;$$);
 sub HMCCU_GetDeviceChannels ($$$);
 sub HMCCU_GetDeviceConfig ($);
 sub HMCCU_GetDeviceDesc ($$;$);
-sub HMCCU_GetDeviceIdentifier ($$;$);
+sub HMCCU_GetDeviceIdentifier ($$;$$);
 sub HMCCU_GetDeviceInfo ($$;$);
 sub HMCCU_GetDeviceInterface ($$$);
 sub HMCCU_GetDeviceList ($);
@@ -315,6 +317,7 @@ sub HMCCU_IsValidChannel ($$$);
 sub HMCCU_IsValidDevice ($$$);
 sub HMCCU_IsValidDeviceOrChannel ($$$);
 sub HMCCU_ParamsetDescToStr ($);
+sub HMCCU_RemoveDevice ($$$;$);
 sub HMCCU_ResetDeviceTables ($;$$);
 sub HMCCU_UpdateDeviceTable ($$);
 
@@ -3385,6 +3388,115 @@ sub HMCCU_ResetDeviceTables ($;$$)
 }
 
 ######################################################################
+# Add new CCU or FHEM device or channel
+# If $devName is undef, a new device or channel will be added to IO
+# device if it doesn't exist.
+######################################################################
+
+sub HMCCU_AddDevice ($$$;$)
+{
+	my ($ioHash, $iface, $address, $devName) = @_;
+	
+	if (defined($devName)) {
+		# Device description must exist
+		return if (!exists($ioHash->{hmccu}{device}{$iface}{$address}));
+		my @devList = ();
+		if (defined($ioHash->{hmccu}{device}{$iface}{$address}{_fhem})) {
+			@devList = split (',', $ioHash->{hmccu}{device}{$iface}{$address}{_fhem});
+			# Prevent duplicate device names
+			foreach my $d (@devList) { return if ($d eq $devName); }
+		}
+	
+		push @devList, $devName;
+		$ioHash->{hmccu}{device}{$iface}{$address}{_fhem} = join(',', @devList);
+	}
+	elsif (!exists($ioHash->{hmccu}{device}{$iface}{$address})) {
+		my ($rpcDevice, undef) = HMCCU_GetRPCDevice ($ioHash, 0, $iface);
+		if ($rpcDevice ne '') {
+			my $rpcHash = $defs{$rpcDevice};
+			HMCCURPCPROC_GetDeviceDesc ($rpcHash, $address);
+			HMCCURPCPROC_GetParamsetDesc ($rpcHash, $address);
+		}
+	}
+}
+
+######################################################################
+# Delete CCU or FHEM device or Channel
+# If $devName is undef, a device or a channel will be removed from
+# IO device.
+######################################################################
+
+sub HMCCU_RemoveDevice ($$$;$)
+{
+	my ($ioHash, $iface, $address, $devName) = @_;
+	
+	return if (!exists($ioHash->{hmccu}{device}{$iface}{$address}));
+
+	if (defined($devName)) {
+		if (defined($ioHash->{hmccu}{device}{$iface}{$address}{_fhem})) {
+			my @devList = grep { $_ ne $devName } split(',', $ioHash->{hmccu}{device}{$iface}{$address}{_fhem});
+			$ioHash->{hmccu}{device}{$iface}{$address}{_fhem} = scalar(@devList) > 0 ?
+				join(',', @devList) : undef;
+		}
+	}
+	elsif (exists($ioHash->{hmccu}{device}{$iface}{$address})) {
+		delete $ioHash->{hmccu}{device}{$iface}{$address};
+	}
+}
+
+######################################################################
+# Update client device ot channel
+######################################################################
+
+sub HMCCU_UpdateDevice ($$)
+{
+	my ($ioHash, $clHash) = @_;
+	
+	return if (!exists($clHash->{ccuif}) || !exists($clHash->{ccuaddr}));
+	
+	my $clType = $clHash->{TYPE};
+	my $address = $clHash->{ccuaddr};
+	my $iface = $clHash->{ccuif};
+	my ($da, $dc) = HMCCU_SplitChnAddr ($address);
+	
+	# Update the links
+	if (exists($ioHash->{hmccu}{snd}{$iface}{$da})) {
+		delete $clHash->{sender} if (exists($clHash->{sender}));
+		delete $clHash->{receiver} if (exists($clHash->{receiver}));
+		my @rcvList = ();
+		my @sndList = ();
+		
+		foreach my $c (sort keys %{$ioHash->{hmccu}{snd}{$iface}{$da}}) {
+			next if ($clType eq 'HMCCUCHN' && "$c" ne "$dc");
+			foreach my $r (keys %{$ioHash->{hmccu}{snd}{$iface}{$da}{$c}}) {
+				my @rcvNames = HMCCU_GetDeviceIdentifier ($ioHash, $r, $iface);
+				my $rcvFlags = HMCCU_FlagsToStr ('peer', 'FLAGS', $ioHash->{hmccu}{snd}{$iface}{$da}{$c}{$r}{FLAGS});
+				push @rcvList, map { $_." [".$rcvFlags."]" } @rcvNames;	
+			}
+		}
+
+		foreach my $c (sort keys %{$ioHash->{hmccu}{rcv}{$iface}{$da}}) {
+			next if ($clType eq 'HMCCUCHN' && "$c" ne "$dc");
+			foreach my $s (keys %{$ioHash->{hmccu}{rcv}{$iface}{$da}{$c}}) {
+				my @sndNames = HMCCU_GetDeviceIdentifier ($ioHash, $s, $iface);
+				my $sndFlags = HMCCU_FlagsToStr ('peer', 'FLAGS', $ioHash->{hmccu}{snd}{$iface}{$da}{$c}{$s}{FLAGS});
+				push @sndList, map { $_." [".$sndFlags."]" } @sndNames; 
+			}
+		}
+
+		$clHash->{sender} = join (',', @sndList) if (scalar(@sndList) > 0);
+		$clHash->{receiver} = join (',', @rcvList) if (scalar(@rcvList) > 0);
+	}
+	
+	my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $address, $iface);
+	if (defined($devDesc)) {
+		if ($clType eq 'HMCCUCHN' && !exists($clHash->{ccurole}) && exists($devDesc->{TYPE})) {
+			$clHash->{ccurole} = $devDesc->{TYPE};
+		}
+	}
+}
+
+######################################################################
 # Get device configuration for all interfaces from CCU
 # Currently binary interfaces like CUxD are not supported
 ######################################################################
@@ -3395,14 +3507,30 @@ sub HMCCU_GetDeviceConfig ($)
 	
 	my ($cDev, $cPar, $cLnk) = (0, 0, 0);
 	
-	foreach my $i (keys %{$ioHash->{hmccu}{interfaces}}) {
-		next if ($ioHash->{hmccu}{interfaces}{$i}{type} eq 'B');
-		if (exists($ioHash->{hmccu}{interfaces}{$i}{device})) {
-			my $rpcHash = $defs{$ioHash->{hmccu}{interfaces}{$i}{device}};
+	foreach my $iface (keys %{$ioHash->{hmccu}{interfaces}}) {
+		next if ($ioHash->{hmccu}{interfaces}{$iface}{type} eq 'B');
+		if (exists($ioHash->{hmccu}{interfaces}{$iface}{device})) {
+			my $rpcHash = $defs{$ioHash->{hmccu}{interfaces}{$iface}{device}};
 			$cDev += HMCCURPCPROC_GetDeviceDesc ($rpcHash);
 			$cPar += HMCCURPCPROC_GetParamsetDesc ($rpcHash);
 			$cLnk += HMCCURPCPROC_GetPeers ($rpcHash);
 		}
+	}
+
+	# Get defined FHEM devices	
+	my @devList = HMCCU_FindClientDevices ($ioHash, "(HMCCUDEV|HMCCUCHN)", undef, undef);
+	foreach my $d (@devList) {
+		my $ch = $defs{$d};
+		if (exists($ch->{ccuaddr}) && exists($ch->{ccuif})) {
+			my $i = $ch->{ccuif};
+			my $a = $ch->{ccuaddr};
+			HMCCU_AddDevice ($ioHash, $i, $a, $d);
+		}
+	}
+
+	# Update FHEM devices
+	foreach my $d (@devList) {
+		HMCCU_UpdateDevice ($ioHash, $defs{$d});
 	}
 	
 	return ($cDev, $cPar, $cLnk);
@@ -3455,12 +3583,6 @@ sub HMCCU_AddDeviceDesc ($$$$)
 		$hash->{hmccu}{device}{$iface}{$k}{_name} = HMCCU_GetDeviceName ($hash, $k, '');
 	}
 
-	# Get defined FHEM devices	
-	my @devList = HMCCU_FindClientDevices ($hash, "(HMCCUDEV|HMCCUCHN)", undef,
-		"ccuaddr=$k");
-	$hash->{hmccu}{device}{$iface}{$k}{_fhem} = join(',', @devList)
-		if (scalar(@devList) > 0);
-
 	return 1;
 }
 
@@ -3498,29 +3620,34 @@ sub HMCCU_GetDeviceDesc ($$;$)
 }
 
 ######################################################################
-# Get device identifier(s)
+# Get list of device identifiers
+# FHEM device names are preceeded by "fhem:".
+# CCU device names are preceeded by "ccu:".
+# If no names were found, the address is returned.
 ######################################################################
 
-sub HMCCU_GetDeviceIdentifier ($$$)
+sub HMCCU_GetDeviceIdentifier ($$;$$)
 {
-	my ($ioHash, $address, $iface) = @_;
+	my ($ioHash, $address, $iface, $chnNo) = @_;
 	
-	my $identifier = $address;
-
+	my @idList = ();
+	my ($da, $dc) = HMCCU_SplitChnAddr ($address);
+	my $c = defined($chnNo) ? $chnNo : '';
+	
 	my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $address, $iface);
 	if (defined($devDesc)) {
-		if (exists($devDesc->{_fhem})) {
-			$identifier = $devDesc->{_fhem};
+		if (defined($devDesc->{_fhem})) {
+			push @idList, map { $_." #".$c } split(',', $devDesc->{_fhem});
 		}
-		elsif (exists($devDesc->{PARENT})) {
-			$identifier = HMCCU_GetDeviceIdentifier ($ioHash, $devDesc->{PARENT}, $iface);
+		elsif (defined($devDesc->{PARENT}) && $devDesc->{PARENT} ne '') {
+			push @idList, HMCCU_GetDeviceIdentifier ($ioHash, $devDesc->{PARENT}, $iface, $dc);
 		}
-		elsif (exists($devDesc->{_name})) {
-			$identifier = "ccu:".$devDesc->{_name};
+		elsif (defined($devDesc->{_name})) {
+			push @idList, "ccu:".$devDesc->{_name};
 		}
 	}
 	
-	return $identifier;
+	return scalar(@idList) > 0 ? @idList : ($address);
 }
 
 ######################################################################
@@ -3878,9 +4005,6 @@ sub HMCCU_AddPeers ($$$)
 {
 	my ($ioHash, $peerList, $iface) = @_;
 		
-	my @devList = HMCCU_FindClientDevices ($ioHash, "(HMCCUDEV|HMCCUCHN)", undef,
-		"ccudevstate=active");
-
 	foreach my $p (@$peerList) {
 		my ($sd, $sc) = HMCCU_SplitChnAddr ($p->{SENDER});
 		my ($rd, $rc) = HMCCU_SplitChnAddr ($p->{RECEIVER});
@@ -3889,43 +4013,9 @@ sub HMCCU_AddPeers ($$$)
 		$ioHash->{hmccu}{snd}{$iface}{$sd}{$sc}{$p->{RECEIVER}}{FLAGS} = $p->{FLAGS};
 		$ioHash->{hmccu}{rcv}{$iface}{$rd}{$rc}{$p->{SENDER}}{NAME} = $p->{NAME};
 		$ioHash->{hmccu}{rcv}{$iface}{$rd}{$rc}{$p->{SENDER}}{DESCRIPTION} = $p->{DESCRIPTION};
+		$ioHash->{hmccu}{rcv}{$iface}{$rd}{$rc}{$p->{SENDER}}{FLAGS} = $p->{FLAGS};
 	}
 
-	foreach my $d (@devList) {
-		my $clHash = $defs{$d};
-		my $clType = $clHash->{TYPE};
-
-		my ($da, $dc) = HMCCU_SplitChnAddr ($clHash->{ccuaddr});
-		next if (!exists($ioHash->{hmccu}{snd}{$iface}{$da}));
-		
-		readingsBeginUpdate ($clHash);
-		foreach my $c (sort keys %{$ioHash->{hmccu}{snd}{$iface}{$da}}) {
-			next if ($clType eq 'HMCCUCHN' && "$c" ne "$dc");
-			my $key = "L-S-".$c;
-			my @rcvList = ();
-			foreach my $r (keys %{$ioHash->{hmccu}{snd}{$iface}{$da}{$c}}) {
-				my $rcvName = HMCCU_GetDeviceIdentifier ($ioHash, $r, $iface);
-				push @rcvList, $rcvName; 				
-				my $rn = HMCCU_CorrectName ($key."-".$rcvName);
-				my $rv = HMCCU_FlagsToStr ('peer', 'FLAGS', $ioHash->{hmccu}{snd}{$iface}{$da}{$c}{$r}{FLAGS});
-				readingsBulkUpdate ($clHash, $rn, $rv);
-			}
-			$clHash->{$key} = scalar(@rcvList) > 0 ? join (',', @rcvList) : "NO_RECEIVERS";
-		}
-		readingsEndUpdate ($clHash, 1);
-
-		foreach my $c (sort keys %{$ioHash->{hmccu}{rcv}{$iface}{$da}}) {
-			next if ($clType eq 'HMCCUCHN' && "$c" ne "$dc");
-			my $key = "L-R-".$c;
-			my @sndList = ();
-			foreach my $s (keys %{$ioHash->{hmccu}{rcv}{$iface}{$da}{$c}}) {
-				my $sndName = HMCCU_GetDeviceIdentifier ($ioHash, $s, $iface);
-				push @sndList, $sndName; 
-			}
-			$clHash->{$key} = scalar(@sndList) > 0 ? join (',', @sndList) : "NO_SENDERS";
-		}
-	}
-				
 	return scalar(@$peerList);
 }
 
@@ -3951,6 +4041,7 @@ sub HMCCU_FlagsToStr ($$$;$$)
 	
 	my %bitmasks = (
 		'device' => {
+			'DIRECTION' => { 1 => "SENDER", 2 => "RECEIVER" },
 			'FLAGS' =>     { 1 => "Visible", 2 => "Internal", 8 => "DontDelete" },
 			'RX_MODE' =>   { 1 => "ALWAYS", 2 => "BURST", 4 => "CONFIG", 8 => "WAKEUP", 16 => "LAZY_CONFIG" }
 		},
@@ -3958,18 +4049,24 @@ sub HMCCU_FlagsToStr ($$$;$$)
 			'FLAGS' =>      { 1 => "Visible", 2 => "Internal", 4 => "Transform", 8 => "Service", 16 => "Sticky" },
 			'OPERATIONS' => { 1 => 'R', 2 => 'W', 4 => 'E' }
 		},
+		'peer' => {
+			'FLAGS' =>      { 1 => "SENDER_BROKEN", 2 => "RECEIVER_BROKEN", 3 => "LINK_BROKEN" }
+		}
 	);
 	
 	my %mappings = (
 		'device' => {
-			'DIRECTION' => { 0 => "NONE", 1 => "SENDER", 2 => "RECEIVER" }
+			'DIRECTION' => { 0 => "NONE" }
 		},
 		'peer' => {
-			'FLAGS' =>      { 0 => "OK", 1 => "SENDER_BROKEN", 2 => "RECEIVER_BROKEN" }
+			'FLAGS' =>     { 0 => "OK" }
 		}
 	);
 	
 	return $value if (!exists($bitmasks{$set}{$flag}) && !exists($mappings{$set}{$flag}));
+
+	return $mappings{$set}{$flag}{$value}
+		if (exists($mappings{$set}{$flag}) && exists($mappings{$set}{$flag}{$value}));
 	
 	if (exists($bitmasks{$set}{$flag})) {
 		my @list = ();
@@ -3978,9 +4075,6 @@ sub HMCCU_FlagsToStr ($$$;$$)
 		}
 	
 		return scalar(@list) == 0 ? $default : join($sep, @list);
-	}
-	elsif ($mappings{$set}{$flag}) {
-		return exists($mappings{$set}{$flag}{$value}) ? $mappings{$set}{$flag}{$value} : $value;
 	}
 	
 	return $value;
@@ -6206,30 +6300,11 @@ sub HMCCU_GetRPCDevice ($$$)
 	
 	my $ccuflags = HMCCU_GetFlags ($name);
 
-# 	if ($ccuflags =~ /(procrpc|extrpc)/) {
-		return (HMCCU_Log ($hash, 1, "Interface not defined for RPC server of type HMCCURPCPROC", ''))
-			if (!defined ($ifname));
-		($rpcdevname, $rpchost) = HMCCU_GetRPCServerInfo ($hash, $ifname, 'device,host');
-		return ($rpcdevname, 0) if (defined ($rpcdevname));
-		return ('', 0) if (!defined ($rpchost));
-#		$rpcdevtype = 'HMCCURPCPROC';
-# 	}
-# 	elsif ($ccuflags =~ /extrpc/) {
-# 		if (defined ($hash->{RPCDEV})) {
-# 			if (exists ($defs{$hash->{RPCDEV}})) {
-# 				my $rpchash = $defs{$hash->{RPCDEV}};
-# 				return (HMCCU_Log ($hash, 1, "RPC device ".$hash->{RPCDEV}." is not assigned to $name", ''), 0)
-# 					if (!defined ($rpchash->{IODev}) || $rpchash->{IODev} != $hash);
-# 			}
-# 			else {
-# 				return (HMCCU_Log ($hash, 1, "RPC device ".$hash->{RPCDEV}." not found", ''), 0);
-# 			}		
-# 			return $hash->{RPCDEV};
-# 		}
-# 	}
-# 	else {
-# 		return (HMCCU_Log ($hash, 1, "No need for RPC device when using internal RPC server", ''));
-# 	}
+	return (HMCCU_Log ($hash, 1, "Interface not defined for RPC server of type HMCCURPCPROC", ''))
+		if (!defined ($ifname));
+	($rpcdevname, $rpchost) = HMCCU_GetRPCServerInfo ($hash, $ifname, 'device,host');
+	return ($rpcdevname, 0) if (defined ($rpcdevname));
+	return ('', 0) if (!defined ($rpchost));
 	
 	# Search for RPC devices associated with I/O device
 	my @devlist;
@@ -6250,12 +6325,7 @@ sub HMCCU_GetRPCDevice ($$$)
 	}
 	my $devcnt = scalar (@devlist);
 	if ($devcnt == 1) {
-# 		if ($ccuflags =~ /extrpc/) {
-# 			$hash->{RPCDEV} = $devlist[0];
-# 		}
-# 		else {
-			$hash->{hmccu}{interfaces}{$ifname}{device} = $devlist[0];
-#		}
+		$hash->{hmccu}{interfaces}{$ifname}{device} = $devlist[0];
 		return ($devlist[0], 0);
 	}
 	elsif ($devcnt > 1) {

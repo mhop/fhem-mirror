@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.001
+#  Version 4.4.002
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -23,8 +23,8 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 
 sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
-sub HMCCUDEV_Delete ($$);
 sub HMCCUDEV_InitDevice ($$);
+sub HMCCUDEV_Undef ($$);
 sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
@@ -38,7 +38,7 @@ sub HMCCUDEV_Initialize ($)
 	my ($hash) = @_;
 
 	$hash->{DefFn} = "HMCCUDEV_Define";
-	$hash->{DeleteFn} = "HMCCUDEV_Delete";
+	$hash->{UndefFn} = "HMCCUCHN_Undef";
 	$hash->{SetFn} = "HMCCUDEV_Set";
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
@@ -287,15 +287,16 @@ sub HMCCUDEV_InitDevice ($$)
 # Delete device
 ######################################################################
 
-sub HMCCUDEV_Delete ($$)
+sub HMCCUDEV_Undef ($$)
 {
-	my ($hash, $name) = @_;
-	
-	if ($hash->{ccuif} eq 'fhem') {
-		HMCCU_DeleteDevice ($hash);
-	}
+	my ($hash, $arg) = @_;
 
-	return undef;
+	if (defined($hash->{IODev})) {
+		HMCCU_RemoveDevice ($hash->{IODev}, $hash->{ccuif}, $hash->{ccuaddr}, $hash->{NAME});
+		if ($hash->{ccuif} eq 'fhem') {
+			HMCCU_DeleteDevice ($hash->{IODev});
+		}
+	}
 }
 
 ######################################################################
