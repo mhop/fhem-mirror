@@ -20,6 +20,8 @@ use HttpUtils;
 
 use IO::Socket::INET;
 
+require "$attr{global}{modpath}/FHEM/31_HUEDevice.pm";
+
 sub HUEBridge_Initialize($)
 {
   my ($hash) = @_;

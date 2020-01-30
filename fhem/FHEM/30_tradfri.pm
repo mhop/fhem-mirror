@@ -17,6 +17,8 @@ use Data::Dumper;
 use POSIX;
 use Socket;
 
+require "$attr{global}{modpath}/FHEM/31_HUEDevice.pm";
+
 use vars qw(%modules);
 use vars qw(%defs);
 use vars qw(%attr);
