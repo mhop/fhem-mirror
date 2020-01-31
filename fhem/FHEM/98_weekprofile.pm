@@ -820,9 +820,17 @@ sub weekprofile_Get($$@)
   if($cmd eq "associations") {
     my $retType = 1; 
     $retType = $params[0] if(@params >= 1);
+    # html only if FHEMWEB and canAsyncOutput
+    if (defined($hash->{CL})) {
+      $retType = ($hash->{CL}{TYPE} eq "FHEMWEB" && $hash->{CL}{canAsyncOutput}) ? $retType : 1;
+    }
+    else {
+      $retType = 1;
+    }
+    # dumpData($hash,"(Get): asso",$hash->{CL}) if defined($hash->{CL});
     my @not_asso = ();
-    my @json_arr = ();
-	  my $retHTML = "<table><thead><tr>";
+    my @json_arr = ();    
+	  my $retHTML = "<html><table><thead><tr>";
     $retHTML .= "<th width='150'><b>Device</b></th><th width='150'><b>Profile</b></th></tr>";
     $retHTML .= "<th>&nbsp;</th><th></th></tr>";
     $retHTML .= "</thead><tbody>"; 
@@ -848,7 +856,7 @@ sub weekprofile_Get($$@)
     foreach my $devname (@not_asso) {      
       $retHTML .= "<tr><td style='text-align:left'>$devname</td><td style='text-align:center'></td></tr>";
     }
-    $retHTML.= "</tbody></table>";
+    $retHTML.= "</tbody></table></html>";
     my $ret = $retHTML;
     if ($retType == 1) {
       my $json_text = undef;
