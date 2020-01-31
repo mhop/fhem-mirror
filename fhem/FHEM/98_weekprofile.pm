@@ -551,6 +551,31 @@ sub weekprofile_refreshSendDevList($)
   return undef;
 }
 
+##############################################
+sub weekprofile_receiveList($)
+{
+  my ($hash) = @_;
+  my $me = $hash->{NAME};
+  
+  my @rcvList = ();
+   
+  foreach my $d (keys %defs)   
+  {
+    next if ($defs{$d}{NAME} eq $me);
+    
+    my $module   = $defs{$d}{TYPE};
+    
+    my %sndHash;
+    @sndHash{@DEVLIST_SEND}=();
+    next if (!exists $sndHash{$module});
+    
+    my $type = weekprofile_getDeviceType($me, $defs{$d}{NAME});
+    next if (!defined($type));    
+    push @rcvList, $defs{$d}{NAME};
+  }  
+  return @rcvList;
+}
+
 ############################################## 
 sub weekprofile_assignDev($)
 {
@@ -1102,7 +1127,7 @@ sub weekprofile_Set($$@)
     
     my ($topic, $name) = weekprofile_splitName($me, $params[0]);
     
-     return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
+    return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
     
     my ($delprf,$idx)  = weekprofile_findPRF($hash,$name,$topic,0);
     return "Error unknown profile $params[0]" unless($delprf);
@@ -1159,6 +1184,43 @@ sub weekprofile_Set($$@)
       } else {
 		  return "Error reading master profile";
 	  }
+  }
+
+  #----------------------------------------------------------  
+  my @rcvList = weekprofile_receiveList($hash);
+  $list.= " import_profile:" if(@rcvList > 0);
+  foreach my $rcvDev (@rcvList) {
+    $list.=$rcvDev.",";
+  }
+  $list = substr($list, 0, -1) if (@rcvList > 0);
+  if ($cmd eq 'import_profile') {
+    return 'usage: import_profile <device> [name]' if(@params < 1);
+    my $device = $params[0];
+    my $type = weekprofile_getDeviceType($me, $device);
+    if (!defined($type)) {
+      Log3 $me, 2, "$me(Set): device $device not supported or defined";
+      return "Error device $device not supported or defined";
+    }
+    my ($topic, $name) = ('default', $device);
+    ($topic, $name) = weekprofile_splitName($me, $params[1]) if(@params == 2);
+    return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
+
+    my $devPrf = weekprofile_readDevProfile($device,$type,$me);
+    my $prf = {};
+    $prf->{NAME} = $name;
+    $prf->{TOPIC} = $topic;
+        
+    if(defined($devPrf)) {
+      $prf->{DATA} = $devPrf;
+    } else {
+      Log3 $me, 2, "device $device has no week profile";
+      return "Error device $device has no week profile";  
+    }
+   
+    Log3 $me, 3, "profile $topic:$name from $device imported";
+    push @{$hash->{PROFILES}} , $prf;     
+    weekprofile_updateReadings($hash);
+    return undef;
   }
   
   $list =~ s/ $//;
@@ -1617,6 +1679,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>reread_master<br>
 		Refresh (reread) the master profile from the master device.
     </li>
+    <li>import_profile<br>
+    <code>set &lt;name&gt; import_profile &lt;device&gt; &lt;[profilename]&gt;</code><br>
+		Importing a profile from a supported device 
+    </li>
   </ul>
   
   <a name="weekprofileget"></a>
@@ -1796,6 +1862,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
     <li>reread_master<br>
 		Aktualisiert das master profile indem das 'Master-Geräte' neu ausgelesen wird.
+    </li>
+    <li>import_profile<br>
+    <code>set &lt;name&gt; import_profile &lt;device&gt; &lt;[profilename]&gt;</code><br>
+		Profil von einem Gerät importieren. 
     </li>
   </ul>
   
