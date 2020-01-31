@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $
+# $Id: 93_DbLog.pm 21051 2020-01-25 20:53:06Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
-  "4.9.9"   => "21.01.2020 default ParseEvent ",
+  "4.9.10"  => "31.01.2020 fix warning, Forum: #107950 ",
+  "4.9.9"   => "21.01.2020 default ParseEvent changed again, Forum: #106769 ",
   "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
   "4.9.7"   => "13.01.2020 change datetime pattern in valueFn of DbLog_addCacheLine. Forum: #107285 ",
   "4.9.6"   => "04.01.2020 fix change off 4.9.4 in default splitting. Forum: #106992 ",
@@ -995,12 +996,14 @@ sub DbLog_ParseEvent($$$$) {
     $value = join(": ", @parts);
     $unit  = "";
   } 
+  
+  # Log3 $name, 2, "DbLog $name -> ParseEvent - Event: $event, Reading: $reading, Value: $value, Unit: $unit";
 
   #default
   if(!defined($reading)) { $reading = ""; }
   if(!defined($value))   { $value   = ""; }
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
-      if($event =~ /^.*:\s$/) {                                       # und 21.01.20 Forum: 106769
+      if($event =~ /^.*:\s$/) {                                          # und 21.01.20 Forum: #106769
           $reading = (split(":", $event))[0];
       } else {
           $reading = "state";
@@ -1554,7 +1557,7 @@ sub DbLog_Log($$) {
 	      # synchoner Mode
           return if($hash->{HELPER}{REOPEN_RUNS});              # return wenn "reopen" mit Ablaufzeit gestartet ist          
           my $error = DbLog_Push($hash, $vb4show, @row_array);
-          Log3 ($name, 5, "DbLog $name -> DbLog_Push Returncode: $error") if($vb4show);
+          Log3 ($name, 5, "DbLog $name -> DbLog_Push Returncode: $error") if($error && $vb4show);
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
           Log3 ($name, 2, "DbLog $name - Last database write cycle done") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
           my $state = $error?$error:(IsDisabled($name))?"disabled":"connected";
@@ -1654,8 +1657,8 @@ sub DbLog_Push(@) {
   my $bi        = AttrVal($name, "bulkInsert", 0);
   my $history   = $hash->{HELPER}{TH};
   my $current   = $hash->{HELPER}{TC};
-  my $errorh    = 0;
-  my $error     = 0;
+  my $errorh    = "";
+  my $error     = "";
   my $doins     = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
   my $dbh;
   
@@ -6085,12 +6088,12 @@ sub DbLog_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 21051 2020-01-25 20:53:06Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 21003 2020-01-17 19:56:36Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 21051 2020-01-25 20:53:06Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
