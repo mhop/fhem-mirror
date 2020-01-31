@@ -48,7 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.1.14" => "29.01.2020  ignore calendars of type ne \"Event\" for set calEventList ",
+  "1.2.0"  => "29.01.2020  get tasks from calendar with set command 'calToDoList' ",
+  "1.1.14" => "29.01.2020  ignore calendars of type ne 'Event' for set calEventList ",
   "1.1.13" => "20.01.2020  change save and read credentials routine ",
   "1.1.12" => "19.01.2020  add attribute interval, automatic event fetch ",
   "1.1.11" => "18.01.2020  status information added: upcoming, alarmed, started, ended ",
@@ -137,6 +138,8 @@ sub SSCal_Initialize($) {
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
+					 "filterCompleteTask:1,2,3 ".
+					 "filterDueTask:1,2,3 ".
                      "interval ".
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ".                     
                      "showRepeatEvent:true,false ".
@@ -344,6 +347,7 @@ sub SSCal_Set($@) {
   } else {
       $setlist = "Unknown argument $opt, choose one of ".
                  "calEventList ".
+                 "calToDoList ".
                  "credentials ".
                  "eraseReadings:noArg ".
                  "listSendqueue:noArg ".
@@ -435,7 +439,7 @@ sub SSCal_Set($@) {
           my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
           next if(!$oid);
           if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "Event") {
-              Log3($name, 2, "$name - WARNING - The Calendar \"$_\" is not of type \"Event\" and will be ignored.");
+              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"Event\" and will be ignored.");
               next;
           }          
 		  $oids .= "," if($oids);
@@ -443,11 +447,48 @@ sub SSCal_Set($@) {
 		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
       }
 	  
-	  return "All Calendars seems to be unknown because their ID's couldn't be found." if(!$oids);
+	  return "No Calendar of type \"Event\" was selected or its ID(s) couldn't be found." if(!$oids);
       
       Log3($name, 5, "$name - Calendar selection for add queue: $cals");
       my $lr = AttrVal($name,"showRepeatEvent", "true");
 	  SSCal_addQueue($name,"eventlist","CALEVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
+      SSCal_getapisites($name);
+  
+  } elsif ($opt eq "calToDoList") {                                                          # Aufgaben einer Cal_id (Liste) abrufen 	  
+      return "Obtain the Calendar list first with \"get $name getCalendars\" command." if(!$hash->{HELPER}{CALFETCHED});  
+	  
+	  my $cals = AttrVal($name,"usedCalendars", "");
+      
+      shift @a; shift @a;
+      my $c = join(" ", @a);
+      $cals = $c?$c:$cals;
+	  return "Please set attribute \"usedCalendars\" or specify the Calendar(s) you want read in \"$opt\" command." if(!$cals);
+	  
+      # Kalender aufsplitten und zu jedem die ID ermitteln
+      my @ca = split(",", $cals);
+	  my $oids;
+      foreach (@ca) {                                         
+          my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
+          next if(!$oid);
+          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "ToDo") {
+              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"ToDo\" and will be ignored.");
+              next;
+          }          
+		  $oids .= "," if($oids);
+		  $oids .= '"'.$oid.'"';
+		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
+      }
+	  
+	  return "No Calendar of type \"ToDo\" was selected or its ID(s) couldn't be found." if(!$oids);
+      
+      Log3($name, 5, "$name - Calendar selection for add queue: $cals");
+      
+      my $limit          = "";                                      # Limit of matched tasks
+      my $offset         = 0;                                       # offset of mnatched tasks
+      my $filterdue      = AttrVal($name,"filterDueTask", 3);       # show tasks with and without due time
+      my $filtercomplete = AttrVal($name,"filterCompleteTask", 3);  # show completed and not completed tasks
+      
+	  SSCal_addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
       SSCal_getapisites($name);
   
   } elsif ($opt eq "restartSendqueue") {
@@ -653,6 +694,12 @@ return;
 
 ######################################################################################
 #                            Eintrag zur SendQueue hinzufügen
+#    $name   = Name Kalenderdevice
+#    $opmode = operation mode
+#    $api    = API (siehe %SSCal_api)
+#    $method = auszuführende API-Methode 
+#    $params = spezifische API-Parameter 
+#
 ######################################################################################
 sub SSCal_addQueue ($$$$$) {
    my ($name,$opmode,$api,$method,$params) = @_;
@@ -1145,6 +1192,22 @@ sub SSCal_calop_parse ($) {
                     Log3($name, 4, "$name - Event parse mode: synchronous");
                     SSCal_extractEventlist ($name);                         
                 }    
+            
+            } elsif ($opmode eq "todolist") {                           # ToDo's der ausgewählten Tasks-Kalender aufbereiten
+                delete $data{SSCal}{$name}{eventlist};                  # zentrales Eventlist-Hash löschen
+                $hash->{eventlist} = $data;                             # Data-Hashreferenz im Hash speichern
+               
+                if ($am) {                                              # Extrahieren der ToDos asynchron (nicht-blockierend)
+                    Log3($name, 4, "$name - Task parse mode: asynchronous");
+                    my $timeout = AttrVal($name, "timeout", 20)+180;
+                    
+                    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("SSCal_extractToDolist", $name, "SSCal_createReadings", $timeout, "SSCal_blockingTimeout", $hash);
+                    $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057                    
+                
+                } else {                                                # Extrahieren der ToDos synchron (blockierend)
+                    Log3($name, 4, "$name - Task parse mode: synchronous");
+                    SSCal_extractEventlist ($name);                         
+                }
             }			
            
         } else {
@@ -1176,7 +1239,7 @@ return;
 }
 
 #############################################################################################
-#                    Extrahiert empfangene Events der Kalenders aus $data
+#                    Extrahiert empfangene Kalendertermine (Events)
 #############################################################################################
 sub SSCal_extractEventlist ($) { 
   my ($name) = @_;
@@ -1184,9 +1247,8 @@ sub SSCal_extractEventlist ($) {
   my $data   = delete $hash->{eventlist};
   my $am     = AttrVal($name, "asyncMode", 0);
   
-  my ($val,$tz,$td,$d,$t,$uts); 
-  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$numday,$bi,$ei,$startEndDiff);
-  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets,$ydiff);
+  my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff);
+  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
   my (undef,$tstart,$tend) = SSCal_timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
@@ -1456,11 +1518,11 @@ sub SSCal_extractEventlist ($) {
                       
                       foreach (@ByDays) {
                           my $rNewTime     = $btsstart;
-                          my $rByDay       = $_;	                              # das erste Wiederholungselement
+                          my $rByDay       = $_;	                            # das erste Wiederholungselement
                           my $rByDayLength = length($rByDay);                   # die Länge des Strings       
   
-                          my $rDayStr;		                                  # Tag auf den das Datum gesetzt werden soll
-                          my $rDayInterval;	                                  # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
+                          my $rDayStr;		                                    # Tag auf den das Datum gesetzt werden soll
+                          my $rDayInterval;	                                    # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
                           if ($rByDayLength > 2) {
                               $rDayStr      = substr($rByDay, -2);
                               $rDayInterval = int(substr($rByDay, 0, $rByDayLength - 2));
@@ -1651,6 +1713,98 @@ sub SSCal_extractEventlist ($) {
 }
 
 #############################################################################################
+#                    Extrahiert empfangene Tasks aus ToDo-Kalender (Aufgabenliste)
+#############################################################################################
+sub SSCal_extractToDolist ($) { 
+  my ($name) = @_;
+  my $hash   = $defs{$name};
+  my $data   = delete $hash->{eventlist};
+  my $am     = AttrVal($name, "asyncMode", 0);
+  
+  my ($val,$tz,$td,$d,$t,$uts); 
+  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$numday,$bi,$ei,$startEndDiff);
+  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets,$ydiff);
+  my @row_array;
+  
+  my (undef,$tstart,$tend) = SSCal_timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my $datetimestart        = FmtDateTime($tstart);
+  my $datetimeend          = FmtDateTime($tend);
+       
+  my $n = 0;       
+  foreach my $key (keys %{$data->{data}}) {
+      my $i = 0;
+  
+      while ($data->{data}{$key}[$i]) {
+          my $ignore = 0; 
+          my $done   = 0;
+          ($nbdate,$nedate) = ("","");		
+          
+          ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Fälligkeit des Tasks (falls gesetzt)
+          ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Ende = Fälligkeit des Tasks (falls gesetzt)
+  
+          if ($bdate && $edate) {                                               # nicht jede Aufgabe hat 
+              $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/;
+              $bmday  = $3;
+              $bmonth = $2;
+              $byear  = $1;
+              $nbtime = $btime;                
+              
+              $edate  =~ /(\d{4})-(\d{2})-(\d{2})/;
+              $emday  = $3;
+              $emonth = $2;
+              $eyear  = $1;
+              $netime = $etime;
+          }
+                                              
+          if(!$data->{data}{$key}[$i]{is_repeat_evt}) {                         # einmaliger Task (momentan gibt es keine Wiederholungstasks)
+              Log3($name, 5, "$name - Single task Begin: $bdate, End: $edate") if($bdate && $edate);
+              
+              if(($ets && $ets < $tstart) || ($bts && $bts > $tend)) {
+                  Log3($name, 4, "$name - Ignore single task -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
+                  $ignore = 1;
+                  $done   = 0; 
+              } else {
+                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                  $ignore = 0;
+                  $done   = 1;
+              }       
+          
+          } 
+          
+          if ($ignore == 1) {
+              $i++;
+              next;
+          }
+          
+          if(!$done) {                                      # für Testzwecke mit $ignore = 0 und $done = 0
+              $bdate = $nbdate?$nbdate:$bdate;
+              $btime = $nbtime?$nbtime:$btime;
+              $bts   = $nbts?$nbts:$bts;
+              
+              $edate = $nedate?$nedate:$edate;
+              $etime = $netime?$netime:$etime;
+              $ets   = $nets?$nets:$ets;                  
+              
+              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+          }
+          $i++;
+          $n++;
+      }
+      $n++;
+  }  
+  
+  # encoding result 
+  my $rowlist = join('_ESC_', @row_array);
+  $rowlist    = encode_base64($rowlist,"");
+     
+  if($am) {                                      # asynchroner Mode mit BlockingCall
+      return "$name|$rowlist";                       
+  } else {                                       # synchoner Modes
+      return SSCal_createReadings ("$name|$rowlist"); 
+  }
+}
+
+#############################################################################################
 #         füllt zentrales Datenhash 
 #         $data{SSCal}{$name}{eventlist} = Referenz zum zentralen Valuehash
 #         erstellt Readings aus zentralen Eventarray
@@ -1660,15 +1814,17 @@ sub SSCal_createReadings ($) {
   my @a        = split("\\|",$string);
   my $name     = $a[0];
   my $hash     = $defs{$name};
-  my $rowlist  = decode_base64($a[1]);
+  my $rowlist  = decode_base64($a[1]) if($a[1]);
   
-  my @row_array = split("_ESC_", $rowlist);
-  
-  # zentrales Datenhash füllen (erzeugt dadurch sortierbare Keys)
-  foreach my $row (@row_array) {
-      chomp $row;
-	  my @r = split(" ", $row, 3);
-      $data{SSCal}{$name}{eventlist}{$r[0]}{$r[1]} = $r[2];
+  if ($rowlist) {
+      my @row_array = split("_ESC_", $rowlist);
+      
+      # zentrales Datenhash füllen (erzeugt dadurch sortierbare Keys)
+      foreach my $row (@row_array) {
+          chomp $row;
+          my @r = split(" ", $row, 3);
+          $data{SSCal}{$name}{eventlist}{$r[0]}{$r[1]} = $r[2];
+      }
   }
   
   # Readings der Eventliste erstellen 
@@ -1780,6 +1936,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
   my $ts        = time();                           # Istzeit Timestamp
+  my $om        = $hash->{OPMODE};                  # aktuelle Operation Mode
   my $status    = "";
   my ($val,$uts,$td);
   
@@ -1789,26 +1946,34 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   $started  = SSCal_isStarted  ($ts,$bts,$ets);
   $ended    = SSCal_isEnded    ($ts,$ets);
   
-  push(@row_array, $bts+$n." 02_Begin "      .$bdate." ".$btime."\n");
-  push(@row_array, $bts+$n." 03_End "        .$edate." ".$etime."\n");
-  push(@row_array, $bts+$n." 04_bTimestamp " .$bts."\n");
-  push(@row_array, $bts+$n." 05_eTimestamp " .$ets."\n");   
-  push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n");  
+  push(@row_array, $bts+$n." 02_Begin "      .$bdate." ".$btime."\n") if($bdate && $btime);
+  push(@row_array, $bts+$n." 03_End "        .$edate." ".$etime."\n") if($edate && $etime);
+  push(@row_array, $bts+$n." 04_bTimestamp " .$bts."\n")              if($bts);
+  push(@row_array, $bts+$n." 05_eTimestamp " .$ets."\n")              if($ets);   
+  push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
 
   foreach my $p (keys %{$vh}) {
-      $vh->{$p} = "" if(!$vh->{$p});
+      $vh->{$p} = "" if(!defined $vh->{$p});
         
-      # Log3($name, 4, "$name - Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
+      # Log3($name, 4, "$name - bts: $bts, Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
         
       $val = encode("UTF-8", $vh->{$p}); 
 
-      push(@row_array, $bts+$n." 01_Summary "       .$val."\n")                            if($p eq "summary");
-      push(@row_array, $bts+$n." 06_Description "   .$val."\n")                            if($p eq "description");
-      push(@row_array, $bts+$n." 07_Location "      .$val."\n")                            if($p eq "location");
-      push(@row_array, $bts+$n." 08_GPS "           .$val."\n")                            if($p eq "gps");
-      push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")                            if($p eq "is_all_day");
-      push(@row_array, $bts+$n." 12_isRepeatEvt "   .$val."\n")                            if($p eq "is_repeat_evt");
-      push(@row_array, $bts+$n." 20_calName "       .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
+      push(@row_array, $bts+$n." 01_Summary "       .$val."\n")       if($p eq "summary");
+      push(@row_array, $bts+$n." 06_Description "   .$val."\n")       if($p eq "description");
+      push(@row_array, $bts+$n." 07_Location "      .$val."\n")       if($p eq "location");
+      push(@row_array, $bts+$n." 08_GPS "           .$val."\n")       if($p eq "gps");
+      push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")       if($p eq "is_all_day");
+      push(@row_array, $bts+$n." 12_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
+      if($p eq "due") {                                                        
+          my (undef,undef,$duedate,$duetime,$duets) = SSCal_explodeDateTime ($hash,$val);
+          push(@row_array, $bts+$n." 15_dueDateTime "  .$duedate." ".$duetime."\n"); 
+          push(@row_array, $bts+$n." 15_dueTimestamp " .$duets."\n");
+      }
+      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete" &&   # nur bei ToDo-Kalender Abfrage
+	                                                                                            $om eq "todolist"        && 
+																								defined $vh->{$p});            
+      push(@row_array, $bts+$n." 20_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
           foreach my $r (keys %{$vh->{evt_repeat_setting}}) {
@@ -1821,11 +1986,10 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           }
       }
       if($p eq "evt_notify_setting") {              
-          my $l       = length (scalar @{$vh->{evt_notify_setting}});                    # Anzahl Stellen (Länge) des aktuellen Arrays
-          my $ens     = 0; 
+          my $l   = length (scalar @{$vh->{evt_notify_setting}});                        # Anzahl Stellen (Länge) des aktuellen Arrays
+          my $ens = 0; 
           
           while ($vh->{evt_notify_setting}[$ens]) {
-                
               foreach my $r (keys %{$vh->{evt_notify_setting}[$ens]}) {
                   $vh->{$p}[$ens]{$r} = "" if(!$vh->{$p}[$ens]{$r});
                   $val                = encode("UTF-8", $vh->{$p}[$ens]{$r}); 
@@ -2442,6 +2606,8 @@ return ("",$t1,$t2);
 #                            'time_value' => '-PT1H'
 #                            'time_value' => '-PT5M'
 #                            'time_value' => 'PT0S'
+#                            'time_value' => 'PT6H'
+#                            'time_value' => '-P1DT15H'
 #
 #              Rückgabe:    $uts: Unix-Timestamp
 #                           $ts:  Timstamp als YYYY-MM-DD HH:MM:SS
@@ -2456,17 +2622,23 @@ sub SSCal_evtNotTime ($$$) {
   return ("","") if(!$tv || !$bts);
   
   if($tv =~ /^-P(\d)+D$/) {
-      $corr = $1*86400;
+      $corr = -1*$1*86400;
   } elsif ($tv =~ /^-PT(\d+)H$/) {
-      $corr = $1*3600;
+      $corr = -1*$1*3600;
   } elsif ($tv =~ /^-PT(\d+)M$/) {
-      $corr = $1*60;
+      $corr = -1*$1*60;
   } elsif ($tv =~ /^PT(\d+)S$/) {
       $corr = $1;
+  } elsif ($tv =~ /^PT(\d+)M$/) {
+      $corr = $1*60;
+  } elsif ($tv =~ /^PT(\d+)H$/) {
+      $corr = $1*3600;
+  } elsif ($tv =~ /^-P(\d)+DT(\d+)H$/) {
+      $corr = -1*($1*86400 + $2*3600);
   }
   
   if(defined $corr) {
-      $uts = $bts-$corr;
+      $uts = $bts+$corr;
       $ts  = FmtDateTime($uts);
   }
   
@@ -2626,11 +2798,14 @@ return;
 #                                zu ignorieren und auch nicht zu zählen !)
 #############################################################################################
 sub SSCal_explodeDateTime ($$) {      
-  my ($hash,$dt) = @_;
-  my $name       = $hash->{NAME};
-  my ($tz,$t)    = ("","");
-  my $invalid    = 0;
-  my ($d,$tstamp,$sec,$min,$hour,$mday,$month,$year);
+  my ($hash,$dt)  = @_;
+  my $name        = $hash->{NAME};
+  my ($tz,$t)     = ("","");
+  my ($d,$tstamp) = ("",0);
+  my $invalid     = 0;
+  my ($sec,$min,$hour,$mday,$month,$year);
+  
+  return ($invalid,$tz,$d,$t,$tstamp) if(!$dt);
 
   if($dt =~ /^TZID=.*$/) {
       ($tz,$dt) = split(":", $dt);
