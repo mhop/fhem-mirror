@@ -1,20 +1,22 @@
+// MSwitch_Wizard.js
+// Autor:Byte09
+// #########################
 
-	var version = 'V0.8 beta';
+
+
+	var version = 'V1.1';
+	var info = ' Modus Wizard ist in dieser Version nicht aktiv';
 	var logging ='off';
 	var observer;
 	var target;
 	var lastevent;
 	var show = 'off';
-	var offtime =1000;
+	var offtime =50;
 	var sets = new Object();
-	
 	
 	var preconfparts = new Array;
 	var preconfpartsname = new Array;
 	var preconfpartshelp = new Array;
-	
-	
-	
 	
 	var configstart = [
 	'#V Version',
@@ -362,7 +364,7 @@ function start1(name){
 		
 
 		
-		
+		document.getElementById('mode').innerHTML += '<br>Wizard Version:'+version+'<br>Info:'+info;
 		// fülle configfenster
 		fillconfig('rawconfig');
 		startwizardtrigger();
@@ -374,12 +376,12 @@ setTimeout(function() {
 	document.getElementById('wizard').value+=' N/A';
 	//document.getElementById('config').value+=' N/A';
 	//document.getElementById('importat').value+=' N/A';
-	document.getElementById('importnotify').value+=' N/A';
+	//document.getElementById('importnotify').value+=' N/A';
 
   	document.getElementById('wizard').disabled = true;
 	//document.getElementById('config').disabled = true;
 	//document.getElementById('importat').disabled = true;
-	document.getElementById('importnotify').disabled = true;
+	//document.getElementById('importnotify').disabled = true;
 	//document.getElementById('importpreconf').disabled = true;
   conf('importPRECONF','importpreconf');
 }, 50);
@@ -472,10 +474,6 @@ document.getElementById('showall').disabled = true;
 		line ='<input id=\"5\" type=\"text\" value=\"\" >';
 		document.getElementById('5step2').innerHTML = line;
 		document.getElementById('5step2').style.display='none';
-
-
-
-
 
 	return ;
 
@@ -992,11 +990,7 @@ function startimportat(){
 	html+='</tr>';
 	html+='</table>';
 	
-	
-	
-		
-	
-	
+
 	document.getElementById('help').innerHTML = 'Es können nur periodisch wiederkehrende ATs importiert werden und nur diese werden zur Auswahl angeboten. Mswitch ist für einmalige Ats ungeeignet. Bei importiertem At berücksichtigt MSwitch keine Sekundenangaben.<br>Es ist darauf zu achten , das nach dem Import sowohl das AT, als auch das MSwitch aktiv sind und eines der beiden deaktiviert werden sollte.';
 	document.getElementById('importAT').innerHTML = html;
 	document.getElementById('sat').style.backgroundColor='#ff0000';
@@ -1086,8 +1080,10 @@ function startimportnotify(){
 	//html+='<br>';
 	//html+='&nbsp;<br>';
 	html+='</td></tr>';
-	html+='<tr><td style=\"\">';
+	html+='<tr><td style=\"text-align: center;\">';
 	html+=ret;
+	html+='<br><br><input disabled name=\"\" id=\"not\" type=\"button\" value=\"import this NOTIFY\" onclick=\"javascript: savenot()\"\">';
+
 	html+='</td>';
 	html+='<td>';
 	html+='Definition:<br>';
@@ -1103,7 +1099,6 @@ function startimportnotify(){
 	html+='</td>';
 	html+='</tr>';
 	html+='<tr><td colspan=\"3\" style=\"text-align: center; vertical-align: middle;\">';
-	html+='<br><input disabled name=\"\" id=\"not\" type=\"button\" value=\"import this NOTIFY\" onclick=\"javascript: savenot()\"\">';
 	html+='</td>';
 	html+='</tr>';
 	html+='</table>';
@@ -1114,6 +1109,8 @@ function startimportnotify(){
 	html+='</tr>';
 	html+='</table>';
 
+
+	document.getElementById('help').innerHTML = 'Es ist darauf zu achten, das nach dem Import sowohl das Notify, als auch das MSwitch aktiv sind und eines der beiden deaktiviert werden sollte.';
 	document.getElementById('importNOTIFY').innerHTML = html;
 	document.getElementById('not').style.backgroundColor='#ff0000';
 	fillconfig('rawconfig2');
