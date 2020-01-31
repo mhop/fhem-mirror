@@ -646,7 +646,7 @@ sub HMCCUDEV_Set ($@)
 					$retmsg .= " toggle:noArg";
 					$retmsg .= " on-for-timer on-till"
 						if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
-					$retmsg .= " pct up down"
+					$retmsg .= " pct up down level"
 						if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "LEVEL", 2) ||
 							HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, "LEVEL", 2));
 				}
@@ -832,11 +832,11 @@ sub HMCCUDEV_Get ($@)
 		return $res;
 	}
 	elsif ($opt eq 'paramsetdesc') {
-		$result = HMCCU_ParamsetDescToStr ($hash);
+		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
 	elsif ($opt eq 'devicedesc') {
-		$result = HMCCU_DeviceDescToStr ($hash);
+		$result = HMCCU_DeviceDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device description");
 	}
 	elsif ($opt eq 'defaults') {

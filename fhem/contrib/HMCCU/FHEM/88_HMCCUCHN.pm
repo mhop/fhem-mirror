@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.005
+#  Version 4.4.007
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -276,13 +276,13 @@ sub HMCCUCHN_Set ($@)
 		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
 
 	if ($opt eq 'datapoint') {
-		my $usage = "Usage: set $name datapoint {datapoint} {value} [...]";
+		my $usage = "Usage: set $name datapoint {{datapoint} {value} | {datapoint}={value}} [...]";
 		my %dpval;
 		my $i = 0;
 
 		while (my $objname = shift @$a) {
 			my $objvalue = shift @$a;
-			$i += 1;
+			$i++;
 
 			return HMCCU_SetError ($hash, $usage) if (!defined ($objvalue));
 			return HMCCU_SetError ($hash, -8)
@@ -291,6 +291,18 @@ sub HMCCUCHN_Set ($@)
 		   my $no = sprintf ("%03d", $i);
 			$objvalue =~ s/\\_/%20/g;
 			$dpval{"$no.$ccuif.$ccuaddr.$objname"} = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
+		}
+		
+		if (defined($h)) {
+			foreach my $objname (keys %$h) {
+				my $objvalue = $h->{$objname};
+				$i++;
+				my $no = sprintf ("%03d", $i);
+				return HMCCU_SetError ($hash, -8)
+					if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 2));
+				$objvalue =~ s/\\_/%20/g;
+				$dpval{"$no.$ccuif.$ccuaddr.$objname"} = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
+			}
 		}
 
 		return HMCCU_SetError ($hash, $usage) if (scalar (keys %dpval) < 1);
@@ -365,10 +377,10 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
 		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "LEVEL", 2));
 		
-		if ($opt eq 'pct') {
+		if ($opt eq 'pct' || $opt eq 'level') {
 			my $objname = '';
 			my $objvalue = shift @$a;
-			return HMCCU_SetError ($hash, "Usage: set $name pct {value} [{ontime} [{ramptime}]]")
+			return HMCCU_SetError ($hash, "Usage: set $name $opt {value} [{ontime} [{ramptime}]]")
 				if (!defined ($objvalue));
 		
 			my $timespec = shift @$a;
@@ -443,7 +455,7 @@ sub HMCCUCHN_Set ($@)
 		my %parSets = ('config' => 'MASTER', 'links' => 'LINK', 'values' => 'VALUES');
 		my $paramset = '';
 		
-		return HMCCU_SetError ($hash, "Usage: set $name $opt [device] [paramset] {parameter}={value}[:{type}] [...]")
+		return HMCCU_SetError ($hash, "No parameter specified")
 			if ((scalar keys %{$h}) < 1);	
 
 		if (exists($parSets{$opt})) {
@@ -453,6 +465,8 @@ sub HMCCUCHN_Set ($@)
 		my $ccuobj = $ccuaddr;
 		my $p = shift @$a;
 		if (defined($p) && $p eq 'device') {
+			return HMCCU_SetError ($hash, "Link parameters can only be set for channels")
+				if ($opt eq 'link');
 			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 			$p = shift @$a;
 		}
@@ -496,9 +510,9 @@ sub HMCCUCHN_Set ($@)
 				}
 				$retmsg .= " toggle:noArg";
 				$retmsg .= " on-for-timer on-till"
-					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "ON_TIME", 2));
-				$retmsg .= " pct up down"
-					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $ccuaddr, "LEVEL", 2));
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
+				$retmsg .= " pct up down level"
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, "LEVEL", 2));
 			}
 		}
 		return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
@@ -590,17 +604,18 @@ sub HMCCUCHN_Get ($@)
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);
 		my $par = shift @$a;
 		
-		if (exists($parSets{$opt})) {
-			$defParamset = $parSets{$opt};
-		}
-		else {
-			if (defined($par)) {
+		if (defined($par)) {
+			if ($opt eq 'paramset') {
 				$defParamset = $par;
-				$par = shift @$a;
+			}
+			else {
+				return "Usage: get $name $opt";
 			}
 		}
 		
-		$par = '.*' if (!defined ($par));
+		if (exists($parSets{$opt})) {
+			$defParamset = $parSets{$opt};
+		}
 
 		my %objects;
 		foreach my $a (@addList) {
@@ -629,8 +644,8 @@ sub HMCCUCHN_Get ($@)
 					$res .= "Device $da\n";
 					foreach my $dc (sort keys %{$convRes->{$da}}) {
 						$res .= "  Channel $dc\n";
-						$res .= join ("\n", map { $_ =~ /$par/ ?
-							"    ".$_.' = '.$convRes->{$da}{$dc}{$_} : ()
+						$res .= join ("\n", map { 
+							"    ".$_.' = '.$convRes->{$da}{$dc}{$_}
 						} sort keys %{$convRes->{$da}{$dc}})."\n";
 					}
 				}
@@ -640,11 +655,11 @@ sub HMCCUCHN_Get ($@)
 		return $res eq '' ? "No data found" : $res;
 	}
 	elsif ($opt eq 'paramsetdesc') {
-		$result = HMCCU_ParamsetDescToStr ($hash);
+		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
 	elsif ($opt eq 'devicedesc') {
-		$result = HMCCU_DeviceDescToStr ($hash);
+		$result = HMCCU_DeviceDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device description");
 	}
 	elsif ($opt eq 'defaults') {
@@ -707,10 +722,10 @@ sub HMCCUCHN_Get ($@)
          Delete readings matching specified reading name expression. Default expression is '.*'.
          Readings 'state' and 'control' are not deleted.
       </li><br/>
-      <li><b>set &lt;name&gt; config</b><br/>
+      <li><b>set &lt;name&gt; config [device] &lt;parameter&gt;=&lt;value[:&lt;type&gt;]&gt;</b><br/>
         Alias for command 'set paramset' for parameter set MASTER.
       </li><br/>
-      <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; [...]</b><br/>
+      <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; | &lt;datapoint&gt=&lt;value&gt; [...]</b><br/>
         Set datapoint values of a CCU channel. If parameter <i>value</i> contains special
         character \_ it's substituted by blank.
         <br/><br/>
@@ -733,7 +748,10 @@ sub HMCCUCHN_Get ($@)
       	Decrement value of datapoint LEVEL. This command is only available if channel contains
       	a datapoint LEVEL. Default for <i>value</i> is 10.
       </li><br/>
-      <li><b>set &lt;name&gt; link</b><br/>
+      <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
+      	Alias for command 'set pct'.
+      </li><br/>
+      <li><b>set &lt;name&gt; link &lt;parameter&gt;=&lt;value[:&lt;type&gt;]&gt;</b><br/>
         Alias for command 'set paramset' for parameter set LINK.
       </li><br/>
       <li><b>set &lt;name&gt; &lt;statevalue&gt;</b><br/>
@@ -819,8 +837,8 @@ sub HMCCUCHN_Get ($@)
    <a name="HMCCUCHNget"></a>
    <b>Get</b><br/><br/>
    <ul>
-      <li><b>get &lt;name&gt; config [&lt;filter-expr&gt;]</b><br/>
-      	Same as 'get paramset', but read only parameter set MASTER.
+      <li><b>get &lt;name&gt; config</b><br/>
+      	Same as 'get paramset', but read only parameter sets MASTER and LINK.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
          Get value of a CCU channel datapoint.
@@ -828,10 +846,10 @@ sub HMCCUCHN_Get ($@)
       <li><b>get &lt;name&gt; defaults</b><br/>
       	Display default attributes for CCU device type.
       </li><br/>
-      <li><b>get &lt;name&gt; devicedesc</b><br/>
+      <li><b>get &lt;name&gt; deviceDesc</b><br/>
       	Display device or channel description. A channel description always includes channel 0.
       </li><br/>
-      <li><b>get &lt;name&gt; deviceinfo</b><br/>
+      <li><b>get &lt;name&gt; deviceInfo</b><br/>
          Display all channels and datapoints of device with datapoint values and types.
       </li><br/>
       <li><b>get &lt;name&gt; devstate</b><br/>
@@ -839,36 +857,24 @@ sub HMCCUCHN_Get ($@)
          attribute 'statedatapoint'. Command will fail if state datapoint does not exist in
          channel.
       </li><br/>
-      <li><b>get &lt;name&gt; links [&lt;filter-expr&gt;]</b><br/>
-      	Same as 'get paramset', but read only parameter set LINK.
-      </li><br/>
-      <li><b>get &lt;name&gt; paramset [&lt;paramset&gt;[,...]] [&lt;filter-expr&gt;]</b><br/>
+      <li><b>get &lt;name&gt; paramset [&lt;paramset&gt;[,...]]</b><br/>
          Get parameters from all or specific parameter sets of device and channel.
          If ccuflag noReadings is set results are displayed in browser window. Otherwise
          they are stored as readings beginning with "R-" for MASTER parameters and "L-" for
          LINK parameters. Values from other parameter sets are stored without prefix.
          Prefixes can be modified with attribute 'ccuReadingPrefix'. If no <i>paramset</i>
-         is specified, all parameter sets will be read.
-         Parameters can be filtered by <i>filter-expr</i>. If option 'device' is specified parameters
+         is specified, all parameter sets will be read. If option 'device' is specified parameters
          of device are read. Without option 'device' parameters of current channel and channel 0 are read.
       </li><br/>
-      <li><b>get &lt;name&gt; paramsetdesc</b><br/>
+      <li><b>get &lt;name&gt; paramsetDesc</b><br/>
          Display description of parameter sets of channel and device.
       </li><br/>
-		<li><b>get &lt;name&gt; peers</b><br/>
-			Read links for current channel and store them as readings beginning with "P-".
-			This prefix can be modified with attribut 'ccuReadingPrefix'.
-		</li><br/>
-		<li><b>get &lt;name&gt; peerlist</b><br/>
-			Read links for current channel and list them in browser window.
-		</li><br/>
       <li><b>get &lt;name&gt; update [{State | <u>Value</u>}]</b><br/>
          Update all datapoints / readings of channel. With option 'State' the device is queried.
          This request method is more accurate but slower then 'Value'.
       </li><br/>
-      <li><b>get &lt;name&gt; values [&lt;filter-expr&gt;]</b><br/>
-      	Same as 'get update' but using RPC instead of ReGa. Datapoint read from CCU can be
-      	filtered by <i>filter-expr</i>.
+      <li><b>get &lt;name&gt; values</b><br/>
+      	Same as 'get update' but using RPC instead of ReGa. 
       </li>
    </ul>
    <br/>
