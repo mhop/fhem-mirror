@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.3.0"  => "01.02.2020  new command \"cleanCompleteTasks\" to delete completed tasks, \"deleteEventId\" to delete an event id, ".
+                           "new get command \"apiInfo\" - detect and show API info, avoid empty readings ",
   "1.2.0"  => "29.01.2020  get tasks from calendar with set command 'calToDoList' ",
   "1.1.14" => "29.01.2020  ignore calendars of type ne 'Event' for set calEventList ",
   "1.1.13" => "20.01.2020  change save and read credentials routine ",
@@ -155,7 +157,7 @@ return;
 
 ################################################################
 # define SyncalBot SSCal 192.168.2.10 [5000] [HTTP(S)] 
-#         ($hash)     [1]         [2]        [3]      [4]  
+#                   [1]      [2]        [3]      [4]  
 #
 ################################################################
 sub SSCal_Define($@) {
@@ -338,7 +340,20 @@ sub SSCal_Set($@) {
   return if(IsDisabled($name));
   
   my $idxlist = join(",", SSCal_sortVersion("asc",keys %{$data{SSCal}{$name}{sendqueue}{entries}}));
- 
+  
+  # alle aktuell angezeigten Event Id's  ermitteln
+  my (@idarray,$evids);
+  foreach my $key (keys %{$defs{$name}{READINGS}}) {
+      next if $key !~ /^.*_EventId$/;
+      push (@idarray, $defs{$name}{READINGS}{$key}{VAL});   
+  }
+  
+  if(@idarray) {
+      my %seen;
+      my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @idarray;                        # distinct / unique the keys
+      $evids     = join(",", @unique);
+  }
+  
   if(!$hash->{CREDENTIALS}) {
       # initiale setlist für neue Devices
       $setlist = "Unknown argument $opt, choose one of ".
@@ -348,7 +363,9 @@ sub SSCal_Set($@) {
       $setlist = "Unknown argument $opt, choose one of ".
                  "calEventList ".
                  "calToDoList ".
+				 "cleanCompleteTasks:noArg ".
                  "credentials ".
+                 ($evids?"deleteEventId:$evids ":"deleteEventId:noArg ").
                  "eraseReadings:noArg ".
                  "listSendqueue:noArg ".
                  "logout:noArg ".
@@ -491,6 +508,71 @@ sub SSCal_Set($@) {
 	  SSCal_addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
       SSCal_getapisites($name);
   
+  } elsif ($opt eq "cleanCompleteTasks") {                                                          # erledigte Aufgaben einer Cal_id (Liste) löschen 	  
+      return "Obtain the Calendar list first with \"get $name getCalendars\" command." if(!$hash->{HELPER}{CALFETCHED});  
+	  
+	  my $cals = AttrVal($name,"usedCalendars", "");
+      
+      shift @a; shift @a;
+      my $c = join(" ", @a);
+      $cals = $c?$c:$cals;
+	  return "Please set attribute \"usedCalendars\" or specify the Calendar(s) you want read in \"$opt\" command." if(!$cals);
+	  
+      # Kalender aufsplitten und zu jedem die ID ermitteln
+      my @ca = split(",", $cals);
+	  my $oids;
+      foreach (@ca) {                                         
+          my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
+          next if(!$oid);
+          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "ToDo") {
+              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"ToDo\" and will be ignored.");
+              next;
+          }          
+		  $oids .= "," if($oids);
+		  $oids .= '"'.$oid.'"';
+		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
+      }
+	  
+	  return "No Calendar of type \"ToDo\" was selected or its ID(s) couldn't be found." if(!$oids);
+      
+      Log3($name, 5, "$name - Calendar selection for add queue: $cals");
+      
+	  # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
+	  SSCal_addQueue($name,"cleanCompleteTasks","CALTODO","clean_complete","&cal_id_list=[$oids]"); 
+      SSCal_getapisites($name);
+  
+  } elsif ($opt eq "deleteEventId") {
+      return "You must specify an event id (Reading EventId) what is to be deleted." if(!$prop);
+      
+      my $eventid = $prop;
+      
+      # Blocknummer ermitteln
+      my $bnr;
+      my @allrds = keys%{$defs{$name}{READINGS}};
+      foreach my $key(@allrds) {
+          next if $key !~ /^.*_EventId$/;
+          $bnr = (split("_", $key))[0] if($defs{$name}{READINGS}{$key}{VAL} == $eventid);   # Blocknummer ermittelt 
+      }
+      
+      return "The blocknumber of specified event id could not be identified. Make sure you have specified a valid event id." if(!$bnr);
+
+      # die Summary zur Event Id ermitteln
+      my $sum = ReadingsVal($name, $bnr."_01_Summary", "");
+
+      # Kalendername und dessen id und Typ ermitteln 
+      my $calname = ReadingsVal($name, $bnr."_90_calName", "");
+      my $calid   = $hash->{HELPER}{CALENDARS}{"$calname"}{id};
+      my $caltype = $hash->{HELPER}{CALENDARS}{"$calname"}{type};
+      
+      # Kalender-API in Abhängigkeit des Kalendertyps wählen
+      my $api = ($caltype eq "Event")?"CALEVENT":"CALTODO";
+      
+      Log3($name, 3, "$name - The event \"$sum\" with id \"$eventid\" will be deleted in calendar \"$calname\".");
+      
+	  # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
+	  SSCal_addQueue($name,"deleteEventId",$api,"delete","&evt_id=$eventid"); 
+      SSCal_getapisites($name);      
+  
   } elsif ($opt eq "restartSendqueue") {
       my $ret = SSCal_getapisites($name);
       if($ret) {
@@ -529,6 +611,7 @@ sub SSCal_Get($@) {
         
 	} else {
 	    $getlist = "Unknown argument $opt, choose one of ".
+                   "apiInfo:noArg ".
                    "getCalendars:noArg ".
 				   "storedCredentials:noArg ".
                    "versionNotes " 
@@ -548,7 +631,16 @@ sub SSCal_Get($@) {
                "Username: $username, Password: $passwd \n"
                ;   
     
-	} elsif ($opt eq "getCalendars") {                                                         # Liste aller Kalender abrufen
+	} elsif ($opt eq "apiInfo") {                                                         # Liste aller Kalender abrufen
+        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+	    SSCal_getclhash($hash,1);
+        $hash->{HELPER}{APIPARSET} = 0;                                                   # Abruf API Infos erzwingen
+
+        # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
+		SSCal_addQueue($name,"apiInfo","","","");            
+        SSCal_getapisites($name);
+  
+    } elsif ($opt eq "getCalendars") {                                                    # Liste aller Kalender abrufen
         # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
 	    SSCal_getclhash($hash,1);
 		
@@ -760,8 +852,8 @@ sub SSCal_checkretry ($$) {
       if($errorcode =~ /119/) {
           delete $hash->{HELPER}{SID};
       }
-      if($errorcode =~ /100|101|117|120|407|409|800|900/) {         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
-          $forbidSend = SSCal_experror($hash,$errorcode);           # Fehlertext zum Errorcode ermitteln
+      if($errorcode =~ /100|101|103|117|120|407|409|800|900/) {         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = SSCal_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
           $data{SSCal}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
@@ -863,7 +955,7 @@ sub SSCal_getapisites($) {
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$prot://$addr:$port/webapi/query.cgi?api=$SSCal_api{APIINFO}{NAME}&method=Query&version=1&query=$SSCal_api{APIAUTH}{NAME},$SSCal_api{CALCAL}{NAME},$SSCal_api{CALEVENT}{NAME},$SSCal_api{CALSHARE}{NAME},$SSCal_api{CALTODO}{NAME}";
+   $url = "$prot://$addr:$port/webapi/query.cgi?api=$SSCal_api{APIINFO}{NAME}&method=Query&version=1&query=$SSCal_api{APIAUTH}{NAME},$SSCal_api{CALCAL}{NAME},$SSCal_api{CALEVENT}{NAME},$SSCal_api{CALSHARE}{NAME},$SSCal_api{CALTODO}{NAME},$SSCal_api{APIINFO}{NAME}";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
@@ -885,10 +977,11 @@ return;
 ####################################################################################
 sub SSCal_getapisites_parse ($) {
    my ($param, $err, $myjson) = @_;
-   my $hash       = $param->{hash};
-   my $name       = $hash->{NAME};
-   my $addr       = $hash->{ADDR};
-   my $port       = $hash->{PORT};
+   my $hash   = $param->{hash};
+   my $name   = $hash->{NAME};
+   my $addr   = $hash->{ADDR};
+   my $port   = $hash->{PORT};
+   my $opmode = $hash->{OPMODE};
 
    my ($error,$errorcode,$success);
   
@@ -972,10 +1065,22 @@ sub SSCal_getapisites_parse ($) {
             $logstr = defined($apitodopath) ? "Path of $SSCal_api{CALTODO}{NAME} selected: $apitodopath" : "Path of $SSCal_api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
             $logstr = defined($apitodomaxver) ? "MaxVersion of $SSCal_api{CALTODO}{NAME} selected: $apitodomaxver" : "MaxVersion of $SSCal_api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
-            Log3($name, 4, "$name - $logstr"); 
+            Log3($name, 4, "$name - $logstr");
+
+          # Pfad und Maxversion von "SYNO.API.Info" ermitteln
+            my $apiinfopath   = $data->{data}->{$SSCal_api{APIINFO}{NAME}}->{path};
+            $apiinfopath      =~ tr/_//d if (defined($apiinfopath));
+            my $apiinfomaxver = $data->{data}->{$SSCal_api{APIINFO}{NAME}}->{maxVersion}; 
+       
+            $logstr = defined($apiinfopath) ? "Path of $SSCal_api{APIINFO}{NAME} selected: $apiinfopath" : "Path of $SSCal_api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            Log3($name, 4, "$name - $logstr");
+            $logstr = defined($apiinfomaxver) ? "MaxVersion of $SSCal_api{APIINFO}{NAME} selected: $apiinfomaxver" : "MaxVersion of $SSCal_api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            Log3($name, 4, "$name - $logstr");             
             
             
             # ermittelte Werte in $hash einfügen
+            $SSCal_api{APIINFO}{PATH}   = $apiinfopath;
+            $SSCal_api{APIINFO}{MAX}    = $apiinfomaxver;
             $SSCal_api{APIAUTH}{PATH}   = $apiauthpath;
             $SSCal_api{APIAUTH}{MAX}    = $apiauthmaxver;            
             $SSCal_api{CALCAL}{PATH}    = $apicalpath;
@@ -986,14 +1091,42 @@ sub SSCal_getapisites_parse ($) {
             $SSCal_api{CALSHARE}{MAX}   = $apisharemaxver;
             $SSCal_api{CALTODO}{PATH}   = $apitodopath;
             $SSCal_api{CALTODO}{MAX}    = $apitodomaxver;
-            
-            readingsBeginUpdate         ($hash);
-            readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
-            readingsBulkUpdateIfChanged ($hash,"Error",    "none");
-            readingsEndUpdate           ($hash,1);
         
             # API values sind gesetzt in Hash
             $hash->{HELPER}{APIPARSET} = 1;
+            
+            if ($opmode eq "apiInfo") {                                     # API Infos in Popup anzeigen             
+                my $out  = "<html>";
+                $out    .= "<b>Synology Calendar API Info</b> <br><br>";
+                $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+                $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td></tr>";
+                $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td></tr>";
+        
+                foreach my $key (keys %SSCal_api) {
+                    my $apiname = $SSCal_api{$key}{NAME};
+                    my $apipath = $SSCal_api{$key}{PATH};
+                    my $apiver  = $SSCal_api{$key}{MAX};
+
+                    $out  .= "<tr><td> $apiname </td><td> $apipath </td><td> $apiver</td></tr>";
+                }
+
+                $out .= "</table>";
+                $out .= "</html>";
+                
+                readingsBeginUpdate         ($hash);
+                readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
+                readingsBulkUpdateIfChanged ($hash,"Error",    "none");
+                readingsBulkUpdate          ($hash, "state",   "done");  
+                readingsEndUpdate           ($hash,1);
+        
+                # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
+                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)	    
+                asyncOutput($hash->{HELPER}{CL}{1},"$out");
+                delete($hash->{HELPER}{CL});
+              
+                SSCal_checkretry($name,0);
+                return;
+            }
                         
         } else {
             $errorcode = "806";
@@ -1040,6 +1173,10 @@ sub SSCal_calop ($) {
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
         
    $url = "$prot://$addr:$port/webapi/".$SSCal_api{$api}{PATH}."?api=".$SSCal_api{$api}{NAME}."&version=".$SSCal_api{$api}{MAX}."&method=$method".$params."&_sid=$sid";
+   
+   if($opmode eq "deleteEventId" && $api eq "CALEVENT") {               # Workaround !!! Methode delete funktioniert nicht mit SYNO.Cal.Event version > 1
+       $url = "$prot://$addr:$port/webapi/".$SSCal_api{$api}{PATH}."?api=".$SSCal_api{$api}{NAME}."&version=1&method=$method".$params."&_sid=$sid";
+   }
 
    my $part = $url;
    if(AttrVal($name, "showPassInLog", "0") == 1) {
@@ -1178,7 +1315,7 @@ sub SSCal_calop_parse ($) {
                 readingsEndUpdate           ($hash,1); 
             
 			} elsif ($opmode eq "eventlist") {                          # Events der ausgewählten Kalender aufbereiten 
-                delete $data{SSCal}{$name}{eventlist};                  # zentrales Eventlist-Hash löschen
+                delete $data{SSCal}{$name}{eventlist};                  # zentrales Event/ToDo Hash löschen
                 $hash->{eventlist} = $data;                             # Data-Hashreferenz im Hash speichern
                
                 if ($am) {                                              # Extrahieren der Events asynchron (nicht-blockierend)
@@ -1194,7 +1331,7 @@ sub SSCal_calop_parse ($) {
                 }    
             
             } elsif ($opmode eq "todolist") {                           # ToDo's der ausgewählten Tasks-Kalender aufbereiten
-                delete $data{SSCal}{$name}{eventlist};                  # zentrales Eventlist-Hash löschen
+                delete $data{SSCal}{$name}{eventlist};                  # zentrales Event/ToDo Hash löschen
                 $hash->{eventlist} = $data;                             # Data-Hashreferenz im Hash speichern
                
                 if ($am) {                                              # Extrahieren der ToDos asynchron (nicht-blockierend)
@@ -1208,7 +1345,40 @@ sub SSCal_calop_parse ($) {
                     Log3($name, 4, "$name - Task parse mode: synchronous");
                     SSCal_extractEventlist ($name);                         
                 }
-            }			
+                
+            } elsif ($opmode eq "cleanCompleteTasks") {                  # abgeschlossene ToDos wurden gelöscht                
+
+                readingsBeginUpdate         ($hash); 
+                readingsBulkUpdateIfChanged ($hash, "Errorcode",  "none");
+                readingsBulkUpdateIfChanged ($hash, "Error",      "none");                  
+                readingsBulkUpdate          ($hash, "state",      "done");                    
+                readingsEndUpdate           ($hash,1); 
+                
+                Log3($name, 3, "$name - All completed tasks were deleted from selected ToDo lists");
+                
+                SSCal_checkretry($name,0);
+            
+            } elsif ($opmode eq "deleteEventId") {                      # ein Kalendereintrag mit Event Id wurde gelöscht                
+
+                readingsBeginUpdate         ($hash); 
+                readingsBulkUpdateIfChanged ($hash, "Errorcode",  "none");
+                readingsBulkUpdateIfChanged ($hash, "Error",      "none");                  
+                readingsBulkUpdate          ($hash, "state",      "done");                    
+                readingsEndUpdate           ($hash,1); 
+                
+                Log3($name, 3, "$name - The specified event id was deleted");
+                
+                # Queuedefinition sichern vor checkretry
+                my $idx = $hash->{OPIDX};
+                my $api = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{api};
+                my $set = ($api eq "CALEVENT")?"calEventList":"calToDoList";
+                
+                SSCal_checkretry($name,0);
+                
+                # Kalendereinträge neu einlesen nach dem löschen Event Id
+                CommandSet(undef, "$name $set");
+                
+            }					
            
         } else {
             # die API-Operation war fehlerhaft
@@ -1930,6 +2100,7 @@ return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth
 #         Ergebisarray Aufbau:
 #                       0                            1               2
 #         (Index aus BeginTimestamp+lfNr) , (Blockindex_Reading) , (Wert)
+#
 #############################################################################################
 sub SSCal_writeValuesToArray ($$$$$$$$$$$) {                 
   my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref) = @_;
@@ -1937,7 +2108,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   my $hash      = $defs{$name};
   my $ts        = time();                           # Istzeit Timestamp
   my $om        = $hash->{OPMODE};                  # aktuelle Operation Mode
-  my $status    = "";
+  my $status    = "initialized";
   my ($val,$uts,$td);
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
@@ -1948,40 +2119,40 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   
   push(@row_array, $bts+$n." 02_Begin "      .$bdate." ".$btime."\n") if($bdate && $btime);
   push(@row_array, $bts+$n." 03_End "        .$edate." ".$etime."\n") if($edate && $etime);
-  push(@row_array, $bts+$n." 04_bTimestamp " .$bts."\n")              if($bts);
-  push(@row_array, $bts+$n." 05_eTimestamp " .$ets."\n")              if($ets);   
+  push(@row_array, $bts+$n." 02_bTimestamp " .$bts."\n")              if($bts);
+  push(@row_array, $bts+$n." 03_eTimestamp " .$ets."\n")              if($ets);   
   push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
+      next if($vh->{$p} eq "");
         
       # Log3($name, 4, "$name - bts: $bts, Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
         
       $val = encode("UTF-8", $vh->{$p}); 
 
       push(@row_array, $bts+$n." 01_Summary "       .$val."\n")       if($p eq "summary");
-      push(@row_array, $bts+$n." 06_Description "   .$val."\n")       if($p eq "description");
+      push(@row_array, $bts+$n." 04_Description "   .$val."\n")       if($p eq "description");
+      push(@row_array, $bts+$n." 05_EventId "       .$val."\n")       if($p eq "evt_id"); 
       push(@row_array, $bts+$n." 07_Location "      .$val."\n")       if($p eq "location");
       push(@row_array, $bts+$n." 08_GPS "           .$val."\n")       if($p eq "gps");
       push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")       if($p eq "is_all_day");
       push(@row_array, $bts+$n." 12_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
+      
       if($p eq "due") {                                                        
           my (undef,undef,$duedate,$duetime,$duets) = SSCal_explodeDateTime ($hash,$val);
           push(@row_array, $bts+$n." 15_dueDateTime "  .$duedate." ".$duetime."\n"); 
           push(@row_array, $bts+$n." 15_dueTimestamp " .$duets."\n");
       }
-      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete" &&   # nur bei ToDo-Kalender Abfrage
-	                                                                                            $om eq "todolist"        && 
-																								defined $vh->{$p});            
-      push(@row_array, $bts+$n." 20_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
+      
+      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete");     
+      push(@row_array, $bts+$n." 90_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
           foreach my $r (keys %{$vh->{evt_repeat_setting}}) {
-              $vh->{$p}{$r} = "" if(!$vh->{$p}{$r});
-                
-              # Log3($name, 4, "$name - id: $key, Entry: $i, Parameter: $p, Value: ".$data->{data}->{$key}->[$i]->{$p}->{$r});
-              $val = encode("UTF-8", $vh->{$p}{$r}); 
-                
+              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
+              next if($vh->{$p}{$r} eq "");
+              $val = encode("UTF-8", $vh->{$p}{$r});                 
               push(@row_array, $bts+$n." 13_repeatRule ".$val."\n") if($r eq "repeat_rule");
           }
       }
