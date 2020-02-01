@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.3.1"  => "01.02.2020  add SSCal_errauthlist hash for login/logout API error codes ",
   "1.3.0"  => "01.02.2020  new command \"cleanCompleteTasks\" to delete completed tasks, \"deleteEventId\" to delete an event id, ".
                            "new get command \"apiInfo\" - detect and show API info, avoid empty readings ",
   "1.2.0"  => "29.01.2020  get tasks from calendar with set command 'calToDoList' ",
@@ -72,6 +73,15 @@ my %SSCal_vNotesIntern = (
 # Versions History extern
 my %SSCal_vNotesExtern = (
   "1.0.0"  => "18.12.2019  initial "
+);
+
+# Aufbau Errorcode-Hashes
+my %SSCal_errauthlist = (
+  400 => "No such account or the password is incorrect",
+  401 => "Account disabled",
+  402 => "Permission denied",
+  403 => "2-step verification code required",
+  404 => "Failed to authenticate 2-step verification code",
 );
 
 my %SSCal_errlist = (
@@ -2376,7 +2386,7 @@ sub SSCal_login_return ($) {
             my $errorcode = $data->{error}{code};
        
             # Fehlertext zum Errorcode ermitteln
-            my $error = SSCal_experror($hash,$errorcode);
+            my $error = SSCal_experrorauth($hash,$errorcode);
 
             readingsBeginUpdate ($hash);
             readingsBulkUpdate  ($hash,"Errorcode", $errorcode);
@@ -2472,7 +2482,7 @@ sub SSCal_logout_return ($) {
            $errorcode = $data->{error}->{code};
 
            # Fehlertext zum Errorcode ermitteln
-           $error     = SSCal_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
+           $error = SSCal_experrorauth($hash,$errorcode); 
 
            Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
        }
@@ -2529,7 +2539,26 @@ return $bool;
 
 
 ##############################################################################
-#  Auflösung Errorcodes SVS API
+#  Auflösung Errorcodes Calendar AUTH API
+#  Übernahmewerte sind $hash, $errorcode
+##############################################################################
+sub SSCal_experrorauth ($$) {
+  my ($hash,$errorcode) = @_;
+  my $device = $hash->{NAME};
+  my $error;
+  
+  unless (exists($SSCal_errauthlist{"$errorcode"})) {
+      $error = "Value of errorcode \"$errorcode\" not found."; 
+      return ($error);
+  }
+
+  $error = $SSCal_errauthlist{"$errorcode"};
+  
+return ($error);
+}
+
+##############################################################################
+#  Auflösung Errorcodes Calendar API
 #  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
 sub SSCal_experror ($$) {
@@ -2542,7 +2571,6 @@ sub SSCal_experror ($$) {
       return ($error);
   }
 
-  # Fehlertext aus Hash-Tabelle %errorlist ermitteln
   $error = $SSCal_errlist{"$errorcode"};
   
 return ($error);
