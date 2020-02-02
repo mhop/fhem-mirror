@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.5.0"  => "02.02.2020  new attribute \"calendarShowInDetail\",\"calendarShowInRoom\" to control calendar overview in room or detail view ",
+  "1.4.0"  => "02.02.2020  get calAsHtml command or use sub SSCal_calAsHtml(\$name) ",
   "1.3.1"  => "01.02.2020  add SSCal_errauthlist hash for login/logout API error codes ",
   "1.3.0"  => "01.02.2020  new command \"cleanCompleteTasks\" to delete completed tasks, \"deleteEventId\" to delete an event id, ".
                            "new get command \"apiInfo\" - detect and show API info, avoid empty readings ",
@@ -137,16 +139,23 @@ our %SSCal_api;
 ################################################################
 sub SSCal_Initialize($) {
  my ($hash) = @_;
- $hash->{DefFn}             = "SSCal_Define";
- $hash->{UndefFn}           = "SSCal_Undef";
- $hash->{DeleteFn}          = "SSCal_Delete"; 
- $hash->{SetFn}             = "SSCal_Set";
- $hash->{GetFn}             = "SSCal_Get";
- $hash->{AttrFn}            = "SSCal_Attr";
- $hash->{DelayedShutdownFn} = "SSCal_DelayedShutdown";
- $hash->{FW_deviceOverview} = 1;
+ $hash->{DefFn}                 = "SSCal_Define";
+ $hash->{UndefFn}               = "SSCal_Undef";
+ $hash->{DeleteFn}              = "SSCal_Delete"; 
+ $hash->{SetFn}                 = "SSCal_Set";
+ $hash->{GetFn}                 = "SSCal_Get";
+ $hash->{AttrFn}                = "SSCal_Attr";
+ $hash->{DelayedShutdownFn}     = "SSCal_DelayedShutdown";
  
- $hash->{AttrList} = "asyncMode:1,0 ".                     
+ # Darstellung FHEMWEB
+ # $hash->{FW_summaryFn}        = "SSCal_FWsummaryFn";
+ $hash->{FW_addDetailToSummary} = 1 ;                       # zusaetzlich zu der Device-Summary auch eine Neue mit dem Inhalt von DetailFn angezeigt             
+ $hash->{FW_detailFn}           = "SSCal_FWdetailFn";
+ $hash->{FW_deviceOverview}     = 1;
+ 
+ $hash->{AttrList} = "asyncMode:1,0 ".  
+                     "calendarShowInDetail:0,1 ".
+                     "calendarShowInRoom:0,1 ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -622,6 +631,7 @@ sub SSCal_Get($@) {
 	} else {
 	    $getlist = "Unknown argument $opt, choose one of ".
                    "apiInfo:noArg ".
+                   "calAsHtml:noArg ".
                    "getCalendars:noArg ".
 				   "storedCredentials:noArg ".
                    "versionNotes " 
@@ -656,6 +666,10 @@ sub SSCal_Get($@) {
 		
 		SSCal_addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
         SSCal_getapisites($name);
+  
+    } elsif ($opt eq "calAsHtml") {                                                    
+        my $out = SSCal_calAsHtml($name);
+        return $out;
   
     } elsif ($opt =~ /versionNotes/) {
 	    my $header  = "<b>Module release information</b><br>";
@@ -743,6 +757,29 @@ sub SSCal_Get($@) {
 	}
 
 return $ret;                                                        # not generate trigger out of command
+}
+
+######################################################################################
+#                 Kalenderübersicht in Detailanzeige darstellen 
+######################################################################################
+sub SSCal_FWdetailFn ($$$$) {
+  my ($FW_wname, $d, $room, $pageHash) = @_;           
+  my $hash = $defs{$d};
+  my $ret  = "";
+  
+  $hash->{".calhtml"} = SSCal_calAsHtml($d);
+
+  if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"calendarShowInDetail",1)) {    # Anzeige Übersicht in Detailansicht
+      $ret .= $hash->{".calhtml"};
+      return $ret;
+  } 
+  
+  if($hash->{".calhtml"} ne "" && $room && AttrVal($d,"calendarShowInRoom",1)) {       # Anzeige in Raumansicht zusätzlich zur Statuszeile
+      $ret = $hash->{".calhtml"};
+      return $ret;
+  }
+
+return undef;
 }
 
 ######################################################################################
@@ -1353,7 +1390,7 @@ sub SSCal_calop_parse ($) {
                 
                 } else {                                                # Extrahieren der ToDos synchron (blockierend)
                     Log3($name, 4, "$name - Task parse mode: synchronous");
-                    SSCal_extractEventlist ($name);                         
+                    SSCal_extractToDolist ($name);                         
                 }
                 
             } elsif ($opmode eq "cleanCompleteTasks") {                  # abgeschlossene ToDos wurden gelöscht                
@@ -3078,6 +3115,64 @@ sub SSCal_setVersionInfo($) {
   }
   
 return;
+}
+
+#############################################################################################
+#   Kalenderliste als HTML-Tabelle zurückgeben
+#############################################################################################
+sub SSCal_calAsHtml($) {      
+  my ($name)= @_;
+  my $hash = $defs{$name}; 
+
+  my ($begin,$end,$summary,$location,$status);  
+
+  my $out  = "<html>";
+  $out    .= "<style>TD.sscal     {text-align: left; padding-left:15px; padding-right:15px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
+  $out    .= "<style>TD.sscalbold {font-weight: bold;}</style>";
+  $out    .= "<table class='block'>";
+  
+  $out    .= "<tr>";
+  $out    .= "<td class='sscal sscalbold'> Begin    </td>";
+  $out    .= "<td class='sscal sscalbold'> End      </td>";
+  $out    .= "<td class='sscal sscalbold'> Summary  </td>";
+  $out    .= "<td class='sscal sscalbold'> Status   </td>";
+  $out    .= "<td class='sscal sscalbold'> Location </td></tr>";
+  
+  $out    .= "<tr><td>  </td></tr>";
+  $out    .= "<tr><td>  </td></tr>";
+
+  my $l = length(keys %{$data{SSCal}{$name}{eventlist}});
+  
+  my $maxbnr;
+  foreach my $key (keys %{$defs{$name}{READINGS}}) {
+      next if $key !~ /^(\d+)_\d+_EventId$/;
+      $maxbnr = $1 if(!$maxbnr || $1>$maxbnr);
+  }
+  
+  my $k;
+  for ($k=0;$k<=$maxbnr;$k++) {
+      my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
+      last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufage vorhanden
+      
+      $summary  = ReadingsVal($name, $prestr."_01_Summary",  "");
+      $begin    = ReadingsVal($name, $prestr."_02_Begin",    "not set");
+      $end      = ReadingsVal($name, $prestr."_03_End",      "not set");
+      $location = ReadingsVal($name, $prestr."_07_Location", "");
+      $status   = ReadingsVal($name, $prestr."_10_Status",   "");
+      
+      $out     .= "<tr class='odd'>";
+      $out     .= "<td class='sscal'> $begin    </td>";
+      $out     .= "<td class='sscal'> $end      </td>";
+      $out     .= "<td class='sscal'> $summary  </td>";
+      $out     .= "<td class='sscal'> $status   </td>";
+      $out     .= "<td class='sscal'> $location </td>";
+      $out     .= "</tr>";
+  }
+
+  $out .= "</table>";
+  $out .= "</html>";
+
+return $out;
 }
 
 #############################################################################################
