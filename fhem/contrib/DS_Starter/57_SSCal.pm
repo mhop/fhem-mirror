@@ -2171,6 +2171,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
 
   foreach my $p (keys %{$vh}) {
+      $vh->{$p} = SSCal_jboolmap($vh->{$p});
       $vh->{$p} = "" if(!defined $vh->{$p});
       next if($vh->{$p} eq "");
         
@@ -3115,6 +3116,19 @@ sub SSCal_setVersionInfo($) {
   }
   
 return;
+}
+
+###############################################################################
+#                       JSON Boolean Test und Mapping
+###############################################################################
+sub SSCal_jboolmap($){ 
+  my ($bool)= @_;
+  
+  if(JSON::is_bool($bool)) {
+      $bool = $bool?1:0;
+  }
+  
+return $bool;
 }
 
 #############################################################################################
