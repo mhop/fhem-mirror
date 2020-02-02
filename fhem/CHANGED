@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     70_DENON_AVR: initial commit.
  - bugfix:  93_DbLog: fix warning, Forum: #107950
  - feature: 98_weekprofile: new command import_profile
  - bugfix:  98_weekprofile: html output for command get associations

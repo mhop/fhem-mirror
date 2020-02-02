@@ -325,6 +325,8 @@ FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
 FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
+FHEM/70_DENON_AVR.pm         delmar               Multimedia
+FHEM/70_DENON_AVR_ZONE.pm    delmar               Multimedia
 FHEM/70_EGPM.pm              alexus               Sonstiges
 FHEM/70_ENIGMA2.pm           loredo               Multimedia
 FHEM/70_Jabber.pm            BioS                 Unterstützende Dienste
