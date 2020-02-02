@@ -57,24 +57,46 @@
 #			get sduino_dummy raw MU;;P0=-12064;;P1=717;;P2=-669;;P3=1351;;P4=-1319;;D=012323414141234123232323232323232323232323;;
 #}    get sduino_dummy raw MU;;P0=697;;P1=-1352;;P2=-679;;P3=1343;;D=01010101010231023232323232323232323232323;CP=0;R=27;;
 ###############################################################################################################################################################################
-# - Remote Control Novy_840029 for Novy Pureline 6830 kitchen hood [Protocol 86] (Länge je nach Taste 12 oder 18 Bit)
-#{    0100				"novy_button"			- nicht geprüft
-#     0101				"+_button"				- i.O.
-#     0110				"-_button"				- i.O.
+# - Remote Control Novy_840029 for Novy Pureline 6830 kitchen hood [Protocol 86] (Länge je nach Taste 12 oder 18 Bit) [additionally Protocol 81] 
+#{    0100				"novy"			      - nicht geprüft
+#     0101				"speed_plus"			- i.O.
+#     0110				"speed_minus"			- i.O.
 #     0111010001	"light_on_off"		- nur 10 Bit, SIGNALduino.pm hängt 2 Nullen an
-#     0111010011	"power_button"		- nur 10 Bit, SIGNALduino.pm hängt 2 Nullen an
+#     0111010011	"power_on_off"		- nur 10 Bit, SIGNALduino.pm hängt 2 Nullen an
 #    https://github.com/RFD-FHEM/RFFHEM/issues/331
 #			nibble 0-1 -> Ident | nibble 2-4 -> Tastencode
-#     light on/off button   -	get sduino_dummy raw MU;;P0=710;;P1=353;;P2=-403;;P4=-761;;P6=-16071;;D=20204161204120412041204120414141204120202041612041204120412041204141412041202020416120412041204120412041414120412020204161204120412041204120414141204120202041;;CP=1;;R=40;;
-#     + button              -	get sduino_dummy raw MU;;P0=22808;;P1=-24232;;P2=701;;P3=-765;;P4=357;;P5=-15970;;P7=-406;;D=012345472347234723472347234723454723472347234723472347234547234723472347234723472345472347234723472347234723454723472347234723472347234;;CP=4;;R=39;;
-#     - button              -	get sduino_dummy raw MU;;P0=-8032;;P1=364;;P2=-398;;P3=700;;P4=-760;;P5=-15980;;D=0123412341234123412341412351234123412341234123414123512341234123412341234141235123412341234123412341412351234123412341234123414123;;CP=1;;R=40;;
-#     power button          -	get sduino_dummy raw MU;;P0=-756;;P1=718;;P2=354;;P3=-395;;P4=-16056;;D=01020202310231310202423102310231023102310202023102313102024231023102310231023102020231023131020242310231023102310231020202310231310202;;CP=2;;R=41;;
-#}    novy button           - get sduino_dummy raw MU;;P0=706;;P1=-763;;P2=370;;P3=-405;;P4=-15980;;D=0123012301230304230123012301230123012303042;;CP=2;;R=42;;
+#     light_on_off   - hex_lengh 5  get sduino_dummy raw MU;;P0=710;;P1=353;;P2=-403;;P4=-761;;P6=-16071;;D=20204161204120412041204120414141204120202041612041204120412041204141412041202020416120412041204120412041414120412020204161204120412041204120414141204120202041;;CP=1;;R=40;;
+#     novy           - hex_lengh 3  get sduino_dummy raw MU;;P0=706;;P1=-763;;P2=370;;P3=-405;;P4=-15980;;D=0123012301230304230123012301230123012303042;;CP=2;;R=42;;
+#     power_on_off   - hex_lengh 5  get sduino_dummy raw MU;;P0=-756;;P1=718;;P2=354;;P3=-395;;P4=-16056;;D=01020202310231310202423102310231023102310202023102313102024231023102310231023102020231023131020242310231023102310231020202310231310202;;CP=2;;R=41;;
+#     speed_minus    - hex_lengh 3  get sduino_dummy raw MU;;P0=-8032;;P1=364;;P2=-398;;P3=700;;P4=-760;;P5=-15980;;D=0123412341234123412341412351234123412341234123414123512341234123412341234141235123412341234123412341412351234123412341234123414123;;CP=1;;R=40;;
+#}    speed_plus     - hex_lengh 3  get sduino_dummy raw MU;;P0=22808;;P1=-24232;;P2=701;;P3=-765;;P4=357;;P5=-15970;;P7=-406;;D=012345472347234723472347234723454723472347234723472347234547234723472347234723472345472347234723472347234723454723472347234723472347234;;CP=4;;R=39;;
+###
+# - Remote Control Novy_840039 for Novy Cloud 230 kitchen hood [Protocol 86] (Länge je nach Taste 12 oder 18 Bit) [additionally Protocol 81]
+#	https://github.com/RFD-FHEM/RFFHEM/issues/792 | https://forum.fhem.de/index.php/topic,107867.0.html
+#{		nibble 0-1 -> Ident | nibble 2-4 -> Tastencode
+#     0111010011	"power_on_off"            - nur 10 Bit, SIGNALduino.pm hängt 2 Nullen an   hex_lengh 5  get sduino_dummy raw MU;;P0=-749;;P1=378;;P2=-456;;P3=684;;P4=-16081;;D=01230101012301232301014123012301230123012301010123012323010141230123012301230123010101230123230101412;;CP=1;;R=66;;
+#     0110110110	"cooking_light_on"				- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-4768;;P1=380;;P2=-397;;P3=690;;P4=-755;;P5=-16077;;CP=1;;R=39;;D=0123412341234123412341412341412341412351234123412341234123414123414123414123;;O;;w=0;;
+#     0110110100	"cooking_light_off"				- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=382;;P1=200;;P2=-745;;P4=-394;;P5=696;;P6=-16083;;CP=0;;R=81;;D=1204520204520204520454560452045204520452045202045202045204545;;O;;w=0;;
+#     0110110101	"cooking_light_dim_plus"  - i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-753;;P1=387;;P2=-419;;P3=679;;P6=-16050;;CP=1;;R=58;;D=0123012301012301012301230161230123012301230123010123010123012301;;p;;w=0;;
+#     0110110011	"cooking_light_dim_minus" - i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P1=386;;P2=-394;;P3=694;;P4=-794;;P5=-16064;;CP=1;;R=51;;D=123412341234123412341412341412323414151234123412341234123414123414123234141;;p;;w=0;;
+#     0111001110	"cooking_light_cold"			- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-92;;P1=371;;P2=-738;;P4=-393;;P5=702;;P6=-16072;;CP=1;;R=69;;D=012145214521212145452121214561452145214521452145212121454521212145;;e;;w=0;;
+#     0111001011	"cooking_light_warm"			- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-17440;;P1=381;;P2=-415;;P3=668;;P4=-756;;P6=-6786;;CP=1;;R=85;;D=0123412341234123412341414123234123414101634123414141232341234141;;e;;w=0;;
+#     0110111110	"ambient_light_on"				- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-9524;;P1=364;;P2=-414;;P3=669;;P4=-755;;P5=-16076;;CP=1;;R=83;;D=0123412341234123412341412341414141412351234123412341234123414123414141414123;;e;;w=0;;
+#     0110111100	"ambient_light_off"				- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P1=371;;P2=-406;;P3=685;;P4=-744;;P6=-16050;;CP=1;;R=88;;D=123412341234123412341412341414141232361234123412341234123414123414141412323;;e;;w=0;;
+#     0110111101	"ambient_light_dim_plus"  - i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=-10584;;P1=362;;P2=-417;;P3=678;;P4=-765;;P5=-16075;;CP=1;;R=67;;D=0123412341234123412341412341414141234151234123412341234123414123414141412341;;O;;w=0;;
+#     0110111011	"ambient_light_dim_minus" - i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P2=-14541;;P3=-396;;P4=707;;P5=-733;;P6=367;;CP=6;;R=86;;D=62634563456345634563456563456565634565626345634563456345634565634565656345656;;p;;w=0;;
+#     0111010110	"ambient_light_cold"			- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P1=363;;P2=-416;;P3=683;;P4=-755;;P5=-16073;;CP=1;;R=74;;D=123412341234123412341414123412341412351234123412341234123414141234123414123;;p;;w=0;;
+#     0111001101	"ambient_light_warm"			- i.O.                                           hex_lengh 5  get sduino_dummy raw MU;;P0=381;;P2=-751;;P4=-419;;P5=678;;P6=-16060;;CP=0;;R=78;;D=6045204520452045204520202045452020452060452045204520452045202020454520204520;;p;;w=1;;
+#     0110        "fan_minus"               - i.O.                                           hex_lengh 3  get sduino_dummy raw MU;;P0=388;;P1=-756;;P2=264;;P3=-399;;P4=683;;P5=-16082;;CP=0;;R=67;;D=0123410341034103410341050341034103410341034103410;;e;;w=0;;
+#     0101        "fan_plus"                - i.O.                                           hex_lengh 3  get sduino_dummy raw MU;;P1=-16074;;P2=366;;P3=-757;;P6=-422;;P7=680;;CP=2;;R=81;;D=671267326732673267326732326712673267326732673267323267;;e;;w=0;;
+#     0110011101	"fan_left"                - not assigned for Novy Cloud 230                hex_lengh 5  get sduino_dummy raw MU;;P0=378;;P2=-788;;P3=-434;;P4=649;;P5=-16070;;CP=0;;R=79;;D=02034203420203434202020342050342034203420342034202034342020203420;;p;;w=0;;
+#     0110011010	"fan_right"               - not assigned for Novy Cloud 230                hex_lengh 5  get sduino_dummy raw MU;;P0=-16705;;P1=361;;P2=-2704;;P3=663;;P4=-778;;P5=-423;;CP=1;;R=68;;D=012341534153415341415353414153415301534153415341534153414153534141534153;;O;;w=0;;
+#}
 ###############################################################################################################################################################################
 # - CAME Drehtor Antrieb - remote CAME_TOP_432EV [Protocol 86] and [additionally Protocol 81]
 #{    https://github.com/RFD-FHEM/RFFHEM/issues/151
 #     nibble 0-1 -> Ident | nibble 2 -> Tastencode
-#}    get sduino_dummy raw MU;;P0=-322;;P1=136;;P2=-15241;;P3=288;;P4=-735;;P6=723;;D=0123434343064343430643434306234343430643434306434343062343434306434343064343430623434343064343430643434306234343430643434306434343062343434306434343064343430623434343064343430643434306234343430643434306434343062343434306434343064343430;;CP=3;;R=27;;
+#}    left_button   -   get sduino_dummy raw MU;;P0=-322;;P1=136;;P2=-15241;;P3=288;;P4=-735;;P6=723;;D=0123434343064343430643434306234343430643434306434343062343434306434343064343430623434343064343430643434306234343430643434306434343062343434306434343064343430623434343064343430643434306234343430643434306434343062343434306434343064343430;;CP=3;;R=27;;
 ###############################################################################################################################################################################
 # - Hoermann HS1-868-BS [Protocol 69]
 #{    https://github.com/RFD-FHEM/RFFHEM/issues/344 | https://github.com/RFD-FHEM/RFFHEM/issues/149
@@ -389,7 +411,28 @@ my %models = (
 											"0110"        => "speed_minus",
 											"0111010001"  => "light_on_off",	# 0111010000
 											"0111010011"  => "power_on_off",	# 0111010010
-											hex_lengh			=> "3,5",
+											hex_lengh			=> "3,5",           # 3 or 5, not 3.5
+											Protocol			=> "P86",
+											Typ						=> "remote"
+										},
+	"Novy_840039" =>	{	"0111010011"	=> "power_on_off",            # Novy_840029 same code!
+											"0110110110"  => "cooking_light_on",
+											"0110110100"  => "cooking_light_off",
+											"0110110101"  => "cooking_light_dim_plus",
+											"0110110011"  => "cooking_light_dim_minus",
+											"0111001110"  => "cooking_light_cold",
+											"0111001011"  => "cooking_light_warm",
+											"0110111110"  => "ambient_light_on",
+											"0110111100"  => "ambient_light_off",
+											"0110111101"  => "ambient_light_dim_plus",
+											"0110111011"  => "ambient_light_dim_minus",
+											"0111010110"  => "ambient_light_cold",
+											"0111001101"  => "ambient_light_warm",
+											"0110"        => "fan_minus",               # Novy_840029 same code!
+											"0101"        => "fan_plus",                # Novy_840029 same code!
+											"0110011101"  => "fan_left",
+											"0110011010"  => "fan_right",
+											hex_lengh			=> "3,5",                     # 3 or 5, not 3.5
 											Protocol			=> "P86",
 											Typ						=> "remote"
 										},
@@ -609,7 +652,9 @@ sub SD_UT_Initialize($) {
 	$hash->{ParseFn}		= "SD_UT_Parse";
 	$hash->{SetFn}			= "SD_UT_Set";
 	$hash->{AttrFn}			= "SD_UT_Attr";
-	$hash->{AttrList}		= "repeats:1,2,3,4,5,6,7,8,9 IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 model:".join(",", sort keys %models)." $readingFnAttributes ";
+	$hash->{AttrList}		= "repeats:1,2,3,4,5,6,7,8,9 IODev do_not_notify:1,0 ".
+												"ignore:0,1 showtime:1,0 model:".join(",", sort keys %models).
+												" $readingFnAttributes UTclock";
 	$hash->{AutoCreate} =
 	{
 		"MD_2003R.*"	 => {ATTR => "model:MD_2003R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
@@ -654,8 +699,8 @@ sub SD_UT_Define($$) {
 		}
 	}
 
-	### [2] checks CAME_TOP_432EV & Novy_840029 & Unitec_47031 ###
-	if (($a[2] eq "CAME_TOP_432EV" || $a[2] eq "Novy_840029" || $a[2] eq "Unitec_47031") && not $a[3] =~ /^[0-9a-fA-F]{2}/s) {
+	### [2] checks CAME_TOP_432EV & Novy_840029 & Novy_840039 & Unitec_47031 ###
+	if (($a[2] eq "CAME_TOP_432EV" || $a[2] eq "Novy_840029" || $a[2] eq "Novy_840039" || $a[2] eq "Unitec_47031") && not $a[3] =~ /^[0-9a-fA-F]{2}/s) {
 		return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}";
 	}
 	### [3] checks SA_434_1_mini & QUIGG_DMV & TR_502MSV ###
@@ -720,6 +765,7 @@ sub SD_UT_Set($$$@) {
 	my $value = "";		# value from models cmd
 	my $save = "";		# bits from models cmd
 	my $repeats = AttrVal($name,'repeats', '5');
+	my $UTclock = AttrVal($name,'UTclock', undef);
 
 	Log3 $name, 4, "$ioname: SD_UT_Set attr_model=$model name=$name (before check)" if($cmd ne "?");
 	return $ret if ($defs{$name}->{DEF} eq "unknown");	# no setlist
@@ -760,6 +806,12 @@ sub SD_UT_Set($$$@) {
 			my $adr = sprintf( "%08b", hex($definition[1]));	# argument 1 - adress to binary with 8 digits
 			$msg = $models{$model}{Protocol} . "#" . $adr;
 			$msgEnd = "#R" . $repeats;
+		############ Novy_840039 ############
+		} elsif ($model eq "Novy_840039" && $cmd ne "?") {
+			my $adr = sprintf( "%08b", hex($definition[1]));	# argument 1 - adress to binary with 8 digits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
+			$UTclock = 375 if (not defined($UTclock));
 		############ CAME_TOP_432EV ############
 		} elsif ($model eq "CAME_TOP_432EV") {
 			my $adr = sprintf( "%08b", hex($definition[1]));	# argument 1 - adress to binary with 8 digits
@@ -843,7 +895,7 @@ sub SD_UT_Set($$$@) {
 			$msgEnd = "0P#R" . $repeats;	# one pulse for end marker, pause, repeats
 		}
 	}
-	
+
 	Log3 $name, 4, "$ioname: SD_UT_Set attr_model=$model msg=$msg msgEnd=$msgEnd" if(defined $msgEnd);
 
 	if ($cmd eq "?") {
@@ -904,6 +956,8 @@ sub SD_UT_Set($$$@) {
 			}
 			Log3 $name, 5, "$ioname: SD_UT_Set attr_model=$model msg=$msg cmd=$cmd value=$value (cmd loop)";
 		}
+
+		$msg .= '#C' . $UTclock if (defined($UTclock));  # optional Clockpulse
 
 		readingsSingleUpdate($hash, "LastAction", "send", 0) if ($models{$model}{Typ} eq "remote");
 		readingsSingleUpdate($hash, "state" , $cmd, 1);
@@ -1011,6 +1065,12 @@ sub SD_UT_Parse($$) {
 		if (!$def && ($protocol == 86 || $protocol == 81)) {
 			$deviceCode = substr($rawData,0,2);
 			$devicedef = "Novy_840029 " . $deviceCode;
+			$def = $modules{SD_UT}{defptr}{$devicedef};
+		}
+		### Novy_840039 [P86] ###
+		if (!$def && ($protocol == 86 || $protocol == 81)) {
+			$deviceCode = substr($rawData,0,2);
+			$devicedef = "Novy_840039 " . $deviceCode;
 			$def = $modules{SD_UT}{defptr}{$devicedef};
 		}
 	}
@@ -1133,9 +1193,8 @@ sub SD_UT_Parse($$) {
             my $button = $models{RC_10}{buttons}{substr($bitData,20,3)};
             $devicedef = "RC_10 ".$deviceCode."_".$button;			
 			$def       = $modules{SD_UT}{defptr}{$devicedef};
-			
-			if ($button ne "all")
-			{
+
+			if ($button ne "all") {
 				$state = substr($bitData,23,1) eq "1" ? "on" : "off" 
 			} else {
 				$state = substr($bitData,20,4);
@@ -1340,8 +1399,8 @@ sub SD_UT_Parse($$) {
 	} elsif ($model eq "TR_502MSV" && $protocol == 34) {
 		$state = substr($bitData,12,8);
 		$deviceCode = substr($bitData,0,12);
-	############ Novy_840029 ############ Protocol 86 ############
-	} elsif ($model eq "Novy_840029" && ($protocol == 86 || $protocol == 81)) {
+	############ Novy_840029, Novy_840039 ############ Protocol 86 ############
+	} elsif ($model eq "Novy_840029" || $model eq "Novy_840039" && ($protocol == 86 || $protocol == 81)) {
 		if ($hlen == 3) {		# 12 Bit [3]
 			$state = substr($bitData,8);			# 4 Bit
 		} else {						# 20 Bit [5]
@@ -1411,8 +1470,8 @@ sub SD_UT_Parse($$) {
 				$state = "warning";
 			}
 		}
-	} elsif ($model eq "RC_10" && $protocol == 90) {
 	############ Manax | mumbi ############ Protocol 90 ############
+	} elsif ($model eq "RC_10" && $protocol == 90) {
 		## Check fixed bits	## Workaround to send ##
 		my $nibble4 = substr($bitData,16,4);			# evey 0000 ?
 		my $nibble5 = substr($bitData,20,4);			# Button and State
@@ -1423,8 +1482,8 @@ sub SD_UT_Parse($$) {
 		readingsBulkUpdate($hash, "x_n5-8_off" , $nibble5.$nibble6to8, 0) if ($state eq "off");
 
 		$deviceCode = substr($bitData,0,16);
-	} elsif ($model eq "KL_RF01" && $protocol == 93) {
 	############ ESTO KL_RF01 ############ Protocol 90 ############
+	} elsif ($model eq "KL_RF01" && $protocol == 93) {
 		## Check fixed bits
 		my $unknown1 = substr($bitData,20,4);		# ?
 		my $unknown2 = substr($bitData,28,4);		# ?
@@ -1471,6 +1530,10 @@ sub SD_UT_Parse($$) {
 				last;
 			}
 		}
+		
+		if ($model eq "Novy_840029" || $model eq "Novy_840039") {
+			$state = $state =~ /^[01]+$/ ? "Please check your model. The code $deviceCode is not supported." : $state;
+		}
 	}
 
 	readingsBulkUpdate($hash, "deviceCode", $deviceCode, 0) if (defined($deviceCode) && $models{$model}{Typ} eq "remote");
@@ -1513,13 +1576,13 @@ sub SD_UT_Attr(@) {
 
 			### ERROR for Users
 			my $allowed_models;
-			foreach my $keys (sort keys %models) {	# read allowed_models with the same hex_lengh
+			foreach my $keys (keys %models) {	# read allowed_models with the same hex_lengh
 				$allowed_models.= $keys.", " if ($models{$keys}{hex_lengh} eq $hex_lengh);
 			}
 
 			Log3 $name, 4, "SD_UT_Attr Check for the change, $oldmodel hex_lengh=$hex_lengh, attrValue=$attrValue needed hex_lengh=".$models{$attrValue}{hex_lengh};
-			return "ERROR! You want to choose the $oldmodel model to $attrValue.\nPlease check your selection.\nThe length of RAWMSG must be the same!\n\nAllowed models are: $allowed_models" if ($models{$attrValue}{hex_lengh} ne $hex_lengh && $oldmodel ne "unknown");	# variants one
-			return "ERROR! You want to choose the unknown model to $attrValue.\nPlease check your selection.\nRAWMSG length is wrong!\n\nAllowed models are: $allowed_models" if (not ($models{$attrValue}{hex_lengh} =~ /($hex_lengh)/ ) && $oldmodel eq "unknown");				# variants two/three
+			return "ERROR! You want to choose the $oldmodel model to $attrValue.\nPlease check your selection.\nThe length of RAWMSG must be the same!\n\nAllowed models are: $allowed_models" if ($models{$attrValue}{hex_lengh} !~ /$hex_lengh/ && $oldmodel ne "unknown");	# variants one
+			return "ERROR! You want to choose the unknown model to $attrValue.\nPlease check your selection.\nRAWMSG length is wrong!\n\nAllowed models are: $allowed_models" if (not ($models{$attrValue}{hex_lengh} =~ /($hex_lengh)/ ) && $oldmodel eq "unknown");				  # variants two/three
 			### #### #### ###
 
 			if ($attrName eq "model" && $attrValue eq "unknown") {
@@ -1569,8 +1632,8 @@ sub SD_UT_Attr(@) {
 				$deviceCode = substr($bitData,0,12);
 				$deviceCode = sprintf("%03X", oct( "0b$deviceCode" ) );
 				$devicename = $devicemodel."_".$deviceCode;
-			############ Novy_840029 ############
-			} elsif ($attrName eq "model" && $attrValue eq "Novy_840029") {
+			############ Novy_840029 || Novy_840039 ############
+			} elsif ($attrName eq "model" && ($attrValue eq "Novy_840029" || $attrValue eq "Novy_840039") ) {
 				$deviceCode = substr($bitData,0,8);
 				$deviceCode = sprintf("%02X", oct( "0b$deviceCode" ) );
 				$devicename = $devicemodel."_".$deviceCode;
@@ -1640,16 +1703,15 @@ sub SD_UT_Attr(@) {
 
 			Log3 $name, 3, "SD_UT_Attr UNDEFINED sensor $attrValue detected, code $deviceCode (DoTrigger)" if ($devicemodel ne "unknown");
 
-			$modules{SD_UT}{defptr}{deletecache} = $name if ($hash->{DEF} eq "unknown");
+			$modules{SD_UT}{defptr}{deletecache} = $name;	# delete old device
 			Log3 $name, 5, "SD_UT: Attr cmd=$cmd devicename=$name attrName=$attrName attrValue=$attrValue oldmodel=$oldmodel";
 
 			readingsSingleUpdate($hash, "state", $state, 0);
 
 			DoTrigger ("global","UNDEFINED unknown_please_select_model SD_UT unknown") if ($devicename eq "unknown_please_select_model");		# if user push attr return to unknown
-			DoTrigger ("global","UNDEFINED $devicename SD_UT $devicemodel $deviceCode") if ($devicename ne "unknown_please_select_model");		# create new device
+			DoTrigger ("global","UNDEFINED $devicename SD_UT $devicemodel $deviceCode") if ($devicename ne "unknown_please_select_model");	# create new device
 
-			#CommandAttr( undef, "$devicename model $attrValue" ) if ($devicename ne "unknown_please_select_model");	# set model | Function not reliable !!!
-			$attr{$devicename}{model}	= "$attrValue" if ($devicename ne "unknown_please_select_model");				# set model
+			$attr{$devicename}{model}	= "$attrValue";				# set model
 
 		} else {
 			readingsSingleUpdate($hash, "state", "Please press button again!", 0);
@@ -1706,8 +1768,8 @@ sub SD_UT_tristate2bin($) {
 1;
 
 =pod
-=item summary    ...
-=item summary_DE ...
+=item summary    module for some SIGNALduino devices
+=item summary_DE Universalmodul f&uuml;r einige SIGNALduino Devices
 =begin html
 
 <a name="SD_UT"></a>
@@ -1733,6 +1795,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(module model: OR28V | protocol 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(module model: RC_10 | protocol 90)</small></ul>
 	 <ul> - NEFF or Refsta Topdraft (Tecnowind) kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: SF01_01319004 | protocol 86)</small></ul>
+	 <ul> - Novy Cloud 230 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840039 | protocol 86)</small></ul>
 	 <ul> - Novy Pureline 6830 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840029 | protocol 86)</small></ul>
 	 <ul> - QUIGG DMV-7000&nbsp;&nbsp;&nbsp;<small>(module model: QUIGG_DMV | protocol 34)</small></ul>
 	 <ul> - Remote control SA-434-1 mini 923301&nbsp;&nbsp;&nbsp;<small>(module model: SA_434_1_mini | protocol 81)</small></ul>
@@ -1964,13 +2027,16 @@ sub SD_UT_tristate2bin($) {
 	<ul><a name="model"></a>
 		<li>model<br>
 		The attribute indicates the model type of your device.<br>
-		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li>
+		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li>
 	</ul><br>
 	<ul><li><a name="repeats">repeats</a><br>
 	This attribute can be used to adjust how many repetitions are sent. Default is 5.</li></ul><br>
+	<ul><li><a name="UTclock">UTclock</a><br>
+	This attribute set the clock pulse when sending. There is no standard value.<br>
+	<small><u>exception:</u></small> The model Novy_840039 has a preset clock pulse of 375. You can manually adjust this individually with the attribute.</li></ul><br>
 
 	<b><i>Generated readings of the models</i></b><br>
-	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
+	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
 	<li>deviceCode<br>
 	Device code of the system</li>
 	<li>LastAction<br>
@@ -2033,6 +2099,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(Modulmodel: OR28V | Protokoll 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10 | Protokoll 90)</small></ul>
 	 <ul> - NEFF oder Refsta Topdraft (Tecnowind) Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: SF01_01319004 | Protokoll 86)</small></ul>
+	 <ul> - Novy Cloud 230 Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Novy_840039 | Protokoll 86)</small></ul>
 	 <ul> - Novy Pureline 6830 Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Novy_840029 | Protokoll 86)</small></ul>
 	 <ul> - QUIGG DMV-7000&nbsp;&nbsp;&nbsp;<small>(Modulmodel: QUIGG_DMV | Protokoll 34)</small></ul>
 	 <ul> - Remote control SA-434-1 mini 923301&nbsp;&nbsp;&nbsp;<small>(Modulmodel: SA_434_1_mini | Protokoll 81)</small></ul>
@@ -2264,13 +2331,16 @@ sub SD_UT_tristate2bin($) {
 	<ul><li><a href="#IODev">IODev</a></li></ul><br>
 	<ul><li><a name="model">model</a><br>
 		Das Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes.<br>
-		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li><a name=" "></a>
+		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li><a name=" "></a>
 	</ul><br>
 	<ul><li><a name="repeats">repeats</a><br>
 	Mit diesem Attribut kann angepasst werden, wie viele Wiederholungen sendet werden. Standard ist 5.</li></ul><br>
+	<ul><li><a name="UTclock">UTclock</a><br>
+	Mit diesem Attribut kann der Clockpulse beim senden eingestellt werden. Einen Standardwert gibt es nicht.<br>
+	<small><u>Ausnahme:</u></small> Das Model Novy_840039 hat einen voreingestellten Clockpulse von 375. Diesen kann man manuell mit dem Attribut individuell anpassen.</li></ul><br>
 
 	<b><i>Generierte Readings der Modelle</i></b><br>
-	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
+	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
 	<li>deviceCode<br>
 	Ger&auml;teCode des Systemes</li>
 	<li>LastAction<br>
