@@ -2205,7 +2205,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
-      $vh->{$p} = SSCal_jboolmap($vh->{$p});
+	  $vh->{$p} = SSCal_jboolmap($vh->{$p});
       next if($vh->{$p} eq "");
         
       # Log3($name, 4, "$name - bts: $bts, Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
@@ -3158,7 +3158,9 @@ sub SSCal_jboolmap($){
   my ($bool)= @_;
   
   if(JSON::is_bool($bool)) {
-      $bool = $bool?1:0;
+	  my $b = JSON::boolean($bool);
+	  $bool = 1 if($b == $JSON::true);
+	  $bool = 0 if($b == $JSON::false);
   }
   
 return $bool;
