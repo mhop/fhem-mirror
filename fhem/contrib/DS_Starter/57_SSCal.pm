@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
+                           "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
   "1.5.0"  => "02.02.2020  new attribute \"calendarShowInDetail\",\"calendarShowInRoom\" to control calendar overview in room or detail view ",
   "1.4.0"  => "02.02.2020  get calAsHtml command or use sub SSCal_calAsHtml(\$name) ",
   "1.3.1"  => "01.02.2020  add SSCal_errauthlist hash for login/logout API error codes ",
@@ -156,6 +158,7 @@ sub SSCal_Initialize($) {
  $hash->{AttrList} = "asyncMode:1,0 ".  
                      "calendarShowInDetail:0,1 ".
                      "calendarShowInRoom:0,1 ".
+                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -188,17 +191,22 @@ sub SSCal_Define($@) {
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 2) {
-      return "You need to specify more parameters.\n". "Format: define <name> SSCal <ServerAddress> [Port] [HTTP(S)]";
+      return "You need to specify more parameters.\n". "Format: define <name> SSCal <ServerAddress> [Port] [HTTP(S)] [Tasks]";
   }
-        
-  my $addr = $a[2];
-  my $port = $a[3] ? $a[3] : 5000;
-  my $prot = $a[4] ? lc($a[4]) : "http";
+  
+  shift @a; shift @a;
+  my $addr = $a[0]  if($a[0] ne "Tasks");
+  my $port = ($a[1] && $a[1] ne "Tasks") ? $a[1]     : 5000;
+  my $prot = ($a[2] && $a[2] ne "Tasks") ? lc($a[2]) : "http";
+  
+  my $model = "Diary";
+  $model    = "Tasks" if( grep {$_ eq "Tasks"} @a );
   
   $hash->{ADDR}                  = $addr;
   $hash->{PORT}                  = $port;
   $hash->{MODEL}                 = "Calendar"; 
   $hash->{PROT}                  = $prot;
+  $hash->{MODEL}                 = $model;
   $hash->{RESEND}                = "next planned SendQueue start: immediately by next entry";
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                # Modul Meta.pm nicht vorhanden  
   $hash->{HELPER}{CALFETCHED}    = 0;                                                                   # vorhandene Kalender sind noch nicht abgerufen
@@ -303,12 +311,23 @@ return undef;
 ################################################################
 sub SSCal_Attr($$$$) {
     my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $hash  = $defs{$name};
+	my $model = $hash->{MODEL};
     my ($do,$val,$cache);
       
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
+	
+	if ($cmd eq "set") {
+		if ($aName =~ /filterCompleteTask|filterDueTask/ && $model ne "Tasks") {            
+			return " The attribute \"$aName\" is only valid for devices of MODEL \"Tasks\"! Please set this attribute in a device of this model.";
+		}
+		
+		if ($aName =~ /showRepeatEvent/ && $model ne "Diary") {            
+			return " The attribute \"$aName\" is only valid for devices of MODEL \"Diary\"! Please set this attribute in a device of this model.";
+		}
+	}
        
     if ($aName eq "disable") {
         if($cmd eq "set") {
@@ -354,6 +373,8 @@ sub SSCal_Set($@) {
   my $prop1   = $a[3];
   my $prop2   = $a[4];
   my $prop3   = $a[5];
+  my $model   = $hash->{MODEL};
+  
   my ($success,$setlist);
         
   return if(IsDisabled($name));
@@ -378,9 +399,19 @@ sub SSCal_Set($@) {
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials "
                  ;  
-  } else {
+  } elsif ($model eq "Diary") {
       $setlist = "Unknown argument $opt, choose one of ".
                  "calEventList ".
+                 "credentials ".
+                 ($evids?"deleteEventId:$evids ":"deleteEventId:noArg ").
+                 "eraseReadings:noArg ".
+                 "listSendqueue:noArg ".
+                 "logout:noArg ".
+                 ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
+                 "restartSendqueue:noArg "
+                 ;
+  } else {                                                                      # Model ist "Tasks"
+      $setlist = "Unknown argument $opt, choose one of ".
                  "calToDoList ".
 				 "cleanCompleteTasks:noArg ".
                  "credentials ".
@@ -808,6 +839,7 @@ sub SSCal_periodicCall($) {
   my ($name)   = @_;
   my $hash     = $defs{$name};
   my $interval = AttrVal($name, "interval", 0);
+  my $model    = $hash->{MODEL};
   my $new;
    
   if(!$interval) {
@@ -823,7 +855,8 @@ sub SSCal_periodicCall($) {
   return if(!$interval);
   
   if($hash->{CREDENTIALS} && !IsDisabled($name)) {
-      CommandSet(undef, "$name calEventList");                      # Events aller gewählter Kalender abrufen (in Queue stellen)
+      if($model eq "Diary") { CommandSet(undef, "$name calEventList") };                      # Einträge aller gewählter Terminkalender abrufen (in Queue stellen)
+	  if($model eq "Tasks") { CommandSet(undef, "$name calToDoList")  };                      # Einträge aller gewählter Aufgabenlisten abrufen (in Queue stellen)
   }
   
   InternalTimer($new, "SSCal_periodicCall", $name, 0);
@@ -2171,8 +2204,8 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
 
   foreach my $p (keys %{$vh}) {
-      $vh->{$p} = SSCal_jboolmap($vh->{$p});
       $vh->{$p} = "" if(!defined $vh->{$p});
+      $vh->{$p} = SSCal_jboolmap($vh->{$p});
       next if($vh->{$p} eq "");
         
       # Log3($name, 4, "$name - bts: $bts, Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
@@ -2193,7 +2226,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           push(@row_array, $bts+$n." 15_dueTimestamp " .$duets."\n");
       }
       
-      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete");     
+      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
       push(@row_array, $bts+$n." 90_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
@@ -3138,7 +3171,11 @@ sub SSCal_calAsHtml($) {
   my ($name)= @_;
   my $hash = $defs{$name}; 
 
-  my ($begin,$end,$summary,$location,$status);  
+  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal);  
+  
+  my %seen;
+  my @cof = split(",", AttrVal($name, "calOverviewFields", "Begin,End,Summary,Status,Location"));
+  grep { !$seen{$_}++ } @cof;                        
 
   my $out  = "<html>";
   $out    .= "<style>TD.sscal     {text-align: left; padding-left:15px; padding-right:15px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
@@ -3146,11 +3183,14 @@ sub SSCal_calAsHtml($) {
   $out    .= "<table class='block'>";
   
   $out    .= "<tr>";
-  $out    .= "<td class='sscal sscalbold'> Begin    </td>";
-  $out    .= "<td class='sscal sscalbold'> End      </td>";
-  $out    .= "<td class='sscal sscalbold'> Summary  </td>";
-  $out    .= "<td class='sscal sscalbold'> Status   </td>";
-  $out    .= "<td class='sscal sscalbold'> Location </td></tr>";
+  $out    .= "<td class='sscal sscalbold'> Begin       </td>"         if($seen{Begin});
+  $out    .= "<td class='sscal sscalbold'> End         </td>"         if($seen{End});
+  $out    .= "<td class='sscal sscalbold'> Summary     </td>"         if($seen{Summary});
+  $out    .= "<td class='sscal sscalbold'> Description </td>"         if($seen{Description});
+  $out    .= "<td class='sscal sscalbold'> Status      </td>"         if($seen{Status});
+  $out    .= "<td class='sscal sscalbold'> Location    </td>"         if($seen{Location});
+  $out    .= "<td class='sscal sscalbold'> GPS         </td>"         if($seen{GPS});
+  $out    .= "<td class='sscal sscalbold'> Calendar    </td>"         if($seen{Calendar});
   
   $out    .= "<tr><td>  </td></tr>";
   $out    .= "<tr><td>  </td></tr>";
@@ -3168,18 +3208,24 @@ sub SSCal_calAsHtml($) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
       last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufage vorhanden
       
-      $summary  = ReadingsVal($name, $prestr."_01_Summary",  "");
-      $begin    = ReadingsVal($name, $prestr."_02_Begin",    "not set");
-      $end      = ReadingsVal($name, $prestr."_03_End",      "not set");
-      $location = ReadingsVal($name, $prestr."_07_Location", "");
-      $status   = ReadingsVal($name, $prestr."_10_Status",   "");
+      $summary  = ReadingsVal($name, $prestr."_01_Summary",     "");
+      $begin    = ReadingsVal($name, $prestr."_02_Begin",       "not set");
+      $end      = ReadingsVal($name, $prestr."_03_End",         "not set");
+      $desc     = ReadingsVal($name, $prestr."_04_Description", "");
+      $location = ReadingsVal($name, $prestr."_07_Location",    "");
+      $gps      = ReadingsVal($name, $prestr."_08_GPS",         "");
+      $status   = ReadingsVal($name, $prestr."_10_Status",      "");
+      $cal      = ReadingsVal($name, $prestr."_90_calName",     "");
       
       $out     .= "<tr class='odd'>";
-      $out     .= "<td class='sscal'> $begin    </td>";
-      $out     .= "<td class='sscal'> $end      </td>";
-      $out     .= "<td class='sscal'> $summary  </td>";
-      $out     .= "<td class='sscal'> $status   </td>";
-      $out     .= "<td class='sscal'> $location </td>";
+      $out     .= "<td class='sscal'> $begin    </td>"      if($seen{Begin});
+      $out     .= "<td class='sscal'> $end      </td>"      if($seen{End});
+      $out     .= "<td class='sscal'> $summary  </td>"      if($seen{Summary});
+      $out     .= "<td class='sscal'> $desc     </td>"      if($seen{Description});
+      $out     .= "<td class='sscal'> $status   </td>"      if($seen{Status});
+      $out     .= "<td class='sscal'> $location </td>"      if($seen{Location});
+      $out     .= "<td class='sscal'> $gps      </td>"      if($seen{GPS});
+      $out     .= "<td class='sscal'> $cal      </td>"      if($seen{Calendar});
       $out     .= "</tr>";
   }
 
