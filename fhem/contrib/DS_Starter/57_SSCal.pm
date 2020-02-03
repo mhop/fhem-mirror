@@ -158,7 +158,7 @@ sub SSCal_Initialize($) {
  $hash->{AttrList} = "asyncMode:1,0 ".  
                      "calendarShowInDetail:0,1 ".
                      "calendarShowInRoom:0,1 ".
-                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar,Completion ".
+                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar,Completion,Timezone ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -3173,7 +3173,7 @@ sub SSCal_calAsHtml($) {
   my ($name)= @_;
   my $hash = $defs{$name}; 
 
-  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal,$completion);  
+  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal,$completion,$tz);  
   
   my %seen;
   my @cof = split(",", AttrVal($name, "calOverviewFields", "Begin,End,Summary,Status,Location"));
@@ -3188,6 +3188,7 @@ sub SSCal_calAsHtml($) {
   $out    .= "<tr>";
   $out    .= "<td class='sscal sscalbold sscalcenter'> Begin             </td>"         if($seen{Begin});
   $out    .= "<td class='sscal sscalbold sscalcenter'> End               </td>"         if($seen{End});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Timezone          </td>"         if($seen{Timezone});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Summary           </td>"         if($seen{Summary});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Description       </td>"         if($seen{Description});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Status            </td>"         if($seen{Status});
@@ -3218,6 +3219,7 @@ sub SSCal_calAsHtml($) {
       $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
       $location   = ReadingsVal($name, $prestr."_07_Location",        "");
       $gps        = ReadingsVal($name, $prestr."_08_GPS",             "");
+	  $tz         = ReadingsVal($name, $prestr."_09_Timezone",        "");
       $status     = ReadingsVal($name, $prestr."_10_Status",          "");
 	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
@@ -3225,6 +3227,7 @@ sub SSCal_calAsHtml($) {
       $out     .= "<tr class='odd'>";
       $out     .= "<td class='sscal'> $begin      </td>"      if($seen{Begin});
       $out     .= "<td class='sscal'> $end        </td>"      if($seen{End});
+	  $out     .= "<td class='sscal'> $tz         </td>"      if($seen{Timezone});
       $out     .= "<td class='sscal'> $summary    </td>"      if($seen{Summary});
       $out     .= "<td class='sscal'> $desc       </td>"      if($seen{Description});
       $out     .= "<td class='sscal'> $status     </td>"      if($seen{Status});
