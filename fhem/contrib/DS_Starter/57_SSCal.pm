@@ -48,9 +48,10 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\" ",
   "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
-  "1.5.0"  => "02.02.2020  new attribute \"calendarShowInDetail\",\"calendarShowInRoom\" to control calendar overview in room or detail view ",
+  "1.5.0"  => "02.02.2020  new attribute \"calOverviewInDetail\",\"calOverviewInRoom\" to control calendar overview in room or detail view ",
   "1.4.0"  => "02.02.2020  get calAsHtml command or use sub SSCal_calAsHtml(\$name) ",
   "1.3.1"  => "01.02.2020  add SSCal_errauthlist hash for login/logout API error codes ",
   "1.3.0"  => "01.02.2020  new command \"cleanCompleteTasks\" to delete completed tasks, \"deleteEventId\" to delete an event id, ".
@@ -156,8 +157,8 @@ sub SSCal_Initialize($) {
  $hash->{FW_deviceOverview}     = 1;
  
  $hash->{AttrList} = "asyncMode:1,0 ".  
-                     "calendarShowInDetail:0,1 ".
-                     "calendarShowInRoom:0,1 ".
+                     "calOverviewInDetail:0,1 ".
+                     "calOverviewInRoom:0,1 ".
                      "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar,Completion,Timezone ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
@@ -800,12 +801,12 @@ sub SSCal_FWdetailFn ($$$$) {
   
   $hash->{".calhtml"} = SSCal_calAsHtml($d);
 
-  if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"calendarShowInDetail",1)) {    # Anzeige Übersicht in Detailansicht
+  if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"calOverviewInDetail",1)) {    # Anzeige Übersicht in Detailansicht
       $ret .= $hash->{".calhtml"};
       return $ret;
   } 
   
-  if($hash->{".calhtml"} ne "" && $room && AttrVal($d,"calendarShowInRoom",1)) {       # Anzeige in Raumansicht zusätzlich zur Statuszeile
+  if($hash->{".calhtml"} ne "" && $room && AttrVal($d,"calOverviewInRoom",1)) {       # Anzeige in Raumansicht zusätzlich zur Statuszeile
       $ret = $hash->{".calhtml"};
       return $ret;
   }
