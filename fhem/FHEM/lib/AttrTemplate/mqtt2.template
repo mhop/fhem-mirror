@@ -36,7 +36,8 @@ attr DEVCID bridgeRegexp \
   [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
   wallpanel[/]([^/]+)[/].*:.* "$1"\
   (wled)[/]([^/]+)[/].*:.* "$1_$2"\
-  (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"
+  (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
+  (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -2161,6 +2162,8 @@ attr DEVICE setList irsend:textField BASE_ID/DEVNAME/IRtoMQTT {"value":$EVTPART2
 attr DEVCID comment irsend needs Infos about protocol and value (n decimal), so e.g."IR_NEC 1587664935" should be fine...
 attr DEVICE model OpenMQTTGateway_ir
 
+
+
 name:OpenMQTTGateway_BT_temp_hum_sensor
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
@@ -2180,6 +2183,50 @@ attr OMG_BT_ID icon temperature_humidity
 attr OMG_BT_ID jsonMap batt:batteryPercent tem:temperature hum:humidity servicedatauuid:0 servicedata:0
 attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
+
+
+
+###############
+#OwnTracks
+# an OwnTracks device
+#contributed by Loredo
+#source post: https://forum.fhem.de/index.php/topic,94495.msg1020111.html#msg1020111
+name:owntracks_device
+desc:A device tracked by OwnTracks
+filter:TYPE=MQTT2_DEVICE:FILTER=CID=owntracks.*
+order:O_01
+par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/]([^/:]+).*:, ? $1 : undef }
+par:DEV_ID;DeviceID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/][^/:]+[/]([^/:]+).*:, ? $1 : undef }
+par:WHICHROOM;Actual room of the device, defaults to OwnTracks; {AttrVal("DEVICE","room","OwnTracks" )}
+attr DEVICE room WHICHROOM
+attr DEVICE icon location_sign
+attr DEVICE jsonMap\
+  _type:lastUpdateType acc:accuracy alt:altitude batt:batteryPercent bs:batteryState cog:direction conn:connection lat:latitude lon:longitude rad:radius\
+  p:pressure t:trigger tid:trackerId tst:timestamp vac:accuracyVertical vel:velocity\
+  event__type:lastUpdateType event_acc:event_accuracy event_lat:event_latitude event_lon:event_longitude event_t:event_trigger event_tid:event_trackerId event_tst:event_timestamp event_wtst:event_waypointCreationTimestamp\
+  step__type:lastUpdateType step_steps:steps_count step_from:steps_timestampBegin step_to:steps_timestampEnd step_tst:steps_timestampReq\
+  beacon__type:lastUpdateType beacon_acc:beacon_accuracy beacon_prox:beacon_proximity beacon_tst:beacon_timestampReq\
+  waypoints__type:lastUpdateType waypoints__creator:waypoints_creator\
+  config__type:lastUpdateType
+attr DEVICE readingList\
+  owntracks/TRACKER_ID/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  owntracks/TRACKER_ID/DEV_ID/event:.* { json2nameValue($EVENT,'event_',$JSONMAP) }\
+  owntracks/TRACKER_ID/DEV_ID/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
+  owntracks/TRACKER_ID/DEV_ID/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
+  owntracks/TRACKER_ID/DEV_ID/waypoints:.* { json2nameValue($EVENT,'waypoints_',$JSONMAP) }\
+  owntracks/TRACKER_ID/DEV_ID/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
+attr DEVICE getList\
+  location:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"reportLocation"}\
+  steps:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"reportSteps"}\
+  config:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"dump"}\
+  waypoints:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"waypoints"}
+attr DEVICE setList\
+  config owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
+  waypoints owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":$EVTPART1}\
+  action owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"action",$EVTPART1}
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model owntracks_device
+
 
 name:roborock
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*valetudo[/].*
@@ -2207,7 +2254,7 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   load_map BASE_ID/DEVNAME/custom_command {"command":"load_map","name":"$EVTPART1"}\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
-attr DEVCID comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">
+attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">
 farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>To display generated map, define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
 attr DEVICE model roborock
 
