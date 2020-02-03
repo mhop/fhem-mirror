@@ -158,7 +158,7 @@ sub SSCal_Initialize($) {
  $hash->{AttrList} = "asyncMode:1,0 ".  
                      "calendarShowInDetail:0,1 ".
                      "calendarShowInRoom:0,1 ".
-                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar ".
+                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar,Completion ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -3171,26 +3171,28 @@ sub SSCal_calAsHtml($) {
   my ($name)= @_;
   my $hash = $defs{$name}; 
 
-  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal);  
+  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal,$completion);  
   
   my %seen;
   my @cof = split(",", AttrVal($name, "calOverviewFields", "Begin,End,Summary,Status,Location"));
   grep { !$seen{$_}++ } @cof;                        
 
   my $out  = "<html>";
-  $out    .= "<style>TD.sscal     {text-align: left; padding-left:15px; padding-right:15px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
-  $out    .= "<style>TD.sscalbold {font-weight: bold;}</style>";
+  $out    .= "<style>TD.sscal       {text-align: left; padding-left:15px; padding-right:15px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
+  $out    .= "<style>TD.sscalbold   {font-weight: bold;}</style>";
+  $out    .= "<style>TD.sscalcenter {text-align: center;}</style>";
   $out    .= "<table class='block'>";
   
   $out    .= "<tr>";
-  $out    .= "<td class='sscal sscalbold'> Begin       </td>"         if($seen{Begin});
-  $out    .= "<td class='sscal sscalbold'> End         </td>"         if($seen{End});
-  $out    .= "<td class='sscal sscalbold'> Summary     </td>"         if($seen{Summary});
-  $out    .= "<td class='sscal sscalbold'> Description </td>"         if($seen{Description});
-  $out    .= "<td class='sscal sscalbold'> Status      </td>"         if($seen{Status});
-  $out    .= "<td class='sscal sscalbold'> Location    </td>"         if($seen{Location});
-  $out    .= "<td class='sscal sscalbold'> GPS         </td>"         if($seen{GPS});
-  $out    .= "<td class='sscal sscalbold'> Calendar    </td>"         if($seen{Calendar});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Begin             </td>"         if($seen{Begin});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> End               </td>"         if($seen{End});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Summary           </td>"         if($seen{Summary});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Description       </td>"         if($seen{Description});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Status            </td>"         if($seen{Status});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Completion<br>(%) </td>"         if($seen{Completion});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Location          </td>"         if($seen{Location});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> GPS               </td>"         if($seen{GPS});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Calendar          </td>"         if($seen{Calendar});
   
   $out    .= "<tr><td>  </td></tr>";
   $out    .= "<tr><td>  </td></tr>";
@@ -3208,24 +3210,26 @@ sub SSCal_calAsHtml($) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
       last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufage vorhanden
       
-      $summary  = ReadingsVal($name, $prestr."_01_Summary",     "");
-      $begin    = ReadingsVal($name, $prestr."_02_Begin",       "not set");
-      $end      = ReadingsVal($name, $prestr."_03_End",         "not set");
-      $desc     = ReadingsVal($name, $prestr."_04_Description", "");
-      $location = ReadingsVal($name, $prestr."_07_Location",    "");
-      $gps      = ReadingsVal($name, $prestr."_08_GPS",         "");
-      $status   = ReadingsVal($name, $prestr."_10_Status",      "");
-      $cal      = ReadingsVal($name, $prestr."_90_calName",     "");
+      $summary    = ReadingsVal($name, $prestr."_01_Summary",         "");
+      $begin      = ReadingsVal($name, $prestr."_02_Begin",           "not set");
+      $end        = ReadingsVal($name, $prestr."_03_End",             "not set");
+      $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
+      $location   = ReadingsVal($name, $prestr."_07_Location",        "");
+      $gps        = ReadingsVal($name, $prestr."_08_GPS",             "");
+      $status     = ReadingsVal($name, $prestr."_10_Status",          "");
+	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
+      $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
       
       $out     .= "<tr class='odd'>";
-      $out     .= "<td class='sscal'> $begin    </td>"      if($seen{Begin});
-      $out     .= "<td class='sscal'> $end      </td>"      if($seen{End});
-      $out     .= "<td class='sscal'> $summary  </td>"      if($seen{Summary});
-      $out     .= "<td class='sscal'> $desc     </td>"      if($seen{Description});
-      $out     .= "<td class='sscal'> $status   </td>"      if($seen{Status});
-      $out     .= "<td class='sscal'> $location </td>"      if($seen{Location});
-      $out     .= "<td class='sscal'> $gps      </td>"      if($seen{GPS});
-      $out     .= "<td class='sscal'> $cal      </td>"      if($seen{Calendar});
+      $out     .= "<td class='sscal'> $begin      </td>"      if($seen{Begin});
+      $out     .= "<td class='sscal'> $end        </td>"      if($seen{End});
+      $out     .= "<td class='sscal'> $summary    </td>"      if($seen{Summary});
+      $out     .= "<td class='sscal'> $desc       </td>"      if($seen{Description});
+      $out     .= "<td class='sscal'> $status     </td>"      if($seen{Status});
+	  $out     .= "<td class='sscal'> $completion </td>"      if($seen{Completion});
+      $out     .= "<td class='sscal'> $location   </td>"      if($seen{Location});
+      $out     .= "<td class='sscal'> $gps        </td>"      if($seen{GPS});
+      $out     .= "<td class='sscal'> $cal        </td>"      if($seen{Calendar});
       $out     .= "</tr>";
   }
 
