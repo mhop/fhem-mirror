@@ -3192,7 +3192,7 @@ sub SSCal_calAsHtml($) {
   my ($name)= @_;
   my $hash = $defs{$name}; 
 
-  my ($begin,$end,$summary,$location,$status,$desc,$gps,$cal,$completion,$tz);  
+  my ($begin,$end,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz);  
   
   my %seen;
   my @cof = split(",", AttrVal($name, "calOverviewFields", "Begin,End,Summary,Status,Location"));
@@ -3227,6 +3227,8 @@ sub SSCal_calAsHtml($) {
       $maxbnr = $1 if(!$maxbnr || $1>$maxbnr);
   }
   
+  return "" if(!defined $maxbnr);
+  
   my $k;
   for ($k=0;$k<=$maxbnr;$k++) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
@@ -3237,18 +3239,21 @@ sub SSCal_calAsHtml($) {
       $end        = ReadingsVal($name, $prestr."_03_End",             "not set");
       $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
       $location   = ReadingsVal($name, $prestr."_07_Location",        "");
-      $gps        = ReadingsVal($name, $prestr."_08_gpsCoordinates",  "");
+      $gpsa       = ReadingsVal($name, $prestr."_08_gpsAddress",      "");
+      $gpsc       = ReadingsVal($name, $prestr."_08_gpsCoordinates",  "");
 	  $tz         = ReadingsVal($name, $prestr."_09_Timezone",        "");
       $status     = ReadingsVal($name, $prestr."_10_Status",          "");
 	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
       
-      if($gps) {
+      $gps = "";
+      if($gpsc) {
           my $img        = FW_makeImage("it_i-net");
-          my ($lat,$lng) = split(",", $gps);
+          my ($lat,$lng) = split(",", $gpsc);
           $lat           = (split("=", $lat))[1];
           $lng           = (split("=", $lng))[1];
-          $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $img </a>";
+          # $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $img </a>";  # OpenstreetMap
+          $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $img </a>";            # Google Maps
       }
       
       $out     .= "<tr class='odd'>";
