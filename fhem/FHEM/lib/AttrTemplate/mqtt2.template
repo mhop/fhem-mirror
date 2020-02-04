@@ -78,7 +78,7 @@ order:100003
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 set DEVICE attrTemplate mqtt2_speech_recognition_type_light
 attr DEVICE genericDeviceType light
-attr DEVICE homebridgeMapping Brightness=brightness::brightness,minValue=0,maxValue=255
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,minValue=0,maxValue=100,max=255,factor=2.55
 option:TYPE=siri
 option:TYPE=alexa
 option:TYPE=gassistant
@@ -2193,9 +2193,9 @@ attr DEVICE readingList\
   BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
-  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":$EVTPART1}\
-  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"black-list":[$EVTPART1]}\
-  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/set {"white-list":[$EVTPART1]}\
+  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"interval":$EVTPART1}\
+  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"black-list":[$EVTPART1]}\
+  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"white-list":[$EVTPART1]}\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
