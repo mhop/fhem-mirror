@@ -18,6 +18,7 @@ use Math::Trig ':great_circle';
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
+use Encode;
 
 #use Data::Dumper;
 
@@ -50,15 +51,15 @@ our %compasspoints = (
         [ "Nord-Nordost",  "NNO", '⬈' ],
         [ "Nord-Ost",      "NO",  '⬈' ],
         [ "Ost-Nordost",   "ONO", '⬈' ],
-        [ "Ost",           "O",   '▶' ],
+        [ "Osten",         "O",   '▶' ],
         [ "Ost-Südost",   "OSO", '⬊' ],
         [ "Südost",       "SO",  '⬊' ],
         [ "Süd-Südost",  "SSO", '⬊' ],
-        [ "Süd",          "S",   '▼' ],
+        [ "Süden",        "S",   '▼' ],
         [ "Süd-Südwest", "SSW", '⬋' ],
         [ "Südwest",      "SW",  '⬋' ],
         [ "West-Südwest", "WSW", '⬋' ],
-        [ "West",          "W",   '◀' ],
+        [ "Westen",        "W",   '◀' ],
         [ "West-Nordwest", "WNW", '⬉' ],
         [ "Nordwest",      "NW",  '⬉' ],
         [ "Nord-Nordwest", "NNW", '⬉' ],
@@ -796,12 +797,12 @@ sub direction2compasspoint($;$$) {
     }
 
     return (
-        $directions_txt_i18n->[$i][0],
+        encode_utf8 $directions_txt_i18n->[$i][0],
         $directions_txt_i18n->[$i][1],
-        $directions_txt_i18n->[$i][2]
+        encode_utf8 $directions_txt_i18n->[$i][2]
     ) if wantarray;
-    return $directions_txt_i18n->[$i][2] if ( $txt && $txt == 3. );
-    return $directions_txt_i18n->[$i][0] if ( $txt && $txt == 2. );
+    return encode_utf8 $directions_txt_i18n->[$i][2] if ( $txt && $txt == 3. );
+    return encode_utf8 $directions_txt_i18n->[$i][0] if ( $txt && $txt == 2. );
     return $directions_txt_i18n->[$i][1];
 }
 
@@ -1054,11 +1055,11 @@ sub compasspoint2compasspoint($;$$$) {
 
     my $i;
     my $i2;
-    my $f  = 0;
-    my $f2 = 0;
+    my $f = 0;
     foreach my $a ( @{$fromDirections_txt_i18n} ) {
+        my $f2 = 0;
         foreach my $b ( @{$a} ) {
-            if ( lc($b) eq lc($shortTxt) ) {
+            if ( lc($b) eq lc( decode_utf8($shortTxt) ) ) {
                 $i2 = $f2;
                 last;
             }
@@ -1083,12 +1084,12 @@ sub compasspoint2compasspoint($;$$$) {
     }
 
     return (
-        $toDirections_txt_i18n->[$i][0],
+        encode_utf8 $toDirections_txt_i18n->[$i][0],
         $toDirections_txt_i18n->[$i][1],
-        $toDirections_txt_i18n->[$i][2]
+        encode_utf8 $toDirections_txt_i18n->[$i][2]
     ) if wantarray;
-    return $toDirections_txt_i18n->[$i][2] if ( $txt == 3. );
-    return $toDirections_txt_i18n->[$i][0] if ( $txt == 2. );
+    return encode_utf8 $toDirections_txt_i18n->[$i][2] if ( $txt == 3. );
+    return encode_utf8 $toDirections_txt_i18n->[$i][0] if ( $txt == 2. );
     return $toDirections_txt_i18n->[$i][1];
 }
 
@@ -1109,11 +1110,11 @@ sub compasspoint2direction($;$) {
 
     my $i;
     my $i2;
-    my $f  = 0;
-    my $f2 = 0;
+    my $f = 0;
     foreach my $a ( @{$fromDirections_txt_i18n} ) {
+        my $f2 = 0;
         foreach my $b ( @{$a} ) {
-            if ( lc($b) eq lc($shortTxt) ) {
+            if ( lc($b) eq lc( decode_utf8($shortTxt) ) ) {
                 $i2 = $f2;
                 last;
             }
