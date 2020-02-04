@@ -733,7 +733,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } elsif($check eq "error => no or wrong data from server!") {\
-      $ret .= '| <b style="color:'.(($new eq $old)?'black':'red').'">';;\
+      $ret .= '| <b style="color:red">';;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } else {\

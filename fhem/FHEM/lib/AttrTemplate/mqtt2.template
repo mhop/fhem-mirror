@@ -2334,10 +2334,11 @@ par:DEVNAME;DEVNAME typically is rockrobo;{ AttrVal("DEVICE","readingList","") =
 deletereading -q DEVICE (?!associatedWith).*
 defmod DEVICE MQTT2_\DEVICE DEVNAME
 attr DEVICE icon vacuum_top
+attr DEVICE devStateIcon { '<img src="fhem/images/DEVNAME_map.png" style="max-width:256;;max-height:256;;">' }
 attr DEVICE readingList homeassistant/vacuum/valetudo_DEVNAME/config:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/state:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/attributes:.* { json2nameValue($EVENT) }\
-  BASE_ID/DEVNAME/map_data:.* {attrTmqtt2_roborock_valetudo2svg("map_data",$EVENT,"www/images/valetudo_map.svg")}
+  BASE_ID/DEVNAME/map_data:.* {attrTmqtt2_roborock_valetudo2svg("map_data",$EVENT,"www/images/DEVNAME_map.svg")}
 attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   charge:noArg BASE_ID/DEVNAME/command return_to_base\
   stop:noArg BASE_ID/DEVNAME/command stop\
@@ -2350,8 +2351,8 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   load_map BASE_ID/DEVNAME/custom_command {"command":"load_map","name":"$EVTPART1"}\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
-attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">
-farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>To display generated map, define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/valetudo_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>.
+attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>To display generated map, define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code, change the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
 attr DEVICE model roborock
 
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
