@@ -49,7 +49,7 @@ our %compasspoints = (
     de => [
         [ "Norden",        "N",   '▲' ],
         [ "Nord-Nordost",  "NNO", '⬈' ],
-        [ "Nord-Ost",      "NO",  '⬈' ],
+        [ "Nordost",      "NO",  '⬈' ],
         [ "Ost-Nordost",   "ONO", '⬈' ],
         [ "Osten",         "O",   '▶' ],
         [ "Ost-Südost",   "OSO", '⬊' ],
@@ -81,7 +81,6 @@ our %compasspoints = (
         [ "Oeste-Noroeste", "ONO", '⬉' ],
         [ "Noroeste",       "NO",  '⬉' ],
         [ "Norte-Noroeste", "NNE", '⬉' ],
-
     ],
     it => [
         [ "Nord",             "N",   '▲' ],
