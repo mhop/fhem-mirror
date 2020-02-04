@@ -805,6 +805,8 @@ sub direction2compasspoint($;$$) {
     return $directions_txt_i18n->[$i][1];
 }
 
+# see below for compasspoint2compasspoint() text translations.
+
 #################################
 ### Solar conversions
 ###
@@ -1018,6 +1020,121 @@ sub duration ($$;$) {
 ### Textual unit conversions
 ###
 
+# Translate point of the compass to other languages
+#   Also works to convert from short text to long text and vice versa.
+sub compasspoint2compasspoint($;$$$) {
+    my ( $shortTxt, $fromLang, $txt, $toLang ) = @_;
+    return $shortTxt if ( !$shortTxt || $shortTxt eq "" );
+    return direction2compasspoint( $shortTxt, $txt,
+        $toLang ? $toLang : $fromLang )
+      if ( $shortTxt =~ m/^\d+(?:\.\d+)?$/ );
+    return compasspoint2direction( $shortTxt, $fromLang )
+      if ( defined($txt) && $txt == 0. );
+
+    my $fromDirections_txt_i18n;
+    $fromLang = "EN" unless ($fromLang);
+    if ( exists( $compasspoints{ lc($fromLang) } ) ) {
+        $fromDirections_txt_i18n = $compasspoints{ lc($fromLang) };
+    }
+    else {
+        $fromLang                = "EN";
+        $fromDirections_txt_i18n = $compasspoints{en};
+    }
+
+    my $toDirections_txt_i18n;
+    $toLang = main::AttrVal( "global", "language", "EN" )
+      unless ($toLang);
+    if ( exists( $compasspoints{ lc($toLang) } ) ) {
+        $toDirections_txt_i18n = $compasspoints{ lc($toLang) };
+    }
+    else {
+        $toLang                = "EN";
+        $toDirections_txt_i18n = $compasspoints{en};
+    }
+
+    my $i;
+    my $i2;
+    my $f  = 0;
+    my $f2 = 0;
+    foreach my $a ( @{$fromDirections_txt_i18n} ) {
+        foreach my $b ( @{$a} ) {
+            if ( lc($b) eq lc($shortTxt) ) {
+                $i2 = $f2;
+                last;
+            }
+            $f2++;
+        }
+        if ( defined($i2) ) {
+            $i = $f;
+            last;
+        }
+        $f++;
+    }
+
+    unless ( defined($txt) ) {
+        $txt = 1;
+        $txt = 3 if ( $i2 == 2. );
+        $txt = 2 if ( $i2 == 0. );
+    }
+
+    unless ( defined($i) ) {
+        return ( "", "", "" ) if wantarray;
+        return "";
+    }
+
+    return (
+        $toDirections_txt_i18n->[$i][0],
+        $toDirections_txt_i18n->[$i][1],
+        $toDirections_txt_i18n->[$i][2]
+    ) if wantarray;
+    return $toDirections_txt_i18n->[$i][2] if ( $txt == 3. );
+    return $toDirections_txt_i18n->[$i][0] if ( $txt == 2. );
+    return $toDirections_txt_i18n->[$i][1];
+}
+
+# convert point of the compass to direction in degree
+sub compasspoint2direction($;$) {
+    my ( $shortTxt, $fromLang ) = @_;
+    return $shortTxt if ( !$shortTxt || $shortTxt eq "" );
+
+    my $fromDirections_txt_i18n;
+    $fromLang = "EN" unless ($fromLang);
+    if ( exists( $compasspoints{ lc($fromLang) } ) ) {
+        $fromDirections_txt_i18n = $compasspoints{ lc($fromLang) };
+    }
+    else {
+        $fromLang                = "EN";
+        $fromDirections_txt_i18n = $compasspoints{en};
+    }
+
+    my $i;
+    my $i2;
+    my $f  = 0;
+    my $f2 = 0;
+    foreach my $a ( @{$fromDirections_txt_i18n} ) {
+        foreach my $b ( @{$a} ) {
+            if ( lc($b) eq lc($shortTxt) ) {
+                $i2 = $f2;
+                last;
+            }
+            $f2++;
+        }
+        if ( defined($i2) ) {
+            $i = $f;
+            last;
+        }
+        $f += 22.5;
+    }
+
+    unless ( defined($i) ) {
+        return ("") if wantarray;
+        return "";
+    }
+
+    return $i;
+}
+
+# Convert an arabic number to roman numerals
 sub arabic2roman ($) {
     my ($n) = @_;
     my %items = ();
@@ -1429,7 +1546,7 @@ sub values2weathercondition($$$$$) {
 
 sub hms2s($) {
     my $in = shift;
-    my @a = split( ":", $in );
+    my @a  = split( ":", $in );
     return 0 if ( scalar @a < 2 || $in !~ m/^[\d:]*$/ );
     return $a[0] * 3600 + $a[1] * 60 + ( $a[2] ? $a[2] : 0 );
 }
@@ -1622,15 +1739,10 @@ sub GetDaytime(;$$$$) {
     while ( !defined( $ret->{daytime} ) ) {
 
         #TODO let user define %sdt2daytimes through attribute
-        $ret->{daytime} =
-          $sdt2daytimes{1}{ $ret->{isdst} }{$ds}
-          if (
-               $sdt2daytimes{1}
+        $ret->{daytime} = $sdt2daytimes{1}{ $ret->{isdst} }{$ds}
+          if ( $sdt2daytimes{1}
             && $sdt2daytimes{1}{ $ret->{isdst} }
-            && defined(
-                $sdt2daytimes{1}{ $ret->{isdst} }{$ds}
-            )
-          );
+            && defined( $sdt2daytimes{1}{ $ret->{isdst} }{$ds} ) );
         $ds--;
 
         # when no relation was found
@@ -1712,13 +1824,9 @@ sub GetDaytime(;$$$$) {
         # find daytime
         my $daytime;
         $daytime = $sdt2daytimes{1}{ $ret->{isdst} }{$i}
-          if (
-               $sdt2daytimes{1}
+          if ( $sdt2daytimes{1}
             && $sdt2daytimes{1}{ $ret->{isdst} }
-            && defined(
-                $sdt2daytimes{1}{ $ret->{isdst} }{$i}
-            )
-          );
+            && defined( $sdt2daytimes{1}{ $ret->{isdst} }{$i} ) );
 
         # create event
         my $t = int( $b + 0.5 );
@@ -1804,7 +1912,7 @@ sub _time(;$$$$);
 sub _time(;$$$$) {
     my ( $time, $lang, $dayOffset, $params ) = @_;
     $dayOffset = 1 if ( !defined($dayOffset) || $dayOffset !~ /^-?\d+$/ );
-    $lang = (
+    $lang      = (
           $main::attr{global}{language}
         ? $main::attr{global}{language}
         : "EN"
@@ -1906,8 +2014,8 @@ sub _time(;$$$$) {
         my $date = sprintf( "%02d-%02d", $ret{monISO}, $ret{mday} );
         $tod = main::IsWe($date);
         if ($dayOffset) {
-            $ytd  = main::IsWe('yesterday');
-            $tom  = main::IsWe('tomorrow');
+            $ytd = main::IsWe('yesterday');
+            $tom = main::IsWe('tomorrow');
         }
 
         if ( $tod ne "none" ) {
