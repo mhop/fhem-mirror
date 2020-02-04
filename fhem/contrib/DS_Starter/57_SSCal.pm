@@ -159,7 +159,7 @@ sub SSCal_Initialize($) {
  $hash->{AttrList} = "asyncMode:1,0 ".  
                      "calOverviewInDetail:0,1 ".
                      "calOverviewInRoom:0,1 ".
-                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,GPS,Calendar,Completion,Timezone ".
+                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -2224,15 +2224,16 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
               $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
               next if($vh->{$p}{$r} eq "");
               if ($r eq "address") {
-                  $address = encode("UTF-8", $vh->{$p}{$r});
+                  $address = encode("UTF-8", $vh->{$p}{$r})           if($vh->{$p}{$r});
               }
               if ($r eq "gps") {
                   $lng = encode("UTF-8", $vh->{$p}{$r}{lng});
                   $lat = encode("UTF-8", $vh->{$p}{$r}{lat});
               }              
           }
-          $val = "mlat=".$lat.",mlon=".$lng;          
-          push(@row_array, $bts+$n." 08_GPS "       .$val."\n");
+          push(@row_array, $bts+$n." 08_gpsAddress "      .$address."\n");
+          $val = "lat=".$lat.",lng=".$lng;          
+          push(@row_array, $bts+$n." 08_gpsCoordinates "  .$val."\n");
       }
       
       push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")       if($p eq "is_all_day");
@@ -3212,7 +3213,7 @@ sub SSCal_calAsHtml($) {
   $out    .= "<td class='sscal sscalbold sscalcenter'> Status            </td>"         if($seen{Status});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Completion<br>(%) </td>"         if($seen{Completion});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Location          </td>"         if($seen{Location});
-  $out    .= "<td class='sscal sscalbold sscalcenter'> GPS               </td>"         if($seen{GPS});
+  $out    .= "<td class='sscal sscalbold sscalcenter'> Map               </td>"         if($seen{Map});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Calendar          </td>"         if($seen{Calendar});
   
   $out    .= "<tr><td>  </td></tr>";
@@ -3236,7 +3237,7 @@ sub SSCal_calAsHtml($) {
       $end        = ReadingsVal($name, $prestr."_03_End",             "not set");
       $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
       $location   = ReadingsVal($name, $prestr."_07_Location",        "");
-      $gps        = ReadingsVal($name, $prestr."_08_GPS",             "");
+      $gps        = ReadingsVal($name, $prestr."_08_gpsCoordinates",  "");
 	  $tz         = ReadingsVal($name, $prestr."_09_Timezone",        "");
       $status     = ReadingsVal($name, $prestr."_10_Status",          "");
 	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
@@ -3245,9 +3246,9 @@ sub SSCal_calAsHtml($) {
       if($gps) {
           my $img        = FW_makeImage("it_i-net");
           my ($lat,$lng) = split(",", $gps);
-          $gps = "<a href='https://www.openstreetmap.org/?$lat&$lng&zoom=14' target='_blank'> $img </a>";
-          #$gps = "<img src=\"$FW_ME/www/images/default/Restart.png\" >";
-          # $gps = $img;
+          $lat           = (split("=", $lat))[1];
+          $lng           = (split("=", $lng))[1];
+          $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $img </a>";
       }
       
       $out     .= "<tr class='odd'>";
@@ -3259,7 +3260,7 @@ sub SSCal_calAsHtml($) {
       $out     .= "<td class='sscal'> $status     </td>"      if($seen{Status});
 	  $out     .= "<td class='sscal'> $completion </td>"      if($seen{Completion});
       $out     .= "<td class='sscal'> $location   </td>"      if($seen{Location});
-      $out     .= "<td class='sscal'> $gps        </td>"      if($seen{GPS});
+      $out     .= "<td class='sscal'> $gps        </td>"      if($seen{Map});
       $out     .= "<td class='sscal'> $cal        </td>"      if($seen{Calendar});
       $out     .= "</tr>";
   }
