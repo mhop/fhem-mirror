@@ -271,7 +271,7 @@ Svn_GetFile($$;$)
   require HttpUtils;
   return "Missing argument from or to" if(!$from || !$to);
   return "Forbidden characters in from/to"
-                  if($from =~ m/\.\./ || $to =~ m/\.\./);
+                  if($from =~ m/\.\./ || $to =~ m/\.\./ || $to =~ m,^/,);
   HttpUtils_NonblockingGet({
     url=>"https://svn.fhem.de/trac/browser/trunk/fhem/$from?format=txt",
     callback=>sub($$$){ 
@@ -290,6 +290,20 @@ Svn_GetFile($$;$)
       Log 1, $@ if($@);
     }});
   return "Download started, check the FHEM-log";
+}
+
+sub
+WriteFile($$)
+{
+  my ($filename, $data) = @_;
+  return "Forbidden characters in filename"
+        if($filename =~ m/\.\./ || $filename =~ m,^/,);
+  if(!open(FH,">$filename")) {
+    Log 1, "ERROR WriteFile $filename: $!";
+    return;
+  }
+  print FH $data;
+  close(FH);
 }
 
 1;
@@ -393,6 +407,16 @@ Svn_GetFile($$;$)
       <ul>
         <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm") }</code>
         <code>{ Svn_GetFile("contrib/86_FS10.pm", "FHEM/86_FS10.pm", sub(){CommandReload(undef, "86_FS10")}) }</code>
+      </ul>
+      </li></br>
+
+    <li><b>WriteFile(file, content)</b><br>
+      Write a file in/below the curent directory.
+      Example:
+      <ul>
+        attr m2d readingList map:.* { WriteFile("www/images/map.png",$EVENT);; {map=>"images/map.png"} }
+        attr m2d devStateIcon { '<img src="fhem/images/map.png" style="max-width:256;;max-height:256;;">' }
+
       </ul>
       </li></br>
 
