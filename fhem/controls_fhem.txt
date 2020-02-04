@@ -1,4 +1,4 @@
-REV 21099
+REV 21110
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-02-03_07:45:02 325413 ./CHANGED
+UPD 2020-02-04_07:45:02 325529 ./CHANGED
 UPD 2020-02-03_07:45:02 42504 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -386,7 +386,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2020-01-23_07:45:05 16143 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-08-26_07:45:03 162302 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2020-01-21_07:45:03 310478 FHEM/73_AutoShuttersControl.pm
+UPD 2020-02-04_07:45:02 310549 FHEM/73_AutoShuttersControl.pm
 UPD 2020-01-17_07:45:03 177378 FHEM/73_DoorBird.pm
 UPD 2019-11-26_07:45:03 89343 FHEM/73_ElectricityCalculator.pm
 UPD 2019-06-19_07:45:02 42826 FHEM/73_GardenaSmartBridge.pm
@@ -644,9 +644,9 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-01-29_07:45:03 50417 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-02-04_07:45:02 58220 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-01-29_07:45:03 157698 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-02-04_07:45:02 165364 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -748,8 +748,8 @@ UPD 2020-02-03_07:45:06 4197513 docs/commandref.html
 UPD 2020-02-03_07:45:08 2602249 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-03_07:45:09 229697 docs/commandref_modular.html
-UPD 2020-02-03_07:45:11 240698 docs/commandref_modular_DE.html
+UPD 2020-02-04_07:45:10 229697 docs/commandref_modular.html
+UPD 2020-02-04_07:45:12 240698 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
