@@ -3177,9 +3177,7 @@ sub SSCal_jboolmap($){
   my ($bool)= @_;
   
   if(JSON::is_bool($bool)) {
-	  my $b = JSON::boolean($bool);
-	  $bool = 1 if($b == $JSON::true);
-	  $bool = 0 if($b == $JSON::false);
+	  $bool = $bool ? 1 : 0;
   }
   
 return $bool;
