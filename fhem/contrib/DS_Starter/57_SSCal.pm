@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\" ",
+  "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
   "1.5.0"  => "02.02.2020  new attribute \"calOverviewInDetail\",\"calOverviewInRoom\" to control calendar overview in room or detail view ",
@@ -2217,7 +2217,24 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
       push(@row_array, $bts+$n." 04_Description "   .$val."\n")       if($p eq "description");
       push(@row_array, $bts+$n." 05_EventId "       .$val."\n")       if($p eq "evt_id"); 
       push(@row_array, $bts+$n." 07_Location "      .$val."\n")       if($p eq "location");
-      push(@row_array, $bts+$n." 08_GPS "           .$val."\n")       if($p eq "gps");
+      
+      if($p eq "gps") {
+          my ($address,$lng,$lat) = ("","","");
+          foreach my $r (keys %{$vh->{gps}}) {
+              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
+              next if($vh->{$p}{$r} eq "");
+              if ($r eq "address") {
+                  $address = encode("UTF-8", $vh->{$p}{$r});
+              }
+              if ($r eq "gps") {
+                  $lng = encode("UTF-8", $vh->{$p}{$r}{lng});
+                  $lat = encode("UTF-8", $vh->{$p}{$r}{lat});
+              }              
+          }
+          $val = "mlat=".$lat.",mlon=".$lng;          
+          push(@row_array, $bts+$n." 08_GPS "       .$val."\n");
+      }
+      
       push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")       if($p eq "is_all_day");
       push(@row_array, $bts+$n." 12_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
       
