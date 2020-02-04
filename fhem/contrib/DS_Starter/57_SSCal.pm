@@ -3177,7 +3177,9 @@ sub SSCal_jboolmap($){
   my ($bool)= @_;
   
   if(JSON::is_bool($bool)) {
-	  $bool = $bool ? 1 : 0;
+	  my $b = JSON::boolean($bool);
+	  $bool = 1 if($b == $JSON::true);
+	  $bool = 0 if($b == $JSON::false);
   }
   
 return $bool;
@@ -3202,7 +3204,7 @@ sub SSCal_calAsHtml($) {
   $out    .= "<style>TD.sscalcenter {text-align: center;}</style>";
   $out    .= "<table class='block'>";
   
-  $out    .= "<tr>";
+  $out    .= "<tr class='odd'>";
   $out    .= "<td class='sscal sscalbold sscalcenter'> Begin             </td>"         if($seen{Begin});
   $out    .= "<td class='sscal sscalbold sscalcenter'> End               </td>"         if($seen{End});
   $out    .= "<td class='sscal sscalbold sscalcenter'> Timezone          </td>"         if($seen{Timezone});
@@ -3254,7 +3256,8 @@ sub SSCal_calAsHtml($) {
           $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $img </a>";            # Google Maps
       }
       
-      $out     .= "<tr class='odd'>";
+      #$out     .= "<tr class='odd'>";
+      $out     .= "<tr class='".($k&1?"odd":"even")."'>";
       $out     .= "<td class='sscal'> $begin      </td>"      if($seen{Begin});
       $out     .= "<td class='sscal'> $end        </td>"      if($seen{End});
 	  $out     .= "<td class='sscal'> $tz         </td>"      if($seen{Timezone});
