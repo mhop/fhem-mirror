@@ -3242,6 +3242,14 @@ sub SSCal_calAsHtml($) {
 	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
       
+      if($gps) {
+          my $img        = FW_makeImage("it_i-net");
+          my ($lat,$lng) = split(",", $gps);
+          $gps = "<a href='https://www.openstreetmap.org/?$lat&$lng&zoom=14' target='_blank'> $img </a>";
+          #$gps = "<img src=\"$FW_ME/www/images/default/Restart.png\" >";
+          # $gps = $img;
+      }
+      
       $out     .= "<tr class='odd'>";
       $out     .= "<td class='sscal'> $begin      </td>"      if($seen{Begin});
       $out     .= "<td class='sscal'> $end        </td>"      if($seen{End});
