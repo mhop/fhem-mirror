@@ -959,8 +959,6 @@ Aurora_Attr($$$;$)
   <a name="Aurora_Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>bri<br>
-    the brightness reported from the device. the value can be betwen 1 and 254</li>
     <li>colormode<br>
     the current colormode</li>
     <li>ct<br>
@@ -995,8 +993,6 @@ Aurora_Attr($$$;$)
         Note: the FS20 compatible dimXX% commands are also accepted.</li>
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
-      <li>bri &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        set brighness to &lt;value&gt;; range is 0-254.</li>
       <li>dimUp [delta]</li>
       <li>dimDown [delta]</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
@@ -1025,7 +1021,7 @@ Aurora_Attr($$$;$)
         <li>multiple paramters can be set at once separated by <code>:</code><br>
           Examples:<br>
             <code>set LC on : transitiontime 100</code><br>
-            <code>set bulb on : bri 100 : color 4000</code><br></li>
+            <code>set bulb on : pct 100 : color 4000</code><br></li>
         </ul>
     </ul><br>
 
