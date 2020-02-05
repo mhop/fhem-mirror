@@ -2161,8 +2161,8 @@ name:OpenMQTTGateway_MCU
 filter:TYPE=MQTT2_DEVICE
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt
 order:X_02
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "oMQTTgw_MCU" : InternalVal("DEVICE","DEF","mosquitto")}
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 deletereading -q DEVICE (?!associatedWith).*
@@ -2176,6 +2176,9 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT:.* { json2nameValue($EVENT,'Sys_')}\
   homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : undef }
+attr DEVICE setList\
+  restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
+
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
 </a>Version: version
@@ -2187,34 +2190,35 @@ attr DEVICE model OpenMQTTGateway_MCU
 
 name:OpenMQTTGateway_BT_scanner
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.
 order:X_02b
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 attr DEVICE readingList\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
   BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
-  BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/set {"interval":0}\
-  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"interval":$EVTPART1}\
-  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"black-list":[$EVTPART1]}\
-  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config/set {"white-list":[$EVTPART1]}\
+  BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
+  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
+  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
+  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
+  BT_minrssi:slider,-110,1,0 BASE_ID/DEVNAME/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
 
 name:OpenMQTTGateway_simple_RF433_switch
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02a
 par:ONCOMMANDREGEX;ONCOMMANDREGEX typically is one or more Codes like 13027392|13519216|12585648|13349168;undef
 par:ON_COMMAND;ON_COMMAND typically is a set of parameters like "value":"13027392","protocol":4,"length":24,"delay":350;undef
 par:OFFCOMMANDREGEX;OFFCOMMANDREGEX typically is one or more Codes like 13381408|13226144|13381408|13599888;undef
 par:OFF_COMMAND;ON_COMMAND typically is a set of parameters like "value":"13381408","protocol":4,"length":24,"delay":350;undef
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 par:DEVCID;CID of the new device - try to read the last RF value; { ReadingsVal("DEVICE","value","unknown") }
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
 defmod OMG_DEVCID MQTT2_\DEVICE DEVCID
@@ -2234,11 +2238,11 @@ attr OMG_DEVCID model OpenMQTTGateway_simple_RF433_switch
 
 name:OpenMQTTGateway_bme
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02b
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
 attr DEVICE readingList\
@@ -2249,11 +2253,11 @@ attr DEVICE model OpenMQTTGateway_bme
 
 name:OpenMQTTGateway_ir
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02c
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](OpenMQTTGateway[^/]*)[/].*:, ? $2 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
 attr DEVICE readingList\
@@ -2264,17 +2268,17 @@ attr DEVICE model OpenMQTTGateway_ir
 
 name:OpenMQTTGateway_BT_temp_hum_sensor
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*OpenMQTTGateway.*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your sensor. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02d
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]OpenMQTTGateway[^/]*[/].*, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:BT_ID;Pls. enter your bluetooth device ID; {undef}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
 defmod OMG_BT_ID MQTT2_\DEVICE oMQTTgw_BT
 deletereading -q OMG_BT_ID (?!associatedWith).*
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/OpenMQTTGateway[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  BASE_ID/O[^/]*M[^/]*G[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr OMG_BT_ID event-min-interval 300
 attr OMG_BT_ID event-on-change-reading batteryPercent,temperature:0.2,humidity:0.2,rssi:5,distance:5
 attr OMG_BT_ID icon temperature_humidity
@@ -2338,7 +2342,7 @@ par:DEVNAME;DEVNAME typically is rockrobo;{ AttrVal("DEVICE","readingList","") =
 deletereading -q DEVICE (?!associatedWith).*
 defmod DEVICE MQTT2_\DEVICE DEVNAME
 attr DEVICE icon vacuum_top
-attr DEVICE devStateIcon { '<img src="fhem/images/DEVNAME_map.png" style="max-width:256;;max-height:256;;">' }
+attr DEVICE devStateIcon { '<img src="fhem/images/DEVNAME_map.svg" style="max-width:256;;max-height:256;;">' }
 attr DEVICE readingList homeassistant/vacuum/valetudo_DEVNAME/config:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/state:.* { json2nameValue($EVENT) }\
   BASE_ID/DEVNAME/attributes:.* { json2nameValue($EVENT) }\
@@ -2355,8 +2359,8 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   load_map BASE_ID/DEVNAME/custom_command {"command":"load_map","name":"$EVTPART1"}\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
-attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">
-farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>To display generated map, define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code, change the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
+attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map seperately, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>Generated map will be shown as devStateIcon or define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code, change "svg" in devStateIcon code to "png" and the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
 attr DEVICE model roborock
 
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
