@@ -748,6 +748,17 @@ structure_Attr($@)
       if the regexp matches the name of the attribute, then this attribute will
       be propagated to all the members. The default is .* (each attribute) for
       featurelevel <= 5.9, else ^$ (no attribute).
+      Note: the following attibutes will never be propagated:
+      <ul>
+        alias async_delay clientstate_behavior clientstate_priority
+        devStateIcon disable disabledForIntervals group icon room propagateAttr
+        setStateIndirectly stateFormat webCmd userattr
+      </ul>
+      To set them you can use the following expression:
+      <ul>
+        attr a:&lt;struct_type&gt;=&lt;struct_name&gt; &lt;attrName&gt;
+        &lt;attrVal&gt;
+      </ul>
       </li>
 
     <li>setStateIndirectly<br>
@@ -976,7 +987,18 @@ structure_Attr($@)
       Falls der Regexp auf den Namen des Attributes zutrifft, dann wird dieses
       Attribut an allen Mitglieder weitergegeben. F&uuml;r featurelevel <= 5.9
       ist die Voreinstellung .* (d.h. alle Attribute), sonst ^$ (d.h. keine
-      Attribute).
+      Attribute). Achtung: folgende Attribute werden nie weitervererbt:
+      <ul>
+        alias async_delay clientstate_behavior clientstate_priority
+        devStateIcon disable disabledForIntervals group icon room propagateAttr
+        setStateIndirectly stateFormat webCmd userattr
+      </ul>
+      Um diese zu setzen kann man den Ausdruck
+      <ul>
+        attr a:&lt;struct_type&gt;=&lt;struct_name&gt; &lt;attrName&gt;
+        &lt;attrVal&gt;
+      </ul>
+      verwenden.
       </li>
 
     <li>setStateIndirectly<br>
