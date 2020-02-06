@@ -20,7 +20,14 @@ use HttpUtils;
 
 use IO::Socket::INET;
 
-require "$attr{global}{modpath}/FHEM/31_HUEDevice.pm";
+sub
+HUEBridge_loadHUEDevice()
+{
+  if( !$modules{HUEDevice}{LOADED} ) {
+    my $ret = CommandReload( undef, "31_HUEDevice" );
+    Log3 undef, 1, $ret if( $ret );
+  }
+}
 
 sub HUEBridge_Initialize($)
 {
@@ -42,6 +49,8 @@ sub HUEBridge_Initialize($)
   $hash->{AttrList} = "key disable:1 disabledForIntervals createGroupReadings:1,0 httpUtils:1,0 noshutdown:1,0 pollDevices:1,2,0 queryAfterSet:1,0 $readingFnAttributes";
 
   #$hash->{isDiscoverable} = { ssdp => {'hue-bridgeid' => '/.*/'}, upnp => {} };
+
+  HUEBridge_loadHUEDevice();
 
   return FHEM::Meta::InitMod( __FILE__, $hash );
 }
