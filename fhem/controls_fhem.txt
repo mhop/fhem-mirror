@@ -1,4 +1,4 @@
-REV 21124
+REV 21128
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -184,7 +184,7 @@ UPD 2016-07-04_07:45:16 3754 FHEM/30_pilight_smoke.pm
 UPD 2016-04-25_07:45:10 5350 FHEM/30_pilight_switch.pm
 UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2020-01-31_07:45:03 17614 FHEM/30_tradfri.pm
-UPD 2019-10-05_07:45:03 29783 FHEM/31_Aurora.pm
+UPD 2020-02-06_07:45:08 29570 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
 UPD 2020-01-24_07:45:04 78908 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
@@ -646,7 +646,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-05_07:45:03 58189 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-02-05_07:45:03 166417 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-02-06_07:45:08 166674 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -744,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-02-05_07:45:08 4198812 docs/commandref.html
+UPD 2020-02-06_07:45:13 4198599 docs/commandref.html
 UPD 2020-02-05_07:45:10 2603253 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-05_07:45:12 229697 docs/commandref_modular.html
-UPD 2020-02-05_07:45:13 240698 docs/commandref_modular_DE.html
+UPD 2020-02-06_07:45:16 229697 docs/commandref_modular.html
+UPD 2020-02-06_07:45:17 240698 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
