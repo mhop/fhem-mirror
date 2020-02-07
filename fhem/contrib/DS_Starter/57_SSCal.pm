@@ -48,7 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.7.0"  => "05.02.2020  respect global language setting for some presentation, new attribute eventIcon ",
+  "1.7.0"  => "07.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
+                           "formatting overview table ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
@@ -160,15 +161,16 @@ sub SSCal_Initialize($) {
  $hash->{AttrList} = "asyncMode:1,0 ".  
                      "calOverviewInDetail:0,1 ".
                      "calOverviewInRoom:0,1 ".
-                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone ".
+                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
-                     "eventIcon:textField-long ".
+                     "tableSpecs:textField-long ".
 					 "filterCompleteTask:1,2,3 ".
 					 "filterDueTask:1,2,3 ".
                      "interval ".
-                     "loginRetries:1,2,3,4,5,6,7,8,9,10 ".                     
+                     "loginRetries:1,2,3,4,5,6,7,8,9,10 ". 
+                     "tableColumnMap:icon,data,text ".					 
                      "showRepeatEvent:true,false ".
                      "showPassInLog:1,0 ".
                      "timeout ".
@@ -2207,7 +2209,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   my $ts        = time();                           # Istzeit Timestamp
   my $om        = $hash->{OPMODE};                  # aktuelle Operation Mode
   my $status    = "initialized";
-  my ($val,$uts,$td);
+  my ($val,$uts,$td,$dleft);
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
   
@@ -2215,10 +2217,20 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   $started  = SSCal_isStarted  ($ts,$bts,$ets);
   $ended    = SSCal_isEnded    ($ts,$ets);
   
-  push(@row_array, $bts+$n." 02_Begin "      .$bdate." ".$btime."\n") if($bdate && $btime);
+  if($bdate && $btime) {
+      push(@row_array, $bts+$n." 02_Begin "  .$bdate." ".$btime."\n");
+      my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());         # Datum Jetzt
+      my ($by,$bm,$bd)       = split("-", $bdate);               # Beginn Datum
+      my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
+      my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
+      if($btimes >= $ntimes) {
+          $dleft = int(($btimes - $ntimes)/86400);
+      }
+  }
   push(@row_array, $bts+$n." 03_End "        .$edate." ".$etime."\n") if($edate && $etime);
   push(@row_array, $bts+$n." 02_bTimestamp " .$bts."\n")              if($bts);
   push(@row_array, $bts+$n." 03_eTimestamp " .$ets."\n")              if($ets);   
+  push(@row_array, $bts+$n." 04_daysLeft "   .$dleft."\n")            if(defined $dleft); 
   push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
 
   foreach my $p (keys %{$vh}) {
@@ -3209,7 +3221,8 @@ sub SSCal_calAsHtml($) {
   my ($name) = @_;
   my $hash   = $defs{$name}; 
   my $lang   = AttrVal("global","language","EN");
-  my ($begin,$end,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz); 
+  my $mi     = AttrVal($name,"tableColumnMap","icon");
+  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft); 
 
   my $de = 0;
   if($lang eq "DE") {$de = 1};
@@ -3222,24 +3235,25 @@ sub SSCal_calAsHtml($) {
   $out    .= "<style>TD.cal       {padding-left:10px; padding-right:10px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
   $out    .= "<style>TD.calbold   {font-weight: bold;}  </style>";
   $out    .= "<style>TD.calright  {text-align: right;}  </style>";
+  $out    .= "<style>TD.calleft   {text-align: left;}   </style>";
   $out    .= "<style>TD.calcenter {text-align: center;} </style>";  
   $out    .= "<style>TD.calw150   {width: 150px;}       </style>";
   
   $out    .= "<table class='block'>";
   $out    .= "<tr class='odd'>";
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Start'            :'Begin')."             </td>" if($seen{Begin});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Ende'             :'End')."               </td>" if($seen{End});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'         :'Timezone')."          </td>" if($seen{Timezone});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'  :'Summary')."           </td>" if($seen{Summary});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Beschreibung'     :'Description')."       </td>" if($seen{Description});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Status'           :'State')."             </td>" if($seen{Status});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Erfüllung<br>(%)' :'Completion<br>(%)')." </td>" if($seen{Completion});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Ort'              :'Location')."          </td>" if($seen{Location});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'            :'Map')."               </td>" if($seen{Map});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'         :'Calendar')."          </td>" if($seen{Calendar});
-  
-  $out    .= "<tr><td>  </td></tr>";
-  $out    .= "<tr><td>  </td></tr>";
+  $out    .= "<td class='cal calbold calright'> ".(($de)?'Start'               :'Begin')."               </td>" if($seen{Begin});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'----'               :'----')."                </td>" if($seen{Begin});
+  $out    .= "<td class='cal calbold calright'> ".(($de)?'Ende'                :'End')."                 </td>" if($seen{End});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'----'               :'----')."                </td>" if($seen{End});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{Days});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Beschreibung'       :'Description')."         </td>" if($seen{Description});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Status'             :'State')."               </td>" if($seen{Status});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Erfüllung&nbsp;(%)' :'Completion&nbsp;(%)')." </td>" if($seen{Completion});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Ort'                :'Location')."            </td>" if($seen{Location});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
 
   my $l = length(keys %{$data{SSCal}{$name}{eventlist}});
   
@@ -3256,9 +3270,12 @@ sub SSCal_calAsHtml($) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
       last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufage vorhanden
       
+	  ($begind,$begint,$endd,$endt,$gps) = ("","","","","");
+	  
       $summary    = ReadingsVal($name, $prestr."_01_Summary",         "");
       $begin      = ReadingsVal($name, $prestr."_02_Begin",           "");
       $end        = ReadingsVal($name, $prestr."_03_End",             "");
+      $dleft      = ReadingsVal($name, $prestr."_04_daysLeft",        "");
       $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
       $location   = ReadingsVal($name, $prestr."_07_Location",        "");
       $gpsa       = ReadingsVal($name, $prestr."_08_gpsAddress",      "");
@@ -3268,14 +3285,36 @@ sub SSCal_calAsHtml($) {
 	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
       
-      $gps = "";
       if($gpsc) {
-          my $img        = FW_makeImage("it_i-net");
+	      my $micon;
+		  if ($mi eq "icon") {
+		      my $di = "it_i-net";
+			  my $ui = $hash->{HELPER}{tableSpecs}{columnMapIcon};
+			  $di    = $ui ? $ui : $di;
+		      $micon = FW_makeImage($di);                   
+		  } elsif ($mi eq "data") {
+		      $micon = join(" ", split(",", $gpsc));
+		  } elsif ($mi eq "text") {
+		      my $dt = "link";
+			  my $ut = $hash->{HELPER}{tableSpecs}{columnMapText};
+			  $micon = $ut ? $ut : $dt;
+		  } else {
+		      $micon = "";
+		  }
+		  
           my ($lat,$lng) = split(",", $gpsc);
           $lat           = (split("=", $lat))[1];
           $lng           = (split("=", $lng))[1];
-          # $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $img </a>";  # OpenstreetMap
-          $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $img </a>";            # Google Maps
+		                                     
+		  my $up = $hash->{HELPER}{tableSpecs}{columnMapProvider} || "";
+		  if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
+		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
+		  } elsif ($up eq "OpenStreetMap") {
+              $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $micon </a>";  # Kartenprovider: OpenstreetMap
+		  } else {
+		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          # Kartenprovider default: Google Maps
+		  }
+          
       }
       
       if($begin ne "") {                                             # Datum sprachabhängig konvertieren bzw. heute/morgen setzen
@@ -3286,32 +3325,43 @@ sub SSCal_calAsHtml($) {
           my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
           my $etimes             = fhemTimeLocal(00, 00, 00, $ed, $em-1, $ey-1900);
           
-          if($de && $begin =~ m/(\d{4})-(\d{2})-(\d{2})\s(.*)/) {
-              $begin =  "$3.$2.$1 $4";
-              $end   =~ m/(\d{4})-(\d{2})-(\d{2})\s(.*)/;
-              $end   =  "$3.$2.$1 $4";  
-          }     
+          if($de) {
+			  $begind = "$bd.$bm.$by";
+              $endd   = "$ed.$em.$ey";	  
+          } else {
+			  $begind = "$by-$bm-$bd";
+              $endd   = "$ey-$em-$ed";			  
+		  }
+		  $begint =  $bt;
+          $endt   =  $et;
+		  
+		  $edleft = "";
+		  if($etimes >= $ntimes) {
+			  $edleft = int(($etimes - $ntimes)/86400);
+		  }		  
 
-          $begin = (($de)?'heute ':'today ').$bt  if(($btimes >= $ntimes) && ($btimes < $ntimes+86400));
-          $end   = (($de)?'heute ':'today ').$et  if(($etimes >= $ntimes) && ($etimes < $ntimes+86400));   
-          
-          $begin = (($de)?'morgen ':'tomorrow ').$bt  if(($btimes >= $ntimes+86400) && ($btimes < $ntimes+172800));
-          $end   = (($de)?'morgen ':'tomorrow ').$et  if(($etimes >= $ntimes+86400) && ($etimes < $ntimes+172800));            
+          $begind = (($de)?'heute ':'today ')      if($dleft eq "0");
+          $endd   = (($de)?'heute ':'today ')      if($edleft eq "0");
+          $begind = (($de)?'morgen ':'tomorrow ')  if($dleft eq "1");
+          $endd   = (($de)?'morgen ':'tomorrow ')  if($edleft eq "1");
+
+          $endd   = "" if($begind eq $endd);                                     # bei Ende nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet      
       }
-
-      $end      = substr($end,11,8) if(substr($begin,0,10) eq substr($end,0,10) && $end !~ /heute|today|morgen|tomorrow/);       # bei Ende nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet 
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
-      $out     .= "<td class='cal calright calw150'> $begin   </td>" if($seen{Begin});
-      $out     .= "<td class='cal calright calw150'> $end     </td>" if($seen{End});
-	  $out     .= "<td class='cal'> $tz                       </td>" if($seen{Timezone});
-      $out     .= "<td class='cal'> $summary                  </td>" if($seen{Summary});
-      $out     .= "<td class='cal'> $desc                     </td>" if($seen{Description});
-      $out     .= "<td class='cal'> $status                   </td>" if($seen{Status});
-	  $out     .= "<td class='cal'> $completion               </td>" if($seen{Completion});
-      $out     .= "<td class='cal'> $location                 </td>" if($seen{Location});
-      $out     .= "<td class='cal'> $gps                      </td>" if($seen{Map});
-      $out     .= "<td class='cal'> $cal                      </td>" if($seen{Calendar});
+      $out     .= "<td class='cal calcenter'> $begind             </td>" if($seen{Begin});
+	  $out     .= "<td class='cal calcenter'> $begint             </td>" if($seen{Begin});
+      $out     .= "<td class='cal calcenter'> $endd               </td>" if($seen{End});
+	  $out     .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});
+      $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{Days});
+	  $out     .= "<td class='cal'          > $tz                 </td>" if($seen{Timezone});
+      $out     .= "<td class='cal'          > $summary            </td>" if($seen{Summary});
+      $out     .= "<td class='cal'          > $desc               </td>" if($seen{Description});
+      $out     .= "<td class='cal calcenter'> $status             </td>" if($seen{Status});
+	  $out     .= "<td class='cal calcenter'> $completion         </td>" if($seen{Completion});
+      $out     .= "<td class='cal'          > $location           </td>" if($seen{Location});
+      $out     .= "<td class='cal'          > $gps                </td>" if($seen{Map});
+      $out     .= "<td class='cal'          > $cal                </td>" if($seen{Calendar});
       $out     .= "</tr>";
   }
 
