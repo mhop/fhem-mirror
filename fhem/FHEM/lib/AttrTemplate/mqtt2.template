@@ -77,11 +77,9 @@ filter:TYPE=MQTT2_DEVICE:FILTER=CID=speechrecognTesting
 order:100003
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 set DEVICE attrTemplate mqtt2_speech_recognition_type_light
-par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
+#par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
 attr DEVICE genericDeviceType light
-attr DEVICE homebridgeMapping Brightness=brightness::brightness,minValue=0,maxValue=100,max=255
-#attr DEVICE homebridgeMapping Brightness=sr_brightness,cmd=brightness,max=255,minValue=0,maxValue=100
-#attr DEVICE userReadings sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,minValue=0,maxValue=255,max=255,factor=0.39216
 #attr DEVICE userReadings NEWUSERREADINGS
 option:TYPE=siri
 option:TYPE=alexa
@@ -1797,6 +1795,42 @@ set DEVICE x_mqttcom announce
 set DEVICE attrTemplate mqtt2_speech_recognition_type_light
 attr DEVICE model shellydimmer
 
+
+###########################################
+# ESPurna
+#
+# ESP8266 devices using ESPurna firmware.
+# See project page for details: https://github.com/xoseperez/espurna/wiki
+name:ESPurna_single_relay
+filter:TYPE=MQTT2_DEVICE
+desc:ESPurna is a alternative firmware comparable to tasmota, see <a href="https://github.com/xoseperez/espurna/wiki">project page wiki</a>. <br>NOTE: First experimental version, to contribute see <a href="https://forum.fhem.de/index.php/topic,108058.0.html">Forum Thread</a>.
+order:A_30
+par:DEVNAME;Device's name in the topic tree;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)/([^/]+)/, ? $1 : undef }
+attr DEVICE readingList DEVNAME/relay/0:.* relay_0\
+  DEVNAME/relay/0:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/app:.* app\
+  DEVNAME/version:.* version\
+  DEVNAME/board:.* board\
+  DEVNAME/host:.* host\
+  DEVNAME/ssid:.* ssid\
+  DEVNAME/ip:.* ip\
+  DEVNAME/mac:.* mac\
+  DEVNAME/rssi:.* rssi\
+  DEVNAME/uptime:.* uptime\
+  DEVNAME/datetime:.* datetime\
+  DEVNAME/freeheap:.* freeheap\
+  DEVNAME/vcc:.* vcc\
+  DEVNAME/status:.* status\
+  DEVNAME/loadavg:.* loadavg
+attr DEVICE setList on DEVNAME/relay/0/set 1\
+  off DEVNAME/relay/0/set 0\
+  toggle DEVNAME/relay/0/set 2
+attr DEVICE setStateList on off toggle
+attr DEVICE event-on-change-reading .*
+set DEVICE attrTemplate mqtt2_speech_recognition_type_switch
+attr DEVICE model ESPurna_single_relay
+
+
 ###############
 #ebusd
 #
@@ -1970,7 +2004,9 @@ attr DEVICE readingList \
   BASE_ID/updates/REMOTE_ID/BULB_TYPE/0:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
   on:noArg BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON"}\
+  on_transition:slider,3,10,3600 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"ON","transition":$EVTPART1}\
   off:noArg BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF"}\
+  off_transition:slider,3,10,3600 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"status":"OFF","transition":$EVTPART1}\
   brightness:colorpicker,BRI,0,15,255 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   hue:colorpicker,HUE,0,1,359 BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}\
   command:uzsuSelectRadio,Weiss,Nacht BASE_ID/REMOTE_ID/BULB_TYPE/GROUP_ID {"$EVTPART0":"$EVTPART1"}
@@ -2360,7 +2396,7 @@ attr DEVICE setList start:noArg BASE_ID/DEVNAME/command start\
   store_map BASE_ID/DEVNAME/custom_command {"command":"store_map","name":"$EVTPART1"}
 attr DEVICE setStateList charge locate pause stop start
 attr DEVICE comment For original code for "attrTmqtt2_roborock_valetudo2svg()" see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. To display generated map seperately, define a weblink device: <br>define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">
-farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>Generated map will be shown as devStateIcon or define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code, change "svg" in devStateIcon code to "png" and the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
+farewell:template has been applied successfully. <br>NOTE: additional code has been downloaded from svn (contrib). <br>Generated map will be shown as devStateIcon or define a weblink device: define valetudo_map weblink htmlCode <img src="fhem/images/DEVNAME_map.svg">.<br>For details, see <a href="https://forum.fhem.de/index.php/topic,104687.msg986304.html#msg986304">this forum thread</a>. NOTE: For use with rand256-Valetudo variant of the code with external map generator, change "svg" in devStateIcon code to "png", change readingList entry for map_data to "BASE_ID/DEVNAME/map_data:.* {}" and add the following line: <br>BASE_ID/DEVNAME/map:.* { WriteFile("www/images/DEVNAME_map.png",$EVENT);; {map=>"images/DEVNAME_map.png"} }
 attr DEVICE model roborock
 
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
