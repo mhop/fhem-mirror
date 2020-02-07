@@ -1,4 +1,4 @@
-REV 21128
+REV 21132
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -174,7 +174,7 @@ UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
 UPD 2019-06-17_07:45:03 64846 FHEM/26_tahoma.pm
 UPD 2019-10-22_07:45:02 93142 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
-UPD 2020-01-31_07:45:03 75137 FHEM/30_HUEBridge.pm
+UPD 2020-02-07_07:45:02 75279 FHEM/30_HUEBridge.pm
 UPD 2019-12-31_07:45:05 32719 FHEM/30_LIGHTIFY.pm
 UPD 2018-02-05_07:45:02 15418 FHEM/30_MilightBridge.pm
 UPD 2017-04-26_07:45:02 3562 FHEM/30_pilight_contact.pm
@@ -557,7 +557,7 @@ UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
 UPD 2019-11-19_07:45:03 23610 FHEM/98_serviced.pm
 UPD 2019-12-24_07:45:11 60214 FHEM/98_statistics.pm
-UPD 2019-11-05_07:45:02 32880 FHEM/98_structure.pm
+UPD 2020-02-07_07:45:02 33533 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2018-10-15_07:45:02 20417 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
@@ -744,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-02-06_07:45:13 4198599 docs/commandref.html
-UPD 2020-02-05_07:45:10 2603253 docs/commandref_DE.html
+UPD 2020-02-07_07:45:06 4198905 docs/commandref.html
+UPD 2020-02-07_07:45:09 2603574 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-06_07:45:16 229697 docs/commandref_modular.html
-UPD 2020-02-06_07:45:17 240698 docs/commandref_modular_DE.html
+UPD 2020-02-07_07:45:10 229697 docs/commandref_modular.html
+UPD 2020-02-07_07:45:11 240698 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
