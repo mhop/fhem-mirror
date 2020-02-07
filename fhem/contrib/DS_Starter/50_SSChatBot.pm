@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.2.2"  => "07.02.2020  add new permanent error 410 'message too long' ",
   "1.2.1"  => "27.01.2020  replace \" H\" with \"%20H\" in payload due to problem in HttpUtils ",
   "1.2.0"  => "04.01.2020  check that Botname with type SSChatBot does exist and write Log if not ",
   "1.1.0"  => "27.12.2019  both POST- and GET-method are now valid in CGI ",
@@ -71,6 +72,7 @@ my %SSChatBot_errlist = (
   404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
   407 => "record not valid",
   409 => "exceed max file size",
+  410 => "message too long",
   800 => "malformed or unsupported URL",
   805 => "empty API data received - may be the Synology Chat Server package is stopped",
   806 => "couldn't get Synology Chat API informations",
@@ -704,7 +706,7 @@ sub SSChatBot_checkretry ($$) {
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|117|120|407|409|800|900/) {         # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      if($errorcode =~ /100|101|117|120|407|409|410|800|900/) {     # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = SSChatBot_experror($hash,$errorcode);       # Fehlertext zum Errorcode ermitteln
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
