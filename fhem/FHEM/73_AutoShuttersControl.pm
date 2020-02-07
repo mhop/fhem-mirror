@@ -4702,7 +4702,7 @@ sub getFreezeStatus {
     $daytime = (
         defined($daytime) and $daytime
         ? $daytime
-        : ( strftime( "%k", localtime() ) < 12 ? 'pm' : 'am' )
+        : ( strftime( "%k", localtime() ) < 12 ? 'am' : 'pm' )
     );
     my $outTemp = $ascDev->getOutTemp;
     $outTemp = $shutters->getOutTemp if ( $shutters->getOutTemp != -100 );
@@ -7897,7 +7897,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.15",
+  "version": "v0.8.16",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
