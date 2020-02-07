@@ -53,6 +53,7 @@
 # 09.01.2020 : A.Goebel : fix to skip readings named "dummy"
 # 09.01.2020 : A.Goebel : fix handling for valueFormat, give exact number of parameters to sprintf and shift all of them
 # 16.01.2020 : A.Goebel : add ignore error messages returned by ebusd
+# 05.02.2020 : A.Goebel : change substitute tilde by slash in attribute names (delimiter)
 
 package main;
 
@@ -94,7 +95,7 @@ my $allSetParams           = "";
 my $allSetParamsForWriting = "";
 my $allGetParams           = "";
 my $allGetParamsForWriting = "";
-my $delimiter              = "~";
+my $delimiter              = "_";
 
 my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes";
 my %ebusCmd  = ();
@@ -267,8 +268,8 @@ GAEBUS_Set($@)
   my $type = shift @a;
   my $arg = join(" ", @a);
 
-  $type =~ s/\xe2\x88\xbc/~/g;
-  $arg  =~ s/\xe2\x88\xbc/~/g;
+  $type =~ s,\xe2\x88\xbc,$delimiter,g;
+  $arg  =~ s,\xe2\x88\xbc,$delimiter,g;
 
   #return "No $a[1] for dummies" if(IsDummy($name));
 
@@ -398,7 +399,7 @@ GAEBUS_Set($@)
 
   }
 
-  $actSetParams =~ s/~/&sim;/g;
+  #$actSetParams =~ s,$delimiter,&sim;,g;
   return "Unknown argument $type, choose one of " . $actSetParams
   	if(!defined($sets{$type}));
 
@@ -546,8 +547,8 @@ GAEBUS_Get($@)
 
   # other read commands
 
-  if (defined($a[1])) { $a[1] =~ s/\xe2\x88\xbc/~/g };
-  if (defined($a[2])) { $a[2] =~ s/\xe2\x88\xbc/~/g };
+  if (defined($a[1])) { $a[1] =~ s,\xe2\x88\xbc,$delimiter,g };
+  if (defined($a[2])) { $a[2] =~ s,\xe2\x88\xbc,$delimiter,g };
 
   if ($a[1] =~ /^[ru]$delimiter/ ) 
   {
@@ -565,7 +566,7 @@ GAEBUS_Get($@)
   # handle commands from %gets and show result from ebusd
 
 
-  $actGetParams =~ s/~/&sim;/g;
+  #$actGetParams =~ s,$delimiter,&sim;,g;
   return "Unknown argument $a[1], choose one of " . $actGetParams
   	if(!defined($gets{$a[1]}));
 
@@ -721,7 +722,7 @@ GAEBUS_Attr(@)
     {
       #Log3 ($hash, 2, "match");
       # " a" or "^a$"
-      $userattr =~ s/ *$attrname//;
+      $userattr =~ s, *$attrname,,;
       if ($userattr eq "")
       {
         delete($attr{$name}{userattr});
@@ -737,8 +738,8 @@ GAEBUS_Attr(@)
 
     if ($attrname =~ /^.*$delimiter/) {
       my $reading = $attr{$name}{$attrname};
-      $reading    =~ s/ .*//;
-      $reading    =~ s/:.*//;
+      $reading    =~ s, .*,,;
+      $reading    =~ s,:.*,,;
 
       foreach my $r (split /;/, $reading) {
         Log3 ($name, 3, "$name: delete reading: $r");
@@ -777,6 +778,25 @@ GAEBUS_Attr(@)
       return undef;
     } 
 
+    if ($attrname =~ /~/) {
+      # migration process after restart (processing statements from fhem.cfg)
+      # migrate attribute names containing tilde as delimiter to $delimiter
+      # migrate values from tilde as delimiter to $delimiter
+      # modify userattr to contain the new attribute name
+
+      my $oattrname = $attrname;
+      $attrval =~ s,~,$delimiter,g;
+      $attrname =~ s,~,$delimiter,g;
+      Log3 ($hash, 2, ">$oattrname<>$attrname<>$attrval<");
+
+      # adjust userattr
+      $attr{$name}{userattr} =~ s,$oattrname,$attrname,;
+
+      # set attribute with modified name and return an error
+      $attr{$name}{$attrname} = $attrval;
+      return "attribute containing invalid char migrated to $attrname ($attrval)";
+    }
+
     if ( " $userattr " =~ / $attrname / ) 
     {
       # this is an attribute form "userattr"
@@ -795,16 +815,16 @@ GAEBUS_Attr(@)
       if (defined $attr{$name}{$attrname}) 
       {
         my $oldreading = $attr{$name}{$attrname};
-        $oldreading    =~ s/ .*//;
-        $oldreading    =~ s/:.*//;
+        $oldreading    =~ s, .*,,;
+        $oldreading    =~ s,:.*,,;
         my $newreading = $attrval;
-        $newreading    =~ s/ .*//;
-        $newreading    =~ s/:.*//;
+        $newreading    =~ s, .*,,;
+        $newreading    =~ s,:.*,,;
 
         my @or = split /;/, $oldreading;
         my @nr = split /;/, $newreading;
 
-        for (my $i; $i <= $#or; $i++)
+        for (my $i=0; $i <= $#or; $i++)
         {
           if ($or[$i] ne $nr[$i])
           {
@@ -1019,6 +1039,7 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   if ($action eq "f")
   {
+    #Log3 ($name, 3, "$name find process answer.");
 
     %sets = ( "reopen" => [] );
     %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
@@ -1029,10 +1050,10 @@ GAEBUS_doEbusCmd($$$$$$$)
     foreach my $line (split /\n/, $actMessage) {
       $cnt++;
 
-      $line =~ s/ /_/g; # no blanks in names and comments
-      $line =~ s/$delimiter/_/g; # clean up the delimiter within the text
+      $line =~ s/ /./g; # no blanks in names and comments
+      $line =~ s,$delimiter,.,g; # clean up the delimiter within the text
 
-      Log3 ($name, 4, "$name $line");
+      #Log3 ($name, 5, "$name $line");
 
       #my ($io,$class,$var) = split (",", $line, 3);
       my ($io, $class, $var, $comment, @params) = split (",", $line, 5);
@@ -1354,16 +1375,16 @@ GAEBUS_valueFormat(@)
     <li>reopen<br>
         Will close and open the socket connection.
         </li><br>
-    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
+    <li>[r]_&lt;class&gt; &lt;variable-name&gt;_&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [r]~&lt;class&gt;~&lt;variable-name&gt;~<br>
+        [r]_&lt;class&gt;_&lt;variable-name&gt;<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used as the name for the reading which are read from ebusd in the interval specified.<br>
         The content of &lt;comment$gt; is dropped and not added to the attribute name.<br>
         </li><br>
-    <li>[w]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
+    <li>[w]_&lt;class&gt; &lt;variable-name&gt;_&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [w]~&lt;class&gt;~&lt;variable-name&gt;<br>
+        [w]_&lt;class&gt;_&lt;variable-name&gt;<br>
         They will only appear if the attribute "ebusWritesEnabled" is set to "1"<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used for set commands to modify parameters for ebus devices<br>
@@ -1380,7 +1401,7 @@ GAEBUS_valueFormat(@)
         </li><br>
 
     <li>ebusd_find<br>
-        Execude <i>find</i> command on ebusd. Result will be used to display supported "set" and "get" commands.
+        Execude <i>find</i> command on ebusd. Result will be used to display supported "set" and "get" commands. Refresh the page in your Browser to make results visible.
         </li><br>
 
     <li>ebusd_hex<br>
@@ -1392,14 +1413,14 @@ GAEBUS_valueFormat(@)
         Will read the actual value form ebusd and update the reading.
         </li><br>
 
-    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
+    <li>[r]_&lt;class&gt; &lt;variable-name&gt;_&lt;comment&gt;<br>
         Will read this variable from the ebusd and show the result as a popup.<br>
         Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         </li><br>
 
     <li>removeCommentFromAttributeNames<br>
-        This will migrate the former used attribute names of format "[rw]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;"
-        into the format "[rw]~&lt;class&gt; &lt;variable-name&gt;".<br>
+        This will migrate the former used attribute names of format "[rw]_&lt;class&gt; &lt;variable-name&gt;_&lt;comment&gt;"
+        into the format "[rw]_&lt;class&gt;_&lt;variable-name&gt;".<br>
 	It is only available if such attributes are defined.<br>
         </li><br>
 
@@ -1420,7 +1441,7 @@ GAEBUS_valueFormat(@)
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[r]~&lt;class&gt;~&lt;variable-name&gt;</code><br>
+        <code>[r]_&lt;class&gt;_&lt;variable-name&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
@@ -1433,7 +1454,7 @@ GAEBUS_valueFormat(@)
 	If "+f" is given as an additional parameter this will remove the "-f" option from the ebusd request. This will return the value stored in ebusd instead of requesting it freshly.<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[w]~&lt;class&gt;~&lt;variable-name&gt;</code><br>
+        <code>[w]_&lt;class&gt;_&lt;variable-name&gt;</code><br>
         define parameters that can be changed on ebus devices (using the write command from ebusctl)
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name that will be used in set to change a parameter for a ebus device.<br>
