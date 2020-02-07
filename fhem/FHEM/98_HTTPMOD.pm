@@ -172,6 +172,7 @@
 #   2019-11-20  precompilation of preProcessRegex removed - can't compile a regex inluding a replacement part for s//
 #   2019-11-29  new fix for special compiled regexes with regex options
 #   2019-12-27  delete hash-{method} if not explicitely set
+#   2020-02-07  delete $hash->{httpbody} when showBody is set to 0 or deleted
 #
 #
 
@@ -243,12 +244,12 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.5.21 - 27.12.2019';
+my $HTTPMOD_Version = '3.5.22 - 7.2.2020';
 
-#
+
+#########################################################################
 # FHEM module intitialisation
 # defines the functions to be called from FHEM
-#########################################################################
 sub HTTPMOD_Initialize($)
 {
     my ($hash) = @_;
@@ -733,10 +734,17 @@ sub HTTPMOD_Attr(@)
                 return "Please install JSON Library to use JSON (apt-get install libjson-perl) - error was $@";
             }
             $hash->{JSONEnabled} = 1;
+
         } elsif ($aName eq "enableCookies") {
             if ($aVal eq "0") {
                 delete $hash->{HTTPCookieHash};
             }
+
+        } elsif ($aName eq "showBody") {
+            if ($aVal eq "0") {
+                delete $hash->{httpbody};
+            }
+
         } elsif ($aName eq "enableXPath" 
                 || $aName =~ /(get|reading)[0-9]+XPath$/
                 || $aName =~ /[Rr]eAuthXPath$/
@@ -831,6 +839,9 @@ sub HTTPMOD_Attr(@)
             }
         } elsif ($aName eq "enableCookies") {
             delete $hash->{HTTPCookieHash};
+
+        } elsif ($aName eq "showBody") {
+            delete $hash->{httpbody};
 
         } elsif ($aName =~ /(reading|get)[0-9]*(-[0-9]+)?MaxAge$/) {
             if (!(grep !/$aName/, grep (/(reading|get)[0-9]*(-[0-9]+)?MaxAge$/, keys %{$attr{$name}}))) {
@@ -1721,6 +1732,7 @@ sub HTTPMOD_Caller()
     my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash) = caller 2;
     return $1 if ($subroutine =~ /main::HTTPMOD_(.*)/);
     return $1 if ($subroutine =~ /main::(.*)/);
+    return 'Fhem internal timer' if ($subroutine =~ /main::HandleTimeout/);
     return "$subroutine";
 }
 
@@ -3655,12 +3667,12 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$){
     <b>Further replacements of URL, header or post data</b><br><br>
     <ul>
         sometimes it is helpful to dynamically change parts of a URL, HTTP header or post data depending on existing readings, internals or perl expressions at runtime. <br>
-        HTTPMOD has two built in replacements: one for values passed to a set or get command and the other one for the session id.<br>
+        HTTPMOD has two built in replacements: one for values passed to a set or get command and the other one for a session id.<br>
         Before a request is sent, the placeholder $val is replaced with the value that is passed in a set command or an optional value that can be passed in a get command (see getXTextArg). This value is internally stored in the internal "value" so it can also be used in a user defined replacement as explaind in this section.<br>
-        The other built in replacement is for the session id. If a session id is extracted via a regex, JSON or XPath the it is stored in the internal "sid" and the placeholder $sid in a URL, header or post data is replaced by the content of thus internal.
+        The other built in replacement is for the session id. If a session id is extracted via a regex, JSON or XPath the it is stored in the internal "sid" and the placeholder $sid in a URL, header or post data is replaced by the content of this internal.
         
-        User defined replacement can exted this functionality and this might be needed to pass further variables to a server, a current date or other things. <br>
-        To support this HTTPMOD offers user defined replacements that are as well applied to a request before it is sent to the server.
+        User defined replacements can exted this functionality and this might be needed to pass further variables to a server, a current date, a CSRF-token or other things. <br>
+        To support this, HTTPMOD offers user defined replacements that are as well applied to a request before it is sent to the server.
         A replacement can be defined with the attributes 
         <ul><code>
           "replacement[0-9]*Regex "<br>
@@ -3674,7 +3686,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$$){
         then the value is interpreted as the name of a reading of the same device or as device:reading to refer to another device.
         If the mode is <code>internal</code>, then the value is interpreted as the name of an internal of the same device or as device:internal to refer to another device.<br>
         The mode <code>text</code> will use the value as a static text and the mode <code>expression</code> will evaluate the value as a perl expression to compute the replacement. Inside such a replacement expression it is possible to refer to capture groups of the replacement regex.<br>
-        The mode <code>key</code> will use a value from a key / value pair that is stored in an obfuscated form in the file system with the set storeKeyValue command. This might be useful for storing passwords.<br>
+        The mode <code>key</code> will use a value from a key / value pair that is stored in an obfuscated form in the file system with the set storeKeyValue command. This can be useful for storing passwords.<br>
         <br>
         Example:
         <ul><code>
