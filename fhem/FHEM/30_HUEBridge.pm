@@ -114,8 +114,9 @@ HUEBridge_Read($)
         $code = $name ."-". $id if( $obj->{r} eq 'lights' );
         $code = $name ."-S". $id if( $obj->{r} eq 'sensors' );
         $code = $name ."-G". $id if( $obj->{r} eq 'groups' );
+        $code = $name ."-G". $obj->{gid} if( $obj->{r} eq 'scenes' && $obj->{gid} );
         if( !$code ) {
-          Log3 $name, 5, "$name: ignoring event: $code";
+          Log3 $name, 5, "$name: ignoring event: $data";
           return;
         }
 
@@ -134,8 +135,11 @@ HUEBridge_Read($)
           }
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'scene-called' ) {
-          Log3 $name, 5, "$name: todo: handle websocket scene-called $data";
-          # trigger scene event ?
+          if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+            #HUEDevice_Parse($chash, $obj);
+            HUEDevice_Parse($chash, { state => { scene => $obj->{scid} } } );
+            #readingsSingleUpdate($hash, 'scene',  $obj->{scid}, 1 );
+          }
 
         } elsif( $obj->{t} eq 'event' && $obj->{e} eq 'added' ) {
           Log3 $name, 5, "$name: websocket add: $data";
@@ -1957,12 +1961,12 @@ HUEBridge_dispatch($$$;$)
 
       }
 
-    } elsif( $type =~ m/^lights\/(\d*)$/ ) {
+    } elsif( $type =~ m/^lights\/(\d+)$/ ) {
       if( HUEDevice_Parse($param->{chash}, $json) ) {
         HUEBridge_updateGroups($hash, $param->{chash}{ID});
       }
 
-    } elsif( $type =~ m/^lights\/(\d*)\/bridgeupdatestate$/ ) {
+    } elsif( $type =~ m/^lights\/(\d+)\/bridgeupdatestate$/ ) {
       # only for https://github.com/bwssytems/ha-bridge
       # see https://forum.fhem.de/index.php/topic,11020.msg961555.html#msg961555
       if( $queryAfterSet ) {
@@ -1976,13 +1980,13 @@ HUEBridge_dispatch($$$;$)
         }
       }
 
-    } elsif( $type =~ m/^groups\/(\d*)$/ ) {
+    } elsif( $type =~ m/^groups\/(\d+)$/ ) {
       HUEDevice_Parse($param->{chash}, $json);
 
-    } elsif( $type =~ m/^sensors\/(\d*)$/ ) {
+    } elsif( $type =~ m/^sensors\/(\d+)$/ ) {
       HUEDevice_Parse($param->{chash}, $json);
 
-    } elsif( $type =~ m/^lights\/(\d*)\/state$/ ) {
+    } elsif( $type =~ m/^lights\/(\d+)\/state$/ ) {
       if( $queryAfterSet ) {
         my $chash = $param->{chash};
         if( $chash->{helper}->{update_timeout} ) {
@@ -1994,7 +1998,8 @@ HUEBridge_dispatch($$$;$)
         }
       }
 
-    } elsif( $type =~ m/^groups\/(\d*)\/action$/ ) {
+    } elsif( $type =~ m/^groups\/(\d+)\/action$/
+             || $type =~ m/^groups\/(\d+)\/scenes\/(\d+)\/recall$/ ) {
       my $chash = $param->{chash};
       if( $chash->{helper}->{update_timeout} ) {
         RemoveInternalTimer($chash);
