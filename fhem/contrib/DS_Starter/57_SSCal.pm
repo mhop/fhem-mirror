@@ -49,7 +49,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 # Versions History intern
 my %SSCal_vNotesIntern = (
   "1.7.0"  => "07.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
-                           "formatting overview table ",
+                           "formatting overview table, feature smallScreen for tableSpecs ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
@@ -2227,11 +2227,12 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           $dleft = int(($btimes - $ntimes)/86400);
       }
   }
-  push(@row_array, $bts+$n." 03_End "        .$edate." ".$etime."\n") if($edate && $etime);
-  push(@row_array, $bts+$n." 02_bTimestamp " .$bts."\n")              if($bts);
-  push(@row_array, $bts+$n." 03_eTimestamp " .$ets."\n")              if($ets);   
-  push(@row_array, $bts+$n." 04_daysLeft "   .$dleft."\n")            if(defined $dleft); 
-  push(@row_array, $bts+$n." 09_Timezone "   .$tz."\n")               if($tz); 
+  push(@row_array, $bts+$n." 03_End "          .$edate." ".$etime."\n")   if($edate && $etime);
+  push(@row_array, $bts+$n." 02_bTimestamp "   .$bts."\n")                if($bts);
+  push(@row_array, $bts+$n." 03_eTimestamp "   .$ets."\n")                if($ets);   
+  push(@row_array, $bts+$n." 04_daysLeft "     .$dleft."\n")              if(defined $dleft); 
+  push(@row_array, $bts+$n." 04_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
+  push(@row_array, $bts+$n." 09_Timezone "     .$tz."\n")                 if($tz); 
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
@@ -3222,6 +3223,7 @@ sub SSCal_calAsHtml($) {
   my $hash   = $defs{$name}; 
   my $lang   = AttrVal("global","language","EN");
   my $mi     = AttrVal($name,"tableColumnMap","icon");
+  my $small  = $hash->{HELPER}{tableSpecs}{smallScreen};        # Smallscreen
   my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft); 
 
   my $de = 0;
@@ -3241,10 +3243,17 @@ sub SSCal_calAsHtml($) {
   
   $out    .= "<table class='block'>";
   $out    .= "<tr class='odd'>";
-  $out    .= "<td class='cal calbold calright'> ".(($de)?'Start'               :'Begin')."               </td>" if($seen{Begin});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'----'               :'----')."                </td>" if($seen{Begin});
-  $out    .= "<td class='cal calbold calright'> ".(($de)?'Ende'                :'End')."                 </td>" if($seen{End});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'----'               :'----')."                </td>" if($seen{End});
+  
+  if($small) {                                                                 # nur ein Datumfeld umbrechbar
+      $out .= "<td class='cal calbold calcenter'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
+      $out .= "<td class='cal calbold calcenter'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
+  } else {
+      $out .= "<td class='cal calbold calright'>  ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
+      $out .= "<td class='cal calbold calcenter'> ".(($de)?'----'              :'----')."                </td>" if($seen{Begin});
+      $out .= "<td class='cal calbold calright'>  ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
+      $out .= "<td class='cal calbold calcenter'> ".(($de)?'----'              :'----')."                </td>" if($seen{End});  
+  }
+  
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{Days});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
@@ -3349,10 +3358,15 @@ sub SSCal_calAsHtml($) {
       }
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
-      $out     .= "<td class='cal calcenter'> $begind             </td>" if($seen{Begin});
-	  $out     .= "<td class='cal calcenter'> $begint             </td>" if($seen{Begin});
-      $out     .= "<td class='cal calcenter'> $endd               </td>" if($seen{End});
-	  $out     .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});
+      if($small) {
+          $out .= "<td class='cal '> ".$begind." ".$begint. "</td>" if($seen{Begin});
+          $out .= "<td class='cal '> ".$endd  ." ".$endt.   "</td>" if($seen{End});
+      } else {
+          $out .= "<td class='cal calcenter'> $begind             </td>" if($seen{Begin});
+          $out .= "<td class='cal calcenter'> $begint             </td>" if($seen{Begin});
+          $out .= "<td class='cal calcenter'> $endd               </td>" if($seen{End});
+          $out .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});      
+      }
       $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{Days});
 	  $out     .= "<td class='cal'          > $tz                 </td>" if($seen{Timezone});
       $out     .= "<td class='cal'          > $summary            </td>" if($seen{Summary});
