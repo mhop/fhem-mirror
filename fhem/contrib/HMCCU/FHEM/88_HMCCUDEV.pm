@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.002
+#  Version 4.4.008
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -25,6 +25,7 @@ sub HMCCUDEV_Initialize ($);
 sub HMCCUDEV_Define ($@);
 sub HMCCUDEV_InitDevice ($$);
 sub HMCCUDEV_Undef ($$);
+sub HMCCUDEV_Rename ($$);
 sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
 sub HMCCUDEV_Attr ($@);
@@ -39,6 +40,7 @@ sub HMCCUDEV_Initialize ($)
 
 	$hash->{DefFn} = "HMCCUDEV_Define";
 	$hash->{UndefFn} = "HMCCUCHN_Undef";
+	$hash->{RenameFn} = "HMCCUDEV_Rename";
 	$hash->{SetFn} = "HMCCUDEV_Set";
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
@@ -85,7 +87,11 @@ sub HMCCUDEV_Define ($@)
 
 	my $ioHash = undef;
 	
+# 	my $existDev = HMCCU_ExistsClientDevice ($devspec, $devtype);
+# 	return "FHEM device $existDev for CCU device $devspec already exists" if (defined($existDev));
+
 	# Store some definitions for delayed initialization
+	$hash->{readonly} = 'no';
 	$hash->{hmccu}{devspec}  = $devspec;
 	$hash->{hmccu}{groupexp} = $h->{groupexp} if (exists ($h->{groupexp}));
 	$hash->{hmccu}{group}    = $h->{group} if (exists ($h->{group}));
@@ -103,11 +109,11 @@ sub HMCCUDEV_Define ($@)
 	}
 
 	# Defaults
-	$hash->{statevals} = 'devstate';
+	$hash->{hmccu}{statevals} = 'devstate';
 	
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
-		if    ($arg eq 'readonly') { $hash->{statevals} = $arg; }
+		if    ($arg eq 'readonly') { $hash->{readonly} = 'yes'; $hash->{hmccu}{statevals} = '' }
 		elsif ($arg eq 'defaults') {
 			HMCCU_SetDefaults ($hash) if ($init_done);
 		}
@@ -260,7 +266,7 @@ sub HMCCUDEV_InitDevice ($$)
 			my $rc = 0;
 			if ($devna) {
 				$dev_hash->{ccutype} = 'n/a';
-				$dev_hash->{statevals} = 'readonly';
+				$dev_hash->{readonly} = 'yes';
 				$rc = HMCCU_CreateDevice ($ioHash, $dev_hash->{ccuaddr}, $name, undef, $dev); 
 			}
 			else {
@@ -300,6 +306,20 @@ sub HMCCUDEV_Undef ($$)
 }
 
 ######################################################################
+# Rename device
+######################################################################
+
+sub HMCCUDEV_Rename ($$)
+{
+	my ($newName, $oldName) = @_;
+	
+	my $clHash = $defs{$newName};
+	my $ioHash = defined($clHash) ? $clHash->{IODev} : undef;
+	
+	HMCCU_RenameDevice ($ioHash, $clHash, $oldName);
+}
+
+######################################################################
 # Set attribute
 ######################################################################
 
@@ -314,19 +334,19 @@ sub HMCCUDEV_Attr ($@)
 			$hash->{IODev} = $defs{$attrval};
 		}
 		elsif ($attrname eq "statevals") {
-			return "Device is read only" if ($hash->{statevals} eq 'readonly');
-			$hash->{statevals} = 'devstate';
+			return "Device is read only" if ($hash->{readonly} eq 'yes');
+			$hash->{hmccu}{statevals} = 'devstate';
 			my @states = split /,/,$attrval;
 			foreach my $st (@states) {
 				my @statesubs = split /:/,$st;
 				return "value := text:substext[,...]" if (@statesubs != 2);
-				$hash->{statevals} .= '|'.$statesubs[0];
+				$hash->{hmccu}{statevals} .= '|'.$statesubs[0];
 			}
 		}
 	}
 	elsif ($cmd eq "del") {
 		if ($attrname eq "statevals") {
-			$hash->{statevals} = "devstate";
+			$hash->{hmccu}{statevals} = $hash->{readonly} eq 'yes' ? '' : "devstate";
 		}
 	}
 
@@ -352,7 +372,7 @@ sub HMCCUDEV_Set ($@)
 	my $hmccu_name = $ioHash->{NAME};
 
 	# Handle read only and disabled devices
-	return undef if ($hash->{statevals} eq 'readonly' && $opt ne '?'
+	return undef if ($hash->{readonly} eq 'yes' && $opt ne '?'
 		&& $opt !~ /^(clear|config|defaults)$/);
 	my $disable = AttrVal ($name, "disable", 0);
 	return undef if ($disable == 1);
@@ -435,7 +455,7 @@ sub HMCCUDEV_Set ($@)
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
-	elsif ($opt =~ /^($hash->{statevals})$/) {
+	elsif ($opt =~ /^($hash->{hmccu}{statevals})$/) {
 		my $cmd = $1;
 		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @$a;
 
@@ -450,12 +470,12 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'toggle') {
-		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
+		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{hmccu}{statevals}));
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');		
 		return HMCCU_SetError ($hash, -13) if ($sd eq '');	
 		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, $sd, 2));
 
-		my $tstates = $hash->{statevals};
+		my $tstates = $hash->{hmccu}{statevals};
 		$tstates =~ s/devstate\|//;
 		my @states = split /\|/, $tstates;
 		my $stc = scalar (@states);
@@ -549,9 +569,9 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
-		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{statevals}));
+		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{hmccu}{statevals}));
 		return HMCCU_SetError ($hash, "No state value for 'on' defined")
-		   if ("on" !~ /($hash->{statevals})/);
+		   if ("on" !~ /($hash->{hmccu}{statevals})/);
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');
 		return HMCCU_SetError ($hash, -13) if ($sd eq '');
 		return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type")
@@ -632,12 +652,12 @@ sub HMCCUDEV_Set ($@)
 	else {
 		my $retmsg = "clear config defaults:noArg";
 		
-		if ($hash->{statevals} ne 'readonly') {
+		if ($hash->{readonly} ne 'yes') {
 			$retmsg .= " control datapoint rpcparameter";
 			if ($sc ne '') {
 				$retmsg .= " devstate";
-				if ($hash->{statevals} ne '') {
-					my @cmdlist = split /\|/,$hash->{statevals};
+				if ($hash->{hmccu}{statevals} ne '') {
+					my @cmdlist = split /\|/,$hash->{hmccu}{statevals};
 					shift @cmdlist;
 					$retmsg .= ':'.join(',',@cmdlist) if (@cmdlist > 0);
 					foreach my $sv (@cmdlist) {
