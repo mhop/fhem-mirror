@@ -364,21 +364,9 @@ sub Pushsafer_Callback($$$)
             readingsBulkUpdate($hash, "lastSuccess", $1);
         }
 
-        if($data =~ /available"?\s*:\s*{(.+)\s*}\s*}\s*$/gcs)
+        if($data =~ /available"?\s*:\s*(\d+)/gcs)
         {
-            my %devices =  grep { defined($_) } map { /^"?(\d+)"?:({.+})$/ ? ($1 => $2) : undef } split(",", $1);
-
-            foreach my $dev (keys %devices)
-            {
-                if(defined($devices{$dev}) and $devices{$dev} =~ /^{\s*"?([^":]+)"?\s*:\s*"?([^":]+)"?\s*}$/)
-                {
-                    my ($devname, $available) = ($1, $2);
-
-                    $devname =~ s/\s+//g;
-
-                    readingsBulkUpdate($hash, "availableMessages-$dev-$devname", $available);
-                }
-            }
+            readingsBulkUpdate($hash, "availableMessages", $1);
         }
 
         readingsEndUpdate($hash, 1);

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_Pushsafer: fix availableMessages reading
  - bugfix:  73_AutoShuttersControl: fix GetAntiFreez
  - change:  59_Weather: add wunderground documentation in commandref
  - feature  mqtt2.template: add speech recognition extensions
