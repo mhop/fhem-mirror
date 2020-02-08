@@ -1422,7 +1422,12 @@ readingsGroup_Notify($$)
             next;
           }
 
-          next if( defined($regex) && $reading !~ m/^$regex$/);
+          if( $regex ) {
+            my $regex = $regex;
+            $regex =~ s/\{/\\\{/g;
+            $regex =~ s/\}/\\\}/g;
+            next if( $reading !~ m/^$regex$/);
+          }
 
           my $value = $value;
           if( $format eq 't' || $format eq 'sec' ) {
