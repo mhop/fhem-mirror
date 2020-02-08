@@ -79,7 +79,7 @@ option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $
 set DEVICE attrTemplate mqtt2_speech_recognition_type_light
 #par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
 attr DEVICE genericDeviceType light
-attr DEVICE homebridgeMapping Brightness=brightness::brightness,minValue=0,maxValue=255,max=255,factor=0.39216
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,minStep=5,factor=0.39216
 #attr DEVICE userReadings NEWUSERREADINGS
 option:TYPE=siri
 option:TYPE=alexa
