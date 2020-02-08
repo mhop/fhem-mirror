@@ -79,7 +79,7 @@ option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $
 set DEVICE attrTemplate mqtt2_speech_recognition_type_light
 #par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
 attr DEVICE genericDeviceType light
-attr DEVICE homebridgeMapping Brightness=brightness::brightness,minStep=5,factor=0.39216
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39216,delay=true
 #attr DEVICE userReadings NEWUSERREADINGS
 option:TYPE=siri
 option:TYPE=alexa
@@ -979,7 +979,7 @@ Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenD
 Shutter specific commands available: ShutterOpenDuration1, ShutterCloseDuration1, ShutterRelay1, ShutterSetHalfway1, ShutterSetClose1, ShutterInvert1, ShutterMotordelay1, ShutterCalibration1; you may use this for general setOptions in tasmota also.\
 commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a>.
-set DEVICE attrTemplate mqtt2_speech_recognition_type_blind
+# set DEVICE attrTemplate mqtt2_speech_recognition_type_blind
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
 
@@ -993,6 +993,7 @@ par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set DEVICE attrTemplate tasmota_2ch_shutter_invert_1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterInvert1 0;; SaveData 1;;
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
+set DEVICE attrTemplate mqtt2_speech_recognition_type_blind
 attr DEVICE model tasmota_2ch_shutter_invert_0
 
 # sonoff 4 channel device flashed with Tasmota.
@@ -1445,7 +1446,7 @@ state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate mqtt2_speech_recognition_type_blind
+#set DEVICE attrTemplate mqtt2_speech_recognition_type_blind
 attr DEVICE model shelly25_roller_invert_1
 
 # shelly2 using original firmware.
