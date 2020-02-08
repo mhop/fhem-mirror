@@ -3234,7 +3234,7 @@ sub SSCal_calAsHtml($;$) {
   
   # Entscheidung ob Tabelle für Small Screen optimiert
   my $small = 0;
-  if ($FW_wname) {                                                             # Aufruf durch FHEMWEB
+  if ($FW_wname && $hash->{HELPER}{tableSpecs}{smallScreen}) {                 # Aufruf durch FHEMWEB und smallScreen-Eigenschaft gesetzt
       my %specs;
       my $FW_style = AttrVal($FW_wname, "stylesheetPrefix", "default");
       my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreen});     # Eigenschaft smallScreen in Array lesen
