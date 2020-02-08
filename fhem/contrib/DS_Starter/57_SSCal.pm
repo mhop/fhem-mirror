@@ -820,7 +820,7 @@ sub SSCal_FWdetailFn ($$$$) {
   my $hash = $defs{$d};
   my $ret  = "";
   
-  $hash->{".calhtml"} = SSCal_calAsHtml($d);
+  $hash->{".calhtml"} = SSCal_calAsHtml($d,$FW_wname);
 
   if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"tableInDetail",1)) {    # Anzeige Übersicht in Detailansicht
       $ret .= $hash->{".calhtml"};
@@ -3220,21 +3220,34 @@ return $bool;
 #############################################################################################
 #   Kalenderliste als HTML-Tabelle zurückgeben
 #############################################################################################
-sub SSCal_calAsHtml($) {      
-  my ($name) = @_;
-  my $hash   = $defs{$name}; 
-  my $lang   = AttrVal("global","language","EN");
-  my $mi     = AttrVal($name,"tableColumnMap","icon");
-  my $small  = $hash->{HELPER}{tableSpecs}{smallScreen};        # Smallscreen
+sub SSCal_calAsHtml($;$) {      
+  my ($name,$FW_wname) = @_;
+  my $hash             = $defs{$name};  
+  my $lang             = AttrVal("global", "language", "EN");
+  my $mi               = AttrVal($name, "tableColumnMap", "icon");
+  
   my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft); 
 
+  # Sprachsteuerung
   my $de = 0;
   if($lang eq "DE") {$de = 1};
   
+  # Entscheidung ob Tabelle für Small Screen optimiert
+  my $small = 0;
+  if ($FW_wname) {                                                             # Aufruf durch FHEMWEB
+      my %specs;
+      my $FW_style = AttrVal($FW_wname, "stylesheetPrefix", "default");
+      my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreen});     # Eigenschaft smallScreen in Array lesen
+      grep { !$specs{$_}++ } @scspecs;
+      $small       = 1 if($specs{$FW_style});                                  # Tabelle für small-Style anpassen                                   
+  }
+  
+  # Auswahl der darzustellenden Tabellenfelder
   my %seen;
   my @cof = split(",", AttrVal($name, "tableFields", "Begin,End,Summary,Status,Location"));
   grep { !$seen{$_}++ } @cof;                        
 
+  # Tabelle
   my $out  = "<html>";
   $out    .= "<style>TD.cal       {padding-left:10px; padding-right:10px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
   $out    .= "<style>TD.calbold   {font-weight: bold;}  </style>";
@@ -3246,7 +3259,7 @@ sub SSCal_calAsHtml($) {
   $out    .= "<table class='block'>";
   $out    .= "<tr class='odd'>";
   
-  if($small) {                                                                 # nur ein Datumfeld umbrechbar
+  if ($small) {                                                                # nur ein Datumfeld umbrechbar
       $out .= "<td class='cal calbold calcenter'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
       $out .= "<td class='cal calbold calcenter'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
   } else {
