@@ -1945,7 +1945,7 @@ readingsGroup_Attr($$$;$)
         this reading will be skipped. Can be given as a string, a perl expression returning a hash or a perl
         expression returning a string, e.g.:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code><br>
-          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %%" }</code><br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li><br>
       <li>valuePrefix<br>
         text to be prepended to the reading value</li><br>
@@ -2198,7 +2198,7 @@ readingsGroup_Attr($$$;$)
         Geben Sie eine Sprintf-Stilformat-Zeichenfolge an, die zum Anzeigen der Readings-Werte verwendet wird. Wenn die Formatzeichenfolge undef ist
         wird dieser Messwert &uuml;bersprungen. Es kann als String angegeben werden, ein Perl-Ausdruck, der einen Hash- oder Perl-Ausdruck zur&uuml;ckgibt, der einen String zur&uuml;ckgibt, z.Bsp:<br>
           <code>attr temperatures valueFormat %.1f &deg;C</code><br>
-          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %" }</code><br>
+          <code>attr temperatures valueFormat { temperature => "%.1f &deg;C", humidity => "%i %%" }</code><br>
           <code>attr temperatures valueFormat { ($READING eq 'temperature')?"%.1f &deg;C":undef }</code></li><br>
       <li>valuePrefix<br>
         Text, der dem Readings-Wert vorangestellt wird</li><br>
