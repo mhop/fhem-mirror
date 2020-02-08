@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument "" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
+  "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
   "8.32.0"  => "29.01.2020  new option \"deleteOther\" for minValue ",
   "8.31.0"  => "26.01.2020  new option \"deleteOther\" for maxValue ",
   "8.30.8"  => "25.01.2020  adjust SQL-Statements in OutputWriteToDB to avoid Duplicate entry errors and other fixes ",
