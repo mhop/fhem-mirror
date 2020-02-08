@@ -49,9 +49,10 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 # Versions History intern
 my %SSCal_vNotesIntern = (
   "1.7.0"  => "07.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
-                           "formatting overview table, feature smallScreen for tableSpecs ",
+                           "formatting overview table, feature smallScreen for tableSpecs, rename atributes to tableFields, ".
+                           "tableInDetail, tableInRoom ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
-  "1.6.0"  => "03.02.2020  new attribute \"calOverviewFields\" to show specified fields in calendar overview in detail/room view, ".
+  "1.6.0"  => "03.02.2020  new attribute \"tableFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
   "1.5.0"  => "02.02.2020  new attribute \"calOverviewInDetail\",\"calOverviewInRoom\" to control calendar overview in room or detail view ",
   "1.4.0"  => "02.02.2020  get calAsHtml command or use sub SSCal_calAsHtml(\$name) ",
@@ -159,9 +160,6 @@ sub SSCal_Initialize($) {
  $hash->{FW_deviceOverview}     = 1;
  
  $hash->{AttrList} = "asyncMode:1,0 ".  
-                     "calOverviewInDetail:0,1 ".
-                     "calOverviewInRoom:0,1 ".
-                     "calOverviewFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -173,6 +171,9 @@ sub SSCal_Initialize($) {
                      "tableColumnMap:icon,data,text ".					 
                      "showRepeatEvent:true,false ".
                      "showPassInLog:1,0 ".
+                     "tableInDetail:0,1 ".
+                     "tableInRoom:0,1 ".
+                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -340,6 +341,7 @@ sub SSCal_Attr($$$$) {
             # Log3($name, 1, "$name - av: ".$av);
             if($@) {
                 Log3($name, 2, "$name - Error while evaluate: ".$@);
+                return $@; 
             } else {
                 $attrVal = $av if(ref($av) eq "HASH");
             }
@@ -820,12 +822,12 @@ sub SSCal_FWdetailFn ($$$$) {
   
   $hash->{".calhtml"} = SSCal_calAsHtml($d);
 
-  if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"calOverviewInDetail",1)) {    # Anzeige Übersicht in Detailansicht
+  if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"tableInDetail",1)) {    # Anzeige Übersicht in Detailansicht
       $ret .= $hash->{".calhtml"};
       return $ret;
   } 
   
-  if($hash->{".calhtml"} ne "" && $room && AttrVal($d,"calOverviewInRoom",1)) {       # Anzeige in Raumansicht zusätzlich zur Statuszeile
+  if($hash->{".calhtml"} ne "" && $room && AttrVal($d,"tableInRoom",1)) {       # Anzeige in Raumansicht zusätzlich zur Statuszeile
       $ret = $hash->{".calhtml"};
       return $ret;
   }
@@ -3230,7 +3232,7 @@ sub SSCal_calAsHtml($) {
   if($lang eq "DE") {$de = 1};
   
   my %seen;
-  my @cof = split(",", AttrVal($name, "calOverviewFields", "Begin,End,Summary,Status,Location"));
+  my @cof = split(",", AttrVal($name, "tableFields", "Begin,End,Summary,Status,Location"));
   grep { !$seen{$_}++ } @cof;                        
 
   my $out  = "<html>";
@@ -3277,7 +3279,7 @@ sub SSCal_calAsHtml($) {
   my $k;
   for ($k=0;$k<=$maxbnr;$k++) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
-      last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufage vorhanden
+      last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufgabe vorhanden
       
 	  ($begind,$begint,$endd,$endt,$gps) = ("","","","","");
 	  
