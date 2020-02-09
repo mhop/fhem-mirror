@@ -3918,7 +3918,6 @@ sub MSwitch_fhemwebconf($$$$) {
 	$notifydef = "[".$notifydef."]";
 	$notify= "[".$notify."]";
 	
-
 	my $return="
 
 	<div id='mode'>Konfigurationsmodus:&nbsp;
@@ -3933,20 +3932,19 @@ sub MSwitch_fhemwebconf($$$$) {
 	<tr>
 	<td id='help'>Hilfetext</td>
 	<td id='help1'></td>
-	<td>
-	<div id ='version'></div>
-	<div id ='tf'></div>
-	</td>
-	</tr></table>
+	</tr>
+	</table>
+	
 	&nbsp;<br>
 	<div id='importWIZARD'>
 	<table border = '0'>
 	<tr>
 	<td style=\"text-align: left; vertical-align: top;\">
+	
 	<table border = '0'>
 	<tr>
-	<td colspan='2'>Teil Trigger
-	<input name=\"\" id=\"showall\" type=\"button\" value=\"show complete\" onclick=\"javascript: togglep1()\"\">
+	<td colspan='2'>Teil 1 (Auslöser des Devices)
+	<br>&nbsp;
 	</td>
 	</tr>
 	<tr><td><div id='1step1' ></div></td><td><div id='1step2' ></div></td></tr>
@@ -3955,26 +3953,31 @@ sub MSwitch_fhemwebconf($$$$) {
 	<tr><td><div id='4step1' ></div></td><td><div id='4step2' ></div></td></tr>
 	<tr><td><div id='5step1' ></div></td><td><div id='5step2' ></div></td></tr>
 	</table>
+		
 	<div>&nbsp;</div>
 	<div id='part2'>&nbsp;</div>
-	<div id='monitor' >
+	</td>
+	</tr>
+	<tr>
+	<td id='monitor' style=\"text-align: center; vertical-align: middle;\">
+	<br><select disabled=\"disabled\" style=\"width: 50em;\" size=\"15\" id =\"eventcontrol\" multiple=\"multiple\"></select>
 	<br>&nbsp;<br>
-	Eventmonitor:<br>
-	<select style=\"width: 50em;\" size=\"15\" id =\"eventcontrol\" multiple=\"multiple\"></select>
-	</div>
 	</td>
-	<td>
-	&nbsp;
-	</td>
+	</tr>
+	<tr>
 	<td style=\"text-align: center; vertical-align: middle;\">
-	<input name=\"makeconf\" id=\"makeconf\" type=\"button\" disabled=\"disabled\" value=\"make new config\" onclick=\"javascript: makeconfig()\"\">&nbsp;
-	<input name=\"saveconf\" id=\"saveconf\" type=\"button\" disabled=\"disabled\" value=\"save new config\" onclick=\"javascript: saveconfig('rawconfig')\"\">
 	<br>&nbsp;<br>
-	<textarea disabled id='rawconfig' style='width: 450px; height: 600px'></textarea>
+	<input name=\"saveconf\" id=\"saveconf\" type=\"button\" disabled=\"disabled\" value=\"save new config\" onclick=\"javascript: saveconfig('rawconfig')\"\">
+	</td>
+	</tr>
+	<tr>
+	<td style=\"display:none; text-align: center; vertical-align: middle;\">	
+	<textarea disabled id='rawconfig' style='width: 600px; height: 400px'></textarea>
 	</td>
 	</tr>
 	</table>
 	</div>
+
 	<div id='importAT'>@found_devices</div>
 	<div id='importNOTIFY'>import notify</div>
 	<div id='importCONFIG'>import config</div>
