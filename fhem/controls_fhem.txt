@@ -1,4 +1,4 @@
-REV 21144
+REV 21154
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -199,7 +199,7 @@ UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
 UPD 2019-07-02_07:45:03 154796 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
-UPD 2019-12-12_07:45:03 90484 FHEM/33_readingsGroup.pm
+UPD 2020-02-09_07:45:03 90608 FHEM/33_readingsGroup.pm
 UPD 2019-03-21_07:45:03 23869 FHEM/33_readingsHistory.pm
 UPD 2018-03-02_07:47:09 12101 FHEM/33_readingsProxy.pm
 UPD 2019-02-17_07:45:05 183107 FHEM/34_ESPEasy.pm
@@ -646,7 +646,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-08_07:45:04 52372 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-02-08_07:45:04 168203 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-02-09_07:45:03 168258 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -744,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-02-08_07:45:08 4198974 docs/commandref.html
-UPD 2020-02-07_07:45:09 2603574 docs/commandref_DE.html
+UPD 2020-02-09_07:45:07 4198975 docs/commandref.html
+UPD 2020-02-09_07:45:09 2603575 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-08_07:45:11 229697 docs/commandref_modular.html
-UPD 2020-02-08_07:45:12 240698 docs/commandref_modular_DE.html
+UPD 2020-02-09_07:45:11 229697 docs/commandref_modular.html
+UPD 2020-02-09_07:45:12 240698 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
