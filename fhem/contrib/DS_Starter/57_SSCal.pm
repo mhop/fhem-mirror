@@ -48,9 +48,9 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.7.0"  => "07.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
-                           "formatting overview table, feature smallScreen for tableSpecs, rename atributes to tableFields, ".
-                           "tableInDetail, tableInRoom ",
+  "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
+                           "formatting overview table, feature smallScreen for tableSpecs, rename attributes to tableFields, ".
+                           "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"tableFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
@@ -173,7 +173,7 @@ sub SSCal_Initialize($) {
                      "showPassInLog:1,0 ".
                      "tableInDetail:0,1 ".
                      "tableInRoom:0,1 ".
-                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days ".
+                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days,EventId ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -1536,10 +1536,10 @@ sub SSCal_extractEventlist ($) {
           my $done   = 0;
           ($nbdate,$nedate) = ("","");		
           
-          ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtstart});    # Beginn des Events
-          ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtend});      # Ende des Events
-          $startEndDiff = $ets - $bts;                                                                        # Differenz Event Ende / Start in Sekunden
-  
+          my $isallday                   = $data->{data}{$key}[$i]{is_all_day};
+          ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtstart});            # Beginn des Events
+          ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtend}, $isallday);   # Ende des Events
+            
           $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/;
           $bmday  = $3;
           $bmonth = $2;
@@ -1551,6 +1551,20 @@ sub SSCal_extractEventlist ($) {
           $emonth = $2;
           $eyear  = $1;
           $netime = $etime;
+          
+          # Bugfix API - wenn is_all_day und an erster Stelle im 'data' Ergebnis des API-Calls ist Endedate/time nicht korrekt !
+          if($isallday && ($bdate ne $edate) && $netime =~ /^00:59:59$/) {
+              $eyear  = $byear;
+              $emonth = $bmonth;
+              $emday  = $bmday;
+              $nbtime =~ s/://g;
+              $netime = "235959";
+
+              ($bi,undef,$bdate,$btime,$bts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  
+              ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);         
+          }
+          
+          $startEndDiff = $ets - $bts;                                          # Differenz Event Ende / Start in Sekunden
                                               
           if(!$data->{data}{$key}[$i]{is_repeat_evt}) {                         # einmaliger Event
               Log3($name, 5, "$name - Single event Begin: $bdate, End: $edate");
@@ -1699,11 +1713,11 @@ sub SSCal_extractEventlist ($) {
                       my @ByDays = split(",", $byday);                          # Array der Wiederholungstage
                       
                       foreach (@ByDays) {
-                          my $rByDay       = $_;	                              # das erste Wiederholungselement
+                          my $rByDay       = $_;	                            # das erste Wiederholungselement
                           my $rByDayLength = length($rByDay);                   # die Länge des Strings       
   
-                          my $rDayStr;		                                  # Tag auf den das Datum gesetzt werden soll
-                          my $rDayInterval;	                                  # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
+                          my $rDayStr;		                                    # Tag auf den das Datum gesetzt werden soll
+                          my $rDayInterval;	                                    # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
                           if ($rByDayLength > 2) {
                               $rDayStr      = substr($rByDay, -2);
                               $rDayInterval = int(substr($rByDay, 0, $rByDayLength - 2));
@@ -2014,7 +2028,7 @@ sub SSCal_extractToDolist ($) {
           ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Fälligkeit des Tasks (falls gesetzt)
           ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Ende = Fälligkeit des Tasks (falls gesetzt)
   
-          if ($bdate && $edate) {                                               # nicht jede Aufgabe hat 
+          if ($bdate && $edate) {                                               # nicht jede Aufgabe hat Date / Time gesetzt
               $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/;
               $bmday  = $3;
               $bmonth = $2;
@@ -2220,7 +2234,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   $ended    = SSCal_isEnded    ($ts,$ets);
   
   if($bdate && $btime) {
-      push(@row_array, $bts+$n." 02_Begin "  .$bdate." ".$btime."\n");
+      push(@row_array, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
       my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());         # Datum Jetzt
       my ($by,$bm,$bd)       = split("-", $bdate);               # Beginn Datum
       my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
@@ -2229,26 +2243,24 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           $dleft = int(($btimes - $ntimes)/86400);
       }
   }
-  push(@row_array, $bts+$n." 03_End "          .$edate." ".$etime."\n")   if($edate && $etime);
-  push(@row_array, $bts+$n." 02_bTimestamp "   .$bts."\n")                if($bts);
-  push(@row_array, $bts+$n." 03_eTimestamp "   .$ets."\n")                if($ets);   
-  push(@row_array, $bts+$n." 04_daysLeft "     .$dleft."\n")              if(defined $dleft); 
-  push(@row_array, $bts+$n." 04_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
-  push(@row_array, $bts+$n." 09_Timezone "     .$tz."\n")                 if($tz); 
+  
+  push(@row_array, $bts+$n." 07_bTimestamp "   .$bts."\n")                if($bts);
+  push(@row_array, $bts+$n." 10_End "          .$edate." ".$etime."\n")   if($edate && $etime);
+  push(@row_array, $bts+$n." 13_eTimestamp "   .$ets."\n")                if($ets);
+  push(@row_array, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
+  push(@row_array, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
+  push(@row_array, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
 	  $vh->{$p} = SSCal_jboolmap($vh->{$p});
       next if($vh->{$p} eq "");
         
-      # Log3($name, 4, "$name - bts: $bts, Parameter: $p, Value: ".$vh->{$p}) if(ref $p ne "HASH");
-        
       $val = encode("UTF-8", $vh->{$p}); 
 
       push(@row_array, $bts+$n." 01_Summary "       .$val."\n")       if($p eq "summary");
-      push(@row_array, $bts+$n." 04_Description "   .$val."\n")       if($p eq "description");
-      push(@row_array, $bts+$n." 05_EventId "       .$val."\n")       if($p eq "evt_id"); 
-      push(@row_array, $bts+$n." 07_Location "      .$val."\n")       if($p eq "location");
+      push(@row_array, $bts+$n." 03_Description "   .$val."\n")       if($p eq "description"); 
+      push(@row_array, $bts+$n." 35_Location "      .$val."\n")       if($p eq "location");
       
       if($p eq "gps") {
           my ($address,$lng,$lat) = ("","","");
@@ -2263,21 +2275,21 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
                   $lat = encode("UTF-8", $vh->{$p}{$r}{lat});
               }              
           }
-          push(@row_array, $bts+$n." 08_gpsAddress "      .$address."\n");
+          push(@row_array, $bts+$n." 40_gpsAddress "      .$address."\n");
           $val = "lat=".$lat.",lng=".$lng;          
-          push(@row_array, $bts+$n." 08_gpsCoordinates "  .$val."\n");
+          push(@row_array, $bts+$n." 45_gpsCoordinates "  .$val."\n");
       }
       
-      push(@row_array, $bts+$n." 11_isAllday "      .$val."\n")       if($p eq "is_all_day");
-      push(@row_array, $bts+$n." 12_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
+      push(@row_array, $bts+$n." 50_isAllday "      .$val."\n")       if($p eq "is_all_day");
+      push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
       
       if($p eq "due") {                                                        
           my (undef,undef,$duedate,$duetime,$duets) = SSCal_explodeDateTime ($hash,$val);
-          push(@row_array, $bts+$n." 15_dueDateTime "  .$duedate." ".$duetime."\n"); 
-          push(@row_array, $bts+$n." 15_dueTimestamp " .$duets."\n");
+          push(@row_array, $bts+$n." 60_dueDateTime "  .$duedate." ".$duetime."\n"); 
+          push(@row_array, $bts+$n." 65_dueTimestamp " .$duets."\n");
       }
       
-      push(@row_array, $bts+$n." 16_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
+      push(@row_array, $bts+$n." 85_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
       push(@row_array, $bts+$n." 90_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
@@ -2285,9 +2297,10 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
               $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
               next if($vh->{$p}{$r} eq "");
               $val = encode("UTF-8", $vh->{$p}{$r});                 
-              push(@row_array, $bts+$n." 13_repeatRule ".$val."\n") if($r eq "repeat_rule");
+              push(@row_array, $bts+$n." 70_repeatRule ".$val."\n") if($r eq "repeat_rule");
           }
       }
+      
       if($p eq "evt_notify_setting") {              
           my $l   = length (scalar @{$vh->{evt_notify_setting}});                        # Anzahl Stellen (Länge) des aktuellen Arrays
           my $ens = 0; 
@@ -2299,14 +2312,16 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
                     
                   if($r eq "time_value") {                                               # Erinnerungstermine (Array) relativ zur Beginnzeit ermitteln
                       ($uts,$td) = SSCal_evtNotTime ($name,$val,$bts);   
-                      push(@row_array, $bts+$n." 14_".sprintf("%0$l.0f", $ens)."_notifyTimestamp ".$uts."\n");
-                      push(@row_array, $bts+$n." 14_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
+                      push(@row_array, $bts+$n." 75_".sprintf("%0$l.0f", $ens)."_notifyTimestamp ".$uts."\n");
+                      push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
                       $alarmed = SSCal_isAlarmed ($ts,$uts,$bts) if(!$alarmed);
                   }
               }
               $ens++; 
           }
       }
+      
+      push(@row_array, $bts+$n." 98_EventId "       .$val."\n")       if($p eq "evt_id");
   }
   
   $status = "upcoming"        if($upcoming);
@@ -2314,7 +2329,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   $status = "started"         if($started);
   $status = "ended"           if($ended);
   
-  push(@row_array, $bts+$n." 10_Status "        .$status."\n");
+  push(@row_array, $bts+$n." 17_Status "        .$status."\n");
   push(@row_array, $bts+$n." 99_---------------------- " ."--------------------------------------------------------------------"."\n");
     
 return @row_array;
@@ -3118,15 +3133,18 @@ return;
 #                    (invalid =1 wenn Datum ungültig, ist nach RFC 5545 diese Wiederholung 
 #                                zu ignorieren und auch nicht zu zählen !)
 #############################################################################################
-sub SSCal_explodeDateTime ($$) {      
-  my ($hash,$dt)  = @_;
-  my $name        = $hash->{NAME};
-  my ($tz,$t)     = ("","");
-  my ($d,$tstamp) = ("",0);
-  my $invalid     = 0;
+sub SSCal_explodeDateTime ($$;$) {      
+  my ($hash,$dt,$isallday)  = @_;
+  my $name                  = $hash->{NAME};
+  my ($tz,$t)               = ("","");
+  my ($d,$tstamp)           = ("",0);
+  my $invalid               = 0;
+  my $corrsec               = 0;                         # Korrektursekunde
   my ($sec,$min,$hour,$mday,$month,$year);
   
   return ($invalid,$tz,$d,$t,$tstamp) if(!$dt);
+  
+  $corrsec = 1 if($isallday);                            # wenn Ganztagsevent, Endetermin um 1 Sekunde verkürzen damit Termin am selben Tag 23:59:59 endet (sonst Folgetag 00:00:00)         
 
   if($dt =~ /^TZID=.*$/) {
       ($tz,$dt) = split(":", $dt);
@@ -3154,6 +3172,21 @@ sub SSCal_explodeDateTime ($$) {
   
   unless ( ($d." ".$t) =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
       Log3($name, 2, "$name - ERROR - invalid DateTime format for explodeDateTime: $d $t");
+  }
+  
+  if ($corrsec) {                              # Termin um 1 Sekunde verkürzen damit Termin am selben Tag 23:59:59 endet (sonst Folgetag 00:00:00)         
+      eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
+      $tstamp -= $corrsec;
+      my $nt   = FmtDateTime($tstamp);
+      $nt      =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+      $year    = $1;     
+      $month   = $2;    
+      $mday    = $3;
+      $hour    = $4;
+      $min     = $5;
+      $sec     = $6;
+      $d       = $year."-".$month."-".$mday;
+      $t       = $hour.":".$min.":".$sec;
   }
   
   eval { timelocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
@@ -3226,7 +3259,10 @@ sub SSCal_calAsHtml($;$) {
   my $lang             = AttrVal("global", "language", "EN");
   my $mi               = AttrVal($name, "tableColumnMap", "icon");
   
-  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft); 
+  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft,$id); 
+
+  # alle Readings in Array einlesen
+  my @allrds = keys%{$defs{$name}{READINGS}};
 
   # Sprachsteuerung
   my $de = 0;
@@ -3278,6 +3314,7 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Ort'                :'Location')."            </td>" if($seen{Location});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'ID'                 :'ID')."                  </td>" if($seen{EventId});
 
   my $l = length(keys %{$data{SSCal}{$name}{eventlist}});
   
@@ -3292,22 +3329,23 @@ sub SSCal_calAsHtml($;$) {
   my $k;
   for ($k=0;$k<=$maxbnr;$k++) {
       my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
-      last if(!ReadingsVal($name, $prestr."_05_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufgabe vorhanden
+      last if(!ReadingsVal($name, $prestr."_98_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufgabe vorhanden
       
 	  ($begind,$begint,$endd,$endt,$gps) = ("","","","","");
 	  
       $summary    = ReadingsVal($name, $prestr."_01_Summary",         "");
-      $begin      = ReadingsVal($name, $prestr."_02_Begin",           "");
-      $end        = ReadingsVal($name, $prestr."_03_End",             "");
-      $dleft      = ReadingsVal($name, $prestr."_04_daysLeft",        "");
-      $desc       = ReadingsVal($name, $prestr."_04_Description",     "");
-      $location   = ReadingsVal($name, $prestr."_07_Location",        "");
-      $gpsa       = ReadingsVal($name, $prestr."_08_gpsAddress",      "");
-      $gpsc       = ReadingsVal($name, $prestr."_08_gpsCoordinates",  "");
-	  $tz         = ReadingsVal($name, $prestr."_09_Timezone",        "");
-      $status     = ReadingsVal($name, $prestr."_10_Status",          "");
-	  $completion = ReadingsVal($name, $prestr."_16_percentComplete", "");
+      $desc       = ReadingsVal($name, $prestr."_03_Description",     "");
+      $begin      = ReadingsVal($name, $prestr."_05_Begin",           "");
+      $end        = ReadingsVal($name, $prestr."_10_End",             "");
+	  $tz         = ReadingsVal($name, $prestr."_15_Timezone",        "");
+      $status     = ReadingsVal($name, $prestr."_17_Status",          "");
+      $dleft      = ReadingsVal($name, $prestr."_20_daysLeft",        "");
+      $location   = ReadingsVal($name, $prestr."_35_Location",        "");
+      $gpsa       = ReadingsVal($name, $prestr."_40_gpsAddress",      "");
+      $gpsc       = ReadingsVal($name, $prestr."_45_gpsCoordinates",  "");
+	  $completion = ReadingsVal($name, $prestr."_85_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
+      $id         = ReadingsVal($name, $prestr."_98_EventId",         "");
       
       if($gpsc) {
 	      my $micon;
@@ -3364,13 +3402,13 @@ sub SSCal_calAsHtml($;$) {
 			  $edleft = int(($etimes - $ntimes)/86400);
 		  }		  
 
-          $begind = (($de)?'heute ':'today ')      if($dleft eq "0");
+          $begind = (($de)?'heute ':'today ')      if($dleft  eq "0");
           $endd   = (($de)?'heute ':'today ')      if($edleft eq "0");
-          $begind = (($de)?'morgen ':'tomorrow ')  if($dleft eq "1");
+          $begind = (($de)?'morgen ':'tomorrow ')  if($dleft  eq "1");
           $endd   = (($de)?'morgen ':'tomorrow ')  if($edleft eq "1");
 
-          $endd   = "" if($begind eq $endd);                                     # bei Ende nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet      
-      }
+          $endd   = "" if($begind eq $endd);                                      # bei Ende nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet      
+      }      
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
       if($small) {
@@ -3391,6 +3429,7 @@ sub SSCal_calAsHtml($;$) {
       $out     .= "<td class='cal'          > $location           </td>" if($seen{Location});
       $out     .= "<td class='cal'          > $gps                </td>" if($seen{Map});
       $out     .= "<td class='cal'          > $cal                </td>" if($seen{Calendar});
+      $out     .= "<td class='cal'          > $id                 </td>" if($seen{EventId});
       $out     .= "</tr>";
   }
 
