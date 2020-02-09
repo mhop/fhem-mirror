@@ -1858,7 +1858,7 @@ sub decodeCompactFrame($$)
   # 16 = 0 decimals
   # functionField part of DIF is also variable, at least for temperatures
   # all in all that would be 4 * 4 (for vif) * 4 * 4 (for dif) * 3 (type of telegram) combinations (768)
-  # for now only search for those that are documented or habe been observed in real telegrams
+  # for now only search for those that are documented or have been observed in real telegrams
   for my $vif  ("13","14","15","16") { 
     #printf("compact frame $vif\n");
     if ($self->{format_signature} == $self->calcCRC(pack("H*", "02FF20" . "04$vif" . "44$vif"))) {
@@ -1893,7 +1893,26 @@ sub decodeCompactFrame($$)
                           . pack("H*", "615B") . substr($compact,15,1) # flow temp 
                           . pack("H*", "5167") . substr($compact,16,1); # external temp
       last;
-    }
+    
+    } elsif ($self->{format_signature} == $self->calcCRC(pack("H*", "0406" . "04FF07" . "04FF08" . "04$vif" . "043B" . "0259" . "025d" . "04FF22" . "026c" . "4406" . "44$vif" . "426c"))) {
+      # Energy, Info, Info, volume, volume flow, flow temp, return temp, time point date, energy, volume, time point date
+      # convert into full frame
+
+      $applicationlayer =   pack("H*", "0406")   . substr($compact, 5,  4) # Energy
+                          . pack("H*", "04FF07") . substr($compact, 9,  4) # Info
+                          . pack("H*", "04FF08") . substr($compact, 13, 4) # Info
+                          . pack("H*", "04$vif") . substr($compact, 17, 4) # volume
+                          . pack("H*", "043b")   . substr($compact, 21, 4) # volume flow
+                          . pack("H*", "0259")   . substr($compact, 25, 2) # flow temp 
+                          . pack("H*", "025d")   . substr($compact, 27, 2) # return temp 
+                          . pack("H*", "04FF22") . substr($compact, 29, 4) # Info
+                          . pack("H*", "026c")   . substr($compact, 33, 2) # time point date 
+                          . pack("H*", "4406")   . substr($compact, 35, 4) # Energy storage 1 
+                          . pack("H*", "44$vif") . substr($compact, 39, 4) # volume storage 1
+                          . pack("H*", "426c")   . substr($compact, 43, 2); # time point date 
+      last;
+    }    
+    
   }
   return $applicationlayer;
 }
