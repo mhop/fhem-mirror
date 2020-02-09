@@ -50,7 +50,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 my %SSCal_vNotesIntern = (
   "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
                            "formatting overview table, feature smallScreen for tableSpecs, rename attributes to tableFields, ".
-                           "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API ",
+                           "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API, function SSCal_boolean ".
+                           "to avoid fhem crash if an older JSON module is installed ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"tableFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
@@ -3242,12 +3243,18 @@ sub SSCal_jboolmap($){
   my ($bool)= @_;
   
   if(JSON::is_bool($bool)) {
-	  my $b = JSON::boolean($bool);
+	  my $b = SSCal_boolean($bool);
 	  $bool = 1 if($b == $JSON::true);
 	  $bool = 0 if($b == $JSON::false);
   }
   
 return $bool;
+}
+
+sub SSCal_boolean {
+    # might be called as method or as function, so pop() to get the last arg 
+    # instead of shift() to get the first
+    pop() ? $JSON::true : $JSON::false
 }
 
 #############################################################################################
@@ -3510,7 +3517,7 @@ Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wi
       "requires": {
         "FHEM": 5.00918799,
         "perl": 5.014,
-        "JSON": 0,
+        "JSON": 4.020,
         "Data::Dumper": 0,
         "MIME::Base64": 0,
         "Time::HiRes": 0,
