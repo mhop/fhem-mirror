@@ -175,7 +175,11 @@ my $DENON_db = {
 		'Smart4' 			=> 'SMART4',
 		'Smart5' 			=> 'SMART5',
 		'Dolby_Audio_Surround'		=> 'DOLBY AUDIO-DSUR',
-		'Neural:X'			=> 'NEURAL:X'
+		'Neural:X'			=> 'NEURAL:X',
+		'Dolby_Audio_Digital'		=> 'DOLBY AUDIO-DD',
+		'Dolby_Audio_Digital-Surround'	=> 'DOLBY AUDIO-DD+DSUR',
+		'Dolby_Audio_Digital-Neural:X'	=> 'DOLBY AUDIO-DD+NEURAL:X',
+                'Virtual' 			=> 'VIRTUAL'
 	},
 	'MU' => {
 		'on' 		=> 'ON',
