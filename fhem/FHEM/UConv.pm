@@ -783,7 +783,7 @@ sub mi2km($;$) {
 sub direction2compasspoint($;$$) {
     my ( $deg, $txt, $lang ) = @_;
     my $i = floor( ( ( $deg + 11.25 ) % 360 ) / 22.5 );
-    return $i if ( !wantarray && defined($txt) && $txt == 0. );
+    return $i if ( !wantarray && defined($txt) && $txt == "0" );
 
     my $directions_txt_i18n;
     $lang = main::AttrVal( "global", "language", "EN" ) unless ($lang);
@@ -800,8 +800,8 @@ sub direction2compasspoint($;$$) {
         $directions_txt_i18n->[$i][1],
         encode_utf8 $directions_txt_i18n->[$i][2]
     ) if wantarray;
-    return encode_utf8 $directions_txt_i18n->[$i][2] if ( $txt && $txt == 3. );
-    return encode_utf8 $directions_txt_i18n->[$i][0] if ( $txt && $txt == 2. );
+    return encode_utf8 $directions_txt_i18n->[$i][2] if ( $txt && $txt eq "3" );
+    return encode_utf8 $directions_txt_i18n->[$i][0] if ( $txt && $txt eq "2" );
     return $directions_txt_i18n->[$i][1];
 }
 
@@ -1029,7 +1029,7 @@ sub compasspoint2compasspoint($;$$$) {
         $toLang ? $toLang : $fromLang )
       if ( $shortTxt =~ m/^\d+(?:\.\d+)?$/ );
     return compasspoint2direction( $shortTxt, $fromLang )
-      if ( defined($txt) && $txt == 0. );
+      if ( defined($txt) && $txt eq "0" );
 
     my $fromDirections_txt_i18n;
     $fromLang = "EN" unless ($fromLang);
@@ -1073,8 +1073,8 @@ sub compasspoint2compasspoint($;$$$) {
 
     unless ( defined($txt) ) {
         $txt = 1;
-        $txt = 3 if ( $i2 == 2. );
-        $txt = 2 if ( $i2 == 0. );
+        $txt = 3 if ( $i2 eq "2" );
+        $txt = 2 if ( $i2 eq "0" );
     }
 
     unless ( defined($i) ) {
@@ -1087,8 +1087,8 @@ sub compasspoint2compasspoint($;$$$) {
         $toDirections_txt_i18n->[$i][1],
         encode_utf8 $toDirections_txt_i18n->[$i][2]
     ) if wantarray;
-    return encode_utf8 $toDirections_txt_i18n->[$i][2] if ( $txt == 3. );
-    return encode_utf8 $toDirections_txt_i18n->[$i][0] if ( $txt == 2. );
+    return encode_utf8 $toDirections_txt_i18n->[$i][2] if ( $txt eq "3" );
+    return encode_utf8 $toDirections_txt_i18n->[$i][0] if ( $txt eq "2" );
     return $toDirections_txt_i18n->[$i][1];
 }
 
@@ -1139,7 +1139,7 @@ sub arabic2roman ($) {
     my ($n) = @_;
     my %items = ();
     my @r;
-    return "" if ( !$n || $n eq "" || $n !~ m/^\d+(?:\.\d+)?$/ || $n == 0. );
+    return "" if ( !$n || $n eq "" || $n !~ m/^\d+(?:\.\d+)?$/ || $n eq "0" );
     return $n
       if ( $n >= 1000001. );    # numbers above cannot be displayed/converted
 
