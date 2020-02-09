@@ -3266,7 +3266,7 @@ sub SSCal_calAsHtml($;$) {
   my $lang             = AttrVal("global", "language", "EN");
   my $mi               = AttrVal($name, "tableColumnMap", "icon");
   
-  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft,$id); 
+  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft,$id,$isallday); 
 
   # alle Readings in Array einlesen
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -3353,6 +3353,7 @@ sub SSCal_calAsHtml($;$) {
 	  $completion = ReadingsVal($name, $prestr."_85_percentComplete", "");
       $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
       $id         = ReadingsVal($name, $prestr."_98_EventId",         "");
+      $isallday   = ReadingsVal($name, $prestr."_50_isAllday",        "");
       
       if($gpsc) {
 	      my $micon;
@@ -3414,13 +3415,20 @@ sub SSCal_calAsHtml($;$) {
           $begind = (($de)?'morgen ':'tomorrow ')  if($dleft  eq "1");
           $endd   = (($de)?'morgen ':'tomorrow ')  if($edleft eq "1");
 
-          $endd   = "" if($begind eq $endd);                                      # bei Ende nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet      
-      }      
+          if (($begind eq $endd) && !$isallday) {
+              $endd   = "";                                      # bei "Ende" nur Uhrzeit angeben wenn Termin am gleichen Tag beginnt/endet aber kein Ganztagstermin ist    
+          } elsif (($begind eq $endd) && $isallday) {
+              $begint = "";
+              $endt   = "";             
+          }
+      }
+
+     
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
       if($small) {
-          $out .= "<td class='cal '> ".$begind." ".$begint. "</td>" if($seen{Begin});
-          $out .= "<td class='cal '> ".$endd  ." ".$endt.   "</td>" if($seen{End});
+          $out .= "<td class='cal '> ".$begind." ".$begint.      "</td>" if($seen{Begin});
+          $out .= "<td class='cal '> ".$endd  ." ".$endt.        "</td>" if($seen{End});
       } else {
           $out .= "<td class='cal calcenter'> $begind             </td>" if($seen{Begin});
           $out .= "<td class='cal calcenter'> $begint             </td>" if($seen{Begin});
