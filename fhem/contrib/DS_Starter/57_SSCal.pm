@@ -3402,10 +3402,13 @@ sub SSCal_calAsHtml($;$) {
 			  $begind = "$by-$bm-$bd";
               $endd   = "$ey-$em-$ed";			  
 		  }
-		  $begint =  $bt;
-          $endt   =  $et;
-		  
+		  my($a,$b,undef) =  split(":", $bt);
+          $begint         =  "$a:$b";
+          my($c,$d,undef) =  split(":", $et);
+		  $endt           =  "$c:$d";
+          
 		  $edleft = "";
+          
 		  if($etimes >= $ntimes) {
 			  $edleft = int(($etimes - $ntimes)/86400);
 		  }		  
