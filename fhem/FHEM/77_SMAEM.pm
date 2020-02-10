@@ -3,7 +3,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2016-2019 Copyright: Volker Kettenbach
+#  (c) 2016-2020 Copyright: Volker Kettenbach
 #  e-mail: volker at kettenbach minus it dot de
 #
 #  Credits: 
@@ -36,6 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
+  "4.0.1" => "10.02.2020  fix perl warning Forum: https://forum.fhem.de/index.php/topic,51569.msg1021988.html#msg1021988",
   "4.0.0" => "16.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
                           "new attribute \"noCoprocess\", many internal code changes ",
   "3.5.0" => "14.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", ".
@@ -622,7 +623,7 @@ sub SMAEM_DoParse ($) {
     my $cosphi = $obis->{"1:13.4.0"}/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
-    my $grid_freq = $obis->{"1:14.4.0"}/1000;
+    my $grid_freq = $obis->{"1:14.4.0"}/1000          if($obis->{"1:14.4.0"});
     push(@row_array, $ps."GridFreq ".$grid_freq."\n") if($grid_freq);
     
     push(@row_array, $ps."SoftwareVersion ".$obis->{"144:0.0.0"}."\n");
