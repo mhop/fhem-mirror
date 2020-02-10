@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_DbRep: fix Perl warning
  - feature: 70_DENON_AVR: added more surround modes (thx Shadow3561)
  - bugfix:  70_Pushsafer: fix availableMessages reading
  - bugfix:  73_AutoShuttersControl: fix GetAntiFreez
