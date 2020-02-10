@@ -1,4 +1,4 @@
-﻿# $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $
+﻿# $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $
 ########################################################################################
 #       95_Dashboard.pm
 #
@@ -55,7 +55,8 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
-  "3.17.0" => "04.10.2019  Path handling of backgroundimage changed ",
+  "3.17.1" => "10.02.2020  fix perl warning, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004 ",
+  "3.17.0" => "06.10.2019  Path handling of backgroundimage changed ",
   "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
   "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
   "3.15.1" => "25.09.2019  change initial attributes, commandref revised ",
@@ -301,16 +302,16 @@ sub Dashboard_Attr($$$) {
   }
   
   if ($aName =~ m/dashboard_(.*)backgroundimage/) {
-      my $container = "";
+      my $ct = "";
       if (!$1) {
-          $container = "MAIN";
+          $ct = "MAIN";
       } else {
-          $container = $1;
+          $ct = $1;
       }
-      delete $hash->{HELPER}{BIMG}{$container};
+      delete $hash->{HELPER}{BIMG}{$ct};
       if($cmd eq "set") {
-          Dashboard_searchImage($name, "$FW_dir/images", $aVal,$container); 
-          if (!$hash->{HELPER}{BIMG}{$container}) {       
+          Dashboard_searchImage($name, "$FW_dir/images", $aVal,$ct); 
+          if (!$hash->{HELPER}{BIMG}{$ct}) {       
               Log3 ($name, 2, "Dashboard $name - Background image file not found: $aVal");          
               return "Background image file not found: $aVal";   
           } 
@@ -430,7 +431,7 @@ sub Dashboard_SummaryFN ($$$$) {
   my $showfullsize         = AttrVal($name, "dashboard_showfullsize", 0); 
   my $flexible             = AttrVal($name, "dashboard_flexible", 0);
   my $customcss            = AttrVal($name, "dashboard_customcss", "none");
-  my $row                  = AttrVal($name, "dashboard_row", "center");
+  # my $row                  = AttrVal($name, "dashboard_row", "center");
   my $debug                = AttrVal($name, "dashboard_debug", "0");
   my ($activetab,$tabname) = Dashboard_GetActiveTab($name,1);
   my $tabcount             = Dashboard_GetTabCount($hash, 1);
@@ -477,28 +478,44 @@ sub Dashboard_SummaryFN ($$$$) {
       ############################ Set FHEM url to avoid hardcoding it in javascript ############################ 
 	  $ret .= "<script type='text/javascript'>var fhemUrl = '".$FW_ME."';</script>";
  
+      ## Dashboard-Tab Details Tabelle (Stift rechte Seite im Kopf)
  	  $ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
 	  $ret .= "<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
-	  $ret .= "<ul class=\"dashboard dashboard_tabnav\">\n";
+	  
+      $ret .= "<ul class=\"dashboard dashboard_tabnav\">\n";
 	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-1\">Current Tab</a></li>\n";
 	  $ret .= "<li class=\"dashboard dashboard_tab\"><a href=\"#tabs-2\">Common</a></li>\n";
-	  $ret .= "</ul>\n";	
-	  $ret .= "<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
+	  $ret .= "</ul>\n";
+      
+      $ret .= "<div id=\"tabs-1\" class=\"dashboard_tabcontent\">\n";
 	  $ret .= "<table>\n";
-	  $ret .= "<tr colspan=\"2\"><td><div id=\"tabID\"></div></td></tr>\n";		
-	  $ret .= "<tr><td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td></tr>";
-	  $ret .= "<tr><td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td></tr>";
+	  $ret .= "<tr colspan=\"2\">";
+      $ret .= "<td><div id=\"tabID\"></div></td>";
+      $ret .= "</tr>\n";		
+	  $ret .= "<tr>";
+      $ret .= "<td>Tabtitle:</td><td colspan=\"2\"><input id=\"tabTitle\" type=\"text\" size=\"25\"></td>";
+      $ret .= "</tr>";
+	  $ret .= "<tr>";
+      $ret .= "<td>Tabicon:</td><td><input id=\"tabIcon\" type=\"text\" size=\"10\"></td><td><input id=\"tabIconColor\" type=\"text\" size=\"7\"></td>";
+      $ret .= "</tr>";
 	  # the method FW_multipleSelect seems not to be available any more in fhem
 	  #$ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\" onfocus=\"FW_multipleSelect(this)\" allvals=\"multiple,$dashboard_groupListfhem\" readonly=\"readonly\"></td></tr>";	
-	  $ret .= "<tr><td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td></tr>";	
-	  $ret .= "<tr><td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td></tr>";	
+	  $ret .= "<tr>";
+      $ret .= "<td>Groups:</td><td colspan=\"2\"><input id=\"tabGroups\" type=\"text\" size=\"25\"></td>";
+      $ret .= "</tr>";	
+	  $ret .= "<tr>";
+      $ret .= "<td></td><td colspan=\"2\"><input type=\"checkbox\" id=\"tabActiveTab\" value=\"\"><label for=\"tabActiveTab\">This Tab is currently selected</label></td>";
+      $ret .= "</tr>";	
 	  $ret .= "</table>\n";
-	  $ret .= "</div>\n";	
+	  $ret .= "</div>\n";
+      
 	  $ret .= "<div id=\"tabs-2\" class=\"dashboard_tabcontent\">\n";
 	  $ret .= "Comming soon";
 	  $ret .= "</div>\n";	
-	  $ret .= "</div>\n";		
+	  
+      $ret .= "</div>\n";		
 	  $ret .= "</div>\n";
+      ## Ende Dashboard-Tab Details Tabelle
 
 	  $ret .= "<div id=\"dashboard_define\" style=\"display: none;\">$name</div>\n";
 	  $ret .= "<table class=\"roomoverview dashboard\" id=\"dashboard\">\n";
@@ -507,7 +524,10 @@ sub Dashboard_SummaryFN ($$$$) {
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_attr\" value=\"$name,$dbwidth,$showhelper,$lockstate,$showbuttonbar,$colheight,$showtogglebuttons,$colcount,$rowtopheight,$rowbottomheight,$tabcount,$activetab,$colwidth,$showfullsize,$customcss,$flexible\">\n";
 	  $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	  $ret .= "</div></td></tr>\n"; 
-	  $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".$bimg." no-repeat !important;\">\n";  
+	  
+      ## Tab Content
+      $ret .= "<tr><td>\n";
+      $ret .= "<div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: ".$bimg." no-repeat !important;\">";
 
 	  ########################### Dashboard Tab-Liste ##############################################
 	  $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
@@ -522,7 +542,8 @@ sub Dashboard_SummaryFN ($$$$) {
 		 	 $ret .= Dashboard_BuildDashboardTab($t, $name);
 		 }
 	  }
-	  $ret .= "</div></td></tr>\n";
+	  $ret .= "</div>";
+      $ret .= "</td></tr>\n";
 	  $ret .= "</table>\n";
       
   } else { 
@@ -546,6 +567,7 @@ return $ret;
 sub Dashboard_BuildDashboardTab ($$) {
 	my ($t, $name) = @_;
     my $hash = $defs{$name};
+    my $ret;
 
 	my $id              = $hash->{NR};
 	my $colcount        = AttrVal($name, 'dashboard_tab'.($t+1).'colcount', AttrVal($name, "dashboard_colcount", 1));
@@ -563,8 +585,8 @@ sub Dashboard_BuildDashboardTab ($$) {
 	}
     
     # Hintergrundbild bauen
-    my $container = "tab".($t+1);
-    my $bimg = $hash->{HELPER}{BIMG}{$container}?"url(/fhem/images/$hash->{HELPER}{BIMG}{$container})":"none";
+    my $ct = "tab".($t+1);
+    my $bimg = $hash->{HELPER}{BIMG}{$ct}?"url(/fhem/images/$hash->{HELPER}{BIMG}{$ct})":"none";
 	
     my @temptabdevicegroup = split(' ', $tabdevicegroups);
     my @tabdevicegroups    = ();
@@ -620,9 +642,9 @@ sub Dashboard_BuildDashboardTab ($$) {
 		}
 	}
 
-	my $ret = "	<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: ".$bimg." no-repeat !important;\">\n";
-	$ret   .= " <ul class=\"dashboard_tabcontent\">\n";
-	$ret   .= "	<table class=\"dashboard_tabcontent\">\n";
+	$ret  = "<div id=\"dashboard_tab".$t."\" data-tabwidgets=\"".$tabsortings."\" data-tabcolwidths=\"".$colwidths."\" class=\"dashboard dashboard_tabpanel\" style=\"background: ".$bimg." no-repeat !important;\">\n";
+	$ret .= "<ul class=\"dashboard_tabcontent\">\n";
+	$ret .= "<table class=\"dashboard_tabcontent\">\n";
     
 	##################### Top Row (only one Column) #############################################
 	if ($row eq "top-center-bottom" || $row eq "top-center" || $row eq "top"){
@@ -637,9 +659,9 @@ sub Dashboard_BuildDashboardTab ($$) {
 		$ret .= Dashboard_BuildDashboardBottomRow($name,$t,$id,$tabgroups,$tabsortings);
 	}
 	 
-	$ret .= "	</table>\n";
-	$ret .= " 	</ul>\n";
-	$ret .= "	</div>\n";
+	$ret .= "</table>\n";
+	$ret .= "</ul>\n";
+	$ret .= "</div>\n";
 
 return $ret;
 }
@@ -653,9 +675,11 @@ sub Dashboard_BuildDashboardTopRow ($$$$$) {
   
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
   $ret .= "<div id=\"dashboard_rowtop_tab".$t."\" class=\"dashboard dashboard_rowtop\">\n";
-  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
+  
+  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column100\">\n";
   $ret .= Dashboard_BuildGroupWidgets($name,$t,"100",$id,$devicegroups,$groupsorting); 
-  $ret .= "		</div>\n";
+  $ret .= "</div>\n";
+  
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
  
@@ -673,7 +697,7 @@ sub Dashboard_BuildDashboardCenterRow ($$$$$$) {
 
   my $currentcol  = $colcount;
   my $maxcolindex = $colcount - 1;
-  my $replace     = "t" . $t . "c" . $maxcolindex . ",";
+  my $replace     = "t".$t."c".$maxcolindex.",";
 
   # replace all sortings referencing not existing columns
   # this does only work if there is no empty column inbetween
@@ -684,9 +708,9 @@ sub Dashboard_BuildDashboardCenterRow ($$$$$$) {
   }
 
   for (my $i=0;$i<$colcount;$i++){
-	  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
+	  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column".$i."\">\n";
 	  $ret .= Dashboard_BuildGroupWidgets($name,$t,$i,$id,$devicegroups,$groupsorting); 
-	  $ret .= "		</div>\n";
+	  $ret .= "</div>\n";
   }
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
@@ -701,10 +725,11 @@ sub Dashboard_BuildDashboardBottomRow ($$$$$) {
   my ($name,$t,$id, $devicegroups, $groupsorting) = @_;
   my $ret; 
   $ret .= "<tr><td  class=\"dashboard_row\">\n";
-  $ret .= "<div id=\"dashboard_rowbottom_tab".$t."\" class=\"dashboard dashboard_rowbottom\">\n";
-  $ret .= "		<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
+  
+  $ret .= "<div class=\"dashboard ui-row dashboard_row dashboard_column\" id=\"dashboard_tab".$t."column200\">\n";
   $ret .= Dashboard_BuildGroupWidgets($name,$t,"200",$id,$devicegroups,$groupsorting); 
-  $ret .= "		</div>\n";
+  $ret .= "</div>\n";
+  
   $ret .= "</div>\n";
   $ret .= "</td></tr>\n";
 
@@ -1030,7 +1055,8 @@ sub Dashboard_GetActiveTab ($;$) {
   
   if (defined($FW_httpheader{Cookie})) {
       Log3 ($name, 4, "Dashboard $name - Cookie set: ".$FW_httpheader{Cookie});
-      my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
+      my %cookie = map({ $_!~/^.*=$/ ? split('=', $_) : "" } split(/; */, $FW_httpheader{Cookie}));        # 10.02.2020, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004
+     # my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
       if (defined($cookie{dashboard_activetab})) {
           $activeTab = $cookie{dashboard_activetab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
@@ -1081,12 +1107,12 @@ sub Dashboard_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {   # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                    # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                      # {x_version} ( nur gesetzt wenn $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20275 2019-09-29 12:58:28Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                         # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 95_Dashboard.pm 20323 2019-10-06 20:12:38Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                  # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );   # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden                                       
       }
@@ -1167,10 +1193,10 @@ return $a;
 
 ######################################################################################
 #           angegebenes $file im $dir und Unterverzeichnissen suchen
-#           und mit Pfad ab ".../images/" in $container speichern wenn gefunden
+#           und mit Pfad ab ".../images/" in $ct speichern wenn gefunden
 ######################################################################################
 sub Dashboard_searchImage($$$$) {
-  my ($name,$dir,$file,$container) = @_;
+  my ($name,$dir,$file,$ct) = @_;
   my $hash = $defs{$name};
   
   my ($t,$im);
@@ -1179,11 +1205,11 @@ sub Dashboard_searchImage($$$$) {
   closedir(DIR);
   foreach (@files) {
       if (-d ($t = "$dir/$_")) {                           # -d returns true if the following string is a directory.
-          Dashboard_searchImage($name,$t,$file,$container);
+          Dashboard_searchImage($name,$t,$file,$ct);
       } else {
           next if ($_ ne $file);
           $im = (split("images\/", $dir."/".$_))[1];
-          $hash->{HELPER}{BIMG}{$container} = $im;         # Ergebnisfile in Container speichern wenn gefunden
+          $hash->{HELPER}{BIMG}{$ct} = $im;         # Ergebnisfile in Container speichern wenn gefunden
           Log3 ($name, 5, "Dashboard $name - Background image file found in: $dir/$_");
       }
   }
@@ -1307,7 +1333,7 @@ sub Dashboard_searchImage($$$$) {
     <li><b>dashboard_backgroundimage </b><br>
         Displays a background image for the complete dashboard. The image is not stretched in any way. So the size should 
         match/extend the dashboard height/width. Only the filename has to be set. <br>
-        The file must be located anywhere below the directory "./www/images/". <br>
+        The file must be at any location below the directory "./www/images/". <br>
         <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
         <br><br>
 		
@@ -1412,7 +1438,7 @@ sub Dashboard_searchImage($$$$) {
         Shows a background image for the tab. (also valid for further dashboard_tabXbackgroundimage) <br> 
 		The image is not stretched in any way, it should therefore match the tab size or extend it. 
         Only the filename has to be set. <br>
-        The file must be located anywhere below the directory "./www/images/". <br>
+        The file must be at any location below the directory "./www/images/". <br>
         <b>Suggestion: </b> Create the directory "./www/images/dashboard" and put the image file into. 
         <br><br>
 		
@@ -1607,7 +1633,7 @@ sub Dashboard_searchImage($$$$) {
     <li><b>dashboard_backgroundimage </b><br>
         Zeigt ein Hintergrundbild im Dashboard an. Das Bild wird nicht gestreckt, es sollte daher auf die Größe des Dashboards 
         passen oder diese überschreiten. Es ist nur der Filename anzugeben. <br>
-        Das File muss sich irgendwo unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        Das File muss sich an beliebiger Stelle unterhalb des Verzeichnisses "./www/images/" befinden. <br>
         <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
         <br><br>
 		
@@ -1721,7 +1747,7 @@ sub Dashboard_searchImage($$$$) {
         Zeigt ein Hintergrundbild für den Tab an. (gilt ebenfalls für weitere dashboard_tabXbackgroundimage) <br>
 		Das Bild wird nicht gestreckt, es sollte also auf die Größe des Tabs passen oder diese überschreiten. Es ist nur der 
         Filename anzugeben. <br>
-        Das File muss sich irgendwo unterhalb des Verzeichnisses "./www/images/" befinden. <br>
+        Das File muss sich an beliebiger Stelle unterhalb des Verzeichnisses "./www/images/" befinden. <br>
         <b>Empfehlung: </b> Das Verzeichnis "./www/images/dashboard" anlegen und das Bildfile in diesem Verzeichnis ablegen. 
         <br><br>
 		
