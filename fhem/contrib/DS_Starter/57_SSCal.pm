@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub SSCal_evalTableSpecs , fix no table is shown after FHEM restart ",
   "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
                            "formatting overview table, feature smallScreen for tableSpecs, rename attributes to tableFields, ".
                            "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API, function SSCal_boolean ".
@@ -174,7 +175,7 @@ sub SSCal_Initialize($) {
                      "showPassInLog:1,0 ".
                      "tableInDetail:0,1 ".
                      "tableInRoom:0,1 ".
-                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,Days,EventId ".
+                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,DaysLeft,EventId ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -337,9 +338,11 @@ sub SSCal_Attr($$$$) {
 			return " The attribute \"$aName\" is only valid for devices of MODEL \"Diary\"! Please set this attribute in a device of this model.";
 		}
         
-        if ($attrVal =~ m/^\{.*\}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/) {
+        if ($attrVal =~ m/^\{.*\}$/s && $attrVal =~ m/=>/) {
+            $attrVal =~ s/\@/\\\@/g;
+			$attrVal =~ s/\$/\\\$/g;
+			
             my $av = eval $attrVal;
-            # Log3($name, 1, "$name - av: ".$av);
             if($@) {
                 Log3($name, 2, "$name - Error while evaluate: ".$@);
                 return $@; 
@@ -3277,12 +3280,12 @@ sub SSCal_calAsHtml($;$) {
   
   # Entscheidung ob Tabelle für Small Screen optimiert
   my $small = 0;
-  if ($FW_wname && $hash->{HELPER}{tableSpecs}{smallScreen}) {                 # Aufruf durch FHEMWEB und smallScreen-Eigenschaft gesetzt
+  if ($FW_wname && $hash->{HELPER}{tableSpecs}{smallScreenStyles}) {                 # Aufruf durch FHEMWEB und smallScreen-Eigenschaft gesetzt
       my %specs;
       my $FW_style = AttrVal($FW_wname, "stylesheetPrefix", "default");
-      my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreen});     # Eigenschaft smallScreen in Array lesen
+      my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreenStyles});     # Eigenschaft smallScreen in Array lesen
       grep { !$specs{$_}++ } @scspecs;
-      $small       = 1 if($specs{$FW_style});                                  # Tabelle für small-Style anpassen                                   
+      $small       = 1 if($specs{$FW_style});                                        # Tabelle für small-Style anpassen                                   
   }
   
   # Auswahl der darzustellenden Tabellenfelder
@@ -3312,7 +3315,7 @@ sub SSCal_calAsHtml($;$) {
       $out .= "<td class='cal calbold calcenter'> ".(($de)?'----'              :'----')."                </td>" if($seen{End});  
   }
   
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{Days});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{DaysLeft});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Beschreibung'       :'Description')."         </td>" if($seen{Description});
@@ -3322,52 +3325,52 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'ID'                 :'ID')."                  </td>" if($seen{EventId});
-
-  my $l = length(keys %{$data{SSCal}{$name}{eventlist}});
   
   my $maxbnr;
   foreach my $key (keys %{$defs{$name}{READINGS}}) {
       next if $key !~ /^(\d+)_\d+_EventId$/;
       $maxbnr = $1 if(!$maxbnr || $1>$maxbnr);
   }
-  
+
   return "" if(!defined $maxbnr);
+  
+  my $l = length($maxbnr);
   
   my $k;
   for ($k=0;$k<=$maxbnr;$k++) {
-      my $prestr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
-      last if(!ReadingsVal($name, $prestr."_98_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufgabe vorhanden
+      my $bnr = sprintf("%0$l.0f", $k);                               # Prestring erstellen
+      last if(!ReadingsVal($name, $bnr."_98_EventId", ""));           # keine Ausgabe wenn es keine EventId mit Blocknummer 0 gibt -> kein Event/Aufgabe vorhanden
       
 	  ($begind,$begint,$endd,$endt,$gps) = ("","","","","");
 	  
-      $summary    = ReadingsVal($name, $prestr."_01_Summary",         "");
-      $desc       = ReadingsVal($name, $prestr."_03_Description",     "");
-      $begin      = ReadingsVal($name, $prestr."_05_Begin",           "");
-      $end        = ReadingsVal($name, $prestr."_10_End",             "");
-	  $tz         = ReadingsVal($name, $prestr."_15_Timezone",        "");
-      $status     = ReadingsVal($name, $prestr."_17_Status",          "");
-      $dleft      = ReadingsVal($name, $prestr."_20_daysLeft",        "");
-      $location   = ReadingsVal($name, $prestr."_35_Location",        "");
-      $gpsa       = ReadingsVal($name, $prestr."_40_gpsAddress",      "");
-      $gpsc       = ReadingsVal($name, $prestr."_45_gpsCoordinates",  "");
-	  $completion = ReadingsVal($name, $prestr."_85_percentComplete", "");
-      $cal        = ReadingsVal($name, $prestr."_90_calName",         "");
-      $id         = ReadingsVal($name, $prestr."_98_EventId",         "");
-      $isallday   = ReadingsVal($name, $prestr."_50_isAllday",        "");
+      $summary    = ReadingsVal($name, $bnr."_01_Summary",         "");
+      $desc       = ReadingsVal($name, $bnr."_03_Description",     "");
+      $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
+      $end        = ReadingsVal($name, $bnr."_10_End",             "");
+	  $tz         = ReadingsVal($name, $bnr."_15_Timezone",        "");
+      $status     = ReadingsVal($name, $bnr."_17_Status",          "");
+      $dleft      = ReadingsVal($name, $bnr."_20_daysLeft",        "");
+      $location   = ReadingsVal($name, $bnr."_35_Location",        "");
+      $gpsa       = ReadingsVal($name, $bnr."_40_gpsAddress",      "");
+      $gpsc       = ReadingsVal($name, $bnr."_45_gpsCoordinates",  "");
+	  $completion = ReadingsVal($name, $bnr."_85_percentComplete", "");
+      $cal        = ReadingsVal($name, $bnr."_90_calName",         "");
+      $id         = ReadingsVal($name, $bnr."_98_EventId",         "");
+      $isallday   = ReadingsVal($name, $bnr."_50_isAllday",        "");
       
       if($gpsc) {
 	      my $micon;
 		  if ($mi eq "icon") {
+              # Karten-Icon auswählen
 		      my $di = "it_i-net";
-			  my $ui = $hash->{HELPER}{tableSpecs}{columnMapIcon};
-			  $di    = $ui ? $ui : $di;
-		      $micon = FW_makeImage($di);                   
+			  my $ui = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr);
+		      $micon = FW_makeImage($ui);                   
 		  } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
+              # Karten-Text auswählen
 		      my $dt = "link";
-			  my $ut = $hash->{HELPER}{tableSpecs}{columnMapText};
-			  $micon = $ut ? $ut : $dt;
+			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr);
 		  } else {
 		      $micon = "";
 		  }
@@ -3376,7 +3379,8 @@ sub SSCal_calAsHtml($;$) {
           $lat           = (split("=", $lat))[1];
           $lng           = (split("=", $lng))[1];
 		                                     
-		  my $up = $hash->{HELPER}{tableSpecs}{columnMapProvider} || "";
+		  # Kartenanbieter auswählen
+          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr);
 		  if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
 		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
 		  } elsif ($up eq "OpenStreetMap") {
@@ -3426,7 +3430,10 @@ sub SSCal_calAsHtml($;$) {
           }
       }
 
-     
+      # Icon für Spalte Resttage spezifizieren
+      $dleft    = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,@allrds);
+      # Icon für Spalte Status spezifizieren
+      $status   = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,@allrds);
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
       if($small) {
@@ -3438,7 +3445,7 @@ sub SSCal_calAsHtml($;$) {
           $out .= "<td class='cal calcenter'> $endd               </td>" if($seen{End});
           $out .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});      
       }
-      $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{Days});
+      $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{DaysLeft});
 	  $out     .= "<td class='cal'          > $tz                 </td>" if($seen{Timezone});
       $out     .= "<td class='cal'          > $summary            </td>" if($seen{Summary});
       $out     .= "<td class='cal'          > $desc               </td>" if($seen{Description});
@@ -3455,6 +3462,118 @@ sub SSCal_calAsHtml($;$) {
   $out .= "</html>";
 
 return $out;
+}
+
+######################################################################################
+#             Evaluiere Eigenschaften von Attribut "tableSpecs"
+#
+# $hash:     Devicehash
+# $default:  Standardwert - wird wieder zurückgegeben wenn kein Funktionsergebnis
+# $specs:    Basisschlüssel (z.B. $hash->{HELPER}{tableSpecs}{columnDaysLeft})
+# @allreads: alle vorhandenen Readings
+# $bnr:      Blocknummer Readings
+#
+######################################################################################
+sub SSCal_evalTableSpecs (@){ 
+  my ($hash,$default,$specs,$bnr,@allrds)= @_;
+  my $name = $hash->{NAME};
+  my $check;
+  
+  # anonymous sub für Abarbeitung Perl-Kommandos
+  $check = sub ($) {
+      my ($specs) = @_;
+      my $ret = AnalyzePerlCommand(undef, $specs);
+  return $ret;
+  };
+                          
+
+  no warnings;
+  
+  if ($specs) {                                                               # Eigenschaft muß Wert haben
+      my ($rn,$reading,$uval,$ui,$rval);
+
+      if (ref($specs) eq "ARRAY") {                                           # Wenn Schlüssel ein ARRAY enthält
+          my $i = 0;
+		  while ($specs->[$i]) {              
+              my $n = keys %{$specs->[$i]};                                   # Anzahl Elemente (Entscheidungskriterien) in Hash
+              
+			  foreach my $k (keys %{$specs->[$i]}) {                  
+                  if ($k eq "icon") {
+				      $ui = $specs->[$i]{$k};
+                      $n--;
+                      next;
+                  }
+                  foreach my $r (@allrds) {                                   # alle vorhandenen Readings evaluieren
+                      if($r =~ m/$k$/) {                                     
+                         (undef,$rn,$reading) = split("_", $r);               # Readingnummer evaluieren
+                         $uval                = $specs->[$i]{$k};             # Vergleichswert 
+                         last;
+                      }
+                  }
+                  
+                  $rval = ReadingsVal($name, $bnr."_".$rn."_".$reading, "empty");
+                  $rval = "\"".$rval."\"";
+                  
+                  if ( eval ($rval . $uval) ) {                   
+                      $ui = $specs->[$i]{icon};
+                      $n--;                         
+                  } else {                          
+                      $ui = "";                          
+                  }
+              }
+
+              if($n == 0 && $ui) {
+                  $default = FW_makeImage($ui);                               # Defaultwert mit Icon ersetzen wenn alle Bedingungen erfüllt              
+              }               
+              $i++;              
+          }
+		  
+      } elsif (ref($specs) eq "HASH") {                                       # Wenn Schlüssel ein HASH enthält  
+		  my $n = keys %{$specs};                                             # Anzahl Elemente (Entscheidungskriterien) in Hash
+		  
+		  foreach my $k (keys %{$specs}) {                  
+			  if ($k eq "icon") {
+				  $ui = $specs->{$k};
+				  $n--;
+				  next;
+			  }
+			  foreach my $r (@allrds) {                                       # alle vorhandenen Readings evaluieren
+				  if($r =~ m/$k$/) {                                     
+					 (undef,$rn,$reading) = split("_", $r);                   # Readingnummer evaluieren
+					 $uval                = $specs->{$k};                     # Vergleichswert 
+					 last;
+				  }
+			  }
+			  
+			  $rval = ReadingsVal($name, $bnr."_".$rn."_".$reading, "empty");
+			  $rval = "\"".$rval."\"";
+			  
+			  if ( eval ($rval . $uval) ) {                   
+				  $ui = $specs->{icon};
+				  $n--;                         
+			  } else {                          
+				  $ui = "";                          
+			  }
+		  }
+
+		  if($n == 0 && $ui) {
+			  $default = FW_makeImage($ui);                                   # Defaultwert mit Icon ersetzen wenn alle Bedingungen erfüllt              
+		  }
+      
+	  } else {                                                                # ref Wert der Eigenschaft ist nicht HASH oder ARRAY
+		  if($specs =~ m/^\{.*\}$/s) {                                        # den Wert als Perl-Funktion ausführen wenn in {}
+			  $specs   =~ s/\$NAME/$name/g;                                   # Platzhalter $NAME, $BNR ersetzen
+			  $specs   =~ s/\$BNR/$bnr/g;
+              $default = $check->($specs);
+		  } else {                                                            # einfache key-value Zuweisung
+		      eval ($default = $specs);                                      
+		  }
+	  }	  
+  } 
+   
+  use warnings;
+  
+return $default;
 }
 
 #############################################################################################
