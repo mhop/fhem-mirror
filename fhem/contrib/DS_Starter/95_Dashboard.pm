@@ -42,6 +42,7 @@ package main;
 use strict;
 use warnings;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+use Data::Dumper;  
 
 use vars qw(%FW_icons); 	# List of icons
 use vars qw($FW_dir);      	# base directory for web server
@@ -1054,10 +1055,18 @@ sub Dashboard_GetActiveTab ($;$) {
   }
   
   if (defined($FW_httpheader{Cookie})) {
-      Log3 ($name, 4, "Dashboard $name - Cookie set: ".$FW_httpheader{Cookie});
-      my %cookie = map({ $_!~/^.*=$/ ? split('=', $_) : "" } split(/; */, $FW_httpheader{Cookie}));        # 10.02.2020, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004
-     # my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
-      if (defined($cookie{dashboard_activetab})) {
+      Log3 ($name, 4, "Dashboard $name - Cookie delivered: ".$FW_httpheader{Cookie});
+
+      # my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));	  
+      my %cookie;                                                            # 10.02.2020, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004
+	  foreach (split(/; */, $FW_httpheader{Cookie})) {
+	      my ($k,$v) = split('=', $_);
+		  next if(!defined $v);
+		  $cookie{$k} = $v;
+	  }
+	 
+      Log3($name, 5, "Dashboard $name - Cookie Hash: ". Dumper %cookie);
+	  if (defined($cookie{dashboard_activetab})) {
           $activeTab = $cookie{dashboard_activetab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
       }
