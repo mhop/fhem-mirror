@@ -48,7 +48,8 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = "IODev ccucalculate ".
-		"ccuflags:multiple-strict,ackState,logCommand,devState,noReadings,trace ccureadingfilter ".
+		"ccuflags:multiple-strict,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings ".
+		"ccureadingfilter ".
 		"ccureadingformat:name,namelc,address,addresslc,datapoint,datapointlc ".
 		"ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix ".
 		"ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint ".
@@ -209,11 +210,6 @@ sub HMCCUCHN_Attr ($@)
 {
 	my ($cmd, $name, $attrname, $attrval) = @_;
 	my $hash = $defs{$name};
-	
-	my %resetReadings = (
-		'ccureadingfilter' => 1, 'ccureadingformat' => 1, 'ccureadingname' => 1,
-		'substitute' => 1, 'ccuscaleval' => 1
-	);
 
 	if ($cmd eq "set") {
 		return "Missing attribute value" if (!defined ($attrval));
@@ -226,11 +222,7 @@ sub HMCCUCHN_Attr ($@)
 	}
 
 	if ($init_done) {
-		my $ioHash = $hash->{IODev};
-		if (defined($ioHash) && !HMCCU_IsFlag ($ioHash->{NAME}, 'noResetReadings') &&
-			exists($resetReadings{$attrname}) && $resetReadings{$attrname} == 1) {
-			HMCCU_DeleteReadings ($hash, '.*');
-		}
+		HMCCU_RefreshReadings ($hash);
 	}
 
 	return undef;
@@ -250,7 +242,7 @@ sub HMCCUCHN_Set ($@)
 	$opt = lc($opt);
 
 	my $rocmds = "clear defaults:noArg";
-	my $rwcmds = "clear config control datapoint defaults:noArg paramset link devstate values";
+	my $rwcmds = "clear config control datapoint defaults:noArg link values";
 	
 	# Get I/O device, check device state
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
@@ -353,8 +345,8 @@ sub HMCCUCHN_Set ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
 
 		my $stc = scalar (@states);
-		my $curState = defined($hash->{hmccu}{dp}{"$cc.$cd"}{SVAL}) ?
-			$hash->{hmccu}{dp}{"$cc.$cd"}{SVAL} : $states[0];
+		my $curState = defined($hash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL}) ?
+			$hash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL} : $states[0];
 
 		my $newState = '';
 		my $st = 0;
@@ -461,36 +453,24 @@ sub HMCCUCHN_Set ($@)
 		HMCCU_DeleteReadings ($hash, $rnexp);
 		return HMCCU_SetState ($hash, "OK");
 	}
-	elsif ($opt =~ /^(paramset|rpcparameter|config|link|values)$/) {
-		my %parSets = ('config' => 'MASTER', 'links' => 'LINK', 'values' => 'VALUES');
-		my $paramset = '';
+	elsif ($opt =~ /^(config|values)$/) {
+		my %parSets = ('config' => 'MASTER', 'values' => 'VALUES');
+		my $paramset = $parSets{$opt};
 		
 		return HMCCU_SetError ($hash, "No parameter specified")
 			if ((scalar keys %{$h}) < 1);	
 
-		if (exists($parSets{$opt})) {
-			$paramset = $parSets{$opt};
-		}
-
 		my $ccuobj = $ccuaddr;
 		my $p = shift @$a;
 		if (defined($p) && $p eq 'device') {
-			return HMCCU_SetError ($hash, "Link parameters can only be set for channels")
-				if ($opt eq 'link');
 			($ccuobj, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 			$p = shift @$a;
 		}
 		
-		if ($opt =~ /(paramset|rpcparameter)/) {
-			return HMCCU_SetError ($hash, "Command $opt requires a parameter set")
-				if (!defined($p));
-			$paramset = $p;
-		}
-
 		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $ccuobj, $ccuif);
 		return HMCCU_SetError ($hash, "Can't get device description")
 			if (!defined($devDesc));
-		return HMCCU_SetError ($hash, "Paramset $paramset not supported by device")
+		return HMCCU_SetError ($hash, "Paramset $paramset not supported by device or channel")
 			if ($devDesc->{PARAMSETS} !~ /$paramset/);
 				
 		if ($paramset eq 'VALUES') {
@@ -501,6 +481,50 @@ sub HMCCUCHN_Set ($@)
 		}
 
 		return HMCCU_SetError ($hash, min(0, $rc));
+	}
+	elsif ($opt eq 'link') {
+		return HMCCU_SetError ($hash, "No parameter specified")
+			if ((scalar keys %{$h}) < 1);	
+		my @rcvList = ();
+		my $receiver = shift @$a;
+		
+		if (defined($receiver)) {
+			if (exists($defs{$receiver}) && defined($defs{$receiver}->{TYPE})) {
+				my $clHash = $defs{$receiver};
+				if ($clHash->{TYPE} eq 'HMCCUDEV') {
+					my $chnNo = shift @$a;
+					return HMCCU_SetError ($hash, "Channel number required for link receiver")
+						if (!defined($chnNo) || $chnNo !~ /^[0-9]{1,2}$/);
+					$receiver = $clHash->{ccuaddr}.":$chnNo";
+				}
+				elsif ($clHash->{TYPE} eq 'HMCCUCHN') {
+					$receiver = $clHash->{ccuaddr};
+				}
+				else {
+					return HMCCU_SetError ($hash, "Receiver $receiver is not a HMCCUCHN or HMCCUDEV device");
+				}
+			}
+			push @rcvList, $receiver;
+		}
+		else {
+			push @rcvList, HMCCU_GetReceivers ($ioHash, $ccuaddr, $ccuif);
+		}
+		
+		return HMCCU_SetError ($hash, "$receiver is not a link receiver of $name")
+			if (!HMCCU_IsValidReceiver ($ioHash, $ccuaddr, $ccuif, $receiver));
+
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $ccuaddr, $ccuif);
+		return HMCCU_SetError ($hash, "Can't get device description")
+			if (!defined($devDesc));
+		return HMCCU_SetError ($hash, "Paramset LINK not supported by device or channel")
+			if ($devDesc->{PARAMSETS} !~ /LINK/);
+		
+		foreach my $rcv (@rcvList) {
+			($rc, $result) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $rcv, $h);
+			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		}
+
+		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'defaults') {
 		$rc = HMCCU_SetDefaults ($hash);
@@ -563,17 +587,7 @@ sub HMCCUCHN_Get ($@)
 	HMCCU_Log ($hash, 3, "get $name $opt ".join (' ', @$a))
 		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
 
-	if ($opt eq 'devstate') {
-		return HMCCU_SetError ($hash, -13) if ($sd eq '');
-		return HMCCU_SetError ($hash, -8)
-			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $sd, 1));
-
-		my $objname = $ccuif.'.'.$ccuaddr.'.'.$sd;
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
-		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		return $result;
-	}
-	elsif ($opt eq 'datapoint') {
+	if ($opt eq 'datapoint') {
 		my $objname = shift @$a;
 		
 		return HMCCU_SetError ($hash, "Usage: get $name datapoint {datapoint}")
@@ -602,26 +616,12 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_SetError ($hash, -2) if ($result eq '');
 		return HMCCU_FormatDeviceInfo ($result);
 	}
-	elsif ($opt =~ /^(paramset|config|values)$/) {
-		my $defParamset = '';
+	elsif ($opt =~ /^(config|values)$/) {
 		my %parSets = ('config' => 'MASTER,LINK', 'values' => 'VALUES');
+		my $defParamset = $parSets{$opt};
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);
-		my $par = shift @$a;
 		
-		if (defined($par)) {
-			if ($opt eq 'paramset') {
-				$defParamset = $par;
-			}
-			else {
-				return "Usage: get $name $opt";
-			}
-		}
-		
-		if (exists($parSets{$opt})) {
-			$defParamset = $parSets{$opt};
-		}
-
 		my %objects;
 		foreach my $a (@addList) {
 			my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $ccuif);
@@ -634,10 +634,20 @@ sub HMCCUCHN_Get ($@)
 			foreach my $ps (split (',', $paramset)) {
 				next if ($devDesc->{PARAMSETS} !~ /$ps/);
 
-				($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $ps, undef, undef);
-				return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-
-				foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
+				if ($ps eq 'LINK') {
+					foreach my $rcv (HMCCU_GetReceivers ($ioHash, $ccuaddr, $ccuif)) {
+						($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $rcv, undef, undef);
+						next if ($rc < 0);
+						foreach my $p (keys %$result) {
+							$objects{$da}{$dc}{"LINK.$rcv"}{$p} = $result->{$p};
+						}					
+					}
+				}
+				else {
+					($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $ps, undef, undef);
+					return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
+					foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
+				}
 			}
 		}
 		
@@ -648,10 +658,12 @@ sub HMCCUCHN_Get ($@)
 				foreach my $da (sort keys %$convRes) {
 					$res .= "Device $da\n";
 					foreach my $dc (sort keys %{$convRes->{$da}}) {
-						$res .= "  Channel $dc\n";
-						$res .= join ("\n", map { 
-							"    ".$_.' = '.$convRes->{$da}{$dc}{$_}
-						} sort keys %{$convRes->{$da}{$dc}})."\n";
+						foreach my $ps (sort keys %{$convRes->{$da}{$dc}}) { 
+							$res .= "  Channel $dc [$ps]\n";
+							$res .= join ("\n", map { 
+								"    ".$_.' = '.$convRes->{$da}{$dc}{$ps}{$_}
+							} sort keys %{$convRes->{$da}{$dc}{$ps}})."\n";
+						}
 					}
 				}
 			}
@@ -671,14 +683,14 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_GetDefaults ($hash, 0);
 	}
 	else {
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg defaults:noArg datapoint";
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of defaults:noArg datapoint";
 		
 		my ($a, $c) = split(":", $hash->{ccuaddr});
 		my @valuelist;
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
 		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
 		$retmsg .= " update:noArg deviceInfo:noArg config:noArg".
-			" deviceDesc:noArg paramset paramsetDesc:noArg values:noArg";
+			" deviceDesc:noArg paramsetDesc:noArg values:noArg";
 		
 		return $retmsg;
 	}
@@ -728,7 +740,12 @@ sub HMCCUCHN_Get ($@)
          Readings 'state' and 'control' are not deleted.
       </li><br/>
       <li><b>set &lt;name&gt; config [device] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
-        Alias for command 'set paramset' for parameter set MASTER.
+         Set multiple config parameters (parameter set MASTER).
+         With option 'device' a parameter set of the device is set instead of the current channel.
+         Supports attribute 'ccuscaleval' for datapoints. Parameter <i>parameter</i> must be a valid
+         config parameter name. If <i>type</i> is not specified, it's taken from
+         parameter set definition. The default <i>type</i> is STRING.
+         Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
       </li><br/>
       <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; | &lt;datapoint&gt=&lt;value&gt; [...]</b><br/>
         Set datapoint values of a CCU channel. If parameter <i>value</i> contains special
@@ -742,13 +759,6 @@ sub HMCCUCHN_Get ($@)
    		Set default attributes for CCU device type. Default attributes are only available for
    		some device types and for some channels of a device type.
       </li><br/>
-      <li><b>set &lt;name&gt; devstate &lt;value&gt;</b><br/>
-         Set state of a CCU device channel. The state datapoint of a channel must be defined
-         by setting attribute 'statedatapoint' to a valid datapoint name.
-         <br/><br/>
-         Example:<br/>
-         <code>set light_entrance devstate true</code>
-      </li><br/>
       <li><b>set &lt;name&gt; down [&lt;value&gt;]</b><br/>
       	Decrement value of datapoint LEVEL. This command is only available if channel contains
       	a datapoint LEVEL. Default for <i>value</i> is 10.
@@ -756,8 +766,13 @@ sub HMCCUCHN_Get ($@)
       <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
       	Alias for command 'set pct'.
       </li><br/>
-      <li><b>set &lt;name&gt; link &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
-        Alias for command 'set paramset' for parameter set LINK.
+      <li><b>set &lt;name&gt; link &lt;receiver&gt; [&lt;channel&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
+         Set multiple link parameters (parameter set LINK). Parameter <i>receiver</i> is the 
+         name of a FHEM device of type HMCCUDEV or HMCCUCHN or a channel address. For FHEM 
+         devices of type HMCCUDEV a <i>channel</i> number must be specified. Parameter <i>parameter</i> must be a valid
+         link configuration parameter name. If <i>type</i> is not specified, it's taken from
+         parameter set definition. The default <i>type</i> is STRING.
+         Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
       </li><br/>
       <li><b>set &lt;name&gt; &lt;statevalue&gt;</b><br/>
          Set state of a CCU device channel to <i>StateValue</i>. The state datapoint of a channel
@@ -790,16 +805,6 @@ sub HMCCUCHN_Get ($@)
          format HH:MM or HH:MM:SS. This command is only available if channel contains a datapoint
          ON_TIME. The attribute 'statevals' must contain at least a value for 'on'. The Attribute
          'statedatapoint' must be set to a writeable datapoint.
-      </li><br/>
-      <li><b>set &lt;name&gt; paramset [device] [&lt;paramset&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;] [...]</b><br/>
-         Set multiple datapoints or config parameters by using RPC interface instead of ReGa.
-         With option 'device' a parameter set of the device is set instead of the current channel.
-         Parameter <i>paramset</i> is a valid parameter set name (i.e. MASTER, LINK, ...). The
-         default parameter set is 'VALUES'.
-         Supports attribute 'ccuscaleval' for datapoints. Parameter <i>parameter</i> must be a valid
-         datapoint or config parameter name. If <i>type</i> is not specified, it's taken from
-         parameter set definition. The default <i>type</i> is STRING.
-         Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
       </li><br/>
       <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
          Set datapoint LEVEL of a channel to the specified <i>value</i>. Optionally a <i>ontime</i>
@@ -840,7 +845,11 @@ sub HMCCUCHN_Get ($@)
       	a datapoint LEVEL. Default for <i>value</i> is 10.
       </li><br/>
       <li><b>set &lt;name&gt; values &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
-        Alias for command 'set paramset' for parameter set VALUES.
+         Set multiple datapoint values (parameter set VALUES).
+         Supports attribute 'ccuscaleval'. Parameter <i>parameter</i> must be a valid
+         datapoint name. If <i>type</i> is not specified, it's taken from
+         parameter set definition. The default <i>type</i> is STRING.
+         Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
       </li>
    </ul>
    <br/>
@@ -849,7 +858,12 @@ sub HMCCUCHN_Get ($@)
    <b>Get</b><br/><br/>
    <ul>
       <li><b>get &lt;name&gt; config</b><br/>
-      	Same as 'get paramset', but read only parameter sets MASTER and LINK.
+         Get configuration parameters of device and channel.
+         If ccuflag noReadings is set results are displayed in browser window. Otherwise
+         they are stored as readings beginning with "R-" for MASTER parameters and "L-" for
+         LINK parameters. 
+         Prefixes can be modified with attribute 'ccuReadingPrefix'. If option 'device' is specified parameters
+         of device are read. Without option 'device' parameters of current channel and channel 0 are read.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
          Get value of a CCU channel datapoint.
@@ -862,20 +876,6 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>get &lt;name&gt; deviceInfo</b><br/>
          Display all channels and datapoints of device with datapoint values and types.
-      </li><br/>
-      <li><b>get &lt;name&gt; devstate</b><br/>
-         Get state of CCU device. Default datapoint STATE can be changed by setting
-         attribute 'statedatapoint'. Command will fail if state datapoint does not exist in
-         channel.
-      </li><br/>
-      <li><b>get &lt;name&gt; paramset [&lt;paramset&gt;[,...]]</b><br/>
-         Get parameters from all or specific parameter sets of device and channel.
-         If ccuflag noReadings is set results are displayed in browser window. Otherwise
-         they are stored as readings beginning with "R-" for MASTER parameters and "L-" for
-         LINK parameters. Values from other parameter sets are stored without prefix.
-         Prefixes can be modified with attribute 'ccuReadingPrefix'. If no <i>paramset</i>
-         is specified, all parameter sets will be read. If option 'device' is specified parameters
-         of device are read. Without option 'device' parameters of current channel and channel 0 are read.
       </li><br/>
       <li><b>get &lt;name&gt; paramsetDesc</b><br/>
          Display description of parameter sets of channel and device.
@@ -913,12 +913,14 @@ sub HMCCUCHN_Get ($@)
       	Example:<br/>
       	<code>dewpoint:taupunkt:1.TEMPERATURE,1.HUMIDITY</code>
       </li><br/>
-      <li><b>ccuflags {ackState, logCommand, devState, noReadings, trace}</b><br/>
+      <li><b>ccuflags {ackState, logCommand, noReadings, showDeviceReadings, showLinkReadings, showConfigReadings, trace}</b><br/>
       	Control behaviour of device:<br/>
       	ackState: Acknowledge command execution by setting STATE to error or success.<br/>
       	logCommand: Write get and set commands to FHEM log with verbose level 3.<br/>
-      	devState: Store channel 0 states in reading 'devstate'<br/>
       	noReadings: Do not update readings<br/>
+      	showDeviceReadings: Show readings of device and channel 0.<br/>
+      	showLinkReadings: Show link readings.<br/>
+      	showMasterReadings: Show configuration readings.<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
       <li><b>ccuget {State | <u>Value</u>}</b><br/>

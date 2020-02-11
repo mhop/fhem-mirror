@@ -746,7 +746,7 @@ sub HMCCURPCPROC_Read ($)
 		next if (!defined ($et));
 		
 		if ($et eq 'EV') {
-			$events{$par[0]}{$par[1]}{$par[2]} = $par[3];
+			$events{$par[0]}{$par[1]}{VALUES}{$par[2]} = $par[3];
 			$evcount++;
 			$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
 			

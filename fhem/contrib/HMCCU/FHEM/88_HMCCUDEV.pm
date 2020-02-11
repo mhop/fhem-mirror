@@ -843,9 +843,17 @@ sub HMCCUDEV_Get ($@)
 		if (scalar(keys %objects) > 0) {
 			my $convRes = HMCCU_UpdateParamsetReadings ($ioHash, $hash, \%objects);
 			if (defined($convRes)) {
-				$res .= join ("\n", map { $_ =~ /$par/ ?
-					"    ".$_.' = '.$convRes->{$_} : ()
-				} sort keys %$convRes)."\n";
+				foreach my $da (sort keys %$convRes) {
+					$res .= "Device $da\n";
+					foreach my $dc (sort keys %{$convRes->{$da}}) {
+						foreach my $ps (sort keys %{$convRes->{$da}{$dc}}) { 
+							$res .= "  Channel $dc [$ps]\n";
+							$res .= join ("\n", map { 
+								"    ".$_.' = '.$convRes->{$da}{$dc}{$ps}{$_}
+							} sort keys %{$convRes->{$da}{$dc}{$ps}})."\n";
+						}
+					}
+				}
 			}
 		}
 		
