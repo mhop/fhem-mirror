@@ -2225,25 +2225,28 @@ attr DEVICE model OpenMQTTGateway_MCU
 { AttrTemplate_Initialize() }
 
 
-name:OpenMQTTGateway_BT_scanner
+name:OpenMQTTGateway_BT_gtag
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
-desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.
-order:X_02b
+desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your gtag. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+order:X_02a1
+#par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
+par:BT_ID;Pls. enter your bluetooth device ID; {undef}
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
-par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
-attr DEVICE readingList\
-  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
-  BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
-attr DEVICE setList\
-  BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
-  BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
-  BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
-  BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
-  BT_minrssi:slider,-110,1,0 BASE_ID/DEVNAME/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
-  deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
-attr DEVICE stateFormat Last: last
-attr DEVICE model OpenMQTTGateway_BT_scanner
+par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
+defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
+#attr OMG_BT_ID readingList READINGLISTOLD
+deletereading -q OMG_BT_ID (?!associatedWith).*
+attr OMG_BT_ID autocreate 0
+attr OMG_BT_ID readingList\
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,;; json2nameValue($EVENT, "${1}_") }\
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,;; {"last_IO"=>"$1"}}
+attr OMG_BT_ID event-min-interval 300
+attr OMG_BT_ID icon temperature_humidity
+attr OMG_BT_ID stateFormat Last IO: last_IO
+attr OMG_BT_ID room NEWDEVROOM
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
 
 name:OpenMQTTGateway_simple_RF433_switch
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
@@ -2308,10 +2311,12 @@ prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $dev
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your sensor. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02d
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:BT_ID;Pls. enter your bluetooth device ID; {undef}
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+#par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
 defmod OMG_BT_ID MQTT2_\DEVICE oMQTTgw_BT
+#attr OMG_BT_ID readingList READINGLISTOLD
 deletereading -q OMG_BT_ID (?!associatedWith).*
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
@@ -2324,7 +2329,6 @@ attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
-
 
 
 ###############
