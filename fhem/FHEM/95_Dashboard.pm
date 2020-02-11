@@ -4,7 +4,7 @@
 #
 #       written and released by Sascha Hermann 2013
 #      
-#       maintained 2019 by Heiko Maaz
+#       maintained 2019-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -42,6 +42,7 @@ package main;
 use strict;
 use warnings;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+use Data::Dumper;  
 
 use vars qw(%FW_icons); 	# List of icons
 use vars qw($FW_dir);      	# base directory for web server
@@ -55,6 +56,7 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.17.1" => "10.02.2020  fix perl warning, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004 ",
   "3.17.0" => "06.10.2019  Path handling of backgroundimage changed ",
   "3.16.0" => "04.10.2019  new attribute dashboard_hideGroupHeader, commandref revised ",   
   "3.15.2" => "29.09.2019  fix warnings, Forum: https://forum.fhem.de/index.php/topic,16503.msg978883.html#msg978883 ",
@@ -1053,9 +1055,18 @@ sub Dashboard_GetActiveTab ($;$) {
   }
   
   if (defined($FW_httpheader{Cookie})) {
-      Log3 ($name, 4, "Dashboard $name - Cookie set: ".$FW_httpheader{Cookie});
-      my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));
-      if (defined($cookie{dashboard_activetab})) {
+      Log3 ($name, 4, "Dashboard $name - Cookie delivered: ".$FW_httpheader{Cookie});
+
+      # my %cookie = map({ split('=', $_) } split(/; */, $FW_httpheader{Cookie}));	  
+      my %cookie;                                                            # 10.02.2020, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004
+	  foreach (split(/; */, $FW_httpheader{Cookie})) {
+	      my ($k,$v) = split('=', $_);
+		  next if(!defined $v);
+		  $cookie{$k} = $v;
+	  }
+	 
+      Log3($name, 5, "Dashboard $name - Cookie Hash: ". Dumper %cookie);
+	  if (defined($cookie{dashboard_activetab})) {
           $activeTab = $cookie{dashboard_activetab};
           $activeTab = ($activeTab <= $maxTab)?$activeTab:$maxTab;
       }
