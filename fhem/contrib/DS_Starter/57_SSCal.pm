@@ -175,7 +175,7 @@ sub SSCal_Initialize($) {
                      "showPassInLog:1,0 ".
                      "tableInDetail:0,1 ".
                      "tableInRoom:0,1 ".
-                     "tableFields:multiple-strict,Begin,End,Summary,Status,Location,Description,Map,Calendar,Completion,Timezone,DaysLeft,EventId ".
+                     "tableFields:multiple-strict,Begin,End,DaysLeft,Timezone,Summary,Description,Status,Completion,Location,Map,Calendar,EventId ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -3363,14 +3363,18 @@ sub SSCal_calAsHtml($;$) {
 		  if ($mi eq "icon") {
               # Karten-Icon auswählen
 		      my $di = "it_i-net";
-			  my $ui = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr);
-		      $micon = FW_makeImage($ui);                   
+			  my $ui = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,@allrds);
+              if($ui =~ /<svg class=|<img class=/) {                   
+			     $micon = $ui; 
+			  }	else {                                                   # in Image umwandeln wenn noch nicht passiert in SSCal_evalTableSpecs
+			     $micon = FW_makeImage($ui); 
+			  }		  			  
 		  } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
               # Karten-Text auswählen
 		      my $dt = "link";
-			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr);
+			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,@allrds);
 		  } else {
 		      $micon = "";
 		  }
@@ -3380,7 +3384,7 @@ sub SSCal_calAsHtml($;$) {
           $lng           = (split("=", $lng))[1];
 		                                     
 		  # Kartenanbieter auswählen
-          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr);
+          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,@allrds);
 		  if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
 		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
 		  } elsif ($up eq "OpenStreetMap") {
