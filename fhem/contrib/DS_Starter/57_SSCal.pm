@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
   "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub SSCal_evalTableSpecs , fix no table is shown after FHEM restart ",
   "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
                            "formatting overview table, feature smallScreen for tableSpecs, rename attributes to tableFields, ".
@@ -175,7 +176,7 @@ sub SSCal_Initialize($) {
                      "showPassInLog:1,0 ".
                      "tableInDetail:0,1 ".
                      "tableInRoom:0,1 ".
-                     "tableFields:multiple-strict,Begin,End,DaysLeft,Timezone,Summary,Description,Status,Completion,Location,Map,Calendar,EventId ".
+                     "tableFields:multiple-strict,Begin,End,DaysLeft,DaysLeftLong,Weekday,Timezone,Summary,Description,Status,Completion,Location,Map,Calendar,EventId ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -2226,14 +2227,15 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref) = @_;
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
-  my $ts        = time();                           # Istzeit Timestamp
-  my $om        = $hash->{OPMODE};                  # aktuelle Operation Mode
+  my $lang      = AttrVal("global", "language", "EN");
+  my $ts        = time();                                # Istzeit Timestamp
+  my $om        = $hash->{OPMODE};                       # aktuelle Operation Mode
   my $status    = "initialized";
-  my ($val,$uts,$td,$dleft);
+  my ($val,$uts,$td,$dleft,$bWday);
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
   
-  $upcoming = SSCal_isUpcoming ($ts,0,$bts);        # initiales upcoming
+  $upcoming = SSCal_isUpcoming ($ts,0,$bts);             # initiales upcoming
   $started  = SSCal_isStarted  ($ts,$bts,$ets);
   $ended    = SSCal_isEnded    ($ts,$ets);
   
@@ -2246,6 +2248,15 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
       if($btimes >= $ntimes) {
           $dleft = int(($btimes - $ntimes)/86400);
       }
+      
+      my @days;
+      (undef, undef, undef, undef, undef, undef, $bWday, undef, undef) = localtime($btimes);
+      if($lang eq "DE") {
+          @days = qw(Sontag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
+      } else {
+          @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday);
+      }
+      $bWday = $days[$bWday];
   }
   
   push(@row_array, $bts+$n." 07_bTimestamp "   .$bts."\n")                if($bts);
@@ -2254,6 +2265,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   push(@row_array, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
   push(@row_array, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
   push(@row_array, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
+  push(@row_array, $bts+$n." 27_Weekday "      .$bWday."\n")              if(defined $bWday);
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
@@ -2867,40 +2879,6 @@ return;
 }
 
 #############################################################################################
-#             Text für den Versand an Synology cal formatieren 
-#             und nicht erlaubte Zeichen entfernen           
-#############################################################################################
-sub SSCal_formText ($) {
-  my $txt = shift;
-  my (%replacements,$pat);
-  
-  %replacements = (
-      '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
-      " H" => " h",                             # Bug im cal wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
-      "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
-      "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
-      "+"  => "%2B",
-  );
-  
-  $txt =~ s/\n/ESC_newline_ESC/g;
-  my @acr = split (/\s+/, $txt);
-              
-  $txt = "";
-  foreach (@acr) {                              # Einzeiligkeit für Versand herstellen
-      $txt .= " " if($txt);
-      $_ =~ s/ESC_newline_ESC/\\n/g;
-      $txt .= $_;
-  }
-  
-  $pat = join '|', map quotemeta, keys(%replacements);
-  
-  $txt =~ s/($pat)/$replacements{$1}/g;   
-  
-return ($txt);
-}
-
-#############################################################################################
 #              Start- und Endezeit ermitteln
 #############################################################################################
 sub SSCal_timeEdge ($) {
@@ -3269,7 +3247,8 @@ sub SSCal_calAsHtml($;$) {
   my $lang             = AttrVal("global", "language", "EN");
   my $mi               = AttrVal($name, "tableColumnMap", "icon");
   
-  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc,$cal,$completion,$tz,$dleft,$edleft,$id,$isallday); 
+  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc); 
+  my ($cal,$completion,$tz,$dleft,$dleftlong,$weekday,$edleft,$id,$isallday);
 
   # alle Readings in Array einlesen
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -3316,6 +3295,8 @@ sub SSCal_calAsHtml($;$) {
   }
   
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{DaysLeft});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Terminziel'         :'Goal')."                </td>" if($seen{DaysLeftLong});
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Wochentag'          :'Weekday')."             </td>" if($seen{Weekday});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Beschreibung'       :'Description')."         </td>" if($seen{Description});
@@ -3350,6 +3331,8 @@ sub SSCal_calAsHtml($;$) {
 	  $tz         = ReadingsVal($name, $bnr."_15_Timezone",        "");
       $status     = ReadingsVal($name, $bnr."_17_Status",          "");
       $dleft      = ReadingsVal($name, $bnr."_20_daysLeft",        "");
+      $dleftlong  = ReadingsVal($name, $bnr."_25_daysLeftLong",    "");
+      $weekday    = ReadingsVal($name, $bnr."_27_Weekday",         "");
       $location   = ReadingsVal($name, $bnr."_35_Location",        "");
       $gpsa       = ReadingsVal($name, $bnr."_40_gpsAddress",      "");
       $gpsc       = ReadingsVal($name, $bnr."_45_gpsCoordinates",  "");
@@ -3364,12 +3347,11 @@ sub SSCal_calAsHtml($;$) {
               # Karten-Icon auswählen
 		      my $di = "it_i-net";
 			  my $ui = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,@allrds);
-              if($ui =~ /<svg class=|<img class=/) {                   
-			     $micon = $ui; 
-			  }	else {                                                   # in Image umwandeln wenn noch nicht passiert in SSCal_evalTableSpecs
-			     $micon = FW_makeImage($ui); 
-			  }		  			  
-		  } elsif ($mi eq "data") {
+              
+              # in Image umwandeln (versuchen) wenn SSCal_evalTableSpecs String liefert
+              if($ui =~ /<svg class=|<img class=/) { $micon = $ui; } else { $micon = FW_makeImage($ui); }		  			  
+		  
+          } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
               # Karten-Text auswählen
@@ -3436,6 +3418,7 @@ sub SSCal_calAsHtml($;$) {
 
       # Icon für Spalte Resttage spezifizieren
       $dleft    = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,@allrds);
+      
       # Icon für Spalte Status spezifizieren
       $status   = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,@allrds);
       
@@ -3450,6 +3433,8 @@ sub SSCal_calAsHtml($;$) {
           $out .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});      
       }
       $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{DaysLeft});
+      $out     .= "<td class='cal calcenter'> $dleftlong          </td>" if($seen{DaysLeftLong});
+      $out     .= "<td class='cal calcenter'> $weekday            </td>" if($seen{Weekday});
 	  $out     .= "<td class='cal'          > $tz                 </td>" if($seen{Timezone});
       $out     .= "<td class='cal'          > $summary            </td>" if($seen{Summary});
       $out     .= "<td class='cal'          > $desc               </td>" if($seen{Description});
@@ -3486,11 +3471,10 @@ sub SSCal_evalTableSpecs (@){
   # anonymous sub für Abarbeitung Perl-Kommandos
   $check = sub ($) {
       my ($specs) = @_;
-      my $ret = AnalyzePerlCommand(undef, $specs);
+      my $ret     = AnalyzePerlCommand(undef, $specs);
   return $ret;
   };
                           
-
   no warnings;
   
   if ($specs) {                                                               # Eigenschaft muß Wert haben
