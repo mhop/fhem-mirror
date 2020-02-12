@@ -2265,7 +2265,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   push(@row_array, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
   push(@row_array, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
   push(@row_array, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
-  push(@row_array, $bts+$n." 27_Weekday "      .$bWday."\n")              if(defined $bWday);
+  push(@row_array, $bts+$n." 30_Weekday "      .$bWday."\n")              if(defined $bWday);
 
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
@@ -3332,7 +3332,7 @@ sub SSCal_calAsHtml($;$) {
       $status     = ReadingsVal($name, $bnr."_17_Status",          "");
       $dleft      = ReadingsVal($name, $bnr."_20_daysLeft",        "");
       $dleftlong  = ReadingsVal($name, $bnr."_25_daysLeftLong",    "");
-      $weekday    = ReadingsVal($name, $bnr."_27_Weekday",         "");
+      $weekday    = ReadingsVal($name, $bnr."_30_Weekday",         "");
       $location   = ReadingsVal($name, $bnr."_35_Location",        "");
       $gpsa       = ReadingsVal($name, $bnr."_40_gpsAddress",      "");
       $gpsc       = ReadingsVal($name, $bnr."_45_gpsCoordinates",  "");
