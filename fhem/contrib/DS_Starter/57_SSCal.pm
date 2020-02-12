@@ -176,7 +176,7 @@ sub SSCal_Initialize($) {
                      "showPassInLog:1,0 ".
                      "tableInDetail:0,1 ".
                      "tableInRoom:0,1 ".
-                     "tableFields:multiple-strict,Begin,End,DaysLeft,DaysLeftLong,Weekday,Timezone,Summary,Description,Status,Completion,Location,Map,Calendar,EventId ".
+                     "tableFields:multiple-strict,Symbol,Begin,End,DaysLeft,DaysLeftLong,Weekday,Timezone,Summary,Description,Status,Completion,Location,Map,Calendar,EventId ".
                      "timeout ".
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
@@ -222,7 +222,7 @@ sub SSCal_Define($@) {
   $hash->{HELPER}{APIPARSET}     = 0;                                                                   # es sind keine API Informationen gesetzt -> neu abrufen
   
   CommandAttr(undef,"$name room SSCal");
-  CommandAttr(undef,"$name event-on-update-reading .*Summary.*,state");
+  CommandAttr(undef,"$name event-on-update-reading .*Summary,.*Status,state");
   
   %SSCal_api = (
     "APIINFO"   => { "NAME" => "SYNO.API.Info" },               # Info-Seite für alle API's, einzige statische Seite !                                                    
@@ -2228,21 +2228,21 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
   my $lang      = AttrVal("global", "language", "EN");
-  my $ts        = time();                                # Istzeit Timestamp
-  my $om        = $hash->{OPMODE};                       # aktuelle Operation Mode
+  my $ts        = time();                                                        # Istzeit Timestamp
+  my $om        = $hash->{OPMODE};                                               # aktuelle Operation Mode
   my $status    = "initialized";
   my ($val,$uts,$td,$dleft,$bWday);
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
   
-  $upcoming = SSCal_isUpcoming ($ts,0,$bts);             # initiales upcoming
+  $upcoming = SSCal_isUpcoming ($ts,0,$bts);                                     # initiales upcoming
   $started  = SSCal_isStarted  ($ts,$bts,$ets);
   $ended    = SSCal_isEnded    ($ts,$ets);
   
   if($bdate && $btime) {
       push(@row_array, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
-      my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());         # Datum Jetzt
-      my ($by,$bm,$bd)       = split("-", $bdate);               # Beginn Datum
+      my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());                         # Datum Jetzt
+      my ($by,$bm,$bd)       = split("-", $bdate);                               # Beginn Datum
       my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
       my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
       if($btimes >= $ntimes) {
@@ -3247,8 +3247,8 @@ sub SSCal_calAsHtml($;$) {
   my $lang             = AttrVal("global", "language", "EN");
   my $mi               = AttrVal($name, "tableColumnMap", "icon");
   
-  my ($begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc); 
-  my ($cal,$completion,$tz,$dleft,$dleftlong,$weekday,$edleft,$id,$isallday);
+  my ($symbol,$begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc); 
+  my ($di,$cal,$completion,$tz,$dleft,$dleftlong,$weekday,$edleft,$id,$isallday);
 
   # alle Readings in Array einlesen
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -3284,6 +3284,7 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<table class='block'>";
   $out    .= "<tr class='odd'>";
   
+  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Symbol'             :'Symbol')."              </td>" if($seen{Symbol});
   if ($small) {                                                                # nur ein Datumfeld umbrechbar
       $out .= "<td class='cal calbold calcenter'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
       $out .= "<td class='cal calbold calcenter'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
@@ -3345,12 +3346,8 @@ sub SSCal_calAsHtml($;$) {
 	      my $micon;
 		  if ($mi eq "icon") {
               # Karten-Icon auswählen
-		      my $di = "it_i-net";
-			  $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image");
-              
-              # in Image umwandeln (versuchen) wenn SSCal_evalTableSpecs String liefert
-              # if($ui =~ /<svg class=|<img class=/) { $micon = $ui; } else { $micon = FW_makeImage($ui); }		  			  
-		  
+		      $di = "it_i-net";
+			  $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image");  
           } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
@@ -3417,12 +3414,17 @@ sub SSCal_calAsHtml($;$) {
       }
 
       # Icon für Spalte Resttage spezifizieren
-      $dleft    = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image");
+      $dleft = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image");
       
       # Icon für Spalte Status spezifizieren
-      $status   = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image");
+      $status = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image");
+	  
+	  # Icon für Spalte "Symbol" bestimmen
+	  $di     = ($hash->{MODEL} eq "Diary") ? "time_calendar" : "time_note";
+	  $symbol = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image");
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
+	  $out     .= "<td class='cal calcenter'> $symbol             </td>" if($seen{Symbol});
       if($small) {
           $out .= "<td class='cal '> ".$begind." ".$begint.      "</td>" if($seen{Begin});
           $out .= "<td class='cal '> ".$endd  ." ".$endt.        "</td>" if($seen{End});
