@@ -3346,17 +3346,17 @@ sub SSCal_calAsHtml($;$) {
 		  if ($mi eq "icon") {
               # Karten-Icon auswählen
 		      my $di = "it_i-net";
-			  my $ui = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,@allrds);
+			  $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image");
               
               # in Image umwandeln (versuchen) wenn SSCal_evalTableSpecs String liefert
-              if($ui =~ /<svg class=|<img class=/) { $micon = $ui; } else { $micon = FW_makeImage($ui); }		  			  
+              # if($ui =~ /<svg class=|<img class=/) { $micon = $ui; } else { $micon = FW_makeImage($ui); }		  			  
 		  
           } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
               # Karten-Text auswählen
 		      my $dt = "link";
-			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,@allrds);
+			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string");
 		  } else {
 		      $micon = "";
 		  }
@@ -3366,7 +3366,7 @@ sub SSCal_calAsHtml($;$) {
           $lng           = (split("=", $lng))[1];
 		                                     
 		  # Kartenanbieter auswählen
-          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,@allrds);
+          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string");
 		  if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
 		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
 		  } elsif ($up eq "OpenStreetMap") {
@@ -3417,10 +3417,10 @@ sub SSCal_calAsHtml($;$) {
       }
 
       # Icon für Spalte Resttage spezifizieren
-      $dleft    = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,@allrds);
+      $dleft    = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image");
       
       # Icon für Spalte Status spezifizieren
-      $status   = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,@allrds);
+      $status   = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image");
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
       if($small) {
@@ -3459,14 +3459,17 @@ return $out;
 # $hash:     Devicehash
 # $default:  Standardwert - wird wieder zurückgegeben wenn kein Funktionsergebnis
 # $specs:    Basisschlüssel (z.B. $hash->{HELPER}{tableSpecs}{columnDaysLeft})
-# @allreads: alle vorhandenen Readings
+# $allreads: Referenz zum ARRAY was alle vorhandenen Readings des Devices enthält
 # $bnr:      Blocknummer Readings
+# $rdtype:   erwarteter Datentyp als Rückgabe (image, string)
 #
 ######################################################################################
 sub SSCal_evalTableSpecs (@){ 
-  my ($hash,$default,$specs,$bnr,@allrds)= @_;
+  my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
   my $name = $hash->{NAME};
   my $check;
+  
+  $rdtype = $rdtype ? $rdtype : "string";                                     # "string" als default Rückgabe Datentyp
   
   # anonymous sub für Abarbeitung Perl-Kommandos
   $check = sub ($) {
@@ -3491,7 +3494,8 @@ sub SSCal_evalTableSpecs (@){
                       $n--;
                       next;
                   }
-                  foreach my $r (@allrds) {                                   # alle vorhandenen Readings evaluieren
+				  
+                  foreach my $r (@{$allrds}) {                                # alle vorhandenen Readings evaluieren
                       if($r =~ m/$k$/) {                                     
                          (undef,$rn,$reading) = split("_", $r);               # Readingnummer evaluieren
                          $uval                = $specs->[$i]{$k};             # Vergleichswert 
@@ -3511,7 +3515,7 @@ sub SSCal_evalTableSpecs (@){
               }
 
               if($n == 0 && $ui) {
-                  $default = FW_makeImage($ui);                               # Defaultwert mit Icon ersetzen wenn alle Bedingungen erfüllt              
+		          $default = $ui;                                             # Defaultwert mit Select ersetzen wenn alle Bedingungen erfüllt			  
               }               
               $i++;              
           }
@@ -3525,7 +3529,7 @@ sub SSCal_evalTableSpecs (@){
 				  $n--;
 				  next;
 			  }
-			  foreach my $r (@allrds) {                                       # alle vorhandenen Readings evaluieren
+			  foreach my $r (@{$allrds}) {                                    # alle vorhandenen Readings evaluieren
 				  if($r =~ m/$k$/) {                                     
 					 (undef,$rn,$reading) = split("_", $r);                   # Readingnummer evaluieren
 					 $uval                = $specs->{$k};                     # Vergleichswert 
@@ -3545,7 +3549,7 @@ sub SSCal_evalTableSpecs (@){
 		  }
 
 		  if($n == 0 && $ui) {
-			  $default = FW_makeImage($ui);                                   # Defaultwert mit Icon ersetzen wenn alle Bedingungen erfüllt              
+		      $default = $ui;                                                 # Defaultwert mit Select ersetzen wenn alle Bedingungen erfüllt       
 		  }
       
 	  } else {                                                                # ref Wert der Eigenschaft ist nicht HASH oder ARRAY
@@ -3556,9 +3560,13 @@ sub SSCal_evalTableSpecs (@){
 		  } else {                                                            # einfache key-value Zuweisung
 		      eval ($default = $specs);                                      
 		  }
-	  }	  
-  } 
-   
+      }	  
+  }
+  
+  if($default && $rdtype eq "image") {
+	  $default = FW_makeImage($default);                                      # Icon aus "string" errechnen wenn "image" als Rückgabe erwartet wird und $default gesetzt  
+  }
+  
   use warnings;
   
 return $default;
@@ -3620,7 +3628,7 @@ Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wi
     "Appointments"
   ],
   "version": "v1.1.1",
-  "release_status": "testing",
+  "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
   ],
