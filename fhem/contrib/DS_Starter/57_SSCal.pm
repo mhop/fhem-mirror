@@ -329,7 +329,6 @@ sub SSCal_Attr($$$$) {
     # aName and aVal are Attribute name and value
 	
 	if ($cmd eq "set") {
-        my $attrVal = $aVal;
         
 		if ($aName =~ /filterCompleteTask|filterDueTask/ && $model ne "Tasks") {            
 			return " The attribute \"$aName\" is only valid for devices of MODEL \"Tasks\"! Please set this attribute in a device of this model.";
@@ -338,6 +337,12 @@ sub SSCal_Attr($$$$) {
 		if ($aName =~ /showRepeatEvent/ && $model ne "Diary") {            
 			return " The attribute \"$aName\" is only valid for devices of MODEL \"Diary\"! Please set this attribute in a device of this model.";
 		}
+        
+		if ($aName =~ /tableSpecs/) {            
+            return " The attribute \"$aName\" has wrong syntax. The value must be set into \"{ }\". " if($aVal !~ m/^\s*\{.*\}\s*$/s);
+		}
+        
+        my $attrVal = $aVal;
         
         if ($attrVal =~ m/^\{.*\}$/s && $attrVal =~ m/=>/) {
             $attrVal =~ s/\@/\\\@/g;
@@ -3307,6 +3312,7 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
   $out    .= "<td class='cal calbold calcenter'> ".(($de)?'ID'                 :'ID')."                  </td>" if($seen{EventId});
+  $out    .= "</tr>";
   
   my $maxbnr;
   foreach my $key (keys %{$defs{$name}{READINGS}}) {
