@@ -223,7 +223,7 @@ sub SSCal_Define($@) {
   $hash->{HELPER}{APIPARSET}     = 0;                                                                   # es sind keine API Informationen gesetzt -> neu abrufen
   
   CommandAttr(undef,"$name room SSCal");
-  CommandAttr(undef,"$name event-on-update-reading .*Summary,.*Status,state");
+  CommandAttr(undef,"$name event-on-update-reading .*Summary,state");
   
   %SSCal_api = (
     "APIINFO"   => { "NAME" => "SYNO.API.Info" },               # Info-Seite für alle API's, einzige statische Seite !                                                    
