@@ -389,8 +389,11 @@ sub HMCCUDEV_Set ($@)
 	my $ccuif = $hash->{ccuif};
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $statevals = AttrVal ($name, 'statevals', '');
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
-
+	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', '', '', '');
+	my $stateVals = HMCCU_GetStateValues ($hash, $cd, 2);
+	my %stateCmds = split (/[:,]/, $stateVals);
+	my @states = keys %stateCmds;
+	
 	my $result = '';
 	my $rc;
 
@@ -455,44 +458,33 @@ sub HMCCUDEV_Set ($@)
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
-	elsif ($opt =~ /^($hash->{hmccu}{statevals})$/) {
-		my $cmd = $1;
-		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @$a;
+	elsif (exists($stateCmds{$opt})) {
+		return HMCCU_SetError ($hash, -12) if ($cc eq '');
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');
+		return HMCCU_SetError ($hash, -8)
+			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
 
-		return HMCCU_SetError ($hash, -11) if ($sc eq '');		
-		return HMCCU_SetError ($hash, -13) if ($sd eq '');		
-		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
-
-		$objvalue =~ s/\\_/%20/g;
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$ccuif.$ccuaddr:$sc.$sd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+			{ "001.$ccuif.$ccuaddr:$cc.$cd" => $stateCmds{$opt} }
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'toggle') {
-		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{hmccu}{statevals}));
-		return HMCCU_SetError ($hash, -11) if ($sc eq '');		
-		return HMCCU_SetError ($hash, -13) if ($sd eq '');	
-		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, $sd, 2));
+		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
+		return HMCCU_SetError ($hash, -12) if ($cc eq '');
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');
+		return HMCCU_SetError ($hash, -8)
+			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2));
 
-		my $tstates = $hash->{hmccu}{statevals};
-		$tstates =~ s/devstate\|//;
-		my @states = split /\|/, $tstates;
 		my $stc = scalar (@states);
+		my $curState = defined($hash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL}) ?
+			$hash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL} : $states[0];
 
-		my $objname = $ccuif.'.'.$ccuaddr.':'.$sc.'.'.$sd;
-		
-		# Read current value of datapoint without updating reading
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 1);
-		Log3 $name, 2, "HMCCU: set toggle: GetDatapoint returned $rc, $result"
-			if ($ccuflags =~ /trace/);
-		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-
-		my $objvalue = '';
+		my $newState = '';
 		my $st = 0;
 		while ($st < $stc) {
-			if ($states[$st] eq $result) {
-				$objvalue = ($st == $stc-1) ? $states[0] : $states[$st+1];
+			if ($states[$st] eq $curState) {
+				$newState = ($st == $stc-1) ? $states[0] : $states[$st+1];
 				last;
 			}
 			else {
@@ -500,11 +492,11 @@ sub HMCCUDEV_Set ($@)
 			}
 		}
 
-		return HMCCU_SetError ($hash, "Current device state doesn't match statevals")
-		   if ($objvalue eq '');
+		return HMCCU_SetError ($hash, "Current device state doesn't match any state value")
+		   if ($newState eq '');
 
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$objname" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+			{ "001.$ccuif.$ccuaddr:$cc.$cd" => $stateCmds{$newState} }
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}

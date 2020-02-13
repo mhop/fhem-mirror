@@ -254,7 +254,7 @@ sub HMCCUCHN_Set ($@)
 	return undef if ($disable == 1);	
 
 	my $ioHash = $hash->{IODev};
-	my $hmccu_name = $ioHash->{NAME};
+	my $ioName = $ioHash->{NAME};
 	if (HMCCU_IsRPCStateBlocking ($ioHash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUCHN: CCU busy";
@@ -274,7 +274,7 @@ sub HMCCUCHN_Set ($@)
 
 	# Log commands
 	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a))
-		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
+		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand')); 
 
 	if ($opt eq 'datapoint') {
 		my $usage = "Usage: set $name datapoint {{datapoint} {value} | {datapoint}={value}} [...]";
@@ -329,7 +329,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif (exists($stateCmds{$opt})) {
-		return HMCCU_SetError ($hash, -13) if ($sd eq '');		
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');		
 		return HMCCU_SetError ($hash, -8)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
 
@@ -340,7 +340,8 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
-		return HMCCU_SetError ($hash, -13) if ($cd eq '');
+		return HMCCU_SetError ($hash, -12) if ($cc eq '');
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');
 		return HMCCU_SetError ($hash, -8)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
 
@@ -427,7 +428,7 @@ sub HMCCUCHN_Set ($@)
 		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
 		return HMCCU_SetError ($hash, "No state value for 'on' defined")
 		   if (!exists($stateCmds{"on"}));
-		return HMCCU_SetError ($hash, -13) if ($cd eq '');
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');
 		return HMCCU_SetError ($hash, -8)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
 		return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type")
@@ -504,15 +505,22 @@ sub HMCCUCHN_Set ($@)
 					return HMCCU_SetError ($hash, "Receiver $receiver is not a HMCCUCHN or HMCCUDEV device");
 				}
 			}
+			elsif (!HMCCU_IsChnAddr ($receiver, 0)) {
+				my ($rcvAdd, $rcvChn) = HMCCU_GetAddress ($ioHash, $receiver, '', '');
+				return HMCCU_SetError ($hash, "$receiver is not a valid CCU channel name")
+					if ($rcvAdd eq '' || $rcvChn eq '');
+				$receiver = "$rcvAdd:$rcvChn";
+			}
+
+			return HMCCU_SetError ($hash, "$receiver is not a link receiver of $name")
+				if (!HMCCU_IsValidReceiver ($ioHash, $ccuaddr, $ccuif, $receiver));
+
 			push @rcvList, $receiver;
 		}
 		else {
 			push @rcvList, HMCCU_GetReceivers ($ioHash, $ccuaddr, $ccuif);
 		}
 		
-		return HMCCU_SetError ($hash, "$receiver is not a link receiver of $name")
-			if (!HMCCU_IsValidReceiver ($ioHash, $ccuaddr, $ccuif, $receiver));
-
 		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $ccuaddr, $ccuif);
 		return HMCCU_SetError ($hash, "Can't get device description")
 			if (!defined($devDesc));
@@ -568,7 +576,7 @@ sub HMCCUCHN_Get ($@)
 	return undef if ($disable == 1);	
 
 	my $ioHash = $hash->{IODev};
-	my $hmccu_name = $ioHash->{NAME};
+	my $ioName = $ioHash->{NAME};
 	if (HMCCU_IsRPCStateBlocking ($ioHash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUCHN: CCU busy";
@@ -577,7 +585,6 @@ sub HMCCUCHN_Get ($@)
 	my $ccutype = $hash->{ccutype};
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 
 	my $result = '';
@@ -585,7 +592,7 @@ sub HMCCUCHN_Get ($@)
 
 	# Log commands
 	HMCCU_Log ($hash, 3, "get $name $opt ".join (' ', @$a))
-		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($hmccu_name, 'logCommand')); 
+		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand')); 
 
 	if ($opt eq 'datapoint') {
 		my $objname = shift @$a;
@@ -768,8 +775,9 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>set &lt;name&gt; link &lt;receiver&gt; [&lt;channel&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
          Set multiple link parameters (parameter set LINK). Parameter <i>receiver</i> is the 
-         name of a FHEM device of type HMCCUDEV or HMCCUCHN or a channel address. For FHEM 
-         devices of type HMCCUDEV a <i>channel</i> number must be specified. Parameter <i>parameter</i> must be a valid
+         name of a FHEM device of type HMCCUDEV or HMCCUCHN or a channel address or a CCU
+         channel name. For FHEM devices of type HMCCUDEV a <i>channel</i> number must be specified.
+         Parameter <i>parameter</i> must be a valid
          link configuration parameter name. If <i>type</i> is not specified, it's taken from
          parameter set definition. The default <i>type</i> is STRING.
          Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.

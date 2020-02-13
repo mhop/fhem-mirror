@@ -3659,12 +3659,11 @@ sub HMCCU_UpdateDeviceRoles ($$;$$)
 	my ($ioHash, $clHash, $iface, $address) = @_;
 
 	my $clType = $clHash->{TYPE};	
-	return if ($clType ne 'HMCCUCHN');
 
 	$iface = $clHash->{ccuif} if (!defined($iface));
 	$address = $clHash->{ccuaddr} if (!defined($address));
 	return if (!defined($address));
-	
+
 	my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $address, $iface);
 	if (defined($devDesc)) {
 		if ($clType eq 'HMCCUCHN' && defined($devDesc->{TYPE})) {
@@ -3680,7 +3679,7 @@ sub HMCCU_UpdateDeviceRoles ($$;$$)
 			}
 			$clHash->{ccurole} = join(',', @roles) if (scalar(@roles) > 0);
 		}
-	}	
+	}
 }
 
 ######################################################################
@@ -6922,57 +6921,90 @@ sub HMCCU_GetSpecialDatapoints ($$$$$)
 	my $type = $hash->{TYPE};
 	my $ccutype = $hash->{ccutype};
 	
+	# F: 1=Channel, 2=Device, 3=Both
+	# S: State Datapoint, C: Control datapoint
+	my %roleDPs = (
+		'SHUTTER_CONTACT'  => { F => 3, S => 'STATE', C => '' },
+		'KEY'              => { F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT' },
+		'BLIND'            => { F => 3, S => 'LEVEL', C => 'LEVEL' },
+		'SWITCH'           => { F => 3, S => 'STATE', C => 'STATE' },
+		'DIMMER'           => { F => 3, S => 'LEVEL', C => 'LEVEL' },
+		'WEATHER_TRANSMIT' => { F => 1, S => 'TEMPERATURE', C => 'TEMPERATURE' },
+		'THERMALCONTROL_TRANSMIT' =>       { F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE' },
+		'CLIMATECONTROL_RT_TRANSCEIVER' => { F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE' }
+	);
+	
 	my $statedatapoint = AttrVal ($name, 'statedatapoint', '');
 	my $statechannel = AttrVal ($name, 'statechannel', '');
 	my $controldatapoint = AttrVal ($name, 'controldatapoint', $statedatapoint);
 	
+	# If attribute statedatapoint is specified, use it
 	if ($statedatapoint ne '') {
 		if ($statedatapoint =~ /^([0-9]+)\.(.+)$/) {
 			($sc, $sd) = ($1, $2);
 		}
 		else {
 			$sd = $statedatapoint;
+			if ($statechannel eq '') {
+				# Try to find state channel
+				my $c = HMCCU_FindDatapoint ($hash, $type, -1, $sd, 3);
+				$sc = $c if ($c >= 0);
+			}
+			else {
+				$sc = $statechannel;
+			}
 		}
 	}
-	$sc = $statechannel if ($statechannel ne '' && $sc eq '');
 
+	# If attribute controldatapoint is specified, use it
 	if ($controldatapoint ne '') {
 		if ($controldatapoint =~ /^([0-9]+)\.(.+)$/) {
 			($cc, $cd) = ($1, $2);
 		}
 		else {
 			$cd = $controldatapoint;
+			# Try to find control channel
+			my $c = HMCCU_FindDatapoint  ($hash, $type, -1, $cd, 3);
+			$cc = $c if ($c >= 0);
 		}
 	}
 
-	# For devices of type HMCCUCHN extract channel numbers from CCU device address
-	if ($type eq 'HMCCUCHN') {
-		$sc = $hash->{ccuaddr};
-		$sc =~ s/^[\*]*[0-9A-Z]+://;
-		$cc = $sc;
-		if ($sd eq '') {
-			if (HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, 'STATE', 3)) { $sd = 'STATE'; }
-			elsif (HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, 'LEVEL', 3)) { $sd = 'LEVEL'; }
-			elsif (HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, 'PRESS_SHORT', 3)) { $sd = 'PRESS_SHORT'; }
+	if (exists($hash->{ccurole})) {
+		my $ccuRole = $hash->{ccurole};
+		if ($type eq 'HMCCUCHN') {
+			my ($da, $dc) = HMCCU_SplitChnAddr ($hash->{ccuaddr});
+			$sc = $dc;
+			$cc = $dc;
+			if (exists($roleDPs{$ccuRole}) && $roleDPs{$ccuRole}{F} & 1) {
+				$sd = $roleDPs{$ccuRole}{S} if ($roleDPs{$ccuRole}{S} ne '');
+				$cd = $roleDPs{$ccuRole}{C} if ($roleDPs{$ccuRole}{C} ne '');
+			}
 		}
-	}
-	else {
-		# Try to find state channel
-		my $c = -1;
-		if ($sc eq '' && $sd ne '') {
-			$c = HMCCU_FindDatapoint ($hash, $type, -1, $sd, 3);
-			$sc = $c if ($c >= 0);
-		}
-		# Try to find control channel
-		if ($cc eq '' && $cd ne '') {
-			$c = HMCCU_FindDatapoint  ($hash, $type, -1, $cd, 3);
-			$cc = $c if ($c >= 0);
+		elsif ($type eq 'HMCCUDEV') {
+			foreach my $roleDef (split(',', $ccuRole)) {
+				my ($dc, $role) = split(':', $roleDef);
+				if (exists($roleDPs{$role}) && $roleDPs{$role}{F} & 2) {
+					if ($roleDPs{$role}{S} ne '' && $sd eq '') {
+						$sd = $roleDPs{$role}{S};
+						$sc = $dc;
+					}
+					if ($roleDPs{$role}{C} ne '' && $cd eq '') {
+						$cd = $roleDPs{$role}{C} ;
+						$cc = $dc;
+					}
+				}
+				last if ($sd ne '' && $cd ne '');
+			}
 		}
 	}
 	
 	# By default set control channel and datapoint to state channel and datapoint
 	$cc = $sc if ($cc eq '');
 	$cd = $sd if ($cd eq '');
+	$hash->{hmccu}{state}{dpt} = $sd;
+	$hash->{hmccu}{state}{chn} = $sc;
+	$hash->{hmccu}{control}{dpt} = $cd;
+	$hash->{hmccu}{control}{chn} = $cc;
 
 	return ($sc, $sd, $cc, $cd);
 }
