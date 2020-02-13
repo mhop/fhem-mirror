@@ -3255,6 +3255,7 @@ sub SSCal_calAsHtml($;$) {
   
   my ($symbol,$begin,$begind,$begint,$end,$endd,$endt,$summary,$location,$status,$desc,$gps,$gpsa,$gpsc); 
   my ($di,$cal,$completion,$tz,$dleft,$dleftlong,$weekday,$edleft,$id,$isallday);
+  my ($colSymbolAlign,$colBeginAlign,$colEndAlign,$colDayAlign,$colDLongAlign,$colWeekdayAlign,$colTzAlign,$colSummaryAlign,$colDescAlign,$colStatusAlign,$colCompAlign,$colLocAlign,$colMapAlign,$colCalAlign,$colIdAlign);
 
   # alle Readings in Array einlesen
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -3287,8 +3288,8 @@ sub SSCal_calAsHtml($;$) {
   Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);	
   $headalign        = "cal".$headalign;
 
-  # Tabelle
-  my $out  = "<html>";
+  # Tabelle erstellen
+  my $out  = "<html>";  
   $out    .= "<style>TD.cal       {padding-left:10px; padding-right:10px; border-spacing:5px; margin-left:auto; margin-right:auto;}</style>";
   $out    .= "<style>TD.calbold   {font-weight: bold;}  </style>";
   $out    .= "<style>TD.calright  {text-align: right;}  </style>";
@@ -3296,8 +3297,15 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<style>TD.calcenter {text-align: center;} </style>";  
   $out    .= "<style>TD.calw150   {width: 150px;}       </style>";
   
+  # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
+  # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
+  $out    .= "<table class='roomoverview'>";
+  $out    .= "<tr>";
+  $out    .= "<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px'>";
+  
   $out    .= "<table class='block'>";
   
+  # Tabellenheader
   if(!$nohead) {
 	  $out    .= "<tr class='odd'>";
 	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Symbol'             :'Symbol')."              </td>" if($seen{Symbol});
@@ -3343,6 +3351,7 @@ sub SSCal_calAsHtml($;$) {
       
 	  ($begind,$begint,$endd,$endt,$gps) = ("","","","","");
 	  
+	  # Readings auslesen
       $summary    = ReadingsVal($name, $bnr."_01_Summary",         "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",     "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
@@ -3446,37 +3455,58 @@ sub SSCal_calAsHtml($;$) {
 	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnSymbolIcon\": $@") if($@);
 	  
 	  # Gestaltung Spaltentext
-	  my $colalign     = "center";                               # Ausrichtung der Spalte, default: center
-	  eval { $colalign = SSCal_evalTableSpecs ($hash,$colalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign},"",\@allrds,"string"); };
+	  my $coldefalign     = "center";                               # Ausrichtung der Spalte, default: center
+	  eval { 
+	       $coldefalign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign}             ,"",\@allrds,"string"); 
+		   $colSymbolAlign  = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSymbolAlign}       ,"",\@allrds,"string");
+		   $colBeginAlign   = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnBeginAlign}        ,"",\@allrds,"string");
+		   $colEndAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEndAlign}          ,"",\@allrds,"string");
+		   $colDayAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftAlign}     ,"",\@allrds,"string");
+		   $colDLongAlign   = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftLongAlign} ,"",\@allrds,"string");
+		   $colWeekdayAlign = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnWeekdayAlign}      ,"",\@allrds,"string");
+		   $colTzAlign      = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnTimezoneAlign}     ,"",\@allrds,"string");
+		   $colSummaryAlign = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSummaryAlign}      ,"",\@allrds,"string");
+		   $colDescAlign    = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDescriptionAlign}  ,"",\@allrds,"string");  
+		   $colStatusAlign  = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnStatusAlign}       ,"",\@allrds,"string");  
+		   $colCompAlign    = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCompletionAlign}   ,"",\@allrds,"string");  
+		   $colLocAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnLocationAlign}     ,"",\@allrds,"string");  
+		   $colMapAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnMapAlign}          ,"",\@allrds,"string");  
+		   $colCalAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCalendarAlign}     ,"",\@allrds,"string");  
+		   $colIdAlign      = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEventIdAlign}      ,"",\@allrds,"string");  
+      };
 	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);
-	  $colalign        = "cal".$colalign;
-      
+	  my $colalign  = $coldefalign;
+	  
+	  # TabellenBody 
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
-	  $out     .= "<td class='cal $colalign'> $symbol             </td>" if($seen{Symbol});
+	  $out     .= "<td class='cal $colSymbolAlign'  > $symbol                  </td>" if($seen{Symbol});
       if($small) {
-          $out .= "<td class='cal $colalign'> ".$begind." ".$begint.      "</td>" if($seen{Begin});
-          $out .= "<td class='cal $colalign'> ".$endd  ." ".$endt.        "</td>" if($seen{End});
+          $out .= "<td class='cal $colBeginAlign'   > ".$begind." ".$begint.  "</td>" if($seen{Begin});
+          $out .= "<td class='cal $colEndAlign'     > ".$endd  ." ".$endt.    "</td>" if($seen{End});
       } else {
-          $out .= "<td class='cal $colalign'> $begind             </td>" if($seen{Begin});
-          $out .= "<td class='cal $colalign'> $begint             </td>" if($seen{Begin});
-          $out .= "<td class='cal $colalign'> $endd               </td>" if($seen{End});
-          $out .= "<td class='cal $colalign'> $endt               </td>" if($seen{End});      
+          $out .= "<td class='cal $colBeginAlign'   > $begind                  </td>" if($seen{Begin});
+          $out .= "<td class='cal $colBeginAlign'   > $begint                  </td>" if($seen{Begin});
+          $out .= "<td class='cal $colEndAlign'     > $endd                    </td>" if($seen{End});
+          $out .= "<td class='cal $colEndAlign'     > $endt                    </td>" if($seen{End});      
       }
-      $out     .= "<td class='cal $colalign'> $dleft              </td>" if($seen{DaysLeft});
-      $out     .= "<td class='cal $colalign'> $dleftlong          </td>" if($seen{DaysLeftLong});
-      $out     .= "<td class='cal $colalign'> $weekday            </td>" if($seen{Weekday});
-	  $out     .= "<td class='cal $colalign'          > $tz                 </td>" if($seen{Timezone});
-      $out     .= "<td class='cal $colalign'          > $summary            </td>" if($seen{Summary});
-      $out     .= "<td class='cal $colalign'          > $desc               </td>" if($seen{Description});
-      $out     .= "<td class='cal $colalign'> $status             </td>" if($seen{Status});
-	  $out     .= "<td class='cal $colalign'> $completion         </td>" if($seen{Completion});
-      $out     .= "<td class='cal $colalign'          > $location           </td>" if($seen{Location});
-      $out     .= "<td class='cal $colalign'          > $gps                </td>" if($seen{Map});
-      $out     .= "<td class='cal $colalign'          > $cal                </td>" if($seen{Calendar});
-      $out     .= "<td class='cal $colalign'          > $id                 </td>" if($seen{EventId});
+      $out     .= "<td class='cal $colDayAlign'    > $dleft                    </td>" if($seen{DaysLeft});
+      $out     .= "<td class='cal $colDLongAlign'  > $dleftlong                </td>" if($seen{DaysLeftLong});
+      $out     .= "<td class='cal $colWeekdayAlign'> $weekday                  </td>" if($seen{Weekday});
+	  $out     .= "<td class='cal $colTzAlign'     > $tz                       </td>" if($seen{Timezone});
+      $out     .= "<td class='cal $colSummaryAlign'> $summary                  </td>" if($seen{Summary});
+      $out     .= "<td class='cal $colDescAlign'   > $desc                     </td>" if($seen{Description});
+      $out     .= "<td class='cal $colStatusAlign' > $status                   </td>" if($seen{Status});
+	  $out     .= "<td class='cal $colCompAlign'   > $completion               </td>" if($seen{Completion});
+      $out     .= "<td class='cal $colLocAlign'    > $location                 </td>" if($seen{Location});
+      $out     .= "<td class='cal $colMapAlign'    > $gps                      </td>" if($seen{Map});
+      $out     .= "<td class='cal $colCalAlign'    > $cal                      </td>" if($seen{Calendar});
+      $out     .= "<td class='cal $colIdAlign'     > $id                       </td>" if($seen{EventId});
       $out     .= "</tr>";
   }
 
+  $out .= "</table>";
+  $out .= "</td>";
+  $out .= "</tr>";
   $out .= "</table>";
   $out .= "</html>";
 
