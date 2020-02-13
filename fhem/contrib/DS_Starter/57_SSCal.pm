@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
   "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
   "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub SSCal_evalTableSpecs , fix no table is shown after FHEM restart ",
   "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
@@ -3275,7 +3276,16 @@ sub SSCal_calAsHtml($;$) {
   # Auswahl der darzustellenden Tabellenfelder
   my %seen;
   my @cof = split(",", AttrVal($name, "tableFields", "Begin,End,Summary,Status,Location"));
-  grep { !$seen{$_}++ } @cof;                        
+  grep { !$seen{$_}++ } @cof; 
+
+  # Gestaltung Headerzeile
+  my $nohead        = 0;                                                             # Unterdrückung Anzeige Headerzeile: 0 - nein, 1 - Ja  
+  eval { $nohead    = SSCal_evalTableSpecs ($hash,$nohead,$hash->{HELPER}{tableSpecs}{cellStyle}{noHeader},"",\@allrds,"string"); };
+  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);
+  my $headalign     = "center";                                                      # Ausrichtung der Headerzeile, default: center
+  eval { $headalign = SSCal_evalTableSpecs ($hash,$headalign,$hash->{HELPER}{tableSpecs}{cellStyle}{headerAlign},"",\@allrds,"string"); };
+  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);	
+  $headalign        = "cal".$headalign;
 
   # Tabelle
   my $out  = "<html>";
@@ -3287,32 +3297,34 @@ sub SSCal_calAsHtml($;$) {
   $out    .= "<style>TD.calw150   {width: 150px;}       </style>";
   
   $out    .= "<table class='block'>";
-  $out    .= "<tr class='odd'>";
   
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Symbol'             :'Symbol')."              </td>" if($seen{Symbol});
-  if ($small) {                                                                # nur ein Datumfeld umbrechbar
-      $out .= "<td class='cal calbold calcenter'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
-      $out .= "<td class='cal calbold calcenter'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
-  } else {
-      $out .= "<td class='cal calbold calright'>  ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
-      $out .= "<td class='cal calbold calcenter'> ".(($de)?'----'              :'----')."                </td>" if($seen{Begin});
-      $out .= "<td class='cal calbold calright'>  ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
-      $out .= "<td class='cal calbold calcenter'> ".(($de)?'----'              :'----')."                </td>" if($seen{End});  
+  if(!$nohead) {
+	  $out    .= "<tr class='odd'>";
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Symbol'             :'Symbol')."              </td>" if($seen{Symbol});
+	  if ($small) {                                                                 # nur ein Datumfeld umbrechbar
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
+	  } else {
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'Start'             :'Begin')."               </td>" if($seen{Begin});
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'----'              :'----')."                </td>" if($seen{Begin});
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'Ende'              :'End')."                 </td>" if($seen{End});
+		  $out .= "<td class='cal calbold $headalign'> ".(($de)?'----'              :'----')."                </td>" if($seen{End});  
+	  }
+	  
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{DaysLeft});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Terminziel'         :'Goal')."                </td>" if($seen{DaysLeftLong});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Wochentag'          :'Weekday')."             </td>" if($seen{Weekday});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Beschreibung'       :'Description')."         </td>" if($seen{Description});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Status'             :'State')."               </td>" if($seen{Status});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Erfüllung&nbsp;(%)' :'Completion&nbsp;(%)')." </td>" if($seen{Completion});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Ort'                :'Location')."            </td>" if($seen{Location});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
+	  $out    .= "<td class='cal calbold $headalign'> ".(($de)?'ID'                 :'ID')."                  </td>" if($seen{EventId});
+	  $out    .= "</tr>";
   }
-  
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Resttage'           :'Days left')."           </td>" if($seen{DaysLeft});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Terminziel'         :'Goal')."                </td>" if($seen{DaysLeftLong});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Wochentag'          :'Weekday')."             </td>" if($seen{Weekday});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zeitzone'           :'Timezone')."            </td>" if($seen{Timezone});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Zusammenfassung'    :'Summary')."             </td>" if($seen{Summary});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Beschreibung'       :'Description')."         </td>" if($seen{Description});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Status'             :'State')."               </td>" if($seen{Status});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Erfüllung&nbsp;(%)' :'Completion&nbsp;(%)')." </td>" if($seen{Completion});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Ort'                :'Location')."            </td>" if($seen{Location});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Karte'              :'Map')."                 </td>" if($seen{Map});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'Kalender'           :'Calendar')."            </td>" if($seen{Calendar});
-  $out    .= "<td class='cal calbold calcenter'> ".(($de)?'ID'                 :'ID')."                  </td>" if($seen{EventId});
-  $out    .= "</tr>";
   
   my $maxbnr;
   foreach my $key (keys %{$defs{$name}{READINGS}}) {
@@ -3352,14 +3364,16 @@ sub SSCal_calAsHtml($;$) {
 	      my $micon;
 		  if ($mi eq "icon") {
               # Karten-Icon auswählen
-		      $di = "it_i-net";
-			  $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image");  
+		      $di           = "it_i-net";
+			  eval { $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image"); };
+              Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapIcon\": $@") if($@);			  
           } elsif ($mi eq "data") {
 		      $micon = join(" ", split(",", $gpsc));
 		  } elsif ($mi eq "text") {
               # Karten-Text auswählen
-		      my $dt = "link";
-			  $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string");
+		      my $dt        = "link";
+			  eval { $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string"); };
+			  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapText\": $@") if($@);
 		  } else {
 		      $micon = "";
 		  }
@@ -3369,16 +3383,15 @@ sub SSCal_calAsHtml($;$) {
           $lng           = (split("=", $lng))[1];
 		                                     
 		  # Kartenanbieter auswählen
-          my $up = SSCal_evalTableSpecs ($hash,"",$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string");
+		  my $up     = "GoogleMaps";
+          eval { $up = SSCal_evalTableSpecs ($hash,$up,$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string"); };
+		  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapProvider\": $@") if($@);
 		  if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
 		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
 		  } elsif ($up eq "OpenStreetMap") {
-              $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $micon </a>";  # Kartenprovider: OpenstreetMap
-		  } else {
-		      $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          # Kartenprovider default: Google Maps
-		  }
-          
-      }
+              $gps = "<a href='https://www.openstreetmap.org/?mlat=$lat&mlon=$lng&zoom=14' target='_blank'> $micon </a>";  # Kartenprovider: OpenstreetMap          
+          }
+	  }
       
       if($begin ne "") {                                             # Datum sprachabhängig konvertieren bzw. heute/morgen setzen
           my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());         # Jetzt
@@ -3420,38 +3433,47 @@ sub SSCal_calAsHtml($;$) {
       }
 
       # Icon für Spalte Resttage spezifizieren
-      $dleft = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image");
+      eval { $dleft = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image"); };
+	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnDaysLeftIcon\": $@") if($@);
       
       # Icon für Spalte Status spezifizieren
-      $status = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image");
+      eval { $status = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image"); };
+	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnStateIcon\": $@") if($@);
 	  
 	  # Icon für Spalte "Symbol" bestimmen
-	  $di     = ($hash->{MODEL} eq "Diary") ? "time_calendar" : "time_note";
-	  $symbol = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image");
+	  $di            = ($hash->{MODEL} eq "Diary") ? "time_calendar" : "time_note";
+	  eval { $symbol = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image"); };
+	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnSymbolIcon\": $@") if($@);
+	  
+	  # Gestaltung Spaltentext
+	  my $colalign     = "center";                               # Ausrichtung der Spalte, default: center
+	  eval { $colalign = SSCal_evalTableSpecs ($hash,$colalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign},"",\@allrds,"string"); };
+	  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);
+	  $colalign        = "cal".$colalign;
       
       $out     .= "<tr class='".($k&1?"odd":"even")."'>";
-	  $out     .= "<td class='cal calcenter'> $symbol             </td>" if($seen{Symbol});
+	  $out     .= "<td class='cal $colalign'> $symbol             </td>" if($seen{Symbol});
       if($small) {
-          $out .= "<td class='cal '> ".$begind." ".$begint.      "</td>" if($seen{Begin});
-          $out .= "<td class='cal '> ".$endd  ." ".$endt.        "</td>" if($seen{End});
+          $out .= "<td class='cal $colalign'> ".$begind." ".$begint.      "</td>" if($seen{Begin});
+          $out .= "<td class='cal $colalign'> ".$endd  ." ".$endt.        "</td>" if($seen{End});
       } else {
-          $out .= "<td class='cal calcenter'> $begind             </td>" if($seen{Begin});
-          $out .= "<td class='cal calcenter'> $begint             </td>" if($seen{Begin});
-          $out .= "<td class='cal calcenter'> $endd               </td>" if($seen{End});
-          $out .= "<td class='cal calcenter'> $endt               </td>" if($seen{End});      
+          $out .= "<td class='cal $colalign'> $begind             </td>" if($seen{Begin});
+          $out .= "<td class='cal $colalign'> $begint             </td>" if($seen{Begin});
+          $out .= "<td class='cal $colalign'> $endd               </td>" if($seen{End});
+          $out .= "<td class='cal $colalign'> $endt               </td>" if($seen{End});      
       }
-      $out     .= "<td class='cal calcenter'> $dleft              </td>" if($seen{DaysLeft});
-      $out     .= "<td class='cal calcenter'> $dleftlong          </td>" if($seen{DaysLeftLong});
-      $out     .= "<td class='cal calcenter'> $weekday            </td>" if($seen{Weekday});
-	  $out     .= "<td class='cal'          > $tz                 </td>" if($seen{Timezone});
-      $out     .= "<td class='cal'          > $summary            </td>" if($seen{Summary});
-      $out     .= "<td class='cal'          > $desc               </td>" if($seen{Description});
-      $out     .= "<td class='cal calcenter'> $status             </td>" if($seen{Status});
-	  $out     .= "<td class='cal calcenter'> $completion         </td>" if($seen{Completion});
-      $out     .= "<td class='cal'          > $location           </td>" if($seen{Location});
-      $out     .= "<td class='cal'          > $gps                </td>" if($seen{Map});
-      $out     .= "<td class='cal'          > $cal                </td>" if($seen{Calendar});
-      $out     .= "<td class='cal'          > $id                 </td>" if($seen{EventId});
+      $out     .= "<td class='cal $colalign'> $dleft              </td>" if($seen{DaysLeft});
+      $out     .= "<td class='cal $colalign'> $dleftlong          </td>" if($seen{DaysLeftLong});
+      $out     .= "<td class='cal $colalign'> $weekday            </td>" if($seen{Weekday});
+	  $out     .= "<td class='cal $colalign'          > $tz                 </td>" if($seen{Timezone});
+      $out     .= "<td class='cal $colalign'          > $summary            </td>" if($seen{Summary});
+      $out     .= "<td class='cal $colalign'          > $desc               </td>" if($seen{Description});
+      $out     .= "<td class='cal $colalign'> $status             </td>" if($seen{Status});
+	  $out     .= "<td class='cal $colalign'> $completion         </td>" if($seen{Completion});
+      $out     .= "<td class='cal $colalign'          > $location           </td>" if($seen{Location});
+      $out     .= "<td class='cal $colalign'          > $gps                </td>" if($seen{Map});
+      $out     .= "<td class='cal $colalign'          > $cal                </td>" if($seen{Calendar});
+      $out     .= "<td class='cal $colalign'          > $id                 </td>" if($seen{EventId});
       $out     .= "</tr>";
   }
 
