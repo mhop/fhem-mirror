@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
   "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
   "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub SSCal_evalTableSpecs , fix no table is shown after FHEM restart ",
@@ -2102,9 +2103,9 @@ sub SSCal_extractToDolist ($) {
 }
 
 #############################################################################################
-#         füllt zentrales Datenhash 
-#         $data{SSCal}{$name}{eventlist} = Referenz zum zentralen Valuehash
-#         erstellt Readings aus zentralen Eventarray
+#   - füllt zentrales $data{SSCal}{$name}{eventlist} Valuehash
+#   - erstellt Readings aus $data{SSCal}{$name}{eventlist}
+#   - ruft Routine auf um zusätzliche Steuerungsevents zu erstellen
 #############################################################################################
 sub SSCal_createReadings ($) { 
   my ($string) = @_;
@@ -2126,13 +2127,17 @@ sub SSCal_createReadings ($) {
   
   # Readings der Eventliste erstellen 
   if($data{SSCal}{$name}{eventlist}) {
+      my @abnr;
       my $l = length(keys %{$data{SSCal}{$name}{eventlist}});                # Anzahl Stellen des max. Index ermitteln
-      readingsBeginUpdate($hash);
+      
+	  readingsBeginUpdate($hash);
       $data{SSCal}{$name}{lstUpdtTs} = $hash->{".updateTime"};               # letzte Updatezeit speichern (Unix Format)                    
       
       my $k = 0;
       foreach my $idx (sort keys %{$data{SSCal}{$name}{eventlist}}) {
-          my $idxstr = sprintf("%0$l.0f", $k);                               # Prestring erstellen 
+          my $idxstr = sprintf("%0$l.0f", $k);                               # Blocknummer erstellen 
+		  push(@abnr, $idxstr);                                              # Array aller vorhandener Blocknummern erstellen
+		  
           foreach my $r (keys %{$data{SSCal}{$name}{eventlist}{$idx}}) {
               if($r =~ /.*Timestamp$/) {                                     # Readings mit Unix Timestamps versteckt erstellen
                   readingsBulkUpdate($hash, ".".$idxstr."_".$r, $data{SSCal}{$name}{eventlist}{$idx}{$r});
@@ -2142,8 +2147,9 @@ sub SSCal_createReadings ($) {
           }
           $k += 1;
       }
-      
       readingsEndUpdate($hash, 1);
+	  
+	  SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist});   # spezifische Controlevents erstellen
   
   } else {
       SSCal_delReadings($name,0);                                            # alle Kalender-Readings löschen
@@ -2162,6 +2168,37 @@ sub SSCal_createReadings ($) {
 
   SSCal_delReadings($name,1) if($data{SSCal}{$name}{lstUpdtTs});                  # Readings löschen wenn Timestamp nicht "lastUpdate"
        
+return;
+}
+
+#############################################################################################
+#      erstellt zusätzliche Steuerungsevents um einfach per Notify 
+#      Gerätesteuerungen aus Kalender einträgen zu generieren
+#      
+#      $abnr  - Referenz zum Array aller vorhandener Blocknummern
+#      $evref - Referenz zum zentralen Valuehash ($data{SSCal}{$name}{eventlist}) 
+#    
+#############################################################################################
+sub SSCal_doCompositeEvents ($$$) { 
+  my ($name,$abnr,$evref) = @_;
+  my $hash                = $defs{$name}; 
+  
+  my ($summary,$begin,$status,$id,$event);
+  
+  foreach my $bnr (@{$abnr}) {
+      $summary    = ReadingsVal($name, $bnr."_01_Summary",         "");
+      $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
+	  $status     = ReadingsVal($name, $bnr."_17_Status",          "");
+      $id         = ReadingsVal($name, $bnr."_98_EventId",         "");  
+
+      $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
+	  
+	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
+		  $event = "composite: $id $begin $status $summary";
+		  CommandTrigger(undef, "$name $event");
+	  }
+  }
+     
 return;
 }
 
