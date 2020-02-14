@@ -33,6 +33,7 @@ allowed_Initialize($)
     disable:1,0
     globalpassword
     password
+    reportAuthAttempts
     validFor
   );
   use warnings 'qw';
@@ -126,23 +127,30 @@ sub
 allowed_Authenticate($$$$)
 {
   my ($me, $cl, $param) = @_;
+  my $aName = $me->{NAME};
 
-  my $doReturn = sub($$){
+  my $doReturn = sub($;$){
     my ($r,$a) = @_;
-    $cl->{AuthenticatedBy} = $me->{NAME} if($r == 1);
-    $cl->{AuthenticationDeniedBy} = $me->{NAME} if($r == 2 && $a);
+    $cl->{AuthenticatedBy} = $aName if($r == 1);
+    $cl->{AuthenticationDeniedBy} = $aName if($r == 2 && $a);
+    if($me->{doReport} && $cl->{PEER}) {
+      my $peer = "$cl->{TYPE}:$cl->{PEER}:$cl->{PORT}";
+      DoTrigger($aName, "accepting connection from $peer")
+        if($r != 2 && $me->{doReport} & 1);
+      DoTrigger($aName, "denying connection from $peer")
+        if($r == 2 && $me->{doReport} & 2);
+    }
     return $r;
   };
 
   return 0 if($me->{disabled});
   return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
-  my $aName = $me->{NAME};
 
   if($cl->{TYPE} eq "FHEMWEB") {
     my $basicAuth = AttrVal($aName, "basicAuth", undef);
     delete $cl->{".httpAuthHeader"};
-    return 0 if(!$basicAuth);
-    return 2 if(!$param);
+    return &$doReturn(0) if(!$basicAuth);
+    return &$doReturn(2) if(!$param);
 
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
@@ -194,8 +202,8 @@ allowed_Authenticate($$$$)
       $pw = AttrVal($aName, "globalpassword", undef);
       $pw = undef if($pw && $cl->{NAME} =~ m/_127.0.0.1_/);
     }
-    return 0 if(!$pw);
-    return 2 if(!defined($param));
+    return &$doReturn(0) if(!$pw);
+    return &$doReturn(2) if(!defined($param));
 
     if($pw =~ m/^{.*}$/) {
       my $password = $param;
@@ -208,7 +216,7 @@ allowed_Authenticate($$$$)
         return &$doReturn(Digest::SHA::sha256_base64("$1:$param") eq $2 ?
                           1 : 2, $param);
       } else {
-        Log3 $me, 3, "Cant load Digest::SHA to decode $me->{NAME} beiscAuth";
+        Log3 $me, 3, "Cant load Digest::SHA to decode $aName basicAuth";
       }
     }
 
@@ -317,6 +325,15 @@ allowed_Attr(@)
       delete $defs{$d}{Authenticated} if($defs{$d});
     }
     InternalTimer(1, "SecurityCheck", 0) if($init_done);
+  
+  } elsif($attrName eq "reportAuthAttempts") {
+    if($set) {
+      my $p = $param[0];
+      return "Wrong value $p for attr $devName report." if($p !~ m/^[123]$/);
+      $hash->{doReport} = $p;
+    } else {
+      delete $hash->{doReport};
+    }
   }
 
   return undef;
@@ -639,6 +656,13 @@ EOF
           perl fhem.pl localhost:7072 secret "set lamp on"
         </code></ul>
     </li><br>
+
+    <a name="reportAuthAttempts"></a>
+    <li>reportAuthAttempts {1|2|3}<br>
+        If set to 1 or 3, each successful Authentication attempt will generate
+        a FHEM event. If set to 2 or 3, generates an event on each unsuccesful
+        Auth attempt.
+        </li>
 
     <a name="globalpassword"></a>
     <li>globalpassword<br>
