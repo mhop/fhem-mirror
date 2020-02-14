@@ -134,7 +134,7 @@ allowed_Authenticate($$$$)
     $cl->{AuthenticatedBy} = $aName if($r == 1);
     $cl->{AuthenticationDeniedBy} = $aName if($r == 2 && $a);
     if($me->{doReport} && $cl->{PEER}) {
-      my $peer = "$cl->{TYPE}:$cl->{PEER}:$cl->{PORT}";
+      my $peer = "$cl->{SNAME}:$cl->{PEER}:$cl->{PORT}";
       DoTrigger($aName, "accepting connection from $peer")
         if($r != 2 && $me->{doReport} & 1);
       DoTrigger($aName, "denying connection from $peer")
