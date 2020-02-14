@@ -2183,18 +2183,19 @@ sub SSCal_doCompositeEvents ($$$) {
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
   
-  my ($summary,$begin,$status,$id,$event);
+  my ($summary,$begin,$status,$isrepeat,$id,$event);
   
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",         "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
 	  $status     = ReadingsVal($name, $bnr."_17_Status",          "");
+      $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",      0);
       $id         = ReadingsVal($name, $bnr."_98_EventId",         "");  
 
       $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
 	  
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
-		  $event = "composite: $id $begin $status $summary";
+		  $event = "composite: $id $isrepeat $begin $status $summary";
 		  CommandTrigger(undef, "$name $event");
 	  }
   }
