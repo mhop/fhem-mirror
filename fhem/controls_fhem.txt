@@ -1,4 +1,4 @@
-REV 21193
+REV 21200
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -475,7 +475,7 @@ UPD 2019-10-03_07:45:03 22511 FHEM/95_holiday.pm
 UPD 2016-02-05_07:45:11 21301 FHEM/95_remotecontrol.pm
 UPD 2018-08-01_07:45:02 79187 FHEM/96_SIP.pm
 UPD 2017-01-24_07:45:02 31432 FHEM/96_Snapcast.pm
-UPD 2019-08-28_07:45:03 21697 FHEM/96_allowed.pm
+UPD 2020-02-15_07:45:05 22583 FHEM/96_allowed.pm
 UPD 2018-08-17_07:45:03 65927 FHEM/97_PiXtendV2.pm
 UPD 2018-12-21_07:45:02 12164 FHEM/97_TrashCal.pm
 UPD 2019-11-17_07:45:02 104235 FHEM/98_ArduCounter.pm
@@ -486,6 +486,7 @@ UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
 UPD 2020-01-11_07:45:04 277025 FHEM/98_DOIF.pm
 UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
+UPD 2020-02-15_07:45:05 31137 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
 UPD 2020-02-08_07:45:04 42729 FHEM/98_GAEBUS.pm
@@ -647,7 +648,7 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-08_07:45:04 52372 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-02-12_07:45:03 168481 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-02-15_07:45:05 170254 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
@@ -745,12 +746,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-02-11_07:45:07 4201308 docs/commandref.html
-UPD 2020-02-11_07:45:10 2603780 docs/commandref_DE.html
+UPD 2020-02-15_07:45:09 4205315 docs/commandref.html
+UPD 2020-02-15_07:45:12 2608224 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-14_07:45:10 229895 docs/commandref_modular.html
-UPD 2020-02-14_07:45:11 240877 docs/commandref_modular_DE.html
+UPD 2020-02-15_07:45:13 230221 docs/commandref_modular.html
+UPD 2020-02-15_07:45:14 241199 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
