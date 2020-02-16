@@ -1,4 +1,4 @@
-REV 21200
+REV 21202
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-02-12_07:45:03 325948 ./CHANGED
-UPD 2020-02-03_07:45:02 42504 ./MAINTAINER.txt
+UPD 2020-02-16_07:45:03 326018 ./CHANGED
+UPD 2020-02-16_07:45:03 42592 ./MAINTAINER.txt
 UPD 2019-09-07_20:01:09 39782 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2020-01-27_07:45:11 159742 ./fhem.pl
@@ -750,8 +750,8 @@ UPD 2020-02-15_07:45:09 4205315 docs/commandref.html
 UPD 2020-02-15_07:45:12 2608224 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-15_07:45:13 230221 docs/commandref_modular.html
-UPD 2020-02-15_07:45:14 241199 docs/commandref_modular_DE.html
+UPD 2020-02-16_07:45:10 230221 docs/commandref_modular.html
+UPD 2020-02-16_07:45:11 241199 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
