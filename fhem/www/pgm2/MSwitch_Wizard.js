@@ -506,9 +506,11 @@ function fillconfig(name){
 	
 }
 
-function saveconfig(name){
+function saveconfig(name,mode){
 	
+	if (mode == 'wizard'){
 	makeconfig();
+	}
 	conf = document.getElementById(name).value;
 	conf = conf.replace(/\n/g,'#[EOL]');
 	conf = conf.replace(/:/g,'#c[dp]');
@@ -1183,6 +1185,7 @@ function setpreconf(name){
 }
 
 function savepreconf(name){
-	saveconfig('rawconfig4');
+	mode = 'preconf';
+	saveconfig('rawconfig4',mode);
 	return;
 }
