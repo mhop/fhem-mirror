@@ -119,6 +119,9 @@ sub DOIF_hsv
 {
   my ($cur,$min,$max,$min_s,$max_s,$s,$v)=@_;
   
+  $s=100 if (!defined ($s));
+  $v=100 if (!defined ($v));
+  
   my $m=($max_s-$min_s)/($max-$min);
   my $n=$min_s-$min*$m;
   if ($cur>$max) {
@@ -3121,11 +3124,11 @@ CmdDoIfPerl($$)
     readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
-    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
-      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
-        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
-      }
-    }
+    #foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+    #  if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
+    #    DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+    #  }
+    #}
   }
 
   $hash->{helper}{last_timer}=0;
@@ -3205,11 +3208,11 @@ CmdDoIf($$)
     readingsEndUpdate($hash, 1);
     $hash->{helper}{globalinit}=1;
     
-    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
-      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
-        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
-      }
-    }
+    #foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+    #  if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
+    #    DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+    #  }
+    #}
   }
 
   $hash->{helper}{last_timer}=0;
@@ -3287,6 +3290,7 @@ CmdDoIf($$)
     }
     $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
   }
+  
   return("","")
 }
 
@@ -3904,6 +3908,11 @@ sub FW_makeImage {
    return($value,"",("iconSwitch,".$state_on.",".$i_off.",".$state_off.",".$icon_on));
  }
  
+ sub ICON {
+   my ($icon)=@_;
+   ::FW_makeImage($icon);
+ }
+ 
  sub icon {
    my ($value,$icon_off,$icon_on,$state_off,$state_on)=@_;
    $state_on=(defined ($state_on) and $state_on ne "") ? $state_on : "on";
@@ -3912,6 +3921,25 @@ sub FW_makeImage {
    $icon_on=((defined ($icon_on) and $icon_on ne "") ? $icon_on :(defined ($icon_off) and $icon_off ne "") ? "$icon_off\@DarkOrange" : "on");
    return($value,"",("iconLabel,".$state_on.",".$icon_on.",".$state_off.",".$i_off));
  }
+
+ sub icon_label
+ {
+   my ($icon,$text,$color,$color_bg,$pos_left,$pos_top) = @_;
+   $color = "" if (!defined ($color));
+   $color_bg = "" if (!defined ($color_bg));
+   $pos_left = -3 if (!defined ($pos_left));
+   $pos_top = -8 if (!defined ($pos_top));
+   my $pad = (length($text) > 1) ? 2 : 5; 
+   return '<div style="display:inline;">'.::FW_makeImage($icon).'<div style="display:inline;border-radius:20px;color:'.$color.';background-color:'.
+          $color_bg.
+          ';font-size:14px;font-weight:bold;text-align:center;position:relative;padding-top: 1px;padding-left: '.$pad.'px; padding-right: '.$pad.'px;padding-bottom: 1px;'.
+          'left:'.$pos_left.'px;top:'.$pos_top.'px;">'.$text.'</div></div>'
+ }
+ 
+ sub hsv {
+   return(::DOIF_hsv(@_));
+ }
+
 
 1;
 
@@ -3976,7 +4004,7 @@ Many examples with english identifiers - see <a href="http://fhem.de/commandref_
 <a name="DOIF"></a>
 <h3>DOIF</h3>
 <ul>
-DOIF (ausgeprochen: du if, übersetzt: tue wenn) ist ein universelles Modul mit UI, welches ereignis- und zeitgesteuert in Abhängigkeit definierter Bedingungen Anweisungen ausführt.<br>
+DOIF (ausgeprochen: du if, übersetzt: tue wenn) ist ein universelles Modul mit <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">Web-Interface</a>, welches ereignis- und zeitgesteuert in Abhängigkeit definierter Bedingungen Anweisungen ausführt.<br>
 <br>
 Mit diesem Modul ist es möglich, einfache wie auch komplexere Automatisierungsvorgänge zu definieren oder in Perl zu programmieren.
 Ereignisse, Zeittrigger, Readings oder Status werden durch DOIF-spezifische Angaben in eckigen Klammern angegeben. Sie führen zur Triggerung des Moduls und damit zur Auswertung und Ausführung der definierten Anweisungen.<br>
@@ -5516,8 +5544,9 @@ Mit <code>set &lt;DOIF-modul&gt; cmd_&lt;nr&gt</code> lässt sich ein Befehlszwe
 Der Befehl hat folgende Eigenschaften:<br>
 <br>
 1) der set-Befehl übersteuert alle Attribute wie z. B. wait, do, usw.<br>
-2) ein laufender Wait-Timer wird unterbrochen<br>
-3) beim deaktivierten oder im Modus disable befindlichen Modul wird der set Befehl ignoriert<br>
+2) bei wait wird der erste Timer einer Sequenz ignoriert, alle folgenden Timer einer Sequenz werden jedoch beachtet<br>
+3) ein laufender Wait-Timer wird unterbrochen<br>
+4) beim deaktivierten oder im Modus disable befindlichen Modul wird der set Befehl ignoriert<br>
 <br>
 <u>Anwendungsbeispiel</u>: Schaltbare Lampe über Fernbedienung und Webinterface<br>
 <br>
