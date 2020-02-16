@@ -1116,7 +1116,7 @@ if (AttrVal( $name, 'MSwitch_Language',AttrVal( 'global', 'language', 'EN' ) ) e
 
     if ( AttrVal( $name, 'MSwitch_Mode', 'Notify' ) eq "Dummy" ) 
 	{
-        return "Unknown argument $opt, choose one of Eventlog:timeline,clear support_info:noArg restore_MSwitch_Data:this_Device,all_Devices active_timer:show,delete";
+        return "Unknown argument $opt, choose one of Eventlog:timeline,clear config:noArg support_info:noArg restore_MSwitch_Data:this_Device,all_Devices active_timer:show,delete";
     }
 
     if ( ReadingsVal( $name, '.lock', 'undef' ) ne "undef" ) 
@@ -3967,7 +3967,7 @@ sub MSwitch_fhemwebconf($$$$) {
 	<tr>
 	<td style=\"text-align: center; vertical-align: middle;\">
 	<br>&nbsp;<br>
-	<input name=\"saveconf\" id=\"saveconf\" type=\"button\" disabled=\"disabled\" value=\"save new config\" onclick=\"javascript: saveconfig('rawconfig')\"\">
+	<input name=\"saveconf\" id=\"saveconf\" type=\"button\" disabled=\"disabled\" value=\"save new config\" onclick=\"javascript: saveconfig('rawconfig','wizard')\"\">
 	</td>
 	</tr>
 	<tr>
