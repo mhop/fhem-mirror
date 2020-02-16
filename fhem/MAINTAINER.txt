@@ -320,6 +320,7 @@ FHEM/66_EseraDigitalInOut.pm pizmus               1Wire
 FHEM/66_EseraIButton.pm      pizmus               1Wire
 FHEM/66_EseraMulti.pm        pizmus               1Wire
 FHEM/66_EseraOneWire.pm      pizmus               1Wire
+FHEM/66_EseraShutter.pm      pizmus               1Wire
 FHEM/66_EseraTemp.pm         pizmus               1Wire
 FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
 FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme

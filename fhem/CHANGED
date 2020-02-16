@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     66_EseraShutter: new module that supports the Esera 1-wire shutter
  - new:     98_DSBMobile: Module to read DSBMobile substitution plan 
  - bugfix:  95_Dashboard: fix Perl warning in Docker environment
  - bugfix:  77_SMAEM: fix Perl warning if no frequence is delivered

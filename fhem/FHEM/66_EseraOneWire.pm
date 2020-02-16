@@ -30,6 +30,7 @@
 #  66_EseraTemp
 #  66_EseraCount
 #  66_EseraIButton
+#  66_EseraShutter
 #
 # For Esera 1-wire controllers with serial/USB interface please check the
 # commandref.
@@ -82,13 +83,14 @@ EseraOneWire_Initialize($)
                       $readingFnAttributes;
 
 
-  $hash->{Clients} = ":EseraDigitalInOut:EseraTemp:EseraMulti:EseraAnalogInOut:EseraIButton:EseraCount:";
+  $hash->{Clients} = ":EseraDigitalInOut:EseraTemp:EseraMulti:EseraAnalogInOut:EseraIButton:EseraCount:EseraShutter:";
   $hash->{MatchList} = { "1:EseraDigitalInOut" => "^DS2408|^11220|^11228|^11229|^11216|^SYS1|^SYS2",
                          "2:EseraTemp" => "^DS1820",
-                         "3:EseraMulti" => "^DS2438|^11121|^11132|^11134|^11135",
+                         "3:EseraMulti" => "^DS2438|^11121|^11134|^11135",
                          "4:EseraAnalogInOut" => "^SYS3",
                          "5:EseraIButton" => "^DS2401",
-			 "6:EseraCount" => "^DS2423"};
+			 "6:EseraCount" => "^DS2423",
+                         "7:EseraShutter" => "^11231|^11209"};
 }
 
 sub
@@ -2185,7 +2187,7 @@ EseraOneWire_processKalMessage($)
     </li>
   </ul>
   <br>
-  <a name="EseraDigitalInOut_Readings"></a>
+  <a name="EseraOneWire_Readings"></a>
   <b>Readings</b>
   <ul>
     <li>state &ndash; possible values are:
@@ -2200,14 +2202,14 @@ EseraOneWire_processKalMessage($)
     </li>
   </ul>
   <br>
-  <a name="EseraDigitalInOut_Attributes"></a>
+  <a name="EseraOneWire_Attributes"></a>
   <b>Attributes</b>
   <ul>
     <li>pollTime &ndash; POLLTIME setting of the controller, see controller manual, default: 5</li>
     <li>dataTime &ndash; DATATIME setting of the controller, see controller manual, default: 10</li>
   </ul>
   <br>
-  <a name="EseraDigitalInOut_Events"></a>
+  <a name="EseraOneWire_Events"></a>
   <b>Events</b>
   <ul>
     <li><code>CONNECTED</code> &ndash; from DevIo</li>
