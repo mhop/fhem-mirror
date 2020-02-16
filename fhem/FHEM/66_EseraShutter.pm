@@ -144,7 +144,7 @@ EseraShutter_sendDownUpStopCommand($$$)
     my $eseraId = $hash->{ESERAID};
     if (!defined $eseraId)
     {
-      my $message = "error: ESERA ID not known";
+      my $message = "error: ESERA ID not known, ".$eseraId." vs ".$hash->{ESERAID};
       Log3 $name, 1, "EseraShutter ($name) - ".$message;
       return $message;
     }
@@ -374,8 +374,11 @@ EseraShutter_Attr(@)
   <ul>
     <code>define &lt;name&gt; EseraShutter &lt;ioDevice&gt; &lt;oneWireId&gt; &lt;deviceType&gt;</code><br>
     &lt;oneWireId&gt; specifies the 1-wire ID of the shutter device.<br>
-    Do not rely on autocreate.<br>
-    Supported values for deviceType:
+    Do not rely on autocreate. The Esera product by default shows up as a DS2408 in the device list of the <br>
+    Esera controller. Autocreate would create a EseraDigitalInOut FHEM device. Use Esera's ConfigTool3 to <br>
+    assign the appropriate article number, e.g. 11231, to the 1-wire device in the controller, and set up <br>
+    the FHEM device with the same &lt;deviceType&gt;.<br>
+    Supported values for deviceType:<br>
     <ul>
       <li>11209</li>
       <li>11231</li>
