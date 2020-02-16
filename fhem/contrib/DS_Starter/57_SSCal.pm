@@ -1607,7 +1607,7 @@ sub SSCal_extractEventlist ($) {
                   if ($p1 eq "FREQ") {
                       $freq = $p2;
                   } elsif ($p1 eq "COUNT") {                                    # Event endet automatisch nach x Wiederholungen
-                      $count = $p2;                                             
+                      $count = $p2-1;                                             
                   } elsif ($p1 eq "INTERVAL") {                                 # Wiederholungsintervall         
                       $interval = $p2;
                   } elsif ($p1 eq "UNTIL") {                                    # festes Intervallende angegeben        
