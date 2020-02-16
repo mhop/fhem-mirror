@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\" ", 
   "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
   "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
@@ -165,6 +166,7 @@ sub SSCal_Initialize($) {
  $hash->{FW_deviceOverview}     = 1;
  
  $hash->{AttrList} = "asyncMode:1,0 ".  
+                     "createATDevs:1,0 ".
 					 "cutOlderDays ".
 					 "cutLaterDays ".
                      "disable:1,0 ".
@@ -413,7 +415,7 @@ sub SSCal_Set($@) {
         
   return if(IsDisabled($name));
   
-  my $idxlist = join(",", SSCal_sortVersion("asc",keys %{$data{SSCal}{$name}{sendqueue}{entries}}));
+  my $idxlist = join(",", sort keys %{$data{SSCal}{$name}{sendqueue}{entries}});
   
   # alle aktuell angezeigten Event Id's  ermitteln
   my (@idarray,$evids);
@@ -2114,6 +2116,8 @@ sub SSCal_createReadings ($) {
   my $hash     = $defs{$name};
   my $rowlist  = decode_base64($a[1]) if($a[1]);
   
+  my @abnr;
+  
   if ($rowlist) {
       my @row_array = split("_ESC_", $rowlist);
       
@@ -2127,7 +2131,6 @@ sub SSCal_createReadings ($) {
   
   # Readings der Eventliste erstellen 
   if($data{SSCal}{$name}{eventlist}) {
-      my @abnr;
       my $l = length(keys %{$data{SSCal}{$name}{eventlist}});                # Anzahl Stellen des max. Index ermitteln
       
 	  readingsBeginUpdate($hash);
@@ -2148,9 +2151,9 @@ sub SSCal_createReadings ($) {
           $k += 1;
       }
       readingsEndUpdate($hash, 1);
-	  
-	  SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist});   # spezifische Controlevents erstellen
-  
+      
+      SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
+	    
   } else {
       SSCal_delReadings($name,0);                                            # alle Kalender-Readings löschen
   }
@@ -2167,7 +2170,11 @@ sub SSCal_createReadings ($) {
   readingsEndUpdate           ($hash,1); 
 
   SSCal_delReadings($name,1) if($data{SSCal}{$name}{lstUpdtTs});                  # Readings löschen wenn Timestamp nicht "lastUpdate"
-       
+      
+  if(AttrVal($name, "createATDevs", 0)) {
+      SSCal_createATdevices   ($name,\@abnr,$data{SSCal}{$name}{eventlist});      # automatisch at-Devics mit FHEM/Perl-Kommandos erstellen
+  }
+
 return;
 }
 
@@ -2190,13 +2197,59 @@ sub SSCal_doCompositeEvents ($$$) {
       $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
 	  $status     = ReadingsVal($name, $bnr."_17_Status",          "");
       $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",      0);
-      $id         = ReadingsVal($name, $bnr."_98_EventId",         "");  
+      $id         = ReadingsVal($name, $bnr."_98_EventId",         "");    
 
       $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
 	  
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
 		  $event = "composite: $id $isrepeat $begin $status $summary";
 		  CommandTrigger(undef, "$name $event");
+	  }
+  }
+     
+return;
+}
+
+#############################################################################################
+#      erstellt automatisch AT-Devices aus Kalendereinträgen die FHEM-Befehle oder
+#      Perl-Routinen in "Summary" enthalten. 
+#      FHEM-Befehle sind in { } und Perl-Routinen in {{ }} einzufassen.
+#      
+#      $abnr  - Referenz zum Array aller vorhandener Blocknummern
+#      $evref - Referenz zum zentralen Valuehash ($data{SSCal}{$name}{eventlist}) 
+#    
+#############################################################################################
+sub SSCal_createATdevices ($$$) { 
+  my ($name,$abnr,$evref) = @_;
+  my $hash                = $defs{$name}; 
+  
+  my ($summary,$begin,$status,$isrepeat,$id,@devs,$event);
+  
+  foreach my $bnr (@{$abnr}) {
+      $id   = ReadingsVal($name, $bnr."_98_EventId", "");
+      @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$id.*"); 
+      foreach (@devs) {
+          next if(!$defs{$_});
+          Log3($name, 4, "$name - delete device: $_");  
+          CommandDelete(undef,$_);
+      }            
+  }
+  
+  foreach my $bnr (@{$abnr}) {
+      $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
+      $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
+	  $status     = ReadingsVal($name, $bnr."_17_Status",       "");
+      $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",   0);
+      $id         = ReadingsVal($name, $bnr."_98_EventId",      "");    
+
+      $begin =~ s/\s/T/;                                                                 # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
+	  
+	  if($begin && $status =~ /upcoming|alarmed/ && $summary =~ /^\s*\{(.*)\}\s*$/) {    # ein at-Device erstellen wenn Voraussetzungen erfüllt
+          my $cmd = $1;
+          my $ao  = $begin;
+          $ao     =~ s/[-:]//g;
+          Log3($name, 3, "$name - Command detected. Create \"SSCal.$id.$ao\", Command: $cmd");	
+          CommandDefMod(undef, "-temporary SSCal.$id.$ao at $begin $cmd");          
 	  }
   }
      
@@ -2781,6 +2834,8 @@ return ($error);
 sub SSCal_sortVersion (@){
   my ($sseq,@versions) = @_;
 
+  return "" if(!@versions);
+  
   my @sorted = map {$_->[0]}
 			   sort {$a->[1] cmp $b->[1]}
 			   map {[$_, pack "C*", split /\./]} @versions;
