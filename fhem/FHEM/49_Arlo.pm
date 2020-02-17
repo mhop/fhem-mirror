@@ -1006,10 +1006,10 @@ sub Arlo_Login($) {
   my $password = encode_base64($hash->{helper}{password}, '');
   my $input = {email => $hash->{helper}{username}, password => $password, EnvSource => 'prod', language => 'de'};
   my $postData = encode_json $input;
-  my $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2];
+  my $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Referer' => 'https://my.arlo.com/'];
   
   my $cookie_jar = HTTP::Cookies->new;
-  my $ua = LWP::UserAgent->new(cookie_jar => $cookie_jar, agent => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:69.0) Gecko/20100101 Firefox/69.0');
+  my $ua = LWP::UserAgent->new(cookie_jar => $cookie_jar, agent => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0');
   my $req = HTTP::Request->new('POST', 'https://ocapi-app.arlo.com/api/auth', $header, $postData);
   my $resp = $ua->request($req);
   
@@ -1024,14 +1024,14 @@ sub Arlo_Login($) {
         $hash->{helper}{userId} = $data->{userId};
         my $validateData = $data->{authenticated};
         my $authorization = encode_base64($data->{token}, '');
-        $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $authorization];
+        $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $authorization, 'Referer' => 'https://my.arlo.com/'];
         $req = HTTP::Request->new('GET', 'https://ocapi-app.arlo.com/api/validateAccessToken?data='.$validateData, $header);
         $resp = $ua->request($req);
         if ($resp->is_success) {
           $respObj = decode_json $resp->decoded_content;
           if ($respObj->{meta}{code} == 200) {
             $loginPhase = 'GetSession';
-            $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $data->{token}];
+            $header = ['Content-Type' => 'application/json; charset=utf-8', 'Auth-Version' => 2, 'Authorization' => $data->{token}, 'Referer' => 'https://my.arlo.com/'];
             $req = HTTP::Request->new('GET', 'https://my.arlo.com/hmsweb/users/session/v2', $header);
             $resp = $ua->request($req);
             if ($resp->is_success) {
@@ -1066,7 +1066,7 @@ sub Arlo_Login($) {
       delete $hash->{RETRY};
       Log3 $name, 2, 'Arlo Login not successful, wrong username or password.';
     } else {
-      Log3 $name, 2, 'Arlo Login not successful, status $status_line';
+      Log3 $name, 2, "Arlo Login not successful, status $status_line";
     }
   }
   if (defined($hash->{RETRY})) {
