@@ -2227,15 +2227,12 @@ sub SSCal_createATdevices ($$$) {
   
   my $room = AttrVal($name, "room", "");
   
- # foreach my $bnr (@{$abnr}) {
- #     $id   = ReadingsVal($name, $bnr."_98_EventId", "");
-      @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$name.*"); 
-      foreach (@devs) {
-          next if(!$defs{$_});
-          Log3($name, 4, "$name - delete device: $_");  
-          CommandDelete(undef,$_);
-      }            
- # }
+  @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$name.*"); 
+  foreach (@devs) {
+      next if(!$defs{$_});
+      Log3($name, 4, "$name - delete device: $_");  
+      CommandDelete(undef,$_);
+  }            
   
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
