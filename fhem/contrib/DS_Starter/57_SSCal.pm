@@ -2257,7 +2257,7 @@ sub SSCal_createATdevices ($$$) {
           } else {
               CommandSetReading(undef, "$atn .associatedWith $name");
               CommandAttr(undef,"$atn room    $location");
-              CommandAttr(undef,"$atn comment $summary - created automatic by SSCal \"$name\" ");
+              CommandAttr(undef,"$atn comment $summary - created automatically by SSCal \"$name\" ");
               $assoc .= " $atn";
           }        
 	  }
