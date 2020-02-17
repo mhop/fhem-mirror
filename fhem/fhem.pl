@@ -303,6 +303,7 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 my %sleepers;                   # list of sleepers
 my %delayedShutdowns;           # definitions needing delayed shutdown
 my %fuuidHash;                  # for duplicate checking
+my $globalUniqueID;             # cache it
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -5435,13 +5436,18 @@ FileDelete($)
 sub
 getUniqueId()
 {
+  return $globalUniqueID if($globalUniqueID);
   my ($err, $uniqueID) = getKeyValue("uniqueID");
   if(defined($uniqueID)) {
     $uniqueID =~ s/[^0-9a-f]//g;
-    return $uniqueID if($uniqueID && length($uniqueID) == 32);
+    if($uniqueID && length($uniqueID) == 32) {
+      $globalUniqueID = $uniqueID;
+      return $uniqueID;
+    }
   }
   $uniqueID = createUniqueId();
   setKeyValue("uniqueID", $uniqueID);
+  $globalUniqueID = $uniqueID;
   return $uniqueID;
 }
 
