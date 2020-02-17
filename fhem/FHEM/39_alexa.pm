@@ -395,6 +395,7 @@ alexa_configDefault($;$)
     $conf->{connections} = [{}] if( !$conf->{connections} );
     $conf->{connections}[0]->{name} = 'FHEM' if( !$conf->{connections}[0]->{name} );
     $conf->{connections}[0]->{server} = $ip if( !$conf->{connections}[0]->{server} );
+    $conf->{connections}[0]->{report} = JSON::false if( !$conf->{connections}[0]->{report} );
     $conf->{connections}[0]->{filter} = 'alexaName=..*' if( !$conf->{connections}[0]->{filter} );
     $conf->{connections}[0]->{uid} = $< if( $conf->{sshproxy} );
 
