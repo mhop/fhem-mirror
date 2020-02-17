@@ -2225,7 +2225,9 @@ sub SSCal_createATdevices ($$$) {
     
   my ($desc,$begin,$status,$isrepeat,$id,@devs,$err,$summary,$location);
   
-  my $room = AttrVal($name, "room", "");
+  my $room  = AttrVal($name, "room", "");
+  my $assoc = "";
+  readingsDelete($hash,".associatedWith");                                               # Deviceassoziationen löschen
   
   @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$name.*"); 
   foreach (@devs) {
@@ -2247,16 +2249,21 @@ sub SSCal_createATdevices ($$$) {
           $begin  =~ s/\s/T/;                                                            # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
           my $ao  = $begin;
           $ao     =~ s/[-:]//g;
-          Log3($name, 4, "$name - Command detected. Create device \"SSCal.$id.$ao\" with type \"at\".");	
-          $err = CommandDefine(undef, "SSCal.$name.$id.$ao at $begin $cmd");
+          my $atn = "SSCal.$name.$id.$ao";                                               # Name neues at-Device
+          Log3($name, 4, "$name - Command detected. Create device \"$atn\" with type \"at\".");	
+          $err = CommandDefine(undef, "$atn at $begin $cmd");
           if ($err) {
-              Log3($name, 1, "$name - Error during create \"at\": $err");	
+              Log3($name, 1, "$name - Error during create \"$atn\": $err");	
           } else {
-              CommandAttr(undef,"SSCal.$name.$id.$ao room    $location");
-              CommandAttr(undef,"SSCal.$name.$id.$ao comment $summary - created automatic by SSCal \"$name\" ");
+              CommandSetReading(undef, "$atn .associatedWith $name");
+              CommandAttr(undef,"$atn room    $location");
+              CommandAttr(undef,"$atn comment $summary - created automatic by SSCal \"$name\" ");
+              $assoc .= " $atn";
           }        
 	  }
   }
+  
+  CommandSetReading(undef, "$name .associatedWith $assoc");
      
 return;
 }
