@@ -2190,19 +2190,19 @@ sub SSCal_doCompositeEvents ($$$) {
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
   
-  my ($summary,$begin,$status,$isrepeat,$id,$event);
+  my ($desc,$begin,$status,$isrepeat,$id,$event);
   
   foreach my $bnr (@{$abnr}) {
-      $summary    = ReadingsVal($name, $bnr."_01_Summary",         "");
-      $begin      = ReadingsVal($name, $bnr."_05_Begin",           "");
-	  $status     = ReadingsVal($name, $bnr."_17_Status",          "");
-      $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",      0);
-      $id         = ReadingsVal($name, $bnr."_98_EventId",         "");    
+      $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
+      $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
+	  $status     = ReadingsVal($name, $bnr."_17_Status",       "");
+      $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",   0);
+      $id         = ReadingsVal($name, $bnr."_98_EventId",      "");    
 
       $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
 	  
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
-		  $event = "composite: $id $isrepeat $begin $status $summary";
+		  $event = "composite: $id $isrepeat $begin $status $desc";
 		  CommandTrigger(undef, "$name $event");
 	  }
   }
@@ -2212,7 +2212,7 @@ return;
 
 #############################################################################################
 #      erstellt automatisch AT-Devices aus Kalendereinträgen die FHEM-Befehle oder
-#      Perl-Routinen in "Summary" enthalten. 
+#      Perl-Routinen in "Description" enthalten. 
 #      FHEM-Befehle sind in { } und Perl-Routinen in {{ }} einzufassen.
 #      
 #      $abnr  - Referenz zum Array aller vorhandener Blocknummern
@@ -2222,34 +2222,42 @@ return;
 sub SSCal_createATdevices ($$$) { 
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
+    
+  my ($desc,$begin,$status,$isrepeat,$id,@devs,$err,$summary,$location);
   
-  my ($summary,$begin,$status,$isrepeat,$id,@devs,$event);
+  my $room = AttrVal($name, "room", "");
   
-  foreach my $bnr (@{$abnr}) {
-      $id   = ReadingsVal($name, $bnr."_98_EventId", "");
-      @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$id.*"); 
+ # foreach my $bnr (@{$abnr}) {
+ #     $id   = ReadingsVal($name, $bnr."_98_EventId", "");
+      @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$name.*"); 
       foreach (@devs) {
           next if(!$defs{$_});
           Log3($name, 4, "$name - delete device: $_");  
           CommandDelete(undef,$_);
       }            
-  }
+ # }
   
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
+      $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
 	  $status     = ReadingsVal($name, $bnr."_17_Status",       "");
-      $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",   0);
-      $id         = ReadingsVal($name, $bnr."_98_EventId",      "");    
+      $location   = ReadingsVal($name, $bnr."_35_Location",  $room);                     # Location wird als room gesetzt
+      $id         = ReadingsVal($name, $bnr."_98_EventId",      "");  
 
-      $begin =~ s/\s/T/;                                                                 # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
-	  
-	  if($begin && $status =~ /upcoming|alarmed/ && $summary =~ /^\s*\{(.*)\}\s*$/) {    # ein at-Device erstellen wenn Voraussetzungen erfüllt
+	  if($begin && $status =~ /upcoming|alarmed/ && $desc =~ /^\s*\{(.*)\}\s*$/) {       # ein at-Device erstellen wenn Voraussetzungen erfüllt
           my $cmd = $1;
+          $begin  =~ s/\s/T/;                                                            # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
           my $ao  = $begin;
           $ao     =~ s/[-:]//g;
-          Log3($name, 3, "$name - Command detected. Create \"SSCal.$id.$ao\", Command: $cmd");	
-          CommandDefMod(undef, "-temporary SSCal.$id.$ao at $begin $cmd");          
+          Log3($name, 4, "$name - Command detected. Create device \"SSCal.$id.$ao\" with type \"at\".");	
+          $err = CommandDefine(undef, "SSCal.$name.$id.$ao at $begin $cmd");
+          if ($err) {
+              Log3($name, 1, "$name - Error during create \"at\": $err");	
+          } else {
+              CommandAttr(undef,"SSCal.$name.$id.$ao room    $location");
+              CommandAttr(undef,"SSCal.$name.$id.$ao comment $summary - created automatic by SSCal \"$name\" ");
+          }        
 	  }
   }
      
