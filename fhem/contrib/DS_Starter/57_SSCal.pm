@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\" ", 
+  "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
   "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
   "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
@@ -229,12 +229,12 @@ sub SSCal_Define($@) {
   CommandAttr(undef,"$name event-on-update-reading .*Summary,state");
   
   %SSCal_api = (
-    "APIINFO"   => { "NAME" => "SYNO.API.Info" },               # Info-Seite für alle API's, einzige statische Seite !                                                    
-    "APIAUTH"   => { "NAME" => "SYNO.API.Auth" },               # API used to perform session login and logout  
-    "CALCAL"    => { "NAME" => "SYNO.Cal.Cal" },                # API to manipulate calendar
-    "CALEVENT"  => { "NAME" => "SYNO.Cal.Event" },              # Provide methods to manipulate events in the specific calendar
+    "APIINFO"   => { "NAME" => "SYNO.API.Info"    },            # Info-Seite für alle API's, einzige statische Seite !                                                    
+    "APIAUTH"   => { "NAME" => "SYNO.API.Auth"    },            # API used to perform session login and logout  
+    "CALCAL"    => { "NAME" => "SYNO.Cal.Cal"     },            # API to manipulate calendar
+    "CALEVENT"  => { "NAME" => "SYNO.Cal.Event"   },            # Provide methods to manipulate events in the specific calendar
     "CALSHARE"  => { "NAME" => "SYNO.Cal.Sharing" },            # Get/set sharing setting of calendar
-    "CALTODO"   => { "NAME" => "SYNO.Cal.Todo" },               # Provide methods to manipulate events in the specific calendar
+    "CALTODO"   => { "NAME" => "SYNO.Cal.Todo"    },            # Provide methods to manipulate events in the specific calendar
   ); 
   
   # Versionsinformationen setzen
@@ -1607,7 +1607,7 @@ sub SSCal_extractEventlist ($) {
                   if ($p1 eq "FREQ") {
                       $freq = $p2;
                   } elsif ($p1 eq "COUNT") {                                    # Event endet automatisch nach x Wiederholungen
-                      $count = $p2-1;                                             
+                      $count = $p2;                                             
                   } elsif ($p1 eq "INTERVAL") {                                 # Wiederholungsintervall         
                       $interval = $p2;
                   } elsif ($p1 eq "UNTIL") {                                    # festes Intervallende angegeben        
@@ -1633,6 +1633,8 @@ sub SSCal_extractEventlist ($) {
               
               Log3($name, 4, "$name - Recurring params - FREQ: $freq, COUNT: $count, INTERVAL: $interval, BYMONTHDAY: $bymonthday, BYDAY: $byday, UNTIL: $until");
                  
+			  $count--;                                                         # Korrektur Anzahl Wiederholungen, COUNT ist Gesamtzahl der Ausführungen !	 
+				 
               if ($freq eq "YEARLY") {                                          # jährliche Wiederholung                             
                   for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {                                    
                       $byear += ($ci>=0?1:0);
