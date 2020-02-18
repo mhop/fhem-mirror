@@ -1832,6 +1832,214 @@ set DEVICE attrTemplate mqtt2_speech_recognition_type_switch
 attr DEVICE model ESPurna_single_relay
 
 
+name:ESPurna_4socketUSB_unified
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/relay/0.*
+desc:ESPurna is a alternative firmware comparable to tasmota, see <a href="https://github.com/xoseperez/espurna/wiki">project page wiki</a>. <br>NOTE: Tested with 5-way multi socket ZHILDE_EU44_W, configures a single device with multi channels. <br>To contribute templates for ESPurna see <a href="https://forum.fhem.de/index.php/topic,108058.0.html">Forum Thread</a>. Template is for use without further configuration on ESP side, so especially no JSON is sent or relayPayload-xy is set!
+order:A_30d
+par:DEVNAME;Device's name in the topic tree;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot 1.on:on:POWER1+off 1.off:off:POWER1+on 2.on:on:POWER2+off 2.off:off:POWER2+on 3.on:on:POWER3+off 3.off:off:POWER3+on 4.on:on:POWER4+off 4.off:off:POWER4+on 5.on:on:POWER5+off 5.off:off:POWER5+on
+attr DEVICE event-on-change-reading .*
+attr DEVICE readingList DEVNAME/relay/0:.* { $EVENT ? {"POWER1"=>"on"} : {"POWER1"=>"off"} }\
+  DEVNAME/relay/1:.* { $EVENT ? {"POWER2"=>"on"} : {"POWER2"=>"off"} }\
+  DEVNAME/relay/2:.* { $EVENT ? {"POWER3"=>"on"} : {"POWER3"=>"off"} }\
+  DEVNAME/relay/3:.* { $EVENT ? {"POWER4"=>"on"} : {"POWER4"=>"off"} }\
+  DEVNAME/relay/4:.* { $EVENT ? {"POWER5"=>"on"} : {"POWER5"=>"off"} }\
+  DEVNAME/status:.*  { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/app:.* app\
+  DEVNAME/version:.* version\
+  DEVNAME/board:.* board\
+  DEVNAME/host:.* host\
+  DEVNAME/ssid:.* ssid\
+  DEVNAME/ip:.* ip\
+  DEVNAME/mac:.* mac\
+  DEVNAME/rssi:.* rssi\
+  DEVNAME/uptime:.* uptime\
+  DEVNAME/datetime:.* datetime\
+  DEVNAME/freeheap:.* freeheap\
+  DEVNAME/vcc:.* vcc\
+  DEVNAME/loadavg:.* loadavg\
+  DEVNAME/desc:.* desc
+attr DEVICE setList on DEVNAME/relay/0/set 1\
+  off DEVNAME/relay/0/set 0\
+  toggle DEVNAME/relay/0/set 2\
+  POWER1:on,off,toggle DEVNAME/relay/0/set $EVTPART1\
+  POWER2:on,off,toggle DEVNAME/relay/1/set $EVTPART1\
+  POWER3:on,off,toggle DEVNAME/relay/2/set $EVTPART1\
+  POWER4:on,off,toggle DEVNAME/relay/3/set $EVTPART1\
+  POWER5:on,off,toggle DEVNAME/relay/4/set $EVTPART1\
+  Reboot:reboot DEVNAME/action/set $EVTPART1
+attr DEVICE setStateList on off toggle
+attr DEVICE stateFormat LWT\
+1:POWER1\
+2:POWER2\
+3:POWER3\
+4:POWER4\
+5:POWER5\
+<br>\
+<a href="http://ip" target="_blank">ip</a>
+set DEVICE attrTemplate mqtt2_speech_recognition_type_switch
+attr DEVICE model ESPurna_4socketUSB_unified
+deletereading -q DEVICE relay_.*
+
+name:ESPurna_4socketUSB_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/relay/4.*
+desc:ESPurna is a alternative firmware comparable to tasmota, see <a href="https://github.com/xoseperez/espurna/wiki">project page wiki</a>.<br>To contribute templates for ESPurna see <a href="https://forum.fhem.de/index.php/topic,108058.0.html">Forum Thread</a>. <br>NOTE: Tested with 5-way multi socket ZHILDE_EU44_W, configures a seperate device for each channel. <br>NOTE: Template is for use without further configuration on ESP side, so especially no JSON is sent or relayPayload-xy is set!
+order:A_30c
+par:DEVNAME;Device's name in the topic tree;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
+attr DEVICE icon ICON
+attr DEVICE event-on-change-reading .*
+attr DEVICE setStateList on off toggle
+set DEVICE attrTemplate mqtt2_speech_recognition_type_switch
+attr DEVICE model ESPurna_4socketUSB_split
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE stateFormat <a href="http://ip" target="_blank">ip\
+LWT\
+</a>\
+state
+deletereading -q DEVICE (?!associatedWith).*
+copy DEVICE DEVICE_CH2
+copy DEVICE DEVICE_CH3
+copy DEVICE DEVICE_CH4
+copy DEVICE DEVICE_USB
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4,DEVICE_USB
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4,DEVICE_USB
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB
+setreading DEVICE_USB associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
+attr DEVICE_CH2 readingList DEVNAME/relay/1:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/ip:.* ip
+attr DEVICE_CH3 readingList DEVNAME/relay/2:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/ip:.* ip
+attr DEVICE_CH4 readingList DEVNAME/relay/3:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/ip:.* ip
+attr DEVICE_USB readingList DEVNAME/relay/4:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/ip:.* ip
+attr DEVICE readingList DEVNAME/relay/0:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  DEVNAME/app:.* app\
+  DEVNAME/version:.* version\
+  DEVNAME/board:.* board\
+  DEVNAME/host:.* host\
+  DEVNAME/ssid:.* ssid\
+  DEVNAME/ip:.* ip\
+  DEVNAME/mac:.* mac\
+  DEVNAME/rssi:.* rssi\
+  DEVNAME/uptime:.* uptime\
+  DEVNAME/datetime:.* datetime\
+  DEVNAME/freeheap:.* freeheap\
+  DEVNAME/vcc:.* vcc\
+  DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
+  DEVNAME/loadavg:.* loadavg\
+  DEVNAME/desc:.* desc
+attr DEVICE_CH2 setList on DEVNAME/relay/1/set 1\
+  off DEVNAME/relay/1/set 0\
+  toggle DEVNAME/relay/1/set 2
+attr DEVICE_CH3 setList on DEVNAME/relay/2/set 1\
+  off DEVNAME/relay/2/set 0\
+  toggle DEVNAME/relay/2/set 2
+attr DEVICE_CH4 setList on DEVNAME/relay/3/set 1\
+  off DEVNAME/relay/3/set 0\
+  toggle DEVNAME/relay/3/set 2
+attr DEVICE_USB setList on DEVNAME/relay/4/set 1\
+  off DEVNAME/relay/4/set 0\
+  toggle DEVNAME/relay/4/set 2
+attr DEVICE setList on DEVNAME/relay/0/set 1\
+  off DEVNAME/relay/0/set 0\
+  toggle DEVNAME/relay/0/set 2\
+  Reboot:reboot DEVNAME/action/set $EVTPART1
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE stateFormat <a href="http://ip" target="_blank">ip\
+LWT\
+</a>\
+state
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH4,DEVICE_CH4,DEVICE_USB
+
+###############
+#DP83848 based Ethernet Board
+#
+name:8channel_ethernet_board_split
+filter:TYPE=MQTT2_DEVICE
+desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
+order:W_03
+par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+state)/, ? $1 : undef }
+par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)state/, ? ${1}ctr : undef }
+par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
+attr DEVICE icon ICON
+attr DEVICE model 8channel_ethernet_board_split
+attr DEVICE setStateList on off
+set DEVICE attrTemplate mqtt2_speech_recognition_type_switch
+deletereading -q DEVICE (?!associatedWith).*
+copy DEVICE DEVICE_CH2
+copy DEVICE DEVICE_CH3
+copy DEVICE DEVICE_CH4
+copy DEVICE DEVICE_CH5
+copy DEVICE DEVICE_CH6
+copy DEVICE DEVICE_CH7
+copy DEVICE DEVICE_CH8
+setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
+setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
+attr DEVICE_CH2 readingList STATETOPIC { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH3 readingList STATETOPIC { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH4 readingList STATETOPIC { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH5 readingList STATETOPIC { $EVENT =~ /output...[01]{4}([01])[01]{3}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH6 readingList STATETOPIC { $EVENT =~ /output...[01]{5}([01])[01]{2}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH7 readingList STATETOPIC { $EVENT =~ /output...[01]{6}([01])[01]/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH8 readingList { $EVENT =~ /output...[01]{7}([01])/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE setList on:noArg CMNDTOPIC setr=1xxxxxxx\
+  off:noArg CMNDTOPIC setr=0xxxxxxx
+attr DEVICE_CH2 setList on:noArg CMNDTOPIC setr=x1xxxxxx\
+  off:noArg CMNDTOPIC setr=x0xxxxxx
+attr DEVICE_CH3 setList on:noArg CMNDTOPIC setr=xx1xxxxx\
+  off:noArg CMNDTOPIC setr=xx0xxxxx
+attr DEVICE_CH4 setList on:noArg CMNDTOPIC setr=xxx1xxxx\
+  off:noArg CMNDTOPIC setr=xxx0xxxx
+attr DEVICE_CH5 setList on:noArg CMNDTOPIC setr=xxxx1xxx\
+  off:noArg CMNDTOPIC setr=xxxx0xxx
+attr DEVICE_CH6 setList on:noArg CMNDTOPIC setr=xxxxx1xx\
+  off:noArg CMNDTOPIC setr=xxxxx0xx
+attr DEVICE_CH7 setList on:noArg CMNDTOPIC setr=xxxxxx1x\
+  off:noArg CMNDTOPIC setr=xxxxxx0x
+attr DEVICE_CH8 setList on:noArg CMNDTOPIC setr=xxxxxxx1\
+  off:noArg CMNDTOPIC setr=xxxxxxx0
+attr DEVICE readingList STATETOPIC
+setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+
+
+name:8channel_ethernet_board_unified
+filter:TYPE=MQTT2_DEVICE
+desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
+order:W_03a
+par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+state)/, ? $1 : undef }
+par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)state/, ? ${1}ctr : undef }
+par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
+attr DEVICE icon ICON
+attr DEVICE setStateList on off
+attr DEVICE jsonMap input:0
+attr DEVICE readingList STATETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE userReadings out1:output:.* { $event =~ m/(.).......$/;;ReadingsVal($name,"out1",undef) ne $1 ? $1 : undef }, out2:output:.* { $event =~ m/.(.)......$/;;;;ReadingsVal($name,"out2",undef) ne $1 ? $1 : undef }, out3:output:.* { $event =~ m/..(.).....$/;;ReadingsVal($name,"out3",undef) ne $1 ? $1 : undef }, out4:output:.* { $event =~ m/...(.)....$/;;ReadingsVal($name,"out4",undef) ne $1 ? $1 : undef }, out5:output:.* { $event =~ m/....(.)...$/;;ReadingsVal($name,"out5",undef) ne $1 ? $1 : undef }, out6:output:.* { $event =~ m/.....(.)..$/;;ReadingsVal($name,"out6",undef) ne $1 ? $1 : undef }, out7:output:.* { $event =~ m/......(.).$/;;ReadingsVal($name,"out7",undef) ne $1 ? $1 : undef }, out8:output:.* { $event =~ m/.......(.)$/;;ReadingsVal($name,"out8",undef) ne $1 ? $1 : undef }
+attr DEVICE setList out1:0,1 {my $command = $EVTPART1."xxxxxxx";; "CMNDTOPIC setr=$command"}\
+  out2:0,1 {my $command = "x".$EVTPART1."xxxxxx";; "CMNDTOPIC setr=$command"}\
+  out3:0,1 {my $command = "xx".$EVTPART1."xxxxx";; "CMNDTOPIC setr=$command"}\
+  out4:0,1 {my $command = "xxx".$EVTPART1."xxxx";; "CMNDTOPIC setr=$command"}\
+  out5:0,1 {my $command = "xxxx".$EVTPART1."xxx";; "CMNDTOPIC setr=$command"}\
+  out6:0,1 {my $command = "xxxxx".$EVTPART1."xx";; "CMNDTOPIC setr=$command"}\
+  out7:0,1 {my $command = "xxxxxx".$EVTPART1."x";; "CMNDTOPIC setr=$command"}\
+  out8:0,1 {"CMNDTOPIC setr=xxxxxxx".$EVTPART1}
+attr DEVICE model 8channel_ethernet_board_unified
+
+
+
 ###############
 #ebusd
 #
@@ -2266,6 +2474,30 @@ attr OMG_BT_ID stateFormat Last IO: last_IO
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
+
+
+name:OpenMQTTGateway_BT_mi_flora_sensor
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
+desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your mi flora device. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+order:X_02a2
+par:BT_ID;Pls. enter your bluetooth device ID; {undef}
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
+defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
+deletereading -q OMG_BT_ID (?!associatedWith).*
+attr OMG_BT_ID autocreate 0
+attr OMG_BT_ID readingList\
+  BASE_ID/O[^/]*M[^/]*G[^/]*/BTtoMQTT/BT_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr OMG_BT_ID event-min-interval 300
+attr OMG_BT_ID event-on-change-reading temperature:0.2,moisture:0.2,rssi:5,distance:5,fertility:5,lux:5
+attr OMG_BT_ID icon temperature_humidity
+attr OMG_BT_ID jsonMap tem:temperature hum:humidity moi:moisture fer:fertility servicedatauuid:0 servicedata:0
+attr OMG_BT_ID stateFormat T: temperature°C, M: moisture%, L: lux, F: fertility
+attr OMG_BT_ID room NEWDEVROOM
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+attr OMG_BT_ID model OpenMQTTGateway_BT_mi_flora_sensor
+
 
 name:OpenMQTTGateway_simple_RF433_switch
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
