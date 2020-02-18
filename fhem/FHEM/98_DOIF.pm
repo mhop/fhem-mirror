@@ -3174,6 +3174,13 @@ CmdDoIfPerl($$)
       }
     }
   }
+  if ($init_done) {
+    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
+        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+      }
+    }
+  }
   return("","")
 }
 
@@ -3291,6 +3298,13 @@ CmdDoIf($$)
     $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
   }
   
+  if ($init_done) {
+    foreach my $key (keys %{$attr{$hash->{NAME}}}) {
+      if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
+        DOIF_Attr ("set",$hash->{NAME},$key,AttrVal($hash->{NAME},$key,""));
+      }
+    }
+  }
   return("","")
 }
 
