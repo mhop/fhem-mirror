@@ -1409,7 +1409,9 @@ sub YAMAHA_MC_SpeakFile($$)    # only called when defined, not on reload.
 
         # Deleting tts File
         Log3 $name, 4, "$name YAMAHA_MC_SpeakFile try delete tts file $originalSearchfilename : $ret";
-        $ret .= qx(timeout 2 sudo id && sudo rm -f $originalSearchfilename || rm -f $originalSearchfilename );
+		if ( $originalSearchfilename !~ /keep/ ) {
+          $ret .= qx(timeout 2 sudo id && sudo rm -f $originalSearchfilename || rm -f $originalSearchfilename );
+		}  
         Log3 $name, 4, "$name YAMAHA_MC_SpeakFile delete tts file $originalSearchfilename : $ret";
 
         if ( ( defined($URILink) ) and ( defined( $hash->{helper}{MediaRendererDLNA} ) ) ) {
@@ -2758,7 +2760,9 @@ sub YAMAHA_MC_HandleCmdQueue($$$) {
                 Log3 $name, 4, " $type ($name) - YAMAHA_MC_HandleCmdQueue: API Version cut to $shortAPI URL before $url";
 
                 #api version setzen durch korrekte Version des Devices
-                $url =~ s/v1/v$shortAPI/g;
+                #$url =~ s/(/v1/)/(/v$shortAPI/)/g;
+				$url =~ s|/v1/|/v$shortAPI/|g;
+				
 
                 Log3 $name, 4, "$type ($name) - YAMAHA_MC_HandleCmdQueue: cmd=$reqCmd starte httpRequest replaced url => $url";
 
@@ -4347,7 +4351,8 @@ sub YAMAHA_MC_httpRequestDirect($$@) {
     Log3 $name, 4, " $type ($name) - YAMAHA_MC_httpRequestDirect: API Version cut to $shortAPI URL before $url";
 
     #api version setzen durch korrekte Version des Devices
-    $url =~ s/v1/v$shortAPI/g;
+    #$url =~ s/(/v1/)/(/v$shortAPI/)/g;
+	$url =~ s|/v1/|/v$shortAPI/|g;
 
     Log3 $name, 4, "$type ($name) - YAMAHA_MC_httpRequestDirect: cmd=$cmd starte httpRequest replaced url => $url";
 
