@@ -2414,7 +2414,7 @@ CommandSetReading($$)
       delete $hash->{CL};
     }
     my $b1 = $b[1];
-    return "bad reading name $b1 (contains not A-Za-z/\\d_\\.- or is too long)"
+    return "$sdev: bad reading name '$b1' (allowed chars: A-Za-z/\\d_\\.-)"
       if(!goodReadingName($b1));
     readingsSingleUpdate($defs{$sdev}, $b1, $b[2], 1);
   }
@@ -2874,7 +2874,7 @@ CommandAttr($$)
   return "Usage: attr [-a|-r] <name> <attrname> [<attrvalue>]\n$namedef"
            if(@a && @a < 2);
   my $a1 = $a[1];
-  return "bad attribute name $a1 (contains not A-Za-z/\\d_\\.- or is too long)"
+  return "$a[0]: bad attribute name '$a1' (allowed chars: A-Za-z/\\d_\\.-)"
            if($featurelevel > 5.9 && !goodReadingName($a1) && $a1 ne "?");
 
   my @rets;
@@ -3092,7 +3092,7 @@ CommandSetstate($$)
       }
 
       Log3 $d, 3,
-         "bad reading name $sname (contains not A-Za-z/\\d_\\.- or is too long)"
+         "$sdev: bad reading name '$sname' (allowed chars: A-Za-z/\\d_\\.-)"
         if(!goodReadingName($sname));
 
       if(!defined($d->{READINGS}{$sname}) ||
