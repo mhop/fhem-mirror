@@ -610,7 +610,7 @@ sub weekprofile_assignDev($)
   }
   
   if (!defined($prf)) {
-	Log3 $me, 5, "create default profile";
+	  Log3 $me, 5, "create default profile";
     my $prfDev = weekprofile_createDefaultProfile($hash);
     if(defined($prfDev)) {
       $prf = {};
@@ -1348,25 +1348,30 @@ sub weekprofile_writeProfilesToFile(@)
   my $prfCnt = scalar(@{$hash->{PROFILES}});
   return if ($prfCnt <= $start);
 
-  my $filename = "./log/weekprofile-$me.cfg";
-  $filename = AttrVal($me,"configFile",$filename);
-
-  my $ret = open(my $fh, '>', $filename);
-  if (!$ret){
-    Log3 $me, 1, "$me(writeProfileToFile): Could not open file '$filename' $!";
-    return;
+  my $defname = "./log/weekprofile-$me.cfg";
+  my $filename = AttrVal($me,"configFile",$defname);
+  my $forceFile = undef;
+  if ( !$defname eq $filename) {
+    $forceFile = "file";
   }
-  
-  print $fh "__version__=".$CONFIG_VERSION."\n";  
+
+  my @content;
+  my $idstring = "__version__=$CONFIG_VERSION";
+  push (@content, $idstring);
   
   Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
   my $json = JSON->new->allow_nonref;
   for (my $i = $start; $i < $prfCnt; $i++) {
-    print $fh "entry=".$json->encode($hash->{PROFILES}[$i])."\n";
-  }  
-  close $fh;
-  DoTrigger($me,"PROFILES_SAVED",1);
-  weekprofile_updateReadings($hash);
+    push (@content, "entry=".$json->encode($hash->{PROFILES}[$i]));
+  }
+  my $param = { FileName => $filename, ForceType => $forceFile, NoNL=>0 };
+  my $ret = FileWrite($param,@content);
+  if ($ret){
+    Log3 $me, 1, "$me(writeProfileToFile): write profiles to $filename failed $ret";
+  } else {
+    DoTrigger($me,"PROFILES_SAVED",1);
+    weekprofile_updateReadings($hash);
+  }
 }
 ############################################## 
 sub weekprofile_readProfilesFromFile(@)
@@ -1376,18 +1381,21 @@ sub weekprofile_readProfilesFromFile(@)
   
   my $useTopics = AttrVal($me,"useTopics",0);
 
-  my $filename = "./log/weekprofile-$me.cfg";
-  $filename = AttrVal($me,"configFile",$filename);
-  
-  unless (-e $filename) {
-     Log3 $me, 5, "$me(readProfilesFromFile): file do not exist '$filename'";
-     return;
+  my $defname = "./log/weekprofile-$me.cfg";
+  my $filename = AttrVal($me,"configFile",$defname);  
+  my $forceFile = undef;
+  if (!$defname eq $filename) {
+    $forceFile = "file";
   }
-  
-  #my $ret = open(my $fh, '<:encoding(UTF-8)', $filename);
-  my $ret = open(my $fh, '<', $filename);
-  if (!$ret){
-    Log3 $me, 1, "$me(readProfilesFromFile): Could not open file '$filename' $!";
+
+  my ($ret, @content) = FileRead({ FileName => $filename, ForceType => $forceFile});
+
+  if ($ret && !defined($forceFile) && $ret =~ /from database/){
+    Log3 $me, 1, "$me(readProfilesFromFile): $ret, retrying from local filesystem";
+    ($ret, @content) = FileRead({ FileName => $filename, ForceType => "file" });
+  }
+  if ($ret) {
+    Log3 $me, 1, "$me(readProfilesFromFile): $ret";
     return;
   }
   
@@ -1396,7 +1404,8 @@ sub weekprofile_readProfilesFromFile(@)
   my $json = JSON->new->allow_nonref;  
   my $rowCnt = 0;
   my $version = undef;
-  while (my $row = <$fh>) {
+  foreach (@content) {
+    my $row = $_;
     chomp $row;    
     Log3 $me, 5, "$me(readProfilesFromFile): data row $row";
     my @data = split('=',$row);
@@ -1449,11 +1458,9 @@ sub weekprofile_readProfilesFromFile(@)
       $rowCnt++;
     } else {
       Log3 $me, 1, "$me(readProfilesFromFile): Error unknown version $version";
-      close $fh;
       return;
     }
-  }  
-  close $fh;
+  }
 }
 
 ############################################## 
