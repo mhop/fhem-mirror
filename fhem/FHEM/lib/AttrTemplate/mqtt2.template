@@ -1966,8 +1966,8 @@ name:8channel_ethernet_board_split
 filter:TYPE=MQTT2_DEVICE
 desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
 order:W_03
-par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+state)/, ? $1 : undef }
-par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)state/, ? ${1}ctr : undef }
+par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+state[:])/, ? $1 : undef }
+par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)state[:], ? "${1}ctr" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 attr DEVICE model 8channel_ethernet_board_split
@@ -1989,13 +1989,13 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
 setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
 setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
-attr DEVICE_CH2 readingList STATETOPIC { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH3 readingList STATETOPIC { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH4 readingList STATETOPIC { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH5 readingList STATETOPIC { $EVENT =~ /output...[01]{4}([01])[01]{3}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH6 readingList STATETOPIC { $EVENT =~ /output...[01]{5}([01])[01]{2}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH7 readingList STATETOPIC { $EVENT =~ /output...[01]{6}([01])[01]/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH8 readingList { $EVENT =~ /output...[01]{7}([01])/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH4 readingList STATETOPIC.* { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH5 readingList STATETOPIC.* { $EVENT =~ /output...[01]{4}([01])[01]{3}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH6 readingList STATETOPIC.* { $EVENT =~ /output...[01]{5}([01])[01]{2}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH7 readingList STATETOPIC.* { $EVENT =~ /output...[01]{6}([01])[01]/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH8 readingList STATETOPIC.* { $EVENT =~ /output...[01]{7}([01])/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE setList on:noArg CMNDTOPIC setr=1xxxxxxx\
   off:noArg CMNDTOPIC setr=0xxxxxxx
 attr DEVICE_CH2 setList on:noArg CMNDTOPIC setr=x1xxxxxx\
@@ -2020,13 +2020,13 @@ name:8channel_ethernet_board_unified
 filter:TYPE=MQTT2_DEVICE
 desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
 order:W_03a
-par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+state)/, ? $1 : undef }
-par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:/]+)state/, ? ${1}ctr : undef }
+par:STATETOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+state[:])/, ? $1 : undef }
+par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)state[:], ? "${1}ctr" : undef }
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 attr DEVICE setStateList on off
 attr DEVICE jsonMap input:0
-attr DEVICE readingList STATETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE readingList STATETOPIC.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE userReadings out1:output:.* { $event =~ m/(.).......$/;;ReadingsVal($name,"out1",undef) ne $1 ? $1 : undef }, out2:output:.* { $event =~ m/.(.)......$/;;;;ReadingsVal($name,"out2",undef) ne $1 ? $1 : undef }, out3:output:.* { $event =~ m/..(.).....$/;;ReadingsVal($name,"out3",undef) ne $1 ? $1 : undef }, out4:output:.* { $event =~ m/...(.)....$/;;ReadingsVal($name,"out4",undef) ne $1 ? $1 : undef }, out5:output:.* { $event =~ m/....(.)...$/;;ReadingsVal($name,"out5",undef) ne $1 ? $1 : undef }, out6:output:.* { $event =~ m/.....(.)..$/;;ReadingsVal($name,"out6",undef) ne $1 ? $1 : undef }, out7:output:.* { $event =~ m/......(.).$/;;ReadingsVal($name,"out7",undef) ne $1 ? $1 : undef }, out8:output:.* { $event =~ m/.......(.)$/;;ReadingsVal($name,"out8",undef) ne $1 ? $1 : undef }
 attr DEVICE setList out1:0,1 {my $command = $EVTPART1."xxxxxxx";; "CMNDTOPIC setr=$command"}\
   out2:0,1 {my $command = "x".$EVTPART1."xxxxxx";; "CMNDTOPIC setr=$command"}\
