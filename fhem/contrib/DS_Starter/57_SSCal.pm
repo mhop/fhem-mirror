@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.13.0" => "19.02.2020  manage recurring entries if one/more of a series entry is deleted or changed ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
   "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
@@ -1530,10 +1531,10 @@ return;
 sub SSCal_extractEventlist ($) { 
   my ($name) = @_;
   my $hash   = $defs{$name};
-  my $data   = delete $hash->{eventlist};
+  my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
   my $am     = AttrVal($name, "asyncMode", 0);
   
-  my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff);
+  my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl);
   my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
@@ -1541,18 +1542,21 @@ sub SSCal_extractEventlist ($) {
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
-  my $n = 0;       
+  my $n = 0;                                              # Zusatz f. lfd. Nr. zur Unterscheidung exakt zeitgleicher Events
   foreach my $key (keys %{$data->{data}}) {
       my $i = 0;
   
       while ($data->{data}{$key}[$i]) {
           my $ignore = 0; 
           my $done   = 0;
-          ($nbdate,$nedate) = ("","");		
+          ($nbdate,$nedate) = ("","");	
+
+          my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events	
+		  SSCal_extractIcal ($name,$data->{data}{$key}[$i]{evt_ical});          # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
           
-          my $isallday                   = $data->{data}{$key}[$i]{is_all_day};
-          ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtstart});            # Beginn des Events
-          ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{dtend}, $isallday);   # Ende des Events
+          my $isallday                         = $data->{data}{$key}[$i]{is_all_day};
+          ($bi,$tz,$bdate,$btime,$bts,$excl)   = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{dtstart}, 0, 0, 0);         # Beginn des Events
+          ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{dtend}, $isallday, 0, 0);   # Ende des Events
             
           $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/;
           $bmday  = $3;
@@ -1574,12 +1578,12 @@ sub SSCal_extractEventlist ($) {
               $nbtime =~ s/://g;
               $netime = "235959";
 
-              ($bi,undef,$bdate,$btime,$bts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  
-              ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);         
+              ($bi,undef,$bdate,$btime,$bts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, 0, 0);  
+              ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, 0, 0);         
           }
           
           $startEndDiff = $ets - $bts;                                          # Differenz Event Ende / Start in Sekunden
-                                              
+		                                                
           if(!$data->{data}{$key}[$i]{is_repeat_evt}) {                         # einmaliger Event
               Log3($name, 5, "$name - Single event Begin: $bdate, End: $edate");
               
@@ -1587,6 +1591,10 @@ sub SSCal_extractEventlist ($) {
                   Log3($name, 4, "$name - Ignore single event -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
                   $ignore = 1;
                   $done   = 0; 
+              } elsif ($excl) {
+                  Log3($name, 4, "$name - Ignored by Ical compare -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
+                  $ignore = 1;
+                  $done   = 0;               
               } else {
                   @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
                   $ignore = 0;
@@ -1613,7 +1621,7 @@ sub SSCal_extractEventlist ($) {
                   } elsif ($p1 eq "UNTIL") {                                    # festes Intervallende angegeben        
                       $until = $p2;
                       $until =~ s/[-:]//g;
-                      (undef,undef,undef,undef,$uets) = SSCal_explodeDateTime ($hash,$until);
+                      (undef,undef,undef,undef,$uets,undef) = SSCal_explodeDateTime ($hash, $until, 0, 0, 0);
                       if ($uets < $tstart) {
                           Log3($name, 4, "$name - Ignore recurring event -> $data->{data}{$key}[$i]{summary} , interval end \"$nedate $netime\" is less than selection start \"$datetimestart\"");
                           $ignore = 1;
@@ -1643,8 +1651,9 @@ sub SSCal_extractEventlist ($) {
                       $nbtime =~ s/://g;
                       $netime =~ s/://g;
                      
-                      ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                      ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                      my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                      ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                       Log3($name, 5, "$name - YEARLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -1656,6 +1665,10 @@ sub SSCal_extractEventlist ($) {
                           Log3($name, 4, "$name - Ignore YEARLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                           $ignore = 1;
                           $done   = 0;                                        
+                      } elsif ($excl) {
+                          Log3($name, 4, "$name - YEARLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                          $ignore = 1;
+                          $done   = 0;                      
                       } else {
                           $bdate = $nbdate?$nbdate:$bdate;
                           $btime = $nbtime?$nbtime:$btime;
@@ -1692,8 +1705,9 @@ sub SSCal_extractEventlist ($) {
                           $nbtime =~ s/://g;
                           $netime =~ s/://g;
   
-                          ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                          ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                          my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                          ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                           Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -1705,6 +1719,10 @@ sub SSCal_extractEventlist ($) {
                               Log3($name, 4, "$name - Ignore MONTHLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                               $ignore = 1;
                               $done   = 0;                                        
+                          } elsif ($excl) {
+                              Log3($name, 4, "$name - MONTHLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                              $ignore = 1;
+                              $done   = 0;                      
                           } else {
                               $bdate = $nbdate?$nbdate:$bdate;
                               $btime = $nbtime?$nbtime:$btime;
@@ -1777,8 +1795,9 @@ sub SSCal_extractEventlist ($) {
                               $nbtime = $nbhh.$nbmm.$nbss;
                               $netime = $nehh.$nemm.$ness;
   
-                              ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                              ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                              my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                              ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                               Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
@@ -1790,6 +1809,10 @@ sub SSCal_extractEventlist ($) {
                                   Log3($name, 4, "$name - Ignore MONTHLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                                   $ignore = 1;
                                   $done   = 0;                                        
+                              } elsif ($excl) {
+                                  Log3($name, 4, "$name - MONTHLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                                  $ignore = 1;
+                                  $done   = 0;                      
                               } else {
                                   $bdate = $nbdate?$nbdate:$bdate;
                                   $btime = $nbtime?$nbtime:$btime;
@@ -1836,7 +1859,7 @@ sub SSCal_extractEventlist ($) {
                           my @weekdays     = qw(SU MO TU WE TH FR SA);
                           my ($rDayOfWeek) = grep {$weekdays[$_] eq $rDayStr} 0..$#weekdays;     # liefert Nr des Wochentages: SU = 0 ... SA = 6
                           
-                          for ($ci=-1; $ci<($count*$interval); $ci++) {
+                          for ($ci=-1; $ci<$count; $ci++) {
                               
                               $rNewTime += $interval*604800 if($ci>=0);                          # Wochenintervall addieren
                               ($nbss, $nbmm, $nbhh, $bmday, $bmonth, $byear, $rDayOfWeekNew, undef, undef) = localtime($rNewTime);                                        
@@ -1858,8 +1881,9 @@ sub SSCal_extractEventlist ($) {
                               $nbtime = $nbhh.$nbmm.$nbss;
                               $netime = $nehh.$nemm.$ness;
   
-                              ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                              ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                              my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                              ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                               Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
@@ -1871,6 +1895,10 @@ sub SSCal_extractEventlist ($) {
                                   Log3($name, 4, "$name - Ignore WEEKLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                                   $ignore = 1;
                                   $done   = 0;                                        
+                              } elsif ($excl) {
+                                  Log3($name, 4, "$name - WEEKLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                                  $ignore = 1;
+                                  $done   = 0;                      
                               } else {
                                   $bdate = $nbdate?$nbdate:$bdate;
                                   $btime = $nbtime?$nbtime:$btime;
@@ -1885,9 +1913,10 @@ sub SSCal_extractEventlist ($) {
                                   $ignore = 0;
                                   $done   = 1;
                                   $n++;
-                                  next;
-                              }                                       
-                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
+                                  # next;
+                              }                     
+                                                          
+                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);  
                           }
                       }   
                   
@@ -1895,15 +1924,16 @@ sub SSCal_extractEventlist ($) {
                       my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rDayOfWeekNew,$rDaysToAddOrSub); 
                       my $rNewTime = $bts;
                       
-                      for ($ci=-1; $ci<($count*$interval); $ci++) {
+                      for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {
                           $rNewTime += $interval*604800 if($ci>=0);                          # Wochenintervall addieren
                           
                           ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($rNewTime,$startEndDiff);                      
                           $nbtime = $nbhh.$nbmm.$nbss;
                           $netime = $nehh.$nemm.$ness;                
   
-                          ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                          ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                          my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                          ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                           Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                            
@@ -1915,6 +1945,10 @@ sub SSCal_extractEventlist ($) {
                               Log3($name, 4, "$name - Ignore WEEKLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                               $ignore = 1;
                               $done   = 0;                                        
+                          } elsif ($excl) {
+                              Log3($name, 4, "$name - WEEKLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                              $ignore = 1;
+                              $done   = 0;                      
                           } else {
                               $bdate = $nbdate?$nbdate:$bdate;
                               $btime = $nbtime?$nbtime:$btime;
@@ -1946,9 +1980,10 @@ sub SSCal_extractEventlist ($) {
   
                       $nbtime = $nbhh.$nbmm.$nbss;
                       $netime = $nehh.$nemm.$ness;                                    
-                     
-                      ($bi,undef,$nbdate,$nbtime,$nbts) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime);  # Beginn des Wiederholungsevents
-                      ($ei,undef,$nedate,$netime,$nets) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime);  # Ende des Wiederholungsevents
+                      
+                      my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
+                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                      ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                       Log3($name, 5, "$name - DAILY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -1960,6 +1995,10 @@ sub SSCal_extractEventlist ($) {
                           Log3($name, 4, "$name - Ignore DAILY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                           $ignore = 1;
                           $done   = 0;                                        
+                      } elsif ($excl) {
+                          Log3($name, 4, "$name - DAILY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
+                          $ignore = 1;
+                          $done   = 0;                      
                       } else {
                           $bdate = $nbdate?$nbdate:$bdate;
                           $btime = $nbtime?$nbtime:$btime;
@@ -2024,7 +2063,7 @@ sub SSCal_extractToDolist ($) {
   my $am     = AttrVal($name, "asyncMode", 0);
   
   my ($val,$tz,$td,$d,$t,$uts); 
-  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$numday,$bi,$ei,$startEndDiff);
+  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$numday,$bi,$ei,$startEndDiff,$excl);
   my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets,$ydiff);
   my @row_array;
   
@@ -2039,10 +2078,12 @@ sub SSCal_extractToDolist ($) {
       while ($data->{data}{$key}[$i]) {
           my $ignore = 0; 
           my $done   = 0;
-          ($nbdate,$nedate) = ("","");		
+          ($nbdate,$nedate) = ("","");	
+
+          my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events		  
           
-          ($bi,$tz,$bdate,$btime,$bts)   = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Fälligkeit des Tasks (falls gesetzt)
-          ($ei,undef,$edate,$etime,$ets) = SSCal_explodeDateTime ($hash,$data->{data}{$key}[$i]{due});    # Ende = Fälligkeit des Tasks (falls gesetzt)
+          ($bi,$tz,$bdate,$btime,$bts,$excl)   = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Fälligkeit des Tasks (falls gesetzt)
+          ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Ende = Fälligkeit des Tasks (falls gesetzt)
   
           if ($bdate && $edate) {                                               # nicht jede Aufgabe hat Date / Time gesetzt
               $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/;
@@ -2411,7 +2452,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
       push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
       
       if($p eq "due") {                                                        
-          my (undef,undef,$duedate,$duetime,$duets) = SSCal_explodeDateTime ($hash,$val);
+          my (undef,undef,$duedate,$duetime,$duets,undef) = SSCal_explodeDateTime ($hash, $val, 0, 0, 0);
           push(@row_array, $bts+$n." 60_dueDateTime "  .$duedate." ".$duetime."\n"); 
           push(@row_array, $bts+$n." 65_dueTimestamp " .$duets."\n");
       }
@@ -2448,7 +2489,8 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           }
       }
       
-      push(@row_array, $bts+$n." 98_EventId "       .$val."\n")       if($p eq "evt_id");
+      push(@row_array, $bts+$n." 95_IcalUID "       .$val."\n")       if($p eq "ical_uid");
+	  push(@row_array, $bts+$n." 98_EventId "       .$val."\n")       if($p eq "evt_id");
   }
   
   $status = "upcoming"        if($upcoming);
@@ -2460,6 +2502,144 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
   push(@row_array, $bts+$n." 99_---------------------- " ."--------------------------------------------------------------------"."\n");
     
 return @row_array;
+}
+
+#############################################################################################
+#         extrahiere Key/Value Paare des VCALENDAR
+#         $vh  = Referenz zum Kalenderdatenhash
+#
+#  Ergebis Hash:
+#  {
+#  'RECURRENCEID' => {
+#                      '0' => undef,
+#                      '2' => 'TZID=Europe/Berlin:20200222T191500 ',
+#                      '1' => 'TZID=Europe/Berlin:20200219T191500 '
+#                    },
+#  'DTSTART' => {
+#                 '0' => 'TZID=Europe/Berlin:20200218T191500',
+#                 '1' => 'TZID=Europe/Berlin:20200219T191800',
+#                 '2' => 'TZID=Europe/Berlin:20200222T192000'
+#               },
+#  'EXDATES' => {
+#                 '1' => undef,
+#                 '2' => undef,
+#                 '0' => '20200221T191500 20200220T191500 '
+#               },
+#  'SEQUENCE' => {
+#                  '0' => '4',
+#                  '2' => '5',
+#                  '1' => '5'
+#                }
+#  }
+#
+#  Auswertung mit  $hash->{HELPER}{VCALENDAR}{"$uid"}
+#
+#############################################################################################
+sub SSCal_extractIcal ($$) {                 
+  my ($name,$vh) = @_;
+  my $hash       = $defs{$name};
+  
+  return if(!$vh);
+  
+  my %temp;
+  my %icals;
+  my ($uid,$k,$v);
+
+  my @ical = split(/\015\012/, $vh);
+ 
+  my $do = 0;
+  my $n  = 0;
+  foreach (@ical) {
+      if($_ =~ m/^([-A-Z]*;).*/) {
+	      ($k,$v) = split(";", $_, 2);
+	  } else {
+          ($k,$v) = split(":", $_, 2);
+	  }
+	  
+	  $v = "" if(!$v);
+	  if("$k:$v" eq "BEGIN:VEVENT") {$do = 1;};
+	  if("$k:$v" eq "END:VEVENT")   {$do = 0; $n++;};
+	  
+	  if ($do) {
+		  $temp{$n}{UID}           = $v     if($k eq "UID");
+		  $temp{$n}{SEQUENCE}      = $v     if($k eq "SEQUENCE");
+		  
+		  if($k eq "DTSTART") {
+		      $v                 = SSCal_icalTimecheck ($name,$v);
+		      $temp{$n}{DTSTART} = $v;
+		  }
+          
+		  if($k eq "DTEND") {
+		      $v                 = SSCal_icalTimecheck ($name,$v);
+		      $temp{$n}{DTEND} = $v;
+		  }
+		  
+		  if($k eq "RECURRENCE-ID") {
+		      $v                      = SSCal_icalTimecheck ($name,$v);
+		      $temp{$n}{RECURRENCEID} = $v;
+		  }
+		  
+		  if($k eq "EXDATE") {
+	          $v                  = SSCal_icalTimecheck ($name,$v);
+		      $temp{$n}{EXDATES} .= $v." ";
+		  }
+	  }
+  }
+  
+  $n = 0;
+  while ($temp{$n}) {
+	  $uid                           = $temp{$n}{UID};
+	  $icals{$uid}{SEQUENCE}{$n}     = $temp{$n}{SEQUENCE};
+	  $icals{$uid}{DTSTART}{$n}      = $temp{$n}{DTSTART};
+      $icals{$uid}{DTEND}{$n}        = $temp{$n}{DTEND};
+	  $icals{$uid}{EXDATES}{$n}      = SSCal_trim($temp{$n}{EXDATES});
+	  $icals{$uid}{RECURRENCEID}{$n} = $temp{$n}{RECURRENCEID};
+	  $n++;
+  }
+  
+  $hash->{HELPER}{VCALENDAR} = \%icals;                                    # Achtung: bei asynch Mode ist hash->{HELPER} nur in BlockingCall !!
+  
+  Log3($name, 5, "$name - VCALENDAR extract of UID \"$uid\":\n".Dumper $hash->{HELPER}{VCALENDAR}{"$uid"}); 
+  
+return;
+}
+
+#############################################################################################
+#  Checked und korrigiert Zeitformate aus VCALENDAR um sie mit API-Werten zu vergleichbar
+#  zu machen
+#############################################################################################
+sub SSCal_icalTimecheck ($$) {
+  my ($name,$v) = @_;
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$zulu,$tstamp,$d,$t,$isdst,$tz);
+
+  $zulu   = 0;
+  $v      = (split(":", $v))[-1] if($v =~ /:/);
+  $zulu   = 3600 if($v =~ /Z$/);                                           # Zulu-Zeit wenn EXDATE mit "Z" endet -> +1 Stunde
+    
+  ($d,$t) = split("T", $v);
+  $year   = substr($d,0,4);     
+  $month  = substr($d,4,2);    
+  $mday   = substr($d,6,2);
+
+  if($t) {
+	  $hour = substr($t,0,2);
+	  $min  = substr($t,2,2);
+	  $sec  = substr($t,4,2);
+	  $t    = $hour.$min.$sec;
+  } else {
+	  $hour = "00";
+	  $min  = "00";
+	  $sec  = "00";
+  }
+  
+  eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
+  (undef, undef, undef, undef, undef, undef, undef, undef, $isdst) = localtime($tstamp);
+  $zulu    = 7200 if($isdst && $zulu);                                  # wenn Sommerzeit und Zulu-Zeit -> +1 Stunde
+  $tstamp += $zulu; 
+  $v       = strftime "%Y%m%dT%H%M%S", localtime($tstamp);
+
+return $v;
 }
 
 #############################################################################################
@@ -2963,7 +3143,9 @@ return ($success, $username, $passwd);
 #############################################################################################
 sub SSCal_trim ($) {
   my $str = shift;
-  $str =~ s/^\s+|\s+$//g;
+  
+  return if(!$str);
+  $str    =~ s/^\s+|\s+$//g;
 
 return ($str);
 }
@@ -3227,23 +3409,67 @@ return;
 #    Rückgabe:       invalid, Zeitzone, Date(YYYY-MM-DD), Time (HH:MM:SS), UnixTimestamp
 #                    (invalid =1 wenn Datum ungültig, ist nach RFC 5545 diese Wiederholung 
 #                                zu ignorieren und auch nicht zu zählen !)
+#    $dtstart:       man benötigt originales DTSTART für den Vergleich bei Recuuring Terminen
 #############################################################################################
-sub SSCal_explodeDateTime ($$;$) {      
-  my ($hash,$dt,$isallday)  = @_;
-  my $name                  = $hash->{NAME};
-  my ($tz,$t)               = ("","");
-  my ($d,$tstamp)           = ("",0);
-  my $invalid               = 0;
-  my $corrsec               = 0;                         # Korrektursekunde
-  my ($sec,$min,$hour,$mday,$month,$year);
+sub SSCal_explodeDateTime ($$$$$) {      
+  my ($hash,$dt,$isallday,$uid,$dtstart) = @_;
+  my $name                 = $hash->{NAME};
+  my ($tz,$t)              = ("","");
+  my ($d,$tstamp)          = ("",0);
+  my $invalid              = 0;
+  my $corrsec              = 0;                          # Korrektursekunde
+  my $excl                 = 0;                          # 1 wenn der Eintrag exkludiert werden soll
   
-  return ($invalid,$tz,$d,$t,$tstamp) if(!$dt);
+  my ($sec,$min,$hour,$mday,$month,$year,$checkbegin,$changed,$changet,$changedt,$z);
   
-  $corrsec = 1 if($isallday);                            # wenn Ganztagsevent, Endetermin um 1 Sekunde verkürzen damit Termin am selben Tag 23:59:59 endet (sonst Folgetag 00:00:00)         
-
+  return ($invalid,$tz,$d,$t,$tstamp,$excl) if(!$dt);
+  
+  $corrsec = 1 if($isallday);                            # wenn Ganztagsevent, Endetermin um 1 Sekunde verkürzen damit Termin am selben Tag 23:59:59 endet (sonst Folgetag 00:00:00)          
+  
   if($dt =~ /^TZID=.*$/) {
       ($tz,$dt) = split(":", $dt);
       $tz       = (split("=", $tz))[1];
+  }
+  
+  if($dtstart) {
+      $dtstart = (split(":", $dtstart))[-1] if($dtstart =~ /:/);
+      
+      # check ob recurring date excluded werden muss (Serienelement gelöscht)
+      my $exdates = $hash->{HELPER}{VCALENDAR}{"$uid"}{EXDATES}{0};   
+      my %seen;
+      if($exdates) {
+          my @exd = split(" ", $exdates);  
+          grep { !$seen{$_}++ } @exd;
+      }
+      $excl = 1 if($seen{$dtstart});                                            # check erfolgreich -> exclude recurring date weil (Serienelement gelöscht)
+  
+      # prüfen ob Serienelement verändert wurde
+      if($dt eq $dtstart) {$checkbegin = 1} else {$checkbegin = 0};             
+      if ($checkbegin) {
+          # prüfen ob DTSTART verändert
+          foreach (keys %{$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}}) {
+              next if(!$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_});
+              $z = $_ if($hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
+          }
+          if($z) {
+              $changedt = $hash->{HELPER}{VCALENDAR}{"$uid"}{DTSTART}{$z};
+              $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
+              $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
+              $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
+          }
+      } else {
+          # prüfen ob DTEND verändert
+          foreach (keys %{$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}}) {
+              next if(!$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_});
+              $z = $_ if($hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
+          }
+          if($z) {
+              $changedt = $hash->{HELPER}{VCALENDAR}{"$uid"}{DTEND}{$z};
+              $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
+              $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
+              $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
+          }      
+      }
   }
   
   ($d,$t) = split("T", $dt);
@@ -3284,15 +3510,17 @@ sub SSCal_explodeDateTime ($$;$) {
       $t       = $hour.":".$min.":".$sec;
   }
   
-  eval { timelocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
+  eval { $tstamp = timelocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
   if ($@) {
-      Log3($name, 3, "$name - WARNING - invalid format of recurring event: $@. It will be ignored due to RFC 5545 standard.");
+      my $err = (split(" at", $@))[0];
+      Log3($name, 3, "$name - WARNING - invalid format of recurring event: $err. It will be ignored due to RFC 5545 standard.");
       $invalid = 1;
   }
 
-  eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
-
-return ($invalid,$tz,$d,$t,$tstamp);
+  $d = $changed ? $changed : $d;                        # mit einmalig geänderten Datum ersetzen
+  $t = $changet ? $changet : $t;                        # mit einmalig geänderter Zeit ersetzen
+  
+return ($invalid,$tz,$d,$t,$tstamp,$excl);
 }
 
 #############################################################################################
