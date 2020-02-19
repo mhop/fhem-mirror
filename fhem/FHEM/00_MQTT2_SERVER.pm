@@ -137,7 +137,7 @@ MQTT2_SERVER_Attr(@)
   my ($type, $devName, $attrName, @param) = @_;
   my $hash = $defs{$devName};
   if($type eq "set" && $attrName eq "SSL") {
-    TcpServer_SetSSL($hash);
+    InternalTimer(1, "TcpServer_SetSSL", $hash, 0); # Wait for sslCertPrefix
   }
   return undef;
 } 
@@ -660,7 +660,7 @@ MQTT2_SERVER_ReadDebug($$)
 
     <a name="SSL"></a>
     <li>SSL<br>
-      Enable SSL (i.e. TLS)
+      Enable SSL (i.e. TLS).
       </li><br>
 
     <li>sslVersion<br>

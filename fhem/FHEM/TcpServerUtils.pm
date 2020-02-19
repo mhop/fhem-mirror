@@ -131,10 +131,15 @@ TcpServer_Accept($$)
       $err = "" if(!$err);
       $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
       my $errLevel = ($err =~ m/error:14094416:SSL/ ? 5 : 1); # 61511
-      Log3 $name, $errLevel, "$type SSL/HTTPS error: $err (peer: $caddr)"
-        if($err !~ m/error:00000000:lib.0.:func.0.:reason.0./); #Forum 56364
-      close($clientinfo[0]);
-      return undef;
+
+      if($err =~ m/http request/) { # HTTP on HTTPS.
+        Log3 $name, $errLevel, "HTTP connect to HTTP socket (peer: $caddr)";
+      } else {
+        Log3 $name, $errLevel, "$type SSL/HTTPS error: $err (peer: $caddr)"
+          if($err !~ m/error:00000000:lib.0.:func.0.:reason.0./); #Forum 56364
+        close($clientinfo[0]);
+        return undef;
+      }
     }
   }
 
@@ -170,9 +175,34 @@ TcpServer_SetSSL($)
   if($@) {
     Log3 $hash, 1, $@;
     Log3 $hash, 1, "Can't load IO::Socket::SSL, falling back to HTTP";
-  } else {
-    $hash->{SSL} = 1;
+    return;
   }
+
+  my $name = $hash->{NAME};
+  my $cp = AttrVal($name, "sslCertPrefix", "certs/server-");
+  if(! -r "${cp}key.pem") {
+
+    Log 1, "$name: Server certificate missing, trying to create one";
+    if($cp =~ m,^(.*)/(.*?), && ! -d $1 && !mkdir($1)) {
+      Log 1, "$name: failed to create $1: $!, falling back to HTTP";
+      return;
+    }
+
+    if(!open(FH,">certreq.txt")) {
+      Log 1, "$name: failed to create certreq.txt: $!, falling back to HTTP";
+      return;
+    }
+    print FH "[ req ]\nprompt = no\ndistinguished_name = dn\n\n".
+             "[ dn ]\nC = DE\nO = FHEM\nCN = home.localhost\n\n";
+    close(FH);
+
+    my $cmd = "openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 ".
+                "-config certreq.txt -out ${cp}cert.pm -keyout ${cp}key.pem";
+    Log 1, "Executing $cmd";
+    `$cmd`;
+    unlink("certreq.txt");
+  }
+  $hash->{SSL} = 1;
 }
 
 

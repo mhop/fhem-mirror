@@ -317,11 +317,14 @@ telnet_Attr(@)
   my $hash = $defs{$devName};
 
   if($type eq "set" && $attrName eq "SSL") {
-    TcpServer_SetSSL($hash);
-    if($hash->{CD}) {
-      my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
-      Log3 $devName, 1, "$hash->{NAME} start_SSL: $ret" if($ret);
-    }
+    InternalTimer(1, sub($) { # Wait for sslCertPrefix
+      my ($hash) = @_;
+      TcpServer_SetSSL($hash);
+      if($hash->{CD}) {
+        my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
+        Log3 $devName, 1, "$hash->{NAME} start_SSL: $ret" if($ret);
+      }
+    }, $hash, 0); # Wait for sslCertPrefix
   }
 
   if(($attrName eq "allowedCommands" ||

@@ -522,7 +522,9 @@ FW_Read($$)
                 "&fwcsrf=".$defs{$FW_wname}{CSRFTOKEN} : "");
      
   if($FW_use{sha} && $method eq 'GET' &&
-     $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i) {
+     $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i &&
+     $FW_httpheader{Upgrade} && $FW_httpheader{Upgrade} =~ /websocket/i &&
+     $FW_httpheader{'Sec-WebSocket-Key'}) {
 
     my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
                                 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
@@ -2699,7 +2701,7 @@ FW_Attr(@)
   my $retMsg;
 
   if($type eq "set" && $attrName eq "HTTPS" && $param[0]) {
-    TcpServer_SetSSL($hash);
+    InternalTimer(1, "TcpServer_SetSSL", $hash, 0); # Wait for sslCertPrefix
   }
 
   if($type eq "set") { # Converting styles
@@ -3844,8 +3846,12 @@ FW_show($$)
         <ul>
         mkdir certs<br>
         cd certs<br>
-        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+        openssl req -new -x509 -nodes -out server-cert.pem -days 3650
+                -keyout server-key.pem
         </ul>
+        These commands are automatically executed if there is no certificate.
+        Because of this automatic execution, the attribute sslCertPrefix should
+        be set, if necessary, before this attribute.
       <br>
     </li>
 
@@ -4585,7 +4591,9 @@ FW_show($$)
         openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout
         server-key.pem
         </ul>
-
+        Diese Befehle werden beim Setzen des Attributes automatisch
+        ausgef&uuml;rht, falls kein Zertifikat gefunden wurde. Deswegen, falls
+        n&ouml;tig, sslCertPrefix vorher setzen.
       <br>
     </li>
 
