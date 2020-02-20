@@ -1,4 +1,4 @@
-##############################################################################
+﻿##############################################################################
 # $Id$
 #
 #  32_withings.pm
@@ -755,11 +755,11 @@ sub withings_getSessionKey($) {
     # }
 
   my $datahash = {
-      url => $hash->{'.https'}."://account.withings.com/connectionwou/account_login?r=https://healthmate.withings.com/",
+      url => "https://account.withings.com/connectionwou/account_login?r=https://healthmate.withings.com/",
     timeout => 10,
     noshutdown => 1,
     ignoreredirects => 1,
-      data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => 'f' },
+      data => { email=> withings_decrypt($hash->{helper}{username}), password => withings_decrypt($hash->{helper}{password}), is_admin => 'f', use_2fa => '' },
   };
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
