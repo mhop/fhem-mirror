@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_DoorBird: Added wiki link
  - feature: 39_alexa.pm: support for proactive event reporting
  - change:  98_weekprofile: change file functions to support configdb 
  - new:     66_EseraShutter: new module that supports the Esera 1-wire shutter
