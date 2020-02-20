@@ -7,7 +7,7 @@
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(DOT)eu
 #     Fhem Forum                 : https://forum.fhem.de/index.php/topic,100758
-#     Fhem Wiki                  : 
+#     Fhem Wiki                  : https://wiki.fhem.de/wiki/DoorBird
 #
 #     This file is part of fhem.
 #
