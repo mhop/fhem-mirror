@@ -1,0 +1,18 @@
+#
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set grid ytics
+set ylabel "&alpha;/g"
+
+#FileLog 4:acceleration_x\x3a:0:
+#FileLog 4:acceleration_y\x3a:0:
+#FileLog 4:acceleration_z\x3a:0:
+
+plot "<IN>" using 1:2 axes x1y1 title '&alpha;x' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y1 title '&alpha;y' ls l2 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y1 title '&alpha;z' ls l1 lw 1 with lines
