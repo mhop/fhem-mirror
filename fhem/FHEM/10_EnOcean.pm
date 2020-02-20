@@ -402,6 +402,8 @@ my %EnO_eepConfig = (
   "D2.11.07" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.11.08" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.14.30" => {attr => {subType => "multiFuncSensor.30"}, GPLOT => "EnO_temp4humi4:Temp/Humi,"},
+  "D2.14.40" => {attr => {subType => "multiFuncSensor.40"}, GPLOT => "EnO_temp4humi4:Temp/Humi,acceleration:acceleration,"},
+  "D2.14.41" => {attr => {subType => "multiFuncSensor.40"}, GPLOT => "EnO_temp4humi4:Temp/Humi,acceleration:acceleration,"},
   "D2.15.00" => {attr => {subType => "multiFuncSensor.00"}},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
@@ -11579,6 +11581,104 @@ sub EnOcean_Parse($$)
       }
       readingsDelete($hash, "waitingCmds");
 
+    } elsif ($st eq "multiFuncSensor.40") {
+      # Multi Sensor [EnOcean STM 550 / EMSIA]
+      # (D2-14-40 - D2-14-41)
+      readingsDelete($hash, 'alarm');
+      my $temperature = ($db[8] << 8 | $db[7]) >> 6;
+      if ($temperature <= 1000) {
+        $temperature = sprintf "%0.1f", $temperature / 10 - 40;
+      } else {
+        my %alarm = (
+          1021 => 'temperature_out_of_range_negative',
+          1022 => 'temperature_out_of_range_positive',
+          1023 => 'temperature_error'
+        );
+        if (exists $alarm{$temperature}) {
+                  push @event, "1:alarm:$alarm{$temperature}";
+        }
+        $temperature = '';
+      }
+      my $humidity = (($db[7] << 8 | $db[6]) >> 6) & 0xFF;
+      if ($humidity <= 200) {
+        $humidity = sprintf "%0.1f", $humidity / 2;
+      } else {
+        my %alarm = (255 => 'humidity_error');
+        if (exists $alarm{$humidity}) {
+                  push @event, "1:alarm:$alarm{$humidity}";
+        }
+        $humidity = '';
+      }
+      my $brightness = (($db[6] << 16 | $db[5] << 8 | $db[4]) >> 5) & 0x1FFFF;
+      if ($brightness <= 100000) {
+      } else {
+        my %alarm = (131071 => 'brightness_error');
+        if (exists $alarm{$brightness}) {
+                  push @event, "1:alarm:$alarm{$brightness}";
+        }
+        $brightness = '';
+      }
+      my @acceleration_status = ('heartbeat', 'treshold_1', 'treshold_2', 'reserved');
+      my $acceleration_status = $acceleration_status[($db[4] & 0x18) >> 3];
+      my $acceleration_x = (($db[4] << 8 | $db[3]) >> 1) & 0x3FF;
+      if ($acceleration_x <= 1000) {
+        $acceleration_x = sprintf "%0.3f", $acceleration_x / 200 - 2.5;
+      } else {
+        my %alarm = (
+          1021 => 'acceleration_x_out_of_range_negative',
+          1022 => 'acceleration_x_out_of_range_positive',
+          1023 => 'acceleration_x_error'
+        );
+        if (exists $alarm{$acceleration_x}) {
+                  push @event, "1:alarm:$alarm{$acceleration_x}";
+        }
+        $acceleration_x = '';
+      }
+      my $acceleration_y = (($db[3] << 16 | $db[2] << 8 | $db[1]) >> 7) & 0x3FF;
+      if ($acceleration_y <= 1000) {
+        $acceleration_y = sprintf "%0.3f", $acceleration_y / 200 - 2.5;
+      } else {
+        my %alarm = (
+          1021 => 'acceleration_y_out_of_range_negative',
+          1022 => 'acceleration_y_out_of_range_positive',
+          1023 => 'acceleration_y_error'
+        );
+        if (exists $alarm{$acceleration_y}) {
+                  push @event, "1:alarm:$alarm{$acceleration_y}";
+        }
+        $acceleration_y = '';
+      }
+      my $acceleration_z = (($db[1] << 8 | $db[0]) >> 5) & 0x3FF;
+      if ($acceleration_z <= 1000) {
+        $acceleration_z = sprintf "%0.3f", $acceleration_z / 200 - 2.5;
+      } else {
+        my %alarm = (
+          1021 => 'acceleration_z_out_of_range_negative',
+          1022 => 'acceleration_z_out_of_range_positive',
+          1023 => 'acceleration_z_error'
+        );
+        if (exists $alarm{$acceleration_z}) {
+                  push @event, "1:alarm:$alarm{$acceleration_z}";
+        }
+        $acceleration_z = '';
+      }
+      my $contact = $db[0] & 16 ? 'closed' : 'open';
+      push @event, "1:acceleration_status:$acceleration_status";
+      push @event, "1:acceleration_x:$acceleration_x";
+      push @event, "1:acceleration_y:$acceleration_y";
+      push @event, "1:acceleration_z:$acceleration_z";
+      push @event, "1:brightness:$brightness";
+      push @event, "1:contact:$contact";
+      push @event, "1:humidity:$humidity";
+      push @event, "1:temperature:$temperature";
+      push @event, "1:state:T: $temperature H: $humidity B: $brightness AS: $acceleration_status C: $contact";
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 216), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
+######
+
     } elsif ($st eq "multiFuncSensor.00") {
       # people activity counter
       # (D2-15-00)
@@ -13137,9 +13237,13 @@ sub EnOcean_Parse($$)
 
   readingsBeginUpdate($hash);
   for(my $i = 0; $i < int(@event); $i++) {
-    # Flag & 1: reading, Flag & 2: changed. Currently ignored.
+    # Flag & 1: reading, Flag & 2: always update
     my ($flag, $vn, $vv) = split(':', $event[$i], 3);
-    readingsBulkUpdate($hash, $vn, $vv);
+    if ($flag + 0 & 2) {
+      readingsBulkUpdate($hash, $vn, $vv);
+    } else {
+      readingsBulkUpdateIfChanged($hash, $vn, $vv);
+    }
     my @cmdObserve = ($name, $vn, $vv);
     EnOcean_observeParse(2, $hash, @cmdObserve);
   }
@@ -16423,7 +16527,7 @@ sub EnOcean_demandResponseTimeout($)
     readingsBulkUpdate($hash, "state", "off");
     Log3 $name, 3, "EnOcean set $name demand response off";
   } else {
-    readingsBulkUpdate($hash, "state", "on");
+    readingsBulkUpdateIfChanged($hash, "state", "on");
     Log3 $name, 3, "EnOcean set $name demand response on";
   }
   readingsEndUpdate($hash, 1);
@@ -22085,6 +22189,32 @@ EnOcean_Delete($$)
      </ul><br>
        The attr subType must be multiFuncSensor.30. This is done if the device was
        created by autocreate.
+     </li>
+     <br><br>
+
+<li>Sensor for Temperature and Humidity, XYZ Acceleration, Illumination, Contact (D2-14-40 - D2-14-41)<br>
+        [EnOcean ST 550, EnOcean EMSIA]<br>
+     <ul>
+       <li>T: &lt;temperature&gt; H: &lt;humidity&gt; B: &lt;brightness&gt; AS &lt;acceleration status&gt; C: closed|open</li>
+       <li>acceleration_status: heartbeat|treshold_1|treshold_2|reserved</li>
+       <li>acceleration_x: &alpha;/g (Sensor Range: &alpha; = 0 g ... 2.5 g)</li>
+       <li>acceleration_y: &alpha;/g (Sensor Range: &alpha; = 0 g ... 2.5 g)</li>
+       <li>acceleration_z: &alpha;/g (Sensor Range: &alpha; = 0 g ... 2.5 g)</li>
+       <li>alarm: temperature_out_of_range_negative|temperature_out_of_range_positive|temperature_error|humidity_error|brightness_error|
+                  acceleration_x_out_of_range_negative|acceleration_x_out_of_range_positive|acceleration_x_error|dead_sensor</li>
+       <li>batteryPercent: 1/%</li>
+       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 100000 lx)</li>
+       <li>contact: closed|open</li>
+       <li>humidity: rH/%</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 60 &#176C)</li>
+       <li>state: T: &lt;temperature&gt; H: &lt;humidity&gt; B: &lt;brightness&gt; AS &lt;acceleration status&gt; C: closed|open</li>
+     </ul><br>
+       The attr subType must be multiFuncSensor.40. This is done if the device was
+       created by autocreate.
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "on" and an interval of 216 sec.<br>
      </li>
      <br><br>
 
