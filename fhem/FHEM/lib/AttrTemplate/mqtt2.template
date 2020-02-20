@@ -1989,6 +1989,7 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
 setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
 setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
+attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE_CH4 readingList STATETOPIC.* { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
@@ -2012,7 +2013,6 @@ attr DEVICE_CH7 setList on:noArg CMNDTOPIC setr=xxxxxx1x\
   off:noArg CMNDTOPIC setr=xxxxxx0x
 attr DEVICE_CH8 setList on:noArg CMNDTOPIC setr=xxxxxxx1\
   off:noArg CMNDTOPIC setr=xxxxxxx0
-attr DEVICE readingList STATETOPIC
 setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
 
 
