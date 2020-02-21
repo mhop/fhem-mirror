@@ -390,8 +390,13 @@ sub HMCCUDEV_Set ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my $statevals = AttrVal ($name, 'statevals', '');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', '', '', '');
-	my $stateVals = HMCCU_GetStateValues ($hash, $cd, 2);
-	my %stateCmds = split (/[:,]/, $stateVals);
+
+	# Get additional commands (including state commands)
+	my $roleCmds = HMCCU_GetSpecialCommands ($hash, $cc);
+	
+	# Get state values related to control command and datapoint
+	my $stateVals = HMCCU_GetStateValues ($hash, $roleCmds, $cd, 2);
+	my %stateCmds = split (/[:\s]/, $stateVals);
 	my @states = keys %stateCmds;
 	
 	my $result = '';
