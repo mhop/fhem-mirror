@@ -45,6 +45,7 @@ eval "use IO::Uncompress::Gunzip qw(gunzip);1" or $missingModul .= "IO::Compress
 eval "use MIME::Base64;1"                      or $missingModul .= "MIME::Base64 ";
 eval "use HTML::TableExtract;1"                or $missingModul .= "HTML::TableExtract ";
 eval "use HTML::TreeBuilder;1"                 or $missingModul .= "HTML::TreeBuilder ";
+eval "use JSON::XS;1"                          or $missingModul .= "JSON::XS ";
 
 #####################################
 sub DSBMobile_Initialize($) {
@@ -219,8 +220,13 @@ sub DSBMobile_getDataCallback($) {
     IO::Uncompress::Gunzip::gunzip \$d64 => \$json;
     $json = latin1ToUtf8($json);
     my $res = decode_json($json);
-
+    if ( $res->{Resultcode} == 1 ) {
+        readingsSingleUpdate( $hash, "error", $res->{ResultStatusInfo}, 0 );
+        return undef;
+    }
     Log3 $name, 5, "[$name] JSON received: " . Dumper($res);
+
+    # todo - add error handling
     my $url;
     my $udate;
     my $test = $res->{ResultMenuItems}[0]->{Childs};
@@ -267,7 +273,7 @@ sub DSBMobile_getDataCallback($) {
     readingsEndUpdate( $hash, 1 );
 
     if ( time_str2num( $udate . ":00" ) < time_str2num( $lastCheck . ":00" ) ) {
-        Log3 $name, 4, "[$name] Last update from $udate, now it's $today. Quitting.";
+        Log3 $name, 4, "[$name] Last update from $udate, now it's $today. Quitting." unless $hash->{helper}{forceRead};
         return undef unless $hash->{helper}{forceRead};
     }
     delete $hash->{helper}{forceRead};
@@ -328,10 +334,11 @@ sub DSBMobile_getTTCallback($) {
     #$te->parse($data);
     my @tabs;
     foreach my $ttab (@tt) {
-        my $te = HTML::TableExtract->new();
+        my $te = HTML::TableExtract->new( slice_columns => 0, gridmap => 0 );
         $te->parse($ttab);
         push( @tabs, $te->tables() );
     }
+    #Log3 $name, 4, "[$name] Extracted Tables". Dumper(@tabs);
 
     Log3 $name, 4, "[$name] Starting extraction info";
 
@@ -381,8 +388,8 @@ sub DSBMobile_getTTCallback($) {
         my $t    = $tabs[$i];
         my $info = $itabs[$i];
         $i++;
-        my $j = 0;
-
+        my $j     = 0;
+        my $group = undef;
         if ($t) {
             foreach my $r ( $t->rows() ) {
                 my @f = @$r;
@@ -393,9 +400,25 @@ sub DSBMobile_getTTCallback($) {
                     @ch = map { makeReadingName($_) } @f;
                     next;
                 }
+                #check if we have a single row (grouping by class)
+                if ( !defined($f[1]) ) {
+                                       
+                    # create the reading if we didn't have a group before
+                    unshift( @ch, makeReadingName($class) ) unless $group;
+                    $group = $f[0];
+                    next;
+                }
+
                 my %tst = ();
                 my $k   = 0;
+
+                # Add the group as "class"
+                if ($group) {
+                    $tst{$class} = $group;
+                }
+
                 foreach my $cl (@ch) {
+                    next if $group && $class eq $cl;
                     $tst{$cl} = $f[$k];
                     $k++;
                 }
@@ -415,7 +438,7 @@ sub DSBMobile_getTTCallback($) {
                 # roomOld    => $f[9],
                 # comment    => $f[10]
                 # );
-
+                Log3 $name, 4, "found single line: " . Dumper(%tst);
                 #push( @result, \%roq ) if ( defined( $row{class} ) && $row{class} =~ /$filter/ );
                 push( @result, \%tst )
                     if ( defined( $tst{$class} )
