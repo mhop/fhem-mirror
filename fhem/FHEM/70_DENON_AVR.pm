@@ -525,25 +525,33 @@ my $DENON_db = {
 		},	
 	},
 	'SLP' => {                  #sleep-Mode
-		'10min'     => '010',
-		'15min'     => '015',
-		'30min'     => '030',
-		'40min'     => '040',
-		'50min'     => '050',
-		'60min'     => '060',
-		'70min'     => '070',
-		'80min'     => '080',
-		'90min'     => '090',
-		'100min'    => '100',
-		'110min'    => '110',
-		'120min'    => '120',
-		'off'    	=> 'OFF',
+		'10min'		=> '010',
+		'15min'		=> '015',
+		'30min'		=> '030',
+		'40min'		=> '040',
+		'50min'		=> '050',
+		'60min'		=> '060',
+		'70min'		=> '070',
+		'80min'		=> '080',
+		'90min'		=> '090',
+		'100min'	=> '100',
+		'110min'	=> '110',
+		'120min'	=> '120',
+		'off'		=> 'OFF',
 	},
 	'STBY' => {                  #autoStandby-Mode
-		'15min'     => '15M',
-		'30min'     => '30M',
-		'60min'     => '60M',
-		'off'    	=> 'OFF',
+		'15min'		=> '15M',
+		'30min'		=> '30M',
+		'60min'		=> '60M',
+		'off'		=> 'OFF',
+	},
+	'SSALSSET' => {                     #AutoLipSync
+		'on'     => 'ON',
+		'off'    => 'OFF',
+	},
+	'SSVCTZMADIS' => {               #Lautstärkeanzeige
+		'relativ'     => 'REL',
+		'absolute'    => 'ABS',
 	},
 	'SV' => {  					#Video-Select
 		'DVD'		=> 'DVD',
@@ -1510,6 +1518,26 @@ DENON_AVR_Parse(@)
 		readingsBulkUpdate($hash, "volume", ($volume / 10).$dezibel);
 		$return = "volume/volumeStraight ".($volume / 10)."/".($volume / 10 - 80);
 		$hash->{helper}{volume} = $volume / 10;
+	}
+	#Auto-LipSync
+	elsif ($msg =~ /^SSALSSET ([A-Z]+)/)
+	{
+		my $status = DENON_GetKey('SSALSSET', $1);
+		readingsBulkUpdate($hash, "autoLipSync", $status) if($status ne "unknown");
+		$return = "autoLipSync ".$status;
+	}
+	#Lautstärkeanzeige
+	elsif ($msg =~ /^SSVCTZMADIS ([A-Z]+)/)
+	{
+		my $status = DENON_GetKey('SSVCTZMADIS', $1);
+		readingsBulkUpdate($hash, "volumeDisplayType", $status) if($status ne "unknown");
+		$return = "volumeDisplayType ".$status;
+	}
+	#Einschaltlautstärke
+	elsif ($msg =~ /^SSVCTZMAPON (.+)/)
+	{
+		readingsBulkUpdate($hash, "volumePowerOn", $1.$percent);
+		$return = "volumePowerOn ".$1;
 	}
 	#Sound Parameter
 	elsif ($msg =~ /^PS(.+)/)
