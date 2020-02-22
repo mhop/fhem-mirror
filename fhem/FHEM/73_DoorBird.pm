@@ -72,6 +72,7 @@ sub DoorBird_Initialize($)
 	$hash->{ReadFn}          = "DoorBird_Read";
 	$hash->{DbLog_splitFn}   = "DoorBird_DbLog_splitFn";
 	$hash->{FW_detailFn}     = "DoorBird_FW_detailFn";
+	$hash->{NotifyFn}        = "DoorBird_Notify";										  
 
     $hash->{AttrList}        = "do_not_notify:1,0 " .
 							   "header " .
@@ -210,6 +211,52 @@ sub DoorBird_Define($$)
 	Log3 $name, 5, $name. " : DoorBird - Define OpsModeList                     : " . Dumper(@{$hash->{helper}{OpsModeList}});
 	Log3 $name, 5, $name. " : DoorBird - Define OpsModeListBackup[0]            : " . ${$hash->{helper}{OpsModeListBackup}}[0];
 	
+	### Notify this device after changes on global variables
+	$hash->{NOTIFYDEV} = "global,";
+
+	### Call intitialization of sub if the initialization is done
+	DoorBird_InitializeDevice($hash) if ($init_done);
+	
+	return undef;
+}
+####END####### Activate module after module has been used via fhem command "define" ############################END#####
+
+
+###START###### Handle Notifications received by this module  ##################################################START####
+sub DoorBird_Notify($$)
+{
+	my ($hash, $dev) = @_;
+	my $name    = $hash->{NAME};
+	my $devName = $dev->{NAME}; # Device that created the events
+	my $events  = deviceEvents($dev, 1);
+
+	### For Debugging purpose only 
+	Log3 $name, 5, $name. " : DoorBird - DoorBird_Notify devname                : " . $devName;
+	Log3 $name, 5, $name. " : DoorBird - DoorBird_Notify events                 : " . Dumper($events);
+
+	### Return without any further action if the module is disabled
+	return "" if(IsDisabled($name));
+
+	### If the global variables notified an update and matches
+	if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
+	{
+		### For Debugging purpose only 
+		Log3 $name, 5, $name. " : DoorBird_Notify                                   : fhem system has been initialized or config has been re-read.";
+		
+		### Call initialization 
+		DoorBird_InitializeDevice($hash);
+	}
+	
+	return undef;
+}
+###END######## Handle Notifications received by this module  ####################################################END####
+
+
+##START###### Initialize the device when all attributes are available ########################################START####
+sub DoorBird_InitializeDevice($)
+{
+	my($hash) = @_;
+	my $name    = $hash->{NAME};
 
 	### Initialize Socket connection
 	DoorBird_OpenSocketConn($hash);
@@ -223,10 +270,12 @@ sub DoorBird_Define($$)
 	InternalTimer(gettimeofday()+ $hash->{helper}{KeepAliveTimeout}	, "DoorBird_LostConn",       $hash, 0);
 	InternalTimer(gettimeofday()+ 10,                                 "DoorBird_RenewSessionID", $hash, 0);
 
+	### For Debugging purpose only 
+	Log3 $name, 3, $name. " : DoorBird_InitializeDevice                         : DoorBird has been initialized";
+
 	return undef;
 }
-####END####### Activate module after module has been used via fhem command "define" ############################END#####
-
+###END######## Initialize the device when all attributes are available #########################################END####
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
 # sub DoorBird_DbLog_splitFn($$)
@@ -247,8 +296,10 @@ sub DoorBird_Undefine($$)
 	RemoveInternalTimer($hash);
 
 	### Close UDP scanning
-	DevIo_CloseDev($hash);
-	
+	delete $selectlist{$name};
+	$hash->{CD}->close();
+	delete $hash->{CD};
+	delete $hash->{FD};
 	### Add Log entry
 	Log3 $name, 3, $name. " - DoorBird has been undefined. The DoorBird unit will no longer polled.";
 
@@ -297,6 +348,9 @@ sub DoorBird_Attr(@)
 		if ($a[3] == int($a[3])) {
 			### Set helper in hash
 			$hash->{helper}{UdpPort} = $a[3];
+			
+			### Call initialization 
+			DoorBird_InitializeDevice($hash);
 		}
 	}
 	### Check whether PollingTimeout attribute has been provided
@@ -673,7 +727,7 @@ sub DoorBird_Set($@)
 	
 	### Define "set" menu
 	my $usage	= "Unknown argument, choose one of";
-		$usage .= " Test";
+		#$usage .= " Test";
 		$usage .= " Open_Door:" . join(",", @RelayAdresses) . " OpsMode:" . join(",", @OpsModeList) . " Restart:noArg Transmit_Audio";
 
 	### If the OpsModeList is not empty
