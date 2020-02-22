@@ -297,8 +297,10 @@ sub DoorBird_Undefine($$)
 
 	### Close UDP scanning
 	delete $selectlist{$name};
-	$hash->{CD}->close();
-	delete $hash->{CD};
+	if (defined($hash->{CD})) {
+		$hash->{CD}->close();
+		delete $hash->{CD};
+	}
 	delete $hash->{FD};
 	### Add Log entry
 	Log3 $name, 3, $name. " - DoorBird has been undefined. The DoorBird unit will no longer polled.";
@@ -2214,9 +2216,6 @@ sub DoorBird_Info_Request($$) {
 					readingsBulkUpdate($hash, $key, $VersionContent -> {$key} );
 				}
 			}
-			### Update Reading for Firmware-Status
-			readingsBulkUpdate($hash, "Firmware-Status", "up-to-date");
-
 			### Update SessionId
 			DoorBird_RenewSessionID($hash);
 
@@ -3971,14 +3970,9 @@ sub DoorBird_SipStatus_Request($$) {
 					readingsBulkUpdate($hash, "SIP_" . $key, $VersionContent -> {$key} );
 				}
 			}
-			### Update Reading for Firmware-Status
-			readingsBulkUpdate($hash, "Firmware-Status", "up-to-date");
 
 			### Execute Readings Bulk Update
 			readingsEndUpdate($hash, 1);
-
-			### Check for Firmware-Updates
-			DoorBird_FirmwareStatus($hash);
 			
 			return "Readings have been updated!\n";
 		}
