@@ -1,6 +1,6 @@
 # $Id$
 # 98_MSwitch.pm
-#
+# 
 # copyright #####################################################
 #
 # 98_MSwitch.pm
@@ -62,7 +62,7 @@ use LWP::Simple;
 
 my $preconffile="https://raw.githubusercontent.com/Byte009/MSwitch_Addons/master/MSwitch_Preconf.conf";
 my $autoupdate = 'off';    #off/on
-my $version    = '3.0';
+my $version    = '3.01';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 50; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $savemodetime = 10000000; # Zeit für Zugriffe im Safemode
@@ -9488,6 +9488,37 @@ my @wertpaar2;
     my $field = "";
     my $SELF  = $name;
 
+	while ( $condition =~ m/(.+)\[(ReadingsVal|ReadingsNum|ReadingsAge|AttrVal|InternalVal):(.+):(.+):(.?)\](.+)/ )
+	{
+		MSwitch_LOG( "Debug ", 5,"condition eingang :".$condition . __LINE__ );
+        my $firstpart  = $1;
+		my $readingtyp = $2;
+        my $readingdevice = $3;
+		my $readingname = $4;
+		my $readingstandart = $5;
+        my $lastpart   = $6;
+		
+		$readingdevice =~ s/\$SELF/$name/;
+		my $reading;
+
+		$reading = ReadingsVal( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "ReadingsVal";
+		$reading = ReadingsNum( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "ReadingsNum";
+		$reading = ReadingsAge( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "ReadingsAge";
+		$reading = AttrVal( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "AttrVal";
+		$reading = InternalVal( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "InternalVal";
+		
+		MSwitch_LOG( "Debug ", 5,"reading: $readingdevice , $readingname  " . __LINE__ );
+		MSwitch_LOG( "Debug ", 5,"reading: $reading  " . __LINE__ );
+		MSwitch_LOG( "Debug ", 5,"conditionausgang : $condition" . __LINE__ );
+        $condition = $firstpart . $reading . $lastpart;
+
+		$x++;
+        last if $x > 10;    #notausstieg
+    }
+
+
+	$x     = 0;
+
     while ( $condition =~ m/(.*)\{(.+)\}(.*)/ ) #z.b $WE
 	{
 
@@ -9495,20 +9526,26 @@ my @wertpaar2;
         my $secondpart = $2;
         my $lastpart   = $3;
         my $exec       = "\$field = " . $2;
-        if ( $secondpart =~ m/(!\$.*|\$.*)/ ) 
-		{
-            $field = $secondpart;
-        }
-        else {
 		
-		if ($debugging eq "1")
-		{
-		MSwitch_LOG( "Debug", 0,"eval line" . __LINE__ );
-		}
+		#MSwitch_LOG( "Debug", 0,"secondpart: ".$secondpart . __LINE__ );
+			if ( $secondpart =~ m/(!\$.*|\$.*)/ ) 
+			{
+				$field = $secondpart;
+			}
+			else 
+			{
+			
+				#if ($debugging eq "1")
+				#{
+				#MSwitch_LOG( "Debug", 0,"eval line" . __LINE__ );
+				#}
 
-            eval($exec);
-        }
-        if ( $field =~ m/([0-9]{2}):([0-9]{2}):([0-9]{2})/ ) {
+				eval($exec);
+			}
+		
+		
+        if ( $field =~ m/([0-9]{2}):([0-9]{2}):([0-9]{2})/ ) 
+		{
             my $hh = $1;
             if ( $hh > 23 ) { $hh = $hh - 24 }
 
@@ -9522,7 +9559,7 @@ my @wertpaar2;
         last if $x > 10;    #notausstieg
     }
 
-
+#MSwitch_LOG( "Debug", 0,$condition . __LINE__ );
 
     if ( $attrrandomnumber ne '' ) {
         MSwitch_Createnumber($hash);
