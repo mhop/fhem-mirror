@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.13.0" => "19.02.2020  manage recurring entries if one/more of a series entry is deleted or changed ",
+  "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
   "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
@@ -1433,6 +1433,7 @@ sub SSCal_calop_parse ($) {
             
 			} elsif ($opmode eq "eventlist") {                          # Events der ausgewählten Kalender aufbereiten 
                 delete $data{SSCal}{$name}{eventlist};                  # zentrales Event/ToDo Hash löschen
+				delete $data{SSCal}{$name}{vcalendar};                  # zentrales VCALENDAR Hash löschen
                 $hash->{eventlist} = $data;                             # Data-Hashreferenz im Hash speichern
                
                 if ($am) {                                              # Extrahieren der Events asynchron (nicht-blockierend)
@@ -1552,7 +1553,7 @@ sub SSCal_extractEventlist ($) {
           ($nbdate,$nedate) = ("","");	
 
           my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events	
-		  SSCal_extractIcal ($name,$data->{data}{$key}[$i]{evt_ical});          # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
+		  SSCal_extractIcal ($name,$data->{data}{$key}[$i]);                    # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
           
           my $isallday                         = $data->{data}{$key}[$i]{is_all_day};
           ($bi,$tz,$bdate,$btime,$bts,$excl)   = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{dtstart}, 0, 0, 0);         # Beginn des Events
@@ -1596,7 +1597,7 @@ sub SSCal_extractEventlist ($) {
                   $ignore = 1;
                   $done   = 0;               
               } else {
-                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -1678,7 +1679,7 @@ sub SSCal_extractEventlist ($) {
                           $etime = $netime?$netime:$etime;
                           $ets   = $nets?$nets:$ets;                  
                           
-                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                           $ignore = 0;
                           $done   = 1;
@@ -1732,7 +1733,7 @@ sub SSCal_extractEventlist ($) {
                               $etime = $netime?$netime:$etime;
                               $ets   = $nets?$nets:$ets;                  
                               
-                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                               $ignore = 0;
                               $done   = 1;
@@ -1822,7 +1823,7 @@ sub SSCal_extractEventlist ($) {
                                   $etime = $netime?$netime:$etime;
                                   $ets   = $nets?$nets:$ets;                  
                                   
-                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                                   $ignore = 0;
                                   $done   = 1;
@@ -1908,7 +1909,7 @@ sub SSCal_extractEventlist ($) {
                                   $etime = $netime?$netime:$etime;
                                   $ets   = $nets?$nets:$ets;                  
                                   
-                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                                   $ignore = 0;
                                   $done   = 1;
@@ -1958,7 +1959,7 @@ sub SSCal_extractEventlist ($) {
                               $etime = $netime?$netime:$etime;
                               $ets   = $nets?$nets:$ets; 
                                   
-                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                               
                               $ignore = 0;
                               $done   = 1;
@@ -2008,7 +2009,7 @@ sub SSCal_extractEventlist ($) {
                           $etime = $netime?$netime:$etime;
                           $ets   = $nets?$nets:$ets;                  
                           
-                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                           $ignore = 0;
                           $done   = 1;
@@ -2034,7 +2035,7 @@ sub SSCal_extractEventlist ($) {
               $etime = $netime?$netime:$etime;
               $ets   = $nets?$nets:$ets;                  
               
-              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
           }
           $i++;
           $n++;
@@ -2107,7 +2108,7 @@ sub SSCal_extractToDolist ($) {
                   $ignore = 1;
                   $done   = 0; 
               } else {
-                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -2128,7 +2129,7 @@ sub SSCal_extractToDolist ($) {
               $etime = $netime?$netime:$etime;
               $ets   = $nets?$nets:$ets;                  
               
-              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array);
+              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
           }
           $i++;
           $n++;
@@ -2366,27 +2367,30 @@ return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth
 
 #############################################################################################
 #         schreibe Key/Value Pairs in zentrales Valuearray zur Readingerstellung
-#         $n                             = Zusatz f. lfd. Nr. zur Unterscheidung exakt 
-#                                          zeitgleicher Events
-#         $vh                            = Referenz zum Kalenderdatenhash
+#         $n           = Zusatz f. lfd. Nr. zur Unterscheidung exakt 
+#                        zeitgleicher Events
+#         $vh          = Referenz zum Kalenderdatenhash
+#         $aref        = Rferenz zum Ergebnisarray
+#         $uid         = UID des Ereignisses als Schlüssel im VCALENDER Hash 
+#                        (Berechnung der Vorwarnzeitenzeiten)                
 #
 #         Ergebisarray Aufbau:
 #                       0                            1               2
-#         (Index aus BeginTimestamp+lfNr) , (Blockindex_Reading) , (Wert)
+#         (Index aus BeginTimestamp + lfNr) , (Blockindex_Reading) , (Wert)
 #
 #############################################################################################
-sub SSCal_writeValuesToArray ($$$$$$$$$$$) {                 
-  my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref) = @_;
+sub SSCal_writeValuesToArray ($$$$$$$$$$$$) {                 
+  my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref,$uid) = @_;
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
   my $lang      = AttrVal("global", "language", "EN");
   my $ts        = time();                                                        # Istzeit Timestamp
   my $om        = $hash->{OPMODE};                                               # aktuelle Operation Mode
   my $status    = "initialized";
-  my ($val,$uts,$td,$dleft,$bWday);
+  my ($val,$uts,$td,$dleft,$bWday,$chts);
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
-  
+ 
   $upcoming = SSCal_isUpcoming ($ts,0,$bts);                                     # initiales upcoming
   $started  = SSCal_isStarted  ($ts,$bts,$ets);
   $ended    = SSCal_isEnded    ($ts,$ets);
@@ -2411,14 +2415,51 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
       $bWday = $days[$bWday];
   }
   
-  push(@row_array, $bts+$n." 07_bTimestamp "   .$bts."\n")                if($bts);
   push(@row_array, $bts+$n." 10_End "          .$edate." ".$etime."\n")   if($edate && $etime);
-  push(@row_array, $bts+$n." 13_eTimestamp "   .$ets."\n")                if($ets);
   push(@row_array, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
   push(@row_array, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
   push(@row_array, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
   push(@row_array, $bts+$n." 30_Weekday "      .$bWday."\n")              if(defined $bWday);
+  
+  # Vorwarnzeiten für veränderte Serientermine korrigieren/anpassen
+  my $origdtstart  = strftime "%Y%m%dT%H%M%S", localtime($bts);
+  my $isRecurrence = 0;
+  my $isAlldaychanded;                                                                                       # 0 -> Ganztagsevent wurde in Serienelement geändert in kein Ganztagsevent
+  
+  foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                             # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
+      next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_});
+      $isRecurrence = 1 if($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_} eq $origdtstart);
+  }
+  
+  my $l   = length (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}});                        # Anzahl Stellen (Länge) des aktuellen VALM TIMEVALUE Hashes
+  my $ens = 0;
+  
+  foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}}) {
+      my $z = $_;
+      $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
+      
+      if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} && !$isRecurrence) {                # wenn keine Veränderung vorhanden ist ({RECURRENCEID}{index}=undef) gelten die Erinnerungszeiten Standarderinnerungszeiten
+          ($uts,$td) = SSCal_evtNotTime ($name,$val,$bts);   
+          push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
+          
+          $alarmed = SSCal_isAlarmed ($ts,$uts,$bts) if(!$alarmed);
+      
+      } elsif ($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} &&
+               $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} eq $origdtstart) {
+          "$bdate $btime" =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;                             # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
+          eval { $chts = timelocal($6, $5, $4, $3, $2-1, $1-1900); };                                        # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
+          ($uts,$td) = SSCal_evtNotTime ($name,$val,$chts);   
+          push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
+          
+          $alarmed = SSCal_isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
+          
+          $isAlldaychanded = 0;          
+      }
+      
+      $ens++;
+  }
 
+  # restliche Keys extrahieren
   foreach my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
 	  $vh->{$p} = SSCal_jboolmap($vh->{$p});
@@ -2448,8 +2489,8 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
           push(@row_array, $bts+$n." 45_gpsCoordinates "  .$val."\n");
       }
       
-      push(@row_array, $bts+$n." 50_isAllday "      .$val."\n")       if($p eq "is_all_day");
-      push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")       if($p eq "is_repeat_evt");
+      push(@row_array, $bts+$n." 50_isAllday "      .(defined $isAlldaychanded ? $isAlldaychanded : $val)."\n")  if($p eq "is_all_day");
+      push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")                                                  if($p eq "is_repeat_evt");
       
       if($p eq "due") {                                                        
           my (undef,undef,$duedate,$duetime,$duets,undef) = SSCal_explodeDateTime ($hash, $val, 0, 0, 0);
@@ -2467,27 +2508,7 @@ sub SSCal_writeValuesToArray ($$$$$$$$$$$) {
               $val = encode("UTF-8", $vh->{$p}{$r});                 
               push(@row_array, $bts+$n." 70_repeatRule ".$val."\n") if($r eq "repeat_rule");
           }
-      }
-      
-      if($p eq "evt_notify_setting") {              
-          my $l   = length (scalar @{$vh->{evt_notify_setting}});                        # Anzahl Stellen (Länge) des aktuellen Arrays
-          my $ens = 0; 
-          
-          while ($vh->{evt_notify_setting}[$ens]) {
-              foreach my $r (keys %{$vh->{evt_notify_setting}[$ens]}) {
-                  $vh->{$p}[$ens]{$r} = "" if(!$vh->{$p}[$ens]{$r});
-                  $val                = encode("UTF-8", $vh->{$p}[$ens]{$r}); 
-                    
-                  if($r eq "time_value") {                                               # Erinnerungstermine (Array) relativ zur Beginnzeit ermitteln
-                      ($uts,$td) = SSCal_evtNotTime ($name,$val,$bts);   
-                      push(@row_array, $bts+$n." 75_".sprintf("%0$l.0f", $ens)."_notifyTimestamp ".$uts."\n");
-                      push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
-                      $alarmed = SSCal_isAlarmed ($ts,$uts,$bts) if(!$alarmed);
-                  }
-              }
-              $ens++; 
-          }
-      }
+      }     
       
       push(@row_array, $bts+$n." 95_IcalUID "       .$val."\n")       if($p eq "ical_uid");
 	  push(@row_array, $bts+$n." 98_EventId "       .$val."\n")       if($p eq "evt_id");
@@ -2532,74 +2553,99 @@ return @row_array;
 #                }
 #  }
 #
-#  Auswertung mit  $hash->{HELPER}{VCALENDAR}{"$uid"}
+#  Auswertung mit  $data{SSCal}{$name}{vcalendar}{"$uid"}
 #
 #############################################################################################
 sub SSCal_extractIcal ($$) {                 
   my ($name,$vh) = @_;
   my $hash       = $defs{$name};
   
-  return if(!$vh);
-  
-  my %temp;
+  my %vcal;
+  my %valm;
   my %icals;
-  my ($uid,$k,$v);
+  my ($uid,$k,$v,$n);
 
-  my @ical = split(/\015\012/, $vh);
- 
-  my $do = 0;
-  my $n  = 0;
-  foreach (@ical) {
-      if($_ =~ m/^([-A-Z]*;).*/) {
-	      ($k,$v) = split(";", $_, 2);
-	  } else {
-          ($k,$v) = split(":", $_, 2);
-	  }
-	  
-	  $v = "" if(!$v);
-	  if("$k:$v" eq "BEGIN:VEVENT") {$do = 1;};
-	  if("$k:$v" eq "END:VEVENT")   {$do = 0; $n++;};
-	  
-	  if ($do) {
-		  $temp{$n}{UID}           = $v     if($k eq "UID");
-		  $temp{$n}{SEQUENCE}      = $v     if($k eq "SEQUENCE");
-		  
-		  if($k eq "DTSTART") {
-		      $v                 = SSCal_icalTimecheck ($name,$v);
-		      $temp{$n}{DTSTART} = $v;
-		  }
+  if($vh->{evt_ical}) {
+      my @ical = split(/\015\012/, $vh->{evt_ical});
+     
+      my $do = 0;
+      $n     = 0;
+      foreach (@ical) {
+          if($_ =~ m/^([-A-Z]*;).*/) {
+              ($k,$v) = split(";", $_, 2);
+          } else {
+              ($k,$v) = split(":", $_, 2);
+          }
           
-		  if($k eq "DTEND") {
-		      $v                 = SSCal_icalTimecheck ($name,$v);
-		      $temp{$n}{DTEND} = $v;
-		  }
-		  
-		  if($k eq "RECURRENCE-ID") {
-		      $v                      = SSCal_icalTimecheck ($name,$v);
-		      $temp{$n}{RECURRENCEID} = $v;
-		  }
-		  
-		  if($k eq "EXDATE") {
-	          $v                  = SSCal_icalTimecheck ($name,$v);
-		      $temp{$n}{EXDATES} .= $v." ";
-		  }
-	  }
+          $v = "" if(!$v);
+          if("$k:$v" eq "BEGIN:VEVENT") {$do = 1;};
+          if("$k:$v" eq "END:VEVENT")   {$do = 0; $n++;};
+          
+          if ($do) {
+              $vcal{$n}{UID}         = $v     if($k eq "UID");
+              $vcal{$n}{SEQUENCE}    = $v     if($k eq "SEQUENCE");
+              
+              if($k eq "DTSTART") {
+                  $v                 = SSCal_icalTimecheck ($name,$v);
+                  $vcal{$n}{DTSTART} = $v;
+              }
+              
+              if($k eq "DTEND") {
+                  $v                 = SSCal_icalTimecheck ($name,$v);
+                  $vcal{$n}{DTEND} = $v;
+              }
+              
+              if($k eq "RECURRENCE-ID") {
+                  $v                      = SSCal_icalTimecheck ($name,$v);
+                  $vcal{$n}{RECURRENCEID} = $v;
+              }
+              
+              if($k eq "EXDATE") {
+                  $v                  = SSCal_icalTimecheck ($name,$v);
+                  $vcal{$n}{EXDATES} .= $v." ";
+              }
+          }
+      }
   }
   
   $n = 0;
-  while ($temp{$n}) {
-	  $uid                           = $temp{$n}{UID};
-	  $icals{$uid}{SEQUENCE}{$n}     = $temp{$n}{SEQUENCE};
-	  $icals{$uid}{DTSTART}{$n}      = $temp{$n}{DTSTART};
-      $icals{$uid}{DTEND}{$n}        = $temp{$n}{DTEND};
-	  $icals{$uid}{EXDATES}{$n}      = SSCal_trim($temp{$n}{EXDATES});
-	  $icals{$uid}{RECURRENCEID}{$n} = $temp{$n}{RECURRENCEID};
+  while ($vh->{evt_notify_setting}[$n]) {
+      foreach (keys %{$vh->{evt_notify_setting}[$n]}) {
+	      if($_ eq "recurrence-id") {
+		      $valm{$n}{RECURRENCEID} = SSCal_icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
+		  }
+
+	      if($_ eq "time_value") {
+		      $valm{$n}{TIMEVALUE} = $vh->{evt_notify_setting}[$n]{$_};
+		  }
+	  }
 	  $n++;
   }
   
-  $hash->{HELPER}{VCALENDAR} = \%icals;                                    # Achtung: bei asynch Mode ist hash->{HELPER} nur in BlockingCall !!
+  $n = 0;
+  # VCALENDER Einträge konsolidieren
+  while ($vcal{$n}) {
+	  $uid                           = $vcal{$n}{UID};
+	  $icals{$uid}{SEQUENCE}{$n}     = $vcal{$n}{SEQUENCE};
+	  $icals{$uid}{DTSTART}{$n}      = $vcal{$n}{DTSTART};
+      $icals{$uid}{DTEND}{$n}        = $vcal{$n}{DTEND};
+	  $icals{$uid}{EXDATES}{$n}      = SSCal_trim($vcal{$n}{EXDATES});
+	  $icals{$uid}{RECURRENCEID}{$n} = $vcal{$n}{RECURRENCEID};
+	  $n++;
+  }
   
-  Log3($name, 5, "$name - VCALENDAR extract of UID \"$uid\":\n".Dumper $hash->{HELPER}{VCALENDAR}{"$uid"}); 
+  $n = 0;
+  # VALARM Einträge konsolidieren
+  $uid = $vh->{ical_uid};
+  while ($valm{$n}) {
+	  $icals{$uid}{VALM}{RECURRENCEID}{$n} = $valm{$n}{RECURRENCEID};
+	  $icals{$uid}{VALM}{TIMEVALUE}{$n}    = $valm{$n}{TIMEVALUE};
+	  $n++;
+  }
+  
+  $data{SSCal}{$name}{vcalendar} = \%icals;                                    # Achtung: bei asynch Mode ist hash->{HELPER} nur in BlockingCall !!
+  
+  Log3($name, 5, "$name - VCALENDAR extract of UID \"$uid\":\n".Dumper $data{SSCal}{$name}{vcalendar}{"$uid"}); 
   
 return;
 }
@@ -2612,6 +2658,8 @@ sub SSCal_icalTimecheck ($$) {
   my ($name,$v) = @_;
   
   my ($sec,$min,$hour,$mday,$month,$year,$zulu,$tstamp,$d,$t,$isdst,$tz);
+  
+  return undef if(!$v);
 
   $zulu   = 0;
   $v      = (split(":", $v))[-1] if($v =~ /:/);
@@ -3435,7 +3483,7 @@ sub SSCal_explodeDateTime ($$$$$) {
       $dtstart = (split(":", $dtstart))[-1] if($dtstart =~ /:/);
       
       # check ob recurring date excluded werden muss (Serienelement gelöscht)
-      my $exdates = $hash->{HELPER}{VCALENDAR}{"$uid"}{EXDATES}{0};   
+      my $exdates = $data{SSCal}{$name}{vcalendar}{"$uid"}{EXDATES}{0};   
       my %seen;
       if($exdates) {
           my @exd = split(" ", $exdates);  
@@ -3447,24 +3495,24 @@ sub SSCal_explodeDateTime ($$$$$) {
       if($dt eq $dtstart) {$checkbegin = 1} else {$checkbegin = 0};             
       if ($checkbegin) {
           # prüfen ob DTSTART verändert
-          foreach (keys %{$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}}) {
-              next if(!$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_});
-              $z = $_ if($hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
+          foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
+              next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_});
+              $z = $_ if($data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
           }
           if($z) {
-              $changedt = $hash->{HELPER}{VCALENDAR}{"$uid"}{DTSTART}{$z};
+              $changedt = $data{SSCal}{$name}{vcalendar}{"$uid"}{DTSTART}{$z};
               $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
               $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
               $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
           }
       } else {
           # prüfen ob DTEND verändert
-          foreach (keys %{$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}}) {
-              next if(!$hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_});
-              $z = $_ if($hash->{HELPER}{VCALENDAR}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
+          foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
+              next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_});
+              $z = $_ if($data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
           }
           if($z) {
-              $changedt = $hash->{HELPER}{VCALENDAR}{"$uid"}{DTEND}{$z};
+              $changedt = $data{SSCal}{$name}{vcalendar}{"$uid"}{DTEND}{$z};
               $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
               $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
               $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
