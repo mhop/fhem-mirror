@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #      98_DSBMobile.pm
-#     An FHEM Perl module that supports parental control for Nintendo Switch
+#     An FHEM Perl module that retrieves information from DSBMobile
 #
 #     Copyright by KernSani
 #
@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #     Changelog:
+#     20.02.2020    Parsing of grouped classes
 ##############################################################################
 ##############################################################################
 #     Todo:
@@ -40,12 +41,12 @@ my $missingModul = "";
 
 #eval "use Blocking;1" or $missingModul .= "Blocking ";
 #eval "use UUID::Random;1"                      or $missingModul .= "install UUID::Random ";
-eval "use IO::Compress::Gzip qw(gzip);1"       or $missingModul .= "IO::Compress::Gzip ";
-eval "use IO::Uncompress::Gunzip qw(gunzip);1" or $missingModul .= "IO::Compress::Gunzip ";
-eval "use MIME::Base64;1"                      or $missingModul .= "MIME::Base64 ";
-eval "use HTML::TableExtract;1"                or $missingModul .= "HTML::TableExtract ";
-eval "use HTML::TreeBuilder;1"                 or $missingModul .= "HTML::TreeBuilder ";
-eval "use JSON::XS;1"                          or $missingModul .= "JSON::XS ";
+eval "use IO::Compress::Gzip qw(gzip);1"           or $missingModul .= "IO::Compress::Gzip ";
+eval "use IO::Uncompress::Gunzip qw(gunzip);1"     or $missingModul .= "IO::Compress::Gunzip ";
+eval "use MIME::Base64;1"                          or $missingModul .= "MIME::Base64 ";
+eval "use HTML::TableExtract;1"                    or $missingModul .= "HTML::TableExtract ";
+eval "use HTML::TreeBuilder;1"                     or $missingModul .= "HTML::TreeBuilder ";
+eval "use JSON::XS qw (encode_json decode_json);1" or $missingModul .= "JSON::XS ";
 
 #####################################
 sub DSBMobile_Initialize($) {
@@ -338,6 +339,7 @@ sub DSBMobile_getTTCallback($) {
         $te->parse($ttab);
         push( @tabs, $te->tables() );
     }
+
     #Log3 $name, 4, "[$name] Extracted Tables". Dumper(@tabs);
 
     Log3 $name, 4, "[$name] Starting extraction info";
@@ -400,9 +402,10 @@ sub DSBMobile_getTTCallback($) {
                     @ch = map { makeReadingName($_) } @f;
                     next;
                 }
+
                 #check if we have a single row (grouping by class)
-                if ( !defined($f[1]) ) {
-                                       
+                if ( !defined( $f[1] ) ) {
+
                     # create the reading if we didn't have a group before
                     unshift( @ch, makeReadingName($class) ) unless $group;
                     $group = $f[0];
@@ -424,22 +427,6 @@ sub DSBMobile_getTTCallback($) {
                 }
                 $tst{sdate} = $fdate;
 
-                # my %row = (
-                # sdate      => $fdate,
-                # class      => $f[0],
-                # hour       => $f[1],
-                # teacherNew => $f[2],
-                # topicNew   => $f[3],
-                # teacherOld => $f[4],
-                # roomNew    => $f[5],
-                # topicOld   => $f[6],
-                # substof    => $f[7],
-                # substto    => $f[8],
-                # roomOld    => $f[9],
-                # comment    => $f[10]
-                # );
-                Log3 $name, 4, "found single line: " . Dumper(%tst);
-                #push( @result, \%roq ) if ( defined( $row{class} ) && $row{class} =~ /$filter/ );
                 push( @result, \%tst )
                     if ( defined( $tst{$class} )
                     && $tst{$class} =~ /$filter/ );
@@ -597,17 +584,36 @@ sub DSBMobile_simpleHTML($;$) {
     my $out = AttrVal( $name, "dsb_outputFormat", undef );
 
     foreach my $day (@days) {
-        $ret .= "</table><table><tr><td><b>" . $day . "</b></td></tr>";
+        my $row   = 0;
+        my $class = "even";
+        $ret .= "</table><table class='block wide'><tr class='$class'><td><b>" . $day . "</b></td></tr>";
+        $row++;
         if ($infoDay) {
             foreach my $iline (@idata) {
+                if ( $row % 2 == 0 ) {
+                    $class = "even";
+                }
+                else {
+                    $class = "odd";
+                }
+                $row++;
+
                 if ( $iline->{sdate} eq $day ) {
-                    $ret .= "<tr><td>" . $iline->{topic} . ": " . $iline->{text} . "</td></tr>";
+                    $ret .= "<tr class='$class'><td>" . $iline->{topic} . ": " . $iline->{text} . "</td></tr>";
                 }
             }
         }
         foreach my $line (@data) {
             if ( $line->{sdate} eq $day ) {
-                $ret .= "<tr><td>";
+                if ( $row % 2 == 0 ) {
+                    $class = "even";
+                }
+                else {
+                    $class = "odd";
+                }
+                $row++;
+
+                $ret .= "<tr class='$class'><td>";
                 if ($out) {
                     my $rep = $out;
                     foreach my $c (@cn) {
@@ -626,34 +632,6 @@ sub DSBMobile_simpleHTML($;$) {
         }
     }
 
-    # foreach my $line (@data) {
-    # next if ( $line->{sdate} lt $today );
-    # if ( $line->{sdate} ne $date ) {
-    # $date = $line->{sdate};
-    # $ret .= "</table><table><tr><td><b>" . $line->{sdate} . "</b></td></tr>";
-    # if ($infoDay) {
-    # foreach my $iline (@idata) {
-    # if ( $iline->{sdate} eq $date ) {
-    # $ret .= "<tr><td>" . $iline->{topic} . ": " . $iline->{text} . "</td></tr>";
-    # }
-    # }
-    # }
-    # }
-    # $ret .= "<tr><td>";
-    # my $out = AttrVal( $name, "dsb_outputFormat", undef );
-    # if ($out) {
-    # foreach my $c (@cn) {
-    # $out =~ s/\%$c\%/$line->{$c}/g;
-    # }
-    # $ret .= $out;
-    # }
-    # else {
-    # foreach my $c (@cn) {
-    # $ret .= $line->{$c} . " ";
-    # }
-    # }
-    # $ret .= "</td></tr>";
-    # }
     $ret .= "</table>";
     return $ret;
 
@@ -662,16 +640,24 @@ sub DSBMobile_simpleHTML($;$) {
 sub DSBMobile_infoHTML($) {
     my ( $name, $infoDay ) = @_;
     my $dat = ReadingsVal( $name, ".lastAResult", "" );
-    my $ret = "<table>";
+    my $ret = "<table class='block wide'>";
 
     $dat = decode_json($dat);
 
     my @data = @$dat;
 
     @data = sort { $a->{date} cmp $b->{date} } @data;
-
+    my $row = 1;
+    my $class;
     foreach my $line (@data) {
-        $ret .= "<tr><td>"
+        if ( $row % 2 == 0 ) {
+            $class = "even";
+        }
+        else {
+            $class = "odd";
+        }
+        $row++;
+        $ret .= "<tr class='$class'><td>"
             . "$line->{date}:</td><td><a  target='_blank' href='$line->{url}'>$line->{title}</a></td></tr>";
     }
     $ret .= "</table>";
