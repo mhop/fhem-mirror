@@ -18,11 +18,11 @@ my $options = { position => { 'bottom-right' => 0,
                               'center' => 4,
                             },
                 width => { 'default' => 0,
-                          'narrow' => 1,
-                          'small' => 2,
-                          'wide' => 3,
-                          'extrawide' => 4,
-                        },
+                           'narrow' => 1,
+                           'small' => 2,
+                           'wide' => 3,
+                           'extrawide' => 4,
+                         },
                 transparency => { 'default' => 0,
                                   '0%' => 1,
                                   '25%' => 2,
@@ -50,6 +50,11 @@ my $options = { position => { 'bottom-right' => 0,
                           'noimage' => 4,
                           'short' => 5,
                         },
+                fontsize => { 'default' => 2,
+                              'small' => 1,
+                              'medium' => 2,
+                              'large' => 3,
+                            },
                 duration => undef,
                 offset => undef,
                 offsety => undef,
@@ -150,8 +155,16 @@ NotifyAndroidTV_Set($$@)
 
   my $list = 'msg';
 
+  my ($param_a, $param_h) = parseParams(\@params);
+
   if( $cmd && ($cmd eq 'msg' || $cmd eq 'notify') ) {
-    my ($param_a, $param_h) = parseParams(\@params);
+    foreach my $option (keys %{$options}) {
+      if( !defined($param_h->{$option}) ) {
+        if( my $default = AttrVal($name, "default". ucfirst $option, undef) ) {
+          $param_h->{$option} = $default;
+        }
+      }
+    }
 
     my $txt = join( ' ', @{$param_a} );
     $txt =~ s/\n/<br>/g;
@@ -175,14 +188,6 @@ NotifyAndroidTV_Set($$@)
     }
 
     return "error: $error" if( $error );
-
-    foreach my $option (keys %{$options}) {
-      if( !defined($param_h->{$option}) ) {
-        if( my $default = AttrVal($name, "default". ucfirst $option, undef) ) {
-          $param_h->{$option} = $default;
-        }
-      }
-    }
 
     $param_h->{offset} = 0 if( !$param_h->{offset} );
     $param_h->{offsety} = 0 if( !$param_h->{offsety} );
@@ -357,7 +362,7 @@ NotifyAndroidTV_Attr($$$)
   <b>Set</b>
   <ul>
     <li>msg [options] &lt;message&gt;<br>
-    possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, width, type, icon, image, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.<br>
+    possible options are: bkgcolor, interrupt, position, transparency, duration, offset, offsety, width, type, fontsize, icon, image, title, imageurl. use <code>set &lt;name&gt; notify</code> to see valid values.<br>
     <code>set nb msg ?</code> shows a help text<br>
     it is better to use imageurl instad of image as it is non blocking!<br>
     image can be given as <code>image={&lt;perlCode&gt;}</code></li>
