@@ -32,29 +32,30 @@ use vars qw(%HMCCU_SCRIPTS);
 		'PRESS_SHORT' => 'on:true press:true' 
 	},
 	'BLIND' => {
-		'LEVEL' => 'pct:?level level:?level open:100 close:0',
+		'LEVEL' => 'pct:?level open:100 close:0 up:?delta=+10 down:?delta=-10',
 		'STOP' => 'stop:true'
 	},
 	'SWITCH' => {
 		'STATE' => 'on:true off:false'
 	},
 	'DIMMER' => {
-		'LEVEL' => 'pct:?level level:?level on:100 off:0',
+		'LEVEL' => 'pct:?level on:100 off:0',
 		'RAMP_STOP' => 'stop:true'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'SET_TEMPERATURE' => 'desiredTemp:?temperature',
-		'MANU_MODE' => 'manu:?temperature on:30.5 off=4.5',
+		'MANU_MODE' => 'manu:?temperature on:30.5 off:4.5',
 		'AUTO_MODE' => 'auto:true',
 		'BOOST_MODE' => 'boost:true'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
 		'SET_TEMPERATURE' => 'desiredTemp:?temperature',
-		'MANU_MODE' => 'manu:?temperature on:30.5 off=4.5',
+		'MANU_MODE' => 'manu:?temperature on:30.5 off:4.5',
 		'AUTO_MODE' => 'auto:true',
 		'BOOST_MODE' => 'boost:true'
 	}
 );
+
 
 ######################################################################
 # Channel roles with attributes
@@ -62,6 +63,7 @@ use vars qw(%HMCCU_SCRIPTS);
 
 %HMCCU_ATTR = (
 	'BLIND' => {
+		'ccureadingname' => 'LEVEL$:+pct',
 		'webCmd' => 'up:down:stop:control',
 		'widgetOverride' => 'control:slider,0,10,100'
 	},
@@ -70,15 +72,18 @@ use vars qw(%HMCCU_SCRIPTS);
 		'widgetOverride' => 'control:uzsuToggle,off,on'
 	},
 	'DIMMER' => {
+		'ccureadingname' => 'LEVEL$:+pct',
 		'webCmd' => 'control',
 		'widgetOverride' => 'pct:slider,0,10,100 level:slider,0,10,100 control:slider,0,10,100'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
+		'ccureadingname' => 'SET_TEMPERATURE$:+desiredTemp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desiredTemp:auto:manu:boost:on:off',
 		'widgetOverride' => 'control:slider,4.5,0.5,30.5,1 desiredTemp:slider,4.5,0.5,30.5,1'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
+		'ccureadingname' => 'SET_TEMPERATURE$:+desiredTemp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desiredTemp',
 		'widgetOverride' => 'control:slider,4.5,0.5,30.5,1 desiredTemp:slider,4.5,0.5,30.5,1'

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.010
+#  Version 4.4.011
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -164,14 +164,16 @@ sub HMCCUCHN_InitDevice ($$)
 	$devHash->{ccuaddr} = $da;
 	$devHash->{ccuname} = $dn;
 	$devHash->{ccutype} = $dt;
+	$devHash->{ccudevstate} = 'active';
 	
 	if ($init_done) {
 		# Interactive device definition
 		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
+		HMCCU_UpdateDevice ($ioHash, $devHash);
+		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
+		HMCCU_GetUpdate ($devHash, $da, 'Value');
 	}
 
-	$devHash->{ccudevstate} = 'active';
-	
 	return 0;
 }
 
@@ -285,13 +287,16 @@ sub HMCCUCHN_Set ($@)
 			}
 		}
 	}
-
+	
 	# Get state values related to control command and datapoint
 	my $stateVals = HMCCU_GetStateValues ($hash, $roleCmds, $cd, 2);
 	my @stateCmdList = split (/[:\s]/, $stateVals);
-	HMCCU_Log ($hash, 2, "Odd number for values in $stateVals") if ((scalar(@stateCmdList) % 2) > 0);
 	my %stateCmds = @stateCmdList;
 	my @states = keys %stateCmds;
+
+# 	HMCCU_Log ($hash, 2, "Additional commands ".join(',', keys %addCmds))
+# 		if (scalar(keys %addCmds) > 0);
+# 	HMCCU_Log ($hash, 2, "sd=$sc.$sd cd=$cc.$cd StateVals=$stateVals states=".join(',', @states));
 
 	my $result = '';
 	my $rc;
@@ -352,16 +357,6 @@ sub HMCCUCHN_Set ($@)
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
-# 	elsif (exists($stateCmds{$opt})) {
-# 		return HMCCU_SetError ($hash, -14) if ($cd eq '');		
-# 		return HMCCU_SetError ($hash, -8)
-# 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $cd, 2));
-# 
-# 		$rc = HMCCU_SetMultipleDatapoints ($hash,
-# 			{ "001.$ccuif.$ccuaddr.$cd" => $stateCmds{$opt} }
-# 		);
-# 		return HMCCU_SetError ($hash, min(0, $rc));
-# 	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
 		return HMCCU_SetError ($hash, -12) if ($cc eq '');
@@ -395,6 +390,7 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif (exists($addCmds{$opt})) {
 		my $value;
+		my %dpval;
 		my ($dpt, $par) = split('=', $addCmds{$opt});
 		$par = '' if (!defined($par));
 
@@ -403,31 +399,29 @@ sub HMCCUCHN_Set ($@)
 
 		if ($par =~ /^\?(.+)$/) {
 			$par = $1;
+			my ($parName, $parDef) = split ('=', $par);
 			$value = shift @$a;
+			if (!defined($value) && defined($parDef)) {
+				if ($parDef =~ /^[+-][0-9]+$/) {
+					return HMCCU_SetError ($hash, "Current value of $cc.$dpt not available")
+						if (!defined($hash->{hmccu}{dp}{"$cc.$dpt"}{VALUES}{SVAL}));
+					$value = $hash->{hmccu}{dp}{"$cc.$dpt"}{VALUES}{SVAL}+int($parDef);
+				}
+				else {
+					$value = $parDef;
+				}
+			}
 		}
 		else {
 			my @parList = split(',', $par);
 			$value = (scalar(@parList) > 1) ? shift @$a : $par;
 		}
 		
-		return HMCCU_SetError ($hash, "Usage: set $name $opt $par") if (!defined($value));
-		
-		$rc = HMCCU_SetMultipleDatapoints ($hash, { "001.$ccuif.$ccuaddr.$dpt" => $value });
-		return HMCCU_SetError ($hash, min(0, $rc));
-	}
-	elsif ($opt =~ /^(pct|level|up|down)$/) {
-		return HMCCU_SetError ($hash, "Can't find LEVEL datapoint for device type $ccutype")
-		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "LEVEL", 2));
-		
+		return HMCCU_SetError ($hash, "Missing parameter") if (!defined($value));
+
 		if ($opt eq 'pct' || $opt eq 'level') {
-			my $objname = '';
-			my $objvalue = shift @$a;
-			return HMCCU_SetError ($hash, "Usage: set $name $opt {value} [{ontime} [{ramptime}]]")
-				if (!defined ($objvalue));
-		
 			my $timespec = shift @$a;
 			my $ramptime = shift @$a;
-			my %dpval;
 
 			# Set on time
 			if (defined ($timespec)) {
@@ -442,32 +436,10 @@ sub HMCCUCHN_Set ($@)
 
 			# Set ramp time
 			$dpval{"002.$ccuif.$ccuaddr.RAMP_TIME"} = $ramptime if (defined ($ramptime));
-
-			# Set level	
-			$dpval{"003.$ccuif.$ccuaddr.LEVEL"} = $objvalue;
-			$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
 		}
-		else {
-			my $delta = shift @$a;
-			$delta = 10 if (!defined ($delta));
-			$delta = -$delta if ($opt eq 'down');
-			my $objname = "$ccuif.$ccuaddr.LEVEL";
-
-			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 1);
-			return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-			
-			# Set level
-			my $objvalue = min(max($result+$delta,0),100);
-			$rc = HMCCU_SetMultipleDatapoints ($hash, { "001.$objname" => $objvalue });
-		}
-		
-		return HMCCU_SetError ($hash, min(0, $rc));
-	}
-	elsif ($opt eq 'stop') {
-		return HMCCU_SetError ($hash, "Can't find STOP datapoint for device type $ccutype")
-		   if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "STOP", 2));
-		
-		$rc = HMCCU_SetMultipleDatapoints ($hash, { "001.$ccuif.$ccuaddr.STOP" => 1 });
+		$dpval{"003.$ccuif.$ccuaddr.$dpt"} = $value;
+				
+		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
@@ -525,6 +497,11 @@ sub HMCCUCHN_Set ($@)
 			if (!defined($devDesc));
 		return HMCCU_SetError ($hash, "Paramset $paramset not supported by device or channel")
 			if ($devDesc->{PARAMSETS} !~ /$paramset/);
+		if (!HMCCU_IsValidParameter ($ioHash, $devDesc, $paramset, $h)) {
+			my @parList = HMCCU_GetParamDef ($ioHash, $devDesc, $paramset);
+			return HMCCU_SetError ($hash, "Invalid parameter specified. Valid parameters are ".
+				join(',', @parList));
+		}
 				
 		if ($paramset eq 'VALUES') {
 			($rc, $result) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h);
@@ -739,7 +716,8 @@ sub HMCCUCHN_Get ($@)
 <ul>
    The module implements Homematic CCU channels as client devices for HMCCU. A HMCCU I/O device must
    exist before a client device can be defined. If a CCU channel is not found execute command
-   'get devicelist' in I/O device.
+   'get devicelist' in I/O device. This will synchronize devices and channels between CCU
+   and HMCCU.
    </br></br>
    <a name="HMCCUCHNdefine"></a>
    <b>Define</b><br/><br/>
@@ -770,13 +748,15 @@ sub HMCCUCHN_Get ($@)
          Readings 'state' and 'control' are not deleted.
       </li><br/>
       <li><b>set &lt;name&gt; config [device|&lt;receiver&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
-         Set multiple config parameters (parameter sets MASTER or LINK).
-         With option 'device' a parameter set of the device is set instead of the current channel.
-         Supports attribute 'ccuscaleval' for datapoints. Parameter <i>parameter</i> must be a valid
-         config parameter name. Parameter <i>receiver</i> is the 
+         Set multiple config or link parameters. If neither 'device' nor <i>receiver</i> is
+         specified, configuration parameters of current channel are set.
+         With option 'device' configuration parameters of the device are set.<br/>
+         If a <i>receiver</i> is specified, parameters will be set for the specified link.
+         Parameter <i>receiver</i> is the 
          name of a FHEM device of type HMCCUDEV or HMCCUCHN or a channel address or a CCU
          channel name. For FHEM devices of type HMCCUDEV a <i>channel</i> number must be specified.
-         Parameter <i>parameter</i> must be a valid. If <i>type</i> is not specified, it's taken from
+         Parameter <i>parameter</i> must be a valid configuration parameter.
+         If <i>type</i> is not specified, it's taken from
          parameter set definition. The default <i>type</i> is STRING.
          Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
       </li><br/>
@@ -794,10 +774,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>set &lt;name&gt; down [&lt;value&gt;]</b><br/>
       	Decrement value of datapoint LEVEL. This command is only available if channel contains
-      	a datapoint LEVEL. Default for <i>value</i> is 10.
-      </li><br/>
-      <li><b>set &lt;name&gt; pct &lt;value&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
-      	Alias for command 'set pct'.
+      	a datapoint LEVEL. Default for <i>value</i> is 20.
       </li><br/>
       <li><b>set &lt;name&gt; link &lt;receiver&gt; [&lt;channel&gt;] &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
          Set multiple link parameters (parameter set LINK). Parameter <i>receiver</i> is the 
@@ -855,9 +832,6 @@ sub HMCCUCHN_Get ($@)
          set myswitch pct 100 600 10
          </code>
       </li><br/>
-      <li><b>set &lt;name&gt; rpcparamter</b><br/>
-      	Alias for command 'set paramset'.
-      </li><br/>
       <li><b>set &lt;name&gt; stop</b><br/>
       	Set datapoint STOP of a channel to true. This command is only available, if the
       	channel contains a writeable datapoint STOP.
@@ -876,7 +850,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>set &lt;name&gt; up [&lt;value&gt;]</b><br/>
       	Increment value of datapoint LEVEL. This command is only available if channel contains
-      	a datapoint LEVEL. Default for <i>value</i> is 10.
+      	a datapoint LEVEL. Default for <i>value</i> is 20.
       </li><br/>
       <li><b>set &lt;name&gt; values &lt;parameter&gt;=&lt;value&gt;[:&lt;type&gt;]</b><br/>
          Set multiple datapoint values (parameter set VALUES).

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCU.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.010
+#  Version 4.4.011
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -54,7 +54,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.4.010';
+my $HMCCU_VERSION = '4.4.011';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -318,12 +318,13 @@ sub HMCCU_GetDeviceType ($$$);
 sub HMCCU_GetFirmwareVersions ($$);
 sub HMCCU_GetGroupMembers ($$);
 sub HMCCU_GetMatchingDevices ($$$$);
-sub HMCCU_GetParamDef ($$$$);
+sub HMCCU_GetParamDef ($$$;$);
 sub HMCCU_GetParamValue ($$$$$);
 sub HMCCU_GetReceivers ($$$);
 sub HMCCU_IsValidChannel ($$$);
 sub HMCCU_IsValidDevice ($$$);
 sub HMCCU_IsValidDeviceOrChannel ($$$);
+sub HMCCU_IsValidParameter ($$$$);
 sub HMCCU_IsValidReceiver ($$$$);
 sub HMCCU_ParamsetDescToStr ($$);
 sub HMCCU_RemoveDevice ($$$;$);
@@ -3608,8 +3609,8 @@ sub HMCCU_RemoveDevice ($$$;$)
 }
 
 ######################################################################
-# Update client device ot channel
-# Store receiver, sender and ccurole
+# Update client device or channel
+# Store receiver, sender
 ######################################################################
 
 sub HMCCU_UpdateDevice ($$)
@@ -4183,11 +4184,11 @@ sub HMCCU_GetClientDeviceModel ($;$)
 #      reference.
 #   $paramset - Valid paramset for device or channel.
 #   $parameter - Parameter name.
-# Returns undef on error. Otherwise a reference to the parameter
-# definition.
+# Returns undef on error. On success return a reference to the
+# parameter or parameter set definition (if $parameter is not specified).
 ######################################################################
 
-sub HMCCU_GetParamDef ($$$$)
+sub HMCCU_GetParamDef ($$$;$)
 {
 	my ($hash, $object, $paramset, $parameter) = @_;
 
@@ -4201,8 +4202,13 @@ sub HMCCU_GetParamDef ($$$$)
 		my ($devAddr, $chnNo) = ($a =~ /:[0-9]{1,2}$/) ? HMCCU_SplitChnAddr ($a) : ($a, 'd');
 
 		my $model = HMCCU_GetDeviceModel ($hash, $devDesc->{_model}, $devDesc->{_fw_ver}, $chnNo);
-		if (defined($model) && exists($model->{$paramset}) && exists($model->{$paramset}{$parameter})) {
-			return $model->{$paramset}{$parameter};
+		if (defined($model) && exists($model->{$paramset})) {
+			if (defined($parameter) && exists($model->{$paramset}{$parameter})) {
+				return $model->{$paramset}{$parameter};
+			}
+			else {
+				return $model->{$paramset}
+			}
 		}
 	}
 	
@@ -4240,6 +4246,41 @@ sub HMCCU_FindParamDef ($$$)
 	}
 	
 	return (undef, undef);
+}
+
+######################################################################
+# Check if parameter exists
+# Parameters:
+#   $hash - Hash reference of IO device.
+#   $object - Device or channel address or device description
+#      reference.
+#   $ps - Parameter set name.
+#   $parameter - Parameter name.
+# Returns 0 or 1
+######################################################################
+
+sub HMCCU_IsValidParameter ($$$$)
+{
+	my ($hash, $object, $ps, $parameter) = @_;
+
+	my $devDesc = ref($object) eq 'HASH' ? $object : HMCCU_GetDeviceDesc ($hash, $object);
+		
+	if (defined($devDesc)) {
+		# Build device address and channel number
+		my $a = $devDesc->{ADDRESS};
+		my ($devAddr, $chnNo) = ($a =~ /:[0-9]{1,2}$/) ? HMCCU_SplitChnAddr ($a) : ($a, 'd');
+
+		my $model = HMCCU_GetDeviceModel ($hash, $devDesc->{_model}, $devDesc->{_fw_ver}, $chnNo);
+		if (defined($model)) {
+			my @parList = ref($parameter) eq 'HASH' ? keys %$parameter : ($parameter);
+			foreach my $p (@parList) {
+				return 0 if (!exists($model->{$ps}) || !exists($model->{$ps}{$p}));
+			}
+			return 1;
+		}
+	}
+	
+	return 0;
 }
 
 ######################################################################
