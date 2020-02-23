@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_weekprofile: use module Attribute configFile also by configDB
+ - bugfix:  98_weekprofile: use global logdir
  - change:  73_DoorBird.pm New behaviour in case of Undefine and fhem startup
  - feature: 70_DENON_AVR: more surround modes, commands, and readings
  - feature: 37_NotifyAndroidTV.pm added fontsize parameter

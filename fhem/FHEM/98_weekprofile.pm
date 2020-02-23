@@ -1340,7 +1340,7 @@ sub weekprofile_writeProfilesToFile(@)
   my $me = $hash->{NAME};
   
   if (!defined($hash->{PROFILES})) {
-	  Log3 $me, 4, "$me(writeProfileToFile): no pofiles to save";
+	  Log3 $me, 4, "$me(writeProfileToFile): no profiles to save";
 	  return;
   }
   
@@ -1348,30 +1348,37 @@ sub weekprofile_writeProfilesToFile(@)
   my $prfCnt = scalar(@{$hash->{PROFILES}});
   return if ($prfCnt <= $start);
 
-  my $defname = "./log/weekprofile-$me.cfg";
-  my $filename = AttrVal($me,"configFile",$defname);
-  my $forceFile = undef;
-  if ( !$defname eq $filename) {
-    $forceFile = "file";
-  }
-
   my @content;
   my $idstring = "__version__=$CONFIG_VERSION";
   push (@content, $idstring);
-  
-  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
   my $json = JSON->new->allow_nonref;
   for (my $i = $start; $i < $prfCnt; $i++) {
     push (@content, "entry=".$json->encode($hash->{PROFILES}[$i]));
   }
-  my $param = { FileName => $filename, ForceType => $forceFile, NoNL=>0 };
-  my $ret = FileWrite($param,@content);
+  
+  my $filename = weekprofile_getDataFile($me);
+  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
+  
+  my $ret = FileWrite($filename,@content);
   if ($ret){
     Log3 $me, 1, "$me(writeProfileToFile): write profiles to $filename failed $ret";
   } else {
     DoTrigger($me,"PROFILES_SAVED",1);
     weekprofile_updateReadings($hash);
   }
+}
+##############################################
+sub weekprofile_getDataFile(@)
+{  
+  my ($me) =  @_;
+  my $filename = "%L/weekprofile-$me.cfg";
+  $filename = AttrVal($me,"configFile",$filename);
+  my @t = localtime(gettimeofday());
+  $filename = ResolveDateWildcards($filename,@t);
+  # compatibility to old weekprofile versions
+  # if no global logdir is set - use log
+  $filename =~s/%L/.\/log/g;
+  return $filename;
 }
 ############################################## 
 sub weekprofile_readProfilesFromFile(@)
@@ -1381,26 +1388,19 @@ sub weekprofile_readProfilesFromFile(@)
   
   my $useTopics = AttrVal($me,"useTopics",0);
 
-  my $defname = "./log/weekprofile-$me.cfg";
-  my $filename = AttrVal($me,"configFile",$defname);  
-  my $forceFile = undef;
-  if (!$defname eq $filename) {
-    $forceFile = "file";
-  }
-
-  my ($ret, @content) = FileRead({ FileName => $filename, ForceType => $forceFile});
-
-  if ($ret && !defined($forceFile) && $ret =~ /from database/){
-    Log3 $me, 1, "$me(readProfilesFromFile): $ret, retrying from local filesystem";
-    ($ret, @content) = FileRead({ FileName => $filename, ForceType => "file" });
-  }
-  if ($ret) {
-    Log3 $me, 1, "$me(readProfilesFromFile): $ret";
-    return;
-  }
-  
+  my $filename = weekprofile_getDataFile($me);
   Log3 $me, 5, "$me(readProfilesFromFile): read profiles from $filename";
   
+  my ($ret, @content) = FileRead($filename);
+  if ($ret) {
+    if (configDBUsed()){
+      Log3 $me, 1, "$me(readProfilesFromFile): please import your config file $filename into configDB!";
+    } else {
+      Log3 $me, 1, "$me(readProfilesFromFile): $ret";
+    }
+    return;
+  }
+
   my $json = JSON->new->allow_nonref;  
   my $rowCnt = 0;
   my $version = undef;
