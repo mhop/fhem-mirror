@@ -162,7 +162,7 @@ MQTT2_SERVER_Set($@)
     return "Usage: publish -r topic [value]" if(@a < 1);
     my $tp = shift(@a);
     my $val = join(" ", @a);
-    readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 0);
+    readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 1);
     MQTT2_SERVER_doPublish($hash->{CL}, $hash, $tp, $val, $retain);
   }
 }

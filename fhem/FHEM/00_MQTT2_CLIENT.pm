@@ -54,7 +54,7 @@ MQTT2_CLIENT_Initialize($)
     username
   );
   use warnings 'qw';
-  $hash->{AttrList} = join(" ", @attrList);
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
 }
 
 #####################################
@@ -248,7 +248,7 @@ MQTT2_CLIENT_Set($@)
     return "Usage: set $name publish -r topic [value]" if(@a < 1);
     my $tp = shift(@a);
     my $val = join(" ", @a);
-    readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 0);
+    readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 1);
     MQTT2_CLIENT_doPublish($hash, $tp, $val, $retain);
 
   } elsif($a[0] eq "password") {
