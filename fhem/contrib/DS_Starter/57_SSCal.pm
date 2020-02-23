@@ -858,7 +858,7 @@ sub SSCal_periodicCall($) {
   if(!$interval) {
       $hash->{MODE} = "Manual";
   } else {
-      $new          = gettimeofday()+$interval;
+      $new = gettimeofday()+$interval;
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "nextUpdate", "Automatic - next polltime: ".FmtTime($new));     # Abrufmode initial auf "Manual" setzen   
       readingsEndUpdate   ($hash,1);
@@ -2183,7 +2183,7 @@ sub SSCal_createReadings ($) {
   readingsBeginUpdate         ($hash); 
   readingsBulkUpdateIfChanged ($hash, "Errorcode",  "none");
   readingsBulkUpdateIfChanged ($hash, "Error",      "none");    
-  readingsBulkUpdate          ($hash, "lastUpdate", $data{SSCal}{$name}{lastUpdate});                   
+  readingsBulkUpdate          ($hash, "lastUpdate", FmtTime(time));                   
   readingsBulkUpdate          ($hash, "state",      "done");                    
   readingsEndUpdate           ($hash,1); 
 
