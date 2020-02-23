@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
   "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
   "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
@@ -436,9 +437,9 @@ sub SSCal_Set($@) {
       $setlist = "Unknown argument $opt, choose one of ".
 	             "credentials "
                  ;  
-  } elsif ($model eq "Diary") {
+  } elsif ($model eq "Diary") {                                                 # Model Terminkalender
       $setlist = "Unknown argument $opt, choose one of ".
-                 "calEventList ".
+                 "calUpdate ".
                  "credentials ".
                  ($evids?"deleteEventId:$evids ":"deleteEventId:noArg ").
                  "eraseReadings:noArg ".
@@ -447,9 +448,9 @@ sub SSCal_Set($@) {
                  ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
                  "restartSendqueue:noArg "
                  ;
-  } else {                                                                      # Model ist "Tasks"
+  } else {                                                                      # Model Aufgabenliste
       $setlist = "Unknown argument $opt, choose one of ".
-                 "calToDoList ".
+                 "calUpdate ".
 				 "cleanCompleteTasks:noArg ".
                  "credentials ".
                  ($evids?"deleteEventId:$evids ":"deleteEventId:noArg ").
@@ -511,89 +512,64 @@ sub SSCal_Set($@) {
           return "SendQueue entry with index \"$prop\" deleted";
       }
   
-  } elsif ($opt eq "calEventList") {                                                          # Termine einer Cal_id (Liste) in Zeitgrenzen abrufen 	  
+  } elsif ($opt eq "calUpdate") {                                                             # Termine einer Cal_id (Liste) in Zeitgrenzen abrufen
       return "Obtain the Calendar list first with \"get $name getCalendars\" command." if(!$hash->{HELPER}{CALFETCHED});
-	  my ($err,$tstart,$tend) = SSCal_timeEdge ($name);
-      
-	  if($err) {
-          Log3($name, 2, "$name - ERROR in timestamp: $err");
-        
-          my $errorcode = "910";
 
-          readingsBeginUpdate         ($hash); 
-          readingsBulkUpdateIfChanged ($hash, "Error",           $err);
-          readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
-          readingsBulkUpdate          ($hash, "state",        "Error");                    
-          readingsEndUpdate           ($hash,1);
-
-          return "ERROR in timestamp: $err";	      
-	  }	  
-	  
-	  my $cals = AttrVal($name,"usedCalendars", "");
-      
+      my $cals = AttrVal($name,"usedCalendars", "");
       shift @a; shift @a;
-      my $c = join(" ", @a);
-      $cals = $c?$c:$cals;
-	  return "Please set attribute \"usedCalendars\" or specify the Calendar(s) you want read in \"$opt\" command." if(!$cals);
-	  
+      my $c    = join(" ", @a);
+      $cals    = $c?$c:$cals;
+      return "Please set attribute \"usedCalendars\" or specify the Calendar(s) you want read in \"$opt\" command." if(!$cals);
+      
       # Kalender aufsplitten und zu jedem die ID ermitteln
       my @ca = split(",", $cals);
-	  my $oids;
+      my ($oids,$caltype,@cas);
+      if($model eq "Diary") { $caltype = "Event"; } else { $caltype = "ToDo"; }
       foreach (@ca) {                                         
           my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
           next if(!$oid);
-          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "Event") {
-              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"Event\" and will be ignored.");
+          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne $caltype) {
+              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"$caltype\" and will be ignored.");
               next;
           }          
-		  $oids .= "," if($oids);
-		  $oids .= '"'.$oid.'"';
-		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
+          $oids .= "," if($oids);
+          $oids .= '"'.$oid.'"';
+          push (@cas, $_);
+          Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
       }
-	  
-	  return "No Calendar of type \"Event\" was selected or its ID(s) couldn't be found." if(!$oids);
+      return "No Calendar of type \"$caltype\" was selected or its ID(s) couldn't be found." if(!$oids); 
+
+      Log3($name, 5, "$name - Calendar selection for add queue: ".join(',', @cas));
+
+      if($model eq "Diary") {                                                 # Modell Terminkalender
+          my ($err,$tstart,$tend) = SSCal_timeEdge ($name);
+          if($err) {
+              Log3($name, 2, "$name - ERROR in timestamp: $err");
+            
+              my $errorcode = "910";
+
+              readingsBeginUpdate         ($hash); 
+              readingsBulkUpdateIfChanged ($hash, "Error",           $err);
+              readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
+              readingsBulkUpdate          ($hash, "state",        "Error");                    
+              readingsEndUpdate           ($hash,1);
+
+              return "ERROR in timestamp: $err";	      
+          }	  
+
+          my $lr = AttrVal($name,"showRepeatEvent", "true");
+          SSCal_addQueue($name,"eventlist","CALEVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
+          SSCal_getapisites($name);      
       
-      Log3($name, 5, "$name - Calendar selection for add queue: $cals");
-      my $lr = AttrVal($name,"showRepeatEvent", "true");
-	  SSCal_addQueue($name,"eventlist","CALEVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
-      SSCal_getapisites($name);
-  
-  } elsif ($opt eq "calToDoList") {                                                          # Aufgaben einer Cal_id (Liste) abrufen 	  
-      return "Obtain the Calendar list first with \"get $name getCalendars\" command." if(!$hash->{HELPER}{CALFETCHED});  
-	  
-	  my $cals = AttrVal($name,"usedCalendars", "");
-      
-      shift @a; shift @a;
-      my $c = join(" ", @a);
-      $cals = $c?$c:$cals;
-	  return "Please set attribute \"usedCalendars\" or specify the Calendar(s) you want read in \"$opt\" command." if(!$cals);
-	  
-      # Kalender aufsplitten und zu jedem die ID ermitteln
-      my @ca = split(",", $cals);
-	  my $oids;
-      foreach (@ca) {                                         
-          my $oid = $hash->{HELPER}{CALENDARS}{"$_"}{id};
-          next if(!$oid);
-          if ($hash->{HELPER}{CALENDARS}{"$_"}{type} ne "ToDo") {
-              Log3($name, 3, "$name - The Calendar \"$_\" is not of type \"ToDo\" and will be ignored.");
-              next;
-          }          
-		  $oids .= "," if($oids);
-		  $oids .= '"'.$oid.'"';
-		  Log3($name, 2, "$name - WARNING - The Calendar \"$_\" seems to be unknown because its ID couldn't be found.") if(!$oid);
+      } else {                                                                # Modell Aufgabenliste
+          my $limit          = "";                                            # Limit of matched tasks
+          my $offset         = 0;                                             # offset of mnatched tasks
+          my $filterdue      = AttrVal($name,"filterDueTask", 3);             # show tasks with and without due time
+          my $filtercomplete = AttrVal($name,"filterCompleteTask", 3);        # show completed and not completed tasks
+          
+          SSCal_addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
+          SSCal_getapisites($name);      
       }
-	  
-	  return "No Calendar of type \"ToDo\" was selected or its ID(s) couldn't be found." if(!$oids);
-      
-      Log3($name, 5, "$name - Calendar selection for add queue: $cals");
-      
-      my $limit          = "";                                      # Limit of matched tasks
-      my $offset         = 0;                                       # offset of mnatched tasks
-      my $filterdue      = AttrVal($name,"filterDueTask", 3);       # show tasks with and without due time
-      my $filtercomplete = AttrVal($name,"filterCompleteTask", 3);  # show completed and not completed tasks
-      
-	  SSCal_addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
-      SSCal_getapisites($name);
   
   } elsif ($opt eq "cleanCompleteTasks") {                                                          # erledigte Aufgaben einer Cal_id (Liste) löschen 	  
       return "Obtain the Calendar list first with \"get $name getCalendars\" command." if(!$hash->{HELPER}{CALFETCHED});  
@@ -892,8 +868,7 @@ sub SSCal_periodicCall($) {
   return if(!$interval);
   
   if($hash->{CREDENTIALS} && !IsDisabled($name)) {
-      if($model eq "Diary") { CommandSet(undef, "$name calEventList") };                      # Einträge aller gewählter Terminkalender abrufen (in Queue stellen)
-	  if($model eq "Tasks") { CommandSet(undef, "$name calToDoList")  };                      # Einträge aller gewählter Aufgabenlisten abrufen (in Queue stellen)
+      CommandSet(undef, "$name calUpdate");                                                       # Einträge aller gewählter Kalender oder Aufgabenlisten abrufen (in Queue stellen)
   }
   
   InternalTimer($new, "SSCal_periodicCall", $name, 0);
@@ -1489,12 +1464,11 @@ sub SSCal_calop_parse ($) {
                 # Queuedefinition sichern vor checkretry
                 my $idx = $hash->{OPIDX};
                 my $api = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{api};
-                my $set = ($api eq "CALEVENT")?"calEventList":"calToDoList";
                 
                 SSCal_checkretry($name,0);
                 
                 # Kalendereinträge neu einlesen nach dem löschen Event Id
-                CommandSet(undef, "$name $set");
+                CommandSet(undef, "$name calUpdate");
                 
             }					
            
@@ -2643,7 +2617,7 @@ sub SSCal_extractIcal ($$) {
 	  $n++;
   }
   
-  $data{SSCal}{$name}{vcalendar} = \%icals;                                    # Achtung: bei asynch Mode ist hash->{HELPER} nur in BlockingCall !!
+  $data{SSCal}{$name}{vcalendar} = \%icals;                                    # Achtung: bei asynch Mode ist $data{SSCal}{$name}{vcalendar} nur im BlockingCall verfügbar !!
   
   Log3($name, 5, "$name - VCALENDAR extract of UID \"$uid\":\n".Dumper $data{SSCal}{$name}{vcalendar}{"$uid"}); 
   
