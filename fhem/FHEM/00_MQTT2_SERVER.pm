@@ -440,8 +440,7 @@ MQTT2_SERVER_doPublish($$$$;$)
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
-    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val)
-        if($src->{NAME} ne $clName);
+    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val);
   }
 
   my $serverName = $server->{NAME};
