@@ -32,6 +32,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use HttpUtils;
 
 sub DENON_AVR_Get($@);
 sub DENON_AVR_Set($@);
@@ -940,6 +941,49 @@ DENON_GetKey($$;$) {
     }
 }
 
+sub DENON_AVR_PerformHttpRequest {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $url = "http://$hash->{IP}/goform/Deviceinfo.xml";
+    Log3 $name, 4, "DENON_AVR ($name) - requesting $url";
+    my $param = {
+                    url        => "$url",
+                    timeout    => 5,
+                    hash       => $hash,
+                    method     => "GET",
+                    header     => "User-Agent: FHEM\r\nAccept: application/xml",
+                    callback   => \&DENON_AVR_ParseHttpResponse
+                };
+
+    HttpUtils_NonblockingGet($param);
+}
+
+sub DENON_AVR_ParseHttpResponse {
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $return;
+
+  if($err ne "") {
+      Log3 $name, 0, "DENON_AVR ($name) - Error while requesting ".$param->{url}." - $err";
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, 'httpState', 'ERROR', 0);
+      readingsBulkUpdate($hash, 'httpError', $err, 0);
+      readingsEndUpdate($hash, 0);
+  } elsif($data ne "") {
+      Log3 $name, 5, "DENON_AVR ($name) - Deviceinfo.xml\n$data";
+      my $ref = XMLin($data, KeyAttr => { }, ForceArray => [ ]);
+
+      my $codes = {
+        '0' => 'Denon',
+        '1' => 'Marantz'
+      };
+      my $brandCode = $ref->{BrandCode};
+
+      $hash->{model} = $codes->{$brandCode} . ' ' . $ref->{ModelName};
+  }
+}
 
 ###################################
 sub
@@ -1028,6 +1072,10 @@ DENON_AVR_Define($$)
 	# connect using TCP connection (non-blocking style)
 	else
 	{
+                $hash->{IP} = $a[2];
+                use XML::Simple qw(:strict);
+                DENON_AVR_PerformHttpRequest($hash);
+
 		$hash->{DeviceName} = $hash->{DeviceName} . ":23"
 			if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
 		  
