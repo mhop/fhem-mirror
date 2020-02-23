@@ -248,6 +248,7 @@ MQTT2_CLIENT_Set($@)
     return "Usage: set $name publish -r topic [value]" if(@a < 1);
     my $tp = shift(@a);
     my $val = join(" ", @a);
+    readingsSingleUpdate($hash, "lastPublish", "$tp:$val", 0);
     MQTT2_CLIENT_doPublish($hash, $tp, $val, $retain);
 
   } elsif($a[0] eq "password") {
