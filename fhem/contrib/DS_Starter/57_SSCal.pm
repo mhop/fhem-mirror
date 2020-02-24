@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.15.0" => "24.02.2020  fix recurrence WEEKLY by DAY ",
+  "1.15.0" => "24.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY ",
   "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
   "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
@@ -1668,12 +1668,12 @@ sub SSCal_extractEventlist ($) {
               if ($freq eq "MONTHLY") {                                        # monatliche Wiederholung                       
                   if ($bymonthday) {                                           # Wiederholungseigenschaft am Tag X des Monats     
                       for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {
-                          $bmonth += $interval;
+                          $bmonth += $interval if($ci>=0);
                           $byear  += int( $bmonth/13);
                           $bmonth %= 12 if($bmonth>12);
                           $bmonth = sprintf("%02d", $bmonth);
                           
-                          $emonth += $interval;
+                          $emonth += $interval if($ci>=0);
                           $eyear  += int( $emonth/13);
                           $emonth %= 12 if($emonth>12);
                           $emonth = sprintf("%02d", $emonth);
@@ -1875,9 +1875,7 @@ sub SSCal_extractEventlist ($) {
                                   $done   = 1;
                                   $n++;
                               }                     
-                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);            
-                               
-                              
+                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);              
                           }
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);
                           $btsstart += (7 * 86400 * $interval);                                    # addiere Tagesintervall, z.B. 4th Freitag ...                             
