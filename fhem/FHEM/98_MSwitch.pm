@@ -1189,22 +1189,7 @@ sub MSwitch_Set($@) {
         return if $return eq "exit";
     }
 	
-# nur bei funktionen in setlist !!!!
-	
-	if ( AttrVal( $name, "MSwitch_Selftrigger_always", 0 ) eq "1" and $cmd ne "?" ) 
-	{
-	# && defined $setlist{$cmd}
-		my $atts = AttrVal( $name, 'setList', "" );
-		my @testarray = split( " ", $atts );
-		my %setlist;
-		foreach (@testarray)
-		{
-			my ($arg1,$arg2) = split( ":", $_ );
-			if (!defined $arg2 or $arg2 eq "") {$arg2 = "noArg"}
-			$setlist{$arg1} = $arg2;
-		}
-		MSwitch_Check_Event( $hash, "MSwitch_self:".$cmd.":".$args[0] ) if defined $setlist{$cmd};
-	}
+
 
 ##########################
 
@@ -1233,6 +1218,10 @@ sub MSwitch_Set($@) {
 						push @arraydynsetlist, $reading;
 						$dynlist =join( ',', @found_devices );
 						$dynsetlist=$dynsetlist.$reading.":".$dynlist." ";
+						
+						
+						
+						
 						}
 						
 					if ($3 ne "")
@@ -1255,6 +1244,45 @@ sub MSwitch_Set($@) {
 		}
 ###########################
 
+
+
+
+
+
+# nur bei funktionen in setlist !!!!
+	
+	if ( AttrVal( $name, "MSwitch_Selftrigger_always", 0 ) eq "1" and $cmd ne "?" ) 
+	{
+	# && defined $setlist{$cmd}
+		my $atts = AttrVal( $name, 'setList', "" );
+		my @testarray = split( " ", $atts );
+		my %setlist;
+		foreach (@testarray)
+		{
+			my ($arg1,$arg2) = split( ":", $_ );
+			if (!defined $arg2 or $arg2 eq "") {$arg2 = "noArg"}
+			$setlist{$arg1} = $arg2;
+		}
+		MSwitch_Check_Event( $hash, "MSwitch_self:".$cmd.":".$args[0] ) if defined $setlist{$cmd};
+	}
+	
+	
+	if ( AttrVal( $name, "MSwitch_Selftrigger_always", 0 ) eq "1" and $cmd ne "?" ) 
+	{
+	# && defined $setlist{$cmd}
+		my %setlist;
+		foreach (@arraydynsetlist)
+		{
+			my ($arg1,$arg2) = split( ":", $_ );
+			if (!defined $arg2 or $arg2 eq "") {$arg2 = "noArg"}
+			$setlist{$arg1} = $arg2;
+		}
+		MSwitch_Check_Event( $hash, "MSwitch_self:".$cmd.":".$args[0] ) if defined $setlist{$cmd};
+	}
+	
+	
+	
+	
 my %setlist;
 
     if ( !defined $args[0] ) { $args[0] = ''; }
