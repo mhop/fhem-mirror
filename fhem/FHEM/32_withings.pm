@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 10 / 2019-01-05
+# Release 12 / 2020-02-20
 
 
 package main;
@@ -52,7 +52,7 @@ my %device_types = (  0 => "User related",
 
 my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "Smart Kid Scale", 4 => "Smart Body Analyzer", 5 => "WiFi Body Scale", 6 => "Cardio Scale", 7 => "Body Scale", },
                        2 => { 21 => "Smart Baby Monitor", 22 => "Home", 23 => "Home v2", },
-                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM+", },
+                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM Core", },
                       16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
                       32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Aura v2", 63 => "Sleep", },
                       64 => { 70 => "Thermo", }, );
@@ -146,17 +146,60 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       99 => { name => "Longitude", reading => "longitude", },#vasistas
                      100 => { name => "Direction", reading => "direction", },#vasistas
                      101 => { name => "Vertical Radius", reading => "radiusVertical", },#vasistas
+                     102 => { name => "unknown 102", reading => "unknown102", }, #?
+                     103 => { name => "unknown 103", reading => "unknown103", }, #?
+                     104 => { name => "unknown 104", reading => "unknown104", }, #?
+                     105 => { name => "unknown 105", reading => "unknown105", }, #?
+                     106 => { name => "unknown 106", reading => "unknown106", }, #?
+                     107 => { name => "unknown 107", reading => "unknown107", }, #?
+                     108 => { name => "unknown 108", reading => "unknown108", }, #?
+                     109 => { name => "unknown 109", reading => "unknown109", }, #?
+                     110 => { name => "unknown 110", reading => "unknown110", }, #?
+                     111 => { name => "unknown 111", reading => "unknown111", }, #?
+                     112 => { name => "unknown 112", reading => "unknown112", }, #?
+                     113 => { name => "unknown 113", reading => "unknown113", }, #?
+                     114 => { name => "unknown 114", reading => "unknown114", }, #?
+                     115 => { name => "unknown 115", reading => "unknown115", }, #?
+                     116 => { name => "unknown 116", reading => "unknown116", }, #?
+                     117 => { name => "unknown 117", reading => "unknown117", }, #?
+                     118 => { name => "unknown 118", reading => "unknown118", }, #?
+                     119 => { name => "unknown 119", reading => "unknown119", }, #?
                      120 => { name => "unknown 120", reading => "unknown120", }, #vasistas
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
+                     123 => { name => "unknown 123", reading => "unknown123", },#
+                     124 => { name => "unknown 124", reading => "unknown124", },#
+                     125 => { name => "unknown 125", reading => "unknown125", },#
+                     126 => { name => "unknown 126", reading => "unknown126", },#
+                     127 => { name => "unknown 127", reading => "unknown127", },#
                      128 => { name => "unknown 128", reading => "unknown128", },#vasistas
                      129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep
+                     130 => { name => "ECG", reading => "heartECG", },#bpm core
+                     131 => { name => "Heart Sounds", reading => "heartSounds", },#bpm core
                      132 => { name => "unknown 132", reading => "unknown132", },#vasistas
+                     133 => { name => "unknown 133", reading => "unknown133", },#
+                     134 => { name => "unknown 134", reading => "unknown134", },#
+                     135 => { name => "unknown 135", reading => "unknown135", },#
+                     136 => { name => "unknown 136", reading => "unknown136", },#
+                     137 => { name => "unknown 137", reading => "unknown137", },#
+                     138 => { name => "unknown 138", reading => "unknown138", },#
+                     139 => { name => "unknown 139", reading => "unknown139", },#
+                     140 => { name => "unknown 140", reading => "unknown140", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
                       );
                       #swimStrokes / swimLaps / walkState / runState
+
+my %ecg_types = ( 0 => "normal",
+                  2 => "inconclusive", );
+
+my %heart_types = ( -5 => "4 measurements to go",
+                    -4 => "3 measurements to go",
+                    -3 => "2 measurements to go",
+                    -2 => "1 measurement to go",
+                     0 => "normal",
+                     4 => "inconclusive", );
 
 my %activity_types =   (  0 => "None",
                           1 => "Walking",
@@ -764,7 +807,7 @@ sub withings_getSessionKey($) {
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
 
-  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
+  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/ || $data =~ /credentials do not match/)
   {
     Log3 $name, 1, "$name: LOGIN ERROR ";
     $hash->{STATE} = "Login error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
@@ -2292,6 +2335,7 @@ sub withings_parseActivity($$) {
         $newlastupdate = $lastupdate-1;
       }
 
+      $newlastupdate = $newlastupdate+(24*60*60) if($lastupdate == $newlastupdate+1 && ($newlastupdate+(24*60*60)) < time());
       readingsSingleUpdate( $hash, ".lastActivity", $newlastupdate+1, 0 );
       #$hash->{LAST_DATA} = FmtDateTime( $newlastupdate );
 
@@ -2383,20 +2427,38 @@ sub withings_parseVasistas($$;$) {
           }
           if($updatetype eq "sleepstate")
           {
-            my $sleepstate = $updatevalue;
+            my $rawvalue = $updatevalue;
             $updatevalue = $sleep_states{$updatevalue};
             if( !defined($updatevalue) ) {
-              Log3 $name, 1, "$name: unknown sleep state: $sleepstate";
-              $updatevalue = $sleepstate;
+              Log3 $name, 1, "$name: unknown sleep state: $rawvalue";
+              $updatevalue = $rawvalue;
             }
           }
           if($updatetype eq "activityType")
           {
-            my $activity = $updatevalue;
+            my $rawvalue = $updatevalue;
             $updatevalue = $activity_types{$updatevalue};
             if( !defined($updatevalue) ) {
-              Log3 $name, 1, "$name: unknown activity type: $activity";
-              $updatevalue = $activity;
+              Log3 $name, 1, "$name: unknown activity type: $rawvalue";
+              $updatevalue = $rawvalue;
+            }
+          }
+          if($updatetype eq "heartECG")
+          {
+            my $rawvalue = $updatevalue;
+            $updatevalue = $ecg_types{$updatevalue};
+            if( !defined($updatevalue) ) {
+              Log3 $name, 1, "$name: unknown ECG type: $rawvalue";
+              $updatevalue = $rawvalue;
+            }
+          }
+          if($updatetype eq "heartSounds")
+          {
+            my $rawvalue = $updatevalue;
+            $updatevalue = $heart_types{$updatevalue};
+            if( !defined($updatevalue) ) {
+              Log3 $name, 1, "$name: unknown heartSound type: $rawvalue";
+              $updatevalue = $rawvalue;
             }
           }
           readingsBeginUpdate($hash);
@@ -3646,7 +3708,7 @@ sub withings_AuthApp($;$) {
 
   my($err,$data) = HttpUtils_BlockingGet($datahash);
 
-  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/)
+  if ($err || !defined($data) || $data =~ /Authentification failed/ || $data =~ /not a valid/ || $data =~ /credentials do not match/)
   {
     Log3 $name, 1, "$name: LOGIN ERROR: ".Dumper($err);
     return undef;
@@ -4272,6 +4334,8 @@ sub withings_weekdays2Int( $ ) {
     <li>diastolicBloodPressure</li>
     <li>systolicBloodPressure</li>
     <li>heartPulse</li>
+    <li>heartECG</li>
+    <li>heartSounds</li>
     <li>pulseWave</li>
     <li>spo2</li>
 
