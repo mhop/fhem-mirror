@@ -48,11 +48,13 @@ use utf8;
 use JSON;
 use HttpUtils;
 use Encode;
+use FHEM::Meta;
 use Cwd;
 use MIME::Base64;
 use Crypt::NaCl::Sodium qw( :utils );
 use Crypt::Argon2 qw/argon2i_raw/;
 use IO::Socket;
+use IO::String;			   
 use LWP::UserAgent;
 use constant false => 0;
 use constant true  => 1;
@@ -94,6 +96,7 @@ sub DoorBird_Initialize($)
 							   "disable:1,0 " .
 						       "loglevel:slider,0,1,5 " .
 						       $readingFnAttributes;
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -1985,7 +1988,6 @@ sub DoorBird_FW_detailFn($$$$) {
 					<td id="ImageCell" width="430px" height="300px" align="center">
 						' . $ImageHtmlCode  . '
 					</td>
-
 					<td id="ImageCell" width="435px" height="300px" align="center">
 						' . $VideoHtmlCode . '<BR>
 					</td>
@@ -2014,7 +2016,6 @@ sub DoorBird_FW_detailFn($$$$) {
 					<tr>
 						<td align="center" colspan="5"><b>History of events - Last download: ' . $hash->{helper}{HistoryTime} . '</b></td>
 					</tr>
-
 					<tr>
 						<td align="center" colspan="2"><b>Doorbell</b></td>
 						<td align="center"></td>
@@ -2253,16 +2254,15 @@ sub DoorBird_FirmwareStatus($) {
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_FirmwareStatus - Checking firmware status on doorbird page";
 	
-	my $FirmwareVersionUnit = ReadingsVal($name, "FIRMWARE", 0);
+	my $FirmwareVersionUnit = ReadingsVal($name, "FIRMWARE"   , 0        );
+	my $FirmwareDevice      = ReadingsVal($name, "DEVICE-TYPE", "unknown");
 
 	### Download website of changelocks
 	my $html = GetFileFromURL("https://www.doorbird.com/changelog");
 	
-	### Get the latest firmware number
-	my $result;
-	if ($html =~ /(?<=Firmware version )(.*)(?=\n=====)/) {
-		$result = $1;
-	}
+	### Get the latest firmware number for this product
+	my $versions = DoorBird_parseChangelog($hash, $html);
+	my $result   = DoorBird_findNewestFWVersion($hash, $versions, $FirmwareDevice);
 
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_FirmwareStatus - result                  : " . $result;
@@ -4061,6 +4061,95 @@ sub DoorBird_BlockGet($$$$) {
 	return($err, $data);
 }
 ####END####### Blocking Get ####################################################################################END#####
+
+
+###START###### Processing Change Log ##########################################################################START####
+# Changelog parser for DoorBird changelog as of 2020-02-22 (or earlier) containing multiple product lines. 
+# Returns a hash ref containing the newest version number for each product name or prefix found.
+#
+# Prefixes are denoted by a trailing 'x', as in the original changelog. Note:
+# this means that still multiple versions matching a single product could be in the hash, 
+# e. g. for different prefixes all matching the final product name.
+
+sub DoorBird_parseChangelog($$)
+{
+	my ($hash, $data) = @_;
+	my $name = $hash->{NAME};
+
+	my $lines = IO::String->new($data);
+	my $all_versions;
+	my $version;
+
+	### For all lines do
+	while(my $line = <$lines>) 	{
+
+		### If the line contains the keywords "Firmware version " followed by a number then obtain it
+		if ($line =~ /^Firmware version (\d{6})$/) 	{
+			$version = $1;
+		}
+
+		### If the line contains the keywords "Products affected: " then obtain it
+		elsif ($line =~ /^Products affected: (.*)$/) {
+
+			### If version is already obtained from the changelog
+			if (defined($version)) {
+				
+				### Split the product names into an array
+				my @products = split(/,\s*/, $1);
+
+				### For each product name mentioned in the changelog
+				foreach my $product (@products) {
+					### Apparently the line of the "Products affected" in current changelog file is not closed with an \r so we ignore this array - entry
+					next if $product =~ /Preceding version: /;
+					
+					### If the Product version for the firmware ha snot yet been defined or the already obtaine version number is older than the current value
+					if (!defined($all_versions->{$product}) or 0 + $all_versions->{$product} < 0 + $version) {
+						
+						### Log Entry for debugging purposes
+						Log3 $name, 5, $name. " : DoorBird_parseChangelog - found firmware version  : " . $version . " for " . $product;
+						
+						### Save latest firmware version
+						$all_versions->{$product} = $version;
+					}
+				}
+				undef $version;
+			}
+			### If version cannot be found
+			else
+			{
+				### Log Entry for debugging purposes
+				Log3 $name, 3, $name. " : DoorBird_parseChangelog - Products without version found in changelog, ignored.";
+			}
+		}
+	}
+	return $all_versions;
+}
+
+# Find newest firmware version for this device by name or prefix.
+# The versions hash ref expected as second argument should match the format returned from DoorBird_parseChangelog().
+sub DoorBird_findNewestFWVersion($$$)
+{
+	my ($hash, $versions, $product_name) = @_;
+	my $name	 = $hash->{NAME};
+	my $newest = 0;
+
+	### For all version entries
+	foreach my $product (sort keys %$versions)
+	{
+		### Optional prefix matching
+		my $prefix = $product;
+		$prefix =~ s/x$//;
+
+		### If the installed product name is (partial) identical with the product name given in the changelog file entry
+		if (length($prefix) <= length($product_name) and $prefix eq substr($product_name, 0, length($prefix)) and 0 + $newest < 0 + $versions->{$product}) {
+			$newest = $versions->{$product};
+		}
+	}
+
+	return $newest;
+}
+####END####### Processing Change Log ###########################################################################END#####
+
 1;
 
 ###START###### Description for fhem commandref ################################################################START####
@@ -4068,7 +4157,6 @@ sub DoorBird_BlockGet($$$$) {
 =item device
 =item summary    Connects fhem to the DoorBird IP door station
 =item summary_DE Verbindet fhem mit der DoorBird IP T&uuml;rstation
-
 =begin html
 
 <a name="DoorBird"></a>
@@ -4094,7 +4182,6 @@ sub DoorBird_BlockGet($$$$) {
 		</tr>
 	</table>
 	<BR>
-
 	<table>
 		<tr>
 			<td>
@@ -4102,7 +4189,6 @@ sub DoorBird_BlockGet($$$$) {
 			</td>
 		</tr>
 	</table>
-
 	<table>
 		<tr>
 			<td>
@@ -4112,7 +4198,6 @@ sub DoorBird_BlockGet($$$$) {
 			</td>
 		</tr>
 	</table>
-
 	<ul>
 		<ul>
 			<table>
@@ -4123,15 +4208,11 @@ sub DoorBird_BlockGet($$$$) {
 			</table>
 		</ul>
 	</ul>
-
 	<BR>
-
 	<table>
 		<tr><td><a name="DoorBirdSet"></a><b>Set</b></td></tr>
 		<tr><td><ul>The set function is able to change or activate the following features as follows:</ul></td></tr>
 	</table>
-
-
 	<table>
 		<tr><td><ul><code>set Light_On                    </code></ul></td><td> : Activates the IR lights of the DoorBird unit. The IR - light deactivates automatically by the default time within the Doorbird unit																			</td></tr>
 		<tr><td><ul><code>set Live_Audio &lt;on:off&gt;   </code></ul></td><td> : Activate/Deactivate the Live Audio Stream of the DoorBird on or off and toggles the direct link in the <b>hidden</b> Reading <code>.AudioURL</code>															</td></tr>
@@ -4140,8 +4221,6 @@ sub DoorBird_BlockGet($$$$) {
 		<tr><td><ul><code>set Restart                     </code></ul></td><td> : Sends the command to restart (reboot) the Doorbird unit																																						</td></tr>
 		<tr><td><ul><code>set Transmit_Audio &lt;Path&gt; </code></ul></td><td> : Converts a given audio file and transmits the stream to the DoorBird speaker. Requires a datapath to audio file to be converted and send. The user "fhem" needs to have write access to this directory.<BR>	</td></tr>
 	</table>
-
-
 	<table>
 		<tr><td><a name="DoorBirdGet"></a><b>Get</b></td></tr>
 		<tr><td>
@@ -4155,8 +4234,6 @@ sub DoorBird_BlockGet($$$$) {
 		<tr><td><ul><code>get Image_Request               </code></ul></td><td> : Downloads the current Image of the camera of DoorBird unit.																																					</td></tr>
 		<tr><td><ul><code>get Info_Request                </code></ul></td><td> : Downloads the current internal setup such as relay configuration, firmware version etc. of the DoorBird unit. The obtained relay adresses will be used as options for the <code>Open_Door</code> command.		</td></tr>
 	</table>
-
-
 	<table>
 		<tr><td><a name="DoorBirdAttr"></a><b>Attributes</b></td></tr>
 		<tr><td>
@@ -4165,7 +4242,6 @@ sub DoorBird_BlockGet($$$$) {
 			</ul>
 		</td></tr>
 	</table>
-
 	<ul>
 		<table>
 			<tr>
@@ -4190,21 +4266,18 @@ sub DoorBird_BlockGet($$$$) {
 				<td>
 					<code>PollingTimeout</code> : </td><td>Timeout in seconds before download requests are terminated in cause of no reaction by DoorBird unit. Might be required to be adjusted due to network speed.<BR>
 																   The default value is 10s.<BR>
-
 				</td>
 			</tr>
 			<tr>
 				<td>
 					<code>UdpPort</code> : </td><td>Port number to be used to receice UDP datagrams. Ports are pre-defined by firmware.<BR>
 																   The default value is port 6524<BR>
-
 				</td>
 			</tr>
 			<tr>
 				<td>
 					<code>SessionIdSec</code> : </td><td>Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>
 																   The default value is 540s = 9min.<BR>
-
 				</td>
 			</tr>
 			<tr>
@@ -4265,8 +4338,6 @@ sub DoorBird_BlockGet($$$$) {
 	</ul>
 </ul>
 =end html
-
-
 =begin html_DE
 
 <a name="DoorBird"></a>
@@ -4292,7 +4363,6 @@ sub DoorBird_BlockGet($$$$) {
 		</tr>
 	</table>
 	<BR>
-
 	<table>
 		<tr>
 			<td>
@@ -4300,7 +4370,6 @@ sub DoorBird_BlockGet($$$$) {
 			</td>
 		</tr>
 	</table>
-
 	<table>
 		<tr>
 			<td>
@@ -4310,7 +4379,6 @@ sub DoorBird_BlockGet($$$$) {
 			</td>
 		</tr>
 	</table>
-
 	<ul>
 		<ul>
 			<table>
@@ -4321,14 +4389,11 @@ sub DoorBird_BlockGet($$$$) {
 			</table>
 		</ul>
 	</ul>
-
 	<BR>
-
 	<table>
 		<tr><td><a name="DoorBirdSet"></a><b>Set</b></td></tr>
 		<tr><td><ul>Die Set - Funktion ist in der lage auf der DoorBird - Anlage die folgenden Einstellungen vorzunehmen bzw. zu de-/aktivieren:</ul><BR></td></tr>
 	</table>
-
 	<table>
 		<tr><td><ul><code>set Light_On                    </code></ul></td><td> : Schaltet das IR lichht der DoorBird Anlage ein. Das IR Licht schaltet sich automatisch nach der in der DoorBird - Anlage vorgegebenen Default Zeit wieder aus.																	</td></tr>
 		<tr><td><ul><code>set Live_Audio &lt;on:off&gt;   </code></ul></td><td> : Aktiviert/Deaktiviert den Live Audio Stream der DoorBird - Anlage Ein oder Aus und wechselt den direkten link in dem <b>versteckten</b> Reading <code>.AudioURL.</code>															</td></tr>
@@ -4337,8 +4402,6 @@ sub DoorBird_BlockGet($$$$) {
 		<tr><td><ul><code>set Restart                     </code></ul></td><td> : Sendet das Kommando zum rebooten der DoorBird - Anlage.																																											</td></tr>
 		<tr><td><ul><code>set Transmit_Audio &lt;Path&gt; </code></ul></td><td> : Konvertiert die angegebene Audio-Datei und sendet diese zur Ausgabe an die DoorBird - Anlage. Es ben&ouml;tigt einen Dateipfad zu der Audio-Datei zu dem der User "fhem" Schreibrechte braucht (z.B.: /opt/fhem/audio).			</td></tr>
 	</table>
-
-
 	<table>
 		<tr><td><a name="DoorBirdGet"></a><b>Get</b></td></tr>
 		<tr><td><ul>Die Get - Funktion ist in der lage von der DoorBird - Anlage die folgenden Informationen und Daten zu laden:<BR><BR></ul></td></tr>
@@ -4348,8 +4411,6 @@ sub DoorBird_BlockGet($$$$) {
 		<tr><td><ul><code>get Image_Request               </code></ul></td><td> : L&auml;dt das gegenw&auml;rtige Bild der DoorBird - Kamera herunter.</td></tr>
 		<tr><td><ul><code>get Info_Request                </code></ul></td><td> : L&auml;dt das interne Setup (Firmware Version, Relais Konfiguration etc.) herunter. Die &uuml;bermittelten Relais-Adressen werden als Option f&uuml;r das Kommando <code>Open_Door</code> verwendet.</td></tr>
 	</table>
-
-
 	<table>
 		<tr><td><a name="DoorBirdAttr"></a><b>Attributes</b></td></tr>
 		<tr><td>
@@ -4358,7 +4419,6 @@ sub DoorBird_BlockGet($$$$) {
 			</ul>
 		</td></tr>
 	</table>
-
 	<ul>
 		<table>
 			<tr>
@@ -4454,9 +4514,7 @@ sub DoorBird_BlockGet($$$$) {
 	</ul>
 </ul>
 =end html_DE
-
 =encoding utf8
-
 =for :application/json;q=META.json 73_DoorBird.pm
 {
   "abstract": "Connects fhem to the DoorBird IP door station",
@@ -4487,6 +4545,7 @@ sub DoorBird_BlockGet($$$$) {
         "Alien::Sodium": 0,
         "Crypt::Argon2": 0,
         "Crypt::NaCl::Sodium": 0,
+		"IO::String": 0,
         "Cwd": 0,
         "Data::Dumper": 0,
         "Encode": 0,
@@ -4522,5 +4581,4 @@ sub DoorBird_BlockGet($$$$) {
   }
 }
 =end :application/json;q=META.json
-
 =cut
