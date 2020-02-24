@@ -1096,6 +1096,56 @@ attr DEVICE stateFormat P1: POWER1 P2: POWER2 P3: POWER3 P4: POWER4
 attr DEVICE webCmd POWER1 toggle:POWER2 toggle:POWER3 toggle:POWER4 toggle
 attr DEVICE model tasmota_4ch_unified_basic_text
 
+# contributed by hummeruli, https://forum.fhem.de/index.php/topic,94495.msg1026611.html#msg1026611
+# tasmota 8ch as one FHEM device.
+name:tasmota_8ch_unified_icon
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Configures a single device including all readings <br>NOTE: Clicking on icons will issue a corresponding toggle command
+order:A_04c
+set DEVICE attrTemplate tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+attr DEVICE setList \
+  POWER1:on,off,toggle CMNDTOPIC/POWER1 $EVTPART1\
+  POWER2:on,off,toggle CMNDTOPIC/POWER2 $EVTPART1\
+  POWER3:on,off,toggle CMNDTOPIC/POWER3 $EVTPART1\
+  POWER4:on,off,toggle CMNDTOPIC/POWER4 $EVTPART1\
+  POWER5:on,off,toggle CMNDTOPIC/POWER5 $EVTPART1\
+  POWER6:on,off,toggle CMNDTOPIC/POWER6 $EVTPART1\
+  POWER7:on,off,toggle CMNDTOPIC/POWER7 $EVTPART1\
+  POWER8:on,off,toggle CMNDTOPIC/POWER8 $EVTPART1
+attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@red 1.on:on:POWER1+off 1.off:off:POWER1+on 2.on:on:POWER2+off 2.off:off:POWER2+on 3.on:on:POWER3+off 3.off:off:POWER3+on 4.on:on:POWER4+off 4.off:off:POWER4+on 5.on:on:POWER5+off 5.off:off:POWER5+on 6.on:on:POWER6+off 6.off:off:POWER6+on 7.on:on:POWER7+off 7.off:off:POWER7+on 8.on:on:POWER8+off 8.off:off:POWER8+on
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER1:.* POWER1\
+  STATTOPIC/POWER2:.* POWER2\
+  STATTOPIC/POWER3:.* POWER3\
+  STATTOPIC/POWER4:.* POWER4\
+  STATTOPIC/POWER5:.* POWER5\
+  STATTOPIC/POWER6:.* POWER6\
+  STATTOPIC/POWER7:.* POWER7\
+  STATTOPIC/POWER8:.* POWER8
+attr DEVICE stateFormat LWT\
+<a href="http://IPAddress" target="_blank">Hostname</a>\
+<a href="http://IPAddress" target="_blank">IPAddress</a>\
+<br>\
+1:POWER1\
+2:POWER2\
+3:POWER3\
+4:POWER4\
+5:POWER5\
+6:POWER6\
+7:POWER7\
+8:POWER8
+attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4:POWER5:POWER6:POWER7:POWER8
+attr DEVICE model tasmota_8ch_unified_icon
+
 #source post: https://forum.fhem.de/index.php/topic,94495.msg899041.html#msg899041
 name:tasmota_rgb_led_controller
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -2692,7 +2742,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:To control a WLED device, see https://github.com/Aircoookie/WLED/wiki for details).
 order:W_01
 par:BASE_ID;BASE_ID typically is wled;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/][^/]+[/].*:, ? $1 : undef }
-par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]([^/]+)[/].*:, ? $1 : undef }
+par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+[/]([^/]+)[/].*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal("DEVICE","icon","hue_filled_iris") }
 attr DEVICE icon ICON
 attr DEVICE setList\
