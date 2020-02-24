@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  70_DENON_AVR: fixed pictureMode commands
  - feature: 73_DoorBird: Improved changelog readout Contribution by: enrikm
  - feature: 70_DENON_AVR: introducing new way of reading model information
  - change:  70_DENON_AVR: more modes, commands, and readings (thx Shadow3561)

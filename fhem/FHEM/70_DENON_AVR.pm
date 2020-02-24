@@ -282,14 +282,14 @@ my $DENON_db = {
 		
 	},
 	'PV' => {
-		'OFF' 		=> 'off',
-		'STD' 		=> 'standart',
+		'OFF' 		=> 'Off',
+		'STD' 		=> 'Standard',
 		'MOV' 		=> 'Movie',
 		'VVD' 		=> 'Vivid',
 		'STM' 		=> 'Stream',
 		'CTM' 		=> 'Custom',
-		'DAY' 		=> 'ISF_Day',
-		'NGT' 		=> 'ISF_Night',
+		'DAY' 		=> 'Day',
+		'NGT' 		=> 'Night',
 	},
 	'PW' => {
 		'on' 		=> 'ON',
