@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "1.15.0" => "24.02.2020  fix recurrence WEEKLY by DAY ",
   "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
   "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
@@ -1810,63 +1811,48 @@ sub SSCal_extractEventlist ($) {
                   }
               }
   
-              if ($freq eq "WEEKLY") {                                          # wöchentliche Wiederholung                            						                            
-                  if ($byday) {                                                 # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
-                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rDayOfWeekNew,$rDaysToAddOrSub); 
-                      my @ByDays   = split(",", $byday);                        # Array der Wiederholungstage
+              if ($freq eq "WEEKLY") {                                              # wöchentliche Wiederholung                            						                            
+                  if ($byday) {                                                     # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
+                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rNewTime,$rDayOfWeekNew,$rDaysToAddOrSub);                   
+                      my @ByDays   = split(",", $byday);                            # Array der Wiederholungstage
                       my $btsstart = $bts;
+                      $ci = -1;
                       
-                      foreach (@ByDays) {
-                          my $rNewTime     = $btsstart;
-                          my $rByDay       = $_;	                            # das erste Wiederholungselement
-                          my $rByDayLength = length($rByDay);                   # die Länge des Strings       
-  
-                          my $rDayStr;		                                    # Tag auf den das Datum gesetzt werden soll
-                          my $rDayInterval;	                                    # z.B. 2 = 2nd Tag des Monats oder -1 = letzter Tag des Monats
-                          if ($rByDayLength > 2) {
-                              $rDayStr      = substr($rByDay, -2);
-                              $rDayInterval = int(substr($rByDay, 0, $rByDayLength - 2));
-                          } else {
-                              $rDayStr      = $rByDay;
-                              $rDayInterval = 1;
-                          }
-  
-                          my @weekdays     = qw(SU MO TU WE TH FR SA);
-                          my ($rDayOfWeek) = grep {$weekdays[$_] eq $rDayStr} 0..$#weekdays;     # liefert Nr des Wochentages: SU = 0 ... SA = 6
-                          
-                          for ($ci=-1; $ci<$count; $ci++) {
+                      while ($ci<$count) {                                                   
+                          $rNewTime = $btsstart;
+                          foreach (@ByDays) {
+                              $ci++;
+                              my $rByDay       = $_;	                                            # das erste Wiederholungselement    
+                              my @weekdays     = qw(SU MO TU WE TH FR SA);
+                              my ($rDayOfWeek) = grep {$weekdays[$_] eq $rByDay} 0..$#weekdays;     # liefert Nr des Wochentages: SU = 0 ... SA = 6
                               
-                              $rNewTime += $interval*604800 if($ci>=0);                          # Wochenintervall addieren
                               ($nbss, $nbmm, $nbhh, $bmday, $bmonth, $byear, $rDayOfWeekNew, undef, undef) = localtime($rNewTime);                                        
                               
                               ($nbhh,$nbmm,$nbss)  = split(":", $nbtime);
-  
-                              if ($rDayOfWeekNew <= $rDayOfWeek) {                               # Nr aktueller Wochentag <= Sollwochentag
+
+                              if ($rDayOfWeekNew <= $rDayOfWeek) {                                  # Nr aktueller Wochentag <= Sollwochentag
                                   $rDaysToAddOrSub = $rDayOfWeek - $rDayOfWeekNew;
                               } else {
                                   $rDaysToAddOrSub = 7 - $rDayOfWeekNew + $rDayOfWeek;          
-                                  $rNewTime       -= 604800;                                     # eine Woche zurückgehen wenn Korrektur aufaddiert wurde
                               }                                            
-                    
-                              $rDaysToAddOrSub += (7 * ($rDayInterval - 1));                     # addiere Tagesintervall, z.B. 4th Freitag ...
-  
-                              $rNewTime = SSCal_plusNSeconds($rNewTime, 86400*$rDaysToAddOrSub, 1);                                                                                                
+
+                              $rNewTime = SSCal_plusNSeconds($rNewTime, 86400 * $rDaysToAddOrSub, 1);                             
                               ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($rNewTime,$startEndDiff);
-                                               
+               
                               $nbtime = $nbhh.$nbmm.$nbss;
                               $netime = $nehh.$nemm.$ness;
-  
+
                               my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
                               ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
                               ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
-  
+
                               Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
-                              if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
+                              if (defined $uets && ($uets < $nbts)) {                               # Event Ende (UNTIL) kleiner aktueller Select Start 
                                   Log3($name, 4, "$name - Ignore WEEKLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
                                   $ignore = 1;
                                   $done   = 0;                                        
-                              } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
+                              } elsif ($nets < $tstart || $nbts > $tend) {                          # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
                                   Log3($name, 4, "$name - Ignore WEEKLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
                                   $ignore = 1;
                                   $done   = 0;                                        
@@ -1884,19 +1870,21 @@ sub SSCal_extractEventlist ($) {
                                   $ets   = $nets?$nets:$ets;                  
                                   
                                   @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-  
+
                                   $ignore = 0;
                                   $done   = 1;
                                   $n++;
-                                  # next;
                               }                     
-                                                          
-                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);  
+                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);            
+                               
+                              
                           }
-                      }   
+                          last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);
+                          $btsstart += (7 * 86400 * $interval);                                    # addiere Tagesintervall, z.B. 4th Freitag ...                             
+                      }    
                   
                   } else {    
-                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rDayOfWeekNew,$rDaysToAddOrSub); 
+                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness); 
                       my $rNewTime = $bts;
                       
                       for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {
