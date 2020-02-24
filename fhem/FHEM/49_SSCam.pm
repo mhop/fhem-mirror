@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2019 by Heiko Maaz
+#       (c) 2015-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.2.1"  => "24.02.2020  set compatibility to SVS version 8.2.7 ",
   "9.2.0"  => "10.12.2019  attribute \"recChatTxt\" for sending recordings by SSChatBot ",
   "9.1.0"  => "08.12.2019  attribute \"snapChatTxt\" for sending snapshots by SSChatBot ",
   "9.0.6"  => "26.11.2019  minor code change ",
@@ -317,7 +318,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat = "8.2.6";
+my $compstat = "8.2.7";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
