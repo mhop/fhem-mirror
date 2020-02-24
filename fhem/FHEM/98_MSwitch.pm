@@ -62,7 +62,7 @@ use LWP::Simple;
 
 my $preconffile="https://raw.githubusercontent.com/Byte009/MSwitch_Addons/master/MSwitch_Preconf.conf";
 my $autoupdate = 'off';    #off/on
-my $version    = '3.01';
+my $version    = '3.02';
 my $vupdate    = 'V2.00'; # versionsnummer der datenstruktur . änderung der nummer löst MSwitch_VUpdate aus .
 my $savecount = 50; # anzahl der zugriff im zeitraum zur auslösung des safemodes. kann durch attribut überschrieben werden .
 my $savemodetime = 10000000; # Zeit für Zugriffe im Safemode
@@ -241,6 +241,7 @@ sub MSwitch_Initialize($) {
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  MSwitch_Sequenz:textField-long "
       . "  MSwitch_Sequenz_time"
+	  . "  MSwitch_setList:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
       . "  MSwitch_Eventhistory:0,1,2,3,4,5,10,20,30,40,50,60,70,80,90,100,150,200"
@@ -1138,13 +1139,13 @@ sub MSwitch_Set($@) {
     my ( $hash, $name, $cmd, @args ) = @_;
     #MSwitch_LOG( $name, 6, "$name Set $cmd, @args " . __LINE__ );
 	
+	my $dynlist ="";
 	
 	if ($cmd ne "?"){
 	MSwitch_LOG( $name, 6, "########## Ausführung Routine SET " . __LINE__ );
 	MSwitch_LOG( $name, 6, "Befehl: Set $cmd, @args " . __LINE__ );
 	}
 	
-
 #lösche saveddevicecmd 
     MSwitch_del_savedcmds($hash);
     return "" if ( IsDisabled($name) && ( $cmd eq 'on' || $cmd eq 'off' ) );# Return without any further action if the module is disabled
@@ -1205,6 +1206,55 @@ sub MSwitch_Set($@) {
 		MSwitch_Check_Event( $hash, "MSwitch_self:".$cmd.":".$args[0] ) if defined $setlist{$cmd};
 	}
 
+##########################
+
+
+	# mswitch dyn setlist
+		my $mswitchsetlist = AttrVal( $name, 'MSwitch_setList', "undef" );
+		my @arraydynsetlist;
+		my @arraydynreadinglist;
+		
+		my $dynsetlist ;
+		if ($mswitchsetlist ne "undef")
+		{
+			my @dynsetlist = split( / /,$mswitchsetlist);
+			
+			foreach my $test (@dynsetlist) 
+			{ 
+				if ( $test =~ m/(.*)\[(.*)\]:?(.*)/ )
+					{
+					
+					my @found_devices = devspec2array($2);
+					
+					if ($1 ne "")
+						{
+						my $reading = $1;
+						chop ($reading);
+						push @arraydynsetlist, $reading;
+						$dynlist =join( ',', @found_devices );
+						$dynsetlist=$dynsetlist.$reading.":".$dynlist." ";
+						}
+						
+					if ($3 ne "")
+						{
+						my $sets = $3;
+						foreach my $test1 (@found_devices) 
+							{
+							push @arraydynsetlist, $test1;
+							$dynsetlist=$dynsetlist.$test1.":".$sets." ";
+							}
+						@arraydynreadinglist=@found_devices;
+						}
+					}
+				else
+					{
+					$dynsetlist=$dynsetlist.$test;
+					}
+			}
+			
+		}
+###########################
+
 my %setlist;
 
     if ( !defined $args[0] ) { $args[0] = ''; }
@@ -1224,8 +1274,11 @@ my %setlist;
 		my ($arg1,$arg2) = split( ":", $_ );
 		if (!defined $arg2 or $arg2 eq "") {$arg2 = "noArg"}
 		$setlist{$arg1} = $arg2;
+
 		}
 	
+	##########################
+
         foreach my $k ( sort keys %sets ) 
 		{
             my $opts = undef;
@@ -1266,7 +1319,23 @@ my %setlist;
                 }
                 return;
 			}
+
+			@gefischt = grep( /$re/, @arraydynsetlist );
+			if ( @arraydynsetlist && grep /$re/, @arraydynsetlist ) 
+			{
 			
+				my @rl = split( " ", AttrVal( $name, "readingList", "" ) );
+                if (( @rl && grep /$re/, @rl ) || ( @arraydynreadinglist && grep /$re/, @arraydynreadinglist ))
+				{
+                    readingsSingleUpdate( $hash, $cmd, "@args", 1 );
+                }
+                else 
+				{
+                    readingsSingleUpdate( $hash, "state", $cmd . " @args", 1 );
+                }
+                return;
+			}
+				
 ##############################
 # dummy state setzen und exit
          if ( $devicemode eq "Dummy" ) 
@@ -1299,8 +1368,6 @@ my %setlist;
         }
 ############################################
 
-
-
 		if (exists $hash->{helper}{config} && $hash->{helper}{config} eq "no_config")
 		{
 		return "Unknown argument $cmd, choose one of wizard:noArg"
@@ -1309,11 +1376,11 @@ my %setlist;
 
         if ( $devicemode eq "Notify" ) 
 		{
-            return "Unknown argument $cmd, choose one of reset_device:noArg active:noArg inactive:noArg del_function_data:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg del_repeats:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
+            return "Unknown argument $cmd, choose one of $dynsetlist reset_device:noArg active:noArg inactive:noArg del_function_data:noArg del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait reload_timer:noArg del_repeats:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
         }
         elsif ( $devicemode eq "Toggle" ) 
 		{
-            return "Unknown argument $cmd, choose one of reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off del_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg del_repeats:noArg change_renamed $setList $special";
+            return "Unknown argument $cmd, choose one of $dynsetlist reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off del_delays:noArg backup_MSwitch:all_devices fakeevent wait reload_timer:noArg del_repeats:noArg change_renamed $setList $special";
         }
         elsif ( $devicemode eq "Dummy" ) 
 		{
@@ -1324,14 +1391,14 @@ my %setlist;
 			}
 			else
 			{
-			    return "Unknown argument $cmd, choose one of del_repeats:noArg del_delays:noArg exec_cmd_1 exec_cmd_2 reset_device:noArg state backup_MSwitch:all_devices $setList $special";
+			    return "Unknown argument $cmd, choose one of $dynsetlist del_repeats:noArg del_delays:noArg exec_cmd_1 exec_cmd_2 reset_device:noArg state backup_MSwitch:all_devices $setList $special";
 			}
 
 	   }
         else 
 		{
             #full
-            return "Unknown argument $cmd, choose one of del_repeats:noArg reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
+            return "Unknown argument $cmd, choose one of $dynsetlist del_repeats:noArg reset_device:noArg active:noArg del_function_data:noArg inactive:noArg on off  del_delays:noArg backup_MSwitch:all_devices fakeevent exec_cmd_1 exec_cmd_2 wait del_repeats:noArg reload_timer:noArg change_renamed reset_cmd_count:1,2,all $setList $special";
         }
     }
 
@@ -1457,6 +1524,7 @@ $hash->{helper}{modesince} =time;
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  MSwitch_Sequenz:textField-long "
       . "  MSwitch_Sequenz_time"
+	  . "  MSwitch_setList:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
       . "  MSwitch_Eventhistory:0,1,2,3,4,5,10,20,30,40,50,60,70,80,90,100,150,200"
@@ -1507,7 +1575,6 @@ $hash->{helper}{modesince} =time;
         return;
 		#  MSwitch_Delete_Delay( $hash, $name );
     }
-	#MSwitch_LOG( $name, 5,"BEFEHL. $cmd ");
 ##############################
     if ( $cmd eq 'inactive' ) 
 	{
@@ -2861,6 +2928,7 @@ sub MSwitch_Attr(@) {
       . "  MSwitch_Mode:Full,Notify,Toggle,Dummy"
 	  . "  MSwitch_Selftrigger_always:0,1"
 	  . "  useSetExtensions:0,1"
+	  . "  MSwitch_setList:textField-long "
       . "  MSwitch_Event_Id_Distributor:textField-long "
       . "  setList:textField-long "
       . "  readingList:textField-long "
@@ -5413,7 +5481,7 @@ $controlhtml=~ s/#/\n/g;
 					  </td></tr></table>
 					  ";
 					  
-					if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+					if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' ) 
 							{				  
 							$MSTEST1="<input name='info' name='TestCMD". $_
 							. "' id='TestCMD". $_
@@ -5447,7 +5515,7 @@ $controlhtml=~ s/#/\n/g;
 	
 
 
-								if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+								if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' ) 
 									{
 										$MSTEST1="<input name='info' name='TestCMD". $_
 										. "' id='TestCMD". $_
@@ -5481,7 +5549,7 @@ $controlhtml=~ s/#/\n/g;
 									$EXECset1.="<input hidden type=\"checkbox\" $exit1 name='exit1". $nopoint . "' /> ";
 								}
 
-								if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+								if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' ) 
 								{
 								$COND1check1="<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionon"
 							  . $_
@@ -5520,7 +5588,7 @@ $controlhtml=~ s/#/\n/g;
 				$EXECset2.="<input hidden type=\"checkbox\" $exit2 name='exit1". $nopoint . "' /> ";	  
                 }
 
-                if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' )
+                if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' ) 
 				{  
 				$COND2check2="<input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('conditionoff"
 									  . $_
@@ -6325,7 +6393,7 @@ $extrakt1 =~ s/\n/#/g;
 		$MSconditiontext = "Trigger condition (time&events)";
     }
 
-    if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' ) 
+    if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' ) 
 	{
 	$MScheckcondition =" <input name='info' type='button' value='check condition' onclick=\"javascript: checkcondition('triggercondition','$Name:trigger:conditiontest')\">";
 	}
@@ -6626,7 +6694,7 @@ $triggerdetailhtml=~ s/#/\n/g;
 		<input type=\"button\" id=\"aw_md1\" value=\"apply filter to saved events\" $disable>
 		<input type=\"button\" id=\"aw_md2\" value=\"clear saved events\" $disable>";
 		
-        if ( AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' && $optiongeneral ne '' )
+        if ( (AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '1' || AttrVal( $Name, 'MSwitch_Debug', "0" ) eq '3' )  && $optiongeneral ne '' )
         {
 			$MSTESTEVENT="<select id = \"eventtest\" name=\"eventtest\">"
               . $optiongeneral
@@ -9506,10 +9574,6 @@ my @wertpaar2;
 		$reading = ReadingsAge( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "ReadingsAge";
 		$reading = AttrVal( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "AttrVal";
 		$reading = InternalVal( $readingdevice, $readingname, $readingstandart ) if $readingtyp eq "InternalVal";
-		
-		MSwitch_LOG( "Debug ", 5,"reading: $readingdevice , $readingname  " . __LINE__ );
-		MSwitch_LOG( "Debug ", 5,"reading: $reading  " . __LINE__ );
-		MSwitch_LOG( "Debug ", 5,"conditionausgang : $condition" . __LINE__ );
         $condition = $firstpart . $reading . $lastpart;
 
 		$x++;
@@ -9527,22 +9591,14 @@ my @wertpaar2;
         my $lastpart   = $3;
         my $exec       = "\$field = " . $2;
 		
-		#MSwitch_LOG( "Debug", 0,"secondpart: ".$secondpart . __LINE__ );
 			if ( $secondpart =~ m/(!\$.*|\$.*)/ ) 
 			{
 				$field = $secondpart;
 			}
 			else 
 			{
-			
-				#if ($debugging eq "1")
-				#{
-				#MSwitch_LOG( "Debug", 0,"eval line" . __LINE__ );
-				#}
-
 				eval($exec);
 			}
-		
 		
         if ( $field =~ m/([0-9]{2}):([0-9]{2}):([0-9]{2})/ ) 
 		{
@@ -9558,8 +9614,6 @@ my @wertpaar2;
         $x++;
         last if $x > 10;    #notausstieg
     }
-
-#MSwitch_LOG( "Debug", 0,$condition . __LINE__ );
 
     if ( $attrrandomnumber ne '' ) {
         MSwitch_Createnumber($hash);
