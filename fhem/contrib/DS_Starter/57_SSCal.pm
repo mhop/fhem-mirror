@@ -252,7 +252,7 @@ sub SSCal_Define($@) {
   readingsBeginUpdate         ($hash);
   readingsBulkUpdateIfChanged ($hash, "Errorcode", "none");
   readingsBulkUpdateIfChanged ($hash, "Error",     "none");   
-  readingsBulkUpdateIfChanged ($hash, "QueueLenth", 0);                          # Länge Sendqueue initialisieren
+  readingsBulkUpdateIfChanged ($hash, "QueueLength", 0);                         # Länge Sendqueue initialisieren
   readingsBulkUpdate          ($hash, "nextUpdate", "Manual");                   # Abrufmode initial auf "Manual" setzen   
   readingsBulkUpdate          ($hash, "state", "Initialized");                   # Init state
   readingsEndUpdate           ($hash,1);              
@@ -3168,7 +3168,7 @@ sub SSCal_updQLength ($;$) {
   my $ql = keys %{$data{SSCal}{$name}{sendqueue}{entries}};
   
   readingsBeginUpdate($hash);                                             
-  readingsBulkUpdate ($hash, "QueueLenth", $ql);                                   # Länge Sendqueue updaten
+  readingsBulkUpdate ($hash, "QueueLength", $ql);                                  # Länge Sendqueue updaten
   readingsEndUpdate  ($hash,1);
   
   my $head = "next planned SendQueue start:";
@@ -3394,7 +3394,7 @@ sub SSCal_delReadings ($$) {
   my ($name,$respts) = @_;
   my ($lu,$rts,$excl);
   
-  $excl  = "Error|Errorcode|QueueLenth|state|nextUpdate";
+  $excl  = "Error|Errorcode|QueueLength|state|nextUpdate";
   $excl .= "|lastUpdate" if($respts);
   
   my @allrds = keys%{$defs{$name}{READINGS}};
@@ -3991,7 +3991,7 @@ return $default;
 1;
 
 =pod
-=item summary    module to integrate Synology Calendar
+=item summary    Module to integrate Synology Calendar
 =item summary_DE Modul zur Integration von Synology Calendar
 =begin html
 
@@ -4011,7 +4011,522 @@ The guide for this module is currently only available in the german <a href="htt
 <h3>SSCal</h3>
 <ul>
 
-Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wiki/SSCal - Integration des Synology Calendar Servers">Wiki</a> vorhanden.
+    Mit diesem Modul erfolgt die Integration des Synology Calendar Servers in FHEM. 
+	Das Modul SSCal basiert auf Funktionen der Synology Calendar API. <br><br> 
+	
+	Die Verbindung zum Kalenderserver erfolgt über eine	Session ID nach erfolgreichem Login. Anforderungen/Abfragen des Servers 
+	werden intern in einer Queue gespeichert und sequentiell abgearbeitet. Steht der Kalenderserver temporär nicht zur Verfügung, 
+	werden die gespeicherten Abfragen nachgeholt sobald die Verbindung zum Server wieder funktioniert. <br><br>
+
+    Es können sowohl Terminkalender (Events) und Aufgabenlisten (ToDo) verarbeitet werden. Für diese verschiedenen Kalenderarten 
+    können verschiedene Device-Models definiert werden, Model <b>Diary</b> für Terminkalender und Model <b>Tasks</b> für 
+    Aufgabenlisten. <br><br>
+    
+    Wenn sie über dieses Modul diskutieren oder zur Verbesserung des Moduls beitragen möchten, ist im FHEM-Forum ein Sammelplatz unter:<br>
+    <a href="https://forum.fhem.de/index.php/topic,106963.0.html">57_SSCal - Modul für den Synology Kalender</a>.<br><br>
+
+    Weitere Infomationen zum Modul sind im FHEM-Wiki zu finden:<br>
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
+    <br><br><br>
+    
+    
+    <b>Vorbereitung </b> <br><br>
+    
+    <ul>	
+    Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. 
+	Weiterhin müssen diverse Perl-Module installiert sein wie unten angegeben. <br> 
+    Im Synology DSM wird ein User benutzt, der Mitglied der Administrator-Group sein <b>muß</b> und zusätzlich die benötigte Berechtigung
+	zum Lesen und/oder Schreiben der relevanten Kalender hat. Die Kalenderberechtigungen werden direkt in der 
+    <a href="https://www.synolgy.com/de-de/knowledgebase/DSM/help/Calendar/calendar_desc">Synology Kalenderapplikation</a> eingestellt.
+	
+	Die Zugangsdaten werden später über ein Set <b>credentials</b> Kommando dem angelegten Device zugewiesen.
+    <br><br>
+        
+    Überblick über die Perl-Module welche von SSCal genutzt werden: <br><br>
+    
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                   </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                   </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                   </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                   </td></tr>
+    <tr><td>Encode              </td><td>                                   </td></tr>
+    <tr><td>POSIX               </td><td>                                   </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM-Modul)                       </td></tr>
+    <tr><td>Meta                </td><td>(FHEM-Modul)                       </td></tr>
+    </table>
+    
+    <br><br>    
+    </ul>
+
+<a name="SSCaldefine"></a>
+<b>Definition</b>
+  <ul>
+  <br>
+    Bei der Definition wird zwischen einem Kalenderdevice für Termine (Events) und Aufagebn (Tasks) unterschieden. 
+	<br><br>
+	
+    Die Definition erfolgt mit: <br><br>
+	<ul>
+      <b><code>define &lt;Name&gt; SSCal &lt;ServerAddr&gt; [&lt;Port&gt;] [&lt;Protocol&gt;] [Tasks] </code></b> <br><br>
+    </ul>
+    
+    Die Parameter beschreiben im Einzelnen:
+    <br>
+    <br>    
+    
+    <table>
+    <colgroup> <col width=15%> <col width=85%> </colgroup>
+    <tr><td><b>Name</b>           </td><td>der Name des neuen Kalenderdevices in FHEM </td></tr>
+    <tr><td><b>ServerAddr</b>     </td><td>die IP-Addresse der Synology DS. <b>Hinweis:</b> Wird ein Servername angegeben, sollte das Attribut dnsServer im glbal Device gesetzt werden ! </td></tr>
+    <tr><td><b>Port</b>           </td><td>optional - Port der Synology DS (default: 5000). </td></tr>
+    <tr><td><b>Protocol</b>       </td><td>optional - Protokoll zur Kommunikation mit dem Kalender-Server, http oder https (default: http). </td></tr>
+    <tr><td><b>Tasks</b>          </td><td>optional - zur Definition einer Aufgabenliste wird "Tasks" hinzugefügt </td></tr>
+    </table>
+
+    <br><br>
+
+    <b>Beispiel:</b>
+     <pre>
+      <code>define Appointments SSCal 192.168.2.10 </code>
+      <code>define Appointments SSCal 192.168.2.10 5001 https </code>
+      # erstellt Terminkalenderdevice mit Standardport (5000/http) bzw. https auf Port 5001
+
+      <code>define Tasklist SSCal ds.myds.org 5001 https Tasks </code>
+      # erstellt Aufgabenlistendevice mit https auf Port 5001
+     </pre>
+     
+    Nach der Definition eines Devices steht nur der set-Befehl <a href="#SSCalcredentials">credentials</a> zur Verfügung.
+	Mit diesem Befehl werden zunächst die Zugangsparameter dem Device bekannt gemacht. <br><br>
+
+    War der Login erfolgreich, werden alle dem User zugänglichen Kalender ermittelt und im 
+    Attribut <a href="#SSCalusedCalendars">usedCalendars</a> zur Auswahl bereitgestellt.	
+    <br><br><br>
+    </ul>
+  
+<a name="SSCalset"></a>
+<b>Set </b>
+
+<ul>
+  <br>
+  Die aufgeführten set-Kommandos sind sowohl für die Devicemodels Diary/Tasks oder teilweise nur für einen dieser Devicemodels gültig.
+  <br><br>
+  
+  <ul>
+  <a name="SSCalcalUpdate"></a>
+  <li><b> calUpdate [&lt;Kalenderliste&gt;] </b> <br>
+  
+  Ruft die Einträge der selektierten Kalender (siehe Attribut <a href="#SSCalusedCalendars">usedCalendars</a>) ab. 
+  Alternativ kann eine Komma getrennte Liste der abzufunden Kalender dem Befehl übergeben werden. Die Kalendernamen können Leerzeichen 
+  enthalten. 
+  <br><br>
+  
+  <ul>
+    <b>Beispiel:</b> <br><br>
+
+    set Appointments calUpdate  <br>
+    # ruft die Einträge der im Attribut usedCalendars spezifizierten Kalender ab <br><br>
+  
+    set Appointments calUpdate Heikos Kalender,Abfall <br>
+    # ruft die Einträge der Kalender "Heikos Kalender" und "Abfall" ab. <br><br>
+  </ul>
+
+  </li><br>
+  </ul>
+
+  <ul>
+  <a name="SSCalcleanCompleteTasks"></a>
+  <li><b> cleanCompleteTasks </b> &nbsp;&nbsp;&nbsp;&nbsp;(nur Model "Tasks") <br>
+  
+  In den selektierten Aufgabenlisten (siehe Attribut <a href="#SSCalusedCalendars">usedCalendars</a>) werden alle 
+  abgeschlossenen Aufgaben gelöscht. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCaldeleteEventId"></a>
+  <li><b> deleteEventId &lt;Id&gt; </b> <br>
+  
+  Die angegebene Event Id (siehe Reading x_x_EventId) wird aus dem Kalender bzw. der Aufgabenliste gelöscht. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalcredentials"></a>
+  <li><b> credentials &lt;User&gt; &lt;Passwort&gt; </b> <br>
+  
+  Speichert die Zugangsdaten. <br>
+  
+  </li><br>
+  </ul> 
+  
+  <ul>
+  <a name="SSCaleraseReadings"></a>
+  <li><b> eraseReadings </b> <br>
+  
+  Löscht alle Kalenderreadings. <br> 
+  
+  </li><br>
+  </ul>  
+  
+  <ul>
+  <a name="SSCallistSendqueue"></a>
+  <li><b> listSendqueue </b> <br>
+  
+  Zeigt alle Einträge in der Sendequeue. Die Queue ist normalerweise nur kurz gefüllt, kann aber im Problemfall 
+  dauerhaft Einträge enthalten. Dadurch kann ein bei einer Abrufaufgabe aufgetretener Fehler ermittelt und zugeordnet
+  werden. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCallogout"></a>
+  <li><b> logout </b> <br>
+  
+  Der User wird ausgeloggt und die Session mit der Synology DS beendet. <br> 
+  
+  </li><br>
+  </ul> 
+  
+  <ul>
+  <a name="SSCalpurgeSendqueue"></a>
+  <li><b> purgeSendqueue </b> <br>
+  
+  Löscht Einträge in der Sendequeue. Es stehen verschiedene Optionen je nach Situation zur Verfügung: <br><br> 
+   <ul>
+    <table>
+    <colgroup> <col width=15%> <col width=85%> </colgroup>
+      <tr><td>-all-         </td><td>löscht alle in der Sendequeue vorhandenen Einträge </td></tr>
+      <tr><td>-permError-   </td><td>löscht alle Einträge, die durch einen permanenten Fehler von der weiteren Verarbeitung ausgeschlossen sind </td></tr>
+      <tr><td>&lt;Index&gt; </td><td>löscht einen eindeutigen Eintrag der Sendequeue </td></tr>
+    </table>
+   </ul>
+   
+  </li><br>
+  </ul>
+   
+  <ul>
+  <a name="SSCalrestartSendqueue"></a>
+  <li><b> restartSendqueue </b> <br>
+  
+  Die Abarbeitung der Einträge in der Sendequeue wird manuell neu angestoßen. Normalerweise nicht nötig, da die Sendequeue bei der 
+  Initialisierung jedes neuen Abrufs impliziz neu gestartet wird. <br>
+  
+  </li><br>
+  </ul>   
+   
+ </ul>
+
+<a name="SSCalget"></a>
+<b>Get</b>
+ <ul>
+  <br>
+ 
+  <ul>
+  <a name="SSCalapiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Ruft die API Informationen des Synology Calendar Servers ab und öffnet ein Popup mit diesen Informationen.
+  <br>
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalcalAsHtml"></a>
+  <li><b> calAsHtml </b> <br>
+  
+  Zeigt ein Popup mit einer Terminübersicht. In eigenen perl-Routinen und für die Einbindung in weblink kann 
+  diese Übersicht aufgerufen werden mit: <br><br>
+  
+    <ul>
+      { SSCal_calAsHtml ("&lt;SSCal-Device&gt;") }
+    </ul>  
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalgetCalendars"></a>
+  <li><b> getCalendars </b> <br>
+  
+  Ruft die auf der Synology vorhandenen Kalender ab und öffnet ein Popup mit Informationen über die jeweiligen Kalender. 
+  </li><br>  
+  
+  <br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalstoredCredentials"></a>
+  <li><b> storedCredentials </b> <br>
+  
+  Zeigt die gespeicherten User/Passwort Kombination. 
+  </li><br>  
+  
+  <br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalversionNotes"></a>
+  <li><b> versionNotes </b> <br>
+  
+  Zeigt Informationen und Hilfen zum Modul.
+  </li><br>  
+  
+  <br>
+  </ul>
+ </ul>  
+  
+<a name="SSCamattr"></a>
+<b>Attribute</b>
+ <br><br>
+ <ul>
+  
+  <ul>  
+  <a name="asyncMode"></a>
+  <li><b>asyncMode</b> <br> 
+  
+    Wenn "1" wird das Datenparsing in einen Hintergrundprozess ausgelagert und vermeidet Blockierungssituationen. <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="createATDevs"></a>
+  <li><b>createATDevs</b> <br> 
+  
+    Wenn "1" werden bei der Erkennung von FHEM-Kommandos bzw. auszuführenden Perl-Routinen im Kalendereintrag durch SSCal 
+    automatisiert at-Devices zur termingerechten Ausführung dieser Kommandos erstellt, geändert und gelöscht. <br>
+    Auszuführende FHEM-Kommandos werden in <b>{ }</b> eingeschlossen im Feld <b>Beschreibung</b> im Synology Kalender WebUI
+    hinterlegt, Perl Routinen werden in doppelte <b>{{ }}</b> eingeschlossen. <br>    
+    Lesen sie bitte dazu die detailliierte Beschreibung im Wiki Abschnitt
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
+    <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="cutOlderDays"></a>
+  <li><b>cutOlderDays</b> <br> 
+  
+    Terminkalendereinträge und Aufgabenkalendereinträge mit Fälligkeitstermin älter als die angegeben Tage werden von der 
+    Verarbeitung ausgeschlossen. <br>
+    (default: 5) <br><br>
+    
+    <ul>
+      <b>Beispiel:</b> <br><br>
+
+      attr &lt;Name&gt; cutOlderDays 30  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="cutLaterDays"></a>
+  <li><b>cutLaterDays</b> <br> 
+  
+    Terminkalendereinträge und Aufgabenkalendereinträge mit Fälligkeitstermin später als die angegeben Tage werden von der 
+    Verarbeitung ausgeschlossen. <br>
+    (default: 5) <br><br>
+    
+    <ul>
+      <b>Beispiel:</b> <br><br>
+
+      attr &lt;Name&gt; cutLaterDays 90  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="filterCompleteTask"></a>
+  <li><b>filterCompleteTask </b> &nbsp;&nbsp;&nbsp;&nbsp;(nur Model "Tasks") <br> 
+  
+    Es werden Einträge in Aufgabenkalendern entsprechend der Fertigstellung gefiltert: <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td>1  </td><td>nur fertig gestellte Aufgaben werden angezeigt                   </td></tr>
+      <tr><td>2  </td><td>nur nicht fertige Aufgaben werden angezeigt                      </td></tr>
+      <tr><td>3  </td><td>es werden fertige und nicht fertige Aufgaben angezeigt (default) </td></tr>
+     </table>
+    </ul>   
+    
+  </li><br>
+  </ul> 
+
+  <ul>  
+  <a name="filterDueTask"></a>
+  <li><b>filterDueTask </b> &nbsp;&nbsp;&nbsp;&nbsp;(nur Model "Tasks") <br> 
+  
+    Es werden Einträge in Aufgabenkalendern mit/ohne Fälligkeit gefiltert: <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td>1  </td><td>nur Einträge mit Fälligkeitstermin werden angezeigt                   </td></tr>
+      <tr><td>2  </td><td>nur Einträge ohne Fälligkeitstermin werden angezeigt                  </td></tr>
+      <tr><td>3  </td><td>es werden Einträge mit und ohne Fälligkeitstermin angezeigt (default) </td></tr>
+     </table>
+    </ul>   
+    
+  </li><br>
+  </ul> 
+
+  <ul>  
+  <a name="interval"></a>
+  <li><b>interval</b> <br> 
+  
+    Automatischer Abrufintervall der Kalendereintträge in Sekunden. Ist "0" agegeben, wird kein automatischer Datenabruf 
+    ausgeführt. (default) <br>
+    Sollen z.B. jede Stunde die Einträge der gewählten Kalender abgerufen werden, wird das Attribut wie 
+    folgt gesetzt: <br><br>
+    
+    <ul>
+      attr &lt;Name&gt; interval 3600  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>  
+  
+  <ul>  
+  <a name="loginRetries"></a>
+  <li><b>loginRetries</b> <br> 
+  
+    Anzahl der Versuche für das inititiale User login. <br>
+    (default: 3)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="showRepeatEvent"></a>
+  <li><b>showRepeatEvent</b> &nbsp;&nbsp;&nbsp;&nbsp;(nur Model "Diary") <br> 
+  
+    Wenn "true" werden neben einmaligen Terminen ebenfalls wiederkehrende Termine ausgewertet. <br>
+    (default: true)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="showPassInLog"></a>
+  <li><b>showPassInLog</b> <br> 
+  
+    Wenn "1" wird das Passwort bzw. die SID im Log angezeigt. <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableColumnMap"></a>
+  <li><b>tableColumnMap </b> <br> 
+  
+    Legt fest, wie der Link zur Karte in der Tabellspalte "Map" bzw. "Karte" gestaltet wird: <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td><b>icon</b>   </td><td>es wird ein durch den User anpassbares Symbol angezeigt (default)  </td></tr>
+      <tr><td><b>data</b>   </td><td>es werden die GPS-Daten angezeigt                                  </td></tr>
+      <tr><td><b>text</b>   </td><td>es wird ein durch den Nutzer einstellbarer Text verwendet          </td></tr>
+     </table>
+    </ul>  
+
+    <br>
+    Der Nutzer kann weitere Anpassungen des verwendeten Icons oder Textes in den Eigenschaften des Attributs tableSpecs 
+    vornehmen. Für detailliierte Informationen dazu siehe Wiki-Kapitel 
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
+    <br>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableInDetail"></a>
+  <li><b>tableInDetail</b> <br> 
+  
+    Eine Termin/Aufgabenübersicht wird in der Detailansicht erstellt bzw. ausgeschaltet. <br>
+    (default: 1)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableInRoom"></a>
+  <li><b>tableInRoom</b> <br> 
+  
+    Eine Termin/Aufgabenübersicht wird in der Raumansicht erstellt bzw. ausgeschaltet. <br>
+    (default: 1)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableFields"></a>
+  <li><b>tableFields</b> <br> 
+  
+    Auswahl der in der Termin/Aufgabenübersicht (Raum- bzw. Detailansicht) anzuzeigenden Felder über eine Drop-Down 
+    Liste. <br>
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableSpecs"></a>
+  <li><b>tableSpecs</b> <br> 
+  
+    Über verschiedene Schlüssel-Wertpaar Kombinationen kann die Darstellung der Informationen in der Übersichtstabelle 
+    angepasst werden. Das Wiki-Kapitel
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
+    liefert detailiierte Informationen dazu.
+     
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="timeout"></a>
+  <li><b>timeout</b> <br> 
+  
+    Timeout für den Datenabruf in Sekunden. <br>
+    (default: 20)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="usedCalendars"></a>
+  <li><b>usedCalendars</b> <br> 
+  
+    Auswahl der abzurufenden Kalender über ein Popup. Die Liste der Kalender wird beim Start des Moduls initial gefüllt, 
+    kann danach aber ebenfalls durch den Befehl: <br><br>
+
+    <ul>
+      get &lt;Name&gt; getCalendars  <br>
+    </ul>   
+    
+    <br>
+    manuell ausgeführt werden. 
+    Wurde noch kein erfolgreicher Kalenderabruf ausgeführt, enthält dieses Attribut lediglich den Eintrag: <br><br>
+    
+    <ul>
+      --wait for Calendar list--  <br>
+    </ul>    
+    
+  </li><br>
+  </ul> 
+  
+ </ul> 
+<br>
  
 </ul>
 
@@ -4046,6 +4561,7 @@ Die Beschreibung des Moduls ist momentan nur im <a href="https://wiki.fhem.de/wi
       "requires": {
         "FHEM": 5.00918799,
         "perl": 5.014,
+        "POSIX": 0,
         "JSON": 4.020,
         "Data::Dumper": 0,
         "MIME::Base64": 0,
