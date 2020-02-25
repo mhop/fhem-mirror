@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.021
+#  Version 4.3.022
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.021';
+my $HMCCU_VERSION = '4.3.022';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -1548,23 +1548,37 @@ sub HMCCU_Set ($@)
 		return HMCCU_SetState ($hash, "OK");
 	}
 	elsif ($opt eq 'datapoint') {
-		$usage = "set $name $opt DevSpec [Channel].Datapoint=Value [...]\n";
+		$usage = "set $name $opt [DevSpec] [Device[,...]].[Channel].Datapoint=Value [...]\n";
 		my $devSpec = shift @$a;
 		
-		return HMCCU_SetError ($hash, $usage) if (scalar (keys %$h) < 1 || !defined($devSpec));
+		return HMCCU_SetError ($hash, $usage) if (scalar (keys %$h) < 1);
 
 		my $cmd = 1;
 		my %dpValues;
+		my @devSpecList = ();
 		
-		my @devList = devspec2array ($devSpec);
-		return HMCCU_SetError ($hash, "No FHEM device matching $devSpec in command set datapoint")
-			if (scalar (@devList) == 0);
+		if (defined($devSpec)) {
+			@devSpecList = devspec2array ($devSpec);
+			return HMCCU_SetError ($hash, "No FHEM device matching $devSpec in command set datapoint")
+				if (scalar (@devSpecList) == 0);
+		}
 		
 		foreach my $dptSpec (keys %$h) {
 			my $adr;
 			my $chn;
 			my $dpt;
-			my ($t1, $t2) = split (/\./, $dptSpec);
+			my @t = split (/\./, $dptSpec);
+			
+			my @devList = ();
+			
+			if (scalar(@t) == 3 || (scalar(@t) == 2 && $dptSpec !~ /^[0-9]{1,2}\.(.+)$/)) {
+				$devSpec = shift @t;
+				@devList = split (',', $devSpec);
+			}
+			else {
+				@devList = @devSpecList;
+			}
+			my ($t1, $t2) = @t;
 			
 			foreach my $devName (@devList) {
 				my $dh = $defs{$devName};
@@ -1599,6 +1613,7 @@ sub HMCCU_Set ($@)
 				my $statevals = AttrVal ($dh->{NAME}, 'statevals', '');
 
 				my $no = sprintf ("%03d", $cmd);
+				HMCCU_Log ($hash, 2, "$no.$ccuif.$devName:$chn.$dpt");
 				$dpValues{"$no.$ccuif.$devName:$chn.$dpt"} = HMCCU_Substitute ($h->{$dptSpec}, $statevals, 1, undef, '');
 				$cmd++;
 			}
@@ -8602,7 +8617,7 @@ sub HMCCU_CCURPC_ListDevicesCB ($$)
 		<li><b>set &lt;name&gt; cleardefaults</b><br/>
 			Clear default attributes imported from file.
 		</li><br/>
-		<li><b>set &lt;name&gt; datapoint &lt;FHEM-DevSpec&gt; [&lt;channel-number&gt;].&lt;datapoint&gt;=&ltvalue&gt;</b><br/>
+		<li><b>set &lt;name&gt; datapoint [&lt;FHEM-DevSpec&gt;] [FHEM-Device[,...]][&lt;channel-number&gt;].&lt;datapoint&gt;=&ltvalue&gt;</b><br/>
 			Set datapoint values on multiple devices. If <i>FHEM-Device</i> is of type HMCCUDEV
 			a <i>channel-number</i> must be specified. The channel number is ignored for devices of
 			type HMCCUCHN.
