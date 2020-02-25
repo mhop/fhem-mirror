@@ -147,6 +147,8 @@
 #
 # 2019-02-16 - changed   default field length for table creation
 #
+# 2020-02-25 - added     support weekprofile in automatic migration
+#
 ##############################################################################
 =cut
 
@@ -609,6 +611,15 @@ sub cfgDB_MigrationImport() {
 	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=InfoPanel','LAYOUTFILE');
+	foreach $filename (@def) {
+		next unless $filename;
+		push @files, $filename;
+	}
+
+# find weekprofile configurations
+	$filename ='';
+	@def = '';
+	@def = _cfgDB_findDef('TYPE=weekprofile','CONFIGFILE');
 	foreach $filename (@def) {
 		next unless $filename;
 		push @files, $filename;

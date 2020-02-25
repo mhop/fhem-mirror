@@ -302,13 +302,14 @@ sub _cfgDB_readConfig() {
 			<li>93_DbLog.pm</li>
 			<li>95_holiday.pm</li>
 			<li>98_SVG.pm</li>
+			<li>98_weekprofile.pm</li>
 			<br/>
 			will use configDB to read their configuration data from database<br/> 
 			instead of formerly used configuration files inside the filesystem.<br/>
 			<br/>
 			This requires you to import your configuration files from filesystem into database.<br/>
 			<br/>
-			Example:<br/>
+			Examples:<br/>
 			<code>configdb fileimport FHEM/nrw.holiday</code><br/>
 			<code>configdb fileimport FHEM/myrss.layout</code><br/>
 			<code>configdb fileimport www/gplot/xyz.gplot</code><br/>
