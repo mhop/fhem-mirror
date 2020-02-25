@@ -637,6 +637,106 @@ sub DSBMobile_simpleHTML($;$) {
 
 }
 ###################################
+sub DSBMobile_tableHTML($;$) {
+    my ( $name, $infoDay ) = @_;
+    my $dat  = ReadingsVal( $name, ".lastResult",  "" );
+    my $idat = ReadingsVal( $name, ".lastIResult", "" );
+    my @cn = split( ",", ReadingsVal( $name, "columnNames", "" ) );
+    my $classr = ReadingsVal( $name, "dsb_classReading", "Klasse_n_" );
+    my $ret = "<table>";
+
+    $dat  = decode_json($dat);
+    $idat = decode_json($idat);
+
+    my @data  = @$dat;
+    my @idata = @$idat;
+    return "no data found" if ( @data == 0 && ( @idata == 0 || !$infoDay ) );
+
+    if ( @data > 0 ) {
+        @data = sort { $a->{sdate} cmp $b->{sdate} or $a->{$classr} cmp $b->{$classr} } @data;
+    }
+
+    # get today
+    my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst )
+        = localtime( gettimeofday() );
+    $month++;
+    $year += 1900;
+    my $today = sprintf( '%04d-%02d-%02d', $year, $month, $mday );
+
+    # build a sorted array of valid dates
+    my %hash = ();
+    foreach my $d (@data) {
+        $hash{ $d->{sdate} } = 1 if $d->{sdate} ge $today;
+    }
+    if ($infoDay) {
+        foreach my $d (@idata) {
+            $hash{ $d->{sdate} } = 1 if $d->{sdate} ge $today;
+        }
+    }
+    my @days = keys %hash;
+    @days = sort { $a cmp $b } @days;
+
+    my $date = "";
+    my $class;
+    my $out = AttrVal( $name, "dsb_outputFormat", undef );
+
+    foreach my $day (@days) {
+        my $row   = 0;
+        my $class = "even";
+        $ret .= "</table><table class='block wide'><tr class='$class'><td><b>" . $day . "</b></td></tr>";
+        $row++;
+        if ($infoDay) {
+            foreach my $iline (@idata) {
+                if ( $row % 2 == 0 ) {
+                    $class = "even";
+                }
+                else {
+                    $class = "odd";
+                }
+                $row++;
+
+                if ( $iline->{sdate} eq $day ) {
+                    $ret
+                        .= "<tr class='$class'><td colspan ='@cn'>"
+                        . $iline->{topic} . ": "
+                        . $iline->{text}
+                        . "</td></tr>";
+                }
+            }
+        }
+        $ret .= "<tr>";
+        foreach my $c (@cn) {
+            $ret .= "<td>" . $c . "</td>";
+        }
+        $ret .= "</tr>";
+
+        foreach my $line (@data) {
+            if ( $line->{sdate} eq $day ) {
+                if ( $row % 2 == 0 ) {
+                    $class = "even";
+                }
+                else {
+                    $class = "odd";
+                }
+                $row++;
+
+                $ret .= "<tr class='$class'>";
+
+                foreach my $c (@cn) {
+                    $ret .= "<td>" . $line->{$c} . "</td>";
+
+                }
+                $ret .= "</tr>";
+
+            }
+        }
+    }
+
+    $ret .= "</table>";
+    return $ret;
+
+}
+###################################
 sub DSBMobile_infoHTML($) {
     my ( $name, $infoDay ) = @_;
     my $dat = ReadingsVal( $name, ".lastAResult", "" );
@@ -745,10 +845,14 @@ sub DSBMobileUUID() {
                 <li><a name="dsb_outputFormat">dsb_outputFormat</a>: can be used to format the output of the weblink. Takes the readingnames enclosed in % as variables, e.g. <code>%Klasse_n_%</code></li>
             </ul>
         </ul>
-        DSBMobile additionally provides two functions to display the information in weblinks:
+        DSBMobile additionally provides three functions to display the information in weblinks:
         <ul>
             <li>DSBMobile_simpleHTML($name ["dsb","showInfoOfTheDay"]): Shows the timetable changes, if the second optional parameter is "1", the Info of the Day will be displayed additionally.
+                The format may be defined with the dsb_outputFormat attribute
                 Example <code>defmod dsb_web weblink htmlCode {DSBMobile_simpleHTML("dsb",1)}</code>
+            </li>
+            <li>DSBMobile_tableHTML($name ["dsb","showInfoOfTheDay"]): Shows the timetable changes in a tabular format, if the second optional parameter is "1", the Info of the Day will be displayed additionally.
+                Example <code>defmod dsb_web weblink htmlCode {DSBMobile_tableHTML("dsb",1)}</code>
             </li>
             <li>DSBMobile_infoHTML($name): Shows the postings with links to the Details.
                 Example <code>defmod dsb_infoweb weblink htmlCode {DSBMobile_infoHTML("dsb")}</code>
@@ -821,10 +925,14 @@ sub DSBMobileUUID() {
                 <li><a name="dsb_outputFormat">dsb_outputFormat</a>: Kann benutzt werden, um den Output des weblinks zu formatieren. Die Readingnamen von % umschlossen können als Variablen verwendet werden, z.B. <code>%Klasse_n_%</code></li>
             </ul>
         </ul>
-        DSBMobile bietet zusätzlich zwei Funktionen, um die Informationen in weblinks darzustellen:
+        DSBMobile bietet zusätzlich drei Funktionen, um die Informationen in weblinks darzustellen:
         <ul>
             <li>DSBMobile_simpleHTML($name ["dsb",showInfoOfTheDay]): Zeigt den Vertretungsplan, wenn der zweite optionale Parameter auf "1" gesetzt wird, wird die Info des Tages zusätzlich mit angezeigt.
+                Die Darstellung kann durch das Attribut dsb_outputFormat beeinflusst werden
                 Beispiel <code>defmod dsb_web weblink htmlCode {DSBMobile_simpleHTML("dsb",1)}</code>
+            </li>
+            <li>DSBMobile_tableHTML($name ["dsb",showInfoOfTheDay]): Zeigt den Vertretungsplan in einfacher tabellarischer Ansicht, wenn der zweite optionale Parameter auf "1" gesetzt wird, wird die Info des Tages zusätzlich mit angezeigt.
+                Beispiel <code>defmod dsb_web weblink htmlCode {DSBMobile_tableHTML("dsb",1)}</code>
             </li>
             <li>DSBMobile_infoHTML($name): Zeigt die Aushänge mit Links zu den Details.
                 Beispiel <code>defmod dsb_infoweb weblink htmlCode {DSBMobile_infoHTML("dsb")}</code>
