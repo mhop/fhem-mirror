@@ -4101,7 +4101,7 @@ The guide for this module is currently only available in the german <a href="htt
 	Mit diesem Befehl werden zunächst die Zugangsparameter dem Device bekannt gemacht. <br><br>
 
     War der Login erfolgreich, werden alle dem User zugänglichen Kalender ermittelt und im 
-    Attribut <a href="#SSCalusedCalendars">usedCalendars</a> zur Auswahl bereitgestellt.	
+    Attribut <a href="#usedCalendars">usedCalendars</a> zur Auswahl bereitgestellt.	
     <br><br><br>
     </ul>
   
@@ -4117,7 +4117,7 @@ The guide for this module is currently only available in the german <a href="htt
   <a name="SSCalcalUpdate"></a>
   <li><b> calUpdate [&lt;Kalenderliste&gt;] </b> <br>
   
-  Ruft die Einträge der selektierten Kalender (siehe Attribut <a href="#SSCalusedCalendars">usedCalendars</a>) ab. 
+  Ruft die Einträge der selektierten Kalender (siehe Attribut <a href="#usedCalendars">usedCalendars</a>) ab. 
   Alternativ kann eine Komma getrennte Liste der abzufunden Kalender dem Befehl übergeben werden. Die Kalendernamen können Leerzeichen 
   enthalten. 
   <br><br>
@@ -4139,7 +4139,7 @@ The guide for this module is currently only available in the german <a href="htt
   <a name="SSCalcleanCompleteTasks"></a>
   <li><b> cleanCompleteTasks </b> &nbsp;&nbsp;&nbsp;&nbsp;(nur Model "Tasks") <br>
   
-  In den selektierten Aufgabenlisten (siehe Attribut <a href="#SSCalusedCalendars">usedCalendars</a>) werden alle 
+  In den selektierten Aufgabenlisten (siehe Attribut <a href="#usedCalendars">usedCalendars</a>) werden alle 
   abgeschlossenen Aufgaben gelöscht. <br> 
   
   </li><br>
