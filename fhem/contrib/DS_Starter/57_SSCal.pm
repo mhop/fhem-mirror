@@ -4033,8 +4033,7 @@ The guide for this module is currently only available in the german <a href="htt
     <b>Vorbereitung </b> <br><br>
     
     <ul>	
-    Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. 
-	Weiterhin müssen diverse Perl-Module installiert sein wie unten angegeben. <br> 
+	Als Grundvoraussetzung muss das <b>Synology Calendar Package</b> auf der Diskstation installiert sein. <br>    
     Im Synology DSM wird ein User benutzt, der Mitglied der Administrator-Group sein <b>muß</b> und zusätzlich die benötigte Berechtigung
 	zum Lesen und/oder Schreiben der relevanten Kalender hat. Die Kalenderberechtigungen werden direkt in der 
     <a href="https://www.synolgy.com/de-de/knowledgebase/DSM/help/Calendar/calendar_desc">Synology Kalenderapplikation</a> eingestellt.
@@ -4042,7 +4041,7 @@ The guide for this module is currently only available in the german <a href="htt
 	Die Zugangsdaten werden später über ein Set <b>credentials</b> Kommando dem angelegten Device zugewiesen.
     <br><br>
         
-    Überblick über die Perl-Module welche von SSCal genutzt werden: <br><br>
+    Weiterhin müssen diverse Perl-Module installiert sein: <br><br>
     
     <table>
     <colgroup> <col width=35%> <col width=65%> </colgroup>
