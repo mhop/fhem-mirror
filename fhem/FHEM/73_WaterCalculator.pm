@@ -72,6 +72,7 @@ sub WaterCalculator_Initialize($)
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
 								  "WFRUnit:l/min,m&sup3;/min,m&sup3;/h " .
 								  "Currency:&#8364;,&#163;,&#36; " .
+								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -111,6 +112,18 @@ sub WaterCalculator_Define($$$)
 	{
                                                    $hash->{system}{WFRUnitFactor} = 1;
 	}
+
+	### Convert Decimal Places 
+	if(defined($attr{$hash}{DecimalPlace})) {
+		$hash->{system}{DecimalPlace} = "%." . $attr{$hash}{DecimalPlace} . "f";
+	
+	}
+	else {
+		$hash->{system}{DecimalPlace} = "%.3f";
+	}
+	
+	### Defining notify trigger
+	$hash->{NOTIFYDEV} = $RegEx;
 		
 	### Writing log entry
 	Log3 $name, 5, $name. " : WaterCalculator - Starting to define module";
@@ -160,6 +173,16 @@ sub WaterCalculator_Attr(@)
 		elsif ($a[3] eq "m&sup3;/min") {$hash->{system}{WFRUnitFactor} = 0.001      ;}
 		elsif ($a[3] eq "m&sup3;/h")   {$hash->{system}{WFRUnitFactor} = 0.06       ;}
 		else                           {$hash->{system}{WFRUnitFactor} = 1          ;}
+	}
+
+	### Convert Decimal Places 
+	elsif ($a[2] eq "DecimalPlace") {
+		if (($a[3] >= 3) && ($a[3] <= 8)) {
+			$hash->{system}{DecimalPlace} = "%." . $a[3] . "f";
+		}
+		else {
+			$hash->{system}{DecimalPlace} = "%.3f";
+		}
 	}
 	
 	return undef;
@@ -426,6 +449,15 @@ sub WaterCalculator_Notify($$)
 			Log3 $WaterCalcName, 3, $WaterCalcName. " : WaterCalculator - The attribute room was missing and has been set to Water Consumption Counter";
 		}
 	}
+	if(!defined($attr{$WaterCalcName}{DecimalPlace}))
+	{
+		### Set attribute with standard value since it is not available
+		$attr{$WaterCalcName}{DecimalPlace}         = 3;
+		$WaterCalcDev->{system}{DecimalPlace} = "%.3f";
+		
+		### Writing log entry
+		Log3 $WaterCalcName, 3, $WaterCalcName. " : WaterCalculator - The attribute DecimalPlace was missing and has been set to 3";
+	}
 
 	### For each feedback on in the array of defined regexpression which has been changed
 	for (my $i = 0; $i < $NumberOfChangedEvents; $i++) 
@@ -520,7 +552,7 @@ sub WaterCalculator_Notify($$)
 		if(defined($WaterCountReadingValuePrevious))
 		{
 			### Write current water Consumption as previous water Consumption for future use in the WaterCalc-Device
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous value found. Continuing with calculations";
@@ -529,7 +561,7 @@ sub WaterCalculator_Notify($$)
 		else
 		{
 			### Write current water Consumption as previous Value for future use in the WaterCalc-Device
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous value NOT found. Skipping Loop";
@@ -616,12 +648,12 @@ sub WaterCalculator_Notify($$)
 			
 			### Save Water pure cost of previous day, current water Consumption as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_ConsumptionCostDayLast",  (sprintf('%.2f', ($WaterCalcConsumptionCostDayLast))), 1);
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_ConsumptionDayLast",      (sprintf('%.3f', ($WaterCalcConsumptionDayLast    ))), 1);
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_CounterDay1st",           (sprintf('%.3f', ($WaterCountReadingValueCurrent  ))), 1);
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_CounterDayLast",          (sprintf('%.3f', ($WaterCountReadingValuePrevious ))), 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_ConsumptionDayLast",      (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionDayLast    ))), 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_CounterDay1st",           (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent  ))), 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_CounterDayLast",          (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious ))), 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,  "." . $WaterCalcReadingPrefix . "_WFRDaySum",                0                                                   , 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,  "." . $WaterCalcReadingPrefix . "_WFRDayCount",              0                                                   , 1);
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_WFRDayMin",               (sprintf('%.3f', ($WaterCalcWFRCurrent            ))), 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_WFRDayMin",               (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent            ))), 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_WFRDayMax",                0                                                   , 1);
 			
 			
@@ -637,9 +669,9 @@ sub WaterCalculator_Notify($$)
 				my $WaterCalcConsumptionCostMonthLast = $WaterCalcConsumptionMonthLast * $attr{$WaterCalcName}{WaterPricePerCubic};
 				### Save Water Consumption and pure cost of previous month
 				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionCostMonthLast",   (sprintf('%.2f', ($WaterCalcConsumptionCostMonthLast))), 1);
-				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMonthLast",       (sprintf('%.3f', ($WaterCalcConsumptionMonthLast    ))), 1);
-				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMonth1st",            (sprintf('%.3f', ($WaterCountReadingValueCurrent    ))), 1);
-				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMonthLast",           (sprintf('%.3f', ($WaterCountReadingValuePrevious   ))), 1);
+				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMonthLast",       (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMonthLast    ))), 1);
+				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMonth1st",            (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent    ))), 1);
+				readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMonthLast",           (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious   ))), 1);
 
 				
 				### Check whether the current value is the first one of the meter-reading month
@@ -659,9 +691,9 @@ sub WaterCalculator_Notify($$)
 					
 					### Save Water Consumption and pure cost of previous meter year
 					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionCostMeterLast", (sprintf('%.2f', ($WaterCalcConsumptionCostMeterLast ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMeterLast",     (sprintf('%.3f', ($WaterCalcConsumptionMeterLast     ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMeter1st",          (sprintf('%.3f', ($WaterCountReadingValueCurrent     ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMeterLast",         (sprintf('%.3f', ($WaterCountReadingValuePrevious    ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMeterLast",     (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMeterLast     ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMeter1st",          (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent     ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterMeterLast",         (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious    ))), 1);
 				}
 
 				### Check whether the current value is the first one of the calendar year
@@ -677,9 +709,9 @@ sub WaterCalculator_Notify($$)
 
 					### Save Water Consumption and pure cost of previous calendar year
 					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionCostYearLast", (sprintf('%.2f', ($WaterCalcConsumptionCostYearLast   ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionYearLast",     (sprintf('%.3f', ($WaterCalcConsumptionYearLast       ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterYear1st",          (sprintf('%.3f', ($WaterCountReadingValueCurrent      ))), 1);
-					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterYearLast",         (sprintf('%.3f', ($WaterCountReadingValuePrevious     ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionYearLast",     (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionYearLast       ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterYear1st",          (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent      ))), 1);
+					readingsSingleUpdate( $WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterYearLast",         (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious     ))), 1);
 				}
 			}
 		}
@@ -693,7 +725,7 @@ sub WaterCalculator_Notify($$)
 		if ($WaterCountReadingTimestampDelta > 10)
 		{
 			### Calculate water consumption (water consumption difference) of previous and current value / [qm]
-			my $WaterCountReadingValueDelta = sprintf('%.3f', ($WaterCountReadingValueCurrent )) - sprintf('%.3f', ($WaterCountReadingValuePrevious));
+			my $WaterCountReadingValueDelta = sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent )) - sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious));
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValueDelta                : " . $WaterCountReadingValueDelta;
 
 			### Calculate Current water flow rate WFR = DV/Dt[qm/s] * 60[s/min] * 1000 [qm --> l] * WFRUnitFactor
@@ -747,22 +779,22 @@ sub WaterCalculator_Notify($$)
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Monthly Payment                         : " . $attr{$WaterCalcName}{MonthlyPayment}             . " " . $attr{$WaterCalcName}{Currency};
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Basic price per annum                   : " . $attr{$WaterCalcName}{BasicPricePerAnnum}         . " " . $attr{$WaterCalcName}{Currency};
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionCostMeter           : " . sprintf('%.2f', ($WaterCalcConsumptionCostMeter)) . " " . $attr{$WaterCalcName}{Currency};
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReserves                       : " . sprintf('%.3f', ($WaterCalcReserves))             . " " . $attr{$WaterCalcName}{Currency};
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReserves                       : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcReserves))             . " " . $attr{$WaterCalcName}{Currency};
 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______Times__________________________________________";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcMeterYearMonth                 : " . $WaterCalcMeterYearMonth;
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Month                           : " . $WaterCountReadingTimestampCurrentMon;
 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______Consumption_________________________________________";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionDay                 : " . sprintf('%.3f', ($WaterCalcConsumptionDay))       . " qm";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMonth               : " . sprintf('%.3f', ($WaterCalcConsumptionMonth))     . " qm";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionYear                : " . sprintf('%.3f', ($WaterCalcConsumptionYear))      . " qm";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMeter               : " . sprintf('%.3f', ($WaterCalcConsumptionMeter))     . " qm";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionDay                 : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionDay))       . " qm";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMonth               : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMonth))     . " qm";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionYear                : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionYear))      . " qm";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMeter               : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMeter))     . " qm";
 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______flow___________________________________________";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRCurrent                     : " . sprintf('%.3f', ($WaterCalcWFRCurrent))    . " l_min";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRCurrent                     : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent))    . " l_min";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRDayMin                      : " . ReadingsVal( $WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_WFRDayMin", 0) . " l_min";
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRDayAverage                  : " . sprintf('%.3f', ($WaterCalcWFRDayAverage)) . " l_min";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRDayAverage                  : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRDayAverage)) . " l_min";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRDayMax                      : " . ReadingsVal( $WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_WFRDayMax", 0) . " l_min";
 
 			###### Write readings to WaterCalc device
@@ -770,19 +802,19 @@ sub WaterCalculator_Notify($$)
 			readingsBeginUpdate($WaterCalcReadingDestinationDevice);
 
 			### Write consumed water Consumption (DV) since last measurement
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_LastDV",      sprintf('%.3f', ($WaterCountReadingValueDelta)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_LastDV",      sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueDelta)));
 
 			### Write timelap (Dt) since last measurement
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_LastDt",      sprintf('%.0f', ($WaterCountReadingTimestampDelta)));
 		
 			### Write current flow = average flow over last measurement period
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRCurrent",        sprintf('%.3f', ($WaterCalcWFRCurrent)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRCurrent",        sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent)));
 			
 			### Write daily   flow = average flow since midnight
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRDayAver",        sprintf('%.3f', ($WaterCalcWFRDayAverage)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRDayAver",        sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRDayAverage)));
 			
 			### Write flow measurement sum since midnight for average calculation
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDaySum",   sprintf('%.3f', ($WaterCalcWFRDaySum)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDaySum",   sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRDaySum)));
 			
 			### Write flow measurement counts since midnight for average calculation
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDayCount", sprintf('%.0f', ($WaterCalcWFRDayCount)));
@@ -794,30 +826,30 @@ sub WaterCalculator_Notify($$)
 				readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRDayMin",     sprintf('%.0f', ($WaterCalcWFRCurrent)));
 				
 				### Create Log entries for debugging
-				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - New daily minimum flow value detected   : " . sprintf('%.3f', ($WaterCalcWFRCurrent));
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - New daily minimum flow value detected   : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent));
 			}
 			
 			### Detect new daily maximum flow value and write to reading
 			if (ReadingsVal($WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_WFRDayMax", 0) < $WaterCalcWFRCurrent)
 			{
 				### Write new maximum flow value
-				readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRDayMax",   sprintf('%.3f', ($WaterCalcWFRCurrent)));
+				readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_WFRDayMax",   sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent)));
 				
 				### Create Log entries for debugging
-				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - New daily maximum flow value detected   : " . sprintf('%.3f', ($WaterCalcWFRCurrent));
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - New daily maximum flow value detected   : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent));
 			}
 			
 			### Write Consumption consumption since midnight
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionDay",         sprintf('%.3f', ($WaterCalcConsumptionDay)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionDay",         sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionDay)));
 			
 			### Write Consumption consumption since beginning of month
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMonth",       sprintf('%.3f', ($WaterCalcConsumptionMonth)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMonth",       sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMonth)));
 
 			### Write Consumption consumption since beginning of year
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionYear",        sprintf('%.3f', ($WaterCalcConsumptionYear)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionYear",        sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionYear)));
 			
 			### Write Consumption consumption since last meter reading
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMeter",       sprintf('%.3f', ($WaterCalcConsumptionMeter)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionMeter",       sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMeter)));
 			
 			### Write pure Consumption costs since midnight
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionCostDay",     sprintf('%.2f', ($WaterCalcConsumptionCostDay)));
@@ -832,10 +864,10 @@ sub WaterCalculator_Notify($$)
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_ConsumptionCostMeter",   sprintf('%.2f', ($WaterCalcConsumptionCostMeter)));
 
 			### Write reserves at Water supplier based on monthly advance payments within year of water meter reading
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_FinanceReserve",    sprintf('%.3f', ($WaterCalcReserves)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_FinanceReserve",    sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcReserves)));
 
 			### Write current meter reading as sshown on the mechanical meter
-			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterCurrent",    sprintf('%.3f', ($WaterCountReadingValueCurrent)));
+			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterCurrent",    sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)));
 			
 			### Write months since last meter reading
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_MonthMeterReading", sprintf('%.0f', ($WaterCalcMeterYearMonth)));
