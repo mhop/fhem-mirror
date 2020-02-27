@@ -1233,7 +1233,11 @@ sub EventProcessingRoommate($@) {
                         $posValue = (
                               $shutters->getSleepPos > 0
                             ? $shutters->getSleepPos
-                            : $shutters->getClosedPos
+                            : (
+                                  $shutters->getSleepPos > 0
+                                ? $shutters->getSleepPos
+                                : $shutters->getClosedPos
+                            )
                         );
                     }
                     else {
@@ -1447,7 +1451,7 @@ sub EventProcessingResidents($@) {
               )
             {
                 $shutters->setLastDrive('residents come home');
-                $shutters->setDriveCmd( $shutters->getClosedPos );
+                $shutters->setDriveCmd( ($shutters->getSleepPos > 0 ? $shutters->getSleepPos : $shutters->getClosedPos) );
             }
             elsif (
                 (
@@ -1651,7 +1655,11 @@ sub EventProcessingWind($@) {
                         : (
                               $shutters->getPrivacyDownStatus == 2
                             ? $shutters->getPrivacyDownPos
-                            : $shutters->getClosedPos
+                            : (
+                                  $shutters->getSleepPos > 0
+                                ? $shutters->getSleepPos
+                                : $shutters->getClosedPos
+                            )
                         )
                     )
                 );
@@ -7897,7 +7905,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.16",
+  "version": "v0.8.17",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
