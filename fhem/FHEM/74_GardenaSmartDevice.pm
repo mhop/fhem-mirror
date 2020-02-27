@@ -66,7 +66,7 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 use Time::Local;
-our $VERSION = '1.6.5';
+our $VERSION = '1.6.6';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -629,7 +629,7 @@ sub WriteReadings($$) {
     readingsBulkUpdate(
         $hash, 'state',
         (
-              ReadingsVal( $name, 'outlet-valve_open', 'readingsValError' ) == 1
+              ReadingsVal( $name, 'outlet-valve_open', 0 ) == 1
             ? RigRadingsValue( $hash, 'open' )
             : RigRadingsValue( $hash, 'closed' )
         )

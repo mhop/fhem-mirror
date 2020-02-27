@@ -423,7 +423,7 @@ sub Set($@) {
         return "please set Attribut gardenaAccountEmail first"
           if ( AttrVal( $name, 'gardenaAccountEmail', 'none' ) eq 'none' );
         return "please set gardenaAccountPassword first"
-          if ( not defined( ReadPassword($hash) ) );
+          if ( not defined( ReadPassword($hash,$name) ) );
         return "token is up to date"
           if ( defined( $hash->{helper}{session_id} ) );
 
@@ -436,7 +436,7 @@ sub Set($@) {
         return "usage: $cmd <password>" if ( @args != 1 );
 
         my $passwd = join( ' ', @args );
-        StorePassword( $hash, $passwd );
+        StorePassword( $hash, $name, $passwd );
 
     }
     elsif ( lc $cmd eq 'deleteaccountpassword' ) {
@@ -448,11 +448,11 @@ sub Set($@) {
     else {
 
         my $list = "getDevicesState:noArg getToken:noArg"
-          if ( defined( ReadPassword($hash) ) );
+          if ( defined( ReadPassword($hash,$name) ) );
         $list .= " gardenaAccountPassword"
-          if ( not defined( ReadPassword($hash) ) );
+          if ( not defined( ReadPassword($hash,$name) ) );
         $list .= " deleteAccountPassword:noArg"
-          if ( defined( ReadPassword($hash) ) );
+          if ( defined( ReadPassword($hash,$name) ) );
         return "Unknown argument $cmd, choose one of $list";
     }
 
@@ -950,7 +950,7 @@ sub getToken($) {
       if ( AttrVal( $name, 'gardenaAccountEmail', 'none' ) eq 'none' );
     return readingsSingleUpdate( $hash, 'state',
         'please set gardena account password first', 1 )
-      if ( not defined( ReadPassword($hash) ) );
+      if ( not defined( ReadPassword($hash,$name) ) );
     readingsSingleUpdate( $hash, 'state', 'get token', 1 );
 
     delete $hash->{helper}{session_id}
@@ -967,7 +967,7 @@ sub getToken($) {
         '"sessions": {"email": "'
           . AttrVal( $name, 'gardenaAccountEmail', 'none' )
           . '","password": "'
-          . ReadPassword($hash) . '"}',
+          . ReadPassword($hash,$name) . '"}',
         undef,
         undef
     );
@@ -976,10 +976,10 @@ sub getToken($) {
 "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
 }
 
-sub StorePassword($$) {
+sub StorePassword($@) {
 
-    my ( $hash, $password ) = @_;
-    my $index   = $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd";
+    my ( $hash, $name, $password ) = @_;
+    my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
     my $key     = getUniqueId() . $index;
     my $enc_pwd = "";
 
@@ -1002,11 +1002,10 @@ sub StorePassword($$) {
     return "password successfully saved";
 }
 
-sub ReadPassword($) {
+sub ReadPassword($$) {
 
-    my ($hash) = @_;
-    my $name   = $hash->{NAME};
-    my $index  = $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd";
+    my ( $hash, $name ) = @_;
+    my $index  = $hash->{TYPE} . "_" . $name . "_passwd";
     my $key    = getUniqueId() . $index;
     my ( $password, $err );
 
@@ -1052,8 +1051,8 @@ sub Rename(@) {
 
     my ( $new, $old ) = @_;
     my $hash = $defs{$new};
-
-    StorePassword( $hash, ReadPassword($hash) );
+    
+    StorePassword( $hash, $new, ReadPassword($hash,$old) );
     setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
 
     return undef;
