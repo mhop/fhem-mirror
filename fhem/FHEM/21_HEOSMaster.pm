@@ -67,6 +67,7 @@ eval "use Encode;1" or $missingModul .= "Encode ";
 
 my $version = "1.0.3";
 
+
 my %heosCmds = (
     'enableChangeEvents'        => 'system/register_for_change_events?enable=',
     'checkAccount'              => 'system/check_account',
@@ -132,8 +133,9 @@ sub HEOSMaster_GetPlayers($);
 sub HEOSMaster_EnableChangeEvents($);
 sub HEOSMaster_PreProcessingReadings($$);
 sub HEOSMaster_ReOpen($);
-sub HEOSMaster_ReadPassword($);
-sub HEOSMaster_StorePassword($$);
+sub HEOSMaster_ReadPassword($$);
+sub HEOSMaster_StorePassword($@);
+sub HEOSMaster_Rename(@);
 sub HEOSMaster_GetGroups($);
 sub HEOSMaster_ProcessRead($$);
 sub HEOSMaster_ParseMsg($$);
@@ -278,7 +280,7 @@ sub HEOSMaster_Get($$@) {
     if( $cmd eq 'showAccount' ) {
         return "usage: $cmd" if( @args != 0 );
     
-        return AttrVal($name,'heosUsername',0) . ":" .HEOSMaster_ReadPassword($hash);
+        return AttrVal($name,'heosUsername',0) . ":" .HEOSMaster_ReadPassword($hash,$name);
     }
     
     my $list = 'showAccount:noArg';
@@ -330,12 +332,12 @@ sub HEOSMaster_Set($@) {
         
         return "please set account informattion first" if(AttrVal($name,'heosUsername','none') eq 'none');
         $heosCmd    = $cmd . $args[0];
-        $action     = 'un='. AttrVal($name,'heosUsername','none') . '&pw=' . HEOSMaster_ReadPassword($hash) if($args[0] eq 'In');
+        $action     = 'un='. AttrVal($name,'heosUsername','none') . '&pw=' . HEOSMaster_ReadPassword($hash,$name) if($args[0] eq 'In');
         
     } elsif($cmd eq 'password') {
         return "usage: $cmd" if( @args != 1 );
         
-        return HEOSMaster_StorePassword( $hash, $args[0] );
+        return HEOSMaster_StorePassword( $hash, $name, $args[0] );
         
     } elsif($cmd eq 'reboot') {
         return "usage: $cmd" if( @args != 0 );
@@ -361,7 +363,7 @@ sub HEOSMaster_Open($) {
     my $port        = 1255;
     my $timeout     = 0.1;
     my $user        = AttrVal($name,'heosUsername',undef);
-    my $password    = HEOSMaster_ReadPassword($hash);
+    my $password    = HEOSMaster_ReadPassword($hash,$name);
 
     
     Log3 $name, 4, "HEOSMaster ($name) - Build socket connection";
@@ -1257,10 +1259,10 @@ sub HEOSMaster_CheckAccount($) {
     Log3 $name, 4, "HEOSMaster ($name) - checkAccount";
 }
 
-sub HEOSMaster_StorePassword($$) {
+sub HEOSMaster_StorePassword($@) {
     
-    my ($hash, $password) = @_;
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    my ($hash, $name, $password) = @_;
+    my $index = $hash->{TYPE}."_".$name."_passwd";
     my $key = getUniqueId().$index;
     my $enc_pwd = "";
 
@@ -1284,11 +1286,21 @@ sub HEOSMaster_StorePassword($$) {
     return "password successfully saved";
 }
 
-sub HEOSMaster_ReadPassword($) {
+sub HEOSMaster_Rename(@) {
+
+    my ( $new, $old ) = @_;
+    my $hash = $defs{$new};
     
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
-    my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
+    StorePassword( $hash, $new, ReadPassword($hash,$old) );
+    setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+
+    return undef;
+}
+
+sub HEOSMaster_ReadPassword($$) {
+    
+    my ($hash, $name) = @_;
+    my $index = $hash->{TYPE}."_".$name."_passwd";
     my $key = getUniqueId().$index;
     my ($password, $err);
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  21_HEOSMaster: fix rename passwordstore bug
  - bugfix:  73_GardenaSmartBridge: fix rename passwordstore bug
  - feature: 73_WaterCalculator: New Attribute DecimalPlace
  - feature: 73_GasCalculator: New Attribute DecimalPlace
