@@ -48,7 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
-  "1.15.0" => "24.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY ",
+  "1.15.0" => "27.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY and BYDAY, create commandref ",
   "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
   "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
@@ -1741,7 +1741,7 @@ sub SSCal_extractEventlist ($) {
                           
                           for ($ci=-1; $ci<($count); $ci++) {
                               if ($rDayInterval > 0) {                                           # Angabe "jeder x Wochentag" ist positiv (-2 wäre z.B. vom Ende des Monats zu zähelen)
-                                  $bmonth += $interval;
+                                  $bmonth += $interval if($ci>=0);
                                   $byear  += int( $bmonth/13);
                                   $bmonth %= 12 if($bmonth>12);
                                   $bmonth  = sprintf("%02d", $bmonth);
@@ -3999,10 +3999,519 @@ return $default;
 <h3>SSCal</h3>
 <ul>
 
-The guide for this module is currently only available in the german <a href="https://wiki.fhem.de/wiki/SSCal - Integration des Synology Calendar Servers">Wiki</a>.
+    With this module the Synology Calendar Server is integrated into FHEM. 
+	The module SSCal is based on functions of the Synology Calendar API. <br><br> 
+	
+	The connection to the calendar server is done by a session ID after successful login. Requests to the server are 
+	internal stored in a queue and are handled sequentially. If the calendar server is temporary unavailable, 
+	the stored requests are catched up once the server is available again. <br><br>
 
+    You can handle diaries (Events) as well as task lists (ToDo). For these different types of calendar 
+    different models of calendar devices can be definied, model <b>Diary</b> for diaries and model <b>Tasks</b> for 
+    task lists. <br><br>
+    
+    If you want discuss about or like to support the development of this module, there is a thread in the FHEM forum:<br>
+    <a href="https://forum.fhem.de/index.php/topic,106963.0.html">57_SSCal - Modul für den Synology Kalender</a>.<br><br>
+
+    Further information about the module you can find in the (german) FHEM Wiki:<br>
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
+    <br><br><br>
+    
+    
+    <b>Preparation </b> <br><br>
+    
+    <ul>	
+	As basic requirement the <b>Synology Calendar Package</b> must be installed on your Synology Disc Station. <br>    
+    In Synology DSM a user as member of the administrator group <b>must</b> be defined for access use. This user must also have the rights
+	to read and/or write the relevant calendars. The entitlement for the calendars are set directly in the 
+    <a href="https://www.synology.com/en-global/knowledgebase/DSM/help/Calendar/calendar_desc">Synology calendar application</a>.
+	
+	The login credentials are assigned later by the set <b>credentials</b> command to the defined device.
+    <br><br>
+        
+    Furthermore some more Perl modules must be installed or available: <br><br>
+    
+    <table>
+    <colgroup> <col width=35%> <col width=65%> </colgroup>
+    <tr><td>JSON                </td><td>                                   </td></tr>
+    <tr><td>Data::Dumper        </td><td>                                   </td></tr>
+    <tr><td>MIME::Base64        </td><td>                                   </td></tr>
+    <tr><td>Time::HiRes         </td><td>                                   </td></tr>
+    <tr><td>Encode              </td><td>                                   </td></tr>
+    <tr><td>POSIX               </td><td>                                   </td></tr>
+    <tr><td>HttpUtils           </td><td>(FHEM module)                       </td></tr>
+    <tr><td>Blocking            </td><td>(FHEM module)                       </td></tr>
+    <tr><td>Meta                </td><td>(FHEM module)                       </td></tr>
+    </table>
+    
+    <br><br>    
+    </ul>
+
+<a name="SSCaldefine"></a>
+<b>Definition</b>
+  <ul>
+  <br>
+    The creation of SSCal devices is differed between the definition of diaries and task lists. 
+	<br><br>
+	
+    The definition is done with: <br><br>
+	<ul>
+      <b><code>define &lt;Name&gt; SSCal &lt;ServerAddr&gt; [&lt;Port&gt;] [&lt;Protocol&gt;] [Tasks] </code></b> <br><br>
+    </ul>
+    
+    The parameters are in detail:
+    <br>
+    <br>    
+    
+    <table>
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
+    <tr><td><b>Name</b>           </td><td>Name of the device in FHEM </td></tr>
+    <tr><td><b>ServerAddr</b>     </td><td>IP address of Synology Disc Station. <b>Note:</b> If you use DNS name instead of IP address, don't forget to set the attribute dnsServer in global device ! </td></tr>
+    <tr><td><b>Port</b>           </td><td>optional - Port of Synology Disc Station (default: 5000). </td></tr>
+    <tr><td><b>Protocol</b>       </td><td>optional - Protocol used for communication with the calendar server, http or https (default: http). </td></tr>
+    <tr><td><b>Tasks</b>          </td><td>optional - to define a task list device add "Tasks" to the definition </td></tr>
+    </table>
+
+    <br><br>
+
+    <b>Examples:</b>
+     <pre>
+      <code>define Appointments SSCal 192.168.2.10 </code>
+      <code>define Appointments SSCal 192.168.2.10 5001 https </code>
+      # creates a diary device on default port (5000/http) respectively https on port 5001
+
+      <code>define Tasklist SSCal ds.myds.org 5001 https Tasks </code>
+      # creates a task list device with protocol https on port 5001
+     </pre>
+     
+    After definition of a device only the command <a href="#SSCalcredentials">credentials</a> is available.
+	First of all you have to set the credentials for communication with the Synology calendar server by using this command. <br><br>
+
+    If the login was successful, all for the user accessible calendars will be determined. The calendars to retrieve  
+    are selectable by attribute <a href="#usedCalendars">usedCalendars</a>.	
+    <br><br><br>
+    </ul>
+  
+<a name="SSCalset"></a>
+<b>Set </b>
+
+<ul>
+  <br>
+  The following set commands are valid for both device models Diary/Tasks or partly for one of these device models.
+  <br><br>
+  
+  <ul>
+  <a name="SSCalcalUpdate"></a>
+  <li><b> calUpdate [&lt;list of calendars&gt;] </b> <br>
+  
+  Fetch entries of the selected calendars (see attribute <a href="#usedCalendars">usedCalendars</a>). 
+  Alternatively you can enter a list of calendars to fetch separated by comma. The calendar names may contain spaces. 
+  <br><br>
+  
+  <ul>
+    <b>Examples:</b> <br><br>
+
+    set Appointments calUpdate  <br>
+    # fetch the entries of calendars specified in attribute usedCalendars <br><br>
+  
+    set Appointments calUpdate Heikos Kalender,Abfall <br>
+    # fetch the entries of both calendars "Heikos Kalender" and "Abfall". <br><br>
+  </ul>
+
+  </li><br>
+  </ul>
+
+  <ul>
+  <a name="SSCalcleanCompleteTasks"></a>
+  <li><b> cleanCompleteTasks </b> &nbsp;&nbsp;&nbsp;&nbsp;(only model "Tasks") <br>
+  
+  All completed tasks in the specified task lists (see attribute <a href="#usedCalendars">usedCalendars</a>) are deleted. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCaldeleteEventId"></a>
+  <li><b> deleteEventId &lt;Id&gt; </b> <br>
+  
+  The specified Event Id (see reading x_x_EventId) will be delted from calendar or tas list. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalcredentials"></a>
+  <li><b> credentials &lt;User&gt; &lt;Passwort&gt; </b> <br>
+  
+  Store the credentials for calendar communication. <br>
+  
+  </li><br>
+  </ul> 
+  
+  <ul>
+  <a name="SSCaleraseReadings"></a>
+  <li><b> eraseReadings </b> <br>
+  
+  Delete all calendar readings. It doesn't effect the calendar entries itself ! <br> 
+  
+  </li><br>
+  </ul>  
+  
+  <ul>
+  <a name="SSCallistSendqueue"></a>
+  <li><b> listSendqueue </b> <br>
+  
+  Shows all entries in the sendqueue. Normally the queue is filled only for a short time, but may contain entries  
+  permanently in case of problems. Thereby the occured failures can be identified and assigned. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCallogout"></a>
+  <li><b> logout </b> <br>
+  
+  The user will be logged out and the session to the Synology Disc Station will be cleared. <br> 
+  
+  </li><br>
+  </ul> 
+  
+  <ul>
+  <a name="SSCalpurgeSendqueue"></a>
+  <li><b> purgeSendqueue </b> <br>
+  
+  Deletes entries from the sendqueue. Several options are usable dependend from situation: <br><br> 
+   <ul>
+    <table>
+    <colgroup> <col width=15%> <col width=85%> </colgroup>
+      <tr><td>-all-         </td><td>deletes all entries from sendqueue </td></tr>
+      <tr><td>-permError-   </td><td>deletes all entries which are suspended from further processing caused by a permanent error </td></tr>
+      <tr><td>&lt;Index&gt; </td><td>deletes the specified entry from sendqueue </td></tr>
+    </table>
+   </ul>
+   
+  </li><br>
+  </ul>
+   
+  <ul>
+  <a name="SSCalrestartSendqueue"></a>
+  <li><b> restartSendqueue </b> <br>
+  
+  The processing of entries in sendqueue will be new started manually. Because of the sendqueue will be restarted automatically by
+  every new retrieval it is normally not necessary to execute this command. <br>
+  
+  </li><br>
+  </ul>   
+   
+ </ul>
+
+<a name="SSCalget"></a>
+<b>Get</b>
+ <ul>
+  <br>
+ 
+  <ul>
+  <a name="SSCalapiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Retrieves the API informations of the Synology calendar server and open a popup window with its data.
+  <br>
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalcalAsHtml"></a>
+  <li><b> calAsHtml </b> <br>
+  
+  Shows a popup with the time summary. In own perl routines and for integration in a weblink device this  
+  overview can be used as follows: <br><br>
+  
+    <ul>
+      { SSCal_calAsHtml ("&lt;SSCal-Device&gt;") }
+    </ul>  
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalgetCalendars"></a>
+  <li><b> getCalendars </b> <br>
+  
+  Requests the existing calendars from your Synology Disc Station and open a popup window with informations about each available calendar. 
+  </li><br>  
+  
+  <br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalstoredCredentials"></a>
+  <li><b> storedCredentials </b> <br>
+  
+  Shows the stored User/Password combination. 
+  </li><br>  
+  
+  <br>
+  </ul>
+  
+  <ul>
+  <a name="SSCalversionNotes"></a>
+  <li><b> versionNotes </b> <br>
+  
+  Shows important informations and hints about the module.
+  </li><br>  
+  
+  <br>
+  </ul>
+ </ul>  
+  
+<a name="SSCamattr"></a>
+<b>Attribute</b>
+ <br><br>
+ <ul>
+  
+  <ul>  
+  <a name="asyncMode"></a>
+  <li><b>asyncMode</b> <br> 
+  
+    If set to "1", the data parsing will be executed within a background process and avoid possible blocking situations. <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="createATDevs"></a>
+  <li><b>createATDevs</b> <br> 
+  
+    If set to "1", FHEM commands and Perl routines to be executed are recognised automatically in a calendar entry by SSCal.
+    In this case SSCal defines, changes or deletes at-devices to execute these commands independently. <br>
+    A FHEM command to be executed has to be included into <b>{ }</b> in the field <b>Description</b> of Synology Calendar 
+	application WebUI, Perl routines has to be included into double <b>{{ }}</b>. <br>    
+    For further detailed information please read the Wiki (germnan) section:
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
+    <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="cutOlderDays"></a>
+  <li><b>cutOlderDays</b> <br> 
+  
+    Entries in calendars are ignored if the due date is older than the number of specified days. <br>
+    (default: 5) <br><br>
+    
+    <ul>
+      <b>Example:</b> <br><br>
+
+      attr &lt;Name&gt; cutOlderDays 30  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="cutLaterDays"></a>
+  <li><b>cutLaterDays</b> <br> 
+  
+    Entries in calendars are ignored if the due date is later than the number of specified days. <br>
+    (default: 5) <br><br>
+    
+    <ul>
+      <b>Example:</b> <br><br>
+
+      attr &lt;Name&gt; cutLaterDays 90  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="filterCompleteTask"></a>
+  <li><b>filterCompleteTask </b> &nbsp;&nbsp;&nbsp;&nbsp;(only model "Tasks") <br> 
+  
+    Entries of the calendar are filtered dependend from their completion: <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td>1  </td><td>only completed tasks are shown                        </td></tr>
+      <tr><td>2  </td><td>only not completed tasks are shown                    </td></tr>
+      <tr><td>3  </td><td>completed and not completed tasks are shown (default) </td></tr>
+     </table>
+    </ul>   
+    
+  </li><br>
+  </ul> 
+
+  <ul>  
+  <a name="filterDueTask"></a>
+  <li><b>filterDueTask </b> &nbsp;&nbsp;&nbsp;&nbsp;(only model "Tasks") <br> 
+  
+    Entries in taks lists with/without due date are filtered: <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td>1  </td><td>only tasks with due date are shown                  </td></tr>
+      <tr><td>2  </td><td>only tasks without due date are shown               </td></tr>
+      <tr><td>3  </td><td>tasks with and without due date are shown (default) </td></tr>
+     </table>
+    </ul>   
+    
+  </li><br>
+  </ul> 
+
+  <ul>  
+  <a name="interval"></a>
+  <li><b>interval &lt;seconds&gt;</b> <br> 
+  
+    Interval in seconds to fetch calendar entries automatically. If "0" is specified, no calendar fetch is  
+    executed. (default) <br><br>
+    
+    <ul>
+      <b>Example:</b> <br><br>
+    
+      Set the attribute as follows if the calendar entries should retrieved every hour: <br>
+      attr &lt;Name&gt; interval 3600  <br>
+    </ul>    
+    
+  </li><br>
+  </ul>  
+  
+  <ul>  
+  <a name="loginRetries"></a>
+  <li><b>loginRetries</b> <br> 
+  
+    Number of attempts for the initial user login. <br>
+    (default: 3)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="showRepeatEvent"></a>
+  <li><b>showRepeatEvent</b> &nbsp;&nbsp;&nbsp;&nbsp;(only model "Diary") <br> 
+  
+    If "true", one-time events as well as recurrent events are fetched. Otherwise only one-time events are retrieved. <br>
+    (default: true)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="showPassInLog"></a>
+  <li><b>showPassInLog</b> <br> 
+  
+    If "1", the password respectively the SID will be shown in the logfile. <br>
+    (default: 0)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableColumnMap"></a>
+  <li><b>tableColumnMap </b> <br> 
+  
+    Determines how the link to a map is shown in the table column "Map": <br><br>
+    
+    <ul>
+     <table>
+     <colgroup> <col width=10%> <col width=90%> </colgroup>
+      <tr><td><b>icon</b>   </td><td>shows a user customisable symbol (default)  </td></tr>
+      <tr><td><b>data</b>   </td><td>shows the GPS data                          </td></tr>
+      <tr><td><b>text</b>   </td><td>shows a text adjustable by the user         </td></tr>
+     </table>
+    </ul>  
+
+    <br>
+    To make further adjustments, there are some more possibilities to specify properties in the attribute tableSpecs.
+    For detailed informations about the possibilities to configure the overview table please consult the (german) Wiki
+    chapter 
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
+    <br>    
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableInDetail"></a>
+  <li><b>tableInDetail</b> <br> 
+  
+    An overview diary or taks table will be displayed in detail view. <br>
+    (default: 1)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableInRoom"></a>
+  <li><b>tableInRoom</b> <br> 
+  
+    An overview diary or taks table will be displayed in room view. <br>
+    (default: 1)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableFields"></a>
+  <li><b>tableFields</b> <br> 
+  
+    Selection of the fields to be displayed in the overview table in room or detail view. <br>
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="tableSpecs"></a>
+  <li><b>tableSpecs</b> <br> 
+  
+    By several key-value pair combinations the presentation of informations in the overview table can be adjusted. 
+    The (german) Wiki chapter 
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
+    provides more detailed help for it.
+     
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="timeout"></a>
+  <li><b>timeout  &lt;seconds&gt;</b> <br> 
+  
+    Timeout for calendar fetch in seconds. <br>
+    (default: 20)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="usedCalendars"></a>
+  <li><b>usedCalendars</b> <br> 
+  
+    Selection of calendars to fetch from a popup window. The list of accessible calendars will initial be created during 
+    FHEM startup. At all times it can also be done manually with command: <br><br>
+
+    <ul>
+      get &lt;Name&gt; getCalendars  <br>
+    </ul>   
+    
+    <br>
+     
+    As long as the accessible calendars are not successfully fetched, this attribute only contains simply the entry: <br><br>
+    
+    <ul>
+      --wait for Calendar list--  <br>
+    </ul>    
+    
+  </li><br>
+  </ul> 
+  
+ </ul> 
+<br>
+ 
 </ul>
-
 
 =end html
 =begin html_DE
@@ -4036,7 +4545,7 @@ The guide for this module is currently only available in the german <a href="htt
 	Als Grundvoraussetzung muss das <b>Synology Calendar Package</b> auf der Diskstation installiert sein. <br>    
     Im Synology DSM wird ein User benutzt, der Mitglied der Administrator-Group sein <b>muß</b> und zusätzlich die benötigte Berechtigung
 	zum Lesen und/oder Schreiben der relevanten Kalender hat. Die Kalenderberechtigungen werden direkt in der 
-    <a href="https://www.synolgy.com/de-de/knowledgebase/DSM/help/Calendar/calendar_desc">Synology Kalenderapplikation</a> eingestellt.
+    <a href="https://www.synology.com/de-de/knowledgebase/DSM/help/Calendar/calendar_desc">Synology Kalenderapplikation</a> eingestellt.
 	
 	Die Zugangsdaten werden später über ein Set <b>credentials</b> Kommando dem angelegten Device zugewiesen.
     <br><br>
@@ -4063,7 +4572,7 @@ The guide for this module is currently only available in the german <a href="htt
 <b>Definition</b>
   <ul>
   <br>
-    Bei der Definition wird zwischen einem Kalenderdevice für Termine (Events) und Aufagebn (Tasks) unterschieden. 
+    Bei der Definition wird zwischen einem Kalenderdevice für Termine (Events) und Aufgaben (Tasks) unterschieden. 
 	<br><br>
 	
     Die Definition erfolgt mit: <br><br>
@@ -4076,9 +4585,9 @@ The guide for this module is currently only available in the german <a href="htt
     <br>    
     
     <table>
-    <colgroup> <col width=15%> <col width=85%> </colgroup>
+    <colgroup> <col width=10%> <col width=90%> </colgroup>
     <tr><td><b>Name</b>           </td><td>der Name des neuen Kalenderdevices in FHEM </td></tr>
-    <tr><td><b>ServerAddr</b>     </td><td>die IP-Addresse der Synology DS. <b>Hinweis:</b> Wird ein Servername angegeben, sollte das Attribut dnsServer im glbal Device gesetzt werden ! </td></tr>
+    <tr><td><b>ServerAddr</b>     </td><td>die IP-Addresse der Synology DS. <b>Hinweis:</b> Wird der DNS-Name statt IP-Adresse verwendet, sollte das Attribut dnsServer im global Device gesetzt werden ! </td></tr>
     <tr><td><b>Port</b>           </td><td>optional - Port der Synology DS (default: 5000). </td></tr>
     <tr><td><b>Protocol</b>       </td><td>optional - Protokoll zur Kommunikation mit dem Kalender-Server, http oder https (default: http). </td></tr>
     <tr><td><b>Tasks</b>          </td><td>optional - zur Definition einer Aufgabenliste wird "Tasks" hinzugefügt </td></tr>
@@ -4086,7 +4595,7 @@ The guide for this module is currently only available in the german <a href="htt
 
     <br><br>
 
-    <b>Beispiel:</b>
+    <b>Beispiele:</b>
      <pre>
       <code>define Appointments SSCal 192.168.2.10 </code>
       <code>define Appointments SSCal 192.168.2.10 5001 https </code>
@@ -4382,9 +4891,9 @@ The guide for this module is currently only available in the german <a href="htt
 
   <ul>  
   <a name="interval"></a>
-  <li><b>interval</b> <br> 
+  <li><b>interval &lt;Sekunden&gt;</b> <br> 
   
-    Automatischer Abrufintervall der Kalendereintträge in Sekunden. Ist "0" agegeben, wird kein automatischer Datenabruf 
+    Automatisches Abrufintervall der Kalendereintträge in Sekunden. Ist "0" agegeben, wird kein automatischer Datenabruf 
     ausgeführt. (default) <br>
     Sollen z.B. jede Stunde die Einträge der gewählten Kalender abgerufen werden, wird das Attribut wie 
     folgt gesetzt: <br><br>
@@ -4494,7 +5003,7 @@ The guide for this module is currently only available in the german <a href="htt
   
   <ul>  
   <a name="timeout"></a>
-  <li><b>timeout</b> <br> 
+  <li><b>timeout  &lt;Sekunden&gt;</b> <br> 
   
     Timeout für den Datenabruf in Sekunden. <br>
     (default: 20)
