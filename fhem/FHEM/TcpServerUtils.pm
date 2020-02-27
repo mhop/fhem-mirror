@@ -334,6 +334,8 @@ TcpServer_WriteBlocking($$)
 
     if( defined $ret ){
       $off += $ret;
+      my $sh = $defs{$hash->{SNAME}};
+      $sh->{BYTES_WRITTEN} += $ret if(defined($sh->{BYTES_WRITTEN}));
 
     } elsif( $! == EWOULDBLOCK ){
       $hash->{wantRead} = 1

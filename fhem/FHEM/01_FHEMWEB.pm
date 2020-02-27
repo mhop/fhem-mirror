@@ -305,6 +305,8 @@ FW_Define($$)
       }
     }, $hash, 0);
   }
+  $hash->{BYTES_READ} = 0;
+  $hash->{BYTES_WRITTEN} = 0;
 
   return $ret;
 }
@@ -362,11 +364,15 @@ FW_Read($$)
                   (defined($ret) ? 'EOF' : $!);
       return;
     }
+    my $sh = $defs{$FW_wname};
+    $sh->{BYTES_READ} += length($buf);
+
     $hash->{BUF} .= $buf;
     if($hash->{SSL} && $c->can('pending')) {
       while($c->pending()) {
         sysread($c, $buf, 1024);
         $hash->{BUF} .= $buf;
+        $sh->{BYTES_READ} += length($buf);
       }
     }
   }
@@ -421,6 +427,10 @@ FW_Read($$)
 
 
   if(!$hash->{HDR}) {
+    if(length($hash->{BUF}) > 1000000) {
+      Log3 $FW_wname, 2, "Too much header, terminating $hash->{PEER}";
+      return TcpServer_Close($hash, 1);
+    }
     return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
     $hash->{BUF} = $3;
@@ -429,6 +439,7 @@ FW_Read($$)
     }
   }
 
+  Log3 $FW_wname, 5, $hash->{HDR};
   my $POSTdata = "";
   if($hash->{CONTENT_LENGTH}) {
     return if(length($hash->{BUF})<$hash->{CONTENT_LENGTH});
@@ -714,6 +725,7 @@ FW_addToWritebuffer($$@)
       }
     }
   }
+  $defs{$hash->{SNAME}}{BYTES_WRITTEN} += length($txt);
   return addToWritebuffer($hash, $txt, $callback, $nolimit);
 }
 
