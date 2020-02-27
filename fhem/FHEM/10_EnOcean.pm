@@ -69,6 +69,7 @@ my %EnO_rorgname = (
   "30" => "SEC",      # secure telegram
   "31" => "ENC",      # secure telegram with encapsulation
   "32" => "SECD",     # decrypted secure telegram
+  "33" => "SECCDM",   # secure chained data message
   "35" => "STE",      # secure Teach-In
   "40" => "CDM",      # chained data message
 );
@@ -785,7 +786,7 @@ EnOcean_Initialize($)
                       "pidFactor_P pidIPortionCallBeforeSetting pidSensorTimeout " .
                       "pollInterval postmasterID productID rampTime rcvRespAction ".
                       "releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no remoteCode remoteEEP remoteID remoteManufID " .
-                      "remoteManagement:client,manager,off rlcAlgo:no,2++,3++ rlcRcv rlcSnd rlcTX:true,false " .
+                      "remoteManagement:client,manager,off rlcAlgo:no,2++,3++,4++ rlcRcv rlcSnd rlcTX:true,false " .
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sendTimePeriodic sensorMode:switch,pushbutton " .
@@ -6938,8 +6939,61 @@ sub EnOcean_Parse($$)
       return "";
     }
 
+    if ($rorg eq "33") {
+      # secure chained data message (SEC_CDM)
+      #Log3 $IODev, 5, "EnOcean $senderID received via $IODev SEC_CDM: $msg";
+      $data =~ m/^(..)(.*)$/;
+      # SEQ evaluation?
+      my ($seq, $idx) = (hex($1) & 0xC0, hex($1) & 0x3F);
+      $data = $2;
+      if ($idx == 0) {
+        # first message part
+        delete $iohash->{helper}{"sec_cdm_$senderID-$seq"};
+        $data =~ m/^(....)(.*)$/;
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{len} = hex($1);
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{rorg} = '31';
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}{$idx} = $2;
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{lenCounter} = length($2) / 2;
+        RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"});
+        $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"} = {hash => $iohash, function => "sec_cdm_$senderID-$seq"};
+        InternalTimer(gettimeofday() + 3, 'EnOcean_helperClear', $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"}, 0);
+        #Log3 $IODev, 5, "EnOcean $senderID SEC_CDM IDX: $idx DATA: " . $iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}{$idx};
+        return $IODev;
+      } else {
+        if (!exists($iohash->{helper}{"sec_cdm_$senderID-$seq"})) {
+          Log3 $IODev, 4, "EnOcean $senderID SEC_CDM sequence error";
+          return $IODev;
+        }
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}{$idx} = $data;
+        $iohash->{helper}{"sec_cdm_$senderID-$seq"}{lenCounter} += length($data) / 2;
+        #Log3 $IODev, 5, "EnOcean $senderID SEC_CDM IDX: $idx DATA: " . $iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}{$idx};
+      }
+      if ($iohash->{helper}{"sec_cdm_$senderID-$seq"}{lenCounter} >= $iohash->{helper}{"sec_cdm_$senderID-$seq"}{len}) {
+        # data message complete
+        # reconstruct RORG, DATA
+        my ($idx, $dataPart, @data);
+        while (($idx, $dataPart) = each(%{$iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}})) {
+          $data[$idx] = $iohash->{helper}{"sec_cdm_$senderID-$seq"}{data}{$idx};
+        }
+        $data = join('', @data);
+        $msg[3] = $data;
+        $rorg = $iohash->{helper}{"sec_cdm_$senderID-$seq"}{rorg};
+        $msg[2] = $rorg;
+        $msg = join(':', @msg);
+        $rorgname = $EnO_rorgname{$rorg};
+        delete $iohash->{helper}{"sec_cdm_$senderID-$seq"};
+        RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"});
+        delete $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"} if (exists $iohash->{helper}{timer}{"helperClear_sec_$senderID-$seq"});
+        #Log3 $IODev, 5, "EnOcean $senderID SEC_CDM concatenated DATA: $data";
+      } else {
+        # wait for next data message part
+        return $IODev;
+      }
+    }
+
     if ($rorg eq "40") {
       # chained data message (CDM)
+      #Log3 $IODev, 5, "EnOcean received via $IODev CDM: $msg";
       $data =~ m/^(..)(.*)$/;
       # SEQ evaluation?
       my ($seq, $idx) = (hex($1) & 0xC0, hex($1) & 0x3F);
@@ -6955,10 +7009,16 @@ sub EnOcean_Parse($$)
         RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
         $iohash->{helper}{timer}{"helperClear_$senderID-$seq"} = {hash => $iohash, function => "cdm_$senderID-$seq"};
         InternalTimer(gettimeofday() + 3, 'EnOcean_helperClear', $iohash->{helper}{timer}{"helperClear_$senderID-$seq"}, 0);
-        #Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
+        #Log3 $IODev, 5, "EnOcean $IODev CDM IDX: $idx DATA: " . $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx};
+        return $IODev;
       } else {
+        if (!exists($iohash->{helper}{"cdm_$senderID-$seq"})) {
+          Log3 $IODev, 4, "EnOcean $senderID CDM sequence error";
+          return $IODev;
+        }
         $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx} = $data;
         $iohash->{helper}{"cdm_$senderID-$seq"}{lenCounter} += length($data) / 2;
+        #Log3 $IODev, 5, "EnOcean $IODev CDM IDX: $idx DATA: " . $iohash->{helper}{"cdm_$senderID-$seq"}{data}{$idx};
       }
       if ($iohash->{helper}{"cdm_$senderID-$seq"}{lenCounter} >= $iohash->{helper}{"cdm_$senderID-$seq"}{len}) {
         # data message complete
@@ -6980,7 +7040,7 @@ sub EnOcean_Parse($$)
         delete $iohash->{helper}{"cdm_$senderID-$seq"};
         RemoveInternalTimer($iohash->{helper}{timer}{"helperClear_$senderID-$seq"}) if(exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
         delete $iohash->{helper}{timer}{"helperClear_$senderID-$seq"} if (exists $iohash->{helper}{timer}{"helperClear_$senderID-$seq"});
-        #Log3 $IODev, 5, "EnOcean $IODev CDM RORG: $rorg concatenated DATA $data";
+        #Log3 $IODev, 5, "EnOcean $IODev CDM RORG: $rorg concatenated DATA: $data";
       } else {
         # wait for next data message part
         return $IODev;
@@ -13885,6 +13945,8 @@ sub EnOcean_Attr(@)
 
     } elsif (AttrVal($name, "rlcAlgo", "") eq "3++" && $attrVal =~ m/^[\dA-Fa-f]{6}$/) {
 
+    } elsif (AttrVal($name, "rlcAlgo", "") eq "4++" && $attrVal =~ m/^[\dA-Fa-f]{8}$/) {
+
     } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
@@ -13892,7 +13954,7 @@ sub EnOcean_Attr(@)
   } elsif ($attrName eq "rlcAlgo") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^no|2++|3++$/) {
+    } elsif ($attrVal !~ m/^no|2++|3++|4++$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -16924,59 +16986,61 @@ sub EnOcean_sec_parseTeachIn($$$$) {
     }
 
   # Decode RLC algorithm and extract RLC and private key (only first part most likely)
-		if ($rlc_algo == 0) {
-			# No RLC used in telegram or internally in memory, use case untested
-			return ("Secure modes without RLC not tested or supported", undef);
-		} elsif ($rlc_algo == 1) {
-			# "RLC= 2-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+    if ($rlc_algo == 0) {
+      # No RLC used in telegram or internally in memory, use case untested
+      return ("Secure modes without RLC not tested or supported", undef);
+    } elsif ($rlc_algo == 1) {
+      # "RLC= 2-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(....)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '2++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } elsif ($rlc_algo == 2) {
+      # RLC= 3-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(......)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '3++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } elsif ($rlc_algo == 3) {
+      # RLC= 4-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
+      # Extract RLC and KEY fields from data trailing SLF field
+      # RLC, KEY, ID, STATUS
+      $crypt =~ /^(........)(.*)$/;
+      $rlc = $1;
+      $key1 = $2;
+      # Store in device hash
+      $attr{$name}{rlcAlgo} = '4++';
+      readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
+      # storing backup copy
+      $attr{$name}{rlcRcv} = $rlc;
+      $attr{$name}{keyRcv} = $key1;
+    } else {
+      # Undefined RLC algorithm
+      return ("Undefined RLC algorithm $rlc_algo", undef);
+    }
 
-			# Extract RLC and KEY fields from data trailing SLF field
-			# RLC, KEY, ID, STATUS
-			$crypt =~ /^(....)(.*)$/;
-			$rlc = $1;
-			$key1 = $2;
-
-			#print "RLC: $rlc\n";
-			#print "Part 1 of KEY: $key1\n";
-
-			# Store in device hash
-			$attr{$name}{rlcAlgo} = '2++';
-                        readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
-			# storing backup copy
-			$attr{$name}{rlcRcv} = $rlc;
-			$attr{$name}{keyRcv} = $key1;
-
-		} elsif ($rlc_algo == 2) {
-			# RLC= 3-byte long. RLC algorithm consists on incrementing in +1 the previous RLC value
-
-			# Extract RLC and KEY fields from data trailing SLF field
-			# RLC, KEY, ID, STATUS
-			$crypt =~ /^(......)(.*)$/;
-			$rlc = $1;
-			$key1 = $2;
-
-			#print "RLC: $rlc\n";
-			#print "Part 1 of KEY: $key1\n";
-
-			# Store in device hash
-			$attr{$name}{rlcAlgo} = '3++';
-                        readingsSingleUpdate($hash, ".rlcRcv", $rlc, 0);
-			# storing backup copy
-			$attr{$name}{rlcRcv} = $rlc;
-			$attr{$name}{keyRcv} = $key1;
-		} else {
-			# Undefined RLC algorithm
-			return ("Undefined RLC algorithm $rlc_algo", undef);
-		}
-
-		# RLC Transmission
-		if ($rlc_tx == 0 ) {
-			# Secure operation mode telegrams do not contain RLC, we store and track it ourself
-			$attr{$name}{rlcTX} = 'false';
-		} else {
-			# Secure operation mode messages contain RLC, CAUTION untested
-			$attr{$name}{rlcTX} = 'true';
-		}
+    # RLC Transmission
+    if ($rlc_tx == 0 ) {
+      # Secure operation mode telegrams do not contain RLC, we store and track it ourself
+      $attr{$name}{rlcTX} = 'false';
+    } else {
+      # Secure operation mode messages contain RLC, CAUTION untested
+      $attr{$name}{rlcTX} = 'true';
+    }
 
 		# Decode MAC Algorithm
 		if ($mac_algo == 0) {
@@ -17141,7 +17205,6 @@ sub EnOcean_sec_getRLC($$$$) {
 	# Boundary check
 	if ($attr{$name}{rlcAlgo} eq '2++') {
 		if ($new_rlc > 65535) {
-			#print "RLC rollover\n";
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "0000";
@@ -17151,7 +17214,6 @@ sub EnOcean_sec_getRLC($$$$) {
 		$attr{$name}{$rlcVar} = uc(unpack('H4',pack('n', $new_rlc)));
 	} elsif ($attr{$name}{rlcAlgo} eq '3++') {
 		if ($new_rlc > 16777215) {
-			#print "RLC rollover\n";
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "000000";
@@ -17159,6 +17221,15 @@ sub EnOcean_sec_getRLC($$$$) {
 		}
                 readingsSingleUpdate($hash, "." . $rlcVar, sprintf("%06X", $new_rlc), 0);
 		$attr{$name}{$rlcVar} = sprintf("%06X", $new_rlc);
+	} elsif ($attr{$name}{rlcAlgo} eq '4++') {
+		if ($new_rlc > 4294967295) {
+			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
+			$new_rlc = 0;
+		        $attr{$name}{$rlcVar} = "00000000";
+                        EnOcean_CommandSave(undef, undef);
+		}
+                readingsSingleUpdate($hash, "." . $rlcVar, sprintf("%08X", $new_rlc), 0);
+		$attr{$name}{$rlcVar} = sprintf("%08X", $new_rlc);
 	}
 
 	Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC new: $attr{$name}{$rlcVar} $new_rlc";
@@ -17289,6 +17360,9 @@ sub EnOcean_sec_convertToNonsecure($$$) {
       $expect_rlc = 1;
     } elsif ($attr{$name}{rlcAlgo} eq '3++') {
       $crypt_pattern .= "(......)";
+      $expect_rlc = 1;
+    } elsif ($attr{$name}{rlcAlgo} eq '4++') {
+      $crypt_pattern .= "(........)";
       $expect_rlc = 1;
     } else {
       # RLC_TX but no info on RLC length
