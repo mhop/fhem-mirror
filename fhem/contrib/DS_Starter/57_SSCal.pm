@@ -1935,7 +1935,7 @@ sub SSCal_extractEventlist ($) {
                   my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness);
                   for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {                                    
                       
-                      $bts += 86400 if($ci>=0);
+                      $bts += 86400*$interval if($ci>=0);
   
                       ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($bts,$startEndDiff);                                    
   
