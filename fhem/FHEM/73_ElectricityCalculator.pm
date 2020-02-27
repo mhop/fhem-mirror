@@ -71,6 +71,7 @@ sub ElectricityCalculator_Initialize($)
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
 								  "SiPrefixPower:W,kW,MW,GW " .
 								  "Currency:&#8364;,&#163;,&#36; " .
+								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -99,18 +100,29 @@ sub ElectricityCalculator_Define($$$)
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
     
-	if(defined($attr{$hash}{SiPrefixPower}))
-	{
+	### Convert SiPrefixPowerFactor 
+	if(defined($attr{$hash}{SiPrefixPower})) {
 		if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
 		else                                        {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 	}
-	else
-	{
+	else {
                                                      $hash->{system}{SiPrefixPowerFactor} = 1;
 	}
+
+	### Convert Decimal Places 
+	if(defined($attr{$hash}{DecimalPlace})) {
+		$hash->{system}{DecimalPlace} = "%." . $attr{$hash}{DecimalPlace} . "f";
+	
+	}
+	else {
+		$hash->{system}{DecimalPlace} = "%.3f";
+	}
+	
+	### Defining notify trigger
+	$hash->{NOTIFYDEV} = $RegEx;
 		
 	### Writing log entry
 	Log3 $name, 5, $name. " : ElectricityCalculator - Starting to define module";
@@ -141,8 +153,7 @@ sub ElectricityCalculator_Attr(@)
 	my $hash                   = $defs{$name};
 	
 	### Check whether "disable" attribute has been provided
-	if ($a[2] eq "disable")
-	{
+	if ($a[2] eq "disable") {
 		if    ($a[3] eq 0)
 		{	
 			$hash->{STATE} = "active";
@@ -154,8 +165,7 @@ sub ElectricityCalculator_Attr(@)
 	}
 	
 	### Check whether "SiPrefixPower" attribute has been provided
-	if ($a[2] eq "SiPrefixPower")
-	{
+	elsif ($a[2] eq "SiPrefixPower") {
 		if    ($a[3] eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 		elsif ($a[3] eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
 		elsif ($a[3] eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
@@ -163,6 +173,16 @@ sub ElectricityCalculator_Attr(@)
 		else                  {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 	}
 	
+	### Convert Decimal Places 
+	elsif ($a[2] eq "DecimalPlace") {
+		if (($a[3] >= 3) && ($a[3] <= 8)) {
+			$hash->{system}{DecimalPlace} = "%." . $a[3] . "f";
+		}
+		else {
+			$hash->{system}{DecimalPlace} = "%.3f";
+		}
+	}
+
 	return undef;
 }
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
@@ -330,7 +350,7 @@ sub ElectricityCalculator_Notify($$)
 	### Check whether the Electricity calculator has been disabled
 	if(IsDisabled($ElectricityCalcName))
 	{
-		return "";
+		return undef;
 	}
 	
 	### Check whether all required attributes has been provided and if not, create them with standard values
@@ -427,6 +447,16 @@ sub ElectricityCalculator_Notify($$)
 			Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator - The attribute room was missing and has been set to Electric Energy Counter";
 		}
 	}
+	
+	if(!defined($attr{$ElectricityCalcName}{DecimalPlace}))
+	{
+		### Set attribute with standard value since it is not available
+		$attr{$ElectricityCalcName}{DecimalPlace}         = 3;
+		$ElectricityCalcDev->{system}{DecimalPlace} = "%.3f";
+		
+		### Writing log entry
+		Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator - The attribute DecimalPlace was missing and has been set to 3";
+	}
 
 	### For each feedback on in the array of defined regexpression which has been changed
 	for (my $i = 0; $i < $NumberOfChangedEvents; $i++) 
@@ -521,7 +551,7 @@ sub ElectricityCalculator_Notify($$)
 		if(defined($ElectricityCountReadingValuePrevious))
 		{
 			### Write current electric Energy as previous Electric Energy for future use in the ElectricityCalc-Device
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous value found. Continuing with calculations";
@@ -530,7 +560,7 @@ sub ElectricityCalculator_Notify($$)
 		else
 		{
 			### Write current electric Energy as previous Value for future use in the ElectricityCalc-Device
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous value NOT found. Skipping Loop";
@@ -616,13 +646,13 @@ sub ElectricityCalculator_Notify($$)
 			my $ElectricityCalcPowerCurrent = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerCurrent", "0");
 			
 			### Save Electricity pure cost of previous day, current electric Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyCostDayLast",  (sprintf('%.3f', ($ElectricityCalcEnergyCostDayLast     ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyDayLast",      (sprintf('%.3f', ($ElectricityCalcEnergyDayLast         ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDay1st",      (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDayLast",     (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyCostDayLast",  (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostDayLast     ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_EnergyDayLast",      (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyDayLast         ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDay1st",      (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent  ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_CounterDayLast",     (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,  "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",        0                                                          , 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,  "." . $ElectricityCalcReadingPrefix . "_PowerDayCount",      0                                                          , 1);
-			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf('%.3f', ($ElectricityCalcPowerCurrent          ))), 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent          ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMax",        0                                                          , 1);
 			
 			
@@ -637,10 +667,10 @@ sub ElectricityCalculator_Notify($$)
 				### Calculate pure Electricity cost of previous month ElectricityCalcEnergyMonthLast * Price per kWh
 				my $ElectricityCalcEnergyCostMonthLast = $ElectricityCalcEnergyMonthLast * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
 				### Save Electricity energy and pure cost of previous month
-				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonthLast",   (sprintf('%.3f', ($ElectricityCalcEnergyCostMonthLast   ))), 1);
-				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMonthLast", (sprintf('%.3f', ($ElectricityCalcEnergyMonthLast       ))), 1);
-				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMonth1st", (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
-				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMonthLast", (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonthLast",   (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostMonthLast   ))), 1);
+				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMonthLast", (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMonthLast       ))), 1);
+				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMonth1st", (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent  ))), 1);
+				readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMonthLast", (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious ))), 1);
 
 				
 				### Check whether the current value is the first one of the meter-reading month
@@ -659,10 +689,10 @@ sub ElectricityCalculator_Notify($$)
 					my $ElectricityCalcEnergyCostMeterLast = $ElectricityCalcEnergyMeterLast * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
 					
 					### Save Electricity energy and pure cost of previous meter year
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMeterLast", (sprintf('%.3f', ($ElectricityCalcEnergyCostMeterLast   ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeterLast",     (sprintf('%.3f', ($ElectricityCalcEnergyMeterLast       ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMeter1st",     (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMeterLast",    (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMeterLast", (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostMeterLast   ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeterLast",     (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMeterLast       ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMeter1st",     (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent  ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterMeterLast",    (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious ))), 1);
 				}
 
 				### Check whether the current value is the first one of the calendar year
@@ -677,10 +707,10 @@ sub ElectricityCalculator_Notify($$)
 					my $ElectricityCalcEnergyCostYearLast = $ElectricityCalcEnergyYearLast * $attr{$ElectricityCalcName}{ElectricityPricePerKWh};
 
 					### Save Electricity energy and pure cost of previous calendar year
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostYearLast", (sprintf('%.3f', ($ElectricityCalcEnergyCostYearLast    ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyYearLast",     (sprintf('%.3f', ($ElectricityCalcEnergyYearLast        ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterYear1st",     (sprintf('%.3f', ($ElectricityCountReadingValueCurrent  ))), 1);
-					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterYearLast",    (sprintf('%.3f', ($ElectricityCountReadingValuePrevious ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostYearLast", (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostYearLast    ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyYearLast",     (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyYearLast        ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterYear1st",     (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent  ))), 1);
+					readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterYearLast",    (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious ))), 1);
 				}
 			}
 		}
@@ -694,7 +724,7 @@ sub ElectricityCalculator_Notify($$)
 		if ($ElectricityCountReadingTimestampDelta > 1)
 		{
 			### Calculate DW (electric Energy difference) of previous and current value / [kWh]
-			my $ElectricityCountReadingValueDelta = sprintf('%.3f', ($ElectricityCountReadingValueCurrent)) - sprintf('%.3f', ($ElectricityCountReadingValuePrevious));
+			my $ElectricityCountReadingValueDelta = sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)) - sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious));
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValueDelta                : " . $ElectricityCountReadingValueDelta;
 
 			### Calculate Current Power P = DW/Dt[kWh/s] * 3600[s/h] * 1000 [1/k] / SiPrefixPowerFactor
@@ -747,23 +777,23 @@ sub ElectricityCalculator_Notify($$)
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Finance________________________________________";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Monthly Payment                                  : " . $attr{$ElectricityCalcName}{MonthlyPayment}        . " " . $attr{$ElectricityCalcName}{Currency};
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Basic price per annum                            : " . $attr{$ElectricityCalcName}{BasicPricePerAnnum}    . " " . $attr{$ElectricityCalcName}{Currency};
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyCostMeter                   : " . sprintf('%.3f', ($ElectricityCalcEnergyCostMeter)) . " " . $attr{$ElectricityCalcName}{Currency};
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcReserves                          : " . sprintf('%.3f', ($ElectricityCalcReserves))        . " " . $attr{$ElectricityCalcName}{Currency};
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyCostMeter                   : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostMeter)) . " " . $attr{$ElectricityCalcName}{Currency};
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcReserves                          : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcReserves))        . " " . $attr{$ElectricityCalcName}{Currency};
 
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Times__________________________________________";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcMeterYearMonth                    : " . $ElectricityCalcMeterYearMonth;
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Current Month                                    : " . $ElectricityCountReadingTimestampCurrentMon;
 
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Energy_________________________________________";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyDay                         : " . sprintf('%.3f', ($ElectricityCalcEnergyDay))       . " kWh";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyMonth                       : " . sprintf('%.3f', ($ElectricityCalcEnergyMonth))     . " kWh";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyYear                        : " . sprintf('%.3f', ($ElectricityCalcEnergyYear))      . " kWh";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyMeter                       : " . sprintf('%.3f', ($ElectricityCalcEnergyMeter))     . " kWh";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyDay                         : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyDay))       . " kWh";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyMonth                       : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMonth))     . " kWh";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyYear                        : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyYear))      . " kWh";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcEnergyMeter                       : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMeter))     . " kWh";
 
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _______Power___________________________________________";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerCurrent                      : " . sprintf('%.3f', ($ElectricityCalcPowerCurrent))    . " W";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerCurrent                      : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent))    . " W";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayMin                       : " . ReadingsVal( $ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMin", 0) . " W";
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayAverage                   : " . sprintf('%.3f', ($ElectricityCalcPowerDayAverage)) . " W";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayAverage                   : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerDayAverage)) . " W";
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcPowerDayMax                       : " . ReadingsVal( $ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMax", 0) . " W";
 
 			###### Write readings to ElectricityCalc device
@@ -771,19 +801,19 @@ sub ElectricityCalculator_Notify($$)
 			readingsBeginUpdate($ElectricityCalcReadingDestinationDevice);
 
 			### Write consumed electric Energy (DV) since last measurement
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastDV",      sprintf('%.3f', ($ElectricityCountReadingValueDelta)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastDV",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueDelta)));
 
 			### Write timelap (Dt) since last measurement
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastDt",            sprintf('%.0f', ($ElectricityCountReadingTimestampDelta)));
 		
 			### Write current Power = average Power over last measurement period
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerCurrent",      sprintf('%.3f', ($ElectricityCalcPowerCurrent)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerCurrent",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent)));
 			
 			### Write daily   Power = average Power since midnight
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayAver",      sprintf('%.3f', ($ElectricityCalcPowerDayAverage)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayAver",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerDayAverage)));
 			
 			### Write Power measurement sum    since midnight for average calculation
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",       sprintf('%.3f', ($ElectricityCalcPowerDaySum)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDaySum",       sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerDaySum)));
 			
 			### Write Power measurement counts since midnight for average calculation
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_PowerDayCount",     sprintf('%.0f', ($ElectricityCalcPowerDayCount)));
@@ -795,48 +825,48 @@ sub ElectricityCalculator_Notify($$)
 				readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMin",   sprintf('%.0f', ($ElectricityCalcPowerCurrent)));
 				
 				### Create Log entries for debugging
-				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - New daily minimum power value detected   : " . sprintf('%.3f', ($ElectricityCalcPowerCurrent));
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - New daily minimum power value detected   : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent));
 			}
 			
 			### Detect new daily maximum power value and write to reading
 			if (ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_PowerDayMax", 0) < $ElectricityCalcPowerCurrent)
 			{
 				### Write new maximum Power value
-				readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMax",   sprintf('%.3f', ($ElectricityCalcPowerCurrent)));
+				readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_PowerDayMax",   sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent)));
 				
 				### Create Log entries for debugging
-				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - New daily maximum power value detected   : " . sprintf('%.3f', ($ElectricityCalcPowerCurrent));
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - New daily maximum power value detected   : " . sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent));
 			}
 			
 			### Write energy consumption since midnight
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyDay",         sprintf('%.3f', ($ElectricityCalcEnergyDay)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyDay",         sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyDay)));
 			
 			### Write energy consumption since beginning of month
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMonth",       sprintf('%.3f', ($ElectricityCalcEnergyMonth)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMonth",       sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMonth)));
 
 			### Write energy consumption since beginning of year
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyYear",        sprintf('%.3f', ($ElectricityCalcEnergyYear)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyYear",        sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyYear)));
 			
 			### Write energy consumption since last meter reading
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeter",       sprintf('%.3f', ($ElectricityCalcEnergyMeter)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyMeter",       sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyMeter)));
 			
 			### Write pure energy costs since midnight
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDay",     sprintf('%.3f', ($ElectricityCalcEnergyCostDay)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostDay",     sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostDay)));
 			
 			### Write pure energy costs since beginning of month
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonth",   sprintf('%.3f', ($ElectricityCalcEnergyCostMonth)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMonth",   sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostMonth)));
 			
 			### Write pure energy costs since beginning of calendar year
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostYear",    sprintf('%.3f', ($ElectricityCalcEnergyCostYear)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostYear",    sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostYear)));
 			
 			### Write pure energy costs since beginning of year of Electricity meter reading
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMeter",   sprintf('%.3f', ($ElectricityCalcEnergyCostMeter)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_EnergyCostMeter",   sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcEnergyCostMeter)));
 
 			### Write reserves at electricity supplier based on monthly advance payments within year of Electricity meter reading
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_FinanceReserve",    sprintf('%.3f', ($ElectricityCalcReserves)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_FinanceReserve",    sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcReserves)));
 
 			### Write current meter reading as sshown on the mechanical meter
-			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterCurrent",    sprintf('%.3f', ($ElectricityCountReadingValueCurrent)));
+			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterCurrent",    sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)));
 			
 			### Write months since last meter reading
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_MonthMeterReading", sprintf('%.0f', ($ElectricityCalcMeterYearMonth)));
@@ -1081,6 +1111,19 @@ sub ElectricityCalculator_Notify($$)
 			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        One value of the pre-defined list: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
 																			It defines which SI-prefix for the power value shall be used. The power value will be divided accordingly by multiples of 1000.
 																			The default value is W (Watt).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>DecimalPlace</code> : </li></td><td>	        One value of the pre-defined list 3 to 7.<BR>
+																			It defines to which accuracy in decimal places all results shall be calculated.
+																			The default value is 3 = 0.001.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1654,6 +1697,19 @@ sub ElectricityCalculator_Notify($$)
 			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        Ein Wert der vorgegebenen Auswahlliste: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
 																			Es definiert welcher SI-Prefix verwendet werden soll und teilt die Leistung entsprechend durch ein Vielfaches von 1000.
 																			Der Standard-Wert ist W (Watt).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>DecimalPlace</code> : </li></td><td>	        Ein Wert der vorgegebenen Auswahlliste von 3 bis 7.<BR>
+																			Es definiert die Genauigkeit in Nachkommastellen mit welcher die Ergebnisse berechnet werden.
+																			Der Standard-Wert ist 3 = 0,001.<BR>
 			</td></tr>
 			</td>
 		</tr>
