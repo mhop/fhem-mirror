@@ -5161,9 +5161,9 @@ json2nameValue($;$$)
     $ret->{$name} = $val;
   };
 
-  sub eObj($$$$$$);
+  sub eObj($$$$$$;$);
   sub
-  eObj($$$$$$$)
+  eObj($$$$$$;$)
   {
     my ($ret,$map,$name,$val,$in,$prefix,$firstLevel) = @_;
     my $err; 
