@@ -3999,16 +3999,16 @@ return $default;
 <h3>SSCal</h3>
 <ul>
 
-    With this module the Synology Calendar Server is integrated into FHEM. 
-	The module SSCal is based on functions of the Synology Calendar API. <br><br> 
+    This module is used to integrate Synology Calendar Server with FHEM. 
+	The SSCal module is based on functions of Synology Calendar API. <br><br> 
 	
-	The connection to the calendar server is done by a session ID after successful login. Requests to the server are 
-	internal stored in a queue and are handled sequentially. If the calendar server is temporary unavailable, 
-	the stored requests are catched up once the server is available again. <br><br>
+	The connection to the calendar server is established via a session ID after successful login. Requirements/queries of the server 
+	are stored internally in a queue and processed sequentially. If the calendar server is temporarily unavailable 
+	the saved queries are retrieved as soon as the connection to the server is working again. <br><br>
 
-    You can handle diaries (Events) as well as task lists (ToDo). For these different types of calendar 
-    different models of calendar devices can be definied, model <b>Diary</b> for diaries and model <b>Tasks</b> for 
-    task lists. <br><br>
+    Both appointment calendars (Events) and task lists (ToDo) can be processed. For these different calendar types 
+    different device models can be defined, Model <b>Diary</b> for appointments and Model <b>Tasks</b> for 
+    Task lists. <br><br>
     
     If you want discuss about or like to support the development of this module, there is a thread in the FHEM forum:<br>
     <a href="https://forum.fhem.de/index.php/topic,106963.0.html">57_SSCal - Modul für den Synology Kalender</a>.<br><br>
