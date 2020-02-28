@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     57_SSCal: new module for Synology Calendar App (API)
  - feature: Add new AttrTemplate file for speech recognition
  - change:  70_DENON_AVR: improved soundMode readings (thx Shadow3561)
  - bugfix:  21_HEOSMaster: fix rename passwordstore bug
