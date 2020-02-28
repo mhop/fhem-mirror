@@ -1,0 +1,65 @@
+###########################################
+# $Id: speechrecogn.template first version 2020-02-28 Beta-User $
+#
+# This file provides add-on templates for use with speech recognistion modules 
+# Originally developped for mqtt2-device, see forum thread here: https://forum.fhem.de/index.php/topic,99195.0.html
+#
+# NOTE: one of the following modules must be installed as a prerequisite for this set of templates to work: siri, alexa, gassistant
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+#original name:speech_recognition_type_switch
+name:speech_recognition_type_switch
+filter:NAME=speechrecognTesting
+order:100001
+option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+attr DEVICE genericDeviceType switch
+option:TYPE=siri
+option:TYPE=alexa
+option:TYPE=gassistant
+
+name:speech_recognition_type_light
+filter:NAME=speechrecognTesting
+order:100002
+option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+attr DEVICE genericDeviceType light
+option:TYPE=siri
+option:TYPE=alexa
+option:TYPE=gassistant
+
+name:speech_recognition_type_light_255
+filter:NAME=speechrecognTesting
+order:100003
+option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+set DEVICE attrTemplate speech_recognition_type_light
+#par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
+attr DEVICE genericDeviceType light
+attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39216,delay=true
+#attr DEVICE userReadings NEWUSERREADINGS
+option:TYPE=siri
+option:TYPE=alexa
+option:TYPE=gassistant
+
+name:speech_recognition_type_blind
+filter:NAME=speechrecognTesting
+order:100004
+option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+attr DEVICE genericDeviceType blind
+option:TYPE=siri
+option:TYPE=alexa
+option:TYPE=gassistant
+
+name:speech_recognition_type_thermostate
+filter:NAME=speechrecognTesting
+order:100005
+option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+attr DEVICE genericDeviceType thermostate
+option:TYPE=siri
+option:TYPE=alexa
+option:TYPE=gassistant
+
