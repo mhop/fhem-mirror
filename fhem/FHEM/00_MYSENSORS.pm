@@ -423,6 +423,11 @@ sub onInternalMsg($$) {
         }
         last;
       };
+      $type == I_TIME and do {
+        if (my $client = matchClient($hash,$msg)){ MYSENSORS::DEVICE::onInternalMessage($client,$msg) }
+        last;
+      };
+
     }
   } elsif (my $client = matchClient($hash,$msg)) {
     MYSENSORS::DEVICE::onInternalMessage($client,$msg);
