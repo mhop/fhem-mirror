@@ -388,17 +388,34 @@ sub HMCCUDEV_Set ($@)
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $statevals = AttrVal ($name, 'statevals', '');
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', '', '', '');
 
+	# Get state and control datapoints
+	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', '', '', '');
+	
 	# Get additional commands (including state commands)
 	my $roleCmds = HMCCU_GetSpecialCommands ($hash, $cc);
 	
+	my $cmdList = '';
+	my %addCmds;
+	foreach my $d (keys %$roleCmds) {
+		my @cmds = split(' ', $roleCmds->{$d});
+		foreach my $cmdDef (@cmds) {
+			my ($cmd, $argDef) = split(':', $cmdDef);
+			$addCmds{$cmd} = "$d=$argDef";
+			$cmdList .= " $cmd";
+			if ($argDef !~ /^\?/) {
+				my @argList = split(',', $argDef);
+				$cmdList .= scalar(@argList) > 1 ? ':'.$argDef : ':noArg';
+			}
+		}
+	}
+	
 	# Get state values related to control command and datapoint
 	my $stateVals = HMCCU_GetStateValues ($hash, $roleCmds, $cd, 2);
-	my %stateCmds = split (/[:\s]/, $stateVals);
+	my @stateCmdList = split (/[:\s]/, $stateVals);
+	my %stateCmds = @stateCmdList;
 	my @states = keys %stateCmds;
-	
+
 	my $result = '';
 	my $rc;
 
@@ -440,7 +457,7 @@ sub HMCCUDEV_Set ($@)
 		   
 		   my $no = sprintf ("%03d", $i);
 			$objvalue =~ s/\\_/%20/g;
-			$dpval{"$no.$ccuif.$ccuaddr:$objname"} = HMCCU_Substitute ($objvalue, $statevals, 1, undef, '');
+			$dpval{"$no.$ccuif.$ccuaddr:$objname"} = HMCCU_Substitute ($objvalue, $stateVals, 1, undef, '');
 		}
 
 		return HMCCU_SetError ($hash, $usage) if (scalar (keys %dpval) < 1);
@@ -459,7 +476,7 @@ sub HMCCUDEV_Set ($@)
 		$objvalue =~ s/\\_/%20/g;
 
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$ccuif.$ccuaddr:$cc.$cd" => HMCCU_Substitute ($objvalue, $statevals, 1, undef, '') }
+			{ "001.$ccuif.$ccuaddr:$cc.$cd" => HMCCU_Substitute ($objvalue, $stateVals, 1, undef, '') }
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
@@ -566,7 +583,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
-		return HMCCU_SetError ($hash, -15) if ($statevals eq '' || !exists($hash->{hmccu}{statevals}));
+		return HMCCU_SetError ($hash, -15) if ($stateVals eq '' || !exists($hash->{hmccu}{statevals}));
 		return HMCCU_SetError ($hash, "No state value for 'on' defined")
 		   if ("on" !~ /($hash->{hmccu}{statevals})/);
 		return HMCCU_SetError ($hash, -11) if ($sc eq '');
@@ -585,7 +602,7 @@ sub HMCCUDEV_Set ($@)
 		
 		$rc = HMCCU_SetMultipleDatapoints ($hash, {
 			"001.$ccuif.$ccuaddr:$sc.ON_TIME" => $timespec,
-			"002.$ccuif.$ccuaddr:$sc.$sd" => HMCCU_Substitute ("on", $statevals, 1, undef, '')
+			"002.$ccuif.$ccuaddr:$sc.$sd" => HMCCU_Substitute ("on", $stateVals, 1, undef, '')
 		});
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}

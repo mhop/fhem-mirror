@@ -19,6 +19,7 @@ use warnings;
 
 use vars qw(%HMCCU_ROLES);
 use vars qw(%HMCCU_ATTR);
+use vars qw(%HMCCU_CONVERSIONS);
 use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
@@ -87,6 +88,32 @@ use vars qw(%HMCCU_SCRIPTS);
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desiredTemp',
 		'widgetOverride' => 'control:slider,4.5,0.5,30.5,1 desiredTemp:slider,4.5,0.5,30.5,1'
+	}
+);
+
+######################################################################
+# Value conversions
+######################################################################
+
+%HMCCU_CONVERSIONS = (
+	'SHUTTER_CONTACT' => {
+		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
+	},
+	'SWITCH' => {
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+	},
+	'BLIND' => {
+		'LEVEL' => { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
+	},
+	'DIMMER' => {
+		'LEVEL' => { '0' => 'off', '100' => 'on', 'off' => '0', 'on' => '100' }
+	},
+	'DEFAULT' => {
+		'AES_KEY' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' },
+		'LOW_BAT' => { '0' => 'ok', 'false' => 'ok', '1' => 'low', 'true' => 'low' },
+		'LOWBAT' => { '0' => 'ok', 'false' => 'ok', '1' => 'low', 'true' => 'low' },
+		'STATE' => { '0' => 'false', '1' => 'true' },
+		'UNREACH' => { '0' => 'alive', 'false' => 'alive', '1' => 'dead', 'true' => 'dead' }
 	}
 );
 

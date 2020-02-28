@@ -66,7 +66,7 @@ sub HMCCUCHN_Define ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
 
-	my $usage = "Usage: define $name HMCCUCHN {device} ['readonly'] ['defaults'] [iodev={iodevname}]";
+	my $usage = "Usage: define $name HMCCUCHN {device} ['readonly'] ['noDefaults'] [iodev={iodevname}]";
 	return $usage if (@$a < 3);
 
 	my $devname = shift @$a;
@@ -91,7 +91,7 @@ sub HMCCUCHN_Define ($@)
 	while (defined ($arg)) {
 		return $usage if ($n == 3);
 		if    ($arg eq 'readonly') { $hash->{readonly} = "yes"; }
-		elsif ($arg eq 'defaults') { HMCCU_SetDefaults ($hash) if ($init_done); }
+		elsif ($arg ne 'noDefaults' && $init_done) { $hash->{hmccu}{nodefaults} = 1; }
 		else { return $usage; }
 		$n++;
 		$arg = shift @$a;
@@ -171,6 +171,11 @@ sub HMCCUCHN_InitDevice ($$)
 		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
 		HMCCU_UpdateDevice ($ioHash, $devHash);
 		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
+		if (!exists($devHash->{hmccu}{nodefaults})) {
+			if (!HMCCU_SetDefaultAttributes ($devHash)) {
+				HMCCU_SetDefaults ($devHash);
+			}
+		}
 		HMCCU_GetUpdate ($devHash, $da, 'Value');
 	}
 
@@ -723,11 +728,10 @@ sub HMCCUCHN_Get ($@)
    <b>Define</b><br/><br/>
    <ul>
       <code>define &lt;name&gt; HMCCUCHN {&lt;channel-name&gt; | &lt;channel-address&gt;}
-      [readonly] [defaults] [iodev=&lt;iodev-name&gt;]</code>
+      [readonly] [noDefaults] [iodev=&lt;iodev-name&gt;]</code>
       <br/><br/>
-      If option 'readonly' is specified no set command will be available. With option 'defaults'
-      some default attributes depending on CCU device type will be set. Default attributes are only
-      available for some device types.<br/>
+      If option 'readonly' is specified no set command will be available. With option 'noDefaults'
+      no default attributes will be set during interactive device definition. <br/>
       The define command accepts a CCU2 channel name or channel address as parameter.
       <br/><br/>
       Examples:<br/>
