@@ -1356,12 +1356,13 @@ sub weekprofile_writeProfilesToFile(@)
     push (@content, "entry=".$json->encode($hash->{PROFILES}[$i]));
   }
   
-  my $filename = weekprofile_getDataFile($me);
-  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
+  my $dbused = configDBUsed();
+  my $filename = weekprofile_getDataFile($hash);
+  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename [DB: $dbused]";
   
   my $ret = FileWrite($filename,@content);
   if ($ret){
-    Log3 $me, 1, "$me(writeProfileToFile): write profiles to $filename failed $ret";
+    Log3 $me, 1, "$me(writeProfileToFile): write profiles to $filename [DB: $dbused] failed $ret";
   } else {
     DoTrigger($me,"PROFILES_SAVED",1);
     weekprofile_updateReadings($hash);
@@ -1370,7 +1371,8 @@ sub weekprofile_writeProfilesToFile(@)
 ##############################################
 sub weekprofile_getDataFile(@)
 {  
-  my ($me) =  @_;
+  my ($hash) = @_;
+  my $me = $hash->{NAME};
   my $filename = "%L/weekprofile-$me.cfg";
   $filename = AttrVal($me,"configFile",$filename);
   my @t = localtime(gettimeofday());
@@ -1378,6 +1380,7 @@ sub weekprofile_getDataFile(@)
   # compatibility to old weekprofile versions
   # if no global logdir is set - use log
   $filename =~s/%L/.\/log/g;
+  $hash->{CONFIGFILE} = $filename; # for configDB migration
   return $filename;
 }
 ############################################## 
@@ -1388,7 +1391,7 @@ sub weekprofile_readProfilesFromFile(@)
   
   my $useTopics = AttrVal($me,"useTopics",0);
 
-  my $filename = weekprofile_getDataFile($me);
+  my $filename = weekprofile_getDataFile($hash);
   Log3 $me, 5, "$me(readProfilesFromFile): read profiles from $filename";
   
   my ($ret, @content) = FileRead($filename);
@@ -1625,6 +1628,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   The connection between the thermostats and the profile is an user attribute 'weekprofile' without the topic name.
   With 'restore_topic' the defined profile in the attribute will be transfered to the thermostat.
   So it is possible to change the topic easily and all thermostats will be updated with the correndponding profile.
+  <br><br>
+  Weekprofile is supports configdb and configdb migrate since svn: 21314
   <br><br>
   <b>Attention:</b> 
   To transfer a profile to a device it needs a lot of Credits. 
