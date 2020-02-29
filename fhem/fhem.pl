@@ -5167,6 +5167,7 @@ json2nameValue($;$$)
   {
     my ($ret,$map,$name,$val,$in,$prefix,$firstLevel) = @_;
     my $err; 
+    $prefix="" if(!$firstLevel);
 
     if($val =~ m/^"/) {
       ($err, $val, $in) = lStr($val);
@@ -5197,8 +5198,9 @@ json2nameValue($;$$)
       my $idx = 1;
       $val =~ s/^\s*//;
       while($val) {
-        ($err,$val) = eObj($ret, $map, $firstLevel ? $idx : $name."_$idx",
-                           $val, $val, $prefix);
+        ($err,$val) = eObj($ret, $map, 
+                                $firstLevel ? "$prefix$idx" : $name."_$idx",
+                                $val, $val, $prefix);
         return ($err,undef) if($err);
         $val =~ s/^\s*,\s*//;
         $val =~ s/\s*$//;
