@@ -2687,8 +2687,8 @@ name:wled_controller
 filter:TYPE=MQTT2_DEVICE
 desc:To control a WLED device, see https://github.com/Aircoookie/WLED/wiki for details).
 order:W_01
-par:BASE_ID;BASE_ID typically is wled;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/][^/]+[/].*:, ? $1 : undef }
-par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is wled;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/][^/]+[/][^/]+:, ? $1 : undef }
+par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,[^:]+[/]([^/]+)[/][^/]+:, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal("DEVICE","icon","hue_filled_iris") }
 attr DEVICE icon ICON
 attr DEVICE setList\
