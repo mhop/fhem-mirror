@@ -579,6 +579,7 @@ FW_errmsg(txt, timeout)
 function
 FW_okDialog(txt, parent, removeFn)
 {
+  $("#FW_okDialog").remove();
   var div = $("<div id='FW_okDialog'>");
   $(div).html(txt);
   $("body").append(div);
