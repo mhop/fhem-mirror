@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_DoorBird: Missing package requirement added to commandref
  - feature: 98_weekprofile: supporting dbconfig migrate
  - change:  70_DENON_AVR: even more surround-modes (thx Shadow3561)
  - new:     57_SSCal: new module for Synology Calendar App (API)
