@@ -3035,7 +3035,7 @@ sub DoorBird_Transmit_Audio($$) {
 		   $GstCommand .= $CommandURL;
 
 		### Log Entry for debugging purposes
-		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - GstCommand              : " . $GstCommand ;
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - GstCommand              : " . $GstCommand;
 
 		### Create command for shell
 		my $ShellCommand  = "timeout " . ($AudioLength + 3) . " " . $GstCommand . " &";
@@ -3047,11 +3047,8 @@ sub DoorBird_Transmit_Audio($$) {
 		eval {
 						system($ShellCommand) or die "Could not execute" . $ShellCommand . " ". $@;
 		};
-		### If error message appered
-		if ( $@ ) {
-		#				$ErrorMessage = $@;
-			}
 
+		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - File streamed successf. : " . $AudioDataPathOrig;
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - ---------------------------------------------------------------";
 		return "The audio file: " . $AudioDataPathOrig . " has been streamed to the DoorBird";
 	}
@@ -4173,6 +4170,7 @@ sub DoorBird_findNewestFWVersion($$$)
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
+					<li>sudo apt-get install gstreamer1.0-tools     </li>
 					<li>sudo cpan Crypt::Argon2						</li>
 					<li>sudo cpan Alien::Base::ModuleBuild			</li>
 					<li>sudo cpan Alien::Sodium						</li>
@@ -4354,6 +4352,7 @@ sub DoorBird_findNewestFWVersion($$$)
 					<li>sudo apt-get install sox					</li>
 					<li>sudo apt-get install libsox-fmt-all			</li>
 					<li>sudo apt-get install libsodium-dev			</li>
+					<li>sudo apt-get install gstreamer1.0-tools     </li>
 					<li>sudo cpan Crypt::Argon2						</li>
 					<li>sudo cpan Alien::Base::ModuleBuild			</li>
 					<li>sudo cpan Alien::Sodium						</li>
@@ -4571,7 +4570,8 @@ sub DoorBird_findNewestFWVersion($$$)
       "requires": {
         "sox": 0,
         "libsox-fmt-all": 0,
-        "libsodium-dev": 0
+        "libsodium-dev": 0,
+		"gstreamer1.0-tools": 0
       },
       "recommends": {
       },
