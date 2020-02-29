@@ -1,4 +1,4 @@
-REV 21298
+REV 21309
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-02-28_07:45:03 327511 ./CHANGED
+UPD 2020-02-29_07:45:03 327705 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-02-28_07:45:12 160084 ./fhem.pl
+UPD 2020-02-29_07:45:11 160087 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-01-05_07:45:02 57916 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -43,7 +43,7 @@ UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2019-02-25_07:45:03 31183 FHEM/00_MQTT.pm
 UPD 2020-02-24_07:45:03 17741 FHEM/00_MQTT2_CLIENT.pm
 UPD 2020-02-24_07:45:03 20051 FHEM/00_MQTT2_SERVER.pm
-UPD 2019-09-19_07:45:03 21792 FHEM/00_MYSENSORS.pm
+UPD 2020-02-29_07:45:03 21951 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2019-04-01_07:45:02 35447 FHEM/00_Neuron.pm
 UPD 2019-10-01_07:45:03 60034 FHEM/00_OWX.pm
@@ -196,7 +196,7 @@ UPD 2019-03-16_07:45:03 18457 FHEM/32_TechemWZ.pm
 UPD 2018-01-17_07:45:02 209352 FHEM/32_WifiLight.pm
 UPD 2018-03-02_07:47:09 15860 FHEM/32_mailcheck.pm
 UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
-UPD 2020-02-25_07:45:02 158813 FHEM/32_withings.pm
+UPD 2020-02-29_07:45:03 160564 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
 UPD 2020-02-09_07:45:03 90608 FHEM/33_readingsGroup.pm
@@ -313,6 +313,7 @@ UPD 2019-07-10_07:45:02 22166 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
 UPD 2019-11-18_07:45:03 168026 FHEM/57_Calendar.pm
+UPD 2020-02-29_07:45:03 224203 FHEM/57_SSCal.pm
 UPD 2020-02-11_07:45:03 19855 FHEM/59_GSI.pm
 UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
 UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
@@ -342,7 +343,7 @@ UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
 UPD 2019-09-30_07:45:03 88148 FHEM/70_BOTVAC.pm
 UPD 2020-01-03_07:45:03 90228 FHEM/70_BRAVIA.pm
 UPD 2019-11-07_07:45:03 10716 FHEM/70_CanOverEthernet.pm
-UPD 2020-02-28_07:45:03 129030 FHEM/70_DENON_AVR.pm
+UPD 2020-02-29_07:45:03 129305 FHEM/70_DENON_AVR.pm
 UPD 2017-04-23_07:45:02 6641 FHEM/70_EGPM.pm
 UPD 2019-03-23_07:45:03 123026 FHEM/70_ENIGMA2.pm
 UPD 2019-12-24_07:45:11 47354 FHEM/70_JSONMETER.pm
@@ -649,8 +650,9 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-08_07:45:04 52372 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-02-25_07:45:02 188261 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-02-29_07:45:03 185671 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
+UPD 2020-02-29_07:45:03 2887 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -747,12 +749,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-02-28_07:45:07 4210199 docs/commandref.html
-UPD 2020-02-28_07:45:09 2609700 docs/commandref_DE.html
+UPD 2020-02-29_07:45:07 4226952 docs/commandref.html
+UPD 2020-02-29_07:45:09 2626984 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-02-28_07:45:11 230470 docs/commandref_modular.html
-UPD 2020-02-28_07:45:12 241440 docs/commandref_modular_DE.html
+UPD 2020-02-29_07:45:10 231125 docs/commandref_modular.html
+UPD 2020-02-29_07:45:11 242098 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1657,6 +1659,7 @@ UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
 UPD 2020-01-09_07:45:02 600 www/images/fhemSVG/tradfri_filled_floalt.svg
 UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
+UPD 2020-02-29_07:45:03 2705 www/images/fhemSVG/tuer_fenster_kontakt.svg
 UPD 2019-12-12_07:45:03 3216 www/images/fhemSVG/tuer_fenster_kontakt_closed.svg
 UPD 2019-12-12_07:45:03 3318 www/images/fhemSVG/tuer_fenster_kontakt_opened.svg
 UPD 2019-02-09_07:45:03 2304 www/images/fhemSVG/ubuntu.svg
