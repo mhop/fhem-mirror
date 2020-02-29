@@ -179,7 +179,8 @@ TcpServer_SetSSL($)
   }
 
   my $name = $hash->{NAME};
-  my $cp = AttrVal($name, "sslCertPrefix", "certs/server-");
+  my $cp = AttrVal("global", "modpath", ".")."/".
+           AttrVal($name, "sslCertPrefix", "certs/server-");
   if(! -r "${cp}key.pem") {
 
     Log 1, "$name: Server certificate missing, trying to create one";
@@ -197,7 +198,7 @@ TcpServer_SetSSL($)
     close(FH);
 
     my $cmd = "openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 ".
-                "-config certreq.txt -out ${cp}cert.pm -keyout ${cp}key.pem";
+                "-config certreq.txt -out ${cp}cert.pem -keyout ${cp}key.pem";
     Log 1, "Executing $cmd";
     `$cmd`;
     unlink("certreq.txt");
