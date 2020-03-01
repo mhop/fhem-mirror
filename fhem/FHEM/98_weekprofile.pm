@@ -2,7 +2,7 @@
 # $Id$
 #
 # Usage
-# 
+#
 # define <name> weekprofile [device]
 ############################################## 
 
@@ -1399,7 +1399,11 @@ sub weekprofile_readProfilesFromFile(@)
     if (configDBUsed()){
       Log3 $me, 1, "$me(readProfilesFromFile): please import your config file $filename into configDB!";
     } else {
-      Log3 $me, 1, "$me(readProfilesFromFile): $ret";
+      if ($ret =~ m/.*Can't open.*/) {
+        Log3 $me, 3, "$me(readProfilesFromFile): $ret - save profil(s) at least one time";
+      } else {
+        Log3 $me, 1, "$me(readProfilesFromFile): $ret";
+      }
     }
     return;
   }
