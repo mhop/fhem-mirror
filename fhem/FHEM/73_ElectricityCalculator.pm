@@ -121,8 +121,11 @@ sub ElectricityCalculator_Define($$$)
 		$hash->{system}{DecimalPlace} = "%.3f";
 	}
 	
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : ElectricityCalculator - RegEx                     : " . $RegEx;
+	
 	### Defining notify trigger
-	$hash->{NOTIFYDEV} = $RegEx;
+	notifyRegexpChanged($hash, $RegEx);
 		
 	### Writing log entry
 	Log3 $name, 5, $name. " : ElectricityCalculator - Starting to define module";
@@ -347,6 +350,9 @@ sub ElectricityCalculator_Notify($$)
 	my $NumberOfChangedEvents						= int(@{$ElectricityCountNameEvents});
  	my $RegEx										= $ElectricityCalcDev->{REGEXP};
 
+	### For debugging purpose only
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify - Trigger Dev Name   : " . $ElectricityCountDev->{NAME};
+
 	### Check whether the Electricity calculator has been disabled
 	if(IsDisabled($ElectricityCalcName))
 	{
@@ -447,7 +453,6 @@ sub ElectricityCalculator_Notify($$)
 			Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator - The attribute room was missing and has been set to Electric Energy Counter";
 		}
 	}
-	
 	if(!defined($attr{$ElectricityCalcName}{DecimalPlace}))
 	{
 		### Set attribute with standard value since it is not available
