@@ -122,8 +122,11 @@ sub WaterCalculator_Define($$$)
 		$hash->{system}{DecimalPlace} = "%.3f";
 	}
 	
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : GasCalculator - RegEx                             : " . $RegEx;
+	
 	### Defining notify trigger
-	$hash->{NOTIFYDEV} = $RegEx;
+	notifyRegexpChanged($hash, $RegEx);
 		
 	### Writing log entry
 	Log3 $name, 5, $name. " : WaterCalculator - Starting to define module";
