@@ -126,10 +126,12 @@ sub GasCalculator_Define($$$)
 		$hash->{system}{DecimalPlace} = "%.3f";
 	}
 	
-	### Defining notify trigger
-	$hash->{NOTIFYDEV} = $RegEx;
-		
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : GasCalculator - RegEx                             : " . $RegEx;
 	
+	### Defining notify trigger
+	notifyRegexpChanged($hash, $RegEx);
+
 	### Writing log entry
 	Log3 $name, 5, $name. " : GasCalculator - Starting to define module";
 
