@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.32.2"  => "01.03.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 again ",
   "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
   "8.32.0"  => "29.01.2020  new option \"deleteOther\" for minValue ",
   "8.31.0"  => "26.01.2020  new option \"deleteOther\" for maxValue ",
@@ -10706,7 +10707,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
-          $value             = looks_like_number($a[1])?sprintf("%.4f",$a[1]):undef;
+          $value             = defined($a[1])?(looks_like_number($a[1])?sprintf("%.4f",$a[1]):$a[1]):undef;     # Version 8.32.2
           $rsf               = $a[2];                             # Runtime String first - Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
@@ -10716,7 +10717,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month|year/) {
-                  $time  = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time  = "00:00:01";                            # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
                   $ntime = "23:59:59";
                   ($year,$mon,$mday) = split("-", $ndate);
                   $corr              = ($i != $ele) ? 86400 : 0;
@@ -10724,7 +10725,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
                   ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
               } elsif ($aggr =~ /hour/) {
                   $hour  = $time;
-                  $time  = "$hour:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time  = "$hour:00:01";                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
                   $ntime = "$hour:59:59";
                   if ($ntime eq "23:59:59") {
                       ($year,$mon,$mday) = split("-", $ndate);
