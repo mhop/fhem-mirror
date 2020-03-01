@@ -3494,7 +3494,9 @@ ResolveDateWildcards($@)
   my ($f, @t) = @_;
   return $f if(!$f);
   return $f if($f !~ m/%/);     # Be fast if there is no wildcard
-  $f =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir}); #log directory
+  my $logdir = AttrVal("global","logdir",
+               AttrVal("global","modpath","")."/log");
+  $f =~ s/%L/$logdir/g;
   return strftime($f,@t);
 }
 
