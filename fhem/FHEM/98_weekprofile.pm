@@ -1400,7 +1400,7 @@ sub weekprofile_readProfilesFromFile(@)
       Log3 $me, 1, "$me(readProfilesFromFile): please import your config file $filename into configDB!";
     } else {
       if ($ret =~ m/.*Can't open.*/) {
-        Log3 $me, 3, "$me(readProfilesFromFile): $ret - save profil(s) at least one time";
+        defined($hash->{MASTERDEV}) ? Log3 $me, 4, "$me(readProfilesFromFile): $ret" : Log3 $me, 3, "$me(readProfilesFromFile): $ret - save profil(s) at least one time";
       } else {
         Log3 $me, 1, "$me(readProfilesFromFile): $ret";
       }
