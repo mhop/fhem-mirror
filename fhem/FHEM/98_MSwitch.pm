@@ -11768,9 +11768,14 @@ sub MSwitch_EventBulk($$$$) {
     MSwitch_LOG( $name, 5, "aufruf eventbulk event " . $event );
     MSwitch_LOG( $name, 5, "aufruf eventbulk eventset " . $hash->{eventsave} );
 
-    if (    ReadingsVal( $name, 'last_event', '' ) ne $event
-         && $event ne ''
-         && $hash->{eventsave} ne 'saved' )
+    # if (    ReadingsVal( $name, 'last_event', '' ) ne $event
+         # && $event ne ''
+         # && $hash->{eventsave} ne 'saved' )
+		 
+		  
+	    if (  $event ne '' && $event ne "last_activation_by:event"
+         && $hash->{eventsave} ne 'saved' )	 
+		 
     {
         $hash->{eventsave} = "saved";
         readingsBeginUpdate($hash);
