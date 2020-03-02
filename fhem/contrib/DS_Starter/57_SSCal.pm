@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 57_SSCal.pm 21307 2020-02-28 15:09:57Z DS_Starter $
+# $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $
 #########################################################################################################################
 #       57_SSCal.pm
 #
@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.1.0"  => "01.03.2020  expand composite Event, bugfix API if entry with 'is_all_day' and at first position in 'data' ",
   "2.0.0"  => "28.02.2020  check in release ",
   "1.15.0" => "27.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY and BYDAY, create commandref ",
   "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
@@ -1511,7 +1512,7 @@ sub SSCal_extractEventlist ($) {
   my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
   my $am     = AttrVal($name, "asyncMode", 0);
   
-  my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl);
+  my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl,$es,$em,$eh);
   my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
@@ -1549,11 +1550,12 @@ sub SSCal_extractEventlist ($) {
           
           # Bugfix API - wenn is_all_day und an erster Stelle im 'data' Ergebnis des API-Calls ist Endedate/time nicht korrekt !
           if($isallday && ($bdate ne $edate) && $netime =~ /^00:59:59$/) {
-              $eyear  = $byear;
-              $emonth = $bmonth;
-              $emday  = $bmday;
+              ($es, $em, $eh, $emday, $emonth, $eyear, undef, undef, undef) = localtime($ets-=3600);
+              $eyear  = sprintf("%02d", $eyear+=1900);
+              $emonth = sprintf("%02d", $emonth+=1);
+              $emday  = sprintf("%02d", $emday);
+              $netime = $eh.$em.$es;
               $nbtime =~ s/://g;
-              $netime = "235959";
 
               ($bi,undef,$bdate,$btime,$bts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, 0, 0);  
               ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, 0, 0);         
@@ -2195,9 +2197,10 @@ sub SSCal_doCompositeEvents ($$$) {
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
   
-  my ($desc,$begin,$status,$isrepeat,$id,$event);
+  my ($summary,$desc,$begin,$status,$isrepeat,$id,$event);
   
   foreach my $bnr (@{$abnr}) {
+      $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
 	  $status     = ReadingsVal($name, $bnr."_17_Status",       "");
@@ -2207,7 +2210,7 @@ sub SSCal_doCompositeEvents ($$$) {
       $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
 	  
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
-		  $event = "composite: $id $isrepeat $begin $status $desc";
+		  $event = "composite: $bnr $id $isrepeat $begin $status ".($desc?$desc:$summary);
 		  CommandTrigger(undef, "$name $event");
 	  }
   }
@@ -2762,7 +2765,7 @@ sub SSCal_login ($$) {
   }
 
   my $timeout = AttrVal($name,"timeout",60);
-  $timeout    = 60 if($timeout < 60);
+  $timeout    = 120 if($timeout < 120);
   Log3($name, 4, "$name - HTTP-Call login will be done with http timeout value: $timeout s");
   
   my $urlwopw;      # nur zur Anzeige bei verbose >= 4 und "showPassInLog" == 0
@@ -3419,7 +3422,7 @@ return;
 #    Rückgabe:       invalid, Zeitzone, Date(YYYY-MM-DD), Time (HH:MM:SS), UnixTimestamp
 #                    (invalid =1 wenn Datum ungültig, ist nach RFC 5545 diese Wiederholung 
 #                                zu ignorieren und auch nicht zu zählen !)
-#    $dtstart:       man benötigt originales DTSTART für den Vergleich bei Recuuring Terminen
+#    $dtstart:       man benötigt originales DTSTART für den Vergleich bei Recurring Terminen
 #############################################################################################
 sub SSCal_explodeDateTime ($$$$$) {      
   my ($hash,$dt,$isallday,$uid,$dtstart) = @_;
@@ -3549,12 +3552,12 @@ sub SSCal_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21307 2020-02-28 15:09:57Z DS_Starter $ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g if($modules{$type}{META}{x_version} =~ /1.1.1/);
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21307 2020-02-28 15:09:57Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
