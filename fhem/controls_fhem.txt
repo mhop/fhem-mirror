@@ -1,4 +1,4 @@
-REV 21319
+REV 21334
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-01_07:45:02 327834 ./CHANGED
+UPD 2020-03-02_07:45:03 328184 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-03-01_07:45:11 160167 ./fhem.pl
+UPD 2020-03-02_07:45:12 160209 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-01-05_07:45:02 57916 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -343,7 +343,7 @@ UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
 UPD 2019-09-30_07:45:03 88148 FHEM/70_BOTVAC.pm
 UPD 2020-01-03_07:45:03 90228 FHEM/70_BRAVIA.pm
 UPD 2019-11-07_07:45:03 10716 FHEM/70_CanOverEthernet.pm
-UPD 2020-02-29_07:45:03 129305 FHEM/70_DENON_AVR.pm
+UPD 2020-03-02_07:45:03 131063 FHEM/70_DENON_AVR.pm
 UPD 2017-04-23_07:45:02 6641 FHEM/70_EGPM.pm
 UPD 2019-03-23_07:45:03 123026 FHEM/70_ENIGMA2.pm
 UPD 2019-12-24_07:45:11 47354 FHEM/70_JSONMETER.pm
@@ -391,13 +391,13 @@ UPD 2019-08-26_07:45:03 162302 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
 UPD 2020-02-28_07:45:03 310973 FHEM/73_AutoShuttersControl.pm
 UPD 2020-03-01_07:45:02 182828 FHEM/73_DoorBird.pm
-UPD 2020-02-28_07:45:03 92752 FHEM/73_ElectricityCalculator.pm
+UPD 2020-03-02_07:45:03 93058 FHEM/73_ElectricityCalculator.pm
 UPD 2020-02-28_07:45:03 42853 FHEM/73_GardenaSmartBridge.pm
-UPD 2020-02-28_07:45:03 83805 FHEM/73_GasCalculator.pm
+UPD 2020-03-02_07:45:03 83933 FHEM/73_GasCalculator.pm
 UPD 2018-01-09_07:45:03 87372 FHEM/73_MPD.pm
 UPD 2020-01-17_07:45:03 40841 FHEM/73_NUKIBridge.pm
 UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
-UPD 2020-02-28_07:45:03 86703 FHEM/73_WaterCalculator.pm
+UPD 2020-03-02_07:45:03 86835 FHEM/73_WaterCalculator.pm
 UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
 UPD 2019-10-25_07:45:03 69268 FHEM/74_AMADDevice.pm
 UPD 2020-02-28_07:45:03 45619 FHEM/74_GardenaSmartDevice.pm
@@ -460,7 +460,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-02-01_07:45:04 427342 FHEM/93_DbLog.pm
-UPD 2020-02-11_07:45:03 864982 FHEM/93_DbRep.pm
+UPD 2020-03-02_07:45:03 865165 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
@@ -504,7 +504,7 @@ UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2020-01-13_07:45:03 188373 FHEM/98_Installer.pm
 UPD 2019-11-23_07:45:02 4884 FHEM/98_JsonList2.pm
 UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
-UPD 2020-02-24_07:45:03 422855 FHEM/98_MSwitch.pm
+UPD 2020-03-02_07:45:03 422984 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
 UPD 2019-09-18_07:45:02 232404 FHEM/98_Modbus.pm
@@ -516,7 +516,7 @@ UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2019-12-29_07:45:10 27772 FHEM/98_RandomTimer.pm
-UPD 2020-03-01_07:45:02 96649 FHEM/98_SVG.pm
+UPD 2020-03-02_07:45:03 96738 FHEM/98_SVG.pm
 UPD 2019-12-18_07:45:02 71578 FHEM/98_Siro.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -571,7 +571,7 @@ UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
 UPD 2019-12-26_07:45:03 88679 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
-UPD 2020-03-01_07:45:02 65190 FHEM/98_weekprofile.pm
+UPD 2020-03-02_07:45:03 65423 FHEM/98_weekprofile.pm
 UPD 2019-02-26_07:45:02 21036 FHEM/99_SUNRISE_EL.pm
 UPD 2020-02-05_07:45:03 11752 FHEM/99_Utils.pm
 UPD 2020-03-01_07:45:02 10556 FHEM/AttrTemplate.pm
@@ -753,8 +753,8 @@ UPD 2020-03-01_07:45:06 4227095 docs/commandref.html
 UPD 2020-03-01_07:45:09 2627043 docs/commandref_DE.html
 UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
 UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-03-01_07:45:10 231125 docs/commandref_modular.html
-UPD 2020-03-01_07:45:11 242098 docs/commandref_modular_DE.html
+UPD 2020-03-02_07:45:10 231125 docs/commandref_modular.html
+UPD 2020-03-02_07:45:11 242098 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1345,6 +1345,8 @@ UPD 2019-02-14_07:45:03 369 www/images/fhemSVG/file_unknown.svg
 UPD 2019-02-14_07:45:03 1944 www/images/fhemSVG/finder.svg
 UPD 2015-07-28_14:05:32 3850 www/images/fhemSVG/floor.svg
 UPD 2019-02-14_07:45:03 3325 www/images/fhemSVG/flux.svg
+UPD 2020-03-02_07:45:03 21991 www/images/fhemSVG/freezer.svg
+UPD 2020-03-02_07:45:03 10863 www/images/fhemSVG/fridge.svg
 UPD 2015-07-28_14:05:32 10015 www/images/fhemSVG/frost.svg
 UPD 2016-12-27_07:45:02 1562 www/images/fhemSVG/fs20_S4A-2_1.svg
 UPD 2016-12-27_07:45:02 1564 www/images/fhemSVG/fs20_S4A-2_2.svg
@@ -1383,6 +1385,7 @@ UPD 2015-08-10_07:45:11 33260 www/images/fhemSVG/fts_sunblind_70.svg
 UPD 2015-08-10_07:45:11 34356 www/images/fhemSVG/fts_sunblind_80.svg
 UPD 2015-08-10_07:45:11 33264 www/images/fhemSVG/fts_sunblind_90.svg
 UPD 2015-07-28_14:05:32 1650 www/images/fhemSVG/fts_window_1wbb_open.svg
+UPD 2020-03-02_07:45:03 3323 www/images/fhemSVG/fuel.svg
 UPD 2017-11-14_07:45:02 5430 www/images/fhemSVG/garden_socket.svg
 UPD 2017-11-26_07:45:02 2381 www/images/fhemSVG/gasoline.svg
 UPD 2015-07-28_14:05:32 2898 www/images/fhemSVG/general_an.svg
@@ -1465,6 +1468,8 @@ UPD 2017-09-07_07:45:02 3192 www/images/fhemSVG/ios_seton_fill.svg
 UPD 2017-11-26_07:45:02 10268 www/images/fhemSVG/it_hue_bridge.svg
 UPD 2015-07-28_14:05:32 16822 www/images/fhemSVG/it_i-net.svg
 UPD 2017-02-09_07:45:02 3657 www/images/fhemSVG/it_printer.svg
+UPD 2020-03-02_07:45:03 235113 www/images/fhemSVG/it_raspberry.svg
+UPD 2020-03-02_07:45:03 69515 www/images/fhemSVG/it_raspberry_logo.svg
 UPD 2017-11-14_07:45:02 6772 www/images/fhemSVG/it_remote_folder.svg
 UPD 2017-05-05_07:45:02 5178 www/images/fhemSVG/kindle.svg
 UPD 2015-07-28_14:05:32 8487 www/images/fhemSVG/lan_rs485.svg
@@ -1671,6 +1676,10 @@ UPD 2017-10-04_07:45:02 7572 www/images/fhemSVG/vacuum_bold.svg
 UPD 2017-10-04_07:45:02 3866 www/images/fhemSVG/vacuum_top.svg
 UPD 2019-02-14_07:45:03 828 www/images/fhemSVG/virtualbox-alt.svg
 UPD 2019-02-14_07:45:03 1551 www/images/fhemSVG/virtualbox.svg
+UPD 2020-03-02_07:45:03 7245 www/images/fhemSVG/vitrine-2.svg
+UPD 2020-03-02_07:45:03 7420 www/images/fhemSVG/vitrine.svg
+UPD 2020-03-02_07:45:03 11669 www/images/fhemSVG/vitrine1.svg
+UPD 2020-03-02_07:45:03 13363 www/images/fhemSVG/vitrine_door_transparent.svg
 UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/vmware.svg
 UPD 2019-05-30_07:45:03 4934 www/images/fhemSVG/weather_fog.svg
 UPD 2019-05-30_07:45:03 2002 www/images/fhemSVG/weather_night.svg
