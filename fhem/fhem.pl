@@ -3485,6 +3485,12 @@ FmtDateTimeRFC1123($)
 }
 
 
+sub
+Logdir()
+{
+  return AttrVal("global","logdir", AttrVal("global","modpath","")."/log");
+}
+
 #####################################
 sub
 ResolveDateWildcards($@)
@@ -3494,8 +3500,7 @@ ResolveDateWildcards($@)
   my ($f, @t) = @_;
   return $f if(!$f);
   return $f if($f !~ m/%/);     # Be fast if there is no wildcard
-  my $logdir = AttrVal("global","logdir",
-               AttrVal("global","modpath","")."/log");
+  my $logdir = Logdir();
   $f =~ s/%L/$logdir/g;
   return strftime($f,@t);
 }

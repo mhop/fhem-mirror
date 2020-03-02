@@ -2114,8 +2114,8 @@ sub
 FW_fileList($;$)
 {
   my ($fname,$mtime) = @_;
-  $fname =~ s/%L/$attr{global}{logdir}/g #Forum #89744
-        if($fname =~ m/%/ && $attr{global}{logdir});
+  my $logdir = Logdir();
+  $fname =~ s/%L/$logdir/g; #Forum #89744
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
   return $fname if(!$re);
@@ -2336,7 +2336,7 @@ FW_fileNameToPath($)
   } elsif($name =~ m/.*gplot$/) {
     return "$FW_gplotdir/$name";
   } elsif($name =~ m/.*log$/) {
-    return AttrVal("global", "logdir", "log")."/$name";
+    return Logdir()."/$name";
   } else {
     return "$MW_dir/$name";
   }
