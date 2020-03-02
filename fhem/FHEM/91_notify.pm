@@ -747,6 +747,12 @@ END
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
+    <a name="disabledAfterTrigger"></a>
+    <li>disabledAfterTrigger &lt;sekunden&gt;<br>
+      deaktiviert die Ausf&uuml;hrung f&uuml;r &lt;sekunden&gt; nach dem
+      das notify ausgel&ouml;st wurde.
+    </li>
+
     <a name="addStateEvent"></a>
     <li>addStateEvent<br>
       Das mit dem state Reading verkn&uuml;pfte Event ist speziell, da das
