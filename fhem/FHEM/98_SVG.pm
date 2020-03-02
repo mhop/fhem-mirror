@@ -1017,20 +1017,18 @@ SVG_calcOffsets($$)
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    my @me = (31,28,31,30,31,30,31,31,30,31,30,31);
+    my @me = (31,29,31,30,31,30,31,31,30,31,30,31); # 29 is fixed in SVG_tspec
 
     if(SVG_Attr($FW_wname, $wl, "endPlotToday", undef)) {
       $sy = $ey = $l[5];
       $sm = $l[4]-1; $em = $l[4];
       $sm += 12, $sy-- if($sm < 0);
       $sd = $l[3]+1; $ed = $l[3];
-      $me[1]++ if(($sy+1900)%4); # leap year. Ignore 1900 and 2100 :)
       $sd=1, $sm=$em, $sy=$ey if($sd > $me[$sm]);
 
     } else {
       $sy = $ey = $l[5];
       $sm = $em = $l[4];
-      $me[1]++ if(($sy+1900)%4); # leap year. Ignore 1900 and 2100 :)
       $sd = 1; $ed = $me[$l[4]];
     }
     $SVG_devs{$d}{from} = SVG_tspec( 0, 0, 0,$sd,$sm,$sy);
