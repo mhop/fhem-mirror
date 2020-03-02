@@ -172,7 +172,7 @@ sub DSBMobile_query($) {
         "LastUpdate" => $date
     );
 
-    my $json = encode_json \%arg;
+    my $json = encode_json( \%arg );
     Log3 $name, 5, "[$name] Arguments (in json) to encode" . Dumper($json);
     my $zip;
     IO::Compress::Gzip::gzip \$json => \$zip;
@@ -232,6 +232,7 @@ sub DSBMobile_getDataCallback($) {
     my $udate;
     my $test = $res->{ResultMenuItems}[0]->{Childs};
     my @aus;
+    my %ttpages = ();    # hash to get unique urls
     foreach my $c (@$test) {
 
         #if ($c->{Title} eq "Pläne") {
@@ -239,8 +240,16 @@ sub DSBMobile_getDataCallback($) {
         #$ret .= Dumper($c->{root}{Childs}[0]->{Childs}[0]->{Detail});
         foreach my $topic ($c) {
             if ( $c->{MethodName} eq "timetable" ) {
-                $url   = $topic->{Root}{Childs}[0]->{Childs}[0]->{Detail};
-                $udate = $topic->{Root}{Childs}[0]->{Childs}[0]->{Date};
+                my $p = $topic->{Root}{Childs};
+                for my $tt (@$p) {
+                    my $subtt = $tt->{Childs};
+                    for my $stt (@$subtt) {
+                        $url           = $stt->{Detail};
+                        $udate         = $stt->{Date};
+                        $ttpages{$url} = 1;
+                        Log3 $name, 5, "[$name] found url $url";
+                    }
+                }
             }
             if ( $c->{MethodName} eq "tiles" ) {
                 my $d = $topic->{Root}{Childs};
@@ -295,22 +304,46 @@ sub DSBMobile_getDataCallback($) {
     readingsBulkUpdate( $hash, ".lastAResult", encode_json( \@aus ) );
     readingsEndUpdate( $hash, 1 );
 
-    Log3 $name, 4, "[$name] Extracted the url: " . $url;
+    # build an array from url hash
+    my @ttpages = keys %ttpages;
 
-    my $nparam = {
-        url      => $url,
-        method   => "GET",
-        hash     => $hash,
-        callback => \&DSBMobile_getTTCallback
-    };
-    Log3 $name, 5, "[$name] 2nd nonblocking HTTP Call starting";
-    HttpUtils_NonblockingGet($nparam);
-
+    if ( @ttpages == 1 ) {
+        Log3 $name, 4, "[$name] Extracted the url: " . $url;
+    }
+    else {
+        Log3 $name, 4, "[$name] Extracted multiple urls: " . Dumper(@ttpages);
+    }
+    $hash->{helper}{tturl} = \@ttpages;
+    DSBMobile_processTTPages($hash);
     return undef;
-
 }
 #####################################
-sub DSBMobile_getTTCallback($) {
+sub DSBMobile_processTTPages($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $ttpage = shift @{ $hash->{helper}{tturl} };
+    Log3 $name, 5, "[$name] processing page " . $ttpage;
+
+    if ($ttpage) {
+        my $nparam = {
+            url      => $ttpage,
+            method   => "GET",
+            hash     => $hash,
+            callback => \&DSBMobile_TTpageCallback
+        };
+        Log3 $name, 5, "[$name] 2nd nonblocking HTTP Call starting for " . $ttpage;
+
+        HttpUtils_NonblockingGet($nparam);
+    }
+    else {
+        delete $hash->{helper}{tturl};
+        DSBMobile_getTTCallback($hash);
+    }
+    return undef;
+}
+#####################################
+sub DSBMobile_TTpageCallback($) {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -322,6 +355,18 @@ sub DSBMobile_getTTCallback($) {
         readingsSingleUpdate( $hash, "error", $err, 0 );
         return undef;
     }
+
+    $hash->{helper}{ttdata} .= $data;
+    DSBMobile_processTTPages($hash);
+}
+
+#####################################
+sub DSBMobile_getTTCallback($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $data = $hash->{helper}{ttdata};
+    delete $hash->{helper}{ttdata};
 
     $data =~ s/&nbsp;/-/g;
     $data = latin1ToUtf8($data);
@@ -679,11 +724,15 @@ sub DSBMobile_tableHTML($;$) {
     my $date = "";
     my $class;
     my $out = AttrVal( $name, "dsb_outputFormat", undef );
-
+    my $cols = @cn;
     foreach my $day (@days) {
         my $row   = 0;
+        my $cols  = @cn;
         my $class = "even";
-        $ret .= "</table><table class='block wide'><tr class='$class'><td><b>" . $day . "</b></td></tr>";
+        $ret
+            .= "</table><table class='block wide'><tr class='$class'><td colspan = '$cols'><b>"
+            . $day
+            . "</b></td></tr>";
         $row++;
         if ($infoDay) {
             foreach my $iline (@idata) {
@@ -697,7 +746,7 @@ sub DSBMobile_tableHTML($;$) {
 
                 if ( $iline->{sdate} eq $day ) {
                     $ret
-                        .= "<tr class='$class'><td colspan ='@cn'>"
+                        .= "<tr class='$class'><td colspan ='$cols' align='middle'>"
                         . $iline->{topic} . ": "
                         . $iline->{text}
                         . "</td></tr>";
@@ -709,7 +758,7 @@ sub DSBMobile_tableHTML($;$) {
             $ret .= "<td>" . $c . "</td>";
         }
         $ret .= "</tr>";
-
+        $row++;
         foreach my $line (@data) {
             if ( $line->{sdate} eq $day ) {
                 if ( $row % 2 == 0 ) {
@@ -736,7 +785,7 @@ sub DSBMobile_tableHTML($;$) {
     return $ret;
 
 }
-###################################
+#######################################
 sub DSBMobile_infoHTML($) {
     my ( $name, $infoDay ) = @_;
     my $dat = ReadingsVal( $name, ".lastAResult", "" );
