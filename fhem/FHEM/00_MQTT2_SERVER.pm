@@ -565,7 +565,6 @@ MQTT2_SERVER_ReadDebug($$)
 1;
 
 =pod
-=item helper
 =item summary    Standalone MQTT message broker
 =item summary_DE Standalone MQTT message broker
 =begin html

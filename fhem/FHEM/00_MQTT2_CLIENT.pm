@@ -489,7 +489,6 @@ MQTT2_CLIENT_getStr($$)
 1;
 
 =pod
-=item helper
 =item summary    Connection to an external MQTT server
 =item summary_DE Verbindung zu einem externen MQTT Server
 =begin html
