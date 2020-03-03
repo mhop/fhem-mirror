@@ -1633,7 +1633,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
   With 'restore_topic' the defined profile in the attribute will be transfered to the thermostat.
   So it is possible to change the topic easily and all thermostats will be updated with the correndponding profile.
   <br><br>
-  Weekprofile is supports configdb and configdb migrate since svn: 21314
+  <b>Hint:</b> 
+  weekprofile supports configdb and configdb migrate since svn: 21314.<br>
+  You have to import the profile\config file into configdb manually if you update from an earlier version.
   <br><br>
   <b>Attention:</b> 
   To transfer a profile to a device it needs a lot of Credits. 
@@ -1818,6 +1820,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
   Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofile ohne Topicname angegeben.
   Mittels 'restore_topic' wird dann das angebene Wochenprofil der Topic an das Thermostat übertragen.
   Somit kann man einfach zwischen den Topics wechseln und die Thermostate bekommen das passende Wochenprofil.
+  <br><br>
+  <b>Hinweis:</b> 
+  weekprofile unterstützt configdb and configdb migrate seit SVN-Version: 21314.<br>
+  Wenn von einer früheren Version geupdatet wird, muss die Profiel-\Konfigurationsdatei manuell in configDB importiert werden.
   <br><br>
   <b>Achtung:</b> Das Übertragen von Wochenprofilen erfordet eine Menge an Credits. 
   Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
