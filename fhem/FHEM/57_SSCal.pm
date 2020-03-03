@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.2.0"  => "03.03.2020  new composite event 'compositeBlockNumbers' ",
   "2.1.0"  => "01.03.2020  expand composite Event, bugfix API if entry with 'is_all_day' and at first position in 'data' ",
   "2.0.0"  => "28.02.2020  check in release ",
   "1.15.0" => "27.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY and BYDAY, create commandref ",
@@ -2199,6 +2200,12 @@ sub SSCal_doCompositeEvents ($$$) {
   
   my ($summary,$desc,$begin,$status,$isrepeat,$id,$event);
   
+  if(@{$abnr}) {
+      my $nrs = join(" ", @{$abnr});
+      $event = "compositeBlockNumbers: $nrs";
+      CommandTrigger(undef, "$name $event");
+  }
+  
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
@@ -2207,8 +2214,8 @@ sub SSCal_doCompositeEvents ($$$) {
       $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",   0);
       $id         = ReadingsVal($name, $bnr."_98_EventId",      "");    
 
-      $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
-	  
+      $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Device
+      
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
 		  $event = "composite: $bnr $id $isrepeat $begin $status ".($desc?$desc:$summary);
 		  CommandTrigger(undef, "$name $event");
