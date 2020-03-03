@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  70_DENON_AVR: model reporting for newer AVRs
  - change:  57_SSCal: expand composite Event, fix API behavior if entry with 
                       'is_all_day' is at first position
  - change:  70_DENON_AVR: soundmode related improvements (thx Shasow3561)
