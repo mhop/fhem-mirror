@@ -21,6 +21,9 @@
 
 package main;
 
+use 5.018;
+use feature qw( lexical_subs );
+
 use strict;
 use warnings;
 use utf8;
@@ -278,7 +281,7 @@ sub GSI_ApiResponse {
 
 		# schedule
 		my $next = (int(gettimeofday() / 3600) * 3600) + (3600 + 1800 + int(rand(1200)));
-		$hash->{'API__NEXT_REQ'} = $next;
+		$hash->{'API_NEXT_REQ'} = $next;
 		InternalTimer($next, \&GSI_ApiRequest, $hash);
 
 		if ($hash->{'NEXT_EVENT'} and $hash->{'NEXT_EVENT'} > gettimeofday()) {
