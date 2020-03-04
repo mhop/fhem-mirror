@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $
+# $Id: 57_SSCal.pm 21348 2020-03-03 22:46:10Z DS_Starter $
 #########################################################################################################################
 #       57_SSCal.pm
 #
@@ -48,6 +48,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.2.1"  => "04.03.2020  expand composite event 'compositeBlockNumbers' by 'none' ",
+  "2.2.0"  => "03.03.2020  new composite event 'compositeBlockNumbers' ",
   "2.1.0"  => "01.03.2020  expand composite Event, bugfix API if entry with 'is_all_day' and at first position in 'data' ",
   "2.0.0"  => "28.02.2020  check in release ",
   "1.15.0" => "27.02.2020  fix recurrence WEEKLY by DAY, MONTHLY by MONTHDAY and BYDAY, create commandref ",
@@ -2158,12 +2160,12 @@ sub SSCal_createReadings ($) {
           $k += 1;
       }
       readingsEndUpdate($hash, 1);
-      
-      SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
 	    
   } else {
       SSCal_delReadings($name,0);                                            # alle Kalender-Readings löschen
   }
+  
+  SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
   
   SSCal_checkretry($name,0);
 
@@ -2199,6 +2201,14 @@ sub SSCal_doCompositeEvents ($$$) {
   
   my ($summary,$desc,$begin,$status,$isrepeat,$id,$event);
   
+  if(@{$abnr}) {
+      my $nrs = join(" ", @{$abnr});
+      $event = "compositeBlockNumbers: $nrs";
+  } else {
+      $event = "compositeBlockNumbers: none";
+  }
+  CommandTrigger(undef, "$name $event");
+  
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
@@ -2207,8 +2217,8 @@ sub SSCal_doCompositeEvents ($$$) {
       $isrepeat   = ReadingsVal($name, $bnr."_55_isRepeatEvt",   0);
       $id         = ReadingsVal($name, $bnr."_98_EventId",      "");    
 
-      $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
-	  
+      $begin =~ s/\s/T/;                                                          # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Device
+      
 	  if($begin) {                                                                # einen Composite-Event erstellen wenn Beginnzeit gesetzt ist
 		  $event = "composite: $bnr $id $isrepeat $begin $status ".($desc?$desc:$summary);
 		  CommandTrigger(undef, "$name $event");
@@ -3552,12 +3562,12 @@ sub SSCal_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21348 2020-03-03 22:46:10Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21312 2020-02-29 09:34:20Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21348 2020-03-03 22:46:10Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden

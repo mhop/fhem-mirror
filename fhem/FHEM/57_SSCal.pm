@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.2.1"  => "04.03.2020  expand composite event 'compositeBlockNumbers' by 'none' ",
   "2.2.0"  => "03.03.2020  new composite event 'compositeBlockNumbers' ",
   "2.1.0"  => "01.03.2020  expand composite Event, bugfix API if entry with 'is_all_day' and at first position in 'data' ",
   "2.0.0"  => "28.02.2020  check in release ",
@@ -2159,12 +2160,12 @@ sub SSCal_createReadings ($) {
           $k += 1;
       }
       readingsEndUpdate($hash, 1);
-      
-      SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
 	    
   } else {
       SSCal_delReadings($name,0);                                            # alle Kalender-Readings löschen
   }
+  
+  SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
   
   SSCal_checkretry($name,0);
 
@@ -2203,8 +2204,10 @@ sub SSCal_doCompositeEvents ($$$) {
   if(@{$abnr}) {
       my $nrs = join(" ", @{$abnr});
       $event = "compositeBlockNumbers: $nrs";
-      CommandTrigger(undef, "$name $event");
+  } else {
+      $event = "compositeBlockNumbers: none";
   }
+  CommandTrigger(undef, "$name $event");
   
   foreach my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
