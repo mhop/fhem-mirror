@@ -63,42 +63,28 @@ option:TYPE=siri
 option:TYPE=alexa
 option:TYPE=gassistant
 
-name:speech_recognition_type_sensor_security
+name:speech_recognition_gdt_only
 filter:NAME=speechrecognTesting
 order:100006
-desc:call e.g. with set <xy> attrTemplate speech_recognition_type_sensor_security HOMEBRIDGEMAPPING_READING="state" HOMEBRIDGEMAPPING_TYPE="waterAlarm"
+desc:call e.g. with set <xy> attrTemplate speech_recognition_gdt_only GENERICDEVICETYPE=Security
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
-par:HOMEBRIDGEMAPPING_READING;HOMEBRIDGEMAPPING_READING <readingname>, defaults to state;{ "state" }
-par:HOMEBRIDGEMAPPING_TYPE;HOMEBRIDGEMAPPING_TYPE <alarm type>, defaults to fireAlarm;{ "fireAlarm" }
-attr DEVICE genericDeviceType Security
-attr DEVICE homebridgeMapping Alarm=HOMEBRIDGEMAPPING_READING,type=HOMEBRIDGEMAPPING_TYPE
+par:GENERICDEVICETYPE;GENERICDEVICETYPE <genericDeviceType>, defaults to contact;{ "contact" }
+attr DEVICE genericDeviceType GENERICDEVICETYPE
 option:TYPE=siri
 option:TYPE=alexa
-set DEVICE attrTemplate speech_recognition_alexa_proactive_events_questions
 option:TYPE=gassistant
 
-name:speech_recognition_type_sensor_contact
+name:speech_recognition_gdt_and_mapping
 filter:NAME=speechrecognTesting
 order:100007
-desc:call e.g. with set xy attrTemplate speech_recognition_type_sensor_contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+desc:call e.g. with set xy attrTemplate speech_recognition_gdt_and_mapping GENERICDEVICETYPE=Security HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
+par:GENERICDEVICETYPE;GENERICDEVICETYPE <genericDeviceType>, defaults to contact;{ "contact" }
 par:HOMEBRIDGEMAPPING;HOMEBRIDGEMAPPING, defaults to "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED";{ "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED" }
-attr DEVICE genericDeviceType contact
+attr DEVICE genericDeviceType GENERICDEVICETYPE
 attr DEVICE homebridgeMapping HOMEBRIDGEMAPPING
 option:TYPE=siri
 option:TYPE=alexa
-set DEVICE attrTemplate speech_recognition_alexa_proactive_events_questions
 option:TYPE=gassistant
 
-name:speech_recognition_alexa_proactive_events_questions
-filter:NAME=speechrecognTesting
-order:100015
-#the following line could be enhanced by setting the defaults to what is set in the alexa device
-par:RADIO_ALEXA_GLOBAL;get global setting;{undef}
-par:RADIO_ALEXA_LOCAL_YES;get local setting, defaults to no;{ AttrVal("DEVICE","alexaProactiveEvents",undef)}
-par:RADIO_ALEXA_LOCAL_NO;get local setting, defaults to no;{ AttrVal("DEVICE","alexaProactiveEvents",undef)}
-option:{ RADIO_ALEXA_LOCAL_YES }
-attr DEVICE alexaProactiveEvents 1
-option:{ RADIO_ALEXA_LOCAL_NO }
-attr DEVICE alexaProactiveEvents 0
 

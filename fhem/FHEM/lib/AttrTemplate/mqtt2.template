@@ -310,6 +310,7 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
+set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVICETYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
 attr DEVICE model zigbee2mqtt_hueMotionSensor
 
 name:zigbee2mqtt_plug
@@ -590,8 +591,8 @@ attr DEVICE readingList \
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/POWER1:.* state\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/RESULT:.* { }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add on-for-timer option running on the device. The following is limited to 1h max duration, but will not affect future simple "on" commands:<br>on-for-timer {my $duration = $EVTPART1*10; 'cmnd/CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}<br>See the "Praxisbeispiele" in the wiki for "pulseTime1" alternative option and it's restrictions.
@@ -620,8 +621,8 @@ attr DEVICE readingList \
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/POWER1:.* state\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/RESULT:.* { }
 deletereading -q DEVICE (?!associatedWith).*
 set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
@@ -661,9 +662,9 @@ attr DEVICE readingList \
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/POWER1:.* state\
-  TELETOPIC/POWER2:.* POWER2\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/POWER2:.* POWER2\
+  STATTOPIC/RESULT:.* { }
 attr DEVICE devStateIcon {\
   my $state = lc ReadingsVal($name, "POWER2", "off");\
   my $devStateIcon = 'building_security@green';\
@@ -743,7 +744,7 @@ attr DEVICE_CH2 setList \
   white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }
 attr DEVICE_CH2 readingList \
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/POWER2:.* state
+  STATTOPIC/POWER2:.* state
 attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0
 attr DEVICE_CH2 webCmd pct:white:Color
 attr DEVICE_CH2 webCmdLabel Helligkeit\
@@ -840,7 +841,7 @@ attr DEVICE readingList \
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
+  STATTOPIC/RESULT:.* { }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }\
   STATTOPIC/POWER1:.* POWER1\
   STATTOPIC/POWER2:.* POWER2
@@ -1001,7 +1002,7 @@ attr DEVICE readingList \
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* POWER1\
   STATTOPIC/POWER2:.* POWER2\
@@ -1067,7 +1068,7 @@ attr DEVICE readingList \
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* POWER1\
   STATTOPIC/POWER2:.* POWER2\
@@ -1140,7 +1141,7 @@ attr DEVICE readingList \
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { }\
   STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
 attr DEVICE webCmd pct:white:Color
