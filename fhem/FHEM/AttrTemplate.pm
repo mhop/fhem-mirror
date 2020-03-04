@@ -122,6 +122,7 @@ AttrTemplate_Initialize()
   $initialized = 1;
   Log 2, "AttrTemplates: got $nr entries" if($nr);
   $FW_addJs = "" if(!defined($FW_addJs));
+  return if($FW_addJs =~ m/attrTemplateHelp/);
   $FW_addJs .= << 'JSEND';
   <script type="text/javascript">
     $(document).ready(function() {
