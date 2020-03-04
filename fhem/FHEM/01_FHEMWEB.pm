@@ -1559,7 +1559,7 @@ FW_makeTableFromArray($$@) {
     FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", (($row++)&1)?"odd":"even";
-      FW_pH "detail=$_", $_;
+      FW_pH "detail=$_", AttrVal($_, 'alias', $_);
       FW_pO "</td><td>";
       FW_pO $defs{$_}{STATE} if(defined($defs{$_}{STATE}));
       FW_pO "</td><td>";
