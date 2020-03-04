@@ -1496,6 +1496,8 @@ HUEDevice_Parse($$)
   }
 
   $hash->{modelid} = $result->{modelid} if( defined($result->{modelid}) );
+  $attr{$name}{model} = $result->{modelid} if( !defined($attr{$name}{model}) && $result->{modelid} );
+
   $hash->{productid} = $result->{productid} if( defined($result->{productid}) );
   $hash->{swversion} = $result->{swversion} if( defined($result->{swversion}) );
   $hash->{swconfigid} = $result->{swconfigid} if( defined($result->{swconfigid}) );
@@ -1653,8 +1655,6 @@ HUEDevice_Parse($$)
     return undef;
   }
 
-
-  $attr{$name}{model} = $result->{modelid} if( !defined($attr{$name}{model}) && $result->{modelid} );
 
   if( !defined($attr{$name}{subType}) ) {
     if( defined($attr{$name}{model}) ) {
