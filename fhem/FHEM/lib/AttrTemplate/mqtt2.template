@@ -310,7 +310,7 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
 attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
-set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVICETYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
+set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
 attr DEVICE model zigbee2mqtt_hueMotionSensor
 
 name:zigbee2mqtt_plug
@@ -1134,7 +1134,8 @@ attr DEVICE setList\
   toggle:noArg CMNDTOPIC/POWER1 2\
   Color:colorpicker,RGB CMNDTOPIC/COLOR\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
-  white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }
+  white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }\
+  saturation:colorpicker,BRI,0,1,100 CMNDTOPIC/HSBCOLOR2\
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1142,6 +1143,7 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? undef :{"saturation"=>$2} : undef }\
   STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
 attr DEVICE webCmd pct:white:Color
@@ -2682,6 +2684,38 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
 attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 farewell:template has been applied successfully. For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 attr DEVICE model wallpanel_app
+
+name:weewx_weather_station
+filter:TYPE=MQTT2_DEVICE
+desc:See source post: https://forum.fhem.de/index.php/topic,108815.msg1027867.html#msg1027867 for details. For setting up weewx for MQTT use see https://github.com/weewx/weewx/wiki/mqtt
+order:X_20
+par:BASE_ID;BASE_ID typically is weather;{ AttrVal("DEVICE","readingList","") =~ m,(weather)[/][^/]+[/].*:, ? $1 : undef }
+par:ICON;ICON as set, defaults to weather_station;{ AttrVal("DEVICE","icon","weather_station") }
+attr DEVICE icon ICON
+attr DEVICE event-on-change-reading .*
+attr DEVICE readingList BASE_ID/outTemp_C:.* temperature\
+  BASE_ID/cloudbase_meter:.* cloudbase\
+  BASE_ID/outHumidity:.* humidity\
+  BASE_ID/pressure_mbar:.* pressure\
+  BASE_ID/rain_mm:.* rainfall\
+  BASE_ID/barometer_mbar:.* barometer\
+  BASE_ID/dewpoint_C:.* dewpoint\
+  BASE_ID/rainTotal:.* rainTotal\
+  BASE_ID/heatindex_C:.* heatindex\
+  BASE_ID/dayRain_mm:.* day_rain\
+  BASE_ID/inDewpoint:.* in_dewpoint\
+  BASE_ID/altimeter_mbar:.* altimeter\
+  BASE_ID/appTemp_C:.* appTemp\
+  BASE_ID/windGust_mps:.* wind_gust\
+  BASE_ID/rain24_mm:.* rain_24h\
+  BASE_ID/hourRain_mm:.* rain_1h\
+  BASE_ID/windSpeed_mps:.* wind\
+  BASE_ID/rainRate_mm_per_hour:.* rainrate\
+  BASE_ID/windDir:.* winddir\
+  BASE_ID/inHumidity:.* in_humidity
+attr DEVICE stateFormat T: temperature°C, H: humidity%rH, P: barometer hPa
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model weewx_weather_station
 
 #source post: https://forum.fhem.de/index.php/topic,98880.msg995308.html#msg995308
 name:wled_controller

@@ -13,10 +13,10 @@
 # perl_code returns a value for the parameter, or undef.
 # If undef, the user has to specify them (the comment is shown to the user)
 
-#original name:speech_recognition_type_switch
 name:speech_recognition_type_switch
 filter:NAME=speechrecognTesting
 order:100001
+desc:template to set speech recognition attributes for genericDeviceType switch
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType switch
 option:TYPE=siri
@@ -26,6 +26,7 @@ option:TYPE=gassistant
 name:speech_recognition_type_light
 filter:NAME=speechrecognTesting
 order:100002
+desc:template to set speech recognition attributes for genericDeviceType light
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType light
 option:TYPE=siri
@@ -35,6 +36,7 @@ option:TYPE=gassistant
 name:speech_recognition_type_light_255
 filter:NAME=speechrecognTesting
 order:100003
+desc:template to set speech recognition attributes for genericDeviceType light - brightness in 255 steps
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 set DEVICE attrTemplate speech_recognition_type_light
 #par:NEWUSERREADINGS;NEWUSERREADINGS as set if sr_brightness is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}' : $old =~ m,sr_brightness:brightness.*, ? $old : $old.', sr_brightness:brightness.* {sprintf("%.0f", ReadingsNum("$name","brightness",0)/255*100)}'  }
@@ -48,6 +50,7 @@ option:TYPE=gassistant
 name:speech_recognition_type_blind
 filter:NAME=speechrecognTesting
 order:100004
+desc:template to set speech recognition attributes for genericDeviceType blind
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType blind
 option:TYPE=siri
@@ -57,6 +60,7 @@ option:TYPE=gassistant
 name:speech_recognition_type_thermostate
 filter:NAME=speechrecognTesting
 order:100005
+desc:template to set speech recognition attributes for genericDeviceType thermostate
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType thermostate
 option:TYPE=siri
@@ -66,10 +70,10 @@ option:TYPE=gassistant
 name:speech_recognition_gdt_only
 filter:NAME=speechrecognTesting
 order:100006
-desc:call e.g. with set <xy> attrTemplate speech_recognition_gdt_only GENERICDEVICETYPE=Security
+desc:template to set speech recognition attributes for to any genericDeviceType; call e.g. with set <xy> attrTemplate speech_recognition_gdt_only GENERICDEVTYPE=Security
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
-par:GENERICDEVICETYPE;GENERICDEVICETYPE <genericDeviceType>, defaults to contact;{ "contact" }
-attr DEVICE genericDeviceType GENERICDEVICETYPE
+par:GENERICDEVTYPE;GENERICDEVTYPE <genericDeviceType>, defaults to contact;{ "contact" }
+attr DEVICE genericDeviceType GENERICDEVTYPE
 option:TYPE=siri
 option:TYPE=alexa
 option:TYPE=gassistant
@@ -77,11 +81,11 @@ option:TYPE=gassistant
 name:speech_recognition_gdt_and_mapping
 filter:NAME=speechrecognTesting
 order:100007
-desc:call e.g. with set xy attrTemplate speech_recognition_gdt_and_mapping GENERICDEVICETYPE=Security HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+desc:generic template to set speech recognition attributes for to any genericDeviceType including full mapping, call e.g. with set xy attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=Security HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
-par:GENERICDEVICETYPE;GENERICDEVICETYPE <genericDeviceType>, defaults to contact;{ "contact" }
-par:HOMEBRIDGEMAPPING;HOMEBRIDGEMAPPING, defaults to "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED";{ "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED" }
-attr DEVICE genericDeviceType GENERICDEVICETYPE
+par:GENERICDEVTYPE;GENERICDEVTYPE <genericDeviceType>, defaults to contact;{ "contact" }
+par:HOMEBRIDGEMAPPING;HOMEBRIDGEMAPPING, defaults to "some split-by-semicolon-compatible represantation or the expression to the right";{ 'ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED'" }
+attr DEVICE genericDeviceType GENERICDEVTYPE
 attr DEVICE homebridgeMapping HOMEBRIDGEMAPPING
 option:TYPE=siri
 option:TYPE=alexa
