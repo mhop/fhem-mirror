@@ -195,7 +195,7 @@ source override values set in the configuration file.
 <a name="command"></a>
 <h3>FHEM command types</h3>
 <ul>
-There are three types of commands: "fhem" commands (described in this
+There are three types of commands: "FHEM" commands (described in this
 document), shell commands (they must be enclosed in double quotes ") and perl
 expressions (enclosed in curly brackets {}). shell commands or perl expressions
 are needed for complex <a href="#at">at</a> or <a href="#notify">notify</a>
@@ -251,6 +251,8 @@ href="#notify">notify</a> FHEM commands.<br>
 A line ending with \ will be concatenated with the next one, so long lines
 (e.g. multiple perl commands) can be split in multiple lines. Some web fronteds
 (e.g. webpgm2) make editing of multiline commands transparent for you (i.e. there is no need for \) .<br>
+Note: mixing command types (FHEM/shell/perl) on one line is not supported, even
+if it might work in some cases.
 <br>
 </ul>
 <!-- command end - diese Zeile nicht entfernen! -->

@@ -177,11 +177,11 @@ gesetzte Werte &uuml;berschreiben die Werte aus der Konfigurationsdatei.
 <a name="command"></a>
 <h3>FHEM Befehlstypen</h3>
 <ul>
-Es gibt drei Arten von Befehlen: "fhem" Befehle (werden in diesem Dokument
-beschrieben), SHELL-Befehle (diese m&uuml;ssen von doppelten
-Anf&uuml;hrungszeichen "" eingeschlossen werden) und PERL-Ausdr&uuml;cken (von
-geschwungenen Klammern {} eingeschlossen). SHELL-Befehle oder
-PERL-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> oder <a
+Es gibt drei Arten von Befehlen: "FHEM" Befehle (werden in diesem Dokument
+beschrieben), Shell-Befehle (diese m&uuml;ssen von doppelten
+Anf&uuml;hrungszeichen "" eingeschlossen werden) und perl-Ausdr&uuml;cken (von
+geschwungenen Klammern {} eingeschlossen). Shell-Befehle oder
+perl-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> oder <a
 href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch
 als "normale" Befehle angewendet werden.
 <br>
@@ -194,18 +194,18 @@ telnet-Prompt eingegeben werden:
   "fhem.pl 7072 "set lamp off""<br>
   {fhem("set lamp off")}<br>
   </ul>
-SHELL-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
-PERL-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
-PERL-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
+Shell-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
+perl-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
+perl-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
 Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte <a href="#perl">
 Perl special</a> zum besseren Verst&auml;ndnis durch.</p>
-<p>Um FHEM-Befehle in einen SHELL-Script zu triggern (dies ist 
+<p>Um FHEM-Befehle in einen Shell-Script zu triggern (dies ist 
 eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
 der fhem.pl.
 <br>
 
 Mehrere FHEM-Kommandos hintereinander werden mittels 
-Semikolon (;) getrennt. Weil Semikola auch in PERL-Code oder SHELL-Programmen 
+Semikolon (;) getrennt. Weil Semikola auch in perl-Code oder Shell-Programmen 
 benutzt werden, m&uuml;ssen sie mittels doppelten Semikola gesch&uuml;tzt werden. Lesen 
 Sie sich bitte die <b>Bermerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.
 <br>
@@ -236,10 +236,14 @@ werden.
 
 <p>Eine mit einem \ abgeschlossene Zeile wird mit der 
 nachfolgenden Zeile verbunden. Somit k&ouml;nnen lange Befehlszeilen (die z.B. aus 
-mehreren PERL-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
+mehreren perl-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
 Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich &uuml;ber mehrere 
 Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <p>&nbsp;</p>
+<br>
+Acthung: das Verwenden unterschiedlicher Befehlsarten (FHEM/Shell/perl) ist
+nicht unterst&uuml;tzt, auch wenn es in manchen F&auml;llen funktioniert.
+
 </ul>
 <!-- command end - diese Zeile nicht entfernen! -->
 
