@@ -919,6 +919,22 @@ FW_answerCall($)
 
   #If we are in XHR or json mode, execute the command directly
   if($FW_XHR || $FW_jsonp) {
+    if($FW_webArgs{asyncCmd}) {
+      my $pid = fhemFork();
+      if($pid) {                                # success, parent
+        TcpServer_Disown( $me );
+        delete($defs{$FW_cname});
+        delete($attr{$FW_cname});
+        FW_Read($me, 1) if($me->{BUF});
+        return -2;
+
+      } elsif(defined($pid)){                   # child
+        delete $me->{BUF};
+        $me->{isChild} = 1;
+
+      } 
+    }
+
     $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : undef;
     $FW_RETTYPE = $FW_chash->{contenttype} ?
         $FW_chash->{contenttype} : "text/plain; charset=$FW_encoding";
