@@ -14,6 +14,7 @@ use Time::HiRes qw(gettimeofday);
 sub FW_IconURL($);
 sub FW_addContent(;$);
 sub FW_addToWritebuffer($$@);
+sub FW_alias($$);
 sub FW_answerCall($);
 sub FW_confFiles($);
 sub FW_dev2image($;$);
@@ -563,28 +564,21 @@ FW_Read($$)
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
   my $pf = AttrVal($FW_wname, "plotfork", undef);
   $pf = 1 if(!defined($pf) && AttrVal($FW_wname, "plotEmbed", 0) == 2);
-  if($pf) {   # 0 disables
-    # Process SVG rendering as a parallel process
+  if($pf) {
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
       my $pid = fhemFork();
-      if($pid) { # success, parent
+      if($pid) {                                # success, parent
         use constant PRIO_PROCESS => 0;
         setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf)
           if($^O !~ m/Win/);
-        # a) while child writes a new request might arrive if client uses
-        # pipelining or
-        # b) parent doesn't know about ssl-session changes due to child writing
-        # to socket
-        # -> have to close socket in parent... so that its only used in this
-        # child.
         TcpServer_Disown( $hash );
         delete($defs{$name});
         delete($attr{$name});
         FW_Read($hash, 1) if($hash->{BUF});
         return;
 
-      } elsif(defined($pid)){ # child
+      } elsif(defined($pid)){                   # child
         delete $hash->{BUF};
         $hash->{isChild} = 1;
 
@@ -1554,12 +1548,14 @@ FW_makeTableFromArray($$@) {
   my ($txt,$class,@obj) = @_;
   if (@obj>0) {
     my $row=1;
+    my $nameDisplay = AttrVal($FW_wname,"nameDisplay",undef);
     FW_pO "<div class='makeTable wide'>";
     FW_pO "<span class='mkTitle'>$txt</span>";
     FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", (($row++)&1)?"odd":"even";
-      FW_pH "detail=$_", AttrVal($_, 'alias', $_);
+      my $alias = FW_alias($_, $nameDisplay);
+      FW_pH "detail=$_", ($alias eq $_) ? $_ : "$_ $alias";
       FW_pO "</td><td>";
       FW_pO $defs{$_}{STATE} if(defined($defs{$_}{STATE}));
       FW_pO "</td><td>";
@@ -1780,14 +1776,14 @@ FW_roomOverview($)
 }
 
 sub
-FW_alias($)
+FW_alias($$)
 {
-  my ($d) = @_;
-  if($FW_room) {
-    return AttrVal($d, "alias_$FW_room", AttrVal($d, "alias", $d));
-  } else {
-    return AttrVal($d, "alias", $d);
-  }
+  my ($DEVICE,$nameDisplay) = @_;
+  my $ALIAS = AttrVal($DEVICE, "alias", $DEVICE);
+  $ALIAS = AttrVal($DEVICE, "alias_$FW_room", $ALIAS) if($FW_room);
+  $ALIAS = eval $nameDisplay if(defined($nameDisplay));
+
+  return $ALIAS;
 }
 
 sub
@@ -1797,11 +1793,7 @@ FW_makeDeviceLine($$$$$)
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
-  my $devName = FW_alias($d);
-  if(defined($nameDisplay)) {
-    my ($DEVICE, $ALIAS) = ($d, $devName);
-    $devName = eval $nameDisplay;
-  }
+  my $devName = FW_alias($d,$nameDisplay);
   my $icon = AttrVal($d, "icon", "");
   $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
