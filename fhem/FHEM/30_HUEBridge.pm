@@ -799,7 +799,7 @@ HUEBridge_Set($@)
 
   } elsif($cmd eq 'createrule' || $cmd eq 'updaterule') {
     return "usage: createrule <name> <conditions&actions json>" if( $cmd eq 'createrule' && @args < 2 );
-    return "usage: updaterule <id> <conditions&actions json>" if( $cmd eq 'updaterule' && @args != 2 );
+    return "usage: updaterule <id> <conditions&actions json>" if( $cmd eq 'updaterule' && @args < 2 );
 
     $args[@args-1] = '
 {  "name":"Wall Switch Rule",
@@ -809,7 +809,7 @@ HUEBridge_Set($@)
    "actions":[
         {"address":"/groups/0/action","method":"PUT", "body":{"scene":"S3"}}
 ]}' if( 0 || !$args[@args-1] );
-    my $json = $args[@args-1];
+    my $json = join( ' ', @args[1..@args-1]);
     my $obj = eval { JSON->new->utf8(0)->decode($json) };
     if( $@ ) {
       Log3 $name, 2, "$name: json error: $@ in $json";
@@ -830,10 +830,10 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'updateschedule') {
-    return "usage: updateschedule <id> <attributes json>" if( @args != 2 );
+    return "usage: $cmd <id> <attributes json>" if( @args < 2 );
     return "$arg is not a hue schedule number" if( $arg !~ m/^\d+$/ );
 
-    my $json = $args[@args-1];
+    my $json = join( ' ', @args[1..@args-1]);
     my $obj = eval { JSON->new->utf8(0)->decode($json) };
     if( $@ ) {
       Log3 $name, 2, "$name: json error: $@ in $json";
