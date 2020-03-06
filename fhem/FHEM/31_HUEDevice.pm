@@ -1607,6 +1607,9 @@ HUEDevice_Parse($$)
 
       #Eurotronic Spirit ZigBee (SPZB0001)
       $readings{valve} = ceil((100/255) * $state->{valve}) if( defined ($state->{valve}) );
+
+      #Heiman Gassensor HS1CG
+      $readings{carbonmonoxide} = $state->{carbonmonoxide} if( defined($state->{carbonmonoxide}) );
     }
 
     $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
