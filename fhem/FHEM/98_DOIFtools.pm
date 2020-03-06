@@ -251,7 +251,8 @@ function doiftoolsRemoveLookUp () {
     $('#addLookUp').dialog( "close" );
 }
 function doiftoolsAddLookUp () {
-    var tn = $(this).text();
+    var tnx = (""+this).split("=");
+    var tn = tnx[1];
     var target = this;
     var txt = "Internals<table class='block wide internals' style='font-size:12px'>";
     FW_cmd(FW_root+"?cmd=jsonlist2 "+tn+"&XHR=1", function(data){
