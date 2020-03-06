@@ -1571,7 +1571,7 @@ FW_makeTableFromArray($$@) {
     foreach (sort @obj) {
       FW_pF "<tr class=\"%s\"><td>", (($row++)&1)?"odd":"even";
       my $alias = FW_alias($_, $nameDisplay);
-      FW_pH "detail=$_", ($alias eq $_) ? $_ : "$_ $alias";
+      FW_pH "detail=$_", $alias eq $_ ? $_ : "$_ <span>($alias)</span>";
       FW_pO "</td><td>";
       FW_pO $defs{$_}{STATE} if(defined($defs{$_}{STATE}));
       FW_pO "</td><td>";
