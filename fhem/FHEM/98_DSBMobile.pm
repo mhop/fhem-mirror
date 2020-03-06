@@ -323,9 +323,9 @@ sub DSBMobile_processTTPages($) {
     my $name = $hash->{NAME};
 
     my $ttpage = shift @{ $hash->{helper}{tturl} };
-    Log3 $name, 5, "[$name] processing page " . $ttpage;
-
+    
     if ($ttpage) {
+        Log3 $name, 5, "[$name] processing page " . $ttpage;
         my $nparam = {
             url      => $ttpage,
             method   => "GET",
