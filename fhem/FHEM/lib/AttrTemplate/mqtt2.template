@@ -1136,6 +1136,9 @@ attr DEVICE setList\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
   white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }\
   saturation:colorpicker,BRI,0,1,100 CMNDTOPIC/HSBCOLOR2\
+  Speed:colorpicker,BRI,0,1,20 CMNDTOPIC/SPEED\
+  Fade:uzsuSelect,ON,OFF CMNDTOPIC/FADE $EVTPART1\
+  mode:selectnumbers,0,1,4,0,lin CMNDTOPIC/SCHEME
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
