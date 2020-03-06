@@ -110,6 +110,6 @@ option:{my @devices=devspec2array("alexaName=ALEXAISNAME");; $devices[1] ? retur
 par:ALEXANAME;Please enter alexaName (you may be asked multiple times to avoid already existing names);{undef) } 
 attr DEVICE alexaName ALEXANAME
 option:TYPE=alexa
-set DEVICE attrTemplate speech_recognition_alaxaName_firstrun
+#set DEVICE attrTemplate speech_recognition_alaxaName_firstrun
 
 

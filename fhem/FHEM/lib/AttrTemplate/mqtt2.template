@@ -1080,7 +1080,6 @@ attr DEVICE readingList \
   STATTOPIC/POWER8:.* POWER8
 attr DEVICE stateFormat LWT\
 <a href="http://IPAddress" target="_blank">Hostname</a>\
-<a href="http://IPAddress" target="_blank">IPAddress</a>\
 <br>\
 1:POWER1\
 2:POWER2\
