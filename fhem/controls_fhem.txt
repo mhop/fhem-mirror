@@ -1,4 +1,4 @@
-REV 21355
+REV 21361
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-04_07:45:02 328448 ./CHANGED
+UPD 2020-03-06_07:45:03 328519 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -57,7 +57,7 @@ UPD 2019-10-29_07:45:02 143655 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2019-09-03_07:45:03 45287 FHEM/00_ZWDongle.pm
-UPD 2020-03-05_07:45:02 161395 FHEM/01_FHEMWEB.pm
+UPD 2020-03-06_07:45:03 161613 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2019-09-06_07:45:02 7946 FHEM/02_HTTPSRV.pm
@@ -487,7 +487,7 @@ UPD 2017-05-10_07:45:02 47704 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
 UPD 2020-02-19_07:45:03 278589 FHEM/98_DOIF.pm
-UPD 2019-08-05_07:45:02 112446 FHEM/98_DOIFtools.pm
+UPD 2020-03-06_07:45:03 112474 FHEM/98_DOIFtools.pm
 UPD 2020-03-03_07:45:02 36632 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -650,9 +650,9 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-08_07:45:04 52372 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-03-05_07:45:02 187158 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-06_07:45:03 188796 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2019-09-28_07:45:02 5018 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2020-03-05_07:45:02 4237 FHEM/lib/AttrTemplate/speechrecogn.template
+UPD 2020-03-06_07:45:03 4777 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -749,12 +749,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-03-04_07:45:06 4227220 docs/commandref.html
-UPD 2020-03-04_07:45:08 2627500 docs/commandref_DE.html
-UPD 2020-01-14_07:45:03 79778 docs/commandref_frame.html
-UPD 2020-01-14_07:45:03 89524 docs/commandref_frame_DE.html
-UPD 2020-03-05_07:45:10 231125 docs/commandref_modular.html
-UPD 2020-03-05_07:45:11 242098 docs/commandref_modular_DE.html
+UPD 2020-03-06_07:45:07 4227332 docs/commandref.html
+UPD 2020-03-06_07:45:10 2627656 docs/commandref_DE.html
+UPD 2020-03-06_07:45:03 79890 docs/commandref_frame.html
+UPD 2020-03-06_07:45:03 89680 docs/commandref_frame_DE.html
+UPD 2020-03-06_07:45:11 231237 docs/commandref_modular.html
+UPD 2020-03-06_07:45:12 242254 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
