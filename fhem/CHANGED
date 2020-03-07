@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_RandomTimer: Add offState attribute to e.g. evaluate state
+       reading instead of STATE; NOTE: this will be 
+       default behaviour starting with featurelevel 6.1
  - change:  98_DOIFtools: fit LookUp to new paw design (Forum #108960)
  - feature: 57_SSCal: additional composite event 'compositeBlockNumbers'
  - change:  70_DENON_AVR: model reporting for newer AVRs

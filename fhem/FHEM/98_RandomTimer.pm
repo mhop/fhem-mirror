@@ -6,7 +6,7 @@
 # 98_RandomTimer.pm
 #
 # written by Dietmar Ortmann
-# Maintained by igami since 02-2018
+# Maintained by Beta-User since 11-2019
 #
 # This file is part of FHEM.
 #
@@ -67,7 +67,7 @@ sub RandomTimer_Initialize($) {
   $hash->{UndefFn}   = "RandomTimer_Undef";
   $hash->{SetFn}     = "RandomTimer_Set";
   $hash->{AttrFn}    = "RandomTimer_Attr";
-  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd ".
+  $hash->{AttrList}  = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd offState ".
                        "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 ".
                        $readingFnAttributes;
 }
@@ -114,8 +114,12 @@ sub RandomTimer_Define($$) {
   $hash->{helper}{REL}            = $rel;
   $hash->{helper}{S_REP}          = $srep;
   $hash->{helper}{S_REL}          = $srel;
-  $hash->{COMMAND}                = Value($hash->{DEVICE});
-
+  $hash->{COMMAND}                = Value($hash->{DEVICE}) if ($featurelevel < 6.1);
+  if ($featurelevel > 6.0) {
+    $hash->{COMMAND}              = ReadingsVal($hash->{DEVICE},"state",undef) ;
+    $hash->{helper}{offRegex}     = "off";
+    $hash->{helper}{offReading}   = "state";
+  }
   #$attr{$name}{verbose} = 4;
 
   readingsSingleUpdate ($hash,  "TimeToSwitch", $hash->{helper}{TIMETOSWITCH}, 1);
@@ -150,6 +154,11 @@ sub RandomTimer_Attr($$$) {
     # Schaltung vorziehen, damit bei einem disable abgeschaltet wird.
     RandomTimer_RemoveInternalTimer("Exec", $hash);
     RandomTimer_InternalTimer("Exec", time()+1, "RandomTimer_Exec", $hash, 0);
+  }
+  if( $attrName ~~ ["offState"] ) {
+    my @offState = split(' ',$attrVal);
+    $hash->{helper}{offRegex}     = $offState[0];
+    $hash->{helper}{offReading}   = $offState[1]//"state";
   }
   return undef;
 }
@@ -209,10 +218,22 @@ sub RandomTimer_device_switch ($) {
 
 sub RandomTimer_device_toggle ($) {
     my ($hash) = @_;
-
+    my $name = $hash->{NAME};
+    #my $attrOffState = AttrVal($name,"offState",undef);
     my $status = Value($hash->{DEVICE});
+
+    if (defined $hash->{helper}{offRegex}) { 
+      $status = ReadingsVal($hash->{DEVICE},$hash->{helper}{offReading},"off");
+      my $attrOffState = $hash->{helper}{offRegex};
+      $status = $status =~ /^$attrOffState$/ ? "off" : lc($status) ;
+      $status = $status =~ /off/ ? "off" : "on" ;
+    }
     if ($status ne "on" && $status ne "off" ) {
-       Log3 $hash, 3, "[".$hash->{NAME}."]"." result of function Value($hash->{DEVICE}) must be 'on' or 'off'";
+       if ($hash->{helper}{offRegex}) {
+         Log3 $hash, 3, "[$name] result of function ReadingsVal($hash->{DEVICE},\"<offReading>\",undef) must be 'on' or 'off' or set attribute offState accordingly";
+       } else {
+         Log3 $hash, 3, "[$name] result of function Value($hash->{DEVICE}) must be 'on' or 'off'";;
+       }
     }
 
     my $sigma = ($status eq "on")
@@ -220,7 +241,7 @@ sub RandomTimer_device_toggle ($) {
        : $hash->{helper}{SIGMAWHENOFF};
 
     my $zufall = int(rand(1000));
-    Log3 $hash, 4,  "[".$hash->{NAME}."]"." IstZustand:$status sigmaWhen-$status:$sigma random:$zufall<$sigma=>" . (($zufall < $sigma)?"true":"false");
+    Log3 $hash, 4,  "[$name] IstZustand:$status sigmaWhen-$status:$sigma random:$zufall<$sigma=>" . (($zufall < $sigma)?"true":"false");
 
     if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($status eq "on") ? "off" : "on";
@@ -633,10 +654,10 @@ sub RandomTimer_GetHashIndirekt ($$) {
      <a name="RandomTimerset"></a>
      <b>Set</b><br>
      <ul>
-	   <code>set &lt;name&gt; execNow</code>
+       <code>set &lt;name&gt; execNow</code>
      <br>
-	 This will force the RandomTimer device to immediately execute the next switch instead of waiting untill timeToSwitch has passed. Use this in case you want immediate reaction on changes of reading values factored in disableCond. As RandomTimer itself will not be notified about any event at all, you'll need an additional event handler like notify that listens to relevant events and issues the "execNow" command towards your RandomTimer device(s).
-	 </ul>
+     This will force the RandomTimer device to immediately execute the next switch instead of waiting untill timeToSwitch has passed. Use this in case you want immediate reaction on changes of reading values factored in disableCond. As RandomTimer itself will not be notified about any event at all, you'll need an additional event handler like notify that listens to relevant events and issues the "execNow" command towards your RandomTimer device(s).
+     </ul>
    </ul><br>  
 
    <ul>  
@@ -672,11 +693,11 @@ sub RandomTimer_GetHashIndirekt ($$) {
           <li><code>attr ZufallsTimerZ keepDeviceAlive</code></li>
         </ul>
       </li>
-	  <br>
-	  <li>
+      <br>
+      <li>
         <code>disableCondCmd</code><br>
         In case the disable condition becomes true while a RandomTimer is already <b>running</b>, by default the same action is executed as when stoptime is reached (see keepDeviceAlive attribute). Setting the <b>disableCondCmd</b> attribute changes this as follows: "none" will lead to no action, "offCmd" means "use off command", "onCmd" will lead to execution of the "on command". Delete the attribute to get back to default behaviour.<br>
-		<br>
+	<br>
         <b>Examples</b>
         <ul>
           <li><code>attr ZufallsTimerZ disableCondCmd offCmd</code></li>
@@ -692,17 +713,18 @@ sub RandomTimer_GetHashIndirekt ($$) {
           <li><code>
             attr Timer oncmd  {fhem("set @ on-for-timer 14")}
           </code></li>
+          <br>NOTE: using on-for-timer commands might lead to irritating results!
           <li><code>
             attr Timer offCmd {fhem("set @ off 16")}
           </code></li>
           <li><code>
-            attr Timer oncmd  set @ on-for-timer 12
+            attr Timer oncmd  set @ pct 65
           </code></li>
           <li><code>
             attr Timer offCmd set @ off 12
           </code></li>
         </ul>
-        The decision to switch on or off depends on the state of the device and is evaluated by the funktion Value(&lt;device&gt;). Value() must evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a stateFormat:<br>
+        The decision to switch on or off depends on the state of the device. For $featurelevel 6.0 and earlier, or if no offState attribute is set, this is evaluated by the funktion Value(&lt;device&gt;). Value() must evaluate one of the values "on" or "off". The behavior of devices that do not evaluate one of those values can be corrected by defining a stateFormat:<br>
         <code>
            attr stateFormat EDIPlug_01 {(ReadingsVal("EDIPlug_01","state","nF") =~ m/(ON|on)/i)  ? "on" : "off" }
         </code><br>
@@ -710,6 +732,12 @@ sub RandomTimer_GetHashIndirekt ($$) {
         <code>
            [EDIPlug] result of function Value(EDIPlug_01) must be 'on' or 'off'
         </code>
+        NOTE: From $featurelevel 6.1 on or if attribute offState is set, the funktion ReadingsVal(&lt;device&gt;,"state",undef) will be used instead of Value(). If "state" of the device exactly matches the regex provided in the attribute "offState" or lowercase of "state" contains a part matching to "off", device will be considered to be "off" (or "on" in all other cases respectively).
+      </li>
+      <li>
+        <code>offState</code><br>
+        Setting this attribute, evaluation of on of will use ReadingsVal(&lt;device&gt;,"state",undef) instead of Value(). The attribute value will be used as regex, so e.g. also "dim00" beside "off" may be considered as indication the device is "off". You may use an optional second parameter (space separated) to check a different reading, e.g. for a HUEDevice-group "0 any_on" might be usefull.
+      <br>NOTE: This will be default behaviour starting with featurelevel 6.1.
       </li>
       <br>
       <li>
