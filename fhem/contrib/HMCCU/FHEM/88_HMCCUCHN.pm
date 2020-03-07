@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.011
+#  Version 4.4.012
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -279,29 +279,23 @@ sub HMCCUCHN_Set ($@)
 	my $roleCmds = HMCCU_GetSpecialCommands ($hash, $cc);
 	
 	my $cmdList = '';
-	my %addCmds;
-	foreach my $d (keys %$roleCmds) {
-		my @cmds = split(' ', $roleCmds->{$d});
-		foreach my $cmdDef (@cmds) {
-			my ($cmd, $argDef) = split(':', $cmdDef);
-			$addCmds{$cmd} = "$d=$argDef";
-			$cmdList .= " $cmd";
-			if ($argDef !~ /^\?/) {
-				my @argList = split(',', $argDef);
-				$cmdList .= scalar(@argList) > 1 ? ':'.$argDef : ':noArg';
+	foreach my $cmd (keys %$roleCmds) {
+		$cmdList .= " $cmd";
+		my @setList = split (/\s+/, $roleCmds->{$cmd});
+		foreach my $set (@setList) {
+			my ($ps, $dpt, $par) = split(/:/, $set);
+			if ($par !~ /^\?/) {
+				my @argList = split (',', $par);
+				$cmdList .= scalar(@argList) > 1 ? ":$par" : ":noArg";
 			}
 		}
 	}
 	
 	# Get state values related to control command and datapoint
-	my $stateVals = HMCCU_GetStateValues ($hash, $roleCmds, $cd, 2);
-	my @stateCmdList = split (/[:\s]/, $stateVals);
+	my $stateVals = HMCCU_GetStateValues ($hash, $cd);
+	my @stateCmdList = split (/[:,]/, $stateVals);
 	my %stateCmds = @stateCmdList;
 	my @states = keys %stateCmds;
-
-# 	HMCCU_Log ($hash, 2, "Additional commands ".join(',', keys %addCmds))
-# 		if (scalar(keys %addCmds) > 0);
-# 	HMCCU_Log ($hash, 2, "sd=$sc.$sd cd=$cc.$cd StateVals=$stateVals states=".join(',', @states));
 
 	my $result = '';
 	my $rc;
@@ -351,14 +345,18 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, -14) if ($cd eq '');
-		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2));
+		if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2)) {
+			HMCCU_Trace ($hash, 2, "Set", "Invalid datapoint $cc $cd");
+			return HMCCU_SetError ($hash, -8);
+		}
 		my $objvalue = shift @$a;
 		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined ($objvalue));
 
 		$objvalue =~ s/\\_/%20/g;
+		$objvalue =~ HMCCU_Substitute ($objvalue, $stateVals, 1, undef, '');
 
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$ccuif.$ccuaddr.$cd" => HMCCU_Substitute ($objvalue, $stateVals, 1, undef, '') }
+			{ "001.$ccuif.$ccuaddr.$cd" => $objvalue }
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
@@ -393,59 +391,91 @@ sub HMCCUCHN_Set ($@)
 		);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
-	elsif (exists($addCmds{$opt})) {
+	elsif (defined($roleCmds) && exists($roleCmds->{$opt})) {
 		my $value;
 		my %dpval;
-		my ($dpt, $par) = split('=', $addCmds{$opt});
-		$par = '' if (!defined($par));
+		my %cfval;
+		
+		my @setList = split (/\s+/, $roleCmds->{$opt});
+		my $i = 0;
+		foreach my $set (@setList) {
+			my ($ps, $dpt, $par) = split(/:/, $set);
+			$ps = $ps eq 'V' ? 'VALUES' : 'MASTER';
+		
+			return HMCCU_SetError ($hash, "Syntax error in definition of command $opt")
+				if (!defined($par));
+	      if (!HMCCU_IsValidParameter ($hash, $ccuaddr, $ps, $dpt)) {
+	      	HMCCU_Trace ($hash, 2, "Set", "Invalid parameter $ps $dpt");
+				return HMCCU_SetError ($hash, -8);
+			}
 
-		return HMCCU_SetError ($hash, -8)
-			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $dpt, 2));
+			if ($par =~ /^\?(.+)$/) {
+				$par = $1;
+				my ($parName, $parDef) = split ('=', $par);
+				$value = shift @$a;
+				if (!defined($value) && defined($parDef)) {
+					if ($parDef =~ /^[+-][0-9]+$/) {
+						return HMCCU_SetError ($hash, "Current value of $cc.$dpt not available")
+							if (!defined($hash->{hmccu}{dp}{"$cc.$dpt"}{$ps}{SVAL}));
+						$value = $hash->{hmccu}{dp}{"$cc.$dpt"}{$ps}{SVAL}+int($parDef);
+					}
+					else {
+						$value = $parDef;
+					}
+				}
+				
+				return HMCCU_SetError ($hash, "Missing parameter $parName")
+					if (!defined($value));
+			}
+			else {
+				$value = $par;
+			}
+		
+			if ($opt eq 'pct' || $opt eq 'level') {
+				my $timespec = shift @$a;
+				my $ramptime = shift @$a;
 
-		if ($par =~ /^\?(.+)$/) {
-			$par = $1;
-			my ($parName, $parDef) = split ('=', $par);
-			$value = shift @$a;
-			if (!defined($value) && defined($parDef)) {
-				if ($parDef =~ /^[+-][0-9]+$/) {
-					return HMCCU_SetError ($hash, "Current value of $cc.$dpt not available")
-						if (!defined($hash->{hmccu}{dp}{"$cc.$dpt"}{VALUES}{SVAL}));
-					$value = $hash->{hmccu}{dp}{"$cc.$dpt"}{VALUES}{SVAL}+int($parDef);
+				# Set on time
+				if (defined ($timespec)) {
+					return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type $ccutype")
+						if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "ON_TIME", 2));
+					if ($timespec =~ /^[0-9]{2}:[0-9]{2}/) {
+						$timespec = HMCCU_GetTimeSpec ($timespec);
+						return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
+					}
+					$dpval{"001.$ccuif.$ccuaddr.ON_TIME"} = $timespec if ($timespec > 0);
+				}
+
+				# Set ramp time
+				if (defined($ramptime)) {
+					return HMCCU_SetError ($hash, "Can't find RAMP_TIME datapoint for device type $ccutype")
+						if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "RAMP_TIME", 2));
+					$dpval{"002.$ccuif.$ccuaddr.RAMP_TIME"} = $ramptime if (defined ($ramptime));
+				}
+				
+				$dpval{"003.$ccuif.$ccuaddr.$dpt"} = $value;
+				last;
+			}
+			else {
+				if ($ps eq 'VALUES') {
+					my $no = sprintf ("%03d", $i);
+					$dpval{"$i.$ccuif.$ccuaddr.$dpt"} = $value;
+					$i++;
 				}
 				else {
-					$value = $parDef;
+					$cfval{$dpt} = $value;
 				}
 			}
 		}
-		else {
-			my @parList = split(',', $par);
-			$value = (scalar(@parList) > 1) ? shift @$a : $par;
+
+		if (scalar(keys %dpval) > 0) {
+			$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
+			return HMCCU_SetError ($hash, min(0, $rc));
 		}
-		
-		return HMCCU_SetError ($hash, "Missing parameter") if (!defined($value));
-
-		if ($opt eq 'pct' || $opt eq 'level') {
-			my $timespec = shift @$a;
-			my $ramptime = shift @$a;
-
-			# Set on time
-			if (defined ($timespec)) {
-				return HMCCU_SetError ($hash, "Can't find ON_TIME datapoint for device type $ccutype")
-					if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, "ON_TIME", 2));
-				if ($timespec =~ /^[0-9]{2}:[0-9]{2}/) {
-					$timespec = HMCCU_GetTimeSpec ($timespec);
-					return HMCCU_SetError ($hash, "Wrong time format. Use HH:MM[:SS]") if ($timespec < 0);
-				}
-				$dpval{"001.$ccuif.$ccuaddr.ON_TIME"} = $timespec if ($timespec > 0);
-			}
-
-			# Set ramp time
-			$dpval{"002.$ccuif.$ccuaddr.RAMP_TIME"} = $ramptime if (defined ($ramptime));
+		if (scalar(keys %cfval) > 0) {
+			($rc, $result) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h, 'MASTER');
+			return HMCCU_SetError ($hash, min(0, $rc));
 		}
-		$dpval{"003.$ccuif.$ccuaddr.$dpt"} = $value;
-				
-		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
-		return HMCCU_SetError ($hash, min(0, $rc));
 	}
 	elsif ($opt eq 'on-for-timer' || $opt eq 'on-till') {
 		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
@@ -508,10 +538,10 @@ sub HMCCUCHN_Set ($@)
 				join(',', @parList));
 		}
 				
-		if ($paramset eq 'VALUES') {
-			($rc, $result) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h);
+		if ($paramset eq 'VALUES' || $paramset eq 'MASTER') {
+			($rc, $result) = HMCCU_SetMultipleParameters ($hash, $ccuaddr, $h, $paramset);
 		}
-		elsif ($paramset eq 'LINK') {
+		else {
 			if (exists($defs{$receiver}) && defined($defs{$receiver}->{TYPE})) {
 				my $clHash = $defs{$receiver};
 				if ($clHash->{TYPE} eq 'HMCCUDEV') {
@@ -538,9 +568,6 @@ sub HMCCUCHN_Set ($@)
 				if (!HMCCU_IsValidReceiver ($ioHash, $ccuaddr, $ccuif, $receiver));
 			($rc, $result) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $receiver, $h);
 		}
-		else {
-			($rc, $result) = HMCCU_RPCRequest ($hash, "putParamset", $ccuaddr, $paramset, $h);
-		}
 
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
@@ -552,10 +579,12 @@ sub HMCCUCHN_Set ($@)
 	else {
 		my $retmsg = "clear defaults:noArg";
 		if ($hash->{readonly} ne 'yes') {
-			$retmsg .= " config control datapoint".$cmdList;
+			$retmsg .= " config control";
+			$retmsg .= ':'.join(',', @states) if (scalar(@states) > 0);
+			$retmsg .= " datapoint".$cmdList;
 			$retmsg .= ' toggle:noArg' if (scalar(@states) > 0);
 			$retmsg .= " on-for-timer on-till"
-				if (HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "ON_TIME", 2));
+				if ($sc ne '' && HMCCU_IsValidDatapoint ($hash, $ccutype, $sc, "ON_TIME", 2));
 		}
 		return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
 	}

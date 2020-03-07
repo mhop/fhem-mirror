@@ -66,7 +66,7 @@ sub HMCCUDEV_Define ($@)
 	my $name = $hash->{NAME};
 	
 	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] ".
-		"['readonly'] ['defaults'] [iodev={iodev-name}] [address={virtual-device-no}]".
+		"['readonly'] ['noDefaults'] [iodev={iodev-name}] [address={virtual-device-no}]".
 		"[{groupexp=regexp|group={device|channel}[,...]]";
 	return $usage if (scalar (@$a) < 3);
 	
@@ -107,16 +107,11 @@ sub HMCCUDEV_Define ($@)
 	else {
 		return "Option address not specified" if (!$init_done && $devspec eq 'virtual');
 	}
-
-	# Defaults
-	$hash->{hmccu}{statevals} = 'devstate';
 	
 	# Parse optional command line parameters
 	foreach my $arg (@$a) {
-		if    ($arg eq 'readonly') { $hash->{readonly} = 'yes'; $hash->{hmccu}{statevals} = '' }
-		elsif ($arg eq 'defaults') {
-			HMCCU_SetDefaults ($hash) if ($init_done);
-		}
+		if    ($arg eq 'readonly') { $hash->{readonly} = 'yes'; }
+		elsif ($arg ne 'noDefaults' && $init_done) { $hash->{hmccu}{nodefaults} = 1; }
 		elsif ($arg =~ /^[0-9]+$/) { $attr{$name}{statechannel} = $arg; }
 		else { return $usage; }
 	}
@@ -177,17 +172,17 @@ sub HMCCUDEV_Define ($@)
 
 sub HMCCUDEV_InitDevice ($$)
 {
-	my ($ioHash, $dev_hash) = @_;
-	my $name = $dev_hash->{NAME};
-	my $devspec = $dev_hash->{hmccu}{devspec};
+	my ($ioHash, $devHash) = @_;
+	my $name = $devHash->{NAME};
+	my $devspec = $devHash->{hmccu}{devspec};
 	my $gdcount = 0;
 	my $gdname = $devspec;
 	
 	if ($devspec eq 'virtual') {
 		my $no = 0;
-		if (exists ($dev_hash->{hmccu}{address})) {
+		if (exists ($devHash->{hmccu}{address})) {
 			# Only true during FHEM start
-			$no = $dev_hash->{hmccu}{address};
+			$no = $devHash->{hmccu}{address};
 		}
 		else {
 			# Search for free address. Maximum of 10000 virtual devices allowed.
@@ -199,11 +194,11 @@ sub HMCCUDEV_InitDevice ($$)
 				}
 			}
 			return 7 if ($no == 0);
-			$dev_hash->{DEF} .= " address=$no";
+			$devHash->{DEF} .= " address=$no";
 		}
-		$dev_hash->{ccuif}   = 'fhem';
-		$dev_hash->{ccuaddr} = sprintf ("VIR%07d", $no);
-		$dev_hash->{ccuname} = $name;
+		$devHash->{ccuif}   = 'fhem';
+		$devHash->{ccuaddr} = sprintf ("VIR%07d", $no);
+		$devHash->{ccuname} = $name;
 	}
 	else {
 		return 1 if (!HMCCU_IsValidDevice ($ioHash, $devspec, 7));
@@ -212,25 +207,38 @@ sub HMCCUDEV_InitDevice ($$)
 		return 1 if (!defined ($da));
 		$gdname = $dn;
 
-		$dev_hash->{ccuif}    = $di;
-		$dev_hash->{ccuaddr}  = $da;
-		$dev_hash->{ccuname}  = $dn;
-		$dev_hash->{ccutype}  = $dt;
-		$dev_hash->{hmccu}{channels} = $dc;
+		$devHash->{ccuif}    = $di;
+		$devHash->{ccuaddr}  = $da;
+		$devHash->{ccuname}  = $dn;
+		$devHash->{ccutype}  = $dt;
+		$devHash->{hmccu}{channels} = $dc;
+
+		if ($init_done) {
+			# Interactive device definition
+			HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
+			HMCCU_UpdateDevice ($ioHash, $devHash);
+			HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
+			if (!exists($devHash->{hmccu}{nodefaults})) {
+				if (!HMCCU_SetDefaultAttributes ($devHash)) {
+					HMCCU_SetDefaults ($devHash);
+				}
+			}
+			HMCCU_GetUpdate ($devHash, $da, 'Value');
+		}
 	}
 	
 	# Parse group options
-	if ($dev_hash->{ccuif} eq 'VirtualDevices' || $dev_hash->{ccuif} eq 'fhem') {
+	if ($devHash->{ccuif} eq 'VirtualDevices' || $devHash->{ccuif} eq 'fhem') {
 		my @devlist = ();
-		if (exists ($dev_hash->{hmccu}{groupexp})) {
+		if (exists ($devHash->{hmccu}{groupexp})) {
 			# Group devices specified by name expression
-			$gdcount = HMCCU_GetMatchingDevices ($ioHash, $dev_hash->{hmccu}{groupexp}, 'dev', \@devlist);
+			$gdcount = HMCCU_GetMatchingDevices ($ioHash, $devHash->{hmccu}{groupexp}, 'dev', \@devlist);
 			return 4 if ($gdcount == 0);
 		}
-		elsif (exists ($dev_hash->{hmccu}{group})) {
+		elsif (exists ($devHash->{hmccu}{group})) {
 			# Group devices specified by comma separated name list
-			my @gdevlist = split (",", $dev_hash->{hmccu}{group});
-			$dev_hash->{ccugroup} = '' if (@gdevlist > 0);
+			my @gdevlist = split (",", $devHash->{hmccu}{group});
+			$devHash->{ccugroup} = '' if (@gdevlist > 0);
 			foreach my $gd (@gdevlist) {
 				my ($gda, $gdc, $gdo) = ('', '', '', '');
 
@@ -251,7 +259,7 @@ sub HMCCUDEV_InitDevice ($$)
 
 		return 3 if ($gdcount == 0);
 		
-		$dev_hash->{ccugroup} = join (',', @devlist);
+		$devHash->{ccugroup} = join (',', @devlist);
 		if ($devspec eq 'virtual') {
 			my $dev = shift @devlist;
 			my $devtype = HMCCU_GetDeviceType ($ioHash, $dev, 'n/a');
@@ -265,13 +273,13 @@ sub HMCCUDEV_InitDevice ($$)
 			
 			my $rc = 0;
 			if ($devna) {
-				$dev_hash->{ccutype} = 'n/a';
-				$dev_hash->{readonly} = 'yes';
-				$rc = HMCCU_CreateDevice ($ioHash, $dev_hash->{ccuaddr}, $name, undef, $dev); 
+				$devHash->{ccutype} = 'n/a';
+				$devHash->{readonly} = 'yes';
+				$rc = HMCCU_CreateDevice ($ioHash, $devHash->{ccuaddr}, $name, undef, $dev); 
 			}
 			else {
-				$dev_hash->{ccutype} = $devtype;
-				$rc = HMCCU_CreateDevice ($ioHash, $dev_hash->{ccuaddr}, $name, $devtype, $dev); 
+				$devHash->{ccutype} = $devtype;
+				$rc = HMCCU_CreateDevice ($ioHash, $devHash->{ccuaddr}, $name, $devtype, $dev); 
 			}
 			return $rc+4 if ($rc > 0);
 						
@@ -281,10 +289,9 @@ sub HMCCUDEV_InitDevice ($$)
 	}
 
 	# Inform HMCCU device about client device
-	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $ioHash->{NAME}, undef));
+	return 2 if (!HMCCU_AssignIODevice ($devHash, $ioHash->{NAME}, undef));
 	
-#	readingsSingleUpdate ($dev_hash, "state", "Initialized", 1);
-	$dev_hash->{ccudevstate} = 'active';
+	$devHash->{ccudevstate} = 'active';
 	
 	return 0;
 }
@@ -335,21 +342,13 @@ sub HMCCUDEV_Attr ($@)
 		}
 		elsif ($attrname eq "statevals") {
 			return "Device is read only" if ($hash->{readonly} eq 'yes');
-			$hash->{hmccu}{statevals} = 'devstate';
-			my @states = split /,/,$attrval;
-			foreach my $st (@states) {
-				my @statesubs = split /:/,$st;
-				return "value := text:substext[,...]" if (@statesubs != 2);
-				$hash->{hmccu}{statevals} .= '|'.$statesubs[0];
-			}
-		}
-	}
-	elsif ($cmd eq "del") {
-		if ($attrname eq "statevals") {
-			$hash->{hmccu}{statevals} = $hash->{readonly} eq 'yes' ? '' : "devstate";
 		}
 	}
 
+	if ($init_done) {
+		HMCCU_RefreshReadings ($hash);
+	}
+	
 	return;
 }
 
@@ -396,23 +395,22 @@ sub HMCCUDEV_Set ($@)
 	my $roleCmds = HMCCU_GetSpecialCommands ($hash, $cc);
 	
 	my $cmdList = '';
-	my %addCmds;
-	foreach my $d (keys %$roleCmds) {
-		my @cmds = split(' ', $roleCmds->{$d});
-		foreach my $cmdDef (@cmds) {
-			my ($cmd, $argDef) = split(':', $cmdDef);
-			$addCmds{$cmd} = "$d=$argDef";
-			$cmdList .= " $cmd";
-			if ($argDef !~ /^\?/) {
-				my @argList = split(',', $argDef);
-				$cmdList .= scalar(@argList) > 1 ? ':'.$argDef : ':noArg';
+	foreach my $cmd (keys %$roleCmds) {
+		$cmdList .= " $cmd";
+		my @setList = split (/\s+/, $roleCmds->{$cmd});
+		foreach my $set (@setList) {
+			my ($ps, $dpt, $par) = split(/:/, $set);
+			if ($par !~ /^\?/) {
+				my @argList = split (',', $par);
+				$cmdList .= scalar(@argList) > 1 ? ":$par" : ":noArg";
 			}
 		}
 	}
 	
 	# Get state values related to control command and datapoint
-	my $stateVals = HMCCU_GetStateValues ($hash, $roleCmds, $cd, 2);
-	my @stateCmdList = split (/[:\s]/, $stateVals);
+	my $stateVals = HMCCU_GetStateValues ($hash, $cd, $cc);
+	my @stateCmdList = split (/[:,]/, $stateVals);
+	
 	my %stateCmds = @stateCmdList;
 	my @states = keys %stateCmds;
 
@@ -664,26 +662,17 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, $rc == 0 ? "No default attributes found" : "OK");
 	}
 	else {
-		my $retmsg = "clear config defaults:noArg";
+		my $retmsg = "clear defaults:noArg";
 		
 		if ($hash->{readonly} ne 'yes') {
-			$retmsg .= " control datapoint rpcparameter";
+			$retmsg .= " datapoint rpcparameter";
 			if ($sc ne '') {
-				$retmsg .= " devstate";
-				if ($hash->{hmccu}{statevals} ne '') {
-					my @cmdlist = split /\|/,$hash->{hmccu}{statevals};
-					shift @cmdlist;
-					$retmsg .= ':'.join(',',@cmdlist) if (@cmdlist > 0);
-					foreach my $sv (@cmdlist) {
-						$retmsg .= ' '.$sv.':noArg';
-					}
-					$retmsg .= " toggle:noArg";
-					$retmsg .= " on-for-timer on-till"
-						if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
-					$retmsg .= " pct up down level"
-						if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "LEVEL", 2) ||
-							HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, "LEVEL", 2));
-				}
+				$retmsg .= " config control";
+				$retmsg .= ':'.join(',', @states) if (scalar(@states) > 0);
+				$retmsg .= $cmdList;
+				$retmsg .= " toggle:noArg" if (scalar(@states) > 0);
+				$retmsg .= " on-for-timer on-till"
+					if (HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $sc, "ON_TIME", 2));
 			}
 		}
 		return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
