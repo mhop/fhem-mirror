@@ -110,6 +110,16 @@ sub weekprofile_getDeviceType($$;$)
 {
   my ($me,$device,$sndrcv) = @_;
   
+  if (IsDummy($device)){
+    Log3 $me, 4, "$me(getDeviceType): $device is dummy - ignored";
+    return undef;
+  }
+  
+  if (IsIgnored($device)){
+    Log3 $me, 4, "$me(getDeviceType): $device is ignored";
+    return undef;
+  }
+  
   $sndrcv = "RCV" if (!defined($sndrcv));
 
   # determine device type
@@ -126,6 +136,12 @@ sub weekprofile_getDeviceType($$;$)
   
   if ($devType =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
+    
+    my $readonly = AttrVal($device,"readOnly",0);
+    if ($readonly) {
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is readonly - ignored";
+      return undef;
+    }
     
     #models: HM-TC-IT-WM-W-EU, HM-CC-RT-DN, HM-CC-TC
     unless ($model =~ m/.*HM-[C|T]C-.*/) {
@@ -149,13 +165,19 @@ sub weekprofile_getDeviceType($$;$)
     
     $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-RT.*/) && ($channel == 4) );
     $type = "CUL_HM" if ( ($model =~ m/.*HM-TC.*/)    && ($channel == 2) );
-    $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-TC.*/) && ($channel == 2) );
+    $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-TC.*/) && ($channel == 2) );    
   }
   #avoid max shutter contact
   elsif ( ($devType =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
   elsif ( $devType =~ /HMCCUDEV/){
+    my $readonly = AttrVal($device,"readOnly",0);
+    if ($readonly) {
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is readonly - ignored";
+      return undef;
+    }
+    
 	  my $model = $devHash->{ccutype};
     if (!defined($model)) {
       Log3 $me, 2, "$me(getDeviceType): ccutype not defined - take HM-xxx (HMCCU_HM)";
