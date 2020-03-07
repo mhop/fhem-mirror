@@ -1013,8 +1013,7 @@ attr DEVICE stateFormat LWT\
 2:POWER2\
 3:POWER3\
 4:POWER4\
-<br>\
-<a href="http://IPAddress" target="_blank">IPAddress</a>
+<br><a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4
 attr DEVICE model tasmota_4ch_unified_icon
 
@@ -1079,8 +1078,7 @@ attr DEVICE readingList \
   STATTOPIC/POWER7:.* POWER7\
   STATTOPIC/POWER8:.* POWER8
 attr DEVICE stateFormat LWT\
-<a href="http://IPAddress" target="_blank">Hostname</a>\
-<br>\
+<a href="http://IPAddress" target="_blank">Hostname</a><br>\
 1:POWER1\
 2:POWER2\
 3:POWER3\
@@ -1089,7 +1087,6 @@ attr DEVICE stateFormat LWT\
 6:POWER6\
 7:POWER7\
 8:POWER8
-attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4:POWER5:POWER6:POWER7:POWER8
 attr DEVICE model tasmota_8ch_unified_icon
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg899041.html#msg899041
@@ -1396,10 +1393,6 @@ attr DEVICE readingList \
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; $con = 100 - $con if $con =~ /\d+/;; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
-attr DEVICE stateFormat <a href="http://ip" target="_blank">\
-online\
-</a>\
-state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
@@ -1440,10 +1433,6 @@ attr DEVICE readingList \
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
-attr DEVICE stateFormat <a href="http://ip" target="_blank">\
-online\
-</a>\
-state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
