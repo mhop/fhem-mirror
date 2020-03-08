@@ -33,7 +33,9 @@ require Exporter;
   2 => "HeatingThermostatPlus",
   3 => "WallMountedThermostat",
   4 => "ShutterContact",
-  5 => "PushButton"
+  5 => "PushButton",
+  6 => "virtualShutterContact",
+  7 => "virtualThermostat"
 );
 
 %msgId2Cmd = (
