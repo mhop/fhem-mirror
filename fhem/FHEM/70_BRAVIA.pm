@@ -24,6 +24,10 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
+#
+#     05.03.2020 Sandro Gertz: add "requestReboot"
+#
+##############################################################################
 
 package main;
 
@@ -204,7 +208,6 @@ sub Get($@) {
     return "argument is missing" if ( int(@a) < 2 );
 
     $what = $a[1];
-
     if ( $what =~ /^(power|presence|input|channel|volume|mute)$/ ) {
         my $value = ReadingsVal($name, $what, "");
         if ($value ne "") {
@@ -306,6 +309,7 @@ sub Set($@) {
     $usage .= " channel:$channels" if ( $channels ne "" );
     $usage .= " openUrl application:" . $apps if ( $apps ne "" );
     $usage .= " text" if (ReadingsVal($name, "requestFormat", "") eq "json");
+    $usage .= " requestReboot:noArg " if (ReadingsVal($name, "requestFormat", "") eq "json");
 
     my $cmd = '';
     my $result;
@@ -745,7 +749,13 @@ sub Set($@) {
         readingsSingleUpdate( $hash, "upnp", $a[2], 1 )
            if ( ReadingsVal($name, "upnp", "") ne $a[2] );
     }
-    
+        
+      # reboot
+    elsif ($a[1] eq "requestReboot") {  
+        Log3($name, 2, "BRAVIA set $name " . $a[1]);     
+        SendCommand( $hash, "requestReboot" );
+      }
+        
     # text
     elsif ( $a[1] eq "text" ) {
         return "No 2nd argument given" if ( !defined( $a[2] ) );
@@ -2256,6 +2266,9 @@ sub GetNormalizedName($) {
       <li><a name="requestFormat"></a><i>requestFormat</i><br>
         "xml" for xml based communication (models from 2011 and 2012)<br>
         "json" for communication with models from 2013 and newer</li>
+      <li><a name="requestReboot"></a><i>requestReboot</i><br>
+        Reboots the TV immediately.
+        This Feature is available on models from 2013 and newer.</li>
       <li><a name="remoteControl"></a><i>remoteControl</i><br>
         Sends command directly to TV.</li>
       <li><a name="statusRequest"></a><i>statusRequest</i><br>
@@ -2337,7 +2350,7 @@ sub GetNormalizedName($) {
     <ul>
       <li><a name="application"></a><i>application</i><br>
         Liste der Anwendungen.
-        Anwenungen sind ab Modelljahr 2013 verfügbar.</li>
+        Anwendungen sind ab Modelljahr 2013 verfügbar.</li>
       <li><a name="channel"></a><i>channel</i><br>
         Liste aller bekannten Kanäle. Das Modul merkt sich alle aufgerufenen Kanäle.
         Ab Modelljahr 2013 werden die Kanäle automatisch geladen
@@ -2375,6 +2388,9 @@ sub GetNormalizedName($) {
       <li><a name="requestFormat"></a><i>requestFormat</i><br>
         "xml" für xml-basierte Kommunikation 2011er/2012er Geräte<br>
         "json" für die Kommunikation seit der 2013er Generation</li>
+      <li><a name="requestReboot"></a><i>requestReboot</i><br>
+        Startet den TV direkt neu.
+        Diese Funktion ist ab Modelljahr 2013 verfügbar.</li>
       <li><a name="remoteControl"></a><i>remoteControl</i><br>
         Direktes Senden von Kommandos an den TV.</li>
       <li><a name="statusRequest"></a><i>statusRequest</i><br>

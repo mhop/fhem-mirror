@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 70_BRAVIA: add requestReboot (thx schnakker)
  - change:  57_SSCal: commandref reviewed
  - feature: 98_RandomTimer: Add offState attribute to e.g. evaluate state
        reading instead of STATE; NOTE: this will be 
