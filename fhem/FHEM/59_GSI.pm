@@ -49,6 +49,8 @@ sub GSI_Define {
 	my ($name, $type, $plz) = split /\s/, $def;
 
 	my $cvsid = '$Id$';
+	$cvsid =~ s/^.*pm\s//;
+	$cvsid =~ s/Z\s\S+\s\$$//;
 
 	return "German ZIP code required" unless ($plz =~ m/\d{5}/);
 	$hash->{'ZIP'} = $plz;
