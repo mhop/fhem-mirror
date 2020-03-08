@@ -59,42 +59,43 @@ desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 order:L_01 
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
+attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
- BASE_TOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
+ $\DEVICETOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
-  devicelist:noArg log BASE_TOPIC/bridge/config/devices\
-  networkmap_raw:noArg raw BASE_TOPIC/bridge/networkmap raw\
-  networkmap_graphviz:noArg graphviz BASE_TOPIC/bridge/networkmap graphviz
+  devicelist:noArg log $\DEVICETOPIC/bridge/config/devices\
+  networkmap_raw:noArg raw $\DEVICETOPIC/bridge/networkmap raw\
+  networkmap_graphviz:noArg graphviz $\DEVICETOPIC/bridge/networkmap graphviz
 attr DEVICE readingList\
-  BASE_TOPIC/bridge/state:.* state\
-  BASE_TOPIC/bridge/config/devices:.* {}\
-  BASE_TOPIC/bridge/config/log_level:.* log_level\
-  BASE_TOPIC/bridge/config/permit_join:.* permit_join\
-  BASE_TOPIC/bridge/config/rename:.* { json2nameValue($EVENT, 'rename_') }\
-  BASE_TOPIC/bridge/log:.*\"type\".\"devices\".\"message\".* devices\
-  BASE_TOPIC/bridge/log:.* log\
-  BASE_TOPIC/bridge/networkmap:.* {}\
-  BASE_TOPIC/bridge/networkmap/graphviz:.* graphviz\
-  BASE_TOPIC/bridge/networkmap/raw:.* raw\
-  BASE_TOPIC/bridge/config:.* { json2nameValue($EVENT) }
+  $\DEVICETOPIC/bridge/state:.* state\
+  $\DEVICETOPIC/bridge/config/devices:.* {}\
+  $\DEVICETOPIC/bridge/config/log_level:.* log_level\
+  $\DEVICETOPIC/bridge/config/permit_join:.* permit_join\
+  $\DEVICETOPIC/bridge/config/rename:.* { json2nameValue($EVENT, 'rename_') }\
+  $\DEVICETOPIC/bridge/log:.*\"type\".\"devices\".\"message\".* devices\
+  $\DEVICETOPIC/bridge/log:.* log\
+  $\DEVICETOPIC/bridge/networkmap:.* {}\
+  $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
+  $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
+  $\DEVICETOPIC/bridge/config:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-  log_level:debug,info,warn,error BASE_TOPIC/bridge/config/log_level $EVTPART1\
-  permit_join:true,false BASE_TOPIC/bridge/config/permit_join $EVTPART1\
-  remove:textField BASE_TOPIC/bridge/config/remove $EVTPART1\
-  y_device_setting:textField BASE_TOPIC/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
-  x_bind:textField BASE_TOPIC/bridge/bind/$EVTPART1 $EVTPART2\
-  x_bind_unbind:textField BASE_TOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
-  x_device_options:textField BASE_TOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1","options": {"$EVTPART2": "$EVTPART3"}}\
-  x_group_add_to:textField BASE_TOPIC/bridge/group/$EVTPART1/add $EVTPART2\
-  x_group_rm_from:textField BASE_TOPIC/bridge/group/$EVTPART1/remove $EVTPART2\
-  x_group_rm_from_all:textField BASE_TOPIC/bridge/group/$EVTPART1/remove_all $EVTPART2\
-  x_group_add_group:textField BASE_TOPIC/bridge/config/add_group $EVTPART1\
-  x_group_rm_group:textField BASE_TOPIC/bridge/config/remove_group $EVTPART1\
-  z_elapsed:textField BASE_TOPIC/bridge/config/elapsed $EVTPART1\
-  z_last_seen:disable,ISO_8601,epoch,ISO_8601_local BASE_TOPIC/bridge/config/last_seen $EVTPART1\
-  z_ban:textField BASE_TOPIC/bridge/config/ban $EVTPART1\
-  z_rename:textField BASE_TOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
-  z_reset_CC:noArg BASE_TOPIC/bridge/config/reset
+  log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
+  permit_join:true,false $\DEVICETOPIC/bridge/config/permit_join $EVTPART1\
+  remove:textField $\DEVICETOPIC/bridge/config/remove $EVTPART1\
+  y_device_setting:textField $\DEVICETOPIC/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
+  x_bind:textField $\DEVICETOPIC/bridge/bind/$EVTPART1 $EVTPART2\
+  x_bind_unbind:textField $\DEVICETOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
+  x_device_options:textField $\DEVICETOPIC/bridge/config/device_options {"friendly_name":"$EVTPART1","options": {"$EVTPART2": "$EVTPART3"}}\
+  x_group_add_to:textField $\DEVICETOPIC/bridge/group/$EVTPART1/add $EVTPART2\
+  x_group_rm_from:textField $\DEVICETOPIC/bridge/group/$EVTPART1/remove $EVTPART2\
+  x_group_rm_from_all:textField $\DEVICETOPIC/bridge/group/$EVTPART1/remove_all $EVTPART2\
+  x_group_add_group:textField $\DEVICETOPIC/bridge/config/add_group $EVTPART1\
+  x_group_rm_group:textField $\DEVICETOPIC/bridge/config/remove_group $EVTPART1\
+  z_elapsed:textField $\DEVICETOPIC/bridge/config/elapsed $EVTPART1\
+  z_last_seen:disable,ISO_8601,epoch,ISO_8601_local $\DEVICETOPIC/bridge/config/last_seen $EVTPART1\
+  z_ban:textField $\DEVICETOPIC/bridge/config/ban $EVTPART1\
+  z_rename:textField $\DEVICETOPIC/bridge/config/rename  {"old":"$EVTPART1","new":"$EVTPART2"}\
+  z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
 attr DEVICE model zigbee2mqtt_bridge
@@ -111,8 +112,9 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","mqtt_device") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:rc_GREEN offline:rc_RED
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }\
-  BASE_TOPIC/DEV_ID/availability:.* availability
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }\
+  $\DEVICETOPIC/availability:.* availability
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE stateFormat availability
 attr DEVICE comment To get also information on device going offline, set "availability_timeout" to a reasonable value in configuration.yaml.
@@ -130,11 +132,12 @@ par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_dimmer
@@ -149,12 +152,13 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 attr DEVICE webCmd toggle:on:off:brightness:color_temp
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_cct
 
@@ -170,12 +174,13 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:hex
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgb_hex
@@ -191,12 +196,13 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgb_rgb
 
@@ -212,15 +218,16 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color_temp:warm:white:hex
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  warm:noArg BASE_TOPIC/DEV_ID/set {"brightness": 200 , "color_temp": 360}\
-  white:noArg BASE_TOPIC/DEV_ID/set {"brightness": 254, "color_temp": 250}\
-  color_temp:colorpicker,CT,250,1,454 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  warm:noArg $\DEVICETOPIC/set {"brightness": 200 , "color_temp": 360}\
+  white:noArg $\DEVICETOPIC/set {"brightness": 254, "color_temp": 250}\
+  color_temp:colorpicker,CT,250,1,454 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}  
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbw_hex
@@ -237,13 +244,14 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color:white
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  white:noArg BASE_TOPIC/DEV_ID/set {"color_temp": 154 , "color_temp": 500}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  white:noArg $\DEVICETOPIC/set {"color_temp": 154 , "color_temp": 500}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbw_rgb
 
@@ -259,13 +267,14 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color_temp:hex
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
-  hex:colorpicker,HEX,0,15,255 BASE_TOPIC/DEV_ID/set {"color":{"$EVTPART0":"#$EVTPART1"}}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}\
+  hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_hex
 
@@ -281,13 +290,14 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
 attr DEVICE webCmd toggle:on:off:brightness:color_temp:color
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
-  brightness:colorpicker,BRI,0,5,255 BASE_TOPIC/DEV_ID/set {"state":"on","$EVTPART0":"$EVTPART1"}\
-  color_temp:colorpicker,CT,154,2,500 BASE_TOPIC/DEV_ID/set {"$EVTPART0":"$EVTPART1"}\
-  color:colorpicker,RGB {"BASE_TOPIC/DEV_ID/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
+  color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}\
+  color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
 set DEVICE attrTemplate speech_recognition_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
 
@@ -298,7 +308,8 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to secur_smoke_detector;{ AttrVal("DEVICE","icon","secur_smoke_detector") }
 attr DEVICE icon ICON
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE stateFormat smoke
 attr DEVICE model zigbee2mqtt_smokeDetector
 
@@ -308,7 +319,8 @@ order:L_04
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
 set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
 attr DEVICE model zigbee2mqtt_hueMotionSensor
@@ -322,10 +334,11 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/set {"state":"OFF"}\
+  on:noArg $\DEVICETOPIC/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
 attr DEVICE setStateList on off
 set DEVICE attrTemplate speech_recognition_type_switch
 attr DEVICE model zigbee2mqtt_plug
@@ -354,11 +367,12 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap state:availability state_l1:state state_l2:0 
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/l1/set {"state":"OFF"}\
+  on:noArg $\DEVICETOPIC/l1/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/l1/set {"state":"OFF"}\
 attr DEVICE setStateList on off
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
@@ -369,8 +383,8 @@ copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 comment Channel 2 for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
-  on:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/l2/set {"state":"OFF"}
+  on:noArg $\DEVICETOPIC/l2/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/l2/set {"state":"OFF"}
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0
@@ -386,13 +400,14 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 set DEVICE attrTemplate zigbee2mqtt_2channel_split
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE setList \
-  on:noArg BASE_TOPIC/DEV_ID/left/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/left/set {"state":"OFF"}
+  on:noArg $\DEVICETOPIC/left/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/left/set {"state":"OFF"}
 attr DEVICE jsonMap state:availability state_left:state state_right:0
 attr DEVICE_CH2 setList \
-  on:noArg BASE_TOPIC/DEV_ID/right/set {"state":"ON"}\
-  off:noArg BASE_TOPIC/DEV_ID/right/set {"state":"OFF"}
+  on:noArg $\DEVICETOPIC/right/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/right/set {"state":"OFF"}
 attr DEVICE_CH2 jsonMap state_left:0 state_right:state state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_split_w_buttons
 
@@ -405,7 +420,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
 #attr DEVICE genericDeviceType contact
 attr DEVICE eventMap true:close false:open
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_ContactSensor
@@ -418,8 +434,9 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%% Pressure: %.1fhpa", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0), ReadingsVal($name,"pressure",0)) }
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_TempHumHpaSensor
 
@@ -433,7 +450,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%%", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0)) }
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_TempHumSensor
 
@@ -446,8 +464,9 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE stateFormat Motion: occupancy Luminance: illuminance
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Human_Motion_Sensor
 
@@ -461,8 +480,9 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE stateFormat Motion: occupancy T: temperature
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_TempMotion_sensor
 
@@ -475,8 +495,9 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE stateFormat Motion: action X: angle_x Y: angle_y Z: angle_z
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Motion_Sensor
 
@@ -488,7 +509,8 @@ order:L_10
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
 attr DEVICE stateFormat Leak: state
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap water_leak:state
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Water_Leak_Sensor
@@ -503,7 +525,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat click
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE attrTemplate speech_recognition_type_switch
 attr DEVICE model zigbee2mqtt_Light_Switch
@@ -518,7 +541,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click Action: action
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Wireless_Button
 
@@ -531,7 +555,8 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","read
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_wireless_button_old
 
@@ -542,7 +567,8 @@ order:L_14
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 attr DEVICE stateFormat Action: action
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_aqara_cube
 
@@ -555,10 +581,11 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to secur_alarm;{ AttrVal("DEVICE","icon","secur_alarm") }
 attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE setList \
-  sensitivity:low,medium,high BASE_TOPIC/DEV_ID/set {"sensitivity":"$EVTPART1"}
+  sensitivity:low,medium,high $\DEVICETOPIC/set {"sensitivity":"$EVTPART1"}
 attr DEVICE stateFormat Action: action X: angle_x Y: angle_y Z: angle_z
-attr DEVICE readingList BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_AlarmSensor
 
