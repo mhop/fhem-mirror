@@ -20,7 +20,7 @@ desc:template to set speech recognition attributes for genericDeviceType switch
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType switch
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_type_light
@@ -30,7 +30,7 @@ desc:template to set speech recognition attributes for genericDeviceType light
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType light
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_type_light_255
@@ -44,7 +44,7 @@ attr DEVICE genericDeviceType light
 attr DEVICE homebridgeMapping Brightness=brightness::brightness,maxValue=100,factor=0.39216,delay=true
 #attr DEVICE userReadings NEWUSERREADINGS
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_type_blind
@@ -54,7 +54,7 @@ desc:template to set speech recognition attributes for genericDeviceType blind
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType blind
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_type_thermostate
@@ -64,7 +64,7 @@ desc:template to set speech recognition attributes for genericDeviceType thermos
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 attr DEVICE genericDeviceType thermostate
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_gdt_only
@@ -75,27 +75,27 @@ option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $
 par:GENERICDEVTYPE;GENERICDEVTYPE <genericDeviceType>, defaults to contact;{ "contact" }
 attr DEVICE genericDeviceType GENERICDEVTYPE
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_gdt_and_mapping
 filter:NAME=speechrecognTesting
 order:100007
-desc:generic template to set speech recognition attributes for to any genericDeviceType including full mapping, call e.g. with set xy attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=Security HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+desc:generic template to set speech recognition attributes for to any genericDeviceType including full mapping, call e.g. with set xy attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 option:{my @devices=devspec2array("TYPE=(siri|alexa|gassistant)");;return 1 if $devices[0];;return 0}
 par:GENERICDEVTYPE;GENERICDEVTYPE <genericDeviceType>, defaults to contact;{ "contact" }
 par:HOMEBRIDGEMAPPING;HOMEBRIDGEMAPPING, defaults to "some split-by-semicolon-compatible represantation or the expression to the right";{ 'ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED' }
 attr DEVICE genericDeviceType GENERICDEVTYPE
 attr DEVICE homebridgeMapping HOMEBRIDGEMAPPING
 option:TYPE=siri
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
 name:speech_recognition_alaxaName_firstrun
 filter:NAME=speechrecognTesting
 order:1000020a
 desc:generic template to set speech recognition attribute alexaName, call e.g. with set xy attrTemplate speech_recognition_alaxaName_firstrun ALEXANAME=myAlexaName
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 par:ALEXANAME;Please enter alexaName;{ AttrVal("DEVICE","alexaName",undef) } 
 attr DEVICE alexaName ALEXANAME
 set DEVICE attrTemplate speech_recognition_alaxaName_secondrun ALEXAISNAME=ALEXANAME
@@ -104,12 +104,12 @@ name:speech_recognition_alaxaName_secondrun
 filter:NAME=speechrecognTesting
 order:1000020b
 desc:generic template to doublecheck alexaName attribute setting to avoid doubletes , call e.g. with set xy attrTemplate speech_recognition_alaxaName_secondrun ALEXAISNAME=myAlexaName
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 par:ALEXAISNAME;Please enter alexaName;{ AttrVal("DEVICE","alexaName",undef) } 
 option:{my @devices=devspec2array("alexaName=ALEXAISNAME");; $devices[1] ? return 1 : return 0}
 par:ALEXANAME;Please enter alexaName (you may be asked multiple times to avoid already existing names);{undef) } 
 attr DEVICE alexaName ALEXANAME
-option:TYPE=alexa
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 #set DEVICE attrTemplate speech_recognition_alaxaName_firstrun
 
 

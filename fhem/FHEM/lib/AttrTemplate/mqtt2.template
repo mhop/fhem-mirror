@@ -424,6 +424,7 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
+set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 attr DEVICE model zigbee2mqtt_ContactSensor
 
 name:zigbee2mqtt_TempHumHpaSensor
@@ -1206,6 +1207,40 @@ attr DEVICE webCmdLabel Helligkeit\
 :Temp
 set DEVICE attrTemplate speech_recognition_type_light
 attr DEVICE model tasmota_rgbwct_led
+
+name:tasmota_cct_led
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Tasmota CCT bulb or CCT LED controller
+order:A_05a3
+set DEVICE attrTemplate tasmota_basic_state_power1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE setList\
+  off:noArg CMNDTOPIC/POWER1 0\
+  on:noArg CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2\
+  CT:colorpicker,CT,153,5,500 CMNDTOPIC/CT\
+  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? undef :{"saturation"=>$2} : undef }\
+  STATTOPIC/POWER1:.* state
+attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
+attr DEVICE webCmd pct:CT
+
+attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",undef,"pct","state")}
+attr DEVICE setStateList on off toggle
+set DEVICE attrTemplate speech_recognition_type_light
+attr DEVICE model tasmota_cct_led
 
 #source post: https://forum.fhem.de/index.php/topic,105364.0.html
 name:tasmota_TuyaMCU_dimmer
