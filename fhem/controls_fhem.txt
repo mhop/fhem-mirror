@@ -1,4 +1,4 @@
-REV 21370
+REV 21373
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -571,7 +571,7 @@ UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
 UPD 2019-12-26_07:45:03 88679 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
-UPD 2020-03-04_07:45:02 65792 FHEM/98_weekprofile.pm
+UPD 2020-03-08_07:45:03 66390 FHEM/98_weekprofile.pm
 UPD 2019-02-26_07:45:02 21036 FHEM/99_SUNRISE_EL.pm
 UPD 2020-02-05_07:45:03 11752 FHEM/99_Utils.pm
 UPD 2020-03-05_07:45:02 10603 FHEM/AttrTemplate.pm
@@ -753,8 +753,8 @@ UPD 2020-03-07_07:45:06 4228415 docs/commandref.html
 UPD 2020-03-06_07:45:10 2627656 docs/commandref_DE.html
 UPD 2020-03-06_07:45:03 79890 docs/commandref_frame.html
 UPD 2020-03-06_07:45:03 89680 docs/commandref_frame_DE.html
-UPD 2020-03-07_07:45:10 231237 docs/commandref_modular.html
-UPD 2020-03-07_07:45:11 242254 docs/commandref_modular_DE.html
+UPD 2020-03-08_07:45:11 231237 docs/commandref_modular.html
+UPD 2020-03-08_07:45:12 242254 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
