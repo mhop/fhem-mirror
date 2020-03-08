@@ -30,6 +30,8 @@ use utf8;
 use Time::HiRes qw( gettimeofday tv_interval );
 use HttpUtils;
 
+no warnings qw( experimental::lexical_subs );
+
 sub GSI_Initialize {
 	my ($hash) = @_;
 
@@ -37,7 +39,7 @@ sub GSI_Initialize {
 	$hash->{'UndefFn'}				= 'GSI_Undef';
 	$hash->{'NotifyFn'}				= 'GSI_Notify';
 	$hash->{'FW_detailFn'}			= 'GSI_FW_detailFn';
-	$hash->{'AttrList'}				= "$readingFnAttributes ";
+	$hash->{'AttrList'}				= "continuous:1,0 $readingFnAttributes ";
 	$hash->{'NOTIFYDEV'}			= 'TYPE=Global';
 	return undef;
 };
@@ -47,8 +49,6 @@ sub GSI_Define {
 	my ($name, $type, $plz) = split /\s/, $def;
 
 	my $cvsid = '$Id$';
-	$cvsid =~ s/^.*pm\s//;
-	$cvsid =~ s/Z\s\S+\s\$$//;	
 
 	return "German ZIP code required" unless ($plz =~ m/\d{5}/);
 	$hash->{'ZIP'} = $plz;
@@ -187,7 +187,9 @@ sub GSI_doReadings {
 			my $val = linearInterpolate($t, $fc->[0]->{'epochtime'}, 
 						$fc->[1]->{'epochtime'}, $fc->[0]->{$dataName}, $fc->[1]->{$dataName});
 			my $diff = abs(ReadingsVal($hash->{'NAME'}, $readingName, 0) - $val);
-			if ($diff >= 1) {
+			if (AttrVal($hash->{'NAME'}, 'continuous', 1) and ($diff >= 1)) {
+				readingsBulkUpdate($hash, $readingName, sprintf('%.f', $val));
+			} elsif (AttrVal($hash->{'NAME'}, 'continuous', 1) == 0) {
 				readingsBulkUpdate($hash, $readingName, sprintf('%.f', $val));
 			};
 		};
@@ -212,13 +214,19 @@ sub GSI_doReadings {
 			};
 		};
 
-		my $next = 3600;
-		foreach my $item ('eevalue', 'co2_g_oekostrom', 'co2_g_standard') {
-			my $n = calcNext($item, 3600);
-			$next = $n if ($n < $next);
+		if (AttrVal($hash->{'NAME'}, 'continuous', 1)) {
+			my $next = 3600;
+			foreach my $item ('eevalue', 'co2_g_oekostrom', 'co2_g_standard') {
+				my $n = calcNext($item, 3600);
+				$next = $n if ($n < $next);
+			};
+			$hash->{'NEXT_EVENT'} = int($t + $next);
+			InternalTimer($t + $next, \&GSI_doReadings, $hash);
+		} else {
+			my $next = (int($t / 3600) * 3600) + 3600;
+			$hash->{'NEXT_EVENT'} = $next;
+			InternalTimer($next, \&GSI_doReadings, $hash);
 		};
-		$hash->{'NEXT_EVENT'} = int($t + $next);
-		InternalTimer($t + $next, \&GSI_doReadings, $hash);
 	};
 
 	return undef;
@@ -281,7 +289,7 @@ sub GSI_ApiResponse {
 
 		# schedule
 		my $next = (int(gettimeofday() / 3600) * 3600) + (3600 + 1800 + int(rand(1200)));
-		$hash->{'API_NEXT_REQ'} = $next;
+		$hash->{'API__NEXT_REQ'} = $next;
 		InternalTimer($next, \&GSI_ApiRequest, $hash);
 
 		if ($hash->{'NEXT_EVENT'} and $hash->{'NEXT_EVENT'} > gettimeofday()) {
