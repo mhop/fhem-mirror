@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.2.2"  => "08.03.2020  review commandref ",
   "2.2.1"  => "04.03.2020  expand composite event 'compositeBlockNumbers' by 'none' ",
   "2.2.0"  => "03.03.2020  new composite event 'compositeBlockNumbers' ",
   "2.1.0"  => "01.03.2020  expand composite Event, bugfix API if entry with 'is_all_day' and at first position in 'data' ",
@@ -4524,7 +4525,46 @@ return $default;
   </ul> 
   
  </ul> 
-<br>
+ <br>
+ 
+<a name="SSCalEvents"></a>
+<b>Hints for event generation </b>
+
+  <ul>
+  <br>
+  Depending on the volume of the retrieved data, a large number of readings can be created. 
+  To avoid too extensive event generation in FHEM, the attribute <b>event-on-update-reading</b> is preset after  
+  definition of the calendar device to: <br><br>
+  
+  <ul>
+    attr <name> event-on-update-reading.*Summary.*,state
+  </ul>
+  <br>
+  
+  If events are to be created for all readings, event-on-update-reading must be set to .* and mustn't be deleted. 
+  <br><br>
+  
+  SSCal generates additional events for each event, which contains a start time, with each new read-in 
+  of a calendar. These events provide the user with assistance in creating his own control logic in FHEM based on 
+  calendar entries. <br><br>
+  
+  The event <b>composite</b> contains the information fields: <br><br>
+
+   <ul>
+    <li> block number of the appointment </li>
+    <li>Event ID of the appointment </li>
+    <li>indicator for a serial appointment (0=no serial appointment or 1=serial appointment) </li>
+    <li>start time in ISO 8601 format </li>
+    <li>Status of the event </li>
+    <li>the text in Description (corresponds to the Description field in Synology Calendar WebUI) or the text in Summary 
+        if Description is not set </li>
+   </ul>
+   <br>
+   
+  The event <b>compositeBlockNumbers</b> contains the block numbers of all events of the calendar. 
+  If there are no appointments, this event has only the value <b>none</b>. 
+    
+  </ul>
  
 </ul>
 
@@ -4641,8 +4681,8 @@ return $default;
   <li><b> calUpdate [&lt;Kalenderliste&gt;] </b> <br>
   
   Ruft die Einträge der selektierten Kalender (siehe Attribut <a href="#usedCalendars">usedCalendars</a>) ab. 
-  Alternativ kann eine Komma getrennte Liste der abzufunden Kalender dem Befehl übergeben werden. Die Kalendernamen können Leerzeichen 
-  enthalten. 
+  Alternativ kann eine Komma getrennte Liste der abzurufenden Kalender dem Befehl übergeben werden. Die Kalendernamen können 
+  Leerzeichen enthalten. 
   <br><br>
   
   <ul>
@@ -5049,7 +5089,46 @@ return $default;
   </ul> 
   
  </ul> 
-<br>
+ <br>
+
+<a name="SSCalEvents"></a>
+<b>Hinweise zur Eventgenerierung </b>
+
+  <ul>
+  <br>
+  Je nach Umfang der abgerufenen Daten können sehr viele Readings erstellt werden. Um eine zu umfangreiche Eventgenerierung 
+  in FHEM zu verhindern, ist nach der Definition des Kalenderdevices das Attribut <b>event-on-update-reading</b> 
+  voreingestellt auf: <br><br>
+  
+  <ul>
+    attr <Name> event-on-update-reading .*Summary.*,state
+  </ul>
+  <br>
+  
+  Sollen Events für alle Readings erstellt werden, muss event-on-update-reading auf .* eingestellt und nicht gelöscht 
+  werden. <br><br>
+  
+  SSCal generiert für jedes Ereignis, welches einen Begin-Zeitpunkt enthält, zusätzliche Events bei jedem erneuten Einlesen 
+  eines Kalenders. Diese Events bieten dem Anwender Hilfe zur Erstellung eigener Steuerungslogiken in FHEM auf Grundlage 
+  von Kalendereinträgen. <br><br>
+  
+  Der Event <b>composite</b> enthält die Informationsfelder: <br><br>
+
+   <ul>
+    <li>Blocknummer des Termins </li>
+    <li>Event-ID des Termins </li>
+    <li>Kennzeichen für ein Serientermin (0=kein Serientermin oder 1=Serientermin) </li>
+    <li>Startzeitpunkt im ISO 8601 Format </li>
+    <li>Status des Events </li>
+    <li>den Text in Description (entspricht dem Feld Beschreibung im Synology Kalender WebUI) bzw. den Text in Summary 
+        falls Description nicht gesetzt ist </li>
+   </ul>
+   <br>
+   
+  Der Event <b>compositeBlockNumbers</b> enthält die Blocknummern aller Termine des Kalenders. Sind keine Termine vorhanden, enthält 
+  dieser Event nur den Wert <b>none</b>. 
+    
+  </ul>
  
 </ul>
 
