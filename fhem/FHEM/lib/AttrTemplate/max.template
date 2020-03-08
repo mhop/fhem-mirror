@@ -1,0 +1,90 @@
+######################################################################
+# $Id: $
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry:
+#   name: line,
+#   one optional filter: line
+#   zero or more par: lines
+#   FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+######################################################################
+
+######################################################################
+name:MAX_HeatingThermostat_1
+filter:devtype=(1|2)
+desc:To configure a HeatingThermostat
+order:M1
+par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_heizungsthermostat") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_HeatingThermostat_1") }
+par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
+par:ACT;ACT as set, defaults to MAX;{ AttrVal("DEVICE","actCycle","1:0") }
+par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1") }
+par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
+attr DEVICE icon ICON
+attr DEVICE comment COMMENT
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow \
+ok:measure_battery_100@green low:measure_battery_0@red \
+(0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
+attr DEVICE stateFormat mode\
+battery\
+rferror\
+Activity
+attr DEVICE webCmd temperature:desiredTemperature:valveposition
+attr DEVICE webCmdLabel Ist<br>:Soll<br>:Ventil<br>
+attr DEVICE widgetOverride valveposition:slider,0,1,100 temperature:selectnumbers,15,0.1,29,1,lin
+attr DEVICE debug DEBUG
+attr DEVICE actCycle ACT
+attr DEVICE autosaveConfig CONFIG
+attr DEVICE event-on-change-reading EOCR
+#set DEVICE attrTemplate speech_recognition_type_thermostate
+######################################################################
+
+######################################################################
+name:MAX_WallMountedThermostat_1
+filter:devtype=(3|7)
+desc:To configure a WallMountedThermostat
+order:M2
+par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_wandthermostat") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_WallMountedThermostat_1") }
+par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
+par:ACT;ACT as set, defaults to MAX;{ AttrVal("DEVICE","actCycle","0:15") }
+par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1") }
+par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
+attr DEVICE icon ICON
+attr DEVICE comment COMMENT
+attr DEVICE debug DEBUG
+attr DEVICE actCycle ACT
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow \
+ok:measure_battery_100@green low:measure_battery_0@red \
+(0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
+attr DEVICE stateFormat mode\
+battery\
+rferror\
+Activity
+attr DEVICE webCmd temperature:desiredTemperature
+attr DEVICE webCmdLabel Ist<br>:Soll<br>
+attr DEVICE widgetOverride temperature:selectnumbers,15,0.1,29,1,lin
+attr DEVICE autosaveConfig CONFIG
+attr DEVICE event-on-change-reading EOCR
+#set DEVICE attrTemplate speech_recognition_type_thermostate
+######################################################################
+
+######################################################################
+name:MAX_ShutterContac_1
+filter:devtype=(4|6)
+desc:To configure a ShutterContact
+order:M3
+par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","hm-sec-win") }
+par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_ShutterContact_1") }
+par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
+attr DEVICE icon ICON
+attr DEVICE comment COMMENT
+attr DEVICE debug DEBUG
+attr DEVICE event-on-change-reading EOCR
+attr DEVICE devStateIcon closed:fts_window_1w opened:fts_window_1w_open
+######################################################################
