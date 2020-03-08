@@ -707,20 +707,24 @@ sub parse {
 	<a name="GSIattr"></a>
 	<b>Attributes</b>
 	<ul>
-    	<a name="cmdStateIcon"></a>
-    	<li>cmdStateIcon<br>
-    		preset to the function
-    		<ul><li><code>{GSI::devStateIcon($name)}</code></li></ul>
-    		and can be advanced to 
-    		<ul><li><code>{GSI::devStateIcon($name,'other_valid_svg_icon_name')}</code></li></ul>
-    		The icon will be colored based on share of renewable energy (GSI) available:
-    		<ul>
-    			<li>0..39: black</li>
-    			<li>40..59: orange</li>
-    			<li>60..100: green</li>
-			</ul><br>
+		<a name="cmdStateIcon"></a>
+		<li>cmdStateIcon<br>
+			preset to the function
+			<ul><li><code>{GSI::devStateIcon($name)}</code></li></ul>
+			and can be advanced to 
+			<ul><li><code>{GSI::devStateIcon($name,'other_valid_svg_icon_name')}</code></li></ul>
+			The icon will be colored based on share of renewable energy (GSI) available:
+			<ul>
+				<li>0..39: black</li>
+				<li>40..59: orange</li>
+				<li>60..100: green</li>
+			</ul>
 		</li>
-	</ul>
+		<a name="continuous"></a>
+		<li>continuous<br>
+			if set to 0 readings will be updated on hourly base. Otherwise readings will be continuously updated with interpolated values.
+		</li>
+	</ul><br>
 
 	<a name="GSIschedule"></a>
 	<b>Consumption schedule</b>
