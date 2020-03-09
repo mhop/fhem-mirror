@@ -267,31 +267,41 @@ sub WaterCalculator_Get($@)
 	### If not enough arguments have been provided
 	if ( @a < 2 )
 	{
-		return "\"get WaterCalculator\" needs at least one argument";
+		return "\"set WaterCalculator\" needs at least one argument";
 	}
 		
 	my $WaterCalcName = shift @a;
 	my $reading  = shift @a;
-	my $value; 
+	my $value = join(" ", @a);
 	my $ReturnMessage;
+	my @cList;
 
-	if(!defined($hash->{helper}{gets}{$reading}))
-	{
-		my @cList = keys %{$hash->{helper}{gets}};
-		return "Unknown argument $reading, choose one of " . join(" ", @cList);
+	### Create Log entries for debugging
+	Log3 $WaterCalcName, 5, $WaterCalcName. "_Get - reading         : " . $reading;
+	Log3 $WaterCalcName, 5, $WaterCalcName. "_Get - value           : " . $value;
 
-		### Create Log entries for debugging
-		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - get list: " . join(" ", @cList);
+	
+	if(defined($hash->{READINGS})) {
+		push(@cList, " "); 
+		push(@cList, keys(%{$hash->{READINGS}}));
 	}
+	else {
+		push(@cList, " "); 
+	}
+
+	### Create Log entries for debugging
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set list: " . join(" ", @cList);
+
+	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';	
 	
 	if ( $reading ne "?")
 	{
 		### Write current value
 		$value = ReadingsVal($WaterCalcName,  $reading, undef);
-		
+
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - get " . $reading . " with value: " . $value;
-
+	
 		### Create ReturnMessage
 		$ReturnMessage = $value;
 	}
@@ -315,17 +325,65 @@ sub WaterCalculator_Set($@)
 	my $reading  = shift @a;
 	my $value = join(" ", @a);
 	my $ReturnMessage;
+	my @cList;
 
-	if(!defined($hash->{helper}{gets}{$reading})) 
-	{
-		my @cList = keys %{$hash->{helper}{sets}};
-		return "Unknown argument $reading, choose one of " . join(" ", @cList);
+	### Create Log entries for debugging
+	Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - reading         : " . $reading;
+	Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - value           : " . $value;
 
-		### Create Log entries for debugging
-		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set list: " . join(" ", @cList);
-	}
 	
-	if ( $reading ne "?")
+	if(defined($hash->{READINGS})) {
+		push(@cList, "SyncCounter"); 
+		push(@cList, keys(%{$hash->{READINGS}}));
+	}
+	else {
+		push(@cList, "SyncCounter"); 
+	}
+
+	### Create Log entries for debugging
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set list: " . join(" ", @cList);
+
+	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';
+
+	### If the command supposed to synchronize the CounterValues between CounterModule and CalculatorModule
+	if ($reading eq "SyncCounter") {
+		### Create Log entries for debugging
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - Syncing Counter with :" . $value;
+		
+		### Sreach for the ReadingsName of the Current CounterValue
+		my @SearchResult = grep(/_CounterCurrent/, @cList);
+
+		### Get current CalculatorValue
+		my $CalculaterValueCurrent = ReadingsVal($WaterCalcName, $SearchResult[0], 0); 
+		
+		### Get current Offset from Attribute
+		my $CounterOffsetCurrent =  AttrVal($WaterCalcName, "WaterCounterOffset", 0);
+
+		### Calculate CounterValue
+		my $CounterValueCurrent = $CalculaterValueCurrent - $CounterOffsetCurrent;
+		
+		### Calculate new Offset
+		my $CounterOffsetNew = $value - $CounterValueCurrent;
+
+		### Calculate Ceck
+#		my $CounterValueNew = $CounterValueCurrent + $CounterOffsetNew;
+		
+		### Create Log entries for debugging
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - Search Result               : " . Dumper(@SearchResult);
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Given  : " . $value;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueCurrent  Result : " . $CalculaterValueCurrent;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetCurrent Result : " . $CounterOffsetCurrent;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueCurrent  Result : " . $CounterValueCurrent;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetNew     Result : " . $CounterOffsetNew;
+#		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Check  : " . $CounterValueNew;
+
+		### Set new Offset in Attributes
+		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
+
+		### Create ReturnMessage
+		$ReturnMessage = $WaterCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
+	}
+	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set " . $reading . " with value: " . $value;
@@ -959,8 +1017,9 @@ sub WaterCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				The set - function sets individual values for example to correct values after power loss etc.<BR>
-				The set - function works only for readings which have been stored in the CalculatorDevice.<BR>
+				The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>
 				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
+				The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1477,8 +1536,9 @@ sub WaterCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
-				Die set - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
+				Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>
 				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
+				Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR>
 		</ul>
 	</td></tr>
 </table>
