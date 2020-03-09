@@ -57,7 +57,7 @@ option:TYPE=siri
 option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 option:TYPE=gassistant
 
-name:speech_recognition_type_thermostate
+name:speech_recognition_type_thermostat
 filter:NAME=speechrecognTesting
 order:100005
 desc:template to set speech recognition attributes for genericDeviceType thermostat
@@ -115,6 +115,6 @@ filter:NAME=speechrecognTesting
 order:1000020c
 desc:generic template to set speech recognition attribute alexaName; only intented for internal use by speech_recognition_alaxaName_secondrun, called e.g. with set xy attrTemplate speech_recognition_alaxaName_ask_different_name ALEXANAME=myAlexaName
 option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
-par:ALEXANAME;Please enter alexaName (the one provided last time seem to exist already);{undef) } 
+par:ALEXANAME;Please enter alexaName (the one provided last time seem to exist already);{ undef } 
 attr DEVICE alexaName ALEXANAME
 set DEVICE attrTemplate speech_recognition_alaxaName_secondrun ALEXAISNAME=ALEXANAME
