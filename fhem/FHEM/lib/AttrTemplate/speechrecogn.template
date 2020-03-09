@@ -1,5 +1,5 @@
 ###########################################
-# $Id: speechrecogn.template first version 2020-02-28 Beta-User $
+# $Id$
 #
 # This file provides add-on templates for use with speech recognistion modules 
 # Originally developped for mqtt2-device, see forum thread here: https://forum.fhem.de/index.php/topic,99195.0.html
