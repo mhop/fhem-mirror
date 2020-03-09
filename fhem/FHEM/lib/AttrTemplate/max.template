@@ -14,8 +14,8 @@
 ######################################################################
 
 ######################################################################
-name:MAX_HeatingThermostat_1
-filter:devtype=(1|2)
+name:MAX_HeatingThermostat_dark
+filter:TYPE=MAX:filter:devtype=(1|2)
 desc:To configure a HeatingThermostat
 order:M1
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_heizungsthermostat") }
@@ -44,8 +44,8 @@ set DEVICE attrTemplate speech_recognition_type_thermostat
 ######################################################################
 
 ######################################################################
-name:MAX_WallMountedThermostat_1
-filter:devtype=(3|7)
+name:MAX_WallMountedThermostat_dark
+filter:TYPE=MAX:filter:devtype=(3|7)
 desc:To configure a WallMountedThermostat
 order:M2
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_wandthermostat") }
@@ -74,8 +74,8 @@ set DEVICE attrTemplate speech_recognition_type_thermostat
 ######################################################################
 
 ######################################################################
-name:MAX_ShutterContac_1
-filter:devtype=(4|6)
+name:MAX_ShutterContac_dark
+filter:TYPE=MAX:filter:devtype=(4|6)
 desc:To configure a ShutterContact
 order:M3
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","hm-sec-win") }
