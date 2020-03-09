@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  98_todoist: UTF in project title for Unicode Icons and Umlauts
  - bugfix:  36_Vallox: Fixed MultiReading Issue
  - feature: 70_BRAVIA: add requestReboot (thx schnakker)
  - change:  57_SSCal: commandref reviewed
