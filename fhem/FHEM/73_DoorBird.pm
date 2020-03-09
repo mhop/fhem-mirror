@@ -3010,20 +3010,11 @@ sub DoorBird_Transmit_Audio($$) {
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - New Filesize            : " . $AudioDataSizeNew;
 
 		### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
-		my $UrlPrefix 		= "http://" . $Url . "/bha-api/";
-		my $UrlPostfix;
-		
-		### If the Session ID has been activated
-		if ($hash->{helper}{SessionIdSec} > 0) {
-			$UrlPostfix 	= " sessionid=" . $hash->{helper}{SessionId} . " content-type=\"audio/basic\" use-content-length=true";			
-		}
-		### If the Session ID has NOT been activated use username and password instead
-		else {
-			my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
-			my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
-			$UrlPostfix 	= " content-type=\"audio/basic\" use-content-length=true user=". $username . " passwd=" . $password;
-		}
-		my $CommandURL 		= $UrlPrefix . "audio-transmit.cgi" . $UrlPostfix;
+		my $UrlPrefix 	= "http://" . $Url . "/bha-api/";
+		my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+		my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+		my $UrlPostfix 	= " content-type=\"audio/basic\" use-content-length=true user=". $username . " passwd=" . $password;
+		my $CommandURL 	= $UrlPrefix . "audio-transmit.cgi" . $UrlPostfix;
 
 		### Log Entry for debugging purposes
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - CommandURL              : " . $CommandURL ;
