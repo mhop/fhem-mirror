@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  12_OilFox: package FHEM::OilFox
  - bugfix:  73_DoorBird: SessionId does not work with TransmitAudio
  - feature: 73_WaterCalculator: New set command to synchronize Counters
  - feature: 73_GasCalculator: New set command to synchronize Counters

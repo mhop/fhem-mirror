@@ -23,7 +23,7 @@
 #
 ####################################################################################################
 
-package main;
+package FHEM::OilFox;
 
 use strict;
 use warnings;
@@ -32,17 +32,57 @@ use JSON;
 use HttpUtils;
 use Blocking;
 use Data::Dumper;
+use GPUtils qw(GP_Import);
 
 use constant API => "https://api.oilfox.io/v3/";
 
-sub OilFox_Initialize($) {
+BEGIN {
+    GP_Import(
+        qw(
+          readingFnAttributes
+          readingsSingleUpdate
+          readingsBeginUpdate
+          readingsEndUpdate
+          readingsBulkUpdate
+          deviceEvents
+          defs
+          HttpUtils_NonblockingGet
+          modules
+          attr
+          AttrVal
+          InternalTimer
+          RemoveInternalTimer
+          Log3
+          strftime)
+    );
+}
+
+sub _Export {
+    no strict qw/refs/;
+    my $pkg  = caller(0);
+    my $main = $pkg;
+    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+    foreach (@_) {
+        *{ $main . $_ } = *{ $pkg . '::' . $_ };
+    }
+}
+
+_Export(
+    qw(
+      Initialize
+      )
+);
+
+
+
+sub Initialize($) {
     my ($hash) = @_;
     
-    $hash->{SetFn}      = "OilFox_Set";
-    $hash->{DefFn}      = "OilFox_Define";
-    $hash->{UndefFn}    = "OilFox_Undef";
-    $hash->{NotifyFn} 	= "OilFox_Notify";
-    $hash->{AttrFn}     = "OilFox_Attr";
+    $hash->{SetFn}      = "FHEM::OilFox::Set";
+    $hash->{DefFn}      = "FHEM::OilFox::Define";
+    $hash->{UndefFn}    = "FHEM::OilFox::Undef";
+    $hash->{NotifyFn} 	= "FHEM::OilFox::Notify";
+    $hash->{AttrFn}     = "FHEM::OilFox::Attr";
     $hash->{AttrList}   = "email " .
                           "password " .
                           "oilfox " .
@@ -50,7 +90,7 @@ sub OilFox_Initialize($) {
                           $readingFnAttributes;
 }
 
-sub OilFox_Define($$){
+sub Define($$){
     my ( $hash, $def ) = @_;
     my @a = split( "[ \t]+", $def );
     my $name = $a[0];
@@ -81,22 +121,22 @@ sub OilFox_Define($$){
     
     $attr{$name}{room} = "OilFox" if( !defined( $attr{$name}{room} ) );
     
-    OilFox_CONNECTED($hash,'initialized');
+    CONNECTED($hash,'initialized');
 
-    OilFox_DoUpdate($hash);
+    DoUpdate($hash);
 
     return undef;
 
 }
 
-sub OilFox_Set($@) {
+sub Set($@) {
     my ($hash,@a) = @_;
     return "\"set $hash->{NAME}\" needs at least an argument" if ( @a < 2 );
     my ($name,$setName,$setVal,$setVal2,$setVal3) = @a;
 
     Log3 $name, 3, "$name: set called with $setName " . ($setVal ? $setVal : "") if ($setName ne "?");
 
-    if (OilFox_CONNECTED($hash) eq 'disabled' && $setName !~ /clear/) {
+    if (CONNECTED($hash) eq 'disabled' && $setName !~ /clear/) {
         return "Unknown argument $setName, choose one of clear:all,readings";
         Log3 $name, 3, "$name: set called with $setName but device is disabled!" if ($setName ne "?");
         return undef;
@@ -110,20 +150,20 @@ sub OilFox_Set($@) {
 
     if ($setName eq 'update') {
         RemoveInternalTimer($hash);
-        OilFox_DoUpdate($hash);
+        DoUpdate($hash);
     }
     
     return undef;
 }
 
-sub OilFox_Notify($$) {
+sub Notify($$) {
     
     my ($hash,$dev) = @_;
     my ($name) = ($hash->{NAME});
     
     if (AttrVal($name, "disable", 0)) {
         Log3 $name, 5, "Device '$name' is disabled, do nothing...";
-        OilFox_CONNECTED($hash,'disabled');
+        CONNECTED($hash,'disabled');
         return undef;
     }
 
@@ -143,29 +183,29 @@ sub OilFox_Notify($$) {
             or grep /^DEFINED.$name$/,@{$events}
             or grep /^MODIFIED.$name$/,@{$events}
         ) {
-            OilFox_APIAuth($hash);
+            APIAuth($hash);
         }
     } 
     
     if ( $devtype eq 'OilFox') {
         if ( grep(/^state:.authenticated$/, @{$events}) ) {
-            OilFox_get($hash);
+            get($hash);
         }
         
         if ( grep(/^state:.disconnected$/, @{$events}) ) {
             Log3 $name, 3, "Reconnecting...";
-            OilFox_APIAuth($hash);
+            APIAuth($hash);
         }
         
         if ( grep(/^state:.connected$/, @{$events}) ) {
-            OilFox_DoUpdate($hash);
+            DoUpdate($hash);
         }
     }
             
     return undef;
 }
 
-sub OilFox_Attr(@) {
+sub Attr(@) {
     
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
@@ -214,14 +254,14 @@ sub OilFox_Attr(@) {
             unless($attrVal > 0);
             $hash->{OilFox}->{interval} = $attrVal;
             RemoveInternalTimer($hash);
-            InternalTimer( time() + $hash->{OilFox}->{interval}, "OilFox_DoUpdate", $hash);
+            InternalTimer( time() + $hash->{OilFox}->{interval}, "FHEM::OilFox::DoUpdate", $hash);
             Log3 $name, 3, "$name - set interval: $attrVal";
         }
 
         elsif( $cmd eq "del" ) {
             $hash->{OilFox}->{interval} = 300;
             RemoveInternalTimer($hash);
-            InternalTimer( time() + $hash->{OilFox}->{interval}, "OilFox_DoUpdate", $hash);
+            InternalTimer( time() + $hash->{OilFox}->{interval}, "FHEM::OilFox::DoUpdate", $hash);
             Log3 $name, 3, "$name - deleted interval and set to default: 300";
         }
     }
@@ -230,7 +270,7 @@ sub OilFox_Attr(@) {
 }
 
 
-sub OilFox_Undef($$){
+sub Undef($$){
     my ( $hash, $arg )  = @_;
     my $name            = $hash->{NAME};
     my $deviceId        = $hash->{DEVICEID};
@@ -240,7 +280,7 @@ sub OilFox_Undef($$){
 }
 
 
-sub OilFox_APIAuth($) {
+sub APIAuth($) {
     my ($hash, $def) = @_;
     my $name = $hash->{NAME};
     
@@ -260,18 +300,18 @@ sub OilFox_APIAuth($) {
         method     	=> "POST",
         header     	=> $header,  
         data 		=> $json,
-        callback   	=> \&OilFox_APIAuthResponse,
+        callback   	=> \&APIAuthResponse,
     });  
     
 }
 
-sub OilFox_APIAuthResponse($) {
+sub APIAuthResponse($) {
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
 
     if($err ne "") {
-        OilFox_CONNECTED($hash,'error');
+        CONNECTED($hash,'error');
         Log3 $name, 2, "error while requesting ".$param->{url}." - $err";     
                                            
     } elsif($data ne "") {
@@ -283,7 +323,7 @@ sub OilFox_APIAuthResponse($) {
         }
             
         if ($result->{errors}) {
-            OilFox_CONNECTED($hash,'error');
+            CONNECTED($hash,'error');
             Log3 $name, 2, "Error: " . $result->{errors}[0]->{detail};
             
         } else {
@@ -299,7 +339,7 @@ sub OilFox_APIAuthResponse($) {
             readingsBulkUpdate($hash,'expires',$expire_date );
             readingsEndUpdate($hash, 1);
             
-            OilFox_CONNECTED($hash,'authenticated');
+            CONNECTED($hash,'authenticated');
 
         }
         
@@ -307,7 +347,7 @@ sub OilFox_APIAuthResponse($) {
 
 }
 
-sub OilFox_CONNECTED($@) {
+sub CONNECTED($@) {
     my ($hash,$set) = @_;
     if ($set) {
        $hash->{OilFox}->{CONNECTED} = $set;
@@ -328,30 +368,30 @@ sub OilFox_CONNECTED($@) {
     }
 }
 
-sub OilFox_DoUpdate($) {
+sub DoUpdate($) {
     my ($hash) = @_;
     my ($name) = $hash->{NAME};
 
     Log3 $name, 5, "doUpdate() called.";
 
-    if (OilFox_CONNECTED($hash) eq "disabled") {
+    if (CONNECTED($hash) eq "disabled") {
         Log3 $name, 3, "$name - Device is disabled.";
         return undef;
     }
 
     if (time() >= $hash->{OilFox}->{expires} ) {
         Log3 $name, 2, "LOGIN TOKEN MISSING OR EXPIRED";
-        OilFox_CONNECTED($hash,'disconnected');
+        CONNECTED($hash,'disconnected');
 
     } elsif ($hash->{OilFox}->{CONNECTED} eq 'connected') {
         Log3 $name, 4, "Update with device: " . $hash->{OilFox}->{oilfox_hwid} . " Interval:". $hash->{OilFox}->{interval};
-        OilFox_get($hash);
-        InternalTimer( time() + $hash->{OilFox}->{interval}, "OilFox_DoUpdate", $hash);
+        get($hash);
+        InternalTimer( time() + $hash->{OilFox}->{interval}, "FHEM::OilFox::DoUpdate", $hash);
     } 
 
 }
 
-sub OilFox_get($) {
+sub get($) {
     my ($hash) = @_;
     my ($name) = $hash->{NAME};
 
@@ -364,13 +404,13 @@ sub OilFox_get($) {
         hash       	=> $hash,
         method     	=> "GET",
         header     	=> $header,  
-        callback   	=> \&OilFox_getResponse,
+        callback   	=> \&getResponse,
     });  
     
     return undef;
 }
 
-sub OilFox_getResponse($) {
+sub getResponse($) {
     
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
@@ -385,7 +425,7 @@ sub OilFox_getResponse($) {
             Log3 $name, 2, "Please register OilFox first";
             $hash->{OilFox}->{oilfox_hwid} = "none";
 
-            OilFox_CONNECTED($hash,'connected');
+            CONNECTED($hash,'connected');
 
         } else {
 
@@ -411,7 +451,7 @@ sub OilFox_getResponse($) {
             $hash->{OilFox}->{oilfox_metering_currentOilHeight} = $myoilfox->{'metering'}->{'currentOilHeight'};
             $hash->{OilFox}->{oilfox_metering_battery} = $myoilfox->{'metering'}->{'battery'};
        
-            OilFox_CONNECTED($hash,'connected');
+            CONNECTED($hash,'connected');
 
         }
         
