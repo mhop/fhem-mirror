@@ -40,7 +40,7 @@ attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-#set DEVICE attrTemplate speech_recognition_type_thermostate
+set DEVICE attrTemplate speech_recognition_type_thermostat
 ######################################################################
 
 ######################################################################
@@ -70,7 +70,7 @@ attr DEVICE webCmdLabel Ist<br>:Soll<br>
 attr DEVICE widgetOverride temperature:selectnumbers,15,0.1,29,1,lin
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-#set DEVICE attrTemplate speech_recognition_type_thermostate
+set DEVICE attrTemplate speech_recognition_type_thermostat
 ######################################################################
 
 ######################################################################

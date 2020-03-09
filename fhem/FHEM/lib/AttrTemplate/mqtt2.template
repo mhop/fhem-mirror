@@ -2199,7 +2199,7 @@ attr DEVICE setStateList on off
 attr DEVICE stateFormat mode\
 desired-temp °C
 attr DEVICE webCmd mode:desired-temp
-set DEVICE attrTemplate speech_recognition_type_thermostate
+set DEVICE attrTemplate speech_recognition_type_thermostat
 attr DEVICE model ems-esp_thermostat_simple
 
 name:ems-esp_thermostat_RC35_type
@@ -2213,7 +2213,7 @@ attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mod
   daytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_daytemp1 $EVTPART1\
   nighttemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_nighttemp1 $EVTPART1\
   holidaytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_holidayttemp1 $EVTPART1
-set DEVICE attrTemplate speech_recognition_type_thermostate
+set DEVICE attrTemplate speech_recognition_type_thermostat
 attr DEVICE model ems-esp_thermostat_RC35_type
 
 
