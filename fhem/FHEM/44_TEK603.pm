@@ -49,7 +49,7 @@ sub TEK603_Initialize($) {
 	$hash->{DefFn}		= 'TEK603_define';
 	$hash->{UndefFn}	= 'TEK603_undef';
 
-	$hash->{AttrList}	= 'do_not_notify:0,1 dummy:1,0 loglevel:0,1,2,3,4,5,6 ' .
+	$hash->{AttrList}	= 'do_not_notify:0,1 dummy:1,0 disable:1,0 loglevel:0,1,2,3,4,5,6 ' .
 				   $readingFnAttributes;
 }
 
@@ -91,6 +91,8 @@ sub TEK603_doInit($) {
 	my $po = $hash->{USBDev};
 	my $dev = $hash->{DeviceName};
 	my $name = $hash->{NAME};
+
+	return if (IsDisabled($name));
 
 	# Wenn / enthalten ist ist es kein ser2net-Device, daher initialisieren
 	if ($dev =~ m/\//)
@@ -139,7 +141,8 @@ sub TEK603_undef($$) {
 
 sub TEK603_ready($) {
 	my ($hash) = @_;
-
+	my $name = $hash->{NAME};
+	return if (IsDisabled($name));
 	return DevIo_OpenDev($hash, 1, 'TEK603_doInit') if($hash->{STATE} eq 'disconnected');
 
 	# This is relevant for windows/USB only
@@ -151,6 +154,7 @@ sub TEK603_ready($) {
 sub TEK603_read($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	return if (IsDisabled($name));
 
 	my $buf = DevIo_SimpleRead($hash);
 	return '' if(!defined($buf));
