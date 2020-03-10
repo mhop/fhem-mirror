@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.32.3"  => "10.03.2020  better logfile messages in some cases of index operation  ",
   "8.32.2"  => "01.03.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 again ",
   "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
   "8.32.0"  => "29.01.2020  new option \"deleteOther\" for minValue ",
@@ -1804,7 +1805,7 @@ sub DbRep_dbConnect($$) {
           $dbpassword = $admpassword;
       } else {
           $err = "Can't use admin credentials for database access, see logfile !";
-          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database access, but can't use it");
+          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database operation, but are not set or can't read it");
 		  return $err;
       }
   }
@@ -6613,6 +6614,9 @@ sub DbRep_Index($) {
           $p = 1;
       }
   }
+  
+  Log3 ($name, 2, "DbRep $name - user \"$dbuser\" doesn't have rights \"INDEX\" and \"ALTER\" as needed - try use adminCredentials automatically !") 
+     if($p);
   
   ($err,$dbh) = DbRep_dbConnect($name,$p);
   if ($err) {
