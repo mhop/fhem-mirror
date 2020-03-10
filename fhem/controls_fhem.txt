@@ -1,4 +1,4 @@
-REV 21384
+REV 21403
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-09_07:45:03 328849 ./CHANGED
+UPD 2020-03-10_07:45:03 329349 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -105,6 +105,7 @@ UPD 2018-04-29_07:45:04 25762 FHEM/11_OWX_TCP.pm
 UPD 2018-05-30_07:45:03 10823 FHEM/12_HMS.pm
 UPD 2019-11-21_07:45:03 13688 FHEM/12_HProtocolGateway.pm
 UPD 2019-11-21_07:45:03 5493 FHEM/12_HProtocolTank.pm
+UPD 2020-03-10_07:45:03 16203 FHEM/12_OilFox.pm
 UPD 2019-08-18_07:45:03 15242 FHEM/13_KS300.pm
 UPD 2016-10-27_07:45:10 29342 FHEM/14_CUL_MAX.pm
 UPD 2019-01-21_07:45:02 10452 FHEM/14_CUL_REDIRECT.pm
@@ -259,7 +260,7 @@ UPD 2017-12-02_07:45:02 14583 FHEM/44_S7_DRead.pm
 UPD 2017-12-02_07:45:02 17913 FHEM/44_S7_DWrite.pm
 UPD 2017-11-29_07:45:02 20344 FHEM/44_S7_S5Client.pm
 UPD 2017-11-28_07:45:03 34206 FHEM/44_S7_S7Client.pm
-UPD 2019-11-21_07:45:03 8085 FHEM/44_TEK603.pm
+UPD 2020-03-10_07:45:03 8220 FHEM/44_TEK603.pm
 UPD 2019-12-21_07:45:03 54781 FHEM/45_Plugwise.pm
 UPD 2019-12-23_07:45:02 27480 FHEM/45_TRX.pm
 UPD 2018-11-08_07:45:05 30506 FHEM/46_Aqicn.pm
@@ -390,14 +391,14 @@ UPD 2020-01-23_07:45:05 16143 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-08-26_07:45:03 162302 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
 UPD 2020-02-28_07:45:03 310973 FHEM/73_AutoShuttersControl.pm
-UPD 2020-03-01_07:45:02 182828 FHEM/73_DoorBird.pm
-UPD 2020-03-02_07:45:03 93058 FHEM/73_ElectricityCalculator.pm
+UPD 2020-03-10_07:45:03 182498 FHEM/73_DoorBird.pm
+UPD 2020-03-10_07:45:03 96019 FHEM/73_ElectricityCalculator.pm
 UPD 2020-02-28_07:45:03 42853 FHEM/73_GardenaSmartBridge.pm
-UPD 2020-03-02_07:45:03 83933 FHEM/73_GasCalculator.pm
+UPD 2020-03-10_07:45:03 86662 FHEM/73_GasCalculator.pm
 UPD 2018-01-09_07:45:03 87372 FHEM/73_MPD.pm
 UPD 2020-01-17_07:45:03 40841 FHEM/73_NUKIBridge.pm
 UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
-UPD 2020-03-02_07:45:03 86835 FHEM/73_WaterCalculator.pm
+UPD 2020-03-10_07:45:03 89613 FHEM/73_WaterCalculator.pm
 UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
 UPD 2019-10-25_07:45:03 69268 FHEM/74_AMADDevice.pm
 UPD 2020-02-28_07:45:03 45619 FHEM/74_GardenaSmartDevice.pm
@@ -565,7 +566,7 @@ UPD 2020-02-07_07:45:02 33533 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2020-02-20_07:45:03 20548 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
-UPD 2020-01-25_07:45:03 89366 FHEM/98_todoist.pm
+UPD 2020-03-10_07:45:03 89436 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
@@ -650,10 +651,10 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-02-08_07:45:04 52372 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-03-09_07:45:03 4335 FHEM/lib/AttrTemplate/max.template
-UPD 2020-03-09_07:45:03 191674 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-10_07:45:03 4433 FHEM/lib/AttrTemplate/max.template
+UPD 2020-03-10_07:45:03 191672 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-09_07:45:03 5073 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2020-03-09_07:45:03 6630 FHEM/lib/AttrTemplate/speechrecogn.template
+UPD 2020-03-10_07:45:03 7617 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -750,12 +751,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-03-09_07:45:07 4230257 docs/commandref.html
-UPD 2020-03-09_07:45:09 2629395 docs/commandref_DE.html
+UPD 2020-03-10_07:45:07 4232448 docs/commandref.html
+UPD 2020-03-10_07:45:09 2630156 docs/commandref_DE.html
 UPD 2020-03-06_07:45:03 79890 docs/commandref_frame.html
 UPD 2020-03-06_07:45:03 89680 docs/commandref_frame_DE.html
-UPD 2020-03-09_07:45:10 231274 docs/commandref_modular.html
-UPD 2020-03-09_07:45:11 242291 docs/commandref_modular_DE.html
+UPD 2020-03-10_07:45:11 231441 docs/commandref_modular.html
+UPD 2020-03-10_07:45:12 242469 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
