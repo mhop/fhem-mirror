@@ -1,4 +1,4 @@
-REV 21403
+REV 21406
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-10_07:45:03 329349 ./CHANGED
+UPD 2020-03-11_07:45:03 329502 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -400,7 +400,7 @@ UPD 2020-01-17_07:45:03 40841 FHEM/73_NUKIBridge.pm
 UPD 2019-12-20_07:45:03 89496 FHEM/73_PRESENCE.pm
 UPD 2020-03-10_07:45:03 89613 FHEM/73_WaterCalculator.pm
 UPD 2018-12-19_07:45:02 118391 FHEM/73_km200.pm
-UPD 2019-10-25_07:45:03 69268 FHEM/74_AMADDevice.pm
+UPD 2020-03-11_07:45:03 69300 FHEM/74_AMADDevice.pm
 UPD 2020-02-28_07:45:03 45619 FHEM/74_GardenaSmartDevice.pm
 UPD 2018-03-22_07:45:04 41340 FHEM/74_HOMBOT.pm
 UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
@@ -461,7 +461,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-02-01_07:45:04 427342 FHEM/93_DbLog.pm
-UPD 2020-03-02_07:45:03 865165 FHEM/93_DbRep.pm
+UPD 2020-03-11_07:45:03 865439 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
@@ -755,8 +755,8 @@ UPD 2020-03-10_07:45:07 4232448 docs/commandref.html
 UPD 2020-03-10_07:45:09 2630156 docs/commandref_DE.html
 UPD 2020-03-06_07:45:03 79890 docs/commandref_frame.html
 UPD 2020-03-06_07:45:03 89680 docs/commandref_frame_DE.html
-UPD 2020-03-10_07:45:11 231441 docs/commandref_modular.html
-UPD 2020-03-10_07:45:12 242469 docs/commandref_modular_DE.html
+UPD 2020-03-11_07:45:10 231441 docs/commandref_modular.html
+UPD 2020-03-11_07:45:11 242469 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
