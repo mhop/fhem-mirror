@@ -211,6 +211,23 @@ AttrTemplate_Set($$@)
     return join("\n", @hlp);
   }
 
+  if($entry eq "checkPar") {
+    my @ret;
+    foreach $entry (sort keys %templates) {
+      my $h = $templates{$entry};
+      for my $k (@{$h->{pars}}) {
+        my ($parname, $comment, $perl_code) = split(";",$k,3);
+        nex if(!$perl_code);
+        $perl_code =~ s/(?<!\\)DEVICE/bla/g;
+        $perl_code =~ s/\\DEVICE/DEVICE/g;
+        my $ret = eval $perl_code;
+        push @ret,"$entry:$parname:$@" if($@);
+      }
+    }
+    return "No errors found" if (!@ret);
+    return join("\n", @ret);
+  }
+
   my $h = $templates{$entry};
   return "Unknown template_entry_name $entry" if(!$h);
 
@@ -245,7 +262,8 @@ AttrTemplate_Set($$@)
       $perl_code =~ s/(?<!\\)DEVICE/$name/g;
       $perl_code =~ s/\\DEVICE/DEVICE/g;
       my $ret = eval $perl_code;
-      return "Error checking template regexp: $@" if($@);
+      return "ERROR executing perl-code $perl_code for param $parname: $@ "
+                if($@);
       if(defined($ret)) {
         $repl{$parname} = $ret;
         next;
