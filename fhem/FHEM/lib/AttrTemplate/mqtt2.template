@@ -655,18 +655,6 @@ deletereading -q DEVICE (?!associatedWith).*
 set IO_DEV publish CMNDTOPIC/Restart 1
 attr DEVICE autocreate 0
 
-name:tasmota_prefix_clearing_and_reboot
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Applies to all tasmota devices <br>NOTE: This template will delete some readings and clear the readingList from prefix use when expanding json. <br>When applying the template the tasmota device is rebooted to get all readings
-order:A_01x1
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
-par:READINGLISTCLEARED;cleared from prefixes;{ AttrVal("DEVICE","readingList","") =~ s/, '[^_]+[_]'/, ''/g, ? $1 : undef }
-attr DEVICE readingList READINGLISTCLEARED
-deletereading -q DEVICE (?!associatedWith).*
-set IO_DEV publish CMNDTOPIC/Restart 1
-attr DEVICE autocreate 0
-
 # tasmota device with one relay, one motion sensor via switch
 name:tasmota_1ch+motion+SI7021
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
@@ -1010,6 +998,141 @@ attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
 
+# 4-way multi socket 3AC+USB device flashed with Tasmota.
+# Tested with Power Strip Hyleton 333, please see <a href="https://templates.blakadder.com/hyleton_333.html">Tasmota Template Repository</a>
+# contributed by joelinux, https://forum.fhem.de/index.php/topic,94495.msg1031089.html#msg1031089
+name:tasmota_3socketUSB_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:4 channel device flashed with Tasmota. <br>NOTE: Tested with 4-way Power Strip Hyleton 333, please see <a href="https://templates.blakadder.com/hyleton_333.html">Tasmota Template Repository</a><br>NOTE: a second, third and fourth device will be created for each additional channel.<br>NOTE: Please wait some seconds to allow Tasmota Device to complete reboot.
+order:A_04_4base
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
+par:LONGITUDE;Read longitude set in FHEM;{ AttrVal("global","longitude","8.686")}
+par:LATITUDE;Read latitude set in FHEM;{ AttrVal("global","latitude","50.112")}
+par:ALTITUDE;Read altitude set in FHEM;{ AttrVal("global","altitude","0")}
+par:BUTTONRULE;Suggest Tasmota Button Rule for Power Strip;{ q/rule on button1#state=3 do backlog power1 2; power2 2; power3 2; power4 2 endon on button1#state=2 do backlog power1 1; power2 1; power3; power4 1 endon/ }
+par:JSONSUPPRESS;Tasmota reading pairs to suppress;"LedTable:0 SaveData:0 Scheme:0 SetOption26:0 ANALOG_A0:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Module:0 Version:0 FallbackTopic:0 GroupTopic:0 WebServerMode:0 Hostname:Hostname RestartReason:0 Time:0 Uptime:0 UptimeSec:0 Heap:0 SleepMode:0 Sleep:0 LoadAvg:0 MqttCount:0 Wifi_AP:0 Wifi_SSId:0 Wifi_BSSId:0 Wifi_Channel:0 Wifi_RSSI:0 Wifi_Signal:0 Wifi_LinkCount:0 Wifi_Downtime:0 subscriptions:0 Status_ButtonRetain:0 Status_ButtonTopic:0 Status_LedMask:0 Status_LedState:0 Status_Module:0 Status_Power:0 Status_PowerOnState:0 Status_PowerRetain:0 Status_SaveData:0 Status_SaveState:0 Status_SensorRetain:0 Status_SwitchMode_1:0 Status_SwitchMode_2:0 Status_SwitchMode_3:0 Status_SwitchMode_4:0 Status_SwitchMode_5:0 Status_SwitchMode_6:0 Status_SwitchMode_7:0 Status_SwitchRetain:0 Status_SwitchTopic:0 Status_Topic:0"
+# Do some cleanup to eventually rerun apply template process
+deletereading -q DEVICE (?!associatedWith).*
+# delete DEVICE_CH2
+# delete DEVICE_CH3
+# delete DEVICE_USB
+# prime Tasmota device
+set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
+# additional settings to aid speech recognition to detect capabilities properly
+set DEVICE attrTemplate speech_recognition_type_switch
+# add some attributes to make your new device looking great
+attr DEVICE icon ICON
+attr DEVICE comment Admin Info and Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, and DEVICE_USB
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE event-on-change-reading .*
+attr DEVICE stateFormat LWT\
+state\
+<a href="http://IPAddress" target="_blank">IPAddress</a>
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER1:.* state\
+  STATTOPIC/POWER2:.* POWER2\
+  STATTOPIC/POWER3:.* POWER3\
+  STATTOPIC/POWER4:.* POWER4\
+  CMNDTOPIC/POWER:.* POWER
+attr DEVICE setList\
+  off:noArg CMNDTOPIC/POWER1 0\
+  on:noArg CMNDTOPIC/POWER1 1\
+  toggle:noArg CMNDTOPIC/POWER1 2\
+  x_Reboot:noArg CMNDTOPIC/restart 1\
+  x_Status:noArg CMNDTOPIC/Status\
+  x_setOtaUrl:http://thehackbox.org/tasmota/release/tasmota-DE.bin CMNDTOPIC/OtaUrl $EVTPART1\
+  x_upgrade:noArg   CMNDTOPIC/upgrade 1\
+  x_ShowHostname:noArg CMNDTOPIC/Backlog setoption53 1; Status;\
+  x_DisableBlinkLED:noArg CMNDTOPIC/Backlog LEDPower 0; setoption31 1; Status;\
+  x_SaveData:0,1 CMNDTOPIC/savedata $EVTPART1\
+  x_Configuration CMNDTOPIC/$EVTPART1 $EVTPART2\
+  x_RuleButton:noArg CMNDTOPIC/BUTTONRULE\
+  x_RuleEnable:noArg CMNDTOPIC/Backlog setoption1 1; setoption32 15; rule1 1\
+  x_Location:noArg CMNDTOPIC/Backlog Latitude LATITUDE; Longitude LONGITUDE; Altitude ALTITUDE\
+  x_NTPServer:multiple,fritz.box CMNDTOPIC/ntpserver $EVTPART1
+# we want state to represent 1st channel.
+attr DEVICE jsonMap POWER1:state Dimmer:pct
+attr DEVICE userReadings formatedUptime:state_UptimeSec.* { my $m = ReadingsVal($name,"state_UptimeSec",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m }
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_USB
+#
+# create devices for 2nd, 3rd and 4th channel
+copy DEVICE DEVICE_CH2
+attr DEVICE_CH2 setStateList on off toggle
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_USB
+#
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_USB
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_USB
+setreading DEVICE_USB associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
+# set attributes specific for 3rd channel
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE_CH3 and DEVICE_USB
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE_CH2 and DEVICE_USB
+attr DEVICE_USB comment Channel 4 (USB) for DEVICE, see also DEVICE_CH2 and DEVICE_CH3
+#
+attr DEVICE_CH2 setList \
+  off:noArg    CMNDTOPIC/POWER2 0\
+  on:noArg     CMNDTOPIC/POWER2 1\
+  toggle:noArg CMNDTOPIC/POWER2 2
+attr DEVICE_CH3 setList \
+  off:noArg    CMNDTOPIC/POWER3 0\
+  on:noArg     CMNDTOPIC/POWER3 1\
+  toggle:noArg CMNDTOPIC/POWER3 2
+attr DEVICE_USB setList \
+  off:noArg    CMNDTOPIC/POWER4 0\
+  on:noArg     CMNDTOPIC/POWER4 1\
+  toggle:noArg CMNDTOPIC/POWER4 2
+#
+attr DEVICE_CH2 readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
+  STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER2:.* state
+attr DEVICE_CH3 readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
+  STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER3:.* state
+attr DEVICE_USB readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
+  STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/POWER4:.* state
+#
+# we want state to represent 2nd channel.
+# keep all POWERx readings to allow period tele/STATE messages to update relay state reading
+# Suppress all other readings on split device. These readings are visible on first device only.
+# Tasmota version upgrades are likely to add/remove readings. So some unwanted ones may appear on second device after such upgrade
+attr DEVICE_CH2 jsonMap POWER2:state POWER1:0 POWER3:0 POWER4:0 POWER5:0 JSONSUPPRESS
+#
+# we want state to represent 3rd channel.
+attr DEVICE_CH3 jsonMap POWER3:state POWER1:0 POWER2:0 POWER4:0 POWER5:0 JSONSUPPRESS
+#
+# we want state to represent 4th (USB) channel.
+attr DEVICE_USB jsonMap POWER4:state POWER1:0 POWER2:0 POWER3:0 POWER5:0 JSONSUPPRESS
+# USB channel gets a unique icon
+attr DEVICE_USB icon rc_USB
+#finally set the model attr for all new devices and do a reboot of device
+set IO_DEV publish CMNDTOPIC/status
+set IO_DEV publish CMNDTOPIC/restart 1
+set DEVICE_CH2 attrTemplate speech_recognition_general_naming_master_template
+set DEVICE_CH3 attrTemplate speech_recognition_general_naming_master_template
+set DEVICE_USB attrTemplate speech_recognition_general_naming_master_template
+farewell:Template has been applied successfully. Wait some seconds for reboot to complete and watch readings get populated.
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB model tasmota_3socketUSB_channel_split
+
+
 # tasmota 4ch as one FHEM device.
 name:tasmota_4ch_unified_icon
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1232,11 +1355,9 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? undef :{"saturation"=>$2} : undef }\
   STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
 attr DEVICE webCmd pct:CT
-
 attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",undef,"pct","state")}
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speech_recognition_type_light
