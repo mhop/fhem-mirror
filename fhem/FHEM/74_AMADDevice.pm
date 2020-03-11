@@ -277,7 +277,6 @@ sub Define($$) {
 
     $iodev = $hash->{IODev}->{NAME};
 
-#     $hash->{VERSIONFLOWSET} = FHEM::Meta::Get( $defs{$iodev}, 'x_flowsetversion' );
     $hash->{VERSIONFLOWSET} = $defs{$iodev}->{VERSIONFLOWSET};
 
     my $d = $modules{AMADDevice}{defptr}{$amad_id};
@@ -358,7 +357,7 @@ sub Attr(@) {
                     "AMADDevice ($name) - set remoteServer to other" );
             }
 
-            $hash->{MODEL}  = $attrVal;
+            $hash->{MODEL} = $attrVal;
             $hash->{DEF} =
               $hash->{HOST} . ' ' . $hash->{AMAD_ID} . ' ' . $attrVal;
         }
@@ -509,6 +508,12 @@ sub GetUpdate($) {
         statusRequest($hash);
         checkDeviceState($hash);
 
+    }
+    elsif ( AttrVal( $bname, 'fhemServerIP', 'not set' ) ne 'not set' ) {
+
+        Log3( $name, 1,
+"AMADDevice ($name) - GetUpdate, attribut fhemServerIP not set in bridge device"
+        );
     }
     else {
 
@@ -784,7 +789,7 @@ sub Set($$@) {
         my $openurl = join( ' ', @args );
         my $browser = AttrVal( $name, 'setOpenUrlBrowser',
             'com.android.chrome|com.google.android.apps.chrome.Main' );
-        my ($bapp,$bappclass) = split( /\|/, $browser );
+        my ( $bapp, $bappclass ) = split( /\|/, $browser );
 
         $path .=
             'openURL?url='
@@ -818,15 +823,10 @@ sub Set($$@) {
     }
 
     elsif ( lc $cmd eq 'openapp' ) {
-#         my $app = join( ' ', @args );
-        my ($app,$appclass) = split( /\|/, $args[0] );
+        my ( $app, $appclass ) = split( /\|/, $args[0] );
 
-        $path .=
-            'openApp?app='
-          . $app;
-        $path .=
-            '&appclass='
-          . $appclass
+        $path .= 'openApp?app=' . $app;
+        $path .= '&appclass=' . $appclass
           if ( defined($appclass) );
 
         $method = 'POST';
@@ -1689,7 +1689,7 @@ sub CreateChangeBtDeviceValue($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v4.4.7",
+  "version": "v4.4.8",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

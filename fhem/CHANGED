@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  74_AMADDevice: add logreport is attribut fhemServerIP not set
  - change:  93_DbRep: better logfile messages in some cases of index operation
  - feature: 44_TEK603: new attribute "disable" 
  - change:  12_OilFox: package FHEM::OilFox
