@@ -82,6 +82,8 @@ attr DEVICE setList\
   log_level:debug,info,warn,error $\DEVICETOPIC/bridge/config/log_level $EVTPART1\
   permit_join:true,false $\DEVICETOPIC/bridge/config/permit_join $EVTPART1\
   remove:textField $\DEVICETOPIC/bridge/config/remove $EVTPART1\
+  ota_update:textField $\DEVICETOPIC/bridge/ota_update/update $EVTPART1\
+  ota_update_check:textField $\DEVICETOPIC/bridge/ota_update/check $EVTPART1\
   y_device_setting:textField $\DEVICETOPIC/$EVTPART1/set {"$EVTPART2": "$EVTPART3"}\
   x_bind:textField $\DEVICETOPIC/bridge/bind/$EVTPART1 $EVTPART2\
   x_bind_unbind:textField $\DEVICETOPIC/bridge/unbind/$EVTPART1 $EVTPART2\
@@ -1049,7 +1051,7 @@ attr DEVICE setList\
   toggle:noArg CMNDTOPIC/POWER1 2\
   x_Reboot:noArg CMNDTOPIC/restart 1\
   x_Status:noArg CMNDTOPIC/Status\
-  x_setOtaUrl:http://thehackbox.org/tasmota/release/tasmota-DE.bin CMNDTOPIC/OtaUrl $EVTPART1\
+  x_setOtaUrl:multiple,http://thehackbox.org/tasmota/release/tasmota-DE.bin CMNDTOPIC/OtaUrl $EVTPART1\
   x_upgrade:noArg   CMNDTOPIC/upgrade 1\
   x_ShowHostname:noArg CMNDTOPIC/Backlog setoption53 1; Status;\
   x_DisableBlinkLED:noArg CMNDTOPIC/Backlog LEDPower 0; setoption31 1; Status;\
