@@ -33,7 +33,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.12";
+my $version = "0.9.13";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -280,7 +280,7 @@ sub WUup_send($) {
 
             if ( $attr{$name}{unit_solarradiation} eq "lux" ) {
                 Log3 $name, 5, "WUup ($name) - solarradiation unit is lux";
-                $value = ( $value / 126.7 );
+                $value = UConv::lux2wpsm( $value, $rnd );
             }
             else {
                 Log3 $name, 5, "WUup ($name) - solarradiation unit is W/m²";
@@ -378,6 +378,7 @@ sub WUup_receive($) {
 # 2019-07-04 replaced link to API documentation
 # 2019-07-05 add Meta support
 # 2019-07-09 add WIKI to Meta data
+# 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
 #
 ################################################################################
 
