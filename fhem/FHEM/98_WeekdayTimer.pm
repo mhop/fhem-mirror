@@ -4,7 +4,7 @@
 #     98_WeekdayTimer.pm
 #     written by Dietmar Ortmann
 #     modified by Tobias Faust
-#     Maintained by igami since 02-2018
+#     Maintained by Beta-User since 11-2019
 #     Thanks Dietmar for all you did for FHEM, RIP
 #
 #     This file is part of fhem.
@@ -978,6 +978,11 @@ sub WeekdayTimer_FensterOffen ($$$) {
 
   my $nextRetry = time()+55+int(rand(10));
   my $epoch = $hash->{profil}{$time}{EPOCH};
+  unless ($epoch) {                             #prevent FHEM crashing when profile is somehow damaged or incomlete, forum #109164
+    my $actual_wp_reading = ReadingsVal($name,"weekprofiles","none");
+    Log3 $hash, 0, "[$name] profile $actual_wp_reading, item $time seems to be somehow damaged or incomlete!";
+    $epoch = int(time()) - 10*MINUTESECONDS;
+  }
   my $delay = int(time()) - $epoch;
   my $nextDelay = int($delay/60.+1.5)*60;  # round to multiple of 60sec
   $nextRetry = $epoch + $nextDelay;
