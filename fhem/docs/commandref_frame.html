@@ -1509,7 +1509,8 @@ The following local attributes are used by a wider range of devices:
     <a name="blockingCallMax"></a>
     <li>blockingCallMax<br>
         Limit the number of parallel running processes started by the
-        BlockingCall FHEM helper routine. Useful on limited hardware.
+        BlockingCall FHEM helper routine. Useful on limited hardware, default
+        is 32. If the limit is reached, further calls are delayed.
     </li><br>
 
     <a name="configfile"></a>
@@ -1780,6 +1781,7 @@ The following local attributes are used by a wider range of devices:
     undefined device.</li>
     <li>MODIFIED &lt;defspec&gt;</br> after a device modification.</li>
     <li>UPDATE</br> after an update is completed.</li>
+    <li>CANNOT_FORK</br>if BlockingCall encounters this problem.</li>
   </ul>
 
 

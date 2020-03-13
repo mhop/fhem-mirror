@@ -1608,7 +1608,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <li>blockingCallMax<br>
         Begrenzt die Anzahl der parallel laufenden Prozesse, die von der
         BlockingCall FHEM Hilfsroutine gestartet wurden. Sinnvoll auf weniger
-        leistungsfaehigen Hardware.
+        leistungsfaehigen Hardware, die Voreinstellung ist 32. Nach erreichen
+        dieser Grenze werden weitere Aufrufe verz&ouml;gert.
     </li><br>
 
     <a name="configfile"></a>
@@ -1914,6 +1915,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <li>MODIFIED &lt;defspec&gt;<br>nach &Auml;nderung einer
     Ger&auml;tedefinition.</li>
     <li>UPDATE<br>nach Abschluss eines Updates.</li>
+    <li>CANNOT_FORK<br>falls in BlockingCall dieses Problem auftritt.</li>
   </ul>
 
 
