@@ -427,13 +427,17 @@ sub DoorBird_Attr(@)
 			### Check whether SessionIdSec is 0 = disabled
 			if ($a[3] == int($a[3]) && ($a[3] == 0)) {
 				### Save attribute as internal
-				$hash->{helper}{SessionIdSec}  = 0;
+				$hash->{helper}{SessionIdSec} = 0;
+				$hash->{helper}{SessionId}    = 0;
 			}
 			### If KeepAliveTimeout is numeric and greater than 9s
 			elsif ($a[3] == int($a[3]) &&  ($a[3] > 9)) {
 
 				### Save attribute as internal
-				$hash->{helper}{SessionIdSec}  = $a[3];
+				$hash->{helper}{SessionIdSec} = $a[3];
+
+				### Obtain SessionId
+				DoorBird_RenewSessionID($hash);
 
 				### Re-Initiate the timer
 				InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
@@ -442,6 +446,9 @@ sub DoorBird_Attr(@)
 			else{
 				### Save standard interval as internal
 				$hash->{helper}{SessionIdSec}  = 540;
+				
+				### Obtain SessionId
+				DoorBird_RenewSessionID($hash);
 				
 				### Re-Initiate the timer
 				InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
@@ -452,6 +459,9 @@ sub DoorBird_Attr(@)
 			### Save standard interval as internal
 			$hash->{helper}{SessionIdSec}  = 540;
 			
+			### Obtain SessionId
+			DoorBird_RenewSessionID($hash);
+				
 			### Re-Initiate the timer
 			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
 		}
@@ -641,7 +651,7 @@ sub DoorBird_Get($@)
 	
 	### If DoorBird has a Camera installed
 	if ($hash->{helper}{CameraInstalled} == true) {
-		$usage .= "Image_Request:noArg History_Request:noArg "
+		$usage .= "Image_Request:noArg History_Request:noArg Video_Request "
 	}
 	### If DoorBird has NO Camera installed
 	else {
@@ -658,10 +668,20 @@ sub DoorBird_Get($@)
 		### Call Subroutine and hand back return value
 		return DoorBird_Info_Request($hash, $option);
 	}
-	### LIVE IMAGE REQUEST
+	### IMAGE REQUEST
 	elsif ($command eq "Image_Request") {
 		### Call Subroutine and hand back return value
 		return DoorBird_Image_Request($hash, $option);
+	}
+	### VIDEO REQUEST
+	elsif ($command eq "Video_Request") {
+		my $VideoDuration = 10;
+		### If the duration has been given use it. Otherwise use 10s
+		if ( $optionString == int($optionString) and $optionString eq int($optionString) and $optionString > 0 ) {
+			$VideoDuration = $optionString;
+		}
+		### Call Subroutine and hand back return value
+		return DoorBird_Video_Request($hash, $VideoDuration, "manual", time());
 	}
 	### HISTORY IMAGE REQUEST
 	elsif ($command eq "History_Request") {
@@ -734,6 +754,7 @@ sub DoorBird_Set($@)
 	my $usage	= "Unknown argument, choose one of";
 		#$usage .= " Test";
 		$usage .= " Open_Door:" . join(",", @RelayAdresses) . " OpsMode:" . join(",", @OpsModeList) . " Restart:noArg Transmit_Audio";
+		$usage .= " Receive_Audio";
 
 	### If the OpsModeList is not empty
 	if ((defined(${$hash->{helper}{OpsModeList}}[0])) && (${$hash->{helper}{OpsModeList}}[0] ne "")) {
@@ -866,7 +887,6 @@ sub DoorBird_Set($@)
 		### Call Subroutine and hand back return value
 		return DoorBird_Light_On($hash, $option)	
 	}
-	
 	### RESTART
 	elsif ($command eq "Restart") {
 		### Call Subroutine and hand back return value
@@ -877,17 +897,15 @@ sub DoorBird_Set($@)
 		### Call Subroutine and hand back return value
 		return DoorBird_Live_Audio($hash, $option)	
 	}
-	### LIVE AUDIO TRANSMIT
+	### AUDIO RECEIVE
+	elsif ($command eq "Receive_Audio") {
+		### Call Subroutine and hand back return value
+		return DoorBird_Receive_Audio($hash, $option)	
+	}
+	### AUDIO TRANSMIT
 	elsif ($command eq "Transmit_Audio") {
 		### Call Subroutine and hand back return value
 		return DoorBird_Transmit_Audio($hash, $option)	
-	}
-	### TEST
-	elsif ($command eq "Test") {
-		### Call Subroutine and hand back return value
-		DoorBird_Video_Request($hash, 10, "doorbell_001", 1571506485);
-		
-		return;
 	}
 	### ADD OR CHANGE FAVORITE
 	### DELETE FAVORITE
@@ -2352,7 +2370,7 @@ sub DoorBird_Live_Video($$) {
 }
 ####END####### Define Subfunction for LIVE VIDEO REQUEST #######################################################END#####
 
-###START###### Define Subfunction for LIVE AUDIO REQUEST ######################################################START####
+###START###### Define Subfunction for LIVE VIDEO REQUEST ######################################################START####
 sub DoorBird_Live_Audio($$) {
 	my ($hash, $option)	= @_;
 
@@ -2361,7 +2379,7 @@ sub DoorBird_Live_Audio($$) {
 	my $url 			= $hash->{helper}{URL};
 	
 	### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
-	my $UrlPrefix 		= "http://" . $url . "/bha-api/";
+	my $UrlPrefix 		= "http://" . $url . "/bha-api/audio-receive.cgi";
 	my $UrlPostfix;
 	if ($hash->{helper}{SessionIdSec} > 0) {
 		$UrlPostfix 	= "?sessionid=" . $hash->{helper}{SessionId};
@@ -2371,7 +2389,7 @@ sub DoorBird_Live_Audio($$) {
 		my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
 		$UrlPostfix 	= "?http-user=". $username . "&http-password=" . $password;
 	}
-	my $AudioURL 		= $UrlPrefix . "audio-receive.cgi" . $UrlPostfix;
+	my $AudioURL 		= $UrlPrefix . $UrlPostfix;
 
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Live_Audio - AudioURL                    : " . $AudioURL ;
@@ -2402,6 +2420,7 @@ sub DoorBird_Live_Audio($$) {
 	return
 }
 ####END####### Define Subfunction for LIVE VIDEO REQUEST #######################################################END#####
+
 
 ###START###### Define Subfunction for LIVE IMAGE REQUEST ######################################################START####
 sub DoorBird_Image_Request($$) {
@@ -2947,7 +2966,7 @@ sub DoorBird_Light_On($$) {
 }
 ####END####### Define Subfunction for LIGHT ON #################################################################END#####
 
-###START###### Define Subfunction for LIVE AUDIO TRANSMIT #####################################################START####
+###START###### Define Subfunction for TRANSMIT AUDIO REQUEST ##################################################START####
 sub DoorBird_Transmit_Audio($$) {
 	my ($hash, $option)	= @_;
 	
@@ -3009,12 +3028,21 @@ sub DoorBird_Transmit_Audio($$) {
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - AudioLength in seconds  : " . $AudioLength;
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - New Filesize            : " . $AudioDataSizeNew;
 
-		### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
-		my $UrlPrefix 	= "http://" . $Url . "/bha-api/";
-		my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
-		my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
-		my $UrlPostfix 	= " content-type=\"audio/basic\" use-content-length=true user=". $username . " passwd=" . $password;
-		my $CommandURL 	= $UrlPrefix . "audio-transmit.cgi" . $UrlPostfix;
+				### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
+		my $UrlPrefix 	= "http://" . $Url . "/bha-api/audio-transmit.cgi";
+		my $UrlPostfix;
+		
+		### If SessionIdSec is enabled
+		if ($hash->{helper}{SessionIdSec} != 0) {
+			   $UrlPostfix 	= "?sessionid=" . $hash->{helper}{SessionId} . " content-type=\"audio/basic\" use-content-length=true";
+		}
+		### Id SessionID Security is disabled
+		else {
+			my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+			my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+			   $UrlPostfix 	= " content-type=\"audio/basic\" use-content-length=true user=" . $username . " passwd=" . $password;
+		}
+		my $CommandURL 	= $UrlPrefix . $UrlPostfix;
 
 		### Log Entry for debugging purposes
 		Log3 $name, 5, $name. " : DoorBird_Transmit_Audio - CommandURL              : " . $CommandURL ;
@@ -3051,7 +3079,89 @@ sub DoorBird_Transmit_Audio($$) {
 		return "The audio file: " . $AudioDataPathOrig . " does not exist!"
 	}
 }
-####END####### Define Subfunction for LIVE AUDIO TRANSMIT ######################################################END#####
+####END####### Define Subfunction for TRANSMIT AUDIO REQUEST ###################################################END#####
+
+###START###### Define Subfunction for RECEIVE AUDIO REQUEST ###################################################START####
+sub DoorBird_Receive_Audio($$) {
+	my ($hash, $option)	= @_;
+	
+	### Obtain values from hash
+	my $name				= $hash->{NAME};
+	my $Username 			= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+	my $Password			= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+	my $Url 				= $hash->{helper}{URL};
+	my $Sox					= $hash->{helper}{SOX};
+	my $AudioDataPathOrig	= $option;
+	
+	### For Test only
+	my $AudioLength = 7;
+	
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_Live_Audio  - ---------------------------------------------------------------";
+	
+	### If file does not exist already
+	if ((-e $AudioDataPathOrig) == false) {
+		### Create new filepath from old filepath
+		my $AudioDataNew;
+		my $AudioDataSizeNew;
+		my $AudioDataPathNew  = $AudioDataPathOrig;
+		   $AudioDataPathNew  =~ s/\..*//;
+		   $AudioDataPathNew .= ".mp3";
+
+		### Create complete command URL for DoorBird depending on whether SessionIdSecurity has been enabled (>0) or disabled (=0)
+		my $UrlPrefix 	= "http://" . $Url . "/bha-api/audio-receive.cgi";
+		my $UrlPostfix;
+		
+		### If SessionIdSec is enabled
+		if ($hash->{helper}{SessionIdSec} != 0) {
+			   $UrlPostfix 	= "?sessionid=" . $hash->{helper}{SessionId};
+		}
+		### Id SessionID Security is disabled
+		else {
+			my $username 	= DoorBird_credential_decrypt($hash->{helper}{".USER"});
+			my $password	= DoorBird_credential_decrypt($hash->{helper}{".PASSWORD"});
+			   $UrlPostfix 	= " user=" . $username . " passwd=" . $password;
+		}
+		my $CommandURL 	= $UrlPrefix . $UrlPostfix;
+
+
+		### Log Entry for debugging purposes
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - CommandURL              : " . $CommandURL ;
+
+		### Create the gst-lauch command
+		my $GstCommand  = "gst-launch-1.0 filesrc location=<"; 
+		   $GstCommand .= $CommandURL;
+		   $GstCommand .=  "> ! wavparse ! audioconvert ! lame ! filesink location=";
+		   $GstCommand .= $AudioDataPathNew;
+
+		### Log Entry for debugging purposes
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - GstCommand              : " . $GstCommand;
+
+		### Create command for shell
+		my $ShellCommand  = "timeout " . ($AudioLength + 3) . " " . $GstCommand . " &";
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - ShellCommand            : " . $ShellCommand;
+
+		### Pass shell command to shell and continue with the code below
+		eval {
+						system($ShellCommand) or die "Could not execute" . $ShellCommand . " ". $@;
+		};
+
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - File streamed successf. : " . $AudioDataPathOrig;
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - ---------------------------------------------------------------";
+		return "The audio file: " . $AudioDataPathOrig . " has been streamed to the DoorBird";
+	}
+	### If Filepath does not exist
+	else {
+		### Log Entry
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - Path doesn't exist      : " . $AudioDataPathOrig;
+		Log3 $name, 1, $name. " : DoorBird_Live_Audio - ---------------------------------------------------------------";
+		return "The audio file: " . $AudioDataPathOrig . " does not exist!"
+	}
+}
+####END####### Define Subfunction for RECEIVE VIDEO REQUEST ####################################################END#####
+
 
 ###START###### Define Subfunction for HISTORY IMAGE REQUEST ###################################################START####
 ### https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_NonblockingGet
@@ -3483,6 +3593,9 @@ sub DoorBird_Video_Request($$$$) {
 	}
 	elsif ($event =~ m/keypad/ ){
 		$ReadingVideo 			= "keypad_video";
+	}
+	elsif ($event =~ m/manual/ ){
+		$ReadingVideo 			= "manual_video";
 	}
 	else {
 		### Create Log entry
@@ -4221,6 +4334,7 @@ sub DoorBird_findNewestFWVersion($$$)
 	<table>
 		<tr><td><ul><code>get History_Request             </code></ul></td><td> : Downloads the pictures of the last events of the doorbell and motion sensor. (Refer to attribute <code>MaxHistory</code>)																						</td></tr>
 		<tr><td><ul><code>get Image_Request               </code></ul></td><td> : Downloads the current Image of the camera of DoorBird unit.																																					</td></tr>
+		<tr><td><ul><code>get Video_Request &lt;Value&gt; </code></ul></td><td> : Downloads the current Video of the camera of DoorBird unit for th etime in seconds given.																														</td></tr>
 		<tr><td><ul><code>get Info_Request                </code></ul></td><td> : Downloads the current internal setup such as relay configuration, firmware version etc. of the DoorBird unit. The obtained relay adresses will be used as options for the <code>Open_Door</code> command.		</td></tr>
 	</table>
 	<table>
@@ -4399,6 +4513,7 @@ sub DoorBird_findNewestFWVersion($$$)
 	<table>
 		<tr><td><ul><code>get History_Request             </code></ul></td><td> : L&auml;dt die Bilder der letzten Ereignisse durch die T&uuml;rklingel und dem Bewegungssensor herunter. (Siehe auch Attribut <code>MaxHistory</code>)</td></tr>
 		<tr><td><ul><code>get Image_Request               </code></ul></td><td> : L&auml;dt das gegenw&auml;rtige Bild der DoorBird - Kamera herunter.</td></tr>
+		<tr><td><ul><code>get Video_Request &lt;Value&gt; </code></ul></td><td> : L&auml;dt das gegenw&auml;rtige Video der DoorBird - Kamera f&uumlr die gegebene Zeit in Sekunden herunter.</td></tr>
 		<tr><td><ul><code>get Info_Request                </code></ul></td><td> : L&auml;dt das interne Setup (Firmware Version, Relais Konfiguration etc.) herunter. Die &uuml;bermittelten Relais-Adressen werden als Option f&uuml;r das Kommando <code>Open_Door</code> verwendet.</td></tr>
 	</table>
 	<table>
