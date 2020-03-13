@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.012
+#  Version 4.4.014
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -248,9 +248,6 @@ sub HMCCUCHN_Set ($@)
 	return "No set command specified" if (!defined ($opt));
 	$opt = lc($opt);
 
-	my $rocmds = "clear defaults:noArg";
-	my $rwcmds = "clear config control datapoint defaults:noArg values";
-	
 	# Get I/O device, check device state
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
@@ -278,16 +275,32 @@ sub HMCCUCHN_Set ($@)
 	# Get additional commands (including state commands)
 	my $roleCmds = HMCCU_GetSpecialCommands ($hash, $cc);
 	
+	my %pset = ('V' => 'VALUES', 'M' => 'MASTER', 'D' => 'MASTER');
 	my $cmdList = '';
+	my %valLookup;
 	foreach my $cmd (keys %$roleCmds) {
 		$cmdList .= " $cmd";
 		my @setList = split (/\s+/, $roleCmds->{$cmd});
 		foreach my $set (@setList) {
 			my ($ps, $dpt, $par) = split(/:/, $set);
-			if ($par !~ /^\?/) {
-				my @argList = split (',', $par);
-				$cmdList .= scalar(@argList) > 1 ? ":$par" : ":noArg";
+			my @argList = ();
+			if ($par =~ /^#/) {
+				my $adr = $ccuaddr;
+				$adr =~ s/:[0-9]{1,2}$//;
+				my $paramDef = HMCCU_GetParamDef ($ioHash, $adr, $pset{$ps}, $dpt);
+				if (defined($paramDef)) {
+					if ($paramDef->{TYPE} eq 'ENUM' && defined($paramDef->{VALUE_LIST})) {
+						$par = $paramDef->{VALUE_LIST};
+						$par =~ s/[ ]+/-/g;
+						@argList = split (',', $par);
+						while (my ($i, $e) = each(@argList)) { $valLookup{$pset{$ps}}{$dpt}{$e} = $i; }
+					}
+				}
 			}
+			elsif ($par !~ /^\?/) {
+				@argList = split (',', $par);
+			}
+			$cmdList .= scalar(@argList) > 1 ? ":$par" : ":noArg";
 		}
 	}
 	
@@ -343,23 +356,6 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetMultipleDatapoints ($hash, \%dpval);
 		return HMCCU_SetError ($hash, min(0, $rc));
 	}
-	elsif ($opt eq 'control') {
-		return HMCCU_SetError ($hash, -14) if ($cd eq '');
-		if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $cc, $cd, 2)) {
-			HMCCU_Trace ($hash, 2, "Set", "Invalid datapoint $cc $cd");
-			return HMCCU_SetError ($hash, -8);
-		}
-		my $objvalue = shift @$a;
-		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined ($objvalue));
-
-		$objvalue =~ s/\\_/%20/g;
-		$objvalue =~ HMCCU_Substitute ($objvalue, $stateVals, 1, undef, '');
-
-		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$ccuif.$ccuaddr.$cd" => $objvalue }
-		);
-		return HMCCU_SetError ($hash, min(0, $rc));
-	}
 	elsif ($opt eq 'toggle') {
 		return HMCCU_SetError ($hash, -15) if ($stateVals eq '');
 		return HMCCU_SetError ($hash, -12) if ($cc eq '');
@@ -400,11 +396,10 @@ sub HMCCUCHN_Set ($@)
 		my $i = 0;
 		foreach my $set (@setList) {
 			my ($ps, $dpt, $par) = split(/:/, $set);
-			$ps = $ps eq 'V' ? 'VALUES' : 'MASTER';
 		
 			return HMCCU_SetError ($hash, "Syntax error in definition of command $opt")
 				if (!defined($par));
-	      if (!HMCCU_IsValidParameter ($hash, $ccuaddr, $ps, $dpt)) {
+	      if (!HMCCU_IsValidParameter ($hash, $ccuaddr, $pset{$ps}, $dpt)) {
 	      	HMCCU_Trace ($hash, 2, "Set", "Invalid parameter $ps $dpt");
 				return HMCCU_SetError ($hash, -8);
 			}
@@ -416,8 +411,8 @@ sub HMCCUCHN_Set ($@)
 				if (!defined($value) && defined($parDef)) {
 					if ($parDef =~ /^[+-][0-9]+$/) {
 						return HMCCU_SetError ($hash, "Current value of $cc.$dpt not available")
-							if (!defined($hash->{hmccu}{dp}{"$cc.$dpt"}{$ps}{SVAL}));
-						$value = $hash->{hmccu}{dp}{"$cc.$dpt"}{$ps}{SVAL}+int($parDef);
+							if (!defined($hash->{hmccu}{dp}{"$cc.$dpt"}{$pset{$ps}}{SVAL}));
+						$value = $hash->{hmccu}{dp}{"$cc.$dpt"}{$pset{$ps}}{SVAL}+int($parDef);
 					}
 					else {
 						$value = $parDef;
@@ -428,7 +423,14 @@ sub HMCCUCHN_Set ($@)
 					if (!defined($value));
 			}
 			else {
-				$value = $par;
+				if (exists($valLookup{$ps}{$dpt})) {
+					return HMCCU_SetError ($hash, "Illegal value $par. Use one of ".join(',', keys %{$valLookup{$ps}{$dpt}}))
+						if (!exists($valLookup{$ps}{$dpt}{$par}));
+					$value = $valLookup{$ps}{$dpt}{$par};
+				}
+				else {
+					$value = $par;
+				}
 			}
 		
 			if ($opt eq 'pct' || $opt eq 'level') {
@@ -457,7 +459,7 @@ sub HMCCUCHN_Set ($@)
 				last;
 			}
 			else {
-				if ($ps eq 'VALUES') {
+				if ($ps eq 'V') {
 					my $no = sprintf ("%03d", $i);
 					$dpval{"$i.$ccuif.$ccuaddr.$dpt"} = $value;
 					$i++;
@@ -579,7 +581,7 @@ sub HMCCUCHN_Set ($@)
 	else {
 		my $retmsg = "clear defaults:noArg";
 		if ($hash->{readonly} ne 'yes') {
-			$retmsg .= " config control";
+			$retmsg .= " config";
 			$retmsg .= ':'.join(',', @states) if (scalar(@states) > 0);
 			$retmsg .= " datapoint".$cmdList;
 			$retmsg .= ' toggle:noArg' if (scalar(@states) > 0);

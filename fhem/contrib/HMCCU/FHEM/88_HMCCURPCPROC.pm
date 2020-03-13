@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.002
+#  Version 4.4.003
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -38,7 +38,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.001';
+my $HMCCURPCPROC_VERSION = '4.4.003';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -2342,7 +2342,8 @@ sub HMCCURPCPROC_Write ($$$$)
 		# Try to send events immediately. Put them in queue if send fails
 		my $rc = 0;
 		my $err = '';
-		if ($et ne 'ND' && $server->{hmccu}{ccuflags} !~ /queueEvents/) {
+#		if ($et ne 'ND' && $server->{hmccu}{ccuflags} !~ /queueEvents/) {
+		if ($server->{hmccu}{ccuflags} !~ /queueEvents/) {
 			($rc, $err) = HMCCURPCPROC_SendData ($server->{hmccu}{sockparent}, $ev);
 			HMCCU_Log ($name, 3, "SendData $ev $err") if ($rc == 0);
 		}
@@ -2429,23 +2430,30 @@ sub HMCCURPCPROC_NewDevicesCB ($$$)
 	my $devcount = scalar (@$a);
 	
 	HMCCU_Log ($name, 2, "$cb NewDevice received $devcount device and channel specifications");
-	
+
+	# Format:
+	# C/D|Address|Type|Version|Firmware|RxMode|Paramsets|
+	# LinkSourceRoles|LinkTargetRoles|Direction|Children|Parent|AESActive
+			
 	foreach my $dev (@$a) {
 		my $msg = '';
+		my $ps = ref($dev->{PARAMSETS}) eq 'ARRAY' ?
+			join(',', @{$dev->{PARAMSETS}}) : $dev->{PARAMSETS};
 		if (defined($dev->{PARENT}) && $dev->{PARENT} ne '') {
+			my $lsr = ref($dev->{LINK_SOURCE_ROLES}) eq 'ARRAY' ?
+				join(',', @{$dev->{LINK_SOURCE_ROLES}}) : $dev->{LINK_SOURCE_ROLES};
+			my $ltr = ref($dev->{LINK_TARGET_ROLES}) eq 'ARRAY' ?
+				join(',', @{$dev->{LINK_TARGET_ROLES}}) : $dev->{LINK_TARGET_ROLES};
 			$msg = "C|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}.
-				"|null|null|".join(',',@{$dev->{PARAMSETS}}).
-				"|".join(',',@{$dev->{LINK_SOURCE_ROLES}}).
-				"|".join(',',@{$dev->{LINK_TARGET_ROLES}})."|".$dev->{DIRECTION}.
+				"|null|null|".$ps."|".$lsr."|".$ltr."|".$dev->{DIRECTION}.
 				"|null|".$dev->{PARENT}."|".$dev->{AES_ACTIVE};
 		}
 		else {
 			# Wired devices do not have a RX_MODE attribute
 			my $rx = exists ($dev->{RX_MODE}) ? $dev->{RX_MODE} : 'null';
 			$msg = "D|".$dev->{ADDRESS}."|".$dev->{TYPE}."|".$dev->{VERSION}."|".
-				$dev->{FIRMWARE}."|".$rx."|".join(',',@{$dev->{PARAMSETS}}).
-				"|null|null|null".
-				"|".join(',',@{$dev->{CHILDREN}})."|null|null";
+				$dev->{FIRMWARE}."|".$rx."|".$ps."|null|null|null|".
+				join(',',@{$dev->{CHILDREN}})."|null|null";
 		}
 		HMCCURPCPROC_Write ($server, "ND", $cb, $msg);
 	}

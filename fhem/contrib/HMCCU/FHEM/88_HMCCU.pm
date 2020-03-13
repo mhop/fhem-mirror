@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCU.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.013
+#  Version 4.4.014
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -56,7 +56,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.4.013';
+my $HMCCU_VERSION = '4.4.014';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -8748,6 +8748,7 @@ sub HMCCU_GetDeviceStates ($)
 		'0.STICKY_UNREACH' => 'stickyUnreach', '0.UPDATE_PENDING' => 'updPending'
 	);
 	
+	my @stValKeys = ('0.LOWBAT', '0.UNREACH');
 	my %stVal = (
 		'0.LOWBAT' => '1|true:low,0|false:ok', '0.UNREACH' => '1|true:dead,0|false:alive'
 	);
@@ -8763,7 +8764,7 @@ sub HMCCU_GetDeviceStates ($)
 				$clHash->{hmccu}{dp}{$dp}{VALUES}{VAL} =~ /^(1|true)$/);
 		}
 		push @values, scalar(@state) > 0 ? join(',', @state) : 'ok';
-		foreach my $dp (keys %stVal) {
+		foreach my $dp (@stValKeys) {
 			if (exists($clHash->{hmccu}{dp}{$dp}) && exists($clHash->{hmccu}{dp}{$dp}{VALUES})&&
 				defined($clHash->{hmccu}{dp}{$dp}{VALUES}{SVAL})) {
 				push @values, $clHash->{hmccu}{dp}{$dp}{VALUES}{SVAL};
