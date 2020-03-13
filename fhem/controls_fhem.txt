@@ -1,4 +1,4 @@
-REV 21409
+REV 21413
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-11_07:45:03 329502 ./CHANGED
+UPD 2020-03-13_07:45:03 329579 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -321,7 +321,7 @@ UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2019-02-25_07:45:03 40604 FHEM/59_PROPLANTA.pm
 UPD 2018-01-27_07:45:02 43120 FHEM/59_Twilight.pm
-UPD 2019-07-10_07:45:02 22406 FHEM/59_WUup.pm
+UPD 2020-03-13_07:45:03 22488 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-02-05_07:45:03 50862 FHEM/59_Weather.pm
 UPD 2019-03-23_07:45:03 44752 FHEM/59_Wunderground.pm
@@ -526,7 +526,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2019-02-13_07:45:03 20746 FHEM/98_WOL.pm
-UPD 2019-12-17_07:45:03 63504 FHEM/98_WeekdayTimer.pm
+UPD 2020-03-13_07:45:03 63869 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -652,7 +652,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-03-12_07:45:02 52360 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-10_07:45:03 4433 FHEM/lib/AttrTemplate/max.template
-UPD 2020-03-12_07:45:02 199307 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-13_07:45:03 199467 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-09_07:45:03 5073 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-12_07:45:02 7237 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -755,8 +755,8 @@ UPD 2020-03-10_07:45:07 4232448 docs/commandref.html
 UPD 2020-03-10_07:45:09 2630156 docs/commandref_DE.html
 UPD 2020-03-06_07:45:03 79890 docs/commandref_frame.html
 UPD 2020-03-06_07:45:03 89680 docs/commandref_frame_DE.html
-UPD 2020-03-12_07:45:10 231441 docs/commandref_modular.html
-UPD 2020-03-12_07:45:11 242469 docs/commandref_modular_DE.html
+UPD 2020-03-13_07:45:11 231441 docs/commandref_modular.html
+UPD 2020-03-13_07:45:12 242469 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
