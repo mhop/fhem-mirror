@@ -1274,13 +1274,14 @@ sub EventProcessingRoommate($@) {
                             or $shutters->getShadingMode eq 'absent'
                         )
                         and (  $shutters->getStatus == $shutters->getClosedPos
-                            or $shutters->getStatus ==
-                            $shutters->getShadingPos )
+                            or $shutters->getStatus == $shutters->getSleepPos
+                            or $shutters->getStatus == $shutters->getShadingPos )
                       )
                     {
                         $shutters->setLastDrive(
                             (
-                                $shutters->getStatus == $shutters->getClosedPos
+                                (  $shutters->getStatus == $shutters->getClosedPos
+                                or $shutters->getStatus == $shutters->getSleepPos)
                                 ? 'roommate come home'
                                 : 'shading out'
                             )
@@ -1439,7 +1440,8 @@ sub EventProcessingResidents($@) {
             my $getModeDown = $shutters->getModeDown;
 
             if (
-                    $shutters->getStatus != $shutters->getClosedPos
+                    (  $shutters->getStatus != $shutters->getClosedPos
+                    or $shutters->getStatus != $shutters->getSleepPos )
                 and not $shutters->getIsDay
                 and $shutters->getRoommatesStatus eq 'none'
                 and (  $getModeDown eq 'home'
@@ -1502,7 +1504,8 @@ sub EventProcessingResidents($@) {
                     and not $shutters->getSelfDefenseAbsent
                     and $shutters->getSelfDefenseAbsentTimerrun );
 
-                if (    $shutters->getStatus == $shutters->getClosedPos
+                if (    (  $shutters->getStatus == $shutters->getClosedPos
+                        or $shutters->getStatus == $shutters->getSleepPos )
                     and $shutters->getIsDay )
                 {
                     $shutters->setHardLockOut('on')
@@ -1525,7 +1528,8 @@ sub EventProcessingResidents($@) {
                 }
             }
             elsif (
-                    $shutters->getStatus == $shutters->getClosedPos
+                    (  $shutters->getStatus == $shutters->getClosedPos
+                    or $shutters->getStatus == $shutters->getSleepPos )
                 and $shutters->getIsDay
                 and $shutters->getRoommatesStatus eq 'none'
                 and (  $getModeUp eq 'home'
@@ -7905,7 +7909,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.17",
+  "version": "v0.8.18",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix SleepPos conditions in residents
+                                    and roommates Fn
  - feature: 73_DoorBird: Manual Video_Request
  - change:  59_WUup: use UConv to calculate solarradiation from lux to W/m²
  - change:  74_AMADDevice: add logreport is attribut fhemServerIP not set
