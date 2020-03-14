@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.3.0"  => "13.03.2020  rename 'sendItem' to '1_sendItem', allow attachments ",
   "1.2.2"  => "07.02.2020  add new permanent error 410 'message too long' ",
   "1.2.1"  => "27.01.2020  replace \" H\" with \"%20H\" in payload due to problem in HttpUtils ",
   "1.2.0"  => "04.01.2020  check that Botname with type SSChatBot does exist and write Log if not ",
@@ -59,6 +60,8 @@ our %SSChatBot_vNotesIntern = (
 
 # Versions History extern
 our %SSChatBot_vNotesExtern = (
+  "1.3.0"  => "13.03.2020 The set command 'sendItem' was renamed to '1_sendItem' to avoid changing the botToken by chance. ".
+                          "Also attachments are allowed now in the '1_sendItem' command. ",
   "1.0.1"  => "11.12.2019 check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
   "1.0.0"  => "08.12.2019 initial "
 );
@@ -295,7 +298,7 @@ sub SSChatBot_Set($@) {
                  "listSendqueue:noArg ".
                  ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
                  "restartSendqueue:noArg ".
-                 "sendItem:textField-long "
+                 "1_sendItem:textField-long "
                  ;
   }
  
@@ -347,21 +350,23 @@ sub SSChatBot_Set($@) {
           return "SendQueue entry with index \"$prop\" deleted";
       }
   
-  } elsif ($opt eq "sendItem") {
+  } elsif ($opt eq "1_sendItem") {
       # einfachster Sendetext users="user1"
       # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
       return undef if(!$hash->{HELPER}{USERFETCHED});
-      my $cmd = join(" ", @a);
       my ($text,$users);
-      my $fileUrl = "";
-      my ($a,$h)  = parseParams($cmd);
+      my ($fileUrl,$attachment) = ("","");
+      # my $cmd = join(" ", @a);
+      my $cmd    = join(" ", map { $_ =~ s/\s//g; $_; } @a );
+      my ($a,$h) = parseParams($cmd);
       if($h) {
-          $text    = $h->{text}    if(defined $h->{text});
-          $users   = $h->{users}   if(defined $h->{users});
-          $fileUrl = $h->{fileUrl} if(defined $h->{fileUrl});
+          $text       = $h->{text}        if(defined $h->{text});
+          $users      = $h->{users}       if(defined $h->{users});
+          $fileUrl    = $h->{fileUrl}     if(defined $h->{fileUrl});
+		  $attachment = $h->{attachments} if(defined $h->{attachments});
       }
       
       if($a) {
@@ -387,7 +392,7 @@ sub SSChatBot_Set($@) {
            
           # Eintrag zur SendQueue hinzufügen
           # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
-          SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", "");
+          SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", $attachment);
       }
        
       SSChatBot_getapisites($name);
@@ -637,7 +642,7 @@ return;
 ######################################################################################
 sub SSChatBot_addQueue ($$$$$$$$) {
     my ($name,$opmode,$method,$userid,$text,$fileUrl,$channel,$attachment) = @_;
-    my $hash                = $defs{$name};
+    my $hash = $defs{$name};
     
     if(!$text && $opmode !~ /chatUserlist|chatChannellist/) {
         Log3($name, 2, "$name - ERROR - can't add message to queue: \"text\" is empty");
@@ -654,7 +659,7 @@ sub SSChatBot_addQueue ($$$$$$$$) {
    $data{SSChatBot}{$name}{sendqueue}{index}++;
    my $index = $data{SSChatBot}{$name}{sendqueue}{index};
    
-   Log3($name, 5, "$name - Add sendItem to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, userid: $userid");
+   Log3($name, 5, "$name - Add sendItem to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, attachment: $attachment, userid: $userid");
    
    my $pars = {'opmode'     => $opmode,   
                'method'     => $method, 
@@ -826,7 +831,7 @@ sub SSChatBot_getapisites_parse ($) {
    my $inport       = $hash->{INPORT};
    my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
 
-   my ($error,$errorcode,$chatexternalmaxver,$chatexternalpath);
+   my ($error,$errorcode,$success,$chatexternalmaxver,$chatexternalpath);
   
     if ($err ne "") {
 	    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -843,7 +848,7 @@ sub SSChatBot_getapisites_parse ($) {
 		
     } elsif ($myjson ne "") {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, my $success) = SSChatBot_evaljson($hash,$myjson);
+        ($hash, $success) = SSChatBot_evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
             SSChatBot_checkretry($name,1);       
@@ -974,9 +979,10 @@ sub SSChatBot_chatop ($) {
       
       $url  = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
       $url .= "&payload={";
-      $url .= "\"text\": \"$text\","        if($text);
-      $url .= "\"file_url\": \"$fileUrl\"," if($fileUrl);
-      $url .= "\"user_ids\": [$userid]"     if($userid);
+      $url .= "\"text\": \"$text\","          if($text);
+      $url .= "\"file_url\": \"$fileUrl\","   if($fileUrl);
+	  $url .= "\"attachments\": $attachment," if($attachment);
+      $url .= "\"user_ids\": [$userid]"       if($userid);
       $url .= "}";
    }
 
@@ -1034,7 +1040,7 @@ sub SSChatBot_chatop_parse ($) {
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        ($hash,$success,$myjson) = SSChatBot_evaljson($hash,$myjson);        
+        ($hash,$success) = SSChatBot_evaljson($hash,$myjson);        
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
             SSChatBot_checkretry($name,1);       
@@ -1569,7 +1575,8 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au,$arg) = ("","","","");
+  my ($command,$cr,$au,$arg,$callbackid,$actions) = ("","","","","","");
+  my $success;
   my @aul;
   my $state = "active";
   my $do    = 0;  
@@ -1590,12 +1597,13 @@ sub SSChatBot_CGI() {
 	  $args =~ s/&/" /g;
 	  $args =~ s/=/="/g;
 	  $args .= "\"";
-      
+	  
+	  $args     = urlDecode($args);
 	  my($a,$h) = parseParams($args);
 	  
       if (!defined($h->{botname})) {
-	        Log 1, "TYPE SSChatBot - ERROR - no Botname received";
-            return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
+	      Log 1, "TYPE SSChatBot - ERROR - no Botname received";
+          return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
       }
 	  
 	  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
@@ -1607,9 +1615,38 @@ sub SSChatBot_CGI() {
 	  
       $hash = $defs{$name};                                 # hash des SSChatBot Devices
 	  
+      # eine Antwort auf ein interaktives Objekt
+      if (defined($h->{payload})) {
+	      # ein Benutzer hat ein interaktives Objekt ausgelöst (Button). Die Datenfelder sind nachfolgend beschrieben:
+		  #   "actions":     Array des Aktionsobjekts, das sich auf die vom Benutzer ausgelöste Aktion bezieht
+		  #   "callback_id": Zeichenkette, die sich auf die Callback_id des Anhangs bezieht, in dem sich die vom Benutzer ausgelöste Aktion befindet
+		  #   "post_id"
+		  #   "token"
+		  #   "user": { "user_id","username" }
+		  my $pldata = $h->{payload};
+          (undef, $success) = SSChatBot_evaljson($hash,$pldata);
+          unless ($success) {
+              Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper($pldata)); 
+              return ("text/plain; charset=utf-8", "invalid JSON data received");
+          }
+          my $data = decode_json($pldata);
+          Log3($name, 5, "$name - received interactive object data:\n". Dumper $data);
+          
+          $h->{token}       = $data->{token};
+          $h->{post_id}     = $data->{post_id};
+          $h->{user_id}     = $data->{user}{user_id};
+          $h->{username}    = $data->{user}{username};
+          $h->{callback_id} = $data->{callback_id};
+          $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
+                              "name: ".$data->{actions}[0]{name}.", ". 
+                              "value: ".$data->{actions}[0]{value}.", ". 
+                              "text: ".$data->{actions}[0]{text}.", ". 
+                              "style: ".$data->{actions}[0]{style};
+      }	  
+	  
       if (!defined($h->{token})) {
-            Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
-            return ("text/plain; charset=utf-8", "Insufficient data");
+          Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
+          return ("text/plain; charset=utf-8", "Insufficient data");
       }
       
       # CSRF Token check
@@ -1647,28 +1684,38 @@ sub SSChatBot_CGI() {
 	  #
 
 	  if ($h->{channel_id}) {
-	      $channelid = urlDecode($h->{channel_id});                           
+	      $channelid = $h->{channel_id};                           
           Log3($name, 4, "$name - channel_id received: ".$channelid);
       }	  
 	  
 	  if ($h->{channel_name}) {
-	      $channelname = urlDecode($h->{channel_name});                           
+	      $channelname = $h->{channel_name};                           
           Log3($name, 4, "$name - channel_name received: ".$channelname);
       }
 	  
 	  if ($h->{user_id}) {
-	      $userid = urlDecode($h->{user_id});                           
+	      $userid = $h->{user_id};                           
           Log3($name, 4, "$name - user_id received: ".$userid);
       }
 	  
 	  if ($h->{username}) {
-	      $username = urlDecode($h->{username});                           
+	      $username = $h->{username};                           
           Log3($name, 4, "$name - username received: ".$username);
       }
 	  
 	  if ($h->{post_id}) {
-	      $postid = urlDecode($h->{post_id});                           
+	      $postid = $h->{post_id};                           
           Log3($name, 4, "$name - postid received: ".$postid);
+      }
+      
+	  if ($h->{callback_id}) {
+	      $callbackid = $h->{callback_id};                           
+          Log3($name, 4, "$name - callback_id received: ".$callbackid);
+      }
+      
+	  if ($h->{actions}) {
+	      $actions = $h->{actions};                           
+          Log3($name, 4, "$name - actions received: ".$actions);
       }
 	  
 	  if ($h->{timestamp}) {
@@ -1677,7 +1724,7 @@ sub SSChatBot_CGI() {
 	  }
 	  
 	  if ($h->{text}) {
-	      $text = urlDecode($h->{text});                          
+	      $text = $h->{text};                          
           Log3($name, 4, "$name - text received: ".$text);
    
           if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
@@ -1786,6 +1833,8 @@ sub SSChatBot_CGI() {
       }
 
 	  readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "recActions",        $actions);  
+      readingsBulkUpdate  ($hash, "recCallbackId",     $callbackid);  
       readingsBulkUpdate  ($hash, "recChannelId",      $channelid);  
 	  readingsBulkUpdate  ($hash, "recChannelname",    $channelname); 
 	  readingsBulkUpdate  ($hash, "recUserId",         $userid); 
