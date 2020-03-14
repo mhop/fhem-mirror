@@ -725,14 +725,13 @@ set DEVICE attrTemplate tasmota_2channel_split
 set DEVICE attrTemplate tasmota_POW
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
-copy DEVICE DEVICE_CH2
 par:ICON;ICON as set, defaults to usb;{ AttrVal("DEVICE_CH2","icon","usb") }
 attr DEVICE_CH2 icon ICON
 attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
-set DEVICE_CH2 attrTemplate speech_recognition_type_switch
+#set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
 
 # plug with LED flashed with Tasmota.
@@ -892,6 +891,7 @@ attr DEVICE_CH2 setList \
   on:noArg     CMNDTOPIC/POWER2 1\
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
+set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
 
 #contributed by 87insane
