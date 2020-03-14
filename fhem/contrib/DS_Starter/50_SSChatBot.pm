@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions ",
   "1.3.0"  => "13.03.2020  rename 'sendItem' to '1_sendItem', allow attachments ",
   "1.2.2"  => "07.02.2020  add new permanent error 410 'message too long' ",
   "1.2.1"  => "27.01.2020  replace \" H\" with \"%20H\" in payload due to problem in HttpUtils ",
@@ -359,7 +360,6 @@ sub SSChatBot_Set($@) {
       return undef if(!$hash->{HELPER}{USERFETCHED});
       my ($text,$users);
       my ($fileUrl,$attachment) = ("","");
-      # my $cmd = join(" ", @a);
       my $cmd    = join(" ", map { $_ =~ s/\s//g; $_; } @a );
       my ($a,$h) = parseParams($cmd);
       if($h) {
@@ -1575,7 +1575,7 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au,$arg,$callbackid,$actions) = ("","","","","","");
+  my ($command,$cr,$au,$arg,$callbackid,$actions,$actval)                              = ("","","","","","","");
   my $success;
   my @aul;
   my $state = "active";
@@ -1714,8 +1714,10 @@ sub SSChatBot_CGI() {
       }
       
 	  if ($h->{actions}) {
-	      $actions = $h->{actions};                           
+	      $actions = $h->{actions};        
           Log3($name, 4, "$name - actions received: ".$actions);
+          $actions =~ m/^type: button.*value: (.*), text:.*$/;
+          $actval  = $1;
       }
 	  
 	  if ($h->{timestamp}) {
@@ -1834,7 +1836,8 @@ sub SSChatBot_CGI() {
 
 	  readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "recActions",        $actions);  
-      readingsBulkUpdate  ($hash, "recCallbackId",     $callbackid);  
+      readingsBulkUpdate  ($hash, "recCallbackId",     $callbackid); 
+      readingsBulkUpdate  ($hash, "recActionsValue",   $actval);                   
       readingsBulkUpdate  ($hash, "recChannelId",      $channelid);  
 	  readingsBulkUpdate  ($hash, "recChannelname",    $channelname); 
 	  readingsBulkUpdate  ($hash, "recUserId",         $userid); 
