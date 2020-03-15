@@ -891,7 +891,7 @@ attr DEVICE_CH2 setList \
   on:noArg     CMNDTOPIC/POWER2 1\
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
-set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
+#set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
 
 #contributed by 87insane
@@ -1128,9 +1128,9 @@ attr DEVICE_USB icon rc_USB
 #finally set the model attr for all new devices and do a reboot of device
 set IO_DEV publish CMNDTOPIC/status
 set IO_DEV publish CMNDTOPIC/restart 1
-set DEVICE_CH2 attrTemplate speech_recognition_general_naming_master_template
-set DEVICE_CH3 attrTemplate speech_recognition_general_naming_master_template
-set DEVICE_USB attrTemplate speech_recognition_general_naming_master_template
+#set DEVICE_CH2 attrTemplate speech_recognition_general_naming_master_template
+#set DEVICE_CH3 attrTemplate speech_recognition_general_naming_master_template
+#set DEVICE_USB attrTemplate speech_recognition_general_naming_master_template
 farewell:Template has been applied successfully. Wait some seconds for reboot to complete and watch readings get populated.
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB model tasmota_3socketUSB_channel_split
 
