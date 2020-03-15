@@ -71,6 +71,10 @@ sub WeekdayTimer_Define($$) {
   $hash->{NAME}            = $name;
   $hash->{DEVICE}          = $device;
   my $language = WeekdayTimer_Language  ($hash, \@a);
+
+  if ($def =~ /weekprofile/gm) { 
+    addToDevAttrList($name, "weekprofile");
+  }
   
   InternalTimer(time(), "WeekdayTimer_Start",$hash,0);
   
@@ -178,6 +182,7 @@ sub WeekdayTimer_Set($@) {
   } elsif ($v =~ /weekprofile ([^: ]+):([^:]+):([^: ]+)\b/) {
     Log3 $hash, 3, "[$name] set $name $v";
     return unless WeekdayTimer_UpdateWeekprofileReading($hash, $1, $2, $3);	
+    WeekdayTimer_DeleteTimer($hash);
     WeekdayTimer_Start($hash);
   }
   return undef;
@@ -1444,7 +1449,8 @@ sub WeekdayTimer_GetWeekprofileReadingTriplett($$) {
       <code>set myWeekprofiles send_to_device holiday:livingrooms wd</code><br>
       </li><br>
       <li>Although it's possible to use more than one weekprofile device in a WeekdayTimer, this is explicitly not recommended despite you are exactly knwowing what you are doing.</li><br>
-    </ul>	
+      <li>Note: The userattr <i>weekprofile</i> will automatically be added to the list and can't be removed. The attribute itself is intended to be set to the corresponding profile name in your weekprofile device allowing easy change using the topic feature.</li><br>
+      </ul>	
     </ul>
   </ul>
   <a name="WeekdayTimerget"></a>
