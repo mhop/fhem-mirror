@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.32.4"  => "15.03.2020  fix rights check for index operation ",
   "8.32.3"  => "10.03.2020  better logfile messages in some cases of index operation  ",
   "8.32.2"  => "01.03.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 again ",
   "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
@@ -6602,8 +6603,8 @@ sub DbRep_Index($) {
   my $bst = [gettimeofday];
   
   # Rechte Check MYSQL
-  if($cmdidx ne "list_all") {
-      if($dbmodel =~ /MYSQL/ && $grants && $grants ne "ALL PRIVILEGES") {
+  if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL/) {
+      if($grants && $grants ne "ALL PRIVILEGES") {
           # Rechte INDEX und ALTER benötigt
           my $i = index($grants,"INDEX");
           my $a = index($grants,"ALTER");
