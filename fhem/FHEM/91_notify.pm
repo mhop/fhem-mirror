@@ -124,6 +124,7 @@ notify_Exec($$)
       $ntfy->{TRIGGERTIME} = $now;
       $ntfy->{STATE} =
         AttrVal($ln,'showtime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+      last if($dat);
     }
   }
   
