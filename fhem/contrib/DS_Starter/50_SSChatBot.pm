@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.4.0"  => "15.03.2020  rename '1_sendItem' to 'asyncSendItem' because of Aesthetics ",
   "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions, review logs of SSChatBot_CGI ",
   "1.3.0"  => "13.03.2020  rename 'sendItem' to '1_sendItem', allow attachments ",
   "1.2.2"  => "07.02.2020  add new permanent error 410 'message too long' ",
@@ -61,6 +62,7 @@ our %SSChatBot_vNotesIntern = (
 
 # Versions History extern
 our %SSChatBot_vNotesExtern = (
+  "1.4.0"  => "15.03.2020 Command '1_sendItem' renamed to 'asyncSendItem' because of Aesthetics ",
   "1.3.0"  => "13.03.2020 The set command 'sendItem' was renamed to '1_sendItem' to avoid changing the botToken by chance. ".
                           "Also attachments are allowed now in the '1_sendItem' command. ",
   "1.0.1"  => "11.12.2019 check OPIDX in parse sendItem, change error code list, complete forbidSend with error text ",
@@ -299,7 +301,7 @@ sub SSChatBot_Set($@) {
                  "listSendqueue:noArg ".
                  ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
                  "restartSendqueue:noArg ".
-                 "1_sendItem:textField-long "
+                 "asyncSendItem:textField-long "
                  ;
   }
  
@@ -351,7 +353,7 @@ sub SSChatBot_Set($@) {
           return "SendQueue entry with index \"$prop\" deleted";
       }
   
-  } elsif ($opt eq "1_sendItem") {
+  } elsif ($opt eq "asyncSendItem") {
       # einfachster Sendetext users="user1"
       # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
       # text="<https://www.synology.com>" users="user1"
@@ -392,7 +394,7 @@ sub SSChatBot_Set($@) {
            
           # Eintrag zur SendQueue hinzufügen
           # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
-          SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", $attachment);
+          SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $uid, $text, $fileUrl, "", $attachment);
       }
        
       SSChatBot_getapisites($name);
@@ -659,7 +661,7 @@ sub SSChatBot_addQueue ($$$$$$$$) {
    $data{SSChatBot}{$name}{sendqueue}{index}++;
    my $index = $data{SSChatBot}{$name}{sendqueue}{index};
    
-   Log3($name, 5, "$name - Add sendItem to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, attachment: $attachment, userid: $userid");
+   Log3($name, 5, "$name - Add Item to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, attachment: $attachment, userid: $userid");
    
    my $pars = {'opmode'     => $opmode,   
                'method'     => $method, 
@@ -972,7 +974,7 @@ sub SSChatBot_chatop ($) {
       $url = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
    }
    
-   if ($opmode eq "sendItem") {
+   if ($opmode eq "asyncSendItem") {
       # Form: payload={"text": "a fun image", "file_url": "http://imgur.com/xxxxx" "user_ids": [5]} 
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
@@ -1149,7 +1151,7 @@ sub SSChatBot_chatop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$out");
 				delete($hash->{HELPER}{CL});                
 			
-            } elsif ($opmode eq "sendItem" && $hash->{OPIDX}) {
+            } elsif ($opmode eq "asyncSendItem" && $hash->{OPIDX}) {
                 my $postid = "";
                 my $idx    = $hash->{OPIDX};
                 my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
@@ -1763,7 +1765,7 @@ sub SSChatBot_CGI() {
               
               $cr = SSChatBot_formText($cr);   
 
-              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                 
+              SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $userid, $cr, "", "", "");                                 
           }
                                   
           my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommand.. zusammenstellen
@@ -1794,7 +1796,7 @@ sub SSChatBot_CGI() {
 				  
 				  $cr = SSChatBot_formText($cr);   
 
-				  SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
+				  SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $userid, $cr, "", "", "");                                
 			  }
 		  }
 		  
