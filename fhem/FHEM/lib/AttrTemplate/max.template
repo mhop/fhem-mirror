@@ -26,7 +26,7 @@ par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1
 par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
 attr DEVICE icon ICON
 attr DEVICE comment COMMENT
-attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow \
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow temporary:sani_heating_timer@yellow \
 ok:measure_battery_100@green low:measure_battery_0@red \
 (0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
 attr DEVICE stateFormat mode\
@@ -58,7 +58,7 @@ attr DEVICE icon ICON
 attr DEVICE comment COMMENT
 attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
-attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow \
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow temporary:sani_heating_timer@yellow \
 ok:measure_battery_100@green low:measure_battery_0@red \
 (0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
 attr DEVICE stateFormat mode\
