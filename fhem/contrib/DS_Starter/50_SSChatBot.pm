@@ -49,7 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
-  "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions ",
+  "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions, review logs of SSChatBot_CGI ",
   "1.3.0"  => "13.03.2020  rename 'sendItem' to '1_sendItem', allow attachments ",
   "1.2.2"  => "07.02.2020  add new permanent error 410 'message too long' ",
   "1.2.1"  => "27.01.2020  replace \" H\" with \"%20H\" in payload due to problem in HttpUtils ",
@@ -1584,7 +1584,7 @@ sub SSChatBot_CGI() {
 
   return ( "text/plain; charset=utf-8", "Booting up" ) unless ($init_done);
 
-  # data received
+  # data received      
   if ($request =~ /^\/outchat(\?|&).*/) {                   # POST- oder GET-Methode empfangen
       $args = (split(/outchat\?/, $request))[1];            # GET-Methode empfangen 
       if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
@@ -1614,6 +1614,10 @@ sub SSChatBot_CGI() {
       }
 	  
       $hash = $defs{$name};                                 # hash des SSChatBot Devices
+      Log3($name, 4, "$name - ####################################################"); 
+      Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
+      Log3($name, 4, "$name - ####################################################");
+      Log3($name, 5, "$name - raw data received (urlDecoded):\n".Dumper($args));
 	  
       # eine Antwort auf ein interaktives Objekt
       if (defined($h->{payload})) {
@@ -1630,7 +1634,7 @@ sub SSChatBot_CGI() {
               return ("text/plain; charset=utf-8", "invalid JSON data received");
           }
           my $data = decode_json($pldata);
-          Log3($name, 5, "$name - received interactive object data:\n". Dumper $data);
+          Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
           
           $h->{token}       = $data->{token};
           $h->{post_id}     = $data->{post_id};
@@ -1662,11 +1666,13 @@ sub SSChatBot_CGI() {
                               "The csrfToken must be identical to the token in OUTDEF of $name device.");
           return ("text/plain; charset=utf-8", "400 Bad Request");          
       }
-	  
-	  Log3($name, 4, "$name - ####################################################"); 
-	  Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
-	  Log3($name, 4, "$name - ####################################################"); 
-	  Log3($name, 5, "$name - data received:\n".Dumper($h));
+      
+      # Timestamp dekodieren
+	  if ($h->{timestamp}) {
+          $h->{timestamp} = FmtDateTime(($h->{timestamp})/1000);
+	  }
+	   
+	  Log3($name, 4, "$name - received data decoded:\n".Dumper($h));
       
       $hash->{OPMODE} = "receiveData";
 	  
@@ -1683,52 +1689,22 @@ sub SSChatBot_CGI() {
       # trigger_word: which trigger word is matched 
 	  #
 
-	  if ($h->{channel_id}) {
-	      $channelid = $h->{channel_id};                           
-          Log3($name, 4, "$name - channel_id received: ".$channelid);
-      }	  
-	  
-	  if ($h->{channel_name}) {
-	      $channelname = $h->{channel_name};                           
-          Log3($name, 4, "$name - channel_name received: ".$channelname);
-      }
-	  
-	  if ($h->{user_id}) {
-	      $userid = $h->{user_id};                           
-          Log3($name, 4, "$name - user_id received: ".$userid);
-      }
-	  
-	  if ($h->{username}) {
-	      $username = $h->{username};                           
-          Log3($name, 4, "$name - username received: ".$username);
-      }
-	  
-	  if ($h->{post_id}) {
-	      $postid = $h->{post_id};                           
-          Log3($name, 4, "$name - postid received: ".$postid);
-      }
-      
-	  if ($h->{callback_id}) {
-	      $callbackid = $h->{callback_id};                           
-          Log3($name, 4, "$name - callback_id received: ".$callbackid);
-      }
+	  $channelid   = $h->{channel_id}   if($h->{channel_id});                      
+	  $channelname = $h->{channel_name} if($h->{channel_name});
+	  $userid      = $h->{user_id}      if($h->{user_id});
+	  $username    = $h->{username}     if($h->{username});
+	  $postid      = $h->{post_id}      if($h->{post_id});
+	  $callbackid  = $h->{callback_id}  if($h->{callback_id});
+      $timestamp   = $h->{timestamp}    if($h->{timestamp});
       
 	  if ($h->{actions}) {
 	      $actions = $h->{actions};        
-          Log3($name, 4, "$name - actions received: ".$actions);
           $actions =~ m/^type: button.*value: (.*), text:.*$/;
           $actval  = $1;
       }
 	  
-	  if ($h->{timestamp}) {
-          $timestamp = FmtDateTime(($h->{timestamp})/1000);
-          Log3($name, 4, "$name - timestamp received: ".$timestamp);
-	  }
-	  
 	  if ($h->{text}) {
-	      $text = $h->{text};                          
-          Log3($name, 4, "$name - text received: ".$text);
-   
+	      $text    = $h->{text};                            
           if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
               my $p1 = $1;
               my $p2 = $2;
