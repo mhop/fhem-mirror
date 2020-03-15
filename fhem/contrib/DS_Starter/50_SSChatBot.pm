@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.5.0"  => "15.03.2020  slash commands set in interactive answer field 'value' will be executed ",
   "1.4.0"  => "15.03.2020  rename '1_sendItem' to 'asyncSendItem' because of Aesthetics ",
   "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions, review logs of SSChatBot_CGI ",
   "1.3.0"  => "13.03.2020  rename 'sendItem' to '1_sendItem', allow attachments ",
@@ -1577,7 +1578,7 @@ sub SSChatBot_CGI() {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au,$arg,$callbackid,$actions,$actval)                              = ("","","","","","","");
+  my ($command,$cr,$au,$arg,$callbackid,$actions,$actval,$avToExec)                    = ("","","","","","","","");
   my $success;
   my @aul;
   my $state = "active";
@@ -1699,14 +1700,20 @@ sub SSChatBot_CGI() {
 	  $callbackid  = $h->{callback_id}  if($h->{callback_id});
       $timestamp   = $h->{timestamp}    if($h->{timestamp});
       
+      # interaktive Schaltflächen (Aktionen) auswerten 
 	  if ($h->{actions}) {
 	      $actions = $h->{actions};        
           $actions =~ m/^type: button.*value: (.*), text:.*$/;
           $actval  = $1;
+          if($actval =~ /^\/.*$/) {
+              Log3($name, 4, "$name - slash command \"$actval\" got from interactive data and execute it with priority");
+              $avToExec = $actval;        
+          }
       }
 	  
-	  if ($h->{text}) {
-	      $text    = $h->{text};                            
+	  if ($h->{text} || $avToExec) {
+	      $text    = $h->{text};
+          $text    = $avToExec if($avToExec);                                         # Vorrang für empfangene interaktive Data (Schaltflächenwerte) die Slash-Befehle enthalten        
           if($text =~ /^\/([Ss]et.*?|[Gg]et.*?|[Cc]ode.*?)\s+(.*)$/) {                # vordefinierte Befehle in FHEM ausführen
               my $p1 = $1;
               my $p2 = $2;
