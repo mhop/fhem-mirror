@@ -1,4 +1,4 @@
-REV 21424
+REV 21434
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-15_07:45:02 329751 ./CHANGED
+UPD 2020-03-16_07:45:03 329892 ./CHANGED
 UPD 2020-02-17_07:45:03 42648 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -317,7 +317,7 @@ UPD 2019-11-18_07:45:03 168026 FHEM/57_Calendar.pm
 UPD 2020-03-09_07:45:03 228062 FHEM/57_SSCal.pm
 UPD 2020-03-09_07:45:03 20495 FHEM/59_GSI.pm
 UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
-UPD 2018-10-17_07:45:02 26685 FHEM/59_LuftdatenInfo.pm
+UPD 2020-03-16_07:45:03 26679 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2019-02-25_07:45:03 40604 FHEM/59_PROPLANTA.pm
 UPD 2018-01-27_07:45:02 43120 FHEM/59_Twilight.pm
@@ -455,13 +455,13 @@ UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
 UPD 2019-12-15_07:45:10 14974 FHEM/90_SIGNALduino_un.pm
 UPD 2018-10-19_07:45:03 26109 FHEM/90_at.pm
 UPD 2017-08-14_07:45:02 6980 FHEM/91_eventTypes.pm
-UPD 2020-03-03_07:45:02 27946 FHEM/91_notify.pm
+UPD 2020-03-16_07:45:03 27967 FHEM/91_notify.pm
 UPD 2019-12-22_07:45:03 10210 FHEM/91_sequence.pm
 UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-02-01_07:45:04 427342 FHEM/93_DbLog.pm
-UPD 2020-03-11_07:45:03 865439 FHEM/93_DbRep.pm
+UPD 2020-03-16_07:45:03 865507 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
@@ -526,7 +526,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2019-02-13_07:45:03 20746 FHEM/98_WOL.pm
-UPD 2020-03-13_07:45:03 63869 FHEM/98_WeekdayTimer.pm
+UPD 2020-03-16_07:45:03 64260 FHEM/98_WeekdayTimer.pm
 UPD 2017-01-18_07:45:02 3906 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -651,10 +651,10 @@ UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-03-12_07:45:02 52360 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
-UPD 2020-03-10_07:45:03 4433 FHEM/lib/AttrTemplate/max.template
-UPD 2020-03-15_07:45:02 199518 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-16_07:45:03 4505 FHEM/lib/AttrTemplate/max.template
+UPD 2020-03-16_07:45:03 199522 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-09_07:45:03 5073 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2020-03-12_07:45:02 7237 FHEM/lib/AttrTemplate/speechrecogn.template
+UPD 2020-03-16_07:45:03 7238 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -751,12 +751,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-03-14_07:45:06 4232799 docs/commandref.html
+UPD 2020-03-16_07:45:06 4233070 docs/commandref.html
 UPD 2020-03-14_07:45:09 2630528 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-03-15_07:45:09 231586 docs/commandref_modular.html
-UPD 2020-03-15_07:45:10 242647 docs/commandref_modular_DE.html
+UPD 2020-03-16_07:45:10 231586 docs/commandref_modular.html
+UPD 2020-03-16_07:45:11 242647 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
