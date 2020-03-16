@@ -395,7 +395,7 @@ sub SSChatBot_Set($@) {
            
           # Eintrag zur SendQueue hinzufügen
           # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
-          SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $uid, $text, $fileUrl, "", $attachment);
+          SSChatBot_addQueue($name, "sendItem", "chatbot", $uid, $text, $fileUrl, "", $attachment);
       }
        
       SSChatBot_getapisites($name);
@@ -975,7 +975,7 @@ sub SSChatBot_chatop ($) {
       $url = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
    }
    
-   if ($opmode eq "asyncSendItem") {
+   if ($opmode eq "sendItem") {
       # Form: payload={"text": "a fun image", "file_url": "http://imgur.com/xxxxx" "user_ids": [5]} 
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
@@ -1152,7 +1152,7 @@ sub SSChatBot_chatop_parse ($) {
 				asyncOutput($hash->{HELPER}{CL}{1},"$out");
 				delete($hash->{HELPER}{CL});                
 			
-            } elsif ($opmode eq "asyncSendItem" && $hash->{OPIDX}) {
+            } elsif ($opmode eq "sendItem" && $hash->{OPIDX}) {
                 my $postid = "";
                 my $idx    = $hash->{OPIDX};
                 my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
@@ -1772,7 +1772,7 @@ sub SSChatBot_CGI() {
               
               $cr = SSChatBot_formText($cr);   
 
-              SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $userid, $cr, "", "", "");                                 
+              SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                 
           }
                                   
           my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommand.. zusammenstellen
@@ -1803,7 +1803,7 @@ sub SSChatBot_CGI() {
 				  
 				  $cr = SSChatBot_formText($cr);   
 
-				  SSChatBot_addQueue($name, "asyncSendItem", "chatbot", $userid, $cr, "", "", "");                                
+				  SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
 			  }
 		  }
 		  
