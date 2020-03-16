@@ -245,7 +245,7 @@ sub LuftdatenInfo_Attr(@) {
     }
   }
   elsif($attribute eq "interval"){
-    my $minInterval = $hash->{CONNECTION} eq "local" ? 30 : 300;
+    my $minInterval = $hash->{MODE} eq "local" ? 30 : 300;
     my $interval = $cmd eq "set" ? $value : $minInterval;
     $interval = $minInterval unless(looks_like_number($interval));
     $interval = $minInterval if($interval < $minInterval);
