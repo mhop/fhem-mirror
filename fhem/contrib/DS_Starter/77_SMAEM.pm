@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use bignum;
 use IO::Socket::Multicast;
-eval "use IO::Interface;1";
+eval "use IO::Interface;1" or my $IOInterfaceAbsent = 1;
 use Blocking;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
@@ -207,6 +207,8 @@ sub SMAEM_Define ($$) {
   $selectlist{"$name"} = $hash;
   
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  
+  Log3($name, 3, "$name - The perl module \"IO::Interface\" is missing. You should install it.") if($IOInterfaceAbsent);
   
   # Versionsinformationen setzen
   SMAEM_setVersionInfo($hash);
@@ -1352,6 +1354,7 @@ return;
         "Blocking": 0      
       },
       "recommends": {
+	    "IO::Interface": 0,
         "FHEM::Meta": 0
       },
       "suggests": {
