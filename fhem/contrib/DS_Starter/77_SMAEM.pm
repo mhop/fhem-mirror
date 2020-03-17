@@ -1,9 +1,9 @@
 ################################################################################################
-# $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $
+# $Id: 77_SMAEM.pm 21170 2020-02-10 21:28:42Z DS_Starter $
 #
 #  Copyright notice
 #
-#  (c) 2016-2019 Copyright: Volker Kettenbach
+#  (c) 2016-2020 Copyright: Volker Kettenbach
 #  e-mail: volker at kettenbach minus it dot de
 #
 #  Credits: 
@@ -36,6 +36,8 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
+  "4.1.0" => "17.03.2020  add define option <interface> ",
+  "4.0.1" => "10.02.2020  fix perl warning Forum: https://forum.fhem.de/index.php/topic,51569.msg1021988.html#msg1021988",
   "4.0.0" => "16.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
                           "new attribute \"noCoprocess\", many internal code changes ",
   "3.5.0" => "14.12.2019  support of SMA Homemanager 2.0 >= 2.03.4.R, attribute \"serialNumber\", ".
@@ -166,6 +168,9 @@ sub SMAEM_Define ($$) {
   my ($success, $gridin_sum, $gridout_sum);
   my $socket;
   
+  my @a  = split("[ \t][ \t]*", $def);
+  my $if = $a[2] ? "'".$a[2]."'" : "";
+  
   $hash->{INTERVAL}              = 60;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
   $hash->{HELPER}{STARTTIME}     = time();
@@ -185,7 +190,15 @@ sub SMAEM_Define ($$) {
   
   Log3 $hash, 3, "SMAEM $name - Multicast socket opened";
   
-  $socket->mcast_add('239.12.255.254');
+  if($a[2]) {
+      eval { $socket->mcast_add('239.12.255.254',$if); };
+	  if ($@) {
+          return "Socket error in define ('239.12.255.254',$if): $@";         
+      }
+  } else {
+      $socket->mcast_add('239.12.255.254');
+  }
+  
 
   $hash->{TCPDev} = $socket;
   $hash->{FD}     = $socket->fileno();
@@ -622,7 +635,7 @@ sub SMAEM_DoParse ($) {
     my $cosphi = $obis->{"1:13.4.0"}/1000;
 	push(@row_array, $ps."CosPhi ".sprintf("%.3f",$cosphi)."\n");
     
-    my $grid_freq = $obis->{"1:14.4.0"}/1000;
+    my $grid_freq = $obis->{"1:14.4.0"}/1000          if($obis->{"1:14.4.0"});
     push(@row_array, $ps."GridFreq ".$grid_freq."\n") if($grid_freq);
     
     push(@row_array, $ps."SoftwareVersion ".$obis->{"144:0.0.0"}."\n");
@@ -1050,12 +1063,12 @@ sub SMAEM_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 77_SMAEM.pm 21170 2020-02-10 21:28:42Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 77_SMAEM.pm 19460 2019-05-24 20:19:41Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 77_SMAEM.pm 21170 2020-02-10 21:28:42Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
