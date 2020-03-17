@@ -31,6 +31,7 @@ use strict;
 use warnings;
 use bignum;
 use IO::Socket::Multicast;
+eval "use IO::Interface;1";
 use Blocking;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
@@ -169,7 +170,7 @@ sub SMAEM_Define ($$) {
   my $socket;
   
   my @a  = split("[ \t][ \t]*", $def);
-  my $if = $a[2] ? "'".$a[2]."'" : "";
+  my $if = $a[2] ? $a[2] : "";
   
   $hash->{INTERVAL}              = 60;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
