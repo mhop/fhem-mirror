@@ -15,7 +15,7 @@
 
 ######################################################################
 name:MAX_HeatingThermostat_dark
-filter:TYPE=MAX:filter:devtype=(1|2)
+filter:TYPE=MAX:FILTER=devtype=(1|2)
 desc:To configure a HeatingThermostat
 order:M1
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_heizungsthermostat") }
@@ -26,9 +26,7 @@ par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1
 par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
 attr DEVICE icon ICON
 attr DEVICE comment COMMENT
-attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow temporary:sani_heating_timer@yellow \
-ok:measure_battery_100@green low:measure_battery_0@red \
-(0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow ok:measure_battery_100@green low:measure_battery_0@red (0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
 attr DEVICE stateFormat mode\
 battery\
 rferror\
@@ -40,12 +38,12 @@ attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speech_recognition_type_thermostate
 ######################################################################
 
 ######################################################################
 name:MAX_WallMountedThermostat_dark
-filter:TYPE=MAX:filter:devtype=(3|7)
+filter:TYPE=MAX:FILTER=devtype=(3|7)
 desc:To configure a WallMountedThermostat
 order:M2
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_wandthermostat") }
@@ -58,9 +56,7 @@ attr DEVICE icon ICON
 attr DEVICE comment COMMENT
 attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
-attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow temporary:sani_heating_timer@yellow \
-ok:measure_battery_100@green low:measure_battery_0@red \
-(0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
+attr DEVICE devStateIcon auto:sani_heating_automatic@lightgray manual:sani_heating_manual@yellow ok:measure_battery_100@green low:measure_battery_0@red (0|alive):10px-kreis-gruen (1|dead):10px-kreis-rot timeout:10px-kreis-gelb
 attr DEVICE stateFormat mode\
 battery\
 rferror\
@@ -70,11 +66,11 @@ attr DEVICE webCmdLabel Ist<br>:Soll<br>
 attr DEVICE widgetOverride temperature:selectnumbers,15,0.1,29,1,lin
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speech_recognition_type_thermostate
 ######################################################################
 
 ######################################################################
-name:MAX_ShutterContac_dark
+name:MAX_ShutterContact_dark
 filter:TYPE=MAX:filter:devtype=(4|6)
 desc:To configure a ShutterContact
 order:M3
