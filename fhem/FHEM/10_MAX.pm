@@ -8,6 +8,8 @@ use strict;
 use warnings;
 use MIME::Base64;
 use MaxCommon;
+use AttrTemplate;
+
 
 sub MAX_Define($$);
 sub MAX_Undef($$);
@@ -74,7 +76,7 @@ MAX_Initialize($)
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 keepAuto:0,1 scanTemp:0,1 ".
+                       "showtime:1,0 keepAuto:0,1 scanTemp:0,1 model:HeatingThermostat,HeatingThermostatPlus,WallMountedThermostat,ShutterContact,PushButton ".
                        $readingFnAttributes;
   $hash->{DbLog_splitFn} = "MAX_DbLog_splitFn";
   return undef;
@@ -88,16 +90,21 @@ MAX_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   return "name \"$name\" is reserved for internal use" if($name eq "fakeWallThermostat" or $name eq "fakeShutterContact");
-  return "wrong syntax: define <name> MAX type addr"
-        if(int(@a)!=4 || $a[3] !~ m/^[A-F0-9]{6}$/i);
+  return 'wrong syntax: define <name> MAX type address'   if(int(@a)!=4 || $a[3] !~ m/^[a-fA-F0-9]{6}$/i);
+  return 'incorrect address 000000' if ($a[3] eq '000000');
+
 
   my $type = $a[2];
   my $addr = lc($a[3]); #all addr should be lowercase
-  if(exists($modules{MAX}{defptr}{$addr})) {
-    my $msg = "MAX_Define: Device with addr $addr is already defined";
-    Log3 $hash, 1, $msg;
+ 
+  if(exists($modules{MAX}{defptr}{$addr}) && $modules{MAX}{defptr}{$addr}->{NAME} ne $name)
+  {
+    my $msg = 'MAX_Define, a Device with addr '.$addr.' is already defined ('.$modules{MAX}{defptr}{$addr}->{NAME}.')';
+    Log3 $hash, 2, $msg;
     return $msg;
   }
+
+
   if($type eq "Cube") {
     my $msg = "MAX_Define: Device type 'Cube' is deprecated. All properties have been moved to the MAXLAN device.";
     Log3 $hash, 1, $msg;
@@ -105,12 +112,16 @@ MAX_Define($$)
   }
   Log3 $hash, 5, "Max_define $type with addr $addr ";
   $hash->{type} = $type;
+  $hash->{devtype}  = MAX_TypeToTypeId($type);
   $hash->{addr} = $addr;
   $modules{MAX}{defptr}{$addr} = $hash;
 
   $hash->{internals}{interfaces} = $interfaces{$type};
 
   AssignIoPort($hash);
+
+  CommandAttr(undef,$name.' model '.$type); # Forum Stats werten nur attr model aus
+
   return undef;
 }
 
@@ -254,6 +265,10 @@ MAX_Set($@)
 {
   my ($hash, $devname, @a) = @_;
   my ($setting, @args) = @a;
+  my $ret = '';
+  my $devtype = int($hash->{devtype});
+
+  return undef if (IsDummy($devname) || IsIgnored($devname) || !$devtype || ($setting eq 'valveposition') || ($setting eq 'temperature'));
 
   return "Invalid IODev" if(MAX_CheckIODev($hash));
 
@@ -485,7 +500,9 @@ MAX_Set($@)
   } elsif($setting eq "wakeUp") {
     return MAX_WakeUp($hash);
 
-  } elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) {
+  } 
+   elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) 
+  {
     return "Invalid arguments.  You must specify at least one: <weekDay> <temp[,hh:mm]>\nExample: Mon 10,06:00,17,09:00" if((@args%2 == 1)||(@args == 0));
 
     #Send wakeUp, so we can send the weekprofile pakets without preamble
@@ -531,9 +548,11 @@ MAX_Set($@)
     }
     Log3 $hash, 5, "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
-  }else{
+  }
+  else
+  {
     my $templist = join(",",map { MAX_SerializeTemperature($_/2) }  (9..61));
-    my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
+    $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
 
     my $assoclist;
     #Build list of devices which this device can be associated to
@@ -566,7 +585,8 @@ MAX_Set($@)
 
     my $templistOffset = join(",",map { MAX_SerializeTemperature(($_-7)/2) }  (0..14));
     my $boostDurVal = join(",", values(%boost_durations));
-    if($hash->{type} =~ /HeatingThermostat.*/) {
+    if($hash->{type} =~ /HeatingThermostat.*/) 
+    {
       my $shash;
       my $wallthermo = 0;
       # check if Wallthermo is in same group
@@ -575,18 +595,25 @@ MAX_Set($@)
         $wallthermo = 1 if(defined $shash->{type} && $shash->{type} eq "WallMountedThermostat" && (MAX_ReadingsVal($shash,"groupid") eq MAX_ReadingsVal($hash,"groupid")));
       }
 
-      if ($wallthermo eq 1) {
-        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
-      } else {
-        return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
-      }
-    } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist minimumTemperature:$templist measurementOffset:$templistOffset windowOpenTemperature:$templist boostDuration:$boostDurVal boostValveposition ";
-    } elsif($hash->{type} eq "ShutterContact") {
-      return "$ret associate:$assoclist deassociate:$assoclist";
-    } else {
-      return $ret;
-    }
+     if ($wallthermo eq 1) 
+     {
+        $ret .= " associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist measurementOffset:$templistOffset windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
+     } 
+      else 
+     {
+        $ret .= " associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset weekProfile";
+     }
+    } 
+     elsif($hash->{type} eq "WallMountedThermostat") 
+    {
+      $ret .= " associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist minimumTemperature:$templist measurementOffset:$templistOffset windowOpenTemperature:$templist boostDuration:$boostDurVal boostValveposition ";
+    } 
+     elsif($hash->{type} eq "ShutterContact") 
+    {
+      $ret .= " associate:$assoclist deassociate:$assoclist";
+    } 
+
+   return AttrTemplate_Set ($hash, $ret, $devname, $setting, @args);
   }
 }
 
