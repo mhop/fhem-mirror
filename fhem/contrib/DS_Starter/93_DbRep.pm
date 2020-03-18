@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 21169 2020-02-10 21:15:23Z DS_Starter $
+# $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.34.0"  => "18.03.2020  option writeToDBSingle for functions averageValue, sumValue ",     
+  "8.33.0"  => "18.03.2020  option older than days and newer than days for reduceLog function ",
+  "8.32.4"  => "15.03.2020  fix rights check for index operation ",
+  "8.32.3"  => "10.03.2020  better logfile messages in some cases of index operation  ",
   "8.32.2"  => "01.03.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 again ",
   "8.32.1"  => "08.02.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 ",
   "8.32.0"  => "29.01.2020  new option \"deleteOther\" for minValue ",
@@ -544,8 +548,8 @@ sub DbRep_Set($@) {
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
-                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
-                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB,writeToDBSingle ":"").
+                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB,writeToDBSingle ":"").
                 (($hash->{ROLE} ne "Agent")?"changeValue ":"").
                 (($hash->{ROLE} ne "Agent")?"delDoublets:adviceDelete,delete ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
@@ -1804,7 +1808,7 @@ sub DbRep_dbConnect($$) {
           $dbpassword = $admpassword;
       } else {
           $err = "Can't use admin credentials for database access, see logfile !";
-          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database access, but can't use it");
+          Log3 ($name, 2, "DbRep $name - ERROR - admin credentials are needed for database operation, but are not set or can't read it");
 		  return $err;
       }
   }
@@ -2056,7 +2060,15 @@ sub DbRep_Main($$;$) {
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
  }
  
- if ($opt =~ /reduceLog/) {	
+ if ($opt =~ /reduceLog/) {
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     if($nthants >= $othants) {
+	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+         return;
+	 } 
      $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
      $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if($hash->{HELPER}{RUNNING_REDUCELOG});  # Forum #77057 
@@ -2116,7 +2128,7 @@ sub DbRep_createTimeArray($$$) {
  }
 
  if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
-     AttrVal($name,"timestamp_end","") eq "current_year_begin") {
+          AttrVal($name,"timestamp_end","") eq "current_year_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
 	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_begin");
  } 
@@ -6601,8 +6613,8 @@ sub DbRep_Index($) {
   my $bst = [gettimeofday];
   
   # Rechte Check MYSQL
-  if($cmdidx ne "list_all") {
-      if($dbmodel =~ /MYSQL/ && $grants && $grants ne "ALL PRIVILEGES") {
+  if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL/) {
+      if($grants && $grants ne "ALL PRIVILEGES") {
           # Rechte INDEX und ALTER benötigt
           my $i = index($grants,"INDEX");
           my $a = index($grants,"ALTER");
@@ -6613,6 +6625,9 @@ sub DbRep_Index($) {
           $p = 1;
       }
   }
+  
+  Log3 ($name, 2, "DbRep $name - user \"$dbuser\" doesn't have rights \"INDEX\" and \"ALTER\" as needed - try use adminCredentials automatically !") 
+     if($p);
   
   ($err,$dbh) = DbRep_dbConnect($name,$p);
   if ($err) {
@@ -8542,12 +8557,23 @@ sub DbRep_reduceLog($) {
     my $dbmodel    = $dbloghash->{MODEL};
     my $dbpassword = $attr{"sec$dblogname"}{secret};
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
+    my $rlpar      = join(" ", @a);
 	my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-    delete $hash->{HELPER}{REDUCELOG};
+
     my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH);
     my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
     my ($dbh,$err,$brt);
+    
+    BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
+	
+	# ausfiltern von optionalen Zeitangaben, z.B. 700:750 -> Rest zur Einhaltung des ursprünglichen Formats nach @a schreiben
+	my @b;
+    foreach (@a) {     
+	    next if($_ =~ /\b(\d+(:\d+)?)\b/);
+        push @b, $_;
+    }
+	@a = @b;
 	
     Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 	
@@ -9781,6 +9807,16 @@ sub DbRep_normRelTime($) {
  my $toth     = AttrVal($name, "timeOlderThan", undef);
  my $fdopt    = 0;                                                    # FullDay Option 
  my ($y,$d,$h,$m,$s,$aval);
+ 
+ # evtl. Relativzeiten bei "reduceLog" berücksichtigen
+ my @a = @{$hash->{HELPER}{REDUCELOG}} if($hash->{HELPER}{REDUCELOG});
+ foreach (@a) {     
+	 if($_ =~ /\b(\d+(:\d+)?)\b/) {
+		 my ($od,$nd) = split(":",$1);                           # $od - Tage älter als , $nd - Tage neuer als
+		 $toth        = "d:$od" if($od);
+		 $tdtn        = "d:$nd" if($nd);
+	 }
+ }
   
  if($tdtn && $tdtn =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
      $aval = $tdtn;
@@ -10707,7 +10743,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
-          $value             = defined($a[1])?(looks_like_number($a[1])?sprintf("%.4f",$a[1]):$a[1]):undef;
+          $value             = defined($a[1])?(looks_like_number($a[1])?sprintf("%.4f",$a[1]):$a[1]):undef;     # Version 8.32.2
           $rsf               = $a[2];                             # Runtime String first - Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
@@ -10717,7 +10753,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
           
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month|year/) {
-                  $time  = "00:00:01";                      # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time  = "00:00:01";                            # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
                   $ntime = "23:59:59";
                   ($year,$mon,$mday) = split("-", $ndate);
                   $corr              = ($i != $ele) ? 86400 : 0;
@@ -10725,7 +10761,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
                   ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
               } elsif ($aggr =~ /hour/) {
                   $hour  = $time;
-                  $time  = "$hour:00:01";                   # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $time  = "$hour:00:01";                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
                   $ntime = "$hour:59:59";
                   if ($ntime eq "23:59:59") {
                       ($year,$mon,$mday) = split("-", $ndate);
@@ -10738,7 +10774,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
               if($i == 0) {              
-                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit") if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
                   push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");    
               } else {
                   if ($aggr =~ /no|day|week|month|year/) {
@@ -10750,7 +10786,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
                       $t1                = fhemTimeLocal(01, 00, $hour, $mday, $mon-1, $year-1900);
                       ($date,$time)      = split(" ",FmtDateTime($t1));                 
                   }
-                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit") if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
                   push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");                   
               }              
           } 
@@ -11186,6 +11222,22 @@ sub DbRep_numval ($){
 return $val;
 }
 
+####################################################################################################
+#       löscht einen Wert vom $hash  des Hauptprozesses aus einem BlockingCall heraus     
+####################################################################################################
+sub DbRep_delHashValFromBlocking($$;$) {
+  my ($name,$v1,$v2) = @_;
+  my $hash        = $defs{$name};
+
+  if($v2) {
+      delete $hash->{$v1}{$v2};
+  } elsif ($v1) {
+      delete $hash->{$v1};
+  }
+
+return 1;
+}
+
 ################################################################
 # sortiert eine Liste von Versionsnummern x.x.x
 # Schwartzian Transform and the GRT transform
@@ -11225,12 +11277,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 21169 2020-02-10 21:15:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 21169 2020-02-10 21:15:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11735,21 +11787,27 @@ return;
                                
                                </li> <br>
  
-    <li><b> averageValue [display | writeToDB]</b> 
-                                 - calculates the average value of database column "VALUE" between period given by 
-                                 timestamp-<a href="#DbRepattr">attributes</a> which are set. 
-                                 The reading to evaluate must be specified by attribute "reading".  <br>
-                                 By attribute "averageCalcForm" the calculation variant for average determination will be configured.
+    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b>
+                                 - calculates an average value of the database field "VALUE" in the time limits 
+	                             of the possible time.*-attributes. <br><br>
                                  
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculated results are stored in the database with a new reading
-                                 name. <br>
-                                 The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".								 
-                                 The prefix is made up of the creation function and the aggregation. <br>
-                                 The timestamp of the new stored readings is deviated from aggregation period, 
-                                 unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 The reading to be evaluated must be specified in the attribute <a href="#reading">reading</a> 
+								 must be specified.                                  
+                                 With the attribute <a href="#averageCalcForm">averageCalcForm</a> the calculation variant 
+                                 is used for Averaging defined. <br><br>
+                                 
+                                 If none or the option <b>display</b> is specified, the results are only displayed. With 
+                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
+                                 with a new reading name into the database. <br>
+                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
+                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 
+                                 The new reading name is formed from a prefix and the original reading name, 
+								 where the original reading name can be replaced by the attribute "readingNameMap".
+                                 The prefix consists of the educational function and the aggregation. <br>
+                                 The timestamp of the new readings in the database is determined by the set aggregation period 
+                                 if no clear time of the result can be determined. 
+                                 The field "EVENT" is filled with "calculated". <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -12659,90 +12717,92 @@ return;
                                  is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
                                  
-    <li><b> reduceLog [average[=day]] </b> <br>
-                                 Reduces historical records within the limits given by the "time.*"-attributes to one record 
-                                 (the 1st) each hour per device & reading. 
-                                 At least one of the "time.*"-attributes must be set (pls. see table below).
-                                 Each of missing time limit will be calculated by the module itself in this case.
+ <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
+                                 Reduces historical data sets. <br><br>
+								 
+								 <b>Method without option specification</b> <br><br>
+								 
+								 If no options are specified, the data will be stored within the time specified by the <b>time.*</b> attributes. 
+                                 Time limits reduced to one entry (the first) per hour per Device & Reading.
+                                 At least one of the <b>time.*</b> attributes must be set (see table below). 
+                                 In this case, the missing time limit is calculated by the module.
                                  <br><br>
                                  
-                                 With the optional argument 'average' not only the records will be reduced, but all numerical 
-                                 values of an hour will be reduced to a single average.
-                                 With option 'average=day' all numerical values of a day are reduced to a single average 
-                                 (implies 'average'). <br><br>
+                                 With the attributes <b>device</b> and <b>reading</b> the data records to be considered can be included
+                                 or be excluded. Both restrictions reduce the selected data and reduce the
+                                 resource requirements. 
+                                 The read "reduceLogState" contains the execution result of the last reduceLog command.  <br><br>
+								 
+                 	             Taking the above into account, the following attributes are relevant for this function: <br><br>
                                  
-                                 By setting attributes "device" and/or "reading" the records to be considered could be included
-                                 respectively excluded. Both containments delimit the selected data from database and may 
-                                 reduce the system RAM load. 
-                                 The reading "reduceLogState" contains the result of the last executed reducelog run.  <br><br>
-                                 
-                 	             The relevant attributes for this function are: <br><br>
-                                 
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
-                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
-                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
-                                      <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
-                                   </table>
-	                               </ul>
-                                   <br>
-                                 
-                                 For compatibility reason the reducelog command can optionally be completed with supplements "EXCLUDE" 
-                                 respectively "INCLUDE" to exclude and/or include device/reading combinations from reducelog: <br><br>
-                                 <ul>
-                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
-                                 </ul>
-                                 This declaration is evaluated as Regex and overwrites the settings made by attributes "device" and "reading",
-                                 which won't be considered in this case. <br><br>
-          
-                                 <ul>
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
+                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                 </table>
+	                             </ul>
+                                 <br>
+								 
                                  <b>Examples: </b><br><br>
-                                 
+                                 <ul>
                                  attr &lt;name&gt; timeOlderThan = d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
-                                 # Records older than 200 days are reduced to the first entry per hour of each device and reading.
-                                 <br> 
+                                 # Records older than 200 days are written to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:200  <br>
                                  set &lt;name&gt; reduceLog average=day <br>
-                                 # Records newer than 200 days are reduced to a single average a day of each device and reading.
-                                 <br> 
+                                 # Records newer than 200 days are limited to one entry per day per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:30  <br>
                                  attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
                                  attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
                                  set &lt;name&gt; reduceLog <br>
-                                 # Records newer than 30 days which are contain devices from type SONOSPLAYER 
-                                 (except device "Sonos_Kueche"), the readings beginning with "room" (except "roomNameAlias"),                       
-                                 are reduced to the first entry per hour of each device and reading.  <br> 
+                                 # Records newer than 30 days that are devices of type SONOSPLAYER 
+                                 (except Device "Sonos_Kitchen") and the readings start with "room" (except "roomNameAlias")                       
+                                 are reduced to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:10 <br>
                                  attr &lt;name&gt; timeOlderThan = d:5  <br>
                                  attr &lt;name&gt; device = Luftdaten_remote  <br>
                                  set &lt;name&gt; reduceLog average <br>
-                                 # Records older than 5 and newer than 10 days and contain DEVICE "Luftdaten_remote" are 
-                                 revised. Numerical values are reduced to the first entry per hour of each device and reading 
-                                 <br>                                  
+                                 # Records older than 5 and newer than 10 days and containing DEVICE "Luftdaten_remote 
+                                 are adjusted. Numerical values of an hour are reduced to an average value <br>                                  
                                  <br>
 								 </ul>
-                                 
-								 <b>Note:</b> <br>
-                                 Even though the function itself is non-blocking, you have to set the attached DbLog  device into 
-                                 the asynchronous mode (attr asyncMode = 1) to avoid a blocking situation of FHEM !. <br>
-                                 It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 
-                                 'history'! <br><br>
-                                 </li> <br>
+								 <br>        
 
+								 <b>Method with option specification</b> <br><br>
+								 
+								 Records older than <b>&lt;no&gt;</b> days and (optionally) newer than 
+								 <b>&lt;nn&gt;</b> days are considered.
+                                 Specifying <b>average</b> not only cleans up the database, but also 
+                                 all numerical values of an hour are reduced to a single mean value.
+                                 With the option <b>average=day</b> all numerical values of a day are reduced to a single 
+                                 Average value reduced (implies 'average'). <br><br>
+
+                                 The additions "EXCLUDE" and "INCLUDE" can be added to exclude device/reading combinations of reduceLog 
+								 or to include them. This specification is evaluated as regex and overwrites the setting of the attributes "device". 
+								 and "reading", which are not considered in this case. <br><br>					
+                                        
+								 <b>Note:</b> <br>
+                                 Although the function itself is designed non-blocking, the assigned DbLog device should
+                                 operated in asynchronous mode to avoid blocking of FHEMWEB (table lock). <br>
+                                 It is also strongly recommended to use the standard INDEX 'Search_Idx' in the table 'history'. 
+                                 to put on ! <br>
+		                         The processing of this command may take an extremely long time (without INDEX). <br><br>
+                                 </li> <br> 
+								 
     <li><b> repairSQLite </b>  - repairs a corrupted SQLite database. <br>
                                  A corruption is usally existent when the error message "database disk image is malformed"
                                  appears in reading "state" of the connected DbLog-device.
@@ -12942,22 +13002,26 @@ return;
 	                                
                                  </li><br><br>                                   
 
-	<li><b> sumValue [display | writeToDB]</b>     
-                                 - calculates the summary of database column "VALUE" between period given by 
-	                             <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or 
-								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
-								 "reading". Using this function is mostly reasonable if value-differences of readings 
-								 are written to the database. <br>
-
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculation results are stored in the database with a new reading
-                                 name. <br>
-                                 The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	 
-                                 The prefix is made up of the creation function and the aggregation. <br>
-                                 The timestamp of the new stored readings is deviated from aggregation period, 
-                                 unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+    <li><b> sumValue [display | writeToDB | writeToDBSingle] </b>      
+                                 - Calculates the total values of the database field "VALUE" in the time limits 
+	                             of the possible time.*-attributes. <br><br>
+                                 
+                                 The reading to be evaluated must be specified in the attribute <a href="#reading">reading</a>. 
+                                 This function is useful if continuous value differences of a reading are written 
+                                 into the database.  <br><br>
+                                 
+                                 If none or the option <b>display</b> is specified, the results are only displayed. With 
+                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
+                                 with a new reading name into the database. <br>
+                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
+                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 
+                                 The new reading name is formed from a prefix and the original reading name, 
+								 where the original reading name can be replaced by the attribute "readingNameMap". 
+                                 The prefix consists of the educational function and the aggregation. <br>
+                                 The timestamp of the new reading in the database is determined by the set aggregation period 
+                                 if no clear time of the result can be determined. 
+                                 The field "EVENT" is filled with "calculated".  <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -14229,15 +14293,21 @@ sub bdump {
                                
                                </li> <br>
                                
-    <li><b> averageValue [display | writeToDB]</b> 
-                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den 
-                                 gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein. <br>
-                                 Mit dem Attribut "averageCalcForm" wird die Berechnungsvariante zur Mittelwertermittlung definiert.                               
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
+    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b> 
+                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen 
+	                             der möglichen time.*-Attribute. <br><br>
+                                 
+                                 Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
+								 angegeben sein.                                  
+                                 Mit dem Attribut <a href="#averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur 
+                                 Mittelwertermittlung definiert. <br><br>
+                                 
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
+                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
+                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
@@ -15176,24 +15246,23 @@ sub bdump {
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
 
-    <li><b> reduceLog [average[=day]] </b> <br>
-                                 Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
-                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading.
-                                 Es muss mindestens eines der "time.*"-Attribute gesetzt sein (siehe Tabelle unten). 
+    <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
+                                 Reduziert historische Datensätze. <br><br>
+								 
+								 <b>Arbeitsweise ohne Optionsangabe</b> <br><br>
+								 
+								 Sind keine Optionen angegeben, werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
+                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading reduziert.
+                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten). 
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
                                  
-                                 Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
-                                 Mit der Option 'average=day' werden alle numerischen Werte eines Tages auf einen einzigen 
-                                 Mittelwert reduziert (impliziert 'average'). <br><br>
-                                 
-                                 Mit den Attributen "device" und "reading" können die zu berücksichtigenden Datensätze eingeschlossen
+                                 Mit den Attributen <b>device</b> und <b>reading</b> können die zu berücksichtigenden Datensätze eingeschlossen
                                  bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
                                  Ressourcenbedarf. 
                                  Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls.  <br><br>
-                                 
-                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+								 
+                 	             Unter Berücksichtigung des oben genannten sind für diese Funktion folgende Attribute relevant: <br><br>
                                  
 	                             <ul>
                                  <table>  
@@ -15210,18 +15279,9 @@ sub bdump {
                                  </table>
 	                             </ul>
                                  <br>
-                                 
-                                 Aus Kompatibilitätsgründen kann der Set-Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
-                                 direkt ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
-                                 <ul>
-                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
-                                 </ul>
-                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" und "reading",
-                                 die in diesem Fall nicht beachtet werden. <br><br>
-          
-                                 <ul>
+								 
                                  <b>Beispiele: </b><br><br>
-                                 
+                                 <ul>
                                  attr &lt;name&gt; timeOlderThan = d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
@@ -15251,7 +15311,21 @@ sub bdump {
                                  werden bereinigt. Numerische Werte einer Stunde werden auf einen Mittelwert reduziert <br>                                  
                                  <br>
 								 </ul>
-                                 
+								 <br>
+								 
+								 <b>Arbeitsweise mit Optionsangabe</b> <br><br>
+								 
+								 Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
+								 <b>&lt;nn&gt;</b> Tage.
+                                 Durch die Angabe von <b>average</b> wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
+                                 Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
+                                 Mittelwert reduziert (impliziert 'average'). <br><br>
+
+                                 Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen 
+								 bzw. einzuschließen. Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" 
+								 und "reading", die in diesem Fall nicht beachtet werden. <br><br>					
+                                        
 								 <b>Hinweis:</b> <br>
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden 
@@ -15466,16 +15540,20 @@ sub bdump {
 	                                
                                  </li><br><br>
 								 
-    <li><b> sumValue [display | writeToDB]</b>     
+    <li><b> sumValue [display | writeToDB | writeToDBSingle]</b>     
                                  - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
-								 Readings in die Datenbank geschrieben werden.  <br>
+	                             der möglichen time.*-Attribute. <br><br>
                                  
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
+                                 Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
+								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
+								 Readings in die Datenbank geschrieben werden.  <br><br>
+                                 
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
+                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
+                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
