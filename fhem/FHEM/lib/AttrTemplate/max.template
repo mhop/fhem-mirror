@@ -32,7 +32,7 @@ battery\
 rferror\
 Activity
 attr DEVICE webCmd temperature:desiredTemperature:valveposition
-attr DEVICE webCmdLabel Ist<br>:Soll<br>:Ventil<br>
+attr DEVICE webCmdLabel LABEL
 attr DEVICE widgetOverride valveposition:slider,0,1,100 temperature:selectnumbers,15,0.1,29,1,lin
 attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
@@ -52,6 +52,7 @@ par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
 par:ACT;ACT as set, defaults to MAX;{ AttrVal("DEVICE","actCycle","0:15") }
 par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1") }
 par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
+par:LABEL;;{ (AttrVal('global','language','DE') eq 'DE') ? return 'Ist<br>:Soll<br>:Ventil<br>' : return 'Actual<br>Desired<br>:Valveposition<br>' }
 attr DEVICE icon ICON
 attr DEVICE comment COMMENT
 attr DEVICE debug DEBUG
@@ -62,7 +63,7 @@ battery\
 rferror\
 Activity
 attr DEVICE webCmd temperature:desiredTemperature
-attr DEVICE webCmdLabel Ist<br>:Soll<br>
+attr DEVICE webCmdLabel LABEL
 attr DEVICE widgetOverride temperature:selectnumbers,15,0.1,29,1,lin
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
@@ -78,6 +79,7 @@ par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","hm-sec-win") }
 par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
 par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_ShutterContact_1") }
 par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
+par:LABEL;;{ (AttrVal('global','language','DE') eq 'DE') ? return 'Ist<br>:Soll<br>' : return 'Actual<br>Desired<br>' }
 attr DEVICE icon ICON
 attr DEVICE comment COMMENT
 attr DEVICE debug DEBUG
