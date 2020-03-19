@@ -2063,18 +2063,19 @@ sub DbRep_Main($$;$) {
         } elsif ($prop eq "allDevCount") {
             $prop = "select device, count(*) from history group by DEVICE;";
         } elsif ($prop eq "recentReadingsOfDevice") {
-            my $tq;
-            if($dbmodel =~ /MYSQL/)  {$tq = "NOW() - INTERVAL 1 DAY"};
-            if($dbmodel =~ /SQLITE/) {$tq = "date('now','-1 day')"};
+            my ($tq,$gcl);
+            if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
+            if($dbmodel =~ /SQLITE/)     {$tq = "date('now','-1 day')"; $gcl = "READING"};
+            if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
+            
             my @cmd = split(/\s/, "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
                                      FROM history t1
                                      INNER JOIN
                                      (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
-                                        from history where DEVICE = \"$device\" and TIMESTAMP > ".$tq." group by READING) x
+                                        from history where DEVICE = '".$device."' and TIMESTAMP > ".$tq." group by ".$gcl.") x
                                      ON x.TIMESTAMP = t1.TIMESTAMP AND
                                         x.DEVICE    = t1.DEVICE    AND
                                         x.READING   = t1.READING;");
-            # if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"};
             
             $prop   = join(" ", @cmd);
         }
