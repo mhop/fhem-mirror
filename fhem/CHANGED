@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     89_ESPEInk: New Module for EInk Modules connected to ESP boards
  - feature: 73_AutoShuttersControl: add additional condition
                                      for holidyweekend drive Time
  - feature: 98_RandomTimer: Add "variations" parameter to further randomize
