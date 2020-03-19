@@ -77,10 +77,10 @@ sub RandomTimer_Define($$) {
   my ($hash, $def) = @_;
 
   RemoveInternalTimer($hash);
-  my ($name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch) =
+  my ($name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch, $variation) =
     split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch>"
+  return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch> [<variations>]"
     if(!defined $timeToSwitch);
 
   return "Wrong timespec_start <$timespec_start>, use \"[+][*]<time or func>\""
@@ -102,7 +102,13 @@ sub RandomTimer_Define($$) {
 
   return "invalid timeToSwitch <$timeToSwitch>, use 9999"
      if(!($timeToSwitch =~  m/^[0-9]{2,4}$/i));
-
+  my ($varDuration,$varStart); 
+  $varDuration=0;
+  $varStart=0;
+  if(defined $variation) {
+    $variation =~ /^([\d]+)/ ? $varDuration = $1 : undef;
+    $variation =~ /[:]([\d]+)/ ? $varStart = $1 : undef;
+  }
   RandomTimer_setSwitchmode ($hash, "800/200") if (!defined $hash->{helper}{SWITCHMODE});
 
   $hash->{NAME}                   = $name;
@@ -112,8 +118,11 @@ sub RandomTimer_Define($$) {
   $hash->{helper}{TIMETOSWITCH}   = $timeToSwitch;
   $hash->{helper}{REP}            = $rep;
   $hash->{helper}{REL}            = $rel;
-  $hash->{helper}{S_REP}          = $srep;
+  $hash->{helper}{VAR_DURATION}   = $varDuration;
+  $hash->{helper}{VAR_START}      = $varStart;
   $hash->{helper}{S_REL}          = $srel;
+  $hash->{helper}{S_REL}          = $srel;
+  
   $hash->{COMMAND}                = Value($hash->{DEVICE}) if ($featurelevel < 6.1);
   if ($featurelevel > 6.0) {
     $hash->{COMMAND}              = ReadingsVal($hash->{DEVICE},"state",undef) ;
@@ -338,6 +347,7 @@ sub RandomTimer_Exec($) {
 
    my $nextSwitch = time() + RandomTimer_getSecsToNextAbschaltTest($hash);
    RandomTimer_RemoveInternalTimer("Exec", $hash);
+   $hash->{helper}{NEXT_CHECK} = strftime("%d.%m.%Y  %H:%M:%S",localtime($nextSwitch));
    RandomTimer_InternalTimer("Exec", $nextSwitch, "RandomTimer_Exec", $hash, 0);
 
 }
@@ -345,11 +355,13 @@ sub RandomTimer_Exec($) {
 sub RandomTimer_getSecsToNextAbschaltTest($) {
     my ($hash) = @_;
     my $intervall = $hash->{helper}{TIMETOSWITCH};
-
-    my $proz = 10;
-    my $delta    = $intervall * $proz/100;
-    my $nextSecs = $intervall - $delta/2 + int(rand($delta));
-
+    my $varDuration = $hash->{helper}{VAR_DURATION};
+    my $nextSecs = $intervall + int(rand($varDuration));
+    unless ($varDuration) {
+      my $proz = 10;
+      my $delta    = $intervall * $proz/100;
+      $nextSecs = $intervall - $delta/2 + int(rand($delta));
+    }
     return $nextSecs;
 }
 
@@ -477,6 +489,9 @@ sub RandomTimer_startZeitErmitteln  ($$) {
    } else {
       $startTime = RandomTimer_zeitBerechnen($now, $hour, $min, $sec);
    }
+   my $varStart = $hash->{helper}{VAR_START};
+   $startTime += int(rand($varStart));
+   
    $hash->{helper}{startTime} = $startTime;
    $hash->{helper}{STARTTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($startTime));
 }
@@ -622,7 +637,23 @@ sub RandomTimer_GetHashIndirekt ($$) {
         </li><br>
         <li>
           <code>timeToSwitch</code><br>
-          The parameter <b>timeToSwitch</b> defines the time in seconds between two on/off switches.
+          The parameter <b>timeToSwitch</b> defines the time in seconds between two on/off switches.<br>
+          Note: timeToSwitch will randomly vary by +-10% by default.
+        </li><br>
+        <li>
+          <code>variations</code><br>
+          The optional parameters <b>variations</b> will modify <i>timeToSwitch</i> and/or <i>timespec_start</i>, syntax is [VAR_DURATION][:VAR_START].<br>
+          <ul>
+            <li>VAR_DURATION will turn <i>timeToSwitch</i> to a minimum value with some random seconds between zero and VAR_DURATION will be added.</li>
+            <li>VAR_START will modify <i>timespec_start</i> by adding some random seconds between zero and VAR_START.</li>
+            <b>Examples:</b><br>
+            Add something between 0 and 10 minutes to <i>timeToSwitch</i>:<br>
+            <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 600</code><br>
+            Randomize day's first check by half an hour:<br>
+            <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 :1800</code><br>
+            Do both:<br>
+            <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 600:1800</code><br>
+          </ul>
         </li>
       </ul>
       <br>

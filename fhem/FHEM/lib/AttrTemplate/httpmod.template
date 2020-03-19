@@ -77,7 +77,7 @@ attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement0
 attr DEVICE enableControlSet 1
 attr DEVICE reading010Name Heizoelpreis
 attr DEVICE reading010OExpr $val =~ s/,/\./;; $val;;
-attr DEVICE reading010Regex ([\d\,]+)[\s]*€
+attr DEVICE reading010Regex ([\d\,]+)[\s]+€
 attr DEVICE replacement01Mode text
 attr DEVICE replacement01Regex %%PLZ%%
 attr DEVICE replacement01Value 40764

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_RandomTimer: Add "variations" parameter to further randomize
+                            possible switching times 
  - feature: 77_SMAEM: add define option <interface>
  - bugfix:  98_WeekdayTimer: prevent crashes related to weekprofile changes 
  - bugfix:  93_DbRep: fix user rights check for index operation
