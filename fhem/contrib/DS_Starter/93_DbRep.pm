@@ -58,6 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.36.0"  => "19.03.2020  sqlSpecial recentReadingsOfDevice ",
+  "8.35.0"  => "19.03.2020  option older than days and newer than days for delEntries function ",
   "8.34.0"  => "18.03.2020  option writeToDBSingle for functions averageValue, sumValue ",     
   "8.33.0"  => "18.03.2020  option older than days and newer than days for reduceLog function ",
   "8.32.4"  => "15.03.2020  fix rights check for index operation ",
@@ -552,7 +554,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB,writeToDBSingle ":"").
                 (($hash->{ROLE} ne "Agent")?"changeValue ":"").
                 (($hash->{ROLE} ne "Agent")?"delDoublets:adviceDelete,delete ":"").
-                (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"delEntries ":"").
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
 				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
@@ -568,7 +570,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
-                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
@@ -801,6 +803,8 @@ sub DbRep_Set($@) {
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
+	  delete $hash->{HELPER}{DELENTRIES};
+	  $hash->{HELPER}{DELENTRIES} = \@a;
       DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
       
@@ -2009,7 +2013,15 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "minValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
- } elsif ($opt eq "delEntries") {         
+ } elsif ($opt eq "delEntries") {
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     if($nthants >= $othants) {
+	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+         return;
+	 }  
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentPurge") {
@@ -2044,12 +2056,27 @@ sub DbRep_Main($$;$) {
     if ($opt =~ /sqlSpecial/) {
         if($prop eq "50mostFreqLogsLast2days") {
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /SQLITE/);
+            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
             $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
         } elsif ($prop eq "allDevReadCount") {
             $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
         } elsif ($prop eq "allDevCount") {
             $prop = "select device, count(*) from history group by DEVICE;";
+        } elsif ($prop eq "recentReadingsOfDevice") {
+            my $tq;
+            if($dbmodel =~ /MYSQL/)  {$tq = "NOW() - INTERVAL 1 DAY"};
+            if($dbmodel =~ /SQLITE/) {$tq = "date('now','-1 day')"};
+            my @cmd = split(/\s/, "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
+                                     FROM history t1
+                                     INNER JOIN
+                                     (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
+                                        from history where DEVICE = \"$device\" and TIMESTAMP > ".$tq." group by READING) x
+                                     ON x.TIMESTAMP = t1.TIMESTAMP AND
+                                        x.DEVICE    = t1.DEVICE    AND
+                                        x.READING   = t1.READING;");
+            # if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"};
+            
+            $prop   = join(" ", @cmd);
         }
     }
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
@@ -2062,7 +2089,7 @@ sub DbRep_Main($$;$) {
  
  if ($opt =~ /reduceLog/) {
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
      my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
      if($nthants >= $othants) {
@@ -9806,13 +9833,14 @@ sub DbRep_normRelTime($) {
  my $tdtn     = AttrVal($name, "timeDiffToNow", undef);
  my $toth     = AttrVal($name, "timeOlderThan", undef);
  my $fdopt    = 0;                                                    # FullDay Option 
- my ($y,$d,$h,$m,$s,$aval);
+ my ($y,$d,$h,$m,$s,$aval,@a);
  
- # evtl. Relativzeiten bei "reduceLog" berücksichtigen
- my @a = @{$hash->{HELPER}{REDUCELOG}} if($hash->{HELPER}{REDUCELOG});
+ # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
+ @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
+ @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
  foreach (@a) {     
 	 if($_ =~ /\b(\d+(:\d+)?)\b/) {
-		 my ($od,$nd) = split(":",$1);                           # $od - Tage älter als , $nd - Tage neuer als
+		 my ($od,$nd) = split(":",$1);                                # $od - Tage älter als , $nd - Tage neuer als
 		 $toth        = "d:$od" if($od);
 		 $tdtn        = "d:$nd" if($nd);
 	 }
@@ -11990,19 +12018,27 @@ return;
                                 
                                  </li>
                                  
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
-	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
+    <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  deletes all database entries or only the database entries specified by 
+	                             <a href="#DbRepattr">attributes</a> device and/or reading. <br><br>
+								 
+								 The time limits are considered according to the available time.*-attributes: <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" is set <b>-&gt;</b> deletes db entries <b>from</b> this timestamp until current date/time <br>
-                                 "timestamp_end" is set  <b>-&gt;</b>  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set <b>-&gt;</b>  deletes db entries <b>between</b> these timestamps <br>
-                                 "timeOlderThan" is set  <b>-&gt;</b>  delete entries <b>older</b> than current time minus "timeOlderThan" <br>
-                                 "timeDiffToNow" is set  <b>-&gt;</b>  delete db entries <b>from</b> current time minus "timeDiffToNow" until now <br>
-                                 
+                                  "timestamp_begin" is set <b>-&gt;</b> deletes db entries <b>from</b> this timestamp until current date/time <br>
+                                  "timestamp_end" is set  <b>-&gt;</b>  deletes db entries <b>until</b> this timestamp <br>
+                                  both Timestamps are set <b>-&gt;</b>  deletes db entries <b>between</b> these timestamps <br>
+                                  "timeOlderThan" is set  <b>-&gt;</b>  delete entries <b>older</b> than current time minus "timeOlderThan" <br>
+                                  "timeDiffToNow" is set  <b>-&gt;</b>  delete db entries <b>from</b> current time minus "timeDiffToNow" until now <br>
+                                 </ul>
+								 
                                  <br>
-                                 Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs to be set to unlock the 
+                                 Due to security reasons the attribute <a href="#allowDeletion">allowDeletion</a> needs to be set to unlock the 
 								 delete-function. <br>
+								 Time limits (days) can be specified as an option. In this case, any time.*-attributes set are 
+								 overmodulated.
+								 Records older than <b>&lt;no&gt;</b> days and (optionally) newer than 
+								 <b>&lt;nn&gt;</b> days are considered.
+								 <br><br>
                                  
                                  The relevant attributes to control function changeValue delEntries are: <br><br>
 
@@ -12022,7 +12058,6 @@ return;
                                  
                                  </li>
 								 <br>
-                                 </ul>
 								 
     <li><b> delSeqDoublets [adviceRemain | adviceDelete | delete]</b> -  show respectively delete identical sequentially datasets.
                                  Therefore Device,Reading and Value of the sequentially datasets are compared.
@@ -14500,7 +14535,7 @@ sub bdump {
                                 
                                  </li>
 
-    <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
+    <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
 	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
 								 folgendermaßen: <br><br>
                                  
@@ -14513,8 +14548,13 @@ sub bdump {
                                  </ul>                                 
                                  <br>
                                  
-                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
-								 gesetzt sein um die Löschfunktion freizuschalten. <br><br>
+                                 Aus Sicherheitsgründen muss das Attribut <a href="#allowDeletion">allowDeletion</a>
+								 gesetzt sein um die Löschfunktion freizuschalten. <br> 
+								 Zeitgrenzen (Tage) können als Option angegeben werden. In diesem Fall werden eventuell gesetzte Zeitattribute 
+								 übersteuert.
+								 Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
+								 <b>&lt;nn&gt;</b> Tage.
+								 <br><br>
                                  
                                  Die zur Steuerung von delEntries relevanten Attribute: <br><br>
 
