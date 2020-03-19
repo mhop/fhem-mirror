@@ -2065,7 +2065,7 @@ sub DbRep_Main($$;$) {
         } elsif ($prop eq "recentReadingsOfDevice") {
             my ($tq,$gcl);
             if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
-            if($dbmodel =~ /SQLITE/)     {$tq = "date('now','-1 day')"; $gcl = "READING"};
+            if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
             if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
             
             my @cmd = split(/\s/, "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
