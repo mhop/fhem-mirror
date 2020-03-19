@@ -3468,6 +3468,7 @@ sub _IsDay($) {
                         )
                         and IsWe()
                         and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                        and $shutters->getTimeUpWeHoliday ne '01:25'
                     )
                 )
                 and int( gettimeofday() / 86400 ) == int(
@@ -3580,7 +3581,8 @@ sub ShuttersSunrise($$) {
     if ( $tm eq 'unix' ) {
         if ( $shutters->getUp eq 'astro' ) {
             if ( ( IsWe() or IsWeTomorrow() )
-                and $ascDev->getSunriseTimeWeHoliday eq 'on' )
+                and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
                 if ( not IsWeTomorrow() ) {
                     if (
@@ -3770,7 +3772,8 @@ sub ShuttersSunrise($$) {
             if (    defined($oldFuncHash)
                 and ref($oldFuncHash) eq 'HASH'
                 and ( IsWe() or IsWeTomorrow() )
-                and $ascDev->getSunriseTimeWeHoliday eq 'on' )
+                and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
                 if ( not IsWeTomorrow() ) {
                     if (
@@ -3806,7 +3809,8 @@ sub ShuttersSunrise($$) {
         }
         elsif ( $shutters->getUp eq 'time' ) {
             if ( ( IsWe() or IsWeTomorrow() )
-                and $ascDev->getSunriseTimeWeHoliday eq 'on' )
+                and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
                 if ( not IsWeTomorrow() ) {
                     if (
@@ -6205,7 +6209,7 @@ sub getTimeDownLate {
 sub getTimeUpWeHoliday {
     my $self = shift;
     my $val =
-      AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_WE_Holiday', '08:00' );
+      AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_WE_Holiday', '01:25' );
 
     if ( defined( FHEM::AutoShuttersControl::_perlCodeCheck($val) ) ) {
         $val = FHEM::AutoShuttersControl::_perlCodeCheck($val);
@@ -6214,7 +6218,7 @@ sub getTimeUpWeHoliday {
     return (
           $val =~ /^(?:[01]?\d|2[0-3]):(?:[0-5]\d)(:(?:[0-5]\d))?$/
         ? $val
-        : '08:00'
+        : '01:25'
     );
 }
 
@@ -7909,7 +7913,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.18",
+  "version": "v0.8.19",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
