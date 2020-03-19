@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.022
+#  Version 4.3.023
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.022';
+my $HMCCU_VERSION = '4.3.023';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -353,6 +353,8 @@ sub HMCCU_GetDutyCycle ($);
 sub HMCCU_GetHMState ($$$);
 sub HMCCU_GetIdFromIP ($$);
 sub HMCCU_GetTimeSpec ($);
+sub HMCCU_Max ($$);
+sub HMCCU_Min ($$);
 sub HMCCU_MaxHashEntries ($$);
 sub HMCCU_RefToString ($);
 sub HMCCU_ResolveName ($$);
@@ -1378,7 +1380,7 @@ sub HMCCU_DelayedShutdown ($)
 	
 #	HMCCU_Log ($hash, 3, "DelayedShutdown()");
 	
-	my $delay = max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
+	my $delay = HMCCU_Max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
 
 	# Shutdown RPC server
 	if (!exists ($hash->{hmccu}{delayedShutdown})) {
@@ -7043,7 +7045,7 @@ sub HMCCU_UpdateCB ($$$)
 	
 	my $c_ok = HMCCU_UpdateMultipleDevices ($hash, \%events);
 	my $c_err = 0;
-	$c_err = max($param->{devCount}-$c_ok, 0) if (exists ($param->{devCount}));
+	$c_err = HMCCU_Max($param->{devCount}-$c_ok, 0) if (exists ($param->{devCount}));
 	HMCCU_Log ($hash, 2, "Update success=$c_ok failed=$c_err") if ($logcount);
 }
 
@@ -7590,6 +7592,20 @@ sub HMCCU_GetHMState ($$$)
 	}
 
 	return @hmstate;
+}
+
+sub HMCCU_Min ($$)
+{
+	my ($a, $b) = @_;
+	
+	return $a < $b ? $a : $b;
+}
+
+sub HMCCU_Max ($$)
+{
+	my ($a, $b) = @_;
+	
+	return $a > $b ? $a : $b;
 }
 
 ######################################################################

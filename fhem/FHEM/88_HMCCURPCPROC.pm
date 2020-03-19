@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.9
+#  Version 1.9.001
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -35,7 +35,7 @@ use SetExtensions;
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '1.9';
+my $HMCCURPCPROC_VERSION = '1.9.001';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -440,7 +440,7 @@ sub HMCCURPCPROC_DelayedShutdown ($)
 	
 #	HMCCU_Log ($hash, 3, "DelayedShutdown()");
 	
-	my $delay = max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
+	my $delay = HMCCU_Max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
 
 	# Shutdown RPC server
 	if (defined ($hmccu_hash) && exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}{manager}) &&
