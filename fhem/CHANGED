@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: older than days / newer than days for reduceLog
+                      and delEntries as option, option writeToDBSingle 
+                      for averageValue and sumValue, 
+                      new sqlSpecial recentReadingsOfDevice,
+                      Forum: #topic,53584.msg1032788.html#msg1032788
  - feature: 72_TA_CMI_JSON: DL-Bus data now also available to RSM (thx mkwi)
  - new:     89_ESPEInk: New Module for EInk Modules connected to ESP boards
  - feature: 73_AutoShuttersControl: add additional condition

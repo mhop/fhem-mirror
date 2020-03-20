@@ -58,6 +58,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.36.0"  => "19.03.2020  sqlSpecial recentReadingsOfDevice ",
+  "8.35.0"  => "19.03.2020  option older than days and newer than days for delEntries function ",
+  "8.34.0"  => "18.03.2020  option writeToDBSingle for functions averageValue, sumValue ",     
+  "8.33.0"  => "18.03.2020  option older than days and newer than days for reduceLog function ",
   "8.32.4"  => "15.03.2020  fix rights check for index operation ",
   "8.32.3"  => "10.03.2020  better logfile messages in some cases of index operation  ",
   "8.32.2"  => "01.03.2020  fix PERL WARNING: Argument \"\" isn't numeric in sprintf at ./FHEM/93_DbRep.pm line 10708 again ",
@@ -546,11 +550,11 @@ sub DbRep_Set($@) {
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
-                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB ":"").
-                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB ":"").
+                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB,writeToDBSingle ":"").
+                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB,writeToDBSingle ":"").
                 (($hash->{ROLE} ne "Agent")?"changeValue ":"").
                 (($hash->{ROLE} ne "Agent")?"delDoublets:adviceDelete,delete ":"").
-                (($hash->{ROLE} ne "Agent")?"delEntries:noArg ":"").
+                (($hash->{ROLE} ne "Agent")?"delEntries ":"").
 				(($hash->{ROLE} ne "Agent")?"delSeqDoublets:adviceRemain,adviceDelete,delete ":"").
                 "deviceRename ".
 				(($hash->{ROLE} ne "Agent")?"readingRename ":"").
@@ -566,7 +570,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
-                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
@@ -583,8 +587,7 @@ sub DbRep_Set($@) {
     
   if ($opt =~ /eraseReadings/) {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-       # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
-       DbRep_delread($hash);
+       DbRep_delread($hash);                             # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
        return undef;
   }
   
@@ -599,7 +602,6 @@ sub DbRep_Set($@) {
            Log3 ($name, 3, "DbRep $name - ###             New database clientSide dump                 ###");
            Log3 ($name, 3, "DbRep $name - ################################################################");
 	   }
-	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "dump");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
@@ -610,7 +612,6 @@ sub DbRep_Set($@) {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New SQLite dump                       ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
-	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "dump");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
@@ -620,7 +621,6 @@ sub DbRep_Set($@) {
        $prop = $prop?$prop:36000;
        if($prop) {
            unless($prop =~ /^(\d+)$/) { return " The Value of $opt is not valid. Use only figures 0-9 without decimal places !";};
-           # unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
        }
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
        Log3 ($name, 3, "DbRep $name - ################################################################");
@@ -631,7 +631,6 @@ sub DbRep_Set($@) {
        my $dbl = $dbloghash->{NAME};
        CommandSet(undef,"$dbl reopen $prop");
        
-	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "repair");
 	   DbRep_Main($hash,$opt);
        return undef;
@@ -642,7 +641,6 @@ sub DbRep_Set($@) {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###             New database Restore/Recovery                ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
-	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "restore");
 	   DbRep_Main($hash,$opt,$prop);
        return undef;
@@ -653,7 +651,6 @@ sub DbRep_Set($@) {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###          New optimize table / vacuum execution           ###");
        Log3 ($name, 3, "DbRep $name - ################################################################");
-	   # Befehl vor Procedure ausführen
        DbRep_beforeproc($hash, "optimize");	   
 	   DbRep_Main($hash,$opt);
        return undef;
@@ -681,7 +678,6 @@ sub DbRep_Set($@) {
           Log3 ($name, 3, "DbRep $name - ################################################################");
           Log3 ($name, 3, "DbRep $name - ###                    new reduceLog run                     ###");
           Log3 ($name, 3, "DbRep $name - ################################################################");
-          # Befehl vor Procedure ausführen
           DbRep_beforeproc($hash, "reduceLog");	   
           DbRep_Main($hash,$opt);
           return undef;
@@ -799,13 +795,15 @@ sub DbRep_Set($@) {
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
+	  delete $hash->{HELPER}{DELENTRIES};
+	  $hash->{HELPER}{DELENTRIES} = \@a;
       DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
       
   } elsif ($opt eq "deviceRename") {
       shift @a;
       shift @a;
-      $prop = join(" ",@a);      # Device Name kann Leerzeichen enthalten
+      $prop = join(" ",@a);                                                     # Device Name kann Leerzeichen enthalten
       my ($olddev, $newdev) = split(",",$prop);
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";    
       if (!$olddev || !$newdev) {return "Both entries \"old device name\", \"new device name\" are needed. Use \"set $name deviceRename olddevname,newdevname\" ";}
@@ -817,7 +815,7 @@ sub DbRep_Set($@) {
   } elsif ($opt eq "readingRename") {
       shift @a;
       shift @a;
-      $prop = join(" ",@a);      # Readingname kann Leerzeichen enthalten
+      $prop = join(" ",@a);                                                     # Readingname kann Leerzeichen enthalten
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my ($oldread, $newread) = split(",",$prop);
       if (!$oldread || !$newread) {return "Both entries \"old reading name\", \"new reading name\" are needed. Use \"set $name readingRename oldreadingname,newreadingname\" ";}
@@ -896,7 +894,6 @@ sub DbRep_Set($@) {
       
   } elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
-      # remove arg 0, 1 to get SQL command
       my $sqlcmd;
       if($opt eq "sqlSpecial") {
           $sqlcmd = $prop;
@@ -905,7 +902,9 @@ sub DbRep_Set($@) {
           my @cmd = @a;
           shift @cmd; shift @cmd;
           $sqlcmd = join(" ", @cmd);
-          $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          @cmd    = split(/\s/, $sqlcmd);
+		  $sqlcmd = join(" ", @cmd);
+		  # $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;    # V8.36.0 20.03.2020
       }
       if($opt eq "sqlCmdHistory") {
           $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
@@ -1041,7 +1040,6 @@ sub DbRep_Get($@) {
   
   } elsif ($opt =~ /dbValue/) {
       return "get \"$opt\" needs at least an argument" if ( @a < 3 );
-      # remove arg 0, 1 to get SQL command
       my @cmd = @a;
       shift @cmd; shift @cmd;
       my $sqlcmd = join(" ",@cmd);
@@ -2007,7 +2005,15 @@ sub DbRep_Main($$;$) {
  } elsif ($opt eq "minValue") {        
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
- } elsif ($opt eq "delEntries") {         
+ } elsif ($opt eq "delEntries") {
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     if($nthants >= $othants) {
+	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+         return;
+	 }  
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentPurge") {
@@ -2042,12 +2048,28 @@ sub DbRep_Main($$;$) {
     if ($opt =~ /sqlSpecial/) {
         if($prop eq "50mostFreqLogsLast2days") {
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
-            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /SQLITE/);
+            $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
             $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
         } elsif ($prop eq "allDevReadCount") {
             $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
         } elsif ($prop eq "allDevCount") {
             $prop = "select device, count(*) from history group by DEVICE;";
+        } elsif ($prop eq "recentReadingsOfDevice") {
+            my ($tq,$gcl);
+            if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
+            if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
+            if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
+            
+            my @cmd = split(/\s/, "SELECT t1.TIMESTAMP,t1.DEVICE,t1.READING,t1.VALUE
+                                     FROM history t1
+                                     INNER JOIN
+                                     (select max(TIMESTAMP) AS TIMESTAMP,DEVICE,READING
+                                        from history where DEVICE = '".$device."' and TIMESTAMP > ".$tq." group by ".$gcl.") x
+                                     ON x.TIMESTAMP = t1.TIMESTAMP AND
+                                        x.DEVICE    = t1.DEVICE    AND
+                                        x.READING   = t1.READING;");
+            
+            $prop   = join(" ", @cmd);
         }
     }
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
@@ -2058,7 +2080,15 @@ sub DbRep_Main($$;$) {
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
  }
  
- if ($opt =~ /reduceLog/) {	
+ if ($opt =~ /reduceLog/) {
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     if($nthants >= $othants) {
+	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
+         return;
+	 } 
      $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
 	 ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
      $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if($hash->{HELPER}{RUNNING_REDUCELOG});  # Forum #77057 
@@ -2118,7 +2148,7 @@ sub DbRep_createTimeArray($$$) {
  }
 
  if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
-     AttrVal($name,"timestamp_end","") eq "current_year_begin") {
+          AttrVal($name,"timestamp_end","") eq "current_year_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
 	 $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_begin");
  } 
@@ -8547,12 +8577,23 @@ sub DbRep_reduceLog($) {
     my $dbmodel    = $dbloghash->{MODEL};
     my $dbpassword = $attr{"sec$dblogname"}{secret};
     my @a          = @{$hash->{HELPER}{REDUCELOG}};
+    my $rlpar      = join(" ", @a);
 	my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-    delete $hash->{HELPER}{REDUCELOG};
+
     my ($ret,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH);
     my (%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = (time(),99,0,0,0,0,0,0);
     my ($dbh,$err,$brt);
+    
+    BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","REDUCELOG"], 1);
+	
+	# ausfiltern von optionalen Zeitangaben, z.B. 700:750 -> Rest zur Einhaltung des ursprünglichen Formats nach @a schreiben
+	my @b;
+    foreach (@a) {     
+	    next if($_ =~ /\b(\d+(:\d+)?)\b/);
+        push @b, $_;
+    }
+	@a = @b;
 	
     Log3 ($name, 5, "DbRep $name -> Start DbLog_reduceLog");
 	
@@ -9785,7 +9826,18 @@ sub DbRep_normRelTime($) {
  my $tdtn     = AttrVal($name, "timeDiffToNow", undef);
  my $toth     = AttrVal($name, "timeOlderThan", undef);
  my $fdopt    = 0;                                                    # FullDay Option 
- my ($y,$d,$h,$m,$s,$aval);
+ my ($y,$d,$h,$m,$s,$aval,@a);
+ 
+ # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
+ @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
+ @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
+ foreach (@a) {     
+	 if($_ =~ /\b(\d+(:\d+)?)\b/) {
+		 my ($od,$nd) = split(":",$1);                                # $od - Tage älter als , $nd - Tage neuer als
+		 $toth        = "d:$od" if($od);
+		 $tdtn        = "d:$nd" if($nd);
+	 }
+ }
   
  if($tdtn && $tdtn =~ /^\s*[ydhms]:(([\d]+.[\d]+)|[\d]+)\s*/) {
      $aval = $tdtn;
@@ -10743,7 +10795,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
               if($i == 0) {              
-                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit") if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
                   push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");    
               } else {
                   if ($aggr =~ /no|day|week|month|year/) {
@@ -10755,7 +10807,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
                       $t1                = fhemTimeLocal(01, 00, $hour, $mday, $mon-1, $year-1900);
                       ($date,$time)      = split(" ",FmtDateTime($t1));                 
                   }
-                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit");
+                  push(@row_array, "$date $time|$device|$type|$event|$reading|$value|$unit") if($hash->{LASTCMD} !~ /\bwriteToDBSingle\b/);
                   push(@row_array, "$ndate $ntime|$device|$type|$event|$reading|$value|$unit");                   
               }              
           } 
@@ -11189,6 +11241,22 @@ sub DbRep_numval ($){
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
   
 return $val;
+}
+
+####################################################################################################
+#       löscht einen Wert vom $hash  des Hauptprozesses aus einem BlockingCall heraus     
+####################################################################################################
+sub DbRep_delHashValFromBlocking($$;$) {
+  my ($name,$v1,$v2) = @_;
+  my $hash        = $defs{$name};
+
+  if($v2) {
+      delete $hash->{$v1}{$v2};
+  } elsif ($v1) {
+      delete $hash->{$v1};
+  }
+
+return 1;
 }
 
 ################################################################
@@ -11740,21 +11808,27 @@ return;
                                
                                </li> <br>
  
-    <li><b> averageValue [display | writeToDB]</b> 
-                                 - calculates the average value of database column "VALUE" between period given by 
-                                 timestamp-<a href="#DbRepattr">attributes</a> which are set. 
-                                 The reading to evaluate must be specified by attribute "reading".  <br>
-                                 By attribute "averageCalcForm" the calculation variant for average determination will be configured.
+    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b>
+                                 - calculates an average value of the database field "VALUE" in the time limits 
+	                             of the possible time.*-attributes. <br><br>
                                  
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculated results are stored in the database with a new reading
-                                 name. <br>
-                                 The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".								 
-                                 The prefix is made up of the creation function and the aggregation. <br>
-                                 The timestamp of the new stored readings is deviated from aggregation period, 
-                                 unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+                                 The reading to be evaluated must be specified in the attribute <a href="#reading">reading</a> 
+								 must be specified.                                  
+                                 With the attribute <a href="#averageCalcForm">averageCalcForm</a> the calculation variant 
+                                 is used for Averaging defined. <br><br>
+                                 
+                                 If none or the option <b>display</b> is specified, the results are only displayed. With 
+                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
+                                 with a new reading name into the database. <br>
+                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
+                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 
+                                 The new reading name is formed from a prefix and the original reading name, 
+								 where the original reading name can be replaced by the attribute "readingNameMap".
+                                 The prefix consists of the educational function and the aggregation. <br>
+                                 The timestamp of the new readings in the database is determined by the set aggregation period 
+                                 if no clear time of the result can be determined. 
+                                 The field "EVENT" is filled with "calculated". <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -11937,19 +12011,27 @@ return;
                                 
                                  </li>
                                  
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or 
-	                             Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow/timeOlderThan". <br><br>
+    <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  deletes all database entries or only the database entries specified by 
+	                             <a href="#DbRepattr">attributes</a> device and/or reading. <br><br>
+								 
+								 The time limits are considered according to the available time.*-attributes: <br><br>
                                  
                                  <ul>
-                                 "timestamp_begin" is set <b>-&gt;</b> deletes db entries <b>from</b> this timestamp until current date/time <br>
-                                 "timestamp_end" is set  <b>-&gt;</b>  deletes db entries <b>until</b> this timestamp <br>
-                                 both Timestamps are set <b>-&gt;</b>  deletes db entries <b>between</b> these timestamps <br>
-                                 "timeOlderThan" is set  <b>-&gt;</b>  delete entries <b>older</b> than current time minus "timeOlderThan" <br>
-                                 "timeDiffToNow" is set  <b>-&gt;</b>  delete db entries <b>from</b> current time minus "timeDiffToNow" until now <br>
-                                 
+                                  "timestamp_begin" is set <b>-&gt;</b> deletes db entries <b>from</b> this timestamp until current date/time <br>
+                                  "timestamp_end" is set  <b>-&gt;</b>  deletes db entries <b>until</b> this timestamp <br>
+                                  both Timestamps are set <b>-&gt;</b>  deletes db entries <b>between</b> these timestamps <br>
+                                  "timeOlderThan" is set  <b>-&gt;</b>  delete entries <b>older</b> than current time minus "timeOlderThan" <br>
+                                  "timeDiffToNow" is set  <b>-&gt;</b>  delete db entries <b>from</b> current time minus "timeDiffToNow" until now <br>
+                                 </ul>
+								 
                                  <br>
-                                 Due to security reasons the attribute <a href="#DbRepattr">attribute</a> "allowDeletion" needs to be set to unlock the 
+                                 Due to security reasons the attribute <a href="#allowDeletion">allowDeletion</a> needs to be set to unlock the 
 								 delete-function. <br>
+								 Time limits (days) can be specified as an option. In this case, any time.*-attributes set are 
+								 overmodulated.
+								 Records older than <b>&lt;no&gt;</b> days and (optionally) newer than 
+								 <b>&lt;nn&gt;</b> days are considered.
+								 <br><br>
                                  
                                  The relevant attributes to control function changeValue delEntries are: <br><br>
 
@@ -11969,7 +12051,6 @@ return;
                                  
                                  </li>
 								 <br>
-                                 </ul>
 								 
     <li><b> delSeqDoublets [adviceRemain | adviceDelete | delete]</b> -  show respectively delete identical sequentially datasets.
                                  Therefore Device,Reading and Value of the sequentially datasets are compared.
@@ -12664,90 +12745,92 @@ return;
                                  is operating in asynchronous mode to avoid FHEMWEB from blocking. <br><br> 
                                  </li> <br>
                                  
-    <li><b> reduceLog [average[=day]] </b> <br>
-                                 Reduces historical records within the limits given by the "time.*"-attributes to one record 
-                                 (the 1st) each hour per device & reading. 
-                                 At least one of the "time.*"-attributes must be set (pls. see table below).
-                                 Each of missing time limit will be calculated by the module itself in this case.
+ <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
+                                 Reduces historical data sets. <br><br>
+								 
+								 <b>Method without option specification</b> <br><br>
+								 
+								 If no options are specified, the data will be stored within the time specified by the <b>time.*</b> attributes. 
+                                 Time limits reduced to one entry (the first) per hour per Device & Reading.
+                                 At least one of the <b>time.*</b> attributes must be set (see table below). 
+                                 In this case, the missing time limit is calculated by the module.
                                  <br><br>
                                  
-                                 With the optional argument 'average' not only the records will be reduced, but all numerical 
-                                 values of an hour will be reduced to a single average.
-                                 With option 'average=day' all numerical values of a day are reduced to a single average 
-                                 (implies 'average'). <br><br>
+                                 With the attributes <b>device</b> and <b>reading</b> the data records to be considered can be included
+                                 or be excluded. Both restrictions reduce the selected data and reduce the
+                                 resource requirements. 
+                                 The read "reduceLogState" contains the execution result of the last reduceLog command.  <br><br>
+								 
+                 	             Taking the above into account, the following attributes are relevant for this function: <br><br>
                                  
-                                 By setting attributes "device" and/or "reading" the records to be considered could be included
-                                 respectively excluded. Both containments delimit the selected data from database and may 
-                                 reduce the system RAM load. 
-                                 The reading "reduceLogState" contains the result of the last executed reducelog run.  <br><br>
-                                 
-                 	             The relevant attributes for this function are: <br><br>
-                                 
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
-                                      <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
-                                      <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
-                                      <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
-                                      <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
-                                   </table>
-	                               </ul>
-                                   <br>
-                                 
-                                 For compatibility reason the reducelog command can optionally be completed with supplements "EXCLUDE" 
-                                 respectively "INCLUDE" to exclude and/or include device/reading combinations from reducelog: <br><br>
-                                 <ul>
-                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
-                                 </ul>
-                                 This declaration is evaluated as Regex and overwrites the settings made by attributes "device" and "reading",
-                                 which won't be considered in this case. <br><br>
-          
-                                 <ul>
+	                             <ul>
+                                 <table>  
+                                 <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                <tr><td> <b>executeBeforeProc</b>                      </td><td>: execution of FHEM command (or Perl-routine) before reducelog </td></tr>
+                                    <tr><td> <b>executeAfterProc</b>                       </td><td>: execution of FHEM command (or Perl-routine) after reducelog </td></tr>
+                                    <tr><td> <b>device</b>                                 </td><td>: include or exclude &lt;device&gt; for selection </td></tr>
+                                    <tr><td> <b>reading</b>                                </td><td>: include or exclude &lt;reading&gt; for selection </td></tr>
+                                    <tr><td> <b>timeOlderThan</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timestamp_end</b>                          </td><td>: records <b>older</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timeDiffToNow</b>                          </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>timestamp_begin</b>                        </td><td>: records <b>newer</b> than this attribute will be reduced </td></tr>
+                                    <tr><td> <b>valueFilter</b>                            </td><td>: an additional REGEXP to control the record selection. The REGEXP is applied to the database field 'VALUE'. </td></tr>
+                                 </table>
+	                             </ul>
+                                 <br>
+								 
                                  <b>Examples: </b><br><br>
-                                 
+                                 <ul>
                                  attr &lt;name&gt; timeOlderThan = d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
-                                 # Records older than 200 days are reduced to the first entry per hour of each device and reading.
-                                 <br> 
+                                 # Records older than 200 days are written to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:200  <br>
                                  set &lt;name&gt; reduceLog average=day <br>
-                                 # Records newer than 200 days are reduced to a single average a day of each device and reading.
-                                 <br> 
+                                 # Records newer than 200 days are limited to one entry per day per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:30  <br>
                                  attr &lt;name&gt; device = TYPE=SONOSPLAYER EXCLUDE=Sonos_Kueche  <br>
                                  attr &lt;name&gt; reading = room% EXCLUDE=roomNameAlias  <br>
                                  set &lt;name&gt; reduceLog <br>
-                                 # Records newer than 30 days which are contain devices from type SONOSPLAYER 
-                                 (except device "Sonos_Kueche"), the readings beginning with "room" (except "roomNameAlias"),                       
-                                 are reduced to the first entry per hour of each device and reading.  <br> 
+                                 # Records newer than 30 days that are devices of type SONOSPLAYER 
+                                 (except Device "Sonos_Kitchen") and the readings start with "room" (except "roomNameAlias")                       
+                                 are reduced to the first entry per hour per Device & Reading.  <br> 
                                  <br>
                                  
                                  attr &lt;name&gt; timeDiffToNow = d:10 <br>
                                  attr &lt;name&gt; timeOlderThan = d:5  <br>
                                  attr &lt;name&gt; device = Luftdaten_remote  <br>
                                  set &lt;name&gt; reduceLog average <br>
-                                 # Records older than 5 and newer than 10 days and contain DEVICE "Luftdaten_remote" are 
-                                 revised. Numerical values are reduced to the first entry per hour of each device and reading 
-                                 <br>                                  
+                                 # Records older than 5 and newer than 10 days and containing DEVICE "Luftdaten_remote 
+                                 are adjusted. Numerical values of an hour are reduced to an average value <br>                                  
                                  <br>
 								 </ul>
-                                 
-								 <b>Note:</b> <br>
-                                 Even though the function itself is non-blocking, you have to set the attached DbLog  device into 
-                                 the asynchronous mode (attr asyncMode = 1) to avoid a blocking situation of FHEM !. <br>
-                                 It is strongly recommended to check if the default INDEX 'Search_Idx' exists on the table 
-                                 'history'! <br><br>
-                                 </li> <br>
+								 <br>        
 
+								 <b>Method with option specification</b> <br><br>
+								 
+								 Records older than <b>&lt;no&gt;</b> days and (optionally) newer than 
+								 <b>&lt;nn&gt;</b> days are considered.
+                                 Specifying <b>average</b> not only cleans up the database, but also 
+                                 all numerical values of an hour are reduced to a single mean value.
+                                 With the option <b>average=day</b> all numerical values of a day are reduced to a single 
+                                 Average value reduced (implies 'average'). <br><br>
+
+                                 The additions "EXCLUDE" and "INCLUDE" can be added to exclude device/reading combinations of reduceLog 
+								 or to include them. This specification is evaluated as regex and overwrites the setting of the attributes "device". 
+								 and "reading", which are not considered in this case. <br><br>					
+                                        
+								 <b>Note:</b> <br>
+                                 Although the function itself is designed non-blocking, the assigned DbLog device should
+                                 operated in asynchronous mode to avoid blocking of FHEMWEB (table lock). <br>
+                                 It is also strongly recommended to use the standard INDEX 'Search_Idx' in the table 'history'. 
+                                 to put on ! <br>
+		                         The processing of this command may take an extremely long time (without INDEX). <br><br>
+                                 </li> <br> 
+								 
     <li><b> repairSQLite </b>  - repairs a corrupted SQLite database. <br>
                                  A corruption is usally existent when the error message "database disk image is malformed"
                                  appears in reading "state" of the connected DbLog-device.
@@ -12919,10 +13002,24 @@ return;
 
     <li><b> sqlSpecial </b>    - This function provides a drop-down list with a selection of prepared reportings. <br>
 								 The statements result is depicted in reading "SqlResult".
-								 The result can be formatted by <a href="#DbRepattr">attribute</a> "sqlResultFormat", 
-                                 a well as the used field separator by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". 
+								 The result can be formatted by attribute <a href="#sqlResultFormat">sqlResultFormat</a> 
+                                 a well as the used field separator by attribute <a href="#sqlResultFieldSep">sqlResultFieldSep</a>. 
                                  <br><br>
-
+                                   
+                 	             The following predefined reportings are selectable: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: reports the 50 most occuring log entries of the last 2 days </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>: all devices occuring in database and their quantity </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>: all device/reading combinations occuring in database and their quantity </td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: determines the newest records of a device available in the database. The
+									                                                      device must be defined in attribute <a href="#reading">reading</a>. 
+																						  Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
+								   </table>
+	                               </ul>
+								   <br>
+								   
                  	             The relevant attributes for this function are: <br><br>
 	                               <ul>
                                    <table>  
@@ -12933,36 +13030,29 @@ return;
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
                                    </table>
 	                               </ul>
-                                   <br>
-                                   
-                 	             The following predefined reportings are selectable: <br><br>
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: reports the 50 most occuring log entries of the last 2 days </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>: all devices occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>: all device/reading combinations occuring in database and their quantity </td></tr>
-                                   </table>
-	                               </ul>
 	                                
                                  </li><br><br>                                   
 
-	<li><b> sumValue [display | writeToDB]</b>     
-                                 - calculates the summary of database column "VALUE" between period given by 
-	                             <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or 
-								 "timeDiffToNow / timeOlderThan". The reading to evaluate must be defined using attribute
-								 "reading". Using this function is mostly reasonable if value-differences of readings 
-								 are written to the database. <br>
-
-                                 Is no or the option "display" specified, the results are only displayed. Using 
-                                 option "writeToDB" the calculation results are stored in the database with a new reading
-                                 name. <br>
-                                 The new readingname is built of a prefix and the original reading name,
-                                 in which the original reading name can be replaced by the value of attribute "readingNameMap".	 
-                                 The prefix is made up of the creation function and the aggregation. <br>
-                                 The timestamp of the new stored readings is deviated from aggregation period, 
-                                 unless no unique point of time of the result can be determined. 
-                                 The field "EVENT" will be filled with "calculated".<br><br>
+    <li><b> sumValue [display | writeToDB | writeToDBSingle] </b>      
+                                 - Calculates the total values of the database field "VALUE" in the time limits 
+	                             of the possible time.*-attributes. <br><br>
+                                 
+                                 The reading to be evaluated must be specified in the attribute <a href="#reading">reading</a>. 
+                                 This function is useful if continuous value differences of a reading are written 
+                                 into the database.  <br><br>
+                                 
+                                 If none or the option <b>display</b> is specified, the results are only displayed. With 
+                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
+                                 with a new reading name into the database. <br>
+                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
+                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 
+                                 The new reading name is formed from a prefix and the original reading name, 
+								 where the original reading name can be replaced by the attribute "readingNameMap". 
+                                 The prefix consists of the educational function and the aggregation. <br>
+                                 The timestamp of the new reading in the database is determined by the set aggregation period 
+                                 if no clear time of the result can be determined. 
+                                 The field "EVENT" is filled with "calculated".  <br><br>
                                  
                                  <ul>
                                  <b>Example of building a new reading name from the original reading "totalpac":</b> <br>
@@ -14234,15 +14324,21 @@ sub bdump {
                                
                                </li> <br>
                                
-    <li><b> averageValue [display | writeToDB]</b> 
-                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den 
-                                 gegebenen Zeitgrenzen ( siehe <a href="#DbRepattr">Attribute</a>). 
-                                 Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein. <br>
-                                 Mit dem Attribut "averageCalcForm" wird die Berechnungsvariante zur Mittelwertermittlung definiert.                               
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
+    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b> 
+                                 - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen 
+	                             der möglichen time.*-Attribute. <br><br>
+                                 
+                                 Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
+								 angegeben sein.                                  
+                                 Mit dem Attribut <a href="#averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur 
+                                 Mittelwertermittlung definiert. <br><br>
+                                 
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
+                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
+                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
@@ -14435,7 +14531,7 @@ sub bdump {
                                 
                                  </li>
 
-    <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
+    <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
 	                             reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
 								 folgendermaßen: <br><br>
                                  
@@ -14448,8 +14544,13 @@ sub bdump {
                                  </ul>                                 
                                  <br>
                                  
-                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" 
-								 gesetzt sein um die Löschfunktion freizuschalten. <br><br>
+                                 Aus Sicherheitsgründen muss das Attribut <a href="#allowDeletion">allowDeletion</a>
+								 gesetzt sein um die Löschfunktion freizuschalten. <br> 
+								 Zeitgrenzen (Tage) können als Option angegeben werden. In diesem Fall werden eventuell gesetzte Zeitattribute 
+								 übersteuert.
+								 Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
+								 <b>&lt;nn&gt;</b> Tage.
+								 <br><br>
                                  
                                  Die zur Steuerung von delEntries relevanten Attribute: <br><br>
 
@@ -15181,24 +15282,23 @@ sub bdump {
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
                                  </li> <br>
 
-    <li><b> reduceLog [average[=day]] </b> <br>
-                                 Reduziert historische Datensätze innerhalb der durch die "time.*"-Attribute bestimmten 
-                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading.
-                                 Es muss mindestens eines der "time.*"-Attribute gesetzt sein (siehe Tabelle unten). 
+    <li><b> reduceLog [&lt;no&gt;[:&lt;nn&gt;]] [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading] </b> <br>
+                                 Reduziert historische Datensätze. <br><br>
+								 
+								 <b>Arbeitsweise ohne Optionsangabe</b> <br><br>
+								 
+								 Sind keine Optionen angegeben, werden die Daten innerhalb der durch die <b>time.*</b>-Attribute bestimmten 
+                                 Zeitgrenzen auf einen Eintrag (den ersten) pro Stunde je Device & Reading reduziert.
+                                 Es muss mindestens eines der <b>time.*</b>-Attribute gesetzt sein (siehe Tabelle unten). 
                                  Die jeweils fehlende Zeitabgrenzung wird in diesem Fall durch das Modul errechnet.
                                  <br><br>
                                  
-                                 Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern 
-                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
-                                 Mit der Option 'average=day' werden alle numerischen Werte eines Tages auf einen einzigen 
-                                 Mittelwert reduziert (impliziert 'average'). <br><br>
-                                 
-                                 Mit den Attributen "device" und "reading" können die zu berücksichtigenden Datensätze eingeschlossen
+                                 Mit den Attributen <b>device</b> und <b>reading</b> können die zu berücksichtigenden Datensätze eingeschlossen
                                  bzw. ausgeschlossen werden. Beide Eingrenzungen reduzieren die selektierten Daten und verringern den
                                  Ressourcenbedarf. 
                                  Das Reading "reduceLogState" enthält das Ausführungsergebnis des letzten reduceLog-Befehls.  <br><br>
-                                 
-                 	             Die für diese Funktion relevanten Attribute sind: <br><br>
+								 
+                 	             Unter Berücksichtigung des oben genannten sind für diese Funktion folgende Attribute relevant: <br><br>
                                  
 	                             <ul>
                                  <table>  
@@ -15215,18 +15315,9 @@ sub bdump {
                                  </table>
 	                             </ul>
                                  <br>
-                                 
-                                 Aus Kompatibilitätsgründen kann der Set-Befehl optional durch die Zusätze "EXCLUDE" bzw. "INCLUDE"
-                                 direkt ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen bzw. einzuschließen: <br><br>
-                                 <ul>
-                                 "reduceLog [average[=day]] [EXCLUDE=device1:reading1,device2:reading2,...] [INCLUDE=device:reading]" <br><br> 
-                                 </ul>
-                                 Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" und "reading",
-                                 die in diesem Fall nicht beachtet werden. <br><br>
-          
-                                 <ul>
+								 
                                  <b>Beispiele: </b><br><br>
-                                 
+                                 <ul>
                                  attr &lt;name&gt; timeOlderThan = d:200  <br>
                                  set &lt;name&gt; reduceLog <br>
                                  # Datensätze die älter als 200 Tage sind, werden auf den ersten Eintrag pro Stunde je Device & Reading
@@ -15256,7 +15347,21 @@ sub bdump {
                                  werden bereinigt. Numerische Werte einer Stunde werden auf einen Mittelwert reduziert <br>                                  
                                  <br>
 								 </ul>
-                                 
+								 <br>
+								 
+								 <b>Arbeitsweise mit Optionsangabe</b> <br><br>
+								 
+								 Es werden Datensätze berücksichtigt die älter sind als <b>&lt;no&gt;</b> Tage und (optional) neuer sind als 
+								 <b>&lt;nn&gt;</b> Tage.
+                                 Durch die Angabe von <b>average</b> wird nicht nur die Datenbank bereinigt, sondern 
+                                 alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.
+                                 Mit der Option <b>average=day</b> werden alle numerischen Werte eines Tages auf einen einzigen 
+                                 Mittelwert reduziert (impliziert 'average'). <br><br>
+
+                                 Die Zusätze "EXCLUDE" bzw. "INCLUDE" können ergänzt werden um device/reading Kombinationen von reduceLog auszuschließen 
+								 bzw. einzuschließen. Diese Angabe wird als Regex ausgewertet und überschreibt die Einstellung der Attribute "device" 
+								 und "reading", die in diesem Fall nicht beachtet werden. <br><br>					
+                                        
 								 <b>Hinweis:</b> <br>
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden 
@@ -15443,9 +15548,23 @@ sub bdump {
     <li><b> sqlSpecial </b>    - Die Funktion bietet eine Drop-Downliste mit einer Auswahl vorbereiter Auswertungen
                                  an. <br>
 								 Das Ergebnis des Statements wird im Reading "SqlResult" dargestellt.
-								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" 
-                                 ausgewählt, sowie der verwendete Feldtrenner durch das <a href="#DbRepattr">Attribut</a> 
-                                 "sqlResultFieldSep" festgelegt werden. <br><br>
+								 Die Ergebnis-Formatierung kann durch das Attribut <a href="#sqlResultFormat">sqlResultFormat</a>
+                                 ausgewählt, sowie der verwendete Feldtrenner durch das Attribut <a href="#sqlResultFieldSep">sqlResultFieldSep</a> 
+                                 festgelegt werden. <br><br>
+								 
+                 	             Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
+									                                                      Device muß im Attribut <a href="#reading">reading</a> definiert sein. 
+																						  Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
+                                   </table>
+	                               </ul>
+								   <br>
 
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
 	                               <ul>
@@ -15457,30 +15576,23 @@ sub bdump {
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
                                    </table>
 	                               </ul>
-                                   <br>
-                                   
-                 	             Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
-                                   </table>
-	                               </ul>
 	                                
                                  </li><br><br>
 								 
-    <li><b> sumValue [display | writeToDB]</b>     
+    <li><b> sumValue [display | writeToDB | writeToDBSingle]</b>     
                                  - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
-	                             (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow / timeOlderThan". 
-                                 Es muss das auszuwertende Reading im <a href="#DbRepattr">Attribut</a> "reading" 
-								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
-								 Readings in die Datenbank geschrieben werden.  <br>
+	                             der möglichen time.*-Attribute. <br><br>
                                  
-                                 Ist keine oder die Option "display" angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 der Option "writeToDB" werden die Berechnungsergebnisse mit einem neuen Readingnamen
-                                 in der Datenbank gespeichert. <br>
+                                 Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
+								 angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines 
+								 Readings in die Datenbank geschrieben werden.  <br><br>
+                                 
+                                 Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
+                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
+                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
+                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
