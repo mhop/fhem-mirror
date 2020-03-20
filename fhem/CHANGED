@@ -4,6 +4,8 @@
  - new:     89_ESPEInk: New Module for EInk Modules connected to ESP boards
  - feature: 73_AutoShuttersControl: add additional condition
                                      for holidyweekend drive Time
+               Man muss also nicht nur im ASC Device per set das HolidayWekkend
+               aktivieren sondern auch explizit das Attribut setzen.
  - feature: 98_RandomTimer: Add "variations" parameter to further randomize
                             possible switching times 
  - feature: 77_SMAEM: add define option <interface>
