@@ -13010,21 +13010,9 @@ return;
 
     <li><b> sqlSpecial </b>    - This function provides a drop-down list with a selection of prepared reportings. <br>
 								 The statements result is depicted in reading "SqlResult".
-								 The result can be formatted by <a href="#DbRepattr">attribute</a> "sqlResultFormat", 
-                                 a well as the used field separator by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep". 
+								 The result can be formatted by attribute <a href="#sqlResultFormat">sqlResultFormat</a> 
+                                 a well as the used field separator by attribute <a href="#sqlResultFieldSep">sqlResultFieldSep</a>. 
                                  <br><br>
-
-                 	             The relevant attributes for this function are: <br><br>
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
-                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
-                                      <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
-                                      <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
-                                   </table>
-	                               </ul>
-                                   <br>
                                    
                  	             The following predefined reportings are selectable: <br><br>
 	                               <ul>
@@ -13033,6 +13021,21 @@ return;
                                       <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: reports the 50 most occuring log entries of the last 2 days </td></tr>
                                       <tr><td> <b>allDevCount </b>             </td><td>: all devices occuring in database and their quantity </td></tr>
                                       <tr><td> <b>allDevReadCount </b>         </td><td>: all device/reading combinations occuring in database and their quantity </td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: determines the newest records of a device available in the database. The
+									                                                      device must be defined in attribute <a href="#reading">reading</a>. 
+																						  Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
+								   </table>
+	                               </ul>
+								   <br>
+								   
+                 	             The relevant attributes for this function are: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+	                                  <tr><td> <b>executeBeforeProc</b>  </td><td>: execution of FHEM command (or Perl-routine) before operation </td></tr>
+                                      <tr><td> <b>executeAfterProc</b>   </td><td>: execution of FHEM command (or Perl-routine) after operation </td></tr>
+                                      <tr><td> <b>sqlResultFormat</b>    </td><td>: determines the formatting of the result </td></tr>
+                                      <tr><td> <b>sqlResultFieldSep</b>  </td><td>: determines the used field separator in statement result </td></tr>
                                    </table>
 	                               </ul>
 	                                
@@ -15553,9 +15556,23 @@ sub bdump {
     <li><b> sqlSpecial </b>    - Die Funktion bietet eine Drop-Downliste mit einer Auswahl vorbereiter Auswertungen
                                  an. <br>
 								 Das Ergebnis des Statements wird im Reading "SqlResult" dargestellt.
-								 Die Ergebnis-Formatierung kann durch das <a href="#DbRepattr">Attribut</a> "sqlResultFormat" 
-                                 ausgewählt, sowie der verwendete Feldtrenner durch das <a href="#DbRepattr">Attribut</a> 
-                                 "sqlResultFieldSep" festgelegt werden. <br><br>
+								 Die Ergebnis-Formatierung kann durch das Attribut <a href="#sqlResultFormat">sqlResultFormat</a>
+                                 ausgewählt, sowie der verwendete Feldtrenner durch das Attribut <a href="#sqlResultFieldSep">sqlResultFieldSep</a> 
+                                 festgelegt werden. <br><br>
+								 
+                 	             Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
+									                                                      Device muß im Attribut <a href="#reading">reading</a> definiert sein. 
+																						  Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
+                                   </table>
+	                               </ul>
+								   <br>
 
                  	             Die für diese Funktion relevanten Attribute sind: <br><br>
 	                               <ul>
@@ -15565,17 +15582,6 @@ sub bdump {
                                       <tr><td> <b>executeAfterProc</b>   </td><td>: FHEM Kommando (oder Perl-Routine) nach der Operation ausführen </td></tr>
                                       <tr><td> <b>sqlResultFormat</b>    </td><td>: Optionen der Ergebnisformatierung </td></tr>
                                       <tr><td> <b>sqlResultFieldSep</b>  </td><td>: Auswahl des Trennzeichens zwischen Ergebnisfeldern </td></tr>
-                                   </table>
-	                               </ul>
-                                   <br>
-                                   
-                 	             Es sind die folgenden vordefinierte Auswertungen auswählbar: <br><br>
-	                               <ul>
-                                   <table>  
-                                   <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
                                    </table>
 	                               </ul>
 	                                
