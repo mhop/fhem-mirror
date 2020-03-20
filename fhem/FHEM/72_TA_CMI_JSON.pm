@@ -189,7 +189,7 @@ sub TA_CMI_JSON_ParseHttpResponse {
       TA_CMI_JSON_extractReadings($hash, $keyValues, 'Outputs', 'Outputs') if ($queryParams =~ /O/);
 
       if ($queryParams =~ /D/) {
-        if ($canDevice eq 'UVR16x2') {
+        if ($canDevice eq 'UVR16x2' or $canDevice eq 'RSM610' ) {
           TA_CMI_JSON_extractReadings($hash, $keyValues, 'DL-Bus', 'DL-Bus');
         } else {
           Log3 $name, 0, "TA_CMI_JSON ($name) - Reading DL-Bus input is not supported on $canDevice";
