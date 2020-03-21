@@ -55,7 +55,7 @@ use Blocking; # http://www.fhemwiki.de/wiki/Blocking_Call
 #use Data::Dumper;
 
 
-my $sip_version ="V1.91 / 31.07.18";
+my $sip_version ="V1.92 / 21.03.2020";
 my $ua;  # SIP user agent
 my @fifo;
 
@@ -378,14 +378,15 @@ sub SIP_Register($$)
   $sub_register = sub 
   {
 	my $expire = $ua->register(registrar => $registrar ) || return "registration failed: ".$ua->error;
-        my $cmd    = "ps -e | grep '".$hash->{parent}." '";
-        my $result = qx($cmd); 
-        if  (index($result,"perl") == -1)
+        #my $cmd    = "ps -e | grep '".$hash->{parent}." '";
+        #my $result = qx($cmd); 
+        #if  (index($result,"perl") == -1)
+        unless (kill 0, $hash->{parent})
         {
           Log3 $name,1,"$logname, can´t find my parent ".$hash->{parent}." in process list !";
           die;
         }
-    	
+    
         Log3 $name,4,"$logname, register new expire : ".FmtDateTime(time()+$expire);
     
         if (AttrVal($name,"sip_listen","none") ne "none")
@@ -2237,44 +2238,26 @@ return $html;
   <a name="SIPattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>sip_audiofile_wfp<br>
-      Audio file that will be played after <b>fetch</b> command. The audio file has to be generated via <br>
-      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
-      since only raw audio format is supported. 
-      </li>
-     <li>sip_audiofile_call</li>
-     <li>sip_audiofile_dtmf</li>
-     <li>sip_audiofile_ok</li>
-    <li>sip_listen  (none , dtmf , wfp)</li>
-    <li>sip_from<br>
-      My sip client info, defaults to sip:620@fritz.box
-      </li>
-    <li>sip_ip<br>
-      external IP address of the FHEM server.
-      </li>
-    <li>sip_port<br>
-      Optionally portnumber used for sip client<br>
-      If attribute is not set a random port number between 44000 and 45000 will be used
-      </li>
-    <li>sip_registrar<br>
-      Hostname or IP address of the SIP server you are connecting to, defaults to fritz.box.
-      </li>
-    <li>sip_ringtime<br>
-      Ringtime for incomming calls (dtmf &wfp)
-      </li>
-    <li>sip_user<br>
-      User name of the SIP client, defaults to 620.
-      </li>
-    <li>sip_waittime<br>
-       Maximum waiting time in state listen_for_wfp it will wait to pick up the call.  
-      </li>
-    <li>sip_dtmf_size  1 to 4 , default is 2</li>
-    <li>sip_dtmf_loop  once or loop , default once</li>
-    <li>sip_force_interval default 300</li>
-    <li>sip_force_max default 99</li>
-    <li>phonebook default none , filename of own phonebook. each row :  number,name</li>
-    <li>history_size default 0 , max rows in history list</li>
-    <li>history_file default none, filename of history list</li>
+    <a name="sip_audiofile_wfp"></a><li>sip_audiofile_wfp<br>Audio file that will be played after <b>fetch</b> command. The audio file has to be generated via <br>
+      sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>since only raw audio format is supported.</li><br>
+    <a name="sip_audiofile_call"></a><li>sip_audiofile_call</li>
+    <a name="sip_audiofile_dtmf"></a><li>sip_audiofile_dtmf</li>
+    <a name="sip_audiofile_ok"></a><li>sip_audiofile_ok</li>
+    <a name="sip_listen"></a><li>sip_listen  (none , dtmf , wfp)</li>
+    <a name="sip_from"></a><li>sip_from<br>My sip client info, defaults to sip:620@fritz.box</li><br>
+    <a name="sip_ip"></a><li>sip_ip<br>external IP address of the FHEM server</li><br>
+    <a name="sip_port"></a><li>sip_port<br>Optionally portnumber used for sip client<br>If attribute is not set a random port number between 44000 and 45000 will be used</li><br>
+    <a name="sip_registrar"></a><li>sip_registrar<br>Hostname or IP address of the SIP server you are connecting to, defaults to fritz.box</li><br>
+    <a name="sip_ringtime"></a><li>sip_ringtime<br>Ringtime for incomming calls (dtmf &wfp)</li><br>
+    <a name="sip_user"></a><li>sip_user<br>User name of the SIP client, defaults to 620</li><br>
+    <a name="sip_waittime"></a><li>sip_waittime<br>Maximum waiting time in state listen_for_wfp it will wait to pick up the call</li><br>
+    <a name="sip_dtmf_size"></a><li>sip_dtmf_size  1 to 4 , default is 2</li><br>
+    <a name="sip_dtmf_loop"></a><li>sip_dtmf_loop  once or loop , default once</li><br>
+    <a name="sip_force_interval"></a><li>sip_force_interval default 300</li><br>
+    <a name="sip_force_max"></a><li>sip_force_max default 99</li><br>
+    <a name="phonebook"></a><li>phonebook default none , filename of own phonebook. each row :  number,name</li><br>
+    <a name="history_size"></a><li>history_size default 0 , max rows in history list</li><br>
+    <a name="history_file"></a><li>history_file default none, filename of history list</li><br>
   </ul>
   <br>
 </ul>
@@ -2321,14 +2304,17 @@ return $html;
     <code>set &lt;name&gt; call &lt;nummer&gt; [&lt;maxtime&gt;] [&lt;nachricht&gt;]</code><br>
     Startet einen Anruf an die angegebene Nummer.<br>
     Optional kann die maximale Zeit angegeben werden. Default ist 30.<br>
-    Optional kann eine Nachricht in Form eines Audiofiles angegeben werden . Das File ist mit dem vollen Pfad oder dem relativen ab dem Verzeichnis mit fhem.pl anzugeben..
+    Optional kann eine Nachricht in Form eines Audiofiles angegeben werden.<br>
+    Das File ist mit dem vollen Pfad oder dem relativen ab dem Verzeichnis mit fhem.pl anzugeben.
    </li>
    <li>
     <code>set &lt;name&gt; listen</code><br>
     Attribut sip_listen = dtmf :
-    Der SIP-Client wird in einen Status versetzt in dem er Anrufe annimmt. Der Ton wird als Echo zurückgespielt. Über die Eingabe von # gefolgt von 2 unterschiedlichen Zahlen und anschließendem Auflegen kann eine Zahl in das Reading <b>dtmf</b> übergeben werden.<br>
+    Der SIP-Client wird in einen Status versetzt in dem er Anrufe annimmt. Der Ton wird als Echo zur&uuml;ckgespielt. Über die Eingabe von # gefolgt von 2 unterschiedlichen Zahlen und anschlie&szlig;endem Auflegen kann eine Zahl in das Reading <b>dtmf</b> &uuml;bergeben werden.<br>
     Attribut sip_listen = wfp :
-    Der SIP-Client wird in einen Status versetzt in dem er auf Anrufe wartet. Erfolgt an Anruf an den Client, wechselt der Status zu <b>ringing</b>. Nun kann das Gespräch via set-Command <b>fetch</b> angenommen werden. Das als sip_audiofile angegebene File wird abgespielt. Anschließend wechselt der Status wieder zu <b>listenwfp</b>.<br>
+    Der SIP-Client wird in einen Status versetzt in dem er auf Anrufe wartet. Erfolgt ein Anruf an den Client, wechselt der Status zu <b>ringing</b>.<br>
+    Nun kann das Gespr&auml;ch via set-Command <b>fetch</b> angenommen werden. Das als sip_audiofile angegebene File wird abgespielt.<br>
+    Anschlie&szlig;end wechselt der Status wieder zu <b>listenwfp</b>.<br>
    </li>
   </ul>
   <br>
@@ -2336,70 +2322,39 @@ return $html;
   <a name="SIPattr"></a>
   <b>Attributes</b>
   <ul>
-    <li>sip_user<br>
-       User Name des SIP-Clients. Default ist 620 (Fritzbox erstes SIP Telefon) 
-    </li>
-    <li>sip_registrar<br>
-      Hostname oder IP-Addresse des SIP-Servers mit dem sich das Modul verbinden soll. (Default fritz.box)
-      </li>
-    <li>sip_from<br>
-      SIP-Client-Info. Syntax : sip:sip_user@sip_registrar Default ist sip:620@fritz.box
-     </li>
-    <li>sip_ip<br>
-      Die IP-Addresse von FHEM im Heimnetz. Solange das Attribut nicht gesetzt ist versucht das Modul diese beim Start zu ermitteln.
-      </li>
-    <li>sip_port<br>
-      Optinale Portnummer die vom Modul benutzt wird.<br>
-      Wenn dem Attribut kein Wert zugewiesen wurde verwendet das Modul eine zuf&auml;llige Portnummer zwichen 44000 und 45000
-      </li>
-     <li><b>Audiofiles</b>
+    <a name="sip_user"></a><li>sip_user<br>User Name des SIP-Clients. Default ist 620 (Fritzbox erstes SIP Telefon)</li></br>
+    <a name="sip_registrar"></a><li>sip_registrar<br>Hostname oder IP-Addresse des SIP-Servers mit dem sich das Modul verbinden soll. (Default fritz.box)</li><br>
+    <a name="sip_from"></a><li>sip_from<br>SIP-Client-Info. Syntax : sip:sip_user@sip_registrar Default ist sip:620@fritz.box</li></br>
+    <a name="sip_from"></a><li>sip_ip<br>Die IP-Addresse von FHEM im Heimnetz. Solange das Attribut nicht gesetzt ist versucht das Modul diese beim Start zu ermitteln.</li><br>
+    <a name="sip_port"></a><li>sip_port<br>Optinale Portnummer die vom Modul benutzt wird.<br>
+      Wenn dem Attribut kein Wert zugewiesen wurde verwendet das Modul eine zuf&auml;llige Portnummer zwichen 44000 und 45000</li><br>
+    <li>Audiofiles
       Audiofiles k&ouml;nnen einfach mit dem externen Programm sox erzeugt werden :<br>
       sox &lt;file&gt;.wav -t raw -r 8000 -c 1 -e a-law &lt;file&gt;.al<br>
       Unterst&uuml;tzt werden nur die beiden RAW Audio Formate a-law und u-law !<br>
       Statt eines echten Audiofiles kann auch eine Text2Speech Nachricht eingetragen werden.<br>
-      Bsp : attr mySIP sip_audiofile_call !Hier ist dein FHEM Server
-     </li>
-    <li>sip_audiofile_wfp<br>
-      Audiofile das nach dem Command <b>fetch</b> abgespielt wird. 
-    </li>
-    <li>sip_audiofile_call</br>
-    Audiofile das dem Angerufenen bei set call vorgespielt wird.
-    </li>
-    <li>sip_audiofile_dtmf<br>
-    Audiofile das dem Anrufer bei listen_for_dtmf abgespielt wird.
-    </li>
-    <li>sip_audiofile_ok<br>
-    Audiofile das bei erkannter DTMF Sequenz abgespielt wird.
-    </li>
-    <li>sip_listen (none , dtmf, wfp)</li>
-    <li>sip_ringtime<br>
-      Klingelzeit für eingehende Anrufe bei listen_for_dtmf 
-      </li>
-    <li>sip_dtmf_size</a><br>
-    1 bis 4 , default 2 Legt die L&auml;ge des erwartenden DTMF Events fest.
-    </li>
-    <li>sip_dtmf_loop<br> once oder loop , default once</li>
-    <li>sip_waittime<br>
-       Maximale Wartezeit im Status listen_for_wfp bis das Gespr&auml;ch automatisch angenommen wird.
-    </li>
-    <li>T2S_Device<br>
-    Name des Text2Speech Devices (Wird nur ben&ouml;tigt wenn Sprachnachrichten statt Audiofiles verwendet werden)
-    </li>
-     <li>T2S_Timeout<br>
-     Wartezeit in Sekunden wie lange maximal auf Text2Speech gewartet wird.
-     </li>
-    <li>audo_converter<br>sox oder ffmpeg, default sox<br>
-     Ist f&uml;r Text2Speech unbedingt erforderlich um die mp3 Dateien in Raw Audio umzuwandeln.<br>
-     Installation z.B. mit sudo apt-get install sox und noch die mp3 Unterst&uuml;tzung mit sudo apt-get install libsox-fmt-mp3
-    </li>
-    <li>sip_force_interval default 300 </li>
-    <li>sip_force_max default 99</li>
-    <li>phonebook default none , Dateiname des eigenen Telefonbuchs. Inhalt: zeilenweise Nr,Name</li>
-    <li>history_size default 0 , max Anzahl von Zeilen in der Ruf/Anrufer Liste</li>
-    <li>history_file default none, Dateiname der Ruf/Anrufer Liste</li>
+      Bsp : attr mySIP sip_audiofile_call !Hier ist dein FHEM Server </li><br>
+    <a name="sip_audiofile_wfp"></a><li>sip_audiofile_wfp<br>Audiofile das nach dem Command <b>fetch</b> abgespielt wird</li><br>
+    <a name="sip_audiofile_call"></a><li>sip_audiofile_call</br>Audiofile das dem Angerufenen bei set call vorgespielt wird</li><br>
+    <a name="sip_audiofile_dtmf"></a><li>sip_audiofile_dtmf<br>Audiofile das dem Anrufer bei listen_for_dtmf abgespielt wird</li><br>
+    <a name="sip_audiofile_ok"></a><li>sip_audiofile_ok<br>Audiofile das bei erkannter DTMF Sequenz abgespielt wird</li><br>
+    <a name="sip_listen"></a><li>sip_listen (none , dtmf, wfp)</li><br>
+    <a name="sip_ringtime"></a><li>sip_ringtime<br>Klingelzeit für eingehende Anrufe bei listen_for_dtmf</li><br>
+    <a name="sip_dtmf_size"></a><li>sip_dtmf_size</a><br>1 bis 4 , default 2 Legt die L&auml;ge des erwartenden DTMF Events fest</li><br>
+    <a name="sip_dtmf_loop"></a><li>sip_dtmf_loop<br> once oder loop , default once</li><br>
+    <a name="sip_waittime"></a><li>sip_waittime<br>Maximale Wartezeit im Status listen_for_wfp bis das Gespr&auml;ch automatisch angenommen wird</li><br>
+    <a name="T2S_Device"></a><li>T2S_Device<br>Name des Text2Speech Devices (Wird nur ben&ouml;tigt wenn Sprachnachrichten statt Audiofiles verwendet werden)</li><br>
+    <a name="T2S_Timeout"></a><li>T2S_Timeout<br>Wartezeit in Sekunden wie lange maximal auf Text2Speech gewartet wird</li><br>
+    <a name="audio_converter"><li>audo_converter<br>sox oder ffmpeg, default sox<br>
+     Ist f&uuml;r Text2Speech unbedingt erforderlich um die mp3 Dateien in Raw Audio umzuwandeln.<br>
+     Installation z.B. mit sudo apt-get install sox und die mp3 Unterst&uuml;tzung mit sudo apt-get install libsox-fmt-mp3</li><br>
+    <a name="sip_force_interval"></a><li>sip_force_interval default 300 </li><br>
+    <a name="sip_force_max"></a><li>sip_force_max default 99</li><br>
+    <a name="phonebook"></a><li>phonebook default none<br>Dateiname des eigenen Telefonbuchs. Inhalt: zeilenweise Nr,Name</li><br>
+    <a name="history_size"></a><li>history_size default 0<br>max Anzahl von Zeilen in der Ruf/Anrufer Liste</li><br>
+    <a name="history_file"></a><li>history_file default none<br>Dateiname der Ruf/Anrufer Liste</li><br>
   </ul>
   <br>
-
 </ul>
 
 =end html_DE
