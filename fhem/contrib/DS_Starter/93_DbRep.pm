@@ -918,7 +918,6 @@ sub DbRep_Set($@) {
           $prop =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
           $prop =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html                   
           $sqlcmd = $prop;
-          Log3 ($name, 1, "DbRep $name - com: $sqlcmd");
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
               DbRep_setCmdFile($name."_sqlCmdList","",$hash);                        # Löschen der sql History Liste im DbRep-Keyfile
