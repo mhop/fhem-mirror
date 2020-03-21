@@ -58,7 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.38.0"  => "21.03.2020  sqlSpecial diffBetweenValuesOfReading, fix FHEM crash if no time-attribute is set and time option of delEntries / reduceLog is used ",
+  "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time option of delEntries / reduceLog is used ",
   "8.37.0"  => "20.03.2020  add column header for free selects (sqlCmd) ",
   "8.36.0"  => "19.03.2020  sqlSpecial recentReadingsOfDevice ",
   "8.35.0"  => "19.03.2020  option older than days and newer than days for delEntries function ",
@@ -574,7 +574,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
-                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice".(($dbmodel eq "MYSQL")?",diffBetweenValuesOfReading":"")." ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice".(($dbmodel eq "MYSQL")?",readingsDifferenceByTimeDelta":"")." ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
@@ -2080,7 +2080,7 @@ sub DbRep_Main($$;$) {
             
             $prop   = join(" ", @cmd);
         
-        } elsif ($prop eq "diffBetweenValuesOfReading") {           
+        } elsif ($prop eq "readingsDifferenceByTimeDelta") {           
             my @cmd = split(/\s/, "SET \@diff=0;
                                    SET \@delta=NULL;
                                    SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA 
@@ -9736,7 +9736,7 @@ sub DbRep_checktimeaggr ($) {
      $aggregation = "day";       # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\bdiffBetweenValuesOfReading\b/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -13060,16 +13060,16 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>:    reports the 50 most occuring log entries of the last 2 days </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>:    all devices occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>:    all device/reading combinations occuring in database and their quantity </td></tr>
-									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>:    determines the newest records of a device available in the database. The
-									                                                         device must be defined in attribute <a href="#device">device</a>. 
-																						     Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
-									  <tr><td> <b>diffBetweenValuesOfReading </b> </td><td>: determines the value difference of successive data records of a reading. The
-									                                                         device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>. 
-																						     Only <b>one</b> device to be evaluated and only <b>one</b> reading to be evaluated can be specified. 
-                                                                                             The time limits of the evaluation are defined by the time.*-attributes. </td></tr>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>:       reports the 50 most occuring log entries of the last 2 days </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>:       all devices occuring in database and their quantity </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>:       all device/reading combinations occuring in database and their quantity </td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>:       determines the newest records of a device available in the database. The
+									                                                            device must be defined in attribute <a href="#device">device</a>. 
+																						        Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
+									  <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: determines the value difference of successive data records of a reading. The
+									                                                            device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>. 
+																						        Only <b>one</b> device to be evaluated and only <b>one</b> reading to be evaluated can be specified. 
+                                                                                                The time limits of the evaluation are defined by the time.*-attributes. </td></tr>
 								   </table>
 	                               </ul>
 								   <br>
@@ -15610,16 +15610,16 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b>    </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>                </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>            </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
-									  <tr><td> <b>recentReadingsOfDevice </b>     </td><td>: ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
-									                                                         Device muß im Attribut <a href="#device">device</a> definiert sein. 
-																						     Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
-									  <tr><td> <b>diffBetweenValuesOfReading </b> </td><td>: ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende
-									                                                         Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. 
-																						     Es kann nur <b>ein</b> auszuwertendes Device und nur <b>ein</b> auszuwertendes Reading angegeben werden. 
-                                                                                             Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt. </td></tr>                        
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>    </td><td>:    ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
+                                      <tr><td> <b>allDevCount </b>                </td><td>:    alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>            </td><td>:    alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>     </td><td>:    ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
+									                                                            Device muß im Attribut <a href="#device">device</a> definiert sein. 
+																						        Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
+									  <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende
+									                                                            Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. 
+																						        Es kann nur <b>ein</b> auszuwertendes Device und nur <b>ein</b> auszuwertendes Reading angegeben werden. 
+                                                                                                Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt. </td></tr>                        
                                    </table>
 	                               </ul>
 								   <br>
