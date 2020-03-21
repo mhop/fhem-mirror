@@ -45,6 +45,7 @@ sub BOTVAC_Initialize($) {
     $hash->{AttrList} = "disable:0,1 " .
                         "actionInterval " .
                         "boundaries:textField-long " .
+                        "sslVerify:0,1 " .
                          $readingFnAttributes;
 }
 
@@ -58,7 +59,6 @@ use GPUtils qw(:all);  # wird für den Import der FHEM Funktionen aus der fhem.p
 
 use Time::HiRes qw(gettimeofday);
 use JSON qw(decode_json encode_json);
-#use IO::Socket::SSL::Utils qw(PEM_string2cert);
 use Digest::SHA qw(hmac_sha256_hex sha1_hex);
 use Encode qw(encode_utf8);
 use MIME::Base64;
@@ -665,17 +665,16 @@ sub SendCommand($$;$$@) {
     my $password    = ReadPassword($hash);
     my $timestamp   = gettimeofday();
     my $timeout     = 180;
-    my $header;
+    my $keepalive   = 0;
+    my $reqId       = 0;
+    my $URL         = "https://";
+    my %sslArgs     = {};
+    my %header;
     my $data;
-    my $reqId = 0;
-
-    Log3($name, 5, "BOTVAC $name: called function SendCommand()");
-
-    my $URL = "https://";
     my $response;
     my $return;
 
-    my %sslArgs;
+    Log3($name, 5, "BOTVAC $name: called function SendCommand()");
 
     if ($service ne "sessions" && $service ne "dashboard") {
         return if (CheckRegistration($hash, $service, $cmd, $option, @successor));
@@ -690,8 +689,20 @@ sub SendCommand($$;$$@) {
     Log3($name, 4, "BOTVAC $name: REQ option $option") if (defined($option));
     LogSuccessors($hash, @successor);
 
-    $header = "Accept: application/vnd.neato.nucleo.v1";
-    $header .= "\r\nContent-Type: application/json";
+    $header{Accept}         = "application/vnd.neato.nucleo.v1";
+    $header{'Content-Type'} = "application/json";
+
+    my $sslVerify= AttrVal($name, "sslVerify", undef);
+    if(defined($sslVerify)) {
+      eval "use IO::Socket::SSL";
+      if($@) {
+        Log3($name, 2, $@);
+      } else {
+        my $sslVerifyMode= eval("$sslVerify ? SSL_VERIFY_PEER : SSL_VERIFY_NONE");
+        Log3($name, 5, "SSL verify mode set to $sslVerifyMode");
+        $sslArgs{SSL_verify_mode} = $sslVerifyMode;
+      }
+    }
 
     if ($service eq "sessions") {
       if (!defined($password)) {
@@ -702,23 +713,20 @@ sub SendCommand($$;$$@) {
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/sessions";
       $data = "{\"platform\": \"ios\", \"email\": \"$email\", \"token\": \"$token\", \"password\": \"$password\"}";
-      %sslArgs = ( SSL_verify_mode => 0 );
 
     } elsif ($service eq "dashboard") {
-      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, ".accessToken", "");
+      $header{Authorization} = "Token token=".ReadingsVal($name, ".accessToken", "");
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/dashboard";
-      %sslArgs = ( SSL_verify_mode => 0 );
 
     } elsif ($service eq "robots") {
       my $serial = ReadingsVal($name, "serial", "");
       return if ($serial eq "");
 
-      $header .= "\r\nAuthorization: Token token=".ReadingsVal($name, ".accessToken", "");
+      $header{Authorization} = "Token token=".ReadingsVal($name, ".accessToken", "");
       $URL .= GetBeehiveHost($hash->{VENDOR});
       $URL .= "/users/me/robots/$serial/";
       $URL .= (defined($cmd) ? $cmd : "maps");
-      %sslArgs = ( SSL_verify_mode => 0 );
 
     } elsif ($service eq "messages") {
       my $serial = ReadingsVal($name, "serial", "");
@@ -814,11 +822,10 @@ sub SendCommand($$;$$@) {
       my $message = join("\n", (lc($serial), $date, $data));
       my $hmac = hmac_sha256_hex($message, ReadingsVal($name, ".secretKey", ""));
 
-      $header .= "\r\nDate: $date";
-      $header .= "\r\nAuthorization: NEATOAPP $hmac";
+      $header{Date}          = $date;
+      $header{Authorization} = "NEATOAPP $hmac";
+      $keepalive = 1;
 
-      #%sslArgs = ( SSL_ca =>  [ GetCAKey( $hash ) ] );
-      %sslArgs = ( SSL_verify_mode => 0 );
     } elsif ($service eq "loadmap") {
       $URL = $cmd;
     }
@@ -828,25 +835,31 @@ sub SendCommand($$;$$@) {
       if ( defined($data) );
     Log3($name, 5, "BOTVAC $name: GET $URL")
       if ( !defined($data) );
-    Log3($name, 5, "BOTVAC $name: header $header")
-      if ( defined($header) );
+    Log3($name, 5, "BOTVAC $name: header ".join("\n", map(($_.': '.$header{$_}), keys %header)))
+      if ( %header );
 
-    ::HttpUtils_NonblockingGet(
-        {
-            url         => $URL,
-            timeout     => $timeout,
-            noshutdown  => 1,
-            header      => $header,
-            data        => $data,
-            hash        => $hash,
-            service     => $service,
-            cmd         => $cmd,
-            successor   => \@successor,
-            timestamp   => $timestamp,
-            sslargs     => { %sslArgs },
-            callback    => \&ReceiveCommand,
-        }
-    );
+    my $params = {
+        url         => $URL,
+        timeout     => $timeout,
+        noshutdown  => 1,
+        keepalive   => $keepalive,
+        header      => \%header,
+        data        => $data,
+        hash        => $hash,
+        service     => $service,
+        cmd         => $cmd,
+        successor   => \@successor,
+        timestamp   => $timestamp,
+        sslargs     => \%sslArgs,
+        callback    => \&ReceiveCommand
+    };
+
+    if ($keepalive) {
+      map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_}} keys %{$params};
+      ::HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
+    } else {
+      ::HttpUtils_NonblockingGet($params);
+    }
 
     return;
 }
@@ -854,19 +867,24 @@ sub SendCommand($$;$$@) {
 ###################################
 sub ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
-    my $hash      = $param->{hash};
-    my $name      = $hash->{NAME};
-    my $service   = $param->{service};
-    my $cmd       = $param->{cmd};
-    my @successor = @{$param->{successor}};
+    my $hash       = $param->{hash};
+    my $name       = $hash->{NAME};
+    my $service    = $param->{service};
+    my $cmd        = $param->{cmd};
+    my $url        = $param->{url};
+    my $keepalive  = $param->{keepalive};
+    my $respHeader = $param->{httpheader};
+    my @successor  = @{$param->{successor}};
 
     my $rc = ( $param->{buf} ) ? $param->{buf} : $param;
 
     my $loadMap;
     my $return;
     my $reqId = 0;
+    my $closeConnection = ($respHeader =~ m/.*[Cc]onnection: keep-alive.*/ ? 0 : 1);
 
     Log3($name, 5, "BOTVAC $name: called function ReceiveCommand() rc: $rc err: $err data: $data ");
+    Log3($name, 5, "BOTVAC $name: http header: $respHeader") if (defined($respHeader));
 
     readingsBeginUpdate($hash);
 
@@ -1224,8 +1242,8 @@ sub ReceiveCommand($$$) {
                   my $t2 = GetSecondsFromString($map->{start_at});
                   my $dt = $t1-$t2-$map->{time_in_suspended_cleaning}-$map->{time_in_error}-$map->{time_in_pause};
                   my $dc = $map->{run_charge_at_start}-$map->{run_charge_at_end};
-                  my $expa = int($map->{cleaned_area}*100/$dc+.5) if ($dc > 0);
-                  my $expt = int($dt*100/$dc/60+.5) if ($dc > 0);
+                  my $expa = $dc>0?int($map->{cleaned_area}*100/$dc+.5):0;
+                  my $expt = $dc>0?int($dt*100/$dc/60+.5):0;
                   readingsBulkUpdateIfChanged($hash, "map_duration", int($dt/6+.5)/10); # min
                   readingsBulkUpdateIfChanged($hash, "map_expected_area", $expa>0?$expa:0); # qm
                   readingsBulkUpdateIfChanged($hash, "map_run_discharge", $dc>0?$dc:0); # %
@@ -1273,9 +1291,16 @@ sub ReceiveCommand($$$) {
 
     readingsEndUpdate( $hash, 1 );
 
+    if (defined($hash->{helper}{".HTTP_CONNECTION"}) and
+        (($keepalive and $closeConnection) or !@successor)) {
+      Log3($name, 4, "BOTVAC $name: Close connection");
+      ::HttpUtils_Close($hash->{helper}{".HTTP_CONNECTION"});
+      undef($hash->{helper}{".HTTP_CONNECTION"});
+    }
+
     if ($loadMap) {
-      my $url = ReadingsVal($name, ".map_url", "");
-      push(@successor , ["loadmap", $url]) if ($url ne "");
+      my $mapurl = ReadingsVal($name, ".map_url", "");
+      push(@successor , ["loadmap", $mapurl]) if ($mapurl ne "");
     }
 
     if (@successor) {
@@ -1299,7 +1324,7 @@ sub ReceiveCommand($$$) {
       SendCommand($hash, $cmdService, $cmdCmd, $cmdOption, @successor)
           if (($service ne $cmdService) or ($cmd ne $cmdCmd) or ($newReqId = "true"));
     }
-
+    
     return;
 }
 

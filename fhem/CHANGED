@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  70_BOTVAC: use keepalive for status update
+                       refactor connection handling
+                       fix warnings while loading maps
  - feature: speechrecogn.template: Add logic to set alexa- and siriName
             mqtt2.template: change speech recogn. logics at tasmota
  - feature: 93_DbRep: older than days / newer than days for reduceLog
