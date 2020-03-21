@@ -58,6 +58,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
+                            "option of delEntries / reduceLog is used, minor fix for sqlCmdHistory ",
+  "8.37.0"  => "20.03.2020  add column header for free selects (sqlCmd) ",
   "8.36.0"  => "19.03.2020  sqlSpecial recentReadingsOfDevice ",
   "8.35.0"  => "19.03.2020  option older than days and newer than days for delEntries function ",
   "8.34.0"  => "18.03.2020  option writeToDBSingle for functions averageValue, sumValue ",     
@@ -191,6 +194,8 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = ( 
+  "8.36.0"  => "19.03.2020 Some simplifications for fast mutable module usage is built in, such as possible command option older than / newer than days for reduceLog and delEntries function. ".
+                           "A new option \"writeToDBSingle\" for functions averageValue, sumValue is built in as well as a new sqlSpecial \"recentReadingsOfDevice\". ",
   "8.32.0"  => "29.01.2020 A new option \"deleteOther\" is available for commands \"maxValue\" and \"minValue\". Now it is possible to delete all values except the ".
                            "extreme values (max/min) from the database within the specified limits of time, device, reading and so on. ",
   "8.30.4"  => "22.01.2020 The behavior of write back values to database is changed for functions averageValue and sumValue. The solution values of that functions now are ".
@@ -570,7 +575,7 @@ sub DbRep_Set($@) {
                 (($hash->{ROLE} ne "Agent")?"reduceLog ":"").
                 (($hash->{ROLE} ne "Agent")?"sqlCmd:textField-long ":"").
                 (($hash->{ROLE} ne "Agent" && $hl)?"sqlCmdHistory:".$hl." ":"").
-                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice ":"").
+                (($hash->{ROLE} ne "Agent")?"sqlSpecial:50mostFreqLogsLast2days,allDevCount,allDevReadCount,recentReadingsOfDevice".(($dbmodel eq "MYSQL")?",readingsDifferenceByTimeDelta":"")." ":"").
                 (($hash->{ROLE} ne "Agent")?"syncStandby ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentFillup:noArg ":"").
 				(($hash->{ROLE} ne "Agent")?"tableCurrentPurge:noArg ":"").
@@ -907,10 +912,13 @@ sub DbRep_Set($@) {
 		  # $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;    # V8.36.0 20.03.2020
       }
       if($opt eq "sqlCmdHistory") {
-          $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ s/§/_ESC_ECS_/g; 
+          $prop =~ tr/ A-Za-z0-9!"#%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ s/_ESC_ECS_/§/g;
           $prop =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
           $prop =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html                   
           $sqlcmd = $prop;
+          Log3 ($name, 1, "DbRep $name - com: $sqlcmd");
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
               DbRep_setCmdFile($name."_sqlCmdList","",$hash);                        # Löschen der sql History Liste im DbRep-Keyfile
@@ -1954,15 +1962,16 @@ sub DbRep_Main($$;$) {
  # zentrales Timestamp-Array und Zeitgrenzen bereitstellen
  my ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next);
  my $ts = "no_aggregation";                                        # Dummy für eine Select-Schleife wenn != $IsTimeSet || $IsAggrSet
- my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash); 
+ my ($IsTimeSet,$IsAggrSet,$aggregation) = DbRep_checktimeaggr($hash);
+
  if($IsTimeSet || $IsAggrSet) {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } else {
      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set") if($opt !~ /tableCurrentPurge/); 
  }
- 
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog/); 
+
+ Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries/); 
  
  #####  Funktionsaufrufe ##### 
  if ($opt eq "sumValue") {
@@ -2046,16 +2055,20 @@ sub DbRep_Main($$;$) {
  } elsif ($opt =~ /sqlCmd|sqlSpecial/ ) {
     # Execute a generic sql command or special sql
     if ($opt =~ /sqlSpecial/) {
+        my ($tq,$gcl);
+        
         if($prop eq "50mostFreqLogsLast2days") {
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
             $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
+        
         } elsif ($prop eq "allDevReadCount") {
             $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
+        
         } elsif ($prop eq "allDevCount") {
             $prop = "select device, count(*) from history group by DEVICE;";
+        
         } elsif ($prop eq "recentReadingsOfDevice") {
-            my ($tq,$gcl);
             if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
             if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
             if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
@@ -2068,6 +2081,26 @@ sub DbRep_Main($$;$) {
                                      ON x.TIMESTAMP = t1.TIMESTAMP AND
                                         x.DEVICE    = t1.DEVICE    AND
                                         x.READING   = t1.READING;");
+            
+            $prop   = join(" ", @cmd);
+        
+        } elsif ($prop eq "readingsDifferenceByTimeDelta") {           
+            my @cmd = split(/\s/, "SET \@diff=0;
+                                   SET \@delta=NULL;
+                                   SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA 
+                                     FROM (SELECT TIMESTAMP,READING,VALUE,
+                                            cast((VALUE-\@diff) AS DECIMAL(12,4))   AS DIFF,
+                                            \@diff:=VALUE                           AS curr_V,
+                                            TIMESTAMPDIFF(MINUTE,\@delta,TIMESTAMP) AS TIME_DELTA,
+                                            \@delta:=TIMESTAMP                      AS curr_T
+                                              FROM  history
+                                          WHERE DEVICE = '".$device."'   AND
+                                                READING = '".$reading."' AND
+                                                TIMESTAMP >= §timestamp_begin§ AND
+                                                TIMESTAMP <= §timestamp_end§
+                                                ORDER BY TIMESTAMP
+                                          ) t1;"
+                           );
             
             $prop   = join(" ", @cmd);
         }
@@ -6179,33 +6212,39 @@ sub sqlCmd_DoParse($) {
      return "$name|''|$opt|$sql|''|''|$err";       
   }
  
-  my @rows;
+  my (@rows,$row,@head);
   my $nrows = 0;
   if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
-    while (my @line = $sth->fetchrow_array()) {
-      Log3 ($name, 4, "DbRep $name - SQL result: @line");
-      my $row = join("$srs", @line);
+      @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};   # https://metacpan.org/pod/DBI#NAME1
+      if (@head) {
+          $row = join("$srs", @head);
+          push(@rows, $row);
+      }
       
-	  # join Delimiter "§" escapen
-	  $row =~ s/§/|°escaped°|/g;
+      while (my @line = $sth->fetchrow_array()) {
+          Log3 ($name, 4, "DbRep $name - SQL result: @line");
+          $row = join("$srs", @line);
       
-      push(@rows, $row);
-      # Anzahl der Datensätze
-      $nrows++;
-    }
+	      # join Delimiter "§" escapen
+	      $row =~ s/§/|°escaped°|/g;
+      
+          push(@rows, $row);
+          # Anzahl der Datensätze
+          $nrows++;
+      }
   } else {
-     $nrows = $sth->rows;
-     eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-     if ($@) {
-         $err = encode_base64($@,"");
-         Log3 ($name, 2, "DbRep $name - ERROR - $@");
-         $dbh->disconnect;
-         return "$name|''|$opt|$sql|''|''|$err";       
-     }
+      $nrows = $sth->rows;
+      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      if ($@) {
+          $err = encode_base64($@,"");
+          Log3 ($name, 2, "DbRep $name - ERROR - $@");
+          $dbh->disconnect;
+          return "$name|''|$opt|$sql|''|''|$err";       
+      }
 	 
-	 push(@rows, $r);
-	 my $com = (split(" ",$sql, 2))[0];
-	 Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");  
+	  push(@rows, $r);
+	  my $com = (split(" ",$sql, 2))[0];
+	  Log3 ($name, 3, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");  
   }
   
   $sth->finish;
@@ -6294,8 +6333,8 @@ sub sqlCmd_ParseDone($) {
 	  foreach $row ( @rows ) {
 	      $row =~ s/\|°escaped°\|/§/g;
 		  $row =~ s/$srs/\|/g if($srs !~ /\|/);
-		  $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
-          $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
+		  $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px;text-align: right;'>/g;
+          $res .= "<tr><td style='padding-right:5px;padding-left:5px;text-align: right;'>".$row."</td></tr>";
       }
 	  $row .= $res."</table></html>";
 	  
@@ -6461,6 +6500,7 @@ sub dbmeta_DoParse($) {
                      }
 				 }
              } elsif ($opt eq "procinfo") {
+                   my $row;
 			       my $res = "<html><table border=2 bordercolor='darkgreen' cellspacing=0>";
 				   $res .= "<tr><td style='padding-right:5px;padding-left:5px;font-weight:bold'>ID</td>";
 				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>USER</td>";
@@ -6471,11 +6511,12 @@ sub dbmeta_DoParse($) {
 				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>STATE</td>";
 				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>INFO</td>";
 				   $res .= "<td style='padding-right:5px;padding-left:5px;font-weight:bold'>PROGRESS</td></tr>";
-			       while (my @line = $sth->fetchrow_array()) {
+                                   
+                   while (my @line = $sth->fetchrow_array()) {
                        Log3 ($name, 4, "DbRep $name - SQL result: @line");
-					   my $row = join("|", @line);
-					   $row =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
-		               $row =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
+					   $row  = join("|", @line);
+					   $row  =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd; 
+		               $row  =~ s/\|/<\/td><td style='padding-right:5px;padding-left:5px'>/g;
                        $res .= "<tr><td style='padding-right:5px;padding-left:5px'>".$row."</td></tr>";
                    }
                    my $tab .= $res."</table></html>";
@@ -9670,9 +9711,22 @@ sub DbRep_checktimeaggr ($) {
  my $IsAggrSet   = 0;
  my $aggregation = AttrVal($name,"aggregation","no");
 
- if ( AttrVal($name,"timestamp_begin",undef) || AttrVal($name,"timestamp_end",undef) ||
-	  AttrVal($name,"timeDiffToNow",undef) || AttrVal($name,"timeOlderThan",undef) || AttrVal($name,"timeYearPeriod",undef) ) {
-	  $IsTimeSet = 1;
+ my @a;
+ @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
+ @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
+ my $timeoption = 0;
+ foreach (@a) {                                                    # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
+	 if($_ =~ /\b(\d+(:\d+)?)\b/) {
+         $timeoption = 1;
+	 }
+ }
+ 
+ if ( AttrVal($name,"timestamp_begin", undef) || 
+      AttrVal($name,"timestamp_end",   undef) ||
+	  AttrVal($name,"timeDiffToNow",   undef) || 
+      AttrVal($name,"timeOlderThan",   undef) || 
+      AttrVal($name,"timeYearPeriod",  undef) || $timeoption ) {
+    $IsTimeSet = 1;
  }
  
  if ($aggregation ne "no") {
@@ -9686,7 +9740,7 @@ sub DbRep_checktimeaggr ($) {
      $aggregation = "day";       # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog/) {
+ if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -13010,12 +13064,16 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: reports the 50 most occuring log entries of the last 2 days </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>: all devices occuring in database and their quantity </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>: all device/reading combinations occuring in database and their quantity </td></tr>
-									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: determines the newest records of a device available in the database. The
-									                                                      device must be defined in attribute <a href="#reading">reading</a>. 
-																						  Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
+                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>:       reports the 50 most occuring log entries of the last 2 days </td></tr>
+                                      <tr><td> <b>allDevCount </b>             </td><td>:       all devices occuring in database and their quantity </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>         </td><td>:       all device/reading combinations occuring in database and their quantity </td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>:       determines the newest records of a device available in the database. The
+									                                                            device must be defined in attribute <a href="#device">device</a>. 
+																						        Only <b>one</b> device to be evaluated can be specified.. </td></tr>                                  
+									  <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: determines the value difference of successive data records of a reading. The
+									                                                            device and reading must be defined in the attribute <a href="#device">device</a> or <a href="#reading">reading</a>. 
+																						        Only <b>one</b> device to be evaluated and only <b>one</b> reading to be evaluated can be specified. 
+                                                                                                The time limits of the evaluation are defined by the time.*-attributes. </td></tr>
 								   </table>
 	                               </ul>
 								   <br>
@@ -15556,12 +15614,16 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> <b>50mostFreqLogsLast2days </b> </td><td>: ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
-                                      <tr><td> <b>allDevCount </b>             </td><td>: alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
-                                      <tr><td> <b>allDevReadCount </b>         </td><td>: alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
-									  <tr><td> <b>recentReadingsOfDevice </b>  </td><td>: ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
-									                                                      Device muß im Attribut <a href="#reading">reading</a> definiert sein. 
-																						  Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
+                                      <tr><td> <b>50mostFreqLogsLast2days </b>    </td><td>:    ermittelt die 50 am häufigsten vorkommenden Loggingeinträge der letzten 2 Tage </td></tr>
+                                      <tr><td> <b>allDevCount </b>                </td><td>:    alle in der Datenbank vorkommenden Devices und deren Anzahl </td></tr>
+                                      <tr><td> <b>allDevReadCount </b>            </td><td>:    alle in der Datenbank vorkommenden Device/Reading-Kombinationen und deren Anzahl</td></tr>
+									  <tr><td> <b>recentReadingsOfDevice </b>     </td><td>:    ermittelt die neuesten in der Datenbank vorhandenen Datensätze eines Devices. Das auszuwertende
+									                                                            Device muß im Attribut <a href="#device">device</a> definiert sein. 
+																						        Es kann nur <b>ein</b> auszuwertendes Device angegeben werden. </td></tr>
+									  <tr><td> <b>readingsDifferenceByTimeDelta </b> </td><td>: ermittelt die Wertedifferenz aufeinanderfolgender Datensätze eines Readings. Das auszuwertende
+									                                                            Device und Reading muß im Attribut <a href="#device">device</a> bzw. <a href="#reading">reading</a> definiert sein. 
+																						        Es kann nur <b>ein</b> auszuwertendes Device und nur <b>ein</b> auszuwertendes Reading angegeben werden. 
+                                                                                                Die Zeitgrenzen der Auswertung werden durch die time.*-Attribute festgelegt. </td></tr>                        
                                    </table>
 	                               </ul>
 								   <br>

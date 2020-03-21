@@ -58,7 +58,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time option of delEntries / reduceLog is used ",
+  "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
+                            "option of delEntries / reduceLog is used, minor fix for sqlCmdHistory ",
   "8.37.0"  => "20.03.2020  add column header for free selects (sqlCmd) ",
   "8.36.0"  => "19.03.2020  sqlSpecial recentReadingsOfDevice ",
   "8.35.0"  => "19.03.2020  option older than days and newer than days for delEntries function ",
@@ -911,10 +912,13 @@ sub DbRep_Set($@) {
 		  # $sqlcmd =~ tr/ A-Za-z0-9!"#$§%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;    # V8.36.0 20.03.2020
       }
       if($opt eq "sqlCmdHistory") {
-          $prop =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ s/§/_ESC_ECS_/g; 
+          $prop =~ tr/ A-Za-z0-9!"#%&'()*+,-.\/:;<=>?@[\\]^_`{|}~äöüÄÖÜß€/ /cs;
+          $prop =~ s/_ESC_ECS_/§/g;
           $prop =~ s/<c>/,/g;                                                        # noch aus Kompatibilitätsgründen enthalten
           $prop =~ s/(\x20)*\xbc/,/g;                                                # Forum: https://forum.fhem.de/index.php/topic,103908.0.html                   
           $sqlcmd = $prop;
+          Log3 ($name, 1, "DbRep $name - com: $sqlcmd");
           if($sqlcmd eq "___purge_historylist___") {
               delete($hash->{HELPER}{SQLHIST});
               DbRep_setCmdFile($name."_sqlCmdList","",$hash);                        # Löschen der sql History Liste im DbRep-Keyfile
