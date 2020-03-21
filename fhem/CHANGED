@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: speechrecogn.template: Add logic to set alexa- and siriName
+            mqtt2.template: change speech recogn. logics at tasmota
  - feature: 93_DbRep: older than days / newer than days for reduceLog
                       and delEntries as option, option writeToDBSingle 
                       for averageValue and sumValue, 

@@ -605,6 +605,7 @@ order:A_01a
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
 attr DEVICE icon ICON
 attr DEVICE jsonMap POWER1:0 POWER2:0 POWER3:0 POWER4:0 Dimmer:0 Channel_0:0 Channel_1:0 Channel_2:0 Channel_3:0 Channel_4:0 HSBColor:0 Color:0
@@ -627,15 +628,17 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add on-for-timer option running on the device. The following is limited to 1h max duration, but will not affect future simple "on" commands:<br>on-for-timer {my $duration = $EVTPART1*10; 'cmnd/CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}<br>See the "Praxisbeispiele" in the wiki for "pulseTime1" alternative option and it's restrictions.
 attr DEVICE autocreate 0
-set DEVICE attrTemplate speech_recognition_type_switch
 attr DEVICE model tasmota_basic_state_power1
+option:{ CALLSPEECHRECOGN }
+set DEVICE attrTemplate speech_recognition_type_switch
+
 
 # sonoff 1 channel device flashed with Tasmota.
 name:tasmota_basic
 filter:TYPE=MQTT2_DEVICE
 desc:Applies to Sonoff 1 Channel devices using POWER-topic for relay state <br>NOTE:<br>- Power topic will be set to POWER1; <br>- the format the device is sending data will also be changed to lowercase!<br>- finally, you'll see the device as model tasmota_basic_state_power1.
 order:A_01
-set DEVICE attrTemplate tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
 
 name:tasmota_clear_readings_reset_readingsList_and_reboot
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -662,7 +665,7 @@ name:tasmota_1ch+motion+SI7021
 desc:tasmota device with one relay, one motion sensor via switch and one SI7021 combined temperature and humidity sensor. <br>Configures a single device including all readings
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 order:A_01b
-set DEVICE attrTemplate tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
@@ -703,7 +706,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-set DEVICE attrTemplate tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
 attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
@@ -739,7 +742,7 @@ name:tasmota_plug_with_rgbw_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:plug with seperate RGBW LED flashed with Tasmota. <br>NOTE: a second device will be created for the rgb device.<br>Tested with Tasmota V. 7.1.2 and Maxcio YX-DE02 Plug using template: {"NAME":"Maxcio YX-DE04","GPIO":[255,17,255,21,56,40,0,0,37,38,39,255,255],"FLAG":1,"BASE":18}
 order:A_01c1a
-set DEVICE attrTemplate tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=0
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -770,6 +773,7 @@ attr DEVICE_CH2 webCmdLabel Helligkeit\
 attr DEVICE_CH2 devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")}
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith).*
+set DEVICE attrTemplate speech_recognition_type_switch
 set DEVICE_CH2 attrTemplate speech_recognition_type_light_255
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
 
@@ -833,7 +837,7 @@ order:A_01d2
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
-  TELETOPIC/RESULT:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
+  TELETOPIC/RESULT:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([-]?[\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries. 
 attr DEVICE model tasmota_use_DS18x20_id
@@ -843,7 +847,7 @@ name:tasmota_2ch_unified
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings
 order:A_02a
-set DEVICE attrTemplate tasmota_basic_state_power1
+set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=0
 deleteAttr DEVICE jsonMap
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
@@ -875,11 +879,11 @@ name:tasmota_2channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 2 channel device flashed with Tasmota. <br>NOTE: a second device will be created for the second channel
 order:A_02
-set DEVICE attrTemplate tasmota_basic_state_power1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 setreading DEVICE associatedWith DEVICE_CH2
-set DEVICE attrTemplate speech_recognition_type_switch
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList \
   STATTOPIC/POWER2:.* state
@@ -891,8 +895,11 @@ attr DEVICE_CH2 setList \
   on:noArg     CMNDTOPIC/POWER2 1\
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
-#set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
+option:{ CALLSPEECHRECOGN }  
+set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE_CH2 attrTemplate speech_recognition_type_switch
+
 
 #contributed by 87insane
 # tasmota 2ch as shutter device.
@@ -904,6 +911,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
+#par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 set IO_DEV publish CMNDTOPIC/Backlog LedState 2; SetOption80 1; Interlock 1,2; Interlock ON; SetOption81 1; switchmode1 3; switchmode2 3; PulseTime1 0; PulseTime2 0; SaveData 1;
 set IO_DEV publish CMNDTOPIC/Restart 1
@@ -944,9 +952,11 @@ Use the "set x_configuration" Option. Example: "set x_configuration ShutterOpenD
 Shutter specific commands available: ShutterOpenDuration1, ShutterCloseDuration1, ShutterRelay1, ShutterSetHalfway1, ShutterSetClose1, ShutterInvert1, ShutterMotordelay1, ShutterCalibration1; you may use this for general setOptions in tasmota also.\
 commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a>.
-# set DEVICE attrTemplate speech_recognition_type_blind
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
+#option:{ CALLSPEECHRECOGN } 
+set DEVICE attrTemplate speech_recognition_type_blind
+
 
 # tasmota 2ch as shutter device.
 name:tasmota_2ch_shutter_invert_0
@@ -958,7 +968,7 @@ par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set DEVICE attrTemplate tasmota_2ch_shutter_invert_1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterInvert1 0;; SaveData 1;;
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
-set DEVICE attrTemplate speech_recognition_type_blind
+#set DEVICE attrTemplate speech_recognition_type_blind
 attr DEVICE model tasmota_2ch_shutter_invert_0
 
 # sonoff 4 channel device flashed with Tasmota.
@@ -968,7 +978,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:sonoff 4 channel device flashed with Tasmota. <br>NOTE: a second, third and fourth device will be created for each additional channel
 order:A_04
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-set DEVICE attrTemplate tasmota_2channel_split
+set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
 setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
@@ -999,6 +1009,11 @@ attr DEVICE_CH4 readingList \
 attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
+set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE_CH2 attrTemplate speech_recognition_type_switch
+set DEVICE_CH3 attrTemplate speech_recognition_type_switch
+set DEVICE_CH4 attrTemplate speech_recognition_type_switch
+
 
 # 4-way multi socket 3AC+USB device flashed with Tasmota.
 # Tested with Power Strip Hyleton 333, please see <a href="https://templates.blakadder.com/hyleton_333.html">Tasmota Template Repository</a>
@@ -1307,7 +1322,7 @@ attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speech_recognition_type_light
 attr DEVICE model tasmota_rgbw_led
 
-name:tasmota_rgbwct_led
+name:tasmota_rgbcct_light
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Tasmota RGBW bulb with CT option like LSC Smart Connect Candle 400lm RGBW
 order:A_05a2
@@ -1331,7 +1346,7 @@ attr DEVICE webCmdLabel Helligkeit\
 :Farbe\
 :Temp
 set DEVICE attrTemplate speech_recognition_type_light
-attr DEVICE model tasmota_rgbwct_led
+attr DEVICE model tasmota_rgbcct_led
 
 name:tasmota_cct_led
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*

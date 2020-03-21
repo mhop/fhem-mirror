@@ -83,20 +83,69 @@ name:speech_recognition_general_naming_master_template
 filter:genericDeviceType=.+
 order:10000200
 desc:generic template to set attributes for identifying this device by speech recognition software. This template will call several sub-templates - dependent on the speech recognition solutions which are in use in your installation. Pls. do not use one of the subtemplates directly. Call e.g. with set xy attrTemplate speech_recognition_general_naming_master_template
-option:{my @devices=devspec2array("TYPE=siri");; $devices[0] ? return 1 : return 0}
 option:{my @devices=devspec2array("TYPE=alexa");; $devices[0] ? return 1 : return 0}
-#set DEVICE attrTemplate speech_recognition_alaxaName_firstrun
+set DEVICE attrTemplate speech_recognition_alexa_specials
+option:{my @devices=devspec2array("TYPE=siri");; $devices[0] ? AttrVal("DEVICE","genericDeviceType","none") eq "none" ? 0 : 1 : 0 }
+set DEVICE attrTemplate speech_recognition_siri_specials
 option:{my @devices=devspec2array("TYPE=gassistant");; $devices[0] ? return 1 : return 0}
 
+#######
+# alexa specials
 
-name:speech_recognition_alaxaName_firstrun
+name:speech_recognition_alexa_specials
 filter:NAME=speechrecognTesting
 order:1000020a
-desc:generic template to set speech recognition attribute alexaName, call e.g. with set xy attrTemplate speech_recognition_alaxaName_firstrun ALEXANAME=myAlexaName
+desc:generic template to set speech recognition attribute alexaName, call e.g. with set xy attrTemplate speech_recognition_alexa_specials ALEXANAME=myAlexaName
 option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
-par:ALEXANAME;Please enter alexaName;{ AttrVal("DEVICE","alexaName",undef) } 
+#par:ALEXANAME;Please enter alexaName. Pls. enter something, even if you do not want any name to be set, use the offered radio option to skip naming instead!;{ AttrVal("DEVICE","alexaName",undef) }
+par:ALEXAISNAME;Current attribute value alexaName;{ AttrVal("DEVICE","alexaName","(not set)") } 
+par:RADIO_SETalexaNAME;Set a new alexaName;{ undef }
+par:RADIO_DoNotSetalexaName;Leave alexaName attribute empty;{ undef }
+par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ undef }
+option:{ RADIO_Delete_gDT }
+deleteAttr DEVICE genericDeviceType
+option:{ RADIO_DoNotSetalexaName }
+option:{ RADIO_SETalexaNAME }
+set DEVICE attrTemplate speech_recognition_request_alexaName
+
+name:speech_recognition_request_alexaName
+filter:NAME=speechrecognTesting
+order:1000020b
+desc:generic template to ask for alexaName attribute setting. Only intented for internal use by speech_recognition_request_alexaName
+par:ALEXAISNAME;Current attribute value alexaName;{ AttrVal("DEVICE","alexaName","(not set)") } 
+par:ALEXANAME;Please enter alexaName. Current value: ALEXAISNAME;{ undef } 
+option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 attr DEVICE alexaName ALEXANAME
-set DEVICE attrTemplate speech_recognition_alaxaName_secondrun ALEXAISNAME=ALEXANAME
+
+####
+#siri specials
+
+name:speech_recognition_siri_specials
+filter:NAME=speechrecognTesting
+order:1000021a
+desc:generic template to set speech recognition attribute alexaName, call e.g. with set xy attrTemplate speech_recognition_siri_specials ALEXANAME=myAlexaName
+option:{my @devices=devspec2array("TYPE=(siri)");; $devices[0] ? return 1 : return 0}
+par:RADIO_SETsiriNAME;Set a new siriName;{ undef }
+par:RADIO_DoNotSetsiriName;Leave siriName attribute empty;{ undef }
+par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ undef }
+option:{ RADIO_Delete_gDT }
+deleteAttr DEVICE genericDeviceType
+option:{ RADIO_DoNotSetsiriName }
+option:{ RADIO_SETsiriNAME }
+set DEVICE attrTemplate speech_recognition_request_siriName
+
+name:speech_recognition_request_siriName
+filter:NAME=speechrecognTesting
+order:1000021b
+desc:generic template to ask for siriName attribute setting. Only intented for internal use by speech_recognition_request_siriName
+par:SIRIISNAME;Current attribute value alexaName;{ AttrVal("DEVICE","siriName","(not set)") } 
+par:SIRINAME;Please enter siriName. Current value: SIRIISNAME;{ undef } 
+option:{my @devices=devspec2array("TYPE=(siri)");; $devices[0] ? return 1 : return 0}
+attr DEVICE siriName SIRINAME
+
+
+#############
+#no longer used:
 
 name:speech_recognition_alaxaName_secondrun
 filter:NAME=speechrecognTesting
