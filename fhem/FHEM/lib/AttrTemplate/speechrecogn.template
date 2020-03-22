@@ -99,9 +99,12 @@ desc:generic template to set speech recognition attribute alexaName, call e.g. w
 option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 #par:ALEXANAME;Please enter alexaName. Pls. enter something, even if you do not want any name to be set, use the offered radio option to skip naming instead!;{ AttrVal("DEVICE","alexaName",undef) }
 par:ALEXAISNAME;Current attribute value alexaName;{ AttrVal("DEVICE","alexaName","(not set)") }
+par:RADIO_KEEPalexaNAME;Keep current attribute value;{ defined AttrVal("DEVICE","alexaName",undef) ? undef :0 }
 par:RADIO_SETalexaNAME;Set a new alexaName;{ undef }
-par:RADIO_DoNotSetalexaName;Leave alexaName attribute empty;{ undef }
+par:RADIO_DoNotSetalexaName;Leave alexaName attribute empty;{ defined AttrVal("DEVICE","alexaName",undef) ? 0 : undef }
 par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ undef }
+option:{ RADIO_KEEPalexaNAME }
+set DEVICE attrTemplate speech_recognition_siri_specials CHECKGDTDONE=1
 option:{ RADIO_Delete_gDT }
 deleteAttr DEVICE genericDeviceType
 option:{ RADIO_DoNotSetalexaName }
@@ -114,7 +117,6 @@ name:speech_recognition_request_alexaName
 filter:NAME=speechrecognTesting
 order:1000020b
 desc:generic template to ask for alexaName attribute setting. Only intented for internal use by speech_recognition_request_alexaName
-#par:ALEXAISNAME;Current attribute value alexaName;{ AttrVal("DEVICE","alexaName","(not set)") } 
 par:ALEXANAME;Please enter alexaName;{ undef } 
 option:{my @devices=devspec2array("TYPE=(alexa)");; $devices[0] ? return 1 : return 0}
 attr DEVICE alexaName ALEXANAME
@@ -130,10 +132,12 @@ order:1000021a
 desc:generic template to set speech recognition attribute alexaName, call e.g. with set xy attrTemplate speech_recognition_siri_specials ALEXANAME=myAlexaName
 option:{my @devices=devspec2array("TYPE=(siri)");; $devices[0] ? return 1 : return 0}
 par:CHECKGDTDONE;Set this to  to 1 if answer was no in previous template;{ 0 } 
+par:RADIO_KEEPsiriNAME;Keep current attribute value;{ defined AttrVal("DEVICE","siriName",undef) ? undef :0 }
 par:RADIO_SETsiriNAME;Set a new siriName;{ undef }
 par:RADIO_DoNotSetsiriName;Leave siriName attribute empty;{ undef }
-par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ CHECKGDTDONE ? 0 : undef }
-option:{ RADIO_Delete_gDT && }
+par:RADIO_Delete_gDT;Discard genericDeviceType attribute;{ CHECKGDTDONE ? undef : 0 }
+option:{ RADIO_KEEPsiriNAME }
+option:{ RADIO_Delete_gDT }
 deleteAttr DEVICE genericDeviceType
 option:{ RADIO_DoNotSetsiriName }
 deleteAttr DEVICE siriName

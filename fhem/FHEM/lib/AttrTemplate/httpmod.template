@@ -621,7 +621,7 @@ attr DEVICE showMatched 1
 attr DEVICE stateFormat { my $ret ="";;\
     my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
     $ret .= '<div style="text-align:left">';;\
-    $ret .= 'last <a title="versions" href="'.InternalVal($name,"MainURL","unknown").'">tasmota</a>-check => '.$lastCheck;;\
+    $ret .= 'last <a title="versions" href="https://github.com/arendst/Tasmota/releases" target="_blank">tasmota</a>-check => '.$lastCheck;;\
     $ret .= '<br><br><pre>';;\
     $ret .= "| device                           | current |   new   |  released  |<br>";;\
     $ret .= "---------------------------------------------------------------------<br>";;\
@@ -639,12 +639,12 @@ attr DEVICE stateFormat { my $ret ="";;\
       foreach my $devStr (@devices) {\
         my ($dev,$old,$new,$date) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\s([^\s]+)\s\|\s([^\)]+)\)$/;;\
         $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
-        $ret .= sprintf("%-32s",$dev);;\
+        $ret .= sprintf("%-32s",AttrVal($dev,"alias",$dev));;\
         $ret .= '</b></a> | ';;\
         $ret .= '<b style="color:lightgray">';;\
-		$ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO1_IPAddress","0.0.0.0")).'" target="_blank">';;\
-		$ret .= sprintf("%7s",$old);;\
-        $ret .= '</b></a> | ';;\
+        $ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO1_IPAddress","0.0.0.0")).'/up" target="_blank">';;\
+        $ret .= sprintf("%7s",$old);;\
+        $ret .= '</a></b> | ';;\
         $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
         $ret .= '<b style="color:red">';;\
         $ret .= sprintf("%7s",$new);;\
