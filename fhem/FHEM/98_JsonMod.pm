@@ -60,9 +60,6 @@ sub JsonMod_Initialize {
 	#$hash->{'NotifyOrderPrefix'}	= "50-";
 	$hash->{'AttrList'}				= join(' ', @attrList)." $readingFnAttributes ";
 
-	print "version1 $] \n" if ($] >= 5.22);
-	print "version2 $] \n" if ($] >= 5.28);
-
 	return undef;
 };
 
