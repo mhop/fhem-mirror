@@ -60,6 +60,9 @@ sub JsonMod_Initialize {
 	#$hash->{'NotifyOrderPrefix'}	= "50-";
 	$hash->{'AttrList'}				= join(' ', @attrList)." $readingFnAttributes ";
 
+	print "version1 $] \n" if ($] >= 5.22);
+	print "version2 $] \n" if ($] >= 5.28);
+
 	return undef;
 };
 
@@ -271,7 +274,7 @@ sub JsonMod_DoReadings {
 	};
 	
 	my sub jsonPathf {
-		no warnings qw( redundant missing );
+		eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 		my ($jsonPathExpression, $format) = @_;
 		$format //= '%s';
 		my $value = $path->get($jsonPathExpression)->getResultValue();
@@ -542,7 +545,7 @@ sub JsonMod_ApiResponse {
 sub JsonMod_Logger {
 	my ($hash, $verbose, $message, @args) = @_;
 	my $name = $hash->{'NAME'};
-	no warnings qw( redundant missing );
+	eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 	Log3 ($name, $verbose, sprintf('[%s] '.$message, $name, @args));
 	return;
 };
