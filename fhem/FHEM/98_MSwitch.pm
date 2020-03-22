@@ -4060,16 +4060,15 @@ sub MSwitch_fhemwebconf($$$$) {
 
 	my  $j1 = "
 	<script type=\"text/javascript\">
-	// VARS
-	//preconf
 	var preconf ='".$preconf."';
-	// firstconfig
 	var logging ='off';
 	var devices = ".$devstring.";
-	var at = ".$at.";
-	var atdef = ".$atdef.";
-	var atcmd = ".$comand.";
-	var atspec = ".$timespec.";
+	
+	var at = '';
+	var atdef = '';
+	var atcmd = '';
+	var atspec = '';
+	
 	var triggertime = ".$trigtime.";
 	var cmds = ".$cmds.";
 	var i;
@@ -4077,8 +4076,10 @@ sub MSwitch_fhemwebconf($$$$) {
 	var o = new Object();
 	var devicename= '".$Name."';
 	var mVersion= '".$version."';
-	var notify = ".$notify.";
-	var notifydef = ".$notifydef.";
+	
+	var notify = '';
+	var notifydef = '';
+	
 	\$(document).ready(function() {
     \$(window).load(function() {
 	name = '$Name';
