@@ -2,7 +2,7 @@
 // Autor:Byte09
 // #########################
 
-	var version = '0.1';
+	var version = '1.0';
 	var info = '';
 	var debug ='off';
 	
@@ -10,6 +10,15 @@
 
 	var globaldetails2 = 'start';
 	var globallock='';
+	var t=$("#MSwitchWebTR"), ip=$(t).attr("ip"), ts=$(t).attr("ts");
+	FW_replaceWidget("[name=aw_ts]", "aw_ts", ["time"], "12:00");
+	$("[name=aw_ts] input[type=text]").attr("id", "aw_ts");  
+	
+	var randomdev=[];
+	
+	
+	var globalaffected;
+	var auswfirst=document.getElementById('devices');
 
 function teststart(){
 // alle startfunktionen ausführen 
@@ -96,19 +105,13 @@ if (debug == 'on'){ alert(devicename+' Debug MSwitchweb an') };
 	return;
 	})
 	
-	
-	
-	
-	
-	
-	
-	var randomdev=[];
+
 	var x = document.getElementsByClassName('randomidclass');
     for (var i = 0; i < x.length; i++) 
 		{
 		var t  = x[i].id;
 		randomdev.push(t);
-		}
+		} 
 	
 	
 	// --------------------
@@ -258,6 +261,7 @@ if (document.getElementById('trigcmdon'))
 		}
 	}
 
+
 // next   ##################################################
 
 
@@ -292,22 +296,25 @@ if (document.getElementById('trigcmdon'))
 	$( "#log2" ).text( "" );
 	$( "#log1" ).text( "eingehende events:" );
 	$( "#log3" ).text( "" );
-	 /* 
+	 
 	var field = $('<select style="width: 30em;" size="5" id ="lf" multiple="multiple" name="lf" size="6"  ></select>');
+	
 	$(field).appendTo('#log2');
-	var field = $('<input id ="editevent" type="button" value="$EDITEVENT"/>');   // !!!!! #######
+	
+	var field = $('<input id ="editevent" type="button" value="'+editevent+'"/>');   // !!!!! #######
+	
 	$(field).appendTo('#log3');
 	$("#editevent").click(function(){
 	transferevent();
 	return;
 	});
- 
+
 	// umwandlung des objekts in standartarray
 	var a3 = Object.keys(o).map(function (k) { return o[k];})
  
 	// array umdrehen
 	a3.reverse();
- 
+  
 	// eintrag in dropdown
 	if (atriwaaray[test] != 1)
 		{
@@ -321,7 +328,7 @@ if (document.getElementById('trigcmdon'))
 		var newselect = $('<option value="'+test+'">'+test+'</option>');
 		$(newselect).appendTo('#trigoff');
 		}
- 
+  
 	// aktualisierung der divx max 5
 	var i;
 	for (i = 0; i < 10; i++) 
@@ -332,30 +339,70 @@ if (document.getElementById('trigcmdon'))
 			$(newselect).appendTo('#lf'); 
 			}
 		}  
- 
-  */
- 
- 
+
 });
-
-
 
 // next   ##################################################
 	
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	if (HASHINIT != 'define')
+	{
+		
+		for (i=0; i<auswfirst.options.length; i++)
+			{
+			var pos=auswfirst.options[i];
+				if(pos.selected)
+				{
+				//alert (pos.value);
+				globalaffected +=pos.value;
+				}
+			}
+		//alert (globalaffected);
+		 var sel1 = document.getElementById('devices');
+			
+			if (UNLOCK == '1')
+			{
+				globallock =' this device is locked !';
+				[ "aw_dev","aw_det","aw_trig","aw_md","aw_md1","aw_md2","aw_addevent"].forEach (lock,);
+				randomdev.forEach (lock);
+			}
+			
+			if (UNLOCK == '2')
+			{
+				globallock =' only trigger is changeable';
+				[ "aw_dev","aw_det","aw_md","aw_md1","aw_md2","aw_addevent"].forEach (lock,);
+				randomdev.forEach (lock);
+			}
+			
+		sel1.onchange = function() 
+		{
+			var actaffected;
+			var auswfirst=document.getElementById('devices');
+			for (i=0; i<auswfirst.options.length; i++)
+				{
+				var pos=auswfirst.options[i];
+				if(pos.selected)
+					{
+					//alert (pos.value);
+					actaffected +=pos.value;
+					}
+				}
+
+			if (actaffected != globalaffected)
+				{
+				globallock =' unsaved affected device';
+				[ "aw_det","aw_trig","aw_md","aw_md1","aw_md2","aw_addevent"].forEach (lock,);
+				randomdev.forEach (lock);
+				}
+			else
+				{
+				[ "aw_det","aw_trig","aw_md","aw_md1","aw_md2","aw_addevent"].forEach (unlock,);
+				randomdev.forEach (unlock);
+				}
+		}	 
+	}
 	
 	
 return;
@@ -793,25 +840,6 @@ if (debug == 'on'){ alert('aktvalue') };
 
 
 
-
-/* // unbekannt
-function noarg(target,copytofield){
-if (debug == 'on'){ alert('noarg') };
-	document.getElementById(copytofield).value = '';
-	document.getElementById(target).innerHTML = '';
-	return;
-	}
-	 
-	
-// unbekannt				   
- function noaction(target,copytofield){
-	 document.getElementById(copytofield).value = '';
-	 document.getElementById(target).innerHTML = '';
-	 return;}
-	*/
-	
-
-
 // unbekannt
 function writeattr(){
 if (debug == 'on'){ alert('writeattr') };
@@ -820,7 +848,6 @@ if (debug == 'on'){ alert('writeattr') };
 	var  def = nm+" Writesequenz "+encodeURIComponent(conf);
 	location = location.pathname+"?detail="+devicename+"&cmd=set "+addcsrf(def);
 	}
-
 
 // lösche log
 function clearlog(){
@@ -831,9 +858,6 @@ if (debug == 'on'){ alert('clearlog') };
 	 location = location.pathname+"?detail="+devicename+"&cmd=set "+addcsrf(def);
 	 }
 	 
-	 
-	
-
 // unbekannt	 
 function savesys(conf){
 if (debug == 'on'){ alert('savesys') };
@@ -891,90 +915,7 @@ if (debug == 'on'){ alert('checkcondition') }
 	}
 	
 	
-// doppelt	
-/* function saveconfig(conf){
-	if (debug == 'on'){ alert('saveconfig') }
-	conf = conf.replace(/\n/g,'#[EOL]');  // !!!
-	conf = conf.replace(/:/g,'#c[dp]');
-	conf = conf.replace(/;/g,'#c[se]');
-	conf = conf.replace(/ /g,'#c[sp]');
-	var nm = $(t).attr("nm");
-	var  def = nm+" saveconfig "+encodeURIComponent(conf);
-	location = location.pathname+"?detail="+devicename+"&cmd=set "+addcsrf(def);
-	} */
-	 
-	
-	
-/*
-// unbekannt
-function textfield(copytofield,target){
-	if (debug == 'on'){ alert('textfield') };
-	var selected =document.getElementById(copytofield).value;
-	if (copytofield.indexOf('cmdonopt') != -1) 
-		{
-		var selectfield = "<input type='text' size='30' value='" + selected +"' onchange=\"javascript: showtextfield(this.value,'" + copytofield + "','" + target + "')\">"  ;
-		document.getElementById(target).innerHTML = selectfield + '<br>';	
-		}
-	else
-		{
-		var selectfield = "<input type='text' size='30' value='" + selected +"' onchange=\"javascript: showtextfield(this.value,'" + copytofield + "','" + target + "')\">"  ;
-		document.getElementById(target).innerHTML = selectfield + '<br>';
-		}
-	return;
-	}  
-
-*/
-
-/*
-
-function hilfe(text){
-	
-	test = "ein langer \
-	string";
-	
-if (debug == 'on'){ alert('hilfe') };
-
-
-
-//vonSeite.close();
-
-
-
-
-}
-
-
-
-
-
-//######################################################################################
-
-// nicht in funktion - geht noch nicht
-function selectfield(args,target,copytofield){
-alert('selectfield');
-	var cmdsatz = args.split(",");
-	var selectstart = "<select id=\"" +target +"1\" name=\"" +target +"1\" onchange=\"javascript: aktvalue('" + copytofield + "',document.getElementById('" +target +"1').value)\">"; 
-	var selectend = '<\select>';
-	var option ='<option value="noArg">noArg</option>'; 
-	var i;
-	var len = cmdsatz.length;
-	var selected =document.getElementById(copytofield).value;
-	for (i=0; i<len; i++){
-	if (selected == cmdsatz[i]){
-	option +=  '<option selected value="' + cmdsatz[i] + '">' + cmdsatz[i] + '</option>';
-	}
-	else{
-	option +=  '<option value="' + cmdsatz[i] + '">' + cmdsatz[i] + '</option>';
-	}
-	}
-	var selectfield = selectstart + option + selectend;
-	document.getElementById(target).innerHTML = selectfield + '<br>';	
-	return;
-	}	 */  
-		
-//######################################################################################	
-	
-	
+// next
 	
 	$("#eventmonitor").click(function(){
 	var check = $("[name=eventmonitor]").prop("checked") ? "1":"0";
@@ -996,6 +937,55 @@ alert('selectfield');
 	
 
 // clickfunktions
+
+
+// details speichern
+/* 	$("#aw_det").click(function(){
+	var nm = $(t).attr("nm");
+	devices = '';
+	eval(JAVAFORM);
+	devices = devices.replace(/:/g,'#[dp]');
+	devices = devices.replace(/;/g,'#[se]');
+	devices = devices.replace(/ /g,'#[sp]');
+	devices = devices.replace(/%/g,'#[pr]');
+	devices =  encodeURIComponent(devices);
+	var  def = nm+" details "+devices+" ";
+	location = location.pathname+"?detail="+devicename+"&cmd=set "+addcsrf(def);
+	});
+	 */
+
+// modify trigger aw_save
+	$("#aw_md").click(function(){
+	if (debug == 'on'){ alert('#aw_md') };
+	var nm = $(t).attr("nm");
+	trigon = $("[name=trigon]").val();
+	trigon = trigon.replace(/ /g,'~');
+	trigoff = $("[name=trigoff]").val();
+	trigoff = trigoff.replace(/ /g,'~');
+	trigcmdon = $("[name=trigcmdon]").val();
+	trigcmdon = trigcmdon.replace(/ /g,'~');
+	trigcmdoff = $("[name=trigcmdoff]").val();
+	if(typeof(trigcmdoff)=="undefined"){trigcmdoff="no_trigger"}
+	trigcmdoff = trigcmdoff.replace(/ /g,'~');
+	trigsave = $("[name=aw_save]").prop("checked") ? "ja":"nein";
+	trigwhite = $("[name=triggerwhitelist]").val();
+	if (trigcmdon == trigon  && trigcmdon != 'no_trigger' && trigon != 'no_trigger'){
+	FW_okDialog('on triggers for \'switch Test on + execute on commands\' and \'execute on commands only\' may not be the same !');
+	return;
+	} 
+	if (trigcmdoff == trigoff && trigcmdoff != 'no_trigger' && trigoff != 'no_trigger'){
+	FW_okDialog('off triggers for \'switch Test off + execute on commands\' and \'execute off commands only\' may not be the same !');
+	return;
+	} 
+	if (trigon == trigoff && trigon != 'no_trigger'){
+	FW_okDialog('trigger for \'switch Test on + execute on commands\' and \'switch Test off + execute off commands\' must not both be \'*\'');
+	return;
+	} 
+	var  def = nm+" trigger "+trigon+" "+trigoff+" "+trigsave+" "+trigcmdon+" "+trigcmdoff+" "  ;
+	location = location.pathname+"?detail="+devicename+"&cmd=set "+addcsrf(def);
+	});
+
+
 
 	// unbekannt
 	$("#aw_little").click(function(){
