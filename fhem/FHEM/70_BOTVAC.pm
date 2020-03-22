@@ -668,7 +668,7 @@ sub SendCommand($$;$$@) {
     my $keepalive   = 0;
     my $reqId       = 0;
     my $URL         = "https://";
-    my %sslArgs     = {};
+    my %sslArgs     = ();
     my %header;
     my $data;
     my $response;
@@ -881,10 +881,12 @@ sub ReceiveCommand($$$) {
     my $loadMap;
     my $return;
     my $reqId = 0;
-    my $closeConnection = ($respHeader =~ m/.*[Cc]onnection: keep-alive.*/ ? 0 : 1);
+    my $closeConnection = (defined($respHeader) && $respHeader =~ m/.*[Cc]onnection: keep-alive.*/ ? 0 : 1);
 
-    Log3($name, 5, "BOTVAC $name: called function ReceiveCommand() rc: $rc err: $err data: $data ");
-    Log3($name, 5, "BOTVAC $name: http header: $respHeader") if (defined($respHeader));
+    Log3($name, 5, "BOTVAC $name: called function ReceiveCommand() rc: $rc");
+    Log3($name, 5, "BOTVAC $name: header: $respHeader") if (defined($respHeader));
+    Log3($name, 5, "BOTVAC $name: err: $err")           if (defined($err));
+    Log3($name, 5, "BOTVAC $name: data: $data")         if (defined($data));
 
     readingsBeginUpdate($hash);
 
