@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbLog: logfile entry if DBI module not installed, Forum: #109382
  - bugfix:  70_BOTVAC: handle some initial values
  - feature: 31_HUEDevice: added batteryPercent reading
                           battery reading is deprecated, will be removed later

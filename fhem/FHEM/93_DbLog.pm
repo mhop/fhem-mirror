@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.9.11"  => "22.03.2020 logfile entry if DBI module not installed, Forum: #109382 ",
   "4.9.10"  => "31.01.2020 fix warning, Forum: #107950 ",
   "4.9.9"   => "21.01.2020 default ParseEvent changed again, Forum: #106769 ",
   "4.9.8"   => "17.01.2020 adjust configCheck with plotEmbed check. Forum: #107383 ",
@@ -303,15 +304,17 @@ return;
 ###############################################################
 sub DbLog_Define($@) {
   my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+  my $name         = $hash->{NAME};
+  my @a            = split("[ \t][ \t]*", $def);
   
-  return "Error: Perl module ".$DbLogMMDBI." is missing. 
-        Install it on Debian with: sudo apt-get install libdbi-perl" if($DbLogMMDBI);  
+  if($DbLogMMDBI) {
+      Log3($name, 1, "DbLog $name - ERROR - Perl module ".$DbLogMMDBI." is missing. DbLog module is not loaded ! On Debian systems you can install it with \"sudo apt-get install libdbi-perl\" ");
+      return "Error: Perl module ".$DbLogMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl";
+  }        
 
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
   
-  my $name               = $hash->{NAME};
   $hash->{CONFIGURATION} = $a[2];
   my $regexp             = $a[3];
 
@@ -341,7 +344,7 @@ sub DbLog_Define($@) {
   my $ret = DbLog_readCfg($hash);
   if ($ret) {
       # return on error while reading configuration
-	  Log3($hash->{NAME}, 1, "DbLog $hash->{NAME} - Error while reading $hash->{CONFIGURATION}: '$ret' ");
+	  Log3($name, 1, "DbLog $name - Error while reading $hash->{CONFIGURATION}: '$ret' ");
       return $ret; 
   }
   
