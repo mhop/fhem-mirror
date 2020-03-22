@@ -73,7 +73,7 @@ sub JsonMod_Define {
 	my $cvsid = '$Id$';
 	$cvsid =~ s/^.*pm\s//;
 	$cvsid =~ s/Z\s\S+\s\$$//;
-
+	$hash->{'SVN'} = $cvsid;
 	$hash->{'CONFIG'}->{'IN_REQUEST'} = 0;
 	$hash->{'CRON'} = JsonMod::Cron->new();
 
