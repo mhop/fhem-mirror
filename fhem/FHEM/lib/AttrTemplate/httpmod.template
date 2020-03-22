@@ -618,7 +618,7 @@ attr DEVICE reading02OExpr $val =~ m/^(.{4})-(.{2})-(.{2})$/ ;; "$3.$2.$1"
 attr DEVICE reading02Regex relative-time[\w\W]*?datetime="(\d*-\d*-\d*)T\d*:\d*:\d*Z"
 attr DEVICE showError 1
 attr DEVICE showMatched 1
-attr DEVICE stateFormat {   my $ret ="";;\
+attr DEVICE stateFormat { my $ret ="";;\
     my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
     $ret .= '<div style="text-align:left">';;\
     $ret .= 'last <a title="versions" href="'.InternalVal($name,"MainURL","unknown").'">tasmota</a>-check => '.$lastCheck;;\
@@ -642,8 +642,9 @@ attr DEVICE stateFormat {   my $ret ="";;\
         $ret .= sprintf("%-32s",$dev);;\
         $ret .= '</b></a> | ';;\
         $ret .= '<b style="color:lightgray">';;\
-        $ret .= sprintf("%7s",$old);;\
-        $ret .= '</b> | ';;\
+		$ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO1_IPAddress","0.0.0.0")).'" target="_blank">';;\
+		$ret .= sprintf("%7s",$old);;\
+        $ret .= '</b></a> | ';;\
         $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
         $ret .= '<b style="color:red">';;\
         $ret .= sprintf("%7s",$new);;\
@@ -667,8 +668,8 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
   } else {\
     my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
     my $DATE = ReadingsVal($name,"latestDate","unknown");;\
-    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version!=")) {\
-      my $version = ReadingsVal($dev,"INFO1_Version","0.0.0");;\
+    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=Version!=,TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version!=")) {\
+      my $version = ReadingsVal($dev,"Version",ReadingsVal($dev,"INFO1_Version","0.0.0"));;\
       $version =~ m/([0-9.]*).*/;;\
       $version = $1;;\
       if ( AttrVal($name,"updatableDevicesMode","onlyUpdatable") eq "all" || $version ne $VERSION ) {\

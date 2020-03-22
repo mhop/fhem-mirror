@@ -1829,6 +1829,7 @@ name:shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyht using original firmware <br>Just adds stateFormat and icon
 order:A_16
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
 attr DEVICE setList \
@@ -1843,6 +1844,7 @@ name:shellyflood
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyht using original firmware <br>Just adds stateFormat and icon
 order:A_16a
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to humidity;{ AttrVal("DEVICE","icon","humidity") }
 attr DEVICE icon ICON
 attr DEVICE setList \
