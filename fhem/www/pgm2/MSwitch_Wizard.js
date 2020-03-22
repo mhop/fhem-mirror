@@ -345,14 +345,15 @@ function start1(name){
 setTimeout(function() {
 	//document.getElementById('wizard').value+=' N/A';
 	//document.getElementById('config').value+=' N/A';
-	//document.getElementById('importat').value+=' N/A';
-	//document.getElementById('importnotify').value+=' N/A';
+	document.getElementById('importat').value+=' N/A';
+	document.getElementById('importnotify').value+=' N/A';
   	//document.getElementById('wizard').disabled = true;
 	//document.getElementById('config').disabled = true;
-	//document.getElementById('importat').disabled = true;
-	//document.getElementById('importnotify').disabled = true;
+	document.getElementById('importat').disabled = true;
+	document.getElementById('importnotify').disabled = true;
+
 	//document.getElementById('importpreconf').disabled = true;
- // conf('importPRECONF','importpreconf');
+    // conf('importPRECONF','importpreconf');
 }, 50);
 
 		
