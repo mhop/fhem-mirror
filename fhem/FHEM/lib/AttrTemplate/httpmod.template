@@ -620,18 +620,18 @@ attr DEVICE showError 1
 attr DEVICE showMatched 1
 attr DEVICE stateFormat { my $ret ="";;\
     my $lastCheck = ReadingsTimestamp($name,"MATCHED_READINGS","???");;\
-    $ret .= '<div style="text-align:left">';;\
+    $ret .= '<div style="text-align:left;;">';;\
     $ret .= 'last <a title="versions" href="https://github.com/arendst/Tasmota/releases" target="_blank">tasmota</a>-check => '.$lastCheck;;\
     $ret .= '<br><br><pre>';;\
     $ret .= "| device                           | current |   new   |  released  |<br>";;\
     $ret .= "---------------------------------------------------------------------<br>";;\
     my $check = ReadingsVal($name,"updatableDevices","error => no or wrong data from server!");;\
     if($check eq "no updates needed!") {\
-      $ret .= '| <b style="color:green">';;\
+      $ret .= '| <b style="color:green;;">';;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } elsif($check eq "error => no or wrong data from server!") {\
-      $ret .= '| <b style="color:red">';;\
+      $ret .= '| <b style="color:red;;">';;\
       $ret .= sprintf("%-65s",$check);;\
       $ret .= '</b> |';;\
     } else {\
@@ -641,16 +641,16 @@ attr DEVICE stateFormat { my $ret ="";;\
         $ret .= '| <a href="/fhem?detail='.$dev.'"><b>';;\
         $ret .= sprintf("%-32s",AttrVal($dev,"alias",$dev));;\
         $ret .= '</b></a> | ';;\
-        $ret .= '<b style="color:lightgray">';;\
+        $ret .= '<b style="color:lightgray;;">';;\
         $ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO1_IPAddress","0.0.0.0")).'/up" target="_blank">';;\
         $ret .= sprintf("%7s",$old);;\
         $ret .= '</a></b> | ';;\
         $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
-        $ret .= '<b style="color:red">';;\
+        $ret .= '<b style="color:red;;">';;\
         $ret .= sprintf("%7s",$new);;\
         $ret .= '</b></a> | ';;\
         $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
-        $ret .= '<b style="color:black">';;\
+        $ret .= '<b style="color:black;;">';;\
         $ret .= sprintf("%-10s",$date);;\
         $ret .= '</b></a>';;\
         $ret .= " |<br>";;\
@@ -668,7 +668,7 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
   } else {\
     my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
     my $DATE = ReadingsVal($name,"latestDate","unknown");;\
-    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=Version!=,TYPE=MQTT[2]?_[D]EVICE:FILTER=INFO1_Version!=")) {\
+    foreach my $dev (devspec2array("TYPE=MQTT[2]?_[D]EVICE:FILTER=readingList~.*tele[/].*INFO.*:FILTER=Version!=,TYPE=MQTT[2]?_[D]EVICE:FILTER=readingList~.*tele[/].*INFO.*:FILTER=INFO1_Version!=")) {\
       my $version = ReadingsVal($dev,"Version",ReadingsVal($dev,"INFO1_Version","0.0.0"));;\
       $version =~ m/([0-9.]*).*/;;\
       $version = $1;;\
