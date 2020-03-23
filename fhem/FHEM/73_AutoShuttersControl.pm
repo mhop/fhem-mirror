@@ -3458,8 +3458,8 @@ sub _IsDay($) {
 
     if (
         (
-               $shutters->getModeDown eq 'brightness'
-            or $shutters->getModeUp eq 'brightness'
+               $shutters->getDown eq 'brightness'
+            or $shutters->getUp eq 'brightness'
         )
         or (
             (
