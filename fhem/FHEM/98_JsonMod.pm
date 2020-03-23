@@ -72,6 +72,7 @@ sub JsonMod_Define {
 	$cvsid =~ s/Z\s\S+\s\$$//;
 	$hash->{'SVN'} = $cvsid;
 	$hash->{'CONFIG'}->{'IN_REQUEST'} = 0;
+	$hash->{'CONFIG'}->{'CRON'} = \'0 * * * *';
 	$hash->{'CRON'} = JsonMod::Cron->new();
 
 	return "no FUUID, is fhem up to date?" if (not $hash->{'FUUID'});
@@ -189,10 +190,14 @@ sub JsonMod_Attr {
 			return "wrong interval expression";
 		};
 	};
-	if ($cmd eq 'delete') {
+	if ($cmd eq 'del') {
 		if ($attrName eq 'interval') {
 			$hash->{'CONFIG'}->{'CRON'} = \'0 * * * *';
 			JsonMod_StopTimer($hash);
+			JsonMod_StartTimer($hash); # unless IsDisabled($name);
+			return;
+		};
+		if ($attrName eq 'disable') {
 			JsonMod_StartTimer($hash); # unless IsDisabled($name);
 		};
 	};
@@ -481,11 +486,13 @@ sub JsonMod_ApiRequest {
 		'callback'	=>		\&JsonMod_ApiResponse
 	};
 
+	my @sec;
 	my $source = $hash->{'CONFIG'}->{'SOURCE'};
 	# fill in SECRET if available
-	$source =~ s/(\[.+?\])/(exists($hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}))?${$hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}}:$1/eg and 
+	$source =~ s/(\[.+?\])/(exists($hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}) and push @sec, $hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)})?${$hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}}:$1/eg and 
 		$param->{'hideurl'} = 1;
 	$param->{'url'} = $source;
+	$param->{'sec'} = \@sec;
 
 	my $header = AttrVal($name, 'httpHeader', '');
 	if ($header) {
@@ -508,9 +515,15 @@ sub JsonMod_ApiResponse {
 	# check for error
 	# TODO
 	$hash->{'CONFIG'}->{'IN_REQUEST'} = 0;
-
 	$hash->{'API_LAST_RES'} = Time::HiRes::time();
-	$hash->{'SOURCE'} = sprintf('%s (%s)', $param->{'url'} //= '', $param->{'code'} //= '');
+
+	# delete secrets from the answering url if any
+	my $url = $param->{'url'} //= '';
+	foreach (@{$param->{'sec'}}) {
+		next if (ref($_) ne 'SCALAR');
+		$url =~ s/(\Q${$_}\E)/'X' x length($1)/e;
+	};
+	$hash->{'SOURCE'} = sprintf('%s (%s)', $url, $param->{'code'} //= '');
 
 	my sub doError {
 		my ($msg) = @_;
