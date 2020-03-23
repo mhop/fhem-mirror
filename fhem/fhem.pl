@@ -136,6 +136,7 @@ sub getAllGets($;$);
 sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
+sub hashKeyRename($$$);
 sub json2nameValue($;$$);
 sub json2reading($$;$$);
 sub latin1ToUtf8($);
@@ -5246,17 +5247,41 @@ json2nameValue($;$$)
   return \%ret;
 }
 
+# add certain values to the key. Used to postprocess json2nameValue, where
+# the input is of the form [{"name":"NAME","value":"Value"}], with
+# hashKeyRename(json2nameValue($in), "^([0-9]+)_name:(.*)","^([0-9]+)");
+sub
+hashKeyRename($$$)
+{
+  my ($hash, $r1, $r2) = @_;
+  my (%repl, %ret);
+  for my $k (keys %{$hash}) {
+    $repl{$1} = $2 if("$k:$hash->{$k}" =~ m/$r1/ && defined($1) && defined($2));
+  }
+  for my $k (keys %{$hash}) {
+    my $val = $hash->{$k};
+    next if($k !~ m/$r2/ || !defined($repl{$1}));
+    $k =~ s/$r2/$repl{$1}/;
+    $ret{makeReadingName($k)} = $val;
+  }
+  return \%ret;
+}
+
 # generate readings from the json string (parsed by json2reading) for $hash
 sub
-json2reading($$;$$)
+json2reading($$;$$$)
 {
-  my ($hash, $json, $prefix, $map) = @_;
+  my ($hash, $json, $prefix, $map, $postProcess) = @_;
 
   $hash = $defs{$hash} if(ref($hash) ne "HASH");
   return "json2reading: first arg is not a FHEM device"
         if(!$hash || ref $hash ne "HASH" || !$hash->{TYPE});
 
   my $ret = json2nameValue($json, $prefix, $map);
+  if($postProcess) {
+    $ret = eval($postProcess);
+    Log 1, $@ if($@);
+  }
   if($ret && ref $ret eq "HASH") {
     readingsBeginUpdate($hash);
     foreach my $k (keys %{$ret}) {
