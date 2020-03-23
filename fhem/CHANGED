@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix PrivacyDownStatus in Brightness,
+                       add set brightness average max objects in array attribut
  - change:  93_DbLog: logfile entry if DBI module not installed, Forum: #109382
  - bugfix:  70_BOTVAC: handle some initial values
  - feature: 31_HUEDevice: added batteryPercent reading

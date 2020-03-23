@@ -728,18 +728,18 @@ sub ShuttersDeviceScan($) {
         if ( ReadingsVal( $_, '.ASC_AttrUpdateChanges_' . $hash->{VERSION}, 0 )
             == 0 )
         {
-            $shutters->setAttrUpdateChanges( 'ASC_Up',
-                AttrVal( $_, 'ASC_Up', 'none' ) );
-            delFromDevAttrList( $_, 'ASC_Up' );
-            $shutters->setAttrUpdateChanges( 'ASC_Down',
-                AttrVal( $_, 'ASC_Down', 'none' ) );
-            delFromDevAttrList( $_, 'ASC_Down' );
-            $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Mode',
-                AttrVal( $_, 'ASC_Self_Defense_Mode', 'none' ) );
-            delFromDevAttrList( $_, 'ASC_Self_Defense_Mode' );
-            $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Exclude',
-                AttrVal( $_, 'ASC_Self_Defense_Exclude', 'none' ) );
-            delFromDevAttrList( $_, 'ASC_Self_Defense_Exclude' );
+      #             $shutters->setAttrUpdateChanges( 'ASC_Up',
+      #                 AttrVal( $_, 'ASC_Up', 'none' ) );
+      #             delFromDevAttrList( $_, 'ASC_Up' );
+      #             $shutters->setAttrUpdateChanges( 'ASC_Down',
+      #                 AttrVal( $_, 'ASC_Down', 'none' ) );
+      #             delFromDevAttrList( $_, 'ASC_Down' );
+      #             $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Mode',
+      #                 AttrVal( $_, 'ASC_Self_Defense_Mode', 'none' ) );
+      #             delFromDevAttrList( $_, 'ASC_Self_Defense_Mode' );
+      #             $shutters->setAttrUpdateChanges( 'ASC_Self_Defense_Exclude',
+      #                 AttrVal( $_, 'ASC_Self_Defense_Exclude', 'none' ) );
+      #             delFromDevAttrList( $_, 'ASC_Self_Defense_Exclude' );
         }
 
         ####
@@ -1041,13 +1041,6 @@ sub EventProcessingWindowRec($@) {
                         $shutters->setNoDelay(1);
                         $shutters->setDriveCmd( $shutters->getPrivacyDownPos );
                     }
-
- #                     elsif ( $shutters->getPrivacyUpStatus == 2 ) {
- #                         $shutters->setLastDrive(
- #                             'window closed at privacy day open');
- #                         $shutters->setNoDelay(1);
- #                         $shutters->setDriveCmd( $shutters->getPrivacyUpPos );
- #                     }
                     else {
                         $shutters->setLastDrive('window closed at day');
                         $shutters->setNoDelay(1);
@@ -1231,8 +1224,7 @@ sub EventProcessingRoommate($@) {
                         or $shutters->getVentilateOpen eq 'off' )
                     {
                         $posValue = (
-                              $shutters->getSleepPos > 0
-                            ? $shutters->getSleepPos
+                            $shutters->getSleepPos > 0 ? $shutters->getSleepPos
                             : (
                                   $shutters->getSleepPos > 0
                                 ? $shutters->getSleepPos
@@ -1275,13 +1267,18 @@ sub EventProcessingRoommate($@) {
                         )
                         and (  $shutters->getStatus == $shutters->getClosedPos
                             or $shutters->getStatus == $shutters->getSleepPos
-                            or $shutters->getStatus == $shutters->getShadingPos )
+                            or $shutters->getStatus ==
+                            $shutters->getShadingPos )
                       )
                     {
                         $shutters->setLastDrive(
                             (
-                                (  $shutters->getStatus == $shutters->getClosedPos
-                                or $shutters->getStatus == $shutters->getSleepPos)
+                                (
+                                    $shutters->getStatus ==
+                                      $shutters->getClosedPos
+                                      or $shutters->getStatus ==
+                                      $shutters->getSleepPos
+                                )
                                 ? 'roommate come home'
                                 : 'shading out'
                             )
@@ -1440,8 +1437,10 @@ sub EventProcessingResidents($@) {
             my $getModeDown = $shutters->getModeDown;
 
             if (
-                    (  $shutters->getStatus != $shutters->getClosedPos
-                    or $shutters->getStatus != $shutters->getSleepPos )
+                (
+                       $shutters->getStatus != $shutters->getClosedPos
+                    or $shutters->getStatus != $shutters->getSleepPos
+                )
                 and not $shutters->getIsDay
                 and $shutters->getRoommatesStatus eq 'none'
                 and (  $getModeDown eq 'home'
@@ -1453,7 +1452,13 @@ sub EventProcessingResidents($@) {
               )
             {
                 $shutters->setLastDrive('residents come home');
-                $shutters->setDriveCmd( ($shutters->getSleepPos > 0 ? $shutters->getSleepPos : $shutters->getClosedPos) );
+                $shutters->setDriveCmd(
+                    (
+                          $shutters->getSleepPos > 0
+                        ? $shutters->getSleepPos
+                        : $shutters->getClosedPos
+                    )
+                );
             }
             elsif (
                 (
@@ -1504,9 +1509,13 @@ sub EventProcessingResidents($@) {
                     and not $shutters->getSelfDefenseAbsent
                     and $shutters->getSelfDefenseAbsentTimerrun );
 
-                if (    (  $shutters->getStatus == $shutters->getClosedPos
-                        or $shutters->getStatus == $shutters->getSleepPos )
-                    and $shutters->getIsDay )
+                if (
+                    (
+                           $shutters->getStatus == $shutters->getClosedPos
+                        or $shutters->getStatus == $shutters->getSleepPos
+                    )
+                    and $shutters->getIsDay
+                  )
                 {
                     $shutters->setHardLockOut('on')
                       if (
@@ -1528,8 +1537,10 @@ sub EventProcessingResidents($@) {
                 }
             }
             elsif (
-                    (  $shutters->getStatus == $shutters->getClosedPos
-                    or $shutters->getStatus == $shutters->getSleepPos )
+                (
+                       $shutters->getStatus == $shutters->getClosedPos
+                    or $shutters->getStatus == $shutters->getSleepPos
+                )
                 and $shutters->getIsDay
                 and $shutters->getRoommatesStatus eq 'none'
                 and (  $getModeUp eq 'home'
@@ -1872,8 +1883,6 @@ sub EventProcessingBrightness($@) {
                     if (    $brightnessPrivacyUpVal > 0
                         and $1 < $brightnessMaxVal
                         and $1 > $brightnessPrivacyUpVal )
-
-              #                         and $shutters->getPrivacyUpStatus == 1 )
                     {
                         $shutters->setPrivacyUpStatus(2);
                         $shutters->setLastDrive('brightness privacy day open');
@@ -1962,8 +1971,6 @@ sub EventProcessingBrightness($@) {
                 ## Setzt den PrivacyDown Modus für die Sichtschutzfahrt auf den Status 0
                 ##  1 bedeutet das PrivacyDown Timer aktiviert wurde, 2 beudet das er im privacyDown ist
                 ##  also das Rollo in privacyDown Position steht und VOR der endgültigen Nachfahrt
-      #                 $shutters->setPrivacyDownStatus(0)
-      #                   if ( not defined( $shutters->getPrivacyDownStatus ) );
 
                 if (    $brightnessPrivacyDownVal > 0
                     and $1 > $brightnessMinVal
@@ -1990,6 +1997,8 @@ sub EventProcessingBrightness($@) {
                 {
                     $posValue  = $shutters->getComfortOpenPos;
                     $lastDrive = 'minimum brightness threshold fell below';
+                    $shutters->setPrivacyDownStatus(0)
+                      if ( $shutters->getPrivacyDownStatus == 2 );
                 }
                 elsif ( CheckIfShuttersWindowRecOpen($shuttersDev) == 0
                     or $shutters->getVentilateOpen eq 'off' )
@@ -2000,10 +2009,14 @@ sub EventProcessingBrightness($@) {
                         : $shutters->getClosedPos
                     );
                     $lastDrive = 'minimum brightness threshold fell below';
+                    $shutters->setPrivacyDownStatus(0)
+                      if ( $shutters->getPrivacyDownStatus == 2 );
                 }
                 else {
                     $posValue  = $shutters->getVentilatePos;
                     $lastDrive = 'minimum brightness threshold fell below';
+                    $shutters->setPrivacyDownStatus(0)
+                      if ( $shutters->getPrivacyDownStatus == 2 );
                 }
 
                 $shutters->setLastDrive($lastDrive);
@@ -2018,9 +2031,6 @@ sub EventProcessingBrightness($@) {
                     $shutters->setSunset(1);
                 }
 
-                $shutters->setPrivacyDownStatus(0)
-                  if (  $shutters->getPrivacyDownStatus == 2
-                    and $shutters->getSunrise );
                 ShuttersCommandSet( $hash, $shuttersDev, $posValue );
 
                 ASC_Debug( 'EventProcessingBrightness: '
@@ -2864,19 +2874,19 @@ sub RenewSunRiseSetShuttersTimer($) {
                 0 ) == 0
           )
         {
-            $attr{$name}{'ASC_Up'} = $shutters->getAttrUpdateChanges('ASC_Up')
-              if ( $shutters->getAttrUpdateChanges('ASC_Up') ne 'none' );
-            $attr{$name}{'ASC_Down'} =
-              $shutters->getAttrUpdateChanges('ASC_Down')
-              if ( $shutters->getAttrUpdateChanges('ASC_Down') ne 'none' );
-            $attr{$name}{'ASC_Self_Defense_Mode'} =
-              $shutters->getAttrUpdateChanges('ASC_Self_Defense_Mode')
-              if ( $shutters->getAttrUpdateChanges('ASC_Self_Defense_Mode') ne
-                'none' );
-            $attr{$name}{'ASC_Self_Defense_Mode'} = 'off'
-              if (
-                $shutters->getAttrUpdateChanges('ASC_Self_Defense_Exclude') eq
-                'on' );
+#             $attr{$name}{'ASC_Up'} = $shutters->getAttrUpdateChanges('ASC_Up')
+#               if ( $shutters->getAttrUpdateChanges('ASC_Up') ne 'none' );
+#             $attr{$name}{'ASC_Down'} =
+#               $shutters->getAttrUpdateChanges('ASC_Down')
+#               if ( $shutters->getAttrUpdateChanges('ASC_Down') ne 'none' );
+#             $attr{$name}{'ASC_Self_Defense_Mode'} =
+#               $shutters->getAttrUpdateChanges('ASC_Self_Defense_Mode')
+#               if ( $shutters->getAttrUpdateChanges('ASC_Self_Defense_Mode') ne
+#                 'none' );
+#             $attr{$name}{'ASC_Self_Defense_Mode'} = 'off'
+#               if (
+#                 $shutters->getAttrUpdateChanges('ASC_Self_Defense_Exclude') eq
+#                 'on' );
 
             CommandDeleteReading( undef, $name . ' .ASC_AttrUpdateChanges_.*' )
               if (
@@ -2890,47 +2900,47 @@ sub RenewSunRiseSetShuttersTimer($) {
                 1, 0 );
         }
 
-        $attr{$name}{ASC_Drive_Delay} =
-          AttrVal( $name, 'ASC_Drive_Offset', 'none' )
-          if ( AttrVal( $name, 'ASC_Drive_Offset', 'none' ) ne 'none' );
-        delFromDevAttrList( $name, 'ASC_Drive_Offset' );
-
-        $attr{$name}{ASC_Drive_DelayStart} =
-          AttrVal( $name, 'ASC_Drive_OffsetStart', 'none' )
-          if ( AttrVal( $name, 'ASC_Drive_OffsetStart', 'none' ) ne 'none' );
-        delFromDevAttrList( $name, 'ASC_Drive_OffsetStart' );
-
-        $attr{$name}{ASC_Shading_StateChange_SunnyCloudy} =
-            AttrVal( $name, 'ASC_Shading_StateChange_Sunny', 'none' ) . ':'
-          . AttrVal( $name, 'ASC_Shading_StateChange_Cloudy', 'none' )
-          if (
-            AttrVal( $name, 'ASC_Shading_StateChange_Sunny', 'none' ) ne 'none'
-            and AttrVal( $name, 'ASC_Shading_StateChange_Cloudy', 'none' ) ne
-            'none' );
-        delFromDevAttrList( $name, 'ASC_Shading_StateChange_Sunny' );
-        delFromDevAttrList( $name, 'ASC_Shading_StateChange_Cloudy' );
-
-        $attr{$name}{ASC_Shading_InOutAzimuth} =
-          ( AttrVal( $name, 'ASC_Shading_Direction', 180 ) -
-              AttrVal( $name, 'ASC_Shading_Angle_Left', 85 ) )
-          . ':'
-          . ( AttrVal( $name, 'ASC_Shading_Direction', 180 ) +
-              AttrVal( $name, 'ASC_Shading_Angle_Right', 85 ) )
-          if ( AttrVal( $name, 'ASC_Shading_Direction', 'none' ) ne 'none'
-            or AttrVal( $name, 'ASC_Shading_Angle_Left',  'none' ) ne 'none'
-            or AttrVal( $name, 'ASC_Shading_Angle_Right', 'none' ) ne 'none' );
-        delFromDevAttrList( $name, 'ASC_Shading_Direction' );
-        delFromDevAttrList( $name, 'ASC_Shading_Angle_Left' );
-        delFromDevAttrList( $name, 'ASC_Shading_Angle_Right' );
-
-        $attr{$name}{ASC_PrivacyDownValue_beforeNightClose} =
-          AttrVal( $name, 'ASC_PrivacyDownTime_beforNightClose', 'none' )
-          if (
-            AttrVal( $name, 'ASC_PrivacyDownTime_beforNightClose', 'none' ) ne
-            'none' );
-        delFromDevAttrList( $name, 'ASC_PrivacyDownTime_beforNightClose' );
-
-        delFromDevAttrList( $name, 'ASC_ExternalTriggerDevice' );
+#         $attr{$name}{ASC_Drive_Delay} =
+#           AttrVal( $name, 'ASC_Drive_Offset', 'none' )
+#           if ( AttrVal( $name, 'ASC_Drive_Offset', 'none' ) ne 'none' );
+#         delFromDevAttrList( $name, 'ASC_Drive_Offset' );
+#
+#         $attr{$name}{ASC_Drive_DelayStart} =
+#           AttrVal( $name, 'ASC_Drive_OffsetStart', 'none' )
+#           if ( AttrVal( $name, 'ASC_Drive_OffsetStart', 'none' ) ne 'none' );
+#         delFromDevAttrList( $name, 'ASC_Drive_OffsetStart' );
+#
+#         $attr{$name}{ASC_Shading_StateChange_SunnyCloudy} =
+#             AttrVal( $name, 'ASC_Shading_StateChange_Sunny', 'none' ) . ':'
+#           . AttrVal( $name, 'ASC_Shading_StateChange_Cloudy', 'none' )
+#           if (
+#             AttrVal( $name, 'ASC_Shading_StateChange_Sunny', 'none' ) ne 'none'
+#             and AttrVal( $name, 'ASC_Shading_StateChange_Cloudy', 'none' ) ne
+#             'none' );
+#         delFromDevAttrList( $name, 'ASC_Shading_StateChange_Sunny' );
+#         delFromDevAttrList( $name, 'ASC_Shading_StateChange_Cloudy' );
+#
+#         $attr{$name}{ASC_Shading_InOutAzimuth} =
+#           ( AttrVal( $name, 'ASC_Shading_Direction', 180 ) -
+#               AttrVal( $name, 'ASC_Shading_Angle_Left', 85 ) )
+#           . ':'
+#           . ( AttrVal( $name, 'ASC_Shading_Direction', 180 ) +
+#               AttrVal( $name, 'ASC_Shading_Angle_Right', 85 ) )
+#           if ( AttrVal( $name, 'ASC_Shading_Direction', 'none' ) ne 'none'
+#             or AttrVal( $name, 'ASC_Shading_Angle_Left',  'none' ) ne 'none'
+#             or AttrVal( $name, 'ASC_Shading_Angle_Right', 'none' ) ne 'none' );
+#         delFromDevAttrList( $name, 'ASC_Shading_Direction' );
+#         delFromDevAttrList( $name, 'ASC_Shading_Angle_Left' );
+#         delFromDevAttrList( $name, 'ASC_Shading_Angle_Right' );
+#
+#         $attr{$name}{ASC_PrivacyDownValue_beforeNightClose} =
+#           AttrVal( $name, 'ASC_PrivacyDownTime_beforNightClose', 'none' )
+#           if (
+#             AttrVal( $name, 'ASC_PrivacyDownTime_beforNightClose', 'none' ) ne
+#             'none' );
+#         delFromDevAttrList( $name, 'ASC_PrivacyDownTime_beforNightClose' );
+#
+#         delFromDevAttrList( $name, 'ASC_ExternalTriggerDevice' );
     }
 }
 
@@ -3580,7 +3590,7 @@ sub ShuttersSunrise($$) {
 
     if ( $tm eq 'unix' ) {
         if ( $shutters->getUp eq 'astro' ) {
-            if ( ( IsWe() or IsWeTomorrow() )
+            if (    ( IsWe() or IsWeTomorrow() )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
@@ -3808,7 +3818,7 @@ sub ShuttersSunrise($$) {
             }
         }
         elsif ( $shutters->getUp eq 'time' ) {
-            if ( ( IsWe() or IsWeTomorrow() )
+            if (    ( IsWe() or IsWeTomorrow() )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
@@ -3930,7 +3940,7 @@ sub IsAfterShuttersManualBlocking($) {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
-    if (    $ascDev->getblockAscDrivesAfterManual
+    if (    $ascDev->getBlockAscDrivesAfterManual
         and $shutters->getStatus != $shutters->getOpenPos
         and $shutters->getStatus != $shutters->getClosedPos
         and $shutters->getStatus != $shutters->getWindPos
@@ -5025,7 +5035,7 @@ sub setPushBrightnessInArray {
             @{
                 $self->{ $self->{shuttersDev} }->{BrightnessAverageArray}->{VAL}
             }
-        ) > 3
+        ) > $shutters->getMaxBrightnessAverageArrayObjects
       );
 }
 
@@ -5672,18 +5682,24 @@ sub getShadingStateChangeSunny {
       );
     $self->{ $self->{shuttersDev} }->{ASC_Shading_StateChange_SunnyCloudy}
       ->{LASTGETTIME} = int( gettimeofday() );
-    my ( $sunny, $cloudy ) =
+    my ( $sunny, $cloudy, $maxBrightnessAverageArrayObjects ) =
       FHEM::AutoShuttersControl::GetAttrValues( $self->{shuttersDev},
         'ASC_Shading_StateChange_SunnyCloudy',
         '35000:20000' );
 
     ### erwartetes Ergebnis
-    # SUNNY:CLOUDY
+    # SUNNY:CLOUDY [BrightnessAverage]
 
     $self->{ $self->{shuttersDev} }->{ASC_Shading_StateChange_SunnyCloudy}
       ->{sunny} = $sunny;
     $self->{ $self->{shuttersDev} }->{ASC_Shading_StateChange_SunnyCloudy}
       ->{cloudy} = $cloudy;
+    $self->{ $self->{shuttersDev} }->{BrightnessAverageArray}->{MAXOBJECT} = (
+        defined($maxBrightnessAverageArrayObjects)
+          and $maxBrightnessAverageArrayObjects ne 'none'
+        ? $maxBrightnessAverageArrayObjects
+        : 3
+    );
 
     return $self->{ $self->{shuttersDev} }
       ->{ASC_Shading_StateChange_SunnyCloudy}->{sunny};
@@ -5707,6 +5723,26 @@ sub getShadingStateChangeCloudy {
 
     return $self->{ $self->{shuttersDev} }
       ->{ASC_Shading_StateChange_SunnyCloudy}->{cloudy};
+}
+
+sub getMaxBrightnessAverageArrayObjects {
+    my $self = shift;
+
+    return $self->{ $self->{shuttersDev} }->{BrightnessAverageArray}
+      ->{MAXOBJECT}
+      if (
+        exists(
+            $self->{ $self->{shuttersDev} }
+              ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME}
+        )
+        and ( gettimeofday() -
+            $self->{ $self->{shuttersDev} }
+            ->{ASC_Shading_StateChange_SunnyCloudy}->{LASTGETTIME} ) < 2
+      );
+    $shutters->getShadingStateChangeSunny;
+
+    return $self->{ $self->{shuttersDev} }->{BrightnessAverageArray}
+      ->{MAXOBJECT};
 }
 
 sub getShadingWaitingPeriod {
@@ -6970,7 +7006,7 @@ sub getWindSensorReading {
     );
 }
 
-sub getblockAscDrivesAfterManual {
+sub getBlockAscDrivesAfterManual {
     my $self = shift;
     my $name = $self->{name};
 
@@ -7466,7 +7502,7 @@ sub getblockAscDrivesAfterManual {
                         outdoor brightness, depending also on other sensor values. Defaults to 20000.
                     </li>
                     <li><strong>ASC_Shading_StateChange_SunnyCloudy</strong> - Shading <strong>starts/stops</strong> at this
-                        outdoor brightness, depending also on other sensor values. Defaults to 35000:20000.
+                        outdoor brightness, depending also on other sensor values. A optional parameter set the maximal object in brightness average array. Defaults to 35000:20000 [3].
                     </li>
                     <li><strong>ASC_Shading_WaitingPeriod</strong> - Waiting time in seconds before additional sensor values
                         to <em>ASC_Shading_StateChange_Sunny</em> or <em>ASC_Shading_StateChange_Cloudy</em>
@@ -7782,8 +7818,8 @@ sub getblockAscDrivesAfterManual {
             <li><strong>ASC_Down - astro/time/brightness</strong> - bei astro wird Sonnenuntergang berechnet, bei time wird der Wert aus ASC_Time_Down_Early als Fahrzeit verwendet und bei brightness muss ASC_Time_Down_Early und ASC_Time_Down_Late korrekt gesetzt werden. Der Timer l&auml;uft dann nach ASC_Time_Down_Late Zeit, es wird aber in der Zeit zwischen ASC_Time_Down_Early und ASC_Time_Down_Late geschaut, ob die als Attribut im Moduldevice hinterlegte ASC_brightnessDriveUpDown der Down Wert erreicht wurde. Wenn ja, wird der Rollladen runter gefahren (default: astro)</li>
             <li><strong>ASC_Shutter_IdleDetection</strong> - <strong>READING:VALUE</strong> gibt das Reading an welches Auskunft &uuml;ber den Fahrstatus des Rollos gibt, sowie als zweites den Wert im Reading welcher aus sagt das das Rollo <strong>nicht</strong> f&auml;hrt</li>
             <li><strong>ASC_DriveUpMaxDuration</strong> - die Dauer des Hochfahrens des Rollladens plus 5 Sekunden (default: 60)</li>
-            <li><strong>ASC_Drive_Offset</strong> - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten, 0 bedeutet keine Verz&ouml;gerung, -1 bedeutet, dass das gleichwertige Attribut aus dem ASC Device ausgewertet werden soll. (default: -1)</li>
-            <li><strong>ASC_Drive_OffsetStart</strong> - in Sekunden verz&ouml;gerter Wert ab welchen dann erst das Offset startet und dazu addiert wird. Funktioniert nur wenn gleichzeitig ASC_Drive_Offset gesetzt wird. (default: -1)</li>
+            <li><strong>ASC_Drive_Delay</strong> - maximaler Wert f&uuml;r einen zuf&auml;llig ermittelte Verz&ouml;gerungswert in Sekunden bei der Berechnung der Fahrzeiten.</li>
+            <li><strong>ASC_Drive_DelayStart</strong> - in Sekunden verz&ouml;gerter Wert ab welchen das Rollo gefahren werden soll.</li>
             <li><strong>ASC_LockOut - soft/hard/off</strong> - stellt entsprechend den Aussperrschutz ein. Bei global aktivem Aussperrschutz (set ASC-Device lockOut soft) und einem Fensterkontakt open bleibt dann der Rollladen oben. Dies gilt nur bei Steuerbefehlen &uuml;ber das ASC Modul. Stellt man global auf hard, wird bei entsprechender M&ouml;glichkeit versucht den Rollladen hardwareseitig zu blockieren. Dann ist auch ein Fahren &uuml;ber die Taster nicht mehr m&ouml;glich. (default: off)</li>
             <li><strong>ASC_LockOut_Cmd - inhibit/blocked/protection</strong> - set Befehl f&uuml;r das Rollladen-Device zum Hardware sperren. Dieser Befehl wird gesetzt werden, wenn man "ASC_LockOut" auf hard setzt (default: none)</li>
             <li><strong>ASC_Mode_Down - always/home/absent/off</strong> - Wann darf die Automatik steuern. immer, niemals, bei Abwesenheit des Roommate (ist kein Roommate und absent eingestellt, wird gar nicht gesteuert) (default: always)</li>
@@ -7813,7 +7849,7 @@ sub getblockAscDrivesAfterManual {
                 <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 18)</li>
                 <li><strong>ASC_Shading_Mode - absent,always,off,home</strong> / wann soll die Beschattung nur stattfinden. (default: off)</li>
                 <li><strong>ASC_Shading_Pos</strong> - Position des Rollladens f&uuml;r die Beschattung (Default: ist abh&auml;ngig vom Attribut<em>ASC</em> 80/20) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
-                <li><strong>ASC_Shading_StateChange_SunnyCloudy</strong> - Brightness Wert ab welchen die Beschattung stattfinden und aufgehoben werden soll, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 35000:20000)</li>
+                <li><strong>ASC_Shading_StateChange_SunnyCloudy</strong> - Brightness Wert ab welchen die Beschattung stattfinden und aufgehoben werden soll, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte. Ein optionaler dritter Wert gibt an wie viele Brightnesswerte im Average Array enthalten sein sollen (default: 35000:20000 [3])</li>
                 <li><strong>ASC_Shading_WaitingPeriod</strong> - wie viele Sekunden soll gewartet werden bevor eine weitere Auswertung der Sensordaten f&uuml;r die Beschattung stattfinden soll (default: 1200)</li>
             </ul></p>
             <li><strong>ASC_ShuttersPlace - window/terrace</strong> - Wenn dieses Attribut auf terrace gesetzt ist, das Residence Device in den Status "gone" geht und SelfDefense aktiv ist (ohne das das Reading selfDefense gesetzt sein muss), wird das Rollo geschlossen (default: window)</li>
@@ -7913,7 +7949,7 @@ sub getblockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.19",
+  "version": "v0.8.20",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
