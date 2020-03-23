@@ -141,7 +141,7 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}
 attr DEVICE setStateList on off
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_dimmer
 
 # A dimmable color light connected via zigbee2mqtt
@@ -161,7 +161,7 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_cct
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
@@ -184,7 +184,7 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgb_hex
 
 name:zigbee2mqtt_light_rgb_rgb
@@ -205,7 +205,7 @@ attr DEVICE setList \
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgb_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
@@ -231,7 +231,7 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
 attr DEVICE userReadings hex:color_y.* {Color::xyY2hex(ReadingsVal($name,"color_x",0),ReadingsVal($name,"color_y",0),ReadingsVal($name,"brightness",254))}  
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbw_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
@@ -254,7 +254,7 @@ attr DEVICE setList \
   white:noArg $\DEVICETOPIC/set {"color_temp": 154 , "color_temp": 500}\
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbw_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
@@ -277,7 +277,7 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}\
   hex:colorpicker,HEX,0,15,255 $\DEVICETOPIC/set {"color":{"$EVTPART0":"#$EVTPART1"}}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
@@ -300,7 +300,7 @@ attr DEVICE setList \
   brightness:colorpicker,BRI,0,5,255 $\DEVICETOPIC/set {"state":"on","$EVTPART0":"$EVTPART1"}\
   color_temp:colorpicker,CT,154,2,500 $\DEVICETOPIC/set {"$EVTPART0":"$EVTPART1"}\
   color:colorpicker,RGB {"$\DEVICETOPIC/set ".zigbee2mqtt_RGB2JSON($EVTPART1)}
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
 
 name:zigbee2mqtt_smokeDetector
@@ -324,7 +324,7 @@ attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE userReadings temperature_weather { sprintf("%.1f",ReadingsVal($name,"temperature","")+2.5) }
-set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
+set DEVICE attrTemplate speech_control_gdt_and_mapping GENERICDEVTYPE=motion HOMEBRIDGEMAPPING="MotionDetected=state,values=motion:1;nomotion:0"
 attr DEVICE model zigbee2mqtt_hueMotionSensor
 
 name:zigbee2mqtt_plug
@@ -342,7 +342,7 @@ attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
 attr DEVICE setStateList on off
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model zigbee2mqtt_plug
 
 name:zigbee2mqtt_plug_w_energy_measuring
@@ -356,7 +356,7 @@ attr DEVICE icon ICON
 set DEVICE attrTemplate zigbee2mqtt_smart+plug
 #missing readingList with sth. comparable to shellies/shellyplug-s-123456/relay/0/power:.* { my $limit = 100;; my $compare = $EVTPART0<$limit ? "off":"on";; ReadingsVal($NAME,"loadState","on") eq $compare ? undef: {loadState => $compare} } 
 #and additional devStateIcon
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model zigbee2mqtt_plug_w_energy_measuring
 
 # zigbee2mqtt 2 channel device
@@ -379,7 +379,7 @@ attr DEVICE setStateList on off
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 setreading DEVICE associatedWith DEVICE_CH2
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model zigbee2mqtt_2channel_split
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 comment Channel 2 for DEVICE
@@ -390,7 +390,7 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0
-set DEVICE_CH2 attrTemplate speech_recognition_type_switch
+set DEVICE_CH2 attrTemplate speech_control_type_switch
 attr DEVICE_CH2 model zigbee2mqtt_2channel_split
 
 # zigbee2mqtt 2 channel device with buttons, forum #102866
@@ -426,7 +426,7 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
-set DEVICE attrTemplate speech_recognition_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+set DEVICE attrTemplate speech_control_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 attr DEVICE model zigbee2mqtt_ContactSensor
 
 name:zigbee2mqtt_TempHumHpaSensor
@@ -531,7 +531,7 @@ attr DEVICE stateFormat click
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model zigbee2mqtt_Light_Switch
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg916789.html#msg916789
@@ -630,7 +630,7 @@ attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add o
 attr DEVICE autocreate 0
 attr DEVICE model tasmota_basic_state_power1
 option:{ CALLSPEECHRECOGN }
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 
 
 # sonoff 1 channel device flashed with Tasmota.
@@ -734,7 +734,7 @@ attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
 setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
-#set DEVICE_CH2 attrTemplate speech_recognition_alaxaName_firstrun
+#set DEVICE_CH2 attrTemplate speech_control_alaxaName_firstrun
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
 
 # plug with LED flashed with Tasmota.
@@ -773,8 +773,8 @@ attr DEVICE_CH2 webCmdLabel Helligkeit\
 attr DEVICE_CH2 devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")}
 attr DEVICE_CH2 setStateList on off toggle
 deletereading -q DEVICE_CH2 (?!associatedWith).*
-set DEVICE attrTemplate speech_recognition_type_switch
-set DEVICE_CH2 attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_switch
+set DEVICE_CH2 attrTemplate speech_control_type_light_255
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
 
 #tasmota device with Infrared-circuit
@@ -897,8 +897,8 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 setStateList on off toggle
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
 option:{ CALLSPEECHRECOGN }  
-set DEVICE attrTemplate speech_recognition_type_switch
-set DEVICE_CH2 attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
+set DEVICE_CH2 attrTemplate speech_control_type_switch
 
 
 #contributed by 87insane
@@ -955,7 +955,7 @@ For calibration, use of more than one shutter device and further information on 
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://github.com/arendst/Tasmota/wiki/blinds-and-roller-shades">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
 #option:{ CALLSPEECHRECOGN } 
-set DEVICE attrTemplate speech_recognition_type_blind
+set DEVICE attrTemplate speech_control_type_blind
 
 
 # tasmota 2ch as shutter device.
@@ -968,7 +968,7 @@ par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set DEVICE attrTemplate tasmota_2ch_shutter_invert_1
 defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC/Backlog ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterInvert1 0;; SaveData 1;;
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
-#set DEVICE attrTemplate speech_recognition_type_blind
+#set DEVICE attrTemplate speech_control_type_blind
 attr DEVICE model tasmota_2ch_shutter_invert_0
 
 # sonoff 4 channel device flashed with Tasmota.
@@ -1009,10 +1009,10 @@ attr DEVICE_CH4 readingList \
 attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
-set DEVICE attrTemplate speech_recognition_type_switch
-set DEVICE_CH2 attrTemplate speech_recognition_type_switch
-set DEVICE_CH3 attrTemplate speech_recognition_type_switch
-set DEVICE_CH4 attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
+set DEVICE_CH2 attrTemplate speech_control_type_switch
+set DEVICE_CH3 attrTemplate speech_control_type_switch
+set DEVICE_CH4 attrTemplate speech_control_type_switch
 
 
 # 4-way multi socket 3AC+USB device flashed with Tasmota.
@@ -1040,7 +1040,7 @@ deletereading -q DEVICE (?!associatedWith).*
 # prime Tasmota device
 set DEVICE attrTemplate tasmota_set_lowercase_texts_and_state1
 # additional settings to aid speech recognition to detect capabilities properly
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 # add some attributes to make your new device looking great
 attr DEVICE icon ICON
 attr DEVICE comment Admin Info and Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, and DEVICE_USB
@@ -1143,9 +1143,9 @@ attr DEVICE_USB icon rc_USB
 #finally set the model attr for all new devices and do a reboot of device
 set IO_DEV publish CMNDTOPIC/status
 set IO_DEV publish CMNDTOPIC/restart 1
-#set DEVICE_CH2 attrTemplate speech_recognition_general_naming_master_template
-#set DEVICE_CH3 attrTemplate speech_recognition_general_naming_master_template
-#set DEVICE_USB attrTemplate speech_recognition_general_naming_master_template
+#set DEVICE_CH2 attrTemplate speech_control_general_naming_master_template
+#set DEVICE_CH3 attrTemplate speech_control_general_naming_master_template
+#set DEVICE_USB attrTemplate speech_control_general_naming_master_template
 farewell:Template has been applied successfully. Wait some seconds for reboot to complete and watch readings get populated.
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB model tasmota_3socketUSB_channel_split
 
@@ -1278,7 +1278,7 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE autocreate 0
 attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","Dimmer","state")}
 attr DEVICE webCmd Color:Color ff0000:Color 00ff00:Color 0000ff:toggle:on:off
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model tasmota_rgb_led_controller
 
 name:tasmota_rgbw_led
@@ -1319,7 +1319,7 @@ attr DEVICE webCmdLabel Helligkeit\
 :Farbe:
 attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")}
 attr DEVICE setStateList on off toggle
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model tasmota_rgbw_led
 
 name:tasmota_rgbcct_light
@@ -1345,7 +1345,7 @@ attr DEVICE webCmdLabel Helligkeit\
 :Weiss\
 :Farbe\
 :Temp
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model tasmota_rgbcct_led
 
 name:tasmota_cct_led
@@ -1377,7 +1377,7 @@ attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:0 Channel_1:0 Channel_2:0 Chan
 attr DEVICE webCmd pct:CT
 attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",undef,"pct","state")}
 attr DEVICE setStateList on off toggle
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model tasmota_cct_led
 
 #source post: https://forum.fhem.de/index.php/topic,105364.0.html
@@ -1402,7 +1402,7 @@ attr DEVICE devStateIcon off:light_light_dim_00:on on:light_light_dim_90:off
 attr DEVICE webCmd Dimmer
 attr DEVICE comment After applying the template, the device to be controlled needs further configuration. For the necessary steps see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
 farewell:template has been applied successfully. Now it's recommended to do some configruation, see <a href="https://github.com/arendst/Tasmota/wiki/TuyaMCU-Configurations#dimmer">Tasmota wiki</a> instructions.
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model tasmota_TuyaMCU_dimmer
 
 name:tasmota_set_lowercase_texts_and_state1
@@ -1454,7 +1454,7 @@ attr DEVICE readingList \
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $light = ReadingsVal($name,"state","off");; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a></div>" }
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model shelly1
 
 name:shelly_announces
@@ -1511,7 +1511,7 @@ attr DEVICE comment To get appropriate loadState values: Change the default limi
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model shelly1_w_energy_meassuring
 
 name:shelly1_w_energy_meassuring_washer_example
@@ -1554,7 +1554,7 @@ attr DEVICE stateFormat pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close stop
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_blind
+set DEVICE attrTemplate speech_control_type_blind
 attr DEVICE model shelly2_roller
 
 # shelly25 using original firmware in roller mode.
@@ -1596,7 +1596,7 @@ attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_blind
+set DEVICE attrTemplate speech_control_type_blind
 attr DEVICE model shelly25_roller_invert_0
 
 name:shelly25_roller_invert_1
@@ -1636,7 +1636,7 @@ attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
-#set DEVICE attrTemplate speech_recognition_type_blind
+#set DEVICE attrTemplate speech_control_type_blind
 attr DEVICE model shelly25_roller_invert_1
 
 # shelly2 using original firmware.
@@ -1821,7 +1821,7 @@ attr DEVICE webCmd on:off:pct:ct:rgb
 #attr DEVICE genericDeviceType light
 attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model shellybulb
 
 # shellyht using original firmware
@@ -1892,7 +1892,7 @@ attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model shelly2rgbw_color
 
 #contributed by user sledge
@@ -1919,7 +1919,7 @@ setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
 attr DEVICE webCmd on:off:pct
 set DEVICE x_mqttcom announce
 attr DEVICE jsonMap brightness:pct
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model shelly2rgbw_4w_split
 attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE autocreate 0
@@ -1985,7 +1985,7 @@ attr DEVICE webCmd pct:on:off
 attr DEVICE jsonMap brightness:pct
 attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "true"?"10px-kreis-rot":"10px-kreis-gruen";; my $light = ReadingsVal($name,"ison","false") eq "true"?"on":"off";; my $cons = ReadingsVal($name,"light_0_power","unknown");; FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Leistung: $cons</div>"}
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speech_recognition_type_light
+set DEVICE attrTemplate speech_control_type_light
 attr DEVICE model shellydimmer
 
 
@@ -2020,7 +2020,7 @@ attr DEVICE setList on DEVNAME/relay/0/set 1\
   toggle DEVNAME/relay/0/set 2
 attr DEVICE setStateList on off toggle
 attr DEVICE event-on-change-reading .*
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model ESPurna_single_relay
 
 
@@ -2071,7 +2071,7 @@ attr DEVICE stateFormat LWT\
 5:POWER5\
 <br>\
 <a href="http://ip" target="_blank">ip</a>
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model ESPurna_4socketUSB_unified
 deletereading -q DEVICE relay_.*
 
@@ -2084,7 +2084,7 @@ par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","h
 attr DEVICE icon ICON
 attr DEVICE event-on-change-reading .*
 attr DEVICE setStateList on off toggle
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 attr DEVICE model ESPurna_4socketUSB_split
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
 attr DEVICE stateFormat <a href="http://ip" target="_blank">ip\
@@ -2164,7 +2164,7 @@ par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 attr DEVICE model 8channel_ethernet_board_split
 attr DEVICE setStateList on off
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_control_type_switch
 deletereading -q DEVICE (?!associatedWith).*
 copy DEVICE DEVICE_CH2
 copy DEVICE DEVICE_CH3
@@ -2339,7 +2339,7 @@ attr DEVICE setStateList on off
 attr DEVICE stateFormat mode\
 desired-temp °C
 attr DEVICE webCmd mode:desired-temp
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speech_control_type_thermostat
 attr DEVICE model ems-esp_thermostat_simple
 
 name:ems-esp_thermostat_RC35_type
@@ -2353,7 +2353,7 @@ attr DEVICE setList mode:uzsuSelectRadio,auto,manual BASEPATH/thermostat_cmd_mod
   daytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_daytemp1 $EVTPART1\
   nighttemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_nighttemp1 $EVTPART1\
   holidaytemp:slider,15.0,0.5,30.0,1 BASEPATH/thermostat_cmd_holidayttemp1 $EVTPART1
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speech_control_type_thermostat
 attr DEVICE model ems-esp_thermostat_RC35_type
 
 
@@ -2415,7 +2415,7 @@ attr DEVICE userReadings hex:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_
 attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
 attr DEVICE setExtensionsEvent 1
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model esp_milight_hub_rgbw_bulb
 
 #rgbw-group
@@ -2445,7 +2445,7 @@ attr milight_REMOTE_ID_0 setList\
 attr milight_REMOTE_ID_0 setStateList on off
 #attr milight_REMOTE_ID_0 userReadings rgb:color_r.* {sprintf("%02X%02X%02X", ReadingsVal($name,"color_r",255), ReadingsVal($name,"color_g",255), ReadingsVal($name,"color_b",255))}
 modify milight_REMOTE_ID_0 milight_REMOTE_ID_0
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr milight_REMOTE_ID_0 model esp_milight_hub_make_rgbw_group
 
 #rgbw_cct-bulb
@@ -2488,7 +2488,7 @@ attr DEVICE webCmdLabel   brightness:dim\
 attr DEVICE setStateList on off
 # computed_color will send RGB = 255,255,255 when in white mode. This is useful for HomeAssistant where it always expects the color to be set.
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model esp_milight_hub_rgb_cct_bulb
 
 #cct-only-bulb
@@ -2524,7 +2524,7 @@ attr DEVICE webCmdLabel :dim\
   :::
 attr DEVICE setStateList on off
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model esp_milight_hub_cct_only_bulb
 
 #rgbw-bulb
@@ -2567,7 +2567,7 @@ attr DEVICE webCmdLabel An:Aus\
   :Sättigung:Modus
 attr DEVICE eventMap /set_white:Weiss/night_mode:Nacht/white_mode:white/on:on/off:off/ON:on/OFF:off/next_mode:Mode/mode_speed_up:Faster/mode_speed_down:Slower/level_up:Up/level_down:Down/
 attr DEVICE comment To switch device also on when changing brightness, change payload pattern to {"status":"ON","$EVTPART0":"$EVTPART1"} or add a new element to setList, similar to brightness, e.g.brightness_on and change payload pattern as described.
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 attr DEVICE model esp_milight_hub_max_features_bulb
 
 #remote for event generation only
@@ -2944,7 +2944,7 @@ attr DEVICE eventMap /effect 0:Solid/effect 2:Breathe/effect 63:Pride/effect 48:
 attr DEVICE webCmd rgb:brightness:Solid:Breathe:Pride:Police
 attr DEVICE setStateList on off toggle
 attr DEVICE comment For questions about the use of different widgets for color selection see discussion at https://forum.fhem.de/index.php/topic,98880.msg995308.html
-set DEVICE attrTemplate speech_recognition_type_light_255
+set DEVICE attrTemplate speech_control_type_light_255
 farewell:template has been applied successfully. <br>Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
 

@@ -70,7 +70,7 @@ desc:Applies to standard relay actuator sketch
 attr DEVICE setCommands on:status1:on off:status1:off
 attr DEVICE setExtensionsEvent 1
 attr DEVICE devStateIcon .*on:on .*off:off on.(for.timer|till.*):on-for-timer:off off.(for.timer|till.*):off-for-timer:on blink.*:light_toggle:off
-set DEVICE attrTemplate speech_recognition_type_switch
+set DEVICE attrTemplate speech_controll_type_switch
 attr DEVICE model A_24a_Relay_Actuator
 
 
