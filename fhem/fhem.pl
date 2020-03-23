@@ -5960,7 +5960,7 @@ restoreDir_saveFile($$)
   my $root = $attr{global}{modpath};
   restoreDir_mkDir($root, "$restoreDir/$fName", 1);
   if(!copy($fName, "$root/$restoreDir/$fName")) {
-    log 1, "copy $fName $root/$restoreDir/$fName failed:$!";
+    Log 1, "copy $fName $root/$restoreDir/$fName failed:$!";
   }
 }
 
