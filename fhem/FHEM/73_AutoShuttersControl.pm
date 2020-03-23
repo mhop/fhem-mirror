@@ -3900,9 +3900,98 @@ sub ShuttersSunrise($$) {
             }
         }
         elsif ( $shutters->getUp eq 'brightness' ) {
-            $shuttersSunriseUnixtime =
-              computeAlignTime( '24:00', $shutters->getTimeUpLate );
+            if (    ( IsWe() or IsWeTomorrow() )
+                and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                and $shutters->getTimeUpWeHoliday ne '01:25' )
+            {
+                if ( not IsWeTomorrow() ) {
+                    if (
+                        IsWe()
+                        and int( gettimeofday() / 86400 ) == int(
+                            (
+                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                            ) / 86400
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime =
+                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                    }
+                    elsif (
+                        int( gettimeofday() / 86400 ) == int(
+                            (
+                                computeAlignTime( '24:00', $shutters->getTimeUpLate )
+                            ) / 86400
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime =
+                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                    }
+                    else {
+                        $shuttersSunriseUnixtime =
+                            computeAlignTime( '24:00', $shutters->getTimeUpLate );
+                    }
+                }
+                else {
+                    if (
+                        IsWe()
+                        and (
+                            int( gettimeofday() / 86400 ) == int(
+                                (
+                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                ) / 86400
+                            )
+                            or int( gettimeofday() / 86400 ) != int(
+                                (
+                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                ) / 86400
+                            )
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime = 
+                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                    }
+                    elsif (
+                        int( gettimeofday() / 86400 ) == int(
+                            (
+                                computeAlignTime( '24:00', $shutters->getTimeUpLate )
+                            ) / 86400
+                        )
+                      )
+                    {
+                        $shuttersSunriseUnixtime = 
+                            computeAlignTime( '24:00', $shutters->getTimeUpLate );
+                    }
+                    else {
+                        if (
+                            int( gettimeofday() / 86400 ) == int(
+                                (
+                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                ) / 86400
+                            )
+                          )
+                        {
+                            $shuttersSunriseUnixtime =
+                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                        }
+                        else {
+                            $shuttersSunriseUnixtime =
+                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                        }
+                    }
+                }
+            }
+            else {
+        
+        
+
+                $shuttersSunriseUnixtime =
+                  computeAlignTime( '24:00', $shutters->getTimeUpLate );
+            }
         }
+
         return $shuttersSunriseUnixtime;
     }
     elsif ( $tm eq 'real' ) {
