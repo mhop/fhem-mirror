@@ -138,7 +138,7 @@ sub getPawList($);
 sub getUniqueId();
 sub hashKeyRename($$$);
 sub json2nameValue($;$$);
-sub json2reading($$;$$);
+sub json2reading($$;$$$);
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
