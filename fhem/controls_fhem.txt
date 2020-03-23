@@ -1,4 +1,4 @@
-REV 21477
+REV 21487
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-22_07:45:03 331358 ./CHANGED
-UPD 2020-03-19_07:45:03 42715 ./MAINTAINER.txt
+UPD 2020-03-23_07:45:03 331622 ./CHANGED
+UPD 2020-03-23_07:45:03 42804 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2020-03-03_07:45:11 160231 ./fhem.pl
@@ -187,7 +187,7 @@ UPD 2016-01-15_07:45:16 6136 FHEM/30_pilight_temp.pm
 UPD 2020-01-31_07:45:03 17614 FHEM/30_tradfri.pm
 UPD 2020-02-06_07:45:08 29570 FHEM/31_Aurora.pm
 UPD 2015-07-28_14:05:31 4627 FHEM/31_ENECSYSINV.pm
-UPD 2020-03-07_07:45:02 79032 FHEM/31_HUEDevice.pm
+UPD 2020-03-23_07:45:03 79328 FHEM/31_HUEDevice.pm
 UPD 2019-03-02_07:45:03 36260 FHEM/31_LightScene.pm
 UPD 2018-02-05_07:45:02 98839 FHEM/31_MilightDevice.pm
 UPD 2017-11-20_07:45:02 22207 FHEM/31_Nello.pm
@@ -341,7 +341,7 @@ UPD 2020-02-17_07:45:03 69557 FHEM/66_EseraOneWire.pm
 UPD 2020-02-17_07:45:03 11076 FHEM/66_EseraShutter.pm
 UPD 2019-11-26_07:45:03 6188 FHEM/66_EseraTemp.pm
 UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
-UPD 2020-03-22_07:45:03 89191 FHEM/70_BOTVAC.pm
+UPD 2020-03-23_07:45:03 89340 FHEM/70_BOTVAC.pm
 UPD 2020-03-09_07:45:03 90968 FHEM/70_BRAVIA.pm
 UPD 2019-11-07_07:45:03 10716 FHEM/70_CanOverEthernet.pm
 UPD 2020-03-04_07:45:02 132569 FHEM/70_DENON_AVR.pm
@@ -461,7 +461,7 @@ UPD 2019-12-22_07:45:03 10210 FHEM/91_sequence.pm
 UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
-UPD 2020-02-01_07:45:04 427342 FHEM/93_DbLog.pm
+UPD 2020-03-23_07:45:03 427624 FHEM/93_DbLog.pm
 UPD 2020-03-22_07:45:03 876828 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2019-07-29_07:45:02 156350 FHEM/93_Log2Syslog.pm
@@ -505,7 +505,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2020-01-13_07:45:03 188373 FHEM/98_Installer.pm
 UPD 2019-11-23_07:45:02 4884 FHEM/98_JsonList2.pm
-UPD 2020-03-22_07:45:03 43964 FHEM/98_JsonMod.pm
+UPD 2020-03-23_07:45:03 44035 FHEM/98_JsonMod.pm
 UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
 UPD 2020-03-22_07:45:03 422621 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
@@ -651,12 +651,12 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-03-20_07:45:03 52360 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-03-23_07:45:03 52607 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-20_07:45:03 4662 FHEM/lib/AttrTemplate/max.template
-UPD 2020-03-22_07:45:03 200306 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-23_07:45:03 200522 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-09_07:45:03 5073 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2020-03-22_07:45:03 10039 FHEM/lib/AttrTemplate/speechrecogn.template
+UPD 2020-03-23_07:45:03 10343 FHEM/lib/AttrTemplate/speechrecogn.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -757,8 +757,8 @@ UPD 2020-03-22_07:45:07 4265282 docs/commandref.html
 UPD 2020-03-22_07:45:09 2633950 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-03-22_07:45:10 232355 docs/commandref_modular.html
-UPD 2020-03-22_07:45:11 243349 docs/commandref_modular_DE.html
+UPD 2020-03-23_07:45:10 232355 docs/commandref_modular.html
+UPD 2020-03-23_07:45:11 243349 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
