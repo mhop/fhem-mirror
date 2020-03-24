@@ -1,4 +1,4 @@
-REV 21487
+REV 21497
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,11 +21,11 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-23_07:45:03 331622 ./CHANGED
+UPD 2020-03-24_07:45:03 331903 ./CHANGED
 UPD 2020-03-23_07:45:03 42804 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-03-03_07:45:11 160231 ./fhem.pl
+UPD 2020-03-24_07:45:12 160949 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-01-05_07:45:02 57916 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -390,7 +390,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-08-26_07:45:03 162302 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2020-03-20_07:45:03 311590 FHEM/73_AutoShuttersControl.pm
+UPD 2020-03-24_07:45:03 316385 FHEM/73_AutoShuttersControl.pm
 UPD 2020-03-14_07:45:02 187286 FHEM/73_DoorBird.pm
 UPD 2020-03-10_07:45:03 96019 FHEM/73_ElectricityCalculator.pm
 UPD 2020-02-28_07:45:03 42853 FHEM/73_GardenaSmartBridge.pm
@@ -505,7 +505,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2020-01-13_07:45:03 188373 FHEM/98_Installer.pm
 UPD 2019-11-23_07:45:02 4884 FHEM/98_JsonList2.pm
-UPD 2020-03-23_07:45:03 44035 FHEM/98_JsonMod.pm
+UPD 2020-03-24_07:45:03 44471 FHEM/98_JsonMod.pm
 UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
 UPD 2020-03-22_07:45:03 422621 FHEM/98_MSwitch.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
@@ -651,12 +651,12 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-03-23_07:45:03 52607 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-03-24_07:45:03 52693 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-20_07:45:03 4662 FHEM/lib/AttrTemplate/max.template
-UPD 2020-03-23_07:45:03 200522 FHEM/lib/AttrTemplate/mqtt2.template
-UPD 2020-03-09_07:45:03 5073 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2020-03-23_07:45:03 10343 FHEM/lib/AttrTemplate/speechrecogn.template
+UPD 2020-03-24_07:45:03 200237 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-03-24_07:45:03 5068 FHEM/lib/AttrTemplate/mysensors.template
+UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -753,12 +753,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-03-22_07:45:07 4265282 docs/commandref.html
-UPD 2020-03-22_07:45:09 2633950 docs/commandref_DE.html
+UPD 2020-03-24_07:45:07 4265359 docs/commandref.html
+UPD 2020-03-24_07:45:09 2633816 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-03-23_07:45:10 232355 docs/commandref_modular.html
-UPD 2020-03-23_07:45:11 243349 docs/commandref_modular_DE.html
+UPD 2020-03-24_07:45:11 232355 docs/commandref_modular.html
+UPD 2020-03-24_07:45:12 243349 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
