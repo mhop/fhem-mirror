@@ -276,7 +276,9 @@ sub JsonMod_DoReadings {
 	};
 	
 	my sub jsonPathf {
-		eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
+		# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
+		no if $] >= 5.022, q|warnings|, qw( redundant missing );
+		#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 		my ($jsonPathExpression, $format) = @_;
 		$format //= '%s';
 		my $value = $path->get($jsonPathExpression)->getResultValue();
@@ -555,7 +557,9 @@ sub JsonMod_ApiResponse {
 sub JsonMod_Logger {
 	my ($hash, $verbose, $message, @args) = @_;
 	my $name = $hash->{'NAME'};
-	eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
+	# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
+	no if $] >= 5.022, q|warnings|, qw( redundant missing );
+	#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 	Log3 ($name, $verbose, sprintf('[%s] '.$message, $name, @args));
 	return;
 };
