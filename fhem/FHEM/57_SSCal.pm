@@ -48,6 +48,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History intern
 my %SSCal_vNotesIntern = (
+  "2.2.3"  => "24.03.2020  minor code change ",
   "2.2.2"  => "08.03.2020  review commandref ",
   "2.2.1"  => "04.03.2020  expand composite event 'compositeBlockNumbers' by 'none' ",
   "2.2.0"  => "03.03.2020  new composite event 'compositeBlockNumbers' ",
@@ -2992,20 +2993,6 @@ sub SSCal_evaljson($$) {
 return($hash,$success,$myjson);
 }
 
-###############################################################################
-#                       JSON Boolean Test und Mapping
-###############################################################################
-sub SSCal_jboolmap($){ 
-  my ($bool) = @_;
-  
-  if(JSON::is_bool($bool)) {
-      $bool = $bool?"true":"false";
-  }
-  
-return $bool;
-}
-
-
 ##############################################################################
 #  Auflösung Errorcodes Calendar AUTH API
 #  Übernahmewerte sind $hash, $errorcode
@@ -3585,7 +3572,7 @@ return;
 ###############################################################################
 #                       JSON Boolean Test und Mapping
 ###############################################################################
-sub SSCal_jboolmap($){ 
+sub SSCal_jboolmap($){
   my ($bool)= @_;
   
   if(JSON::is_bool($bool)) {
