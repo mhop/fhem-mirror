@@ -525,13 +525,15 @@ sub JsonMod_ApiResponse {
 		next if (ref($_) ne 'SCALAR');
 		$url =~ s/(\Q${$_}\E)/'X' x length($1)/e;
 	};
+
 	$hash->{'SOURCE'} = sprintf('%s (%s)', $url, $param->{'code'} //= '');
+	$hash->{'API__LAST_MSG'} = $param->{'code'} //= 'failed';
 
 	my sub doError {
 		my ($msg) = @_;
 		$hash->{'API__LAST_MSG'} = $msg;
 		my $next = Time::HiRes::time() + 600;
-		$hash->{'API__NEXT_REQ'} = $next;
+		#$hash->{'API__NEXT_REQ'} = $next;
 		return InternalTimer($next, \&JsonMod_ApiRequest, $hash);
 	};
 
