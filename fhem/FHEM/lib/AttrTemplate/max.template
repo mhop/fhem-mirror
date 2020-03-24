@@ -19,7 +19,7 @@ filter:TYPE=MAX:FILTER=devtype=(1|2)
 desc:To configure a HeatingThermostat
 order:M1
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_heizungsthermostat") }
-par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_HeatingThermostat_1") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_HeatingThermostat_dark") }
 par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
 par:ACT;ACT as set, defaults to MAX;{ AttrVal("DEVICE","actCycle","1:0") }
 par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1") }
@@ -38,7 +38,7 @@ attr DEVICE debug DEBUG
 attr DEVICE actCycle ACT
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speechcontrol_type_thermostat
 ######################################################################
 
 ######################################################################
@@ -47,7 +47,7 @@ filter:TYPE=MAX:FILTER=devtype=(3|7)
 desc:To configure a WallMountedThermostat
 order:M2
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","max_wandthermostat") }
-par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_WallMountedThermostat_1") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_WallMountedThermostat_dark") }
 par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
 par:ACT;ACT as set, defaults to MAX;{ AttrVal("DEVICE","actCycle","0:15") }
 par:CONFIG;CONFIG as set, defaults to MAX;{ AttrVal("DEVICE","autosaveConfig","1") }
@@ -67,7 +67,7 @@ attr DEVICE webCmdLabel LABEL
 attr DEVICE widgetOverride temperature:selectnumbers,15,0.1,29,1,lin
 attr DEVICE autosaveConfig CONFIG
 attr DEVICE event-on-change-reading EOCR
-set DEVICE attrTemplate speech_recognition_type_thermostat
+set DEVICE attrTemplate speechcontrol_type_thermostat
 ######################################################################
 
 ######################################################################
@@ -77,9 +77,8 @@ desc:To configure a ShutterContact
 order:M3
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","hm-sec-win") }
 par:DEBUG;DEBUG as set, defaults to MAX;{ AttrVal("DEVICE","debug","1") }
-par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_ShutterContact_1") }
+par:COMMENT;COMMENT as set, defaults to MAX;{ AttrVal("DEVICE","comment","Configured using template MAX_ShutterContact_dark") }
 par:EOCR;EOCR as set, defaults to MAX;{ AttrVal("DEVICE","event-on-change-reading",".*") }
-par:LABEL;;{ (AttrVal('global','language','DE') eq 'DE') ? return 'Ist<br>:Soll<br>' : return 'Actual<br>Desired<br>' }
 attr DEVICE icon ICON
 attr DEVICE comment COMMENT
 attr DEVICE debug DEBUG
