@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  59_WUup: remove prototypes and HTML entitities
  - bugfix:  73_AutoShuttersControl: change default value for rain and wind
                protection, add rain protection to commandref
  - change:  73_AutoShuttersControl: remove prototyp, add weekendholiday for

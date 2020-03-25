@@ -33,17 +33,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.13";
-
-# Declare functions
-sub WUup_Initialize($);
-sub WUup_Define($$$);
-sub WUup_Undef($$);
-sub WUup_Set($@);
-sub WUup_Attr(@);
-sub WUup_stateRequestTimer($);
-sub WUup_send($);
-sub WUup_receive($);
+my $version = "0.9.14";
 
 ################################################################################
 #
@@ -51,7 +41,7 @@ sub WUup_receive($);
 #
 ################################################################################
 
-sub WUup_Initialize($) {
+sub WUup_Initialize {
     my ($hash) = @_;
 
     $hash->{DefFn}   = "WUup_Define";
@@ -75,7 +65,7 @@ sub WUup_Initialize($) {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub WUup_Define($$$) {
+sub WUup_Define {
     my ( $hash, $def ) = @_;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
@@ -121,13 +111,13 @@ sub WUup_Define($$$) {
     return undef;
 }
 
-sub WUup_Undef($$) {
+sub WUup_Undef {
     my ( $hash, $arg ) = @_;
     RemoveInternalTimer($hash);
     return undef;
 }
 
-sub WUup_Set($@) {
+sub WUup_Set {
     my ( $hash, $name, $cmd, @args ) = @_;
 
     return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
@@ -140,7 +130,7 @@ sub WUup_Set($@) {
     }
 }
 
-sub WUup_Attr(@) {
+sub WUup_Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
@@ -191,7 +181,7 @@ sub WUup_Attr(@) {
     return undef;
 }
 
-sub WUup_stateRequestTimer($) {
+sub WUup_stateRequestTimer {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
@@ -219,7 +209,7 @@ sub WUup_stateRequestTimer($) {
       "Sub WUup_stateRequestTimer ($name) - Request Timer is called";
 }
 
-sub WUup_send($) {
+sub WUup_send {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
     my $version = $hash->{VERSION};
@@ -312,9 +302,6 @@ sub WUup_send($) {
         Log3 $name, 5, "WUup ($name) - full URL: $url";
         HttpUtils_NonblockingGet($param);
 
-        #        my $response = GetFileFromURL($url);
-        #        readingsBulkUpdate( $hash, "response", $response );
-        #        Log3 $name, 4, "WUup ($name) - server response: $response";
     }
     else {
         CommandDeleteReading( undef, "$name data" );
@@ -328,7 +315,7 @@ sub WUup_send($) {
     return;
 }
 
-sub WUup_receive($) {
+sub WUup_receive {
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
@@ -379,6 +366,7 @@ sub WUup_receive($) {
 # 2019-07-05 add Meta support
 # 2019-07-09 add WIKI to Meta data
 # 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
+# 2020-03-25 remove prototypes
 #
 ################################################################################
 
@@ -436,7 +424,7 @@ sub WUup_receive($) {
         <li><b>disable</b> - disables the module</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
-        <li><b>unit_solarradiation</b> - change the units of your solarradiation readings (lux or W/m&sup2;)</li>
+        <li><b>unit_solarradiation</b> - change the units of your solarradiation readings (lux or W/m²)</li>
         <li><b>round</b> - round values to this number of decimals for calculation (default 4)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
 <a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">parameter name from api.</a> 
@@ -448,29 +436,29 @@ sub WUup_receive($) {
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
-            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+            (°C -> °F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
         <u>The following information is supported:</u>
         <ul>
-            <li>winddir - instantaneous wind direction (0-360) [&deg;]</li>
+            <li>winddir - instantaneous wind direction (0-360) [°]</li>
             <li>windspeedmph - instantaneous wind speed ·[mph]</li>
             <li>windgustmph - current wind gust, using software specific time period [mph]</li>
-            <li>windgustdir - current wind direction, using software specific time period [&deg;]</li>
+            <li>windgustdir - current wind direction, using software specific time period [°]</li>
             <li>windspdmph_avg2m  - 2 minute average wind speed [mph]</li>
-            <li>winddir_avg2m - 2 minute average wind direction [&deg;]</li>
+            <li>winddir_avg2m - 2 minute average wind direction [°]</li>
             <li>windgustmph_10m - past 10 minutes wind gust [mph]</li>
-            <li>windgustdir_10m - past 10 minutes wind gust direction [&deg;]</li>
-            <li>humidity - outdoor humidity (0-100) [&#37;]</li>
-            <li>dewptf- outdoor dewpoint [F]</li>
-            <li>tempf - outdoor temperature [F]</li>
+            <li>windgustdir_10m - past 10 minutes wind gust direction [°]</li>
+            <li>humidity - outdoor humidity (0-100) [%]</li>
+            <li>dewptf- outdoor dewpoint [°F]</li>
+            <li>tempf - outdoor temperature [°F]</li>
             <li>rainin - rain over the past hour -- the accumulated rainfall in the past 60 min [in]</li>
             <li>dailyrainin - rain so far today in local time [in]</li>
             <li>baromin - barometric pressure [inHg]</li>
-            <li>soiltempf - soil temperature [F]</li>
-            <li>soilmoisture - soil moisture [&#37;]</li>
-            <li>solarradiation - solar radiation[W/m&sup2;]</li>
+            <li>soiltempf - soil temperature [°F]</li>
+            <li>soilmoisture - soil moisture [%]</li>
+            <li>solarradiation - solar radiation[W/m²]</li>
             <li>UV - [index]</li>
-            <li>AqPM2.5 - PM2.5 mass [&micro;g/m&sup3;]</li>
-            <li>AqPM10 - PM10 mass [&micro;g/m&sup3;]</li>
+            <li>AqPM2.5 - PM2.5 mass [µg/m³]</li>
+            <li>AqPM10 - PM10 mass [µg/m³]</li>
         </ul>
         </li>
     </ul>
@@ -541,40 +529,40 @@ sub WUup_receive($) {
         <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
         Windgeschwindigkeiten an (m/s oder km/h)</li>
         <li><b>unit_solarradiation</b> - gibt die Einheit der Readings für die
-        Sonneneinstrahlung an (lux oder W/m&sup2;)</li>
+        Sonneneinstrahlung an (lux oder W/m²)</li>
         <li><b>round</b> - Anzahl der Nachkommastellen zur Berechnung (Standard 4)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
 <a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">Parameternamen aus der API.</a><br />
-        Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
+        Jedes dieser Attribute enthält Informationen über zu sendende Wetterdaten
         im Format <code>sensorName:readingName</code>.<br/>
         Beispiel: <code>attr WUup wutempf outside:temperature</code> definiert
-        das Attribut wutempf und sendet das Reading "temperature" vom Ger&auml;t "outside" als Parameter "tempf" 
+        das Attribut wutempf und sendet das Reading "temperature" vom Gerät "outside" als Parameter "tempf" 
         (welches die aktuelle Temperatur angibt).
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
-        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
-        <u>Unterst&uuml;tzte Angaben</u>
+        (°C -> °;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+        <u>Unterstützte Angaben</u>
         <ul>
-            <li>winddir - momentane Windrichtung (0-360) [&deg;]</li>
+            <li>winddir - momentane Windrichtung (0-360) [°]</li>
             <li>windspeedmph - momentane Windgeschwindigkeit [mph]</li>
-            <li>windgustmph - aktuelle B&ouml;e, mit Software-spezifischem Zeitraum [mph]</li>
-            <li>windgustdir - aktuelle B&ouml;enrichtung, mit Software-spezifischer Zeitraum [&deg;]</li>
+            <li>windgustmph - aktuelle Böe, mit Software-spezifischem Zeitraum [mph]</li>
+            <li>windgustdir - aktuelle Böenrichtung, mit Software-spezifischer Zeitraum [°]</li>
             <li>windspdmph_avg2m - durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten [mph]</li>
-            <li>winddir_avg2m - durchschnittliche Windrichtung innerhalb 2 Minuten [&deg;]</li>
-            <li>windgustmph_10m - B&ouml;en der vergangenen 10 Minuten [mph]</li>
-            <li>windgustdir_10m - Richtung der B&ouml;en der letzten 10 Minuten [&deg;]</li>
-            <li>humidity - Luftfeuchtigkeit im Freien (0-100) [&#37;]</li>
-            <li>dewptf- Taupunkt im Freien [F]</li>
-            <li>tempf - Au&szlig;entemperatur [F]</li>
+            <li>winddir_avg2m - durchschnittliche Windrichtung innerhalb 2 Minuten [°]</li>
+            <li>windgustmph_10m - Böen der vergangenen 10 Minuten [mph]</li>
+            <li>windgustdir_10m - Richtung der Böen der letzten 10 Minuten [°]</li>
+            <li>humidity - Luftfeuchtigkeit im Freien (0-100) [%]</li>
+            <li>dewptf- Taupunkt im Freien [°F]</li>
+            <li>tempf - Außentemperatur [°F]</li>
             <li>rainin - Regen in der vergangenen Stunde [in]</li>
             <li>dailyrainin - Regenmenge bisher heute [in]</li>
             <li>baromin - barometrischer Druck [inHg]</li>
-            <li>soiltempf - Bodentemperatur [F]</li>
-            <li>soilmoisture - Bodenfeuchtigkeit [&#37;]</li>
-            <li>solarradiation - Sonneneinstrahlung [W/m&sup2;]</li>
+            <li>soiltempf - Bodentemperatur [°F]</li>
+            <li>soilmoisture - Bodenfeuchtigkeit [%]</li>
+            <li>solarradiation - Sonneneinstrahlung [W/m²]</li>
             <li>UV - [Index]</li>
-            <li>AqPM2.5 - Feinstaub PM2,5 [&micro;g/m&sup3;]</li>
-            <li>AqPM10 - Feinstaub PM10 [&micro;g/m&sup3;]</li>
+            <li>AqPM2.5 - Feinstaub PM2,5 [µg/m³]</li>
+            <li>AqPM10 - Feinstaub PM10 [µg/m³]</li>
         </ul>
         </li>
     </ul>
@@ -592,7 +580,7 @@ sub WUup_receive($) {
     <ul>
         <li>Die komplette API-Beschreibung findet sich 
 <a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">hier</a></li>
-        <li>Viel Spa&szlig;!</li><br/>
+        <li>Viel Spaß!</li><br/>
     </ul>
 
 </ul>
@@ -612,7 +600,7 @@ sub WUup_receive($) {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.12",
+  "version": "v0.9.14",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
