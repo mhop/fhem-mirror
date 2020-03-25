@@ -24,7 +24,6 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
 ########################################################################
 sub Heating_Control_Initialize($)
 {

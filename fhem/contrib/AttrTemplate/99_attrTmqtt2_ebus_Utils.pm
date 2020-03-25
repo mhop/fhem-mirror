@@ -6,7 +6,6 @@ package main;
 
 use strict;
 use warnings;
-use POSIX;
 
 sub
 attrTmqtt2_ebus_Utils_Initialize($$)

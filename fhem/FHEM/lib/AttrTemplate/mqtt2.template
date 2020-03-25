@@ -1486,6 +1486,9 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 order:A_10b
 desc:Applies to single relay Shelly devices offering energy meassuring like Shelly 1PM or Shelly Plug S
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
+par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
+par:NEWUSERREADINGS;NEWUSERREADINGS as set if relay_0_energy_total is included, otherwise it will be added;{ my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? 'relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum("$name","relay_0_energy",0)}' : $old =~ m,relay_0_energy_total:relay_0_energy.*, ? $old : $old.', relay_0_energy_total:relay_0_energy:.* monotonic {ReadingsNum("$name","relay_0_energy",0)}'  }
 attr DEVICE setList\
   relay0:on,off,toggle shellies/DEVNAME/relay/0/command $EVTPART1\
   off:noArg shellies/DEVNAME/relay/0/command off\
@@ -1513,6 +1516,10 @@ deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model shelly1_w_energy_meassuring
+option:{ RADIO_SETUSERREADING }
+attr DEVICE userReadings NEWUSERREADINGS
+
+
 
 name:shelly1_w_energy_meassuring_washer_example
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*

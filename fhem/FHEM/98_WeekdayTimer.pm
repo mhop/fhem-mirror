@@ -27,7 +27,6 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
 
 use Time::Local 'timelocal_nocheck';
 

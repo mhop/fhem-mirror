@@ -642,7 +642,7 @@ attr DEVICE stateFormat { my $ret ="";;\
         $ret .= sprintf("%-32s",AttrVal($dev,"alias",$dev));;\
         $ret .= '</b></a> | ';;\
         $ret .= '<b style="color:lightgray;;">';;\
-        $ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO1_IPAddress","0.0.0.0")).'/up" target="_blank">';;\
+        $ret .= '<a href="http://'.ReadingsVal($dev,"IPAddress",ReadingsVal($dev,"INFO2_IPAddress","0.0.0.0")).'/up" target="_blank">';;\
         $ret .= sprintf("%7s",$old);;\
         $ret .= '</a></b> | ';;\
         $ret .= '<a href="https://github.com/arendst/Tasmota/releases/tag/v'.$new.'">';;\
