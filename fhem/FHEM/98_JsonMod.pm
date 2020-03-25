@@ -30,6 +30,7 @@ use utf8;
 use Time::Local qw( timelocal timegm );
 use Text::Balanced qw ( extract_codeblock extract_delimited );
 use Unicode::Normalize qw( NFD );
+use List::Util qw( any );
 use HttpUtils;
 
 #use Memory::Usage;
@@ -474,20 +475,25 @@ sub JsonMod_DoReadings {
 	};
 
 	if (my $readingList = AttrVal($name, 'readingList', '')) {
-		my $NAME = $name;
+		# support for perl expressions within
+		my $NAME = $name; 
 		if (not eval $readingList and $@) {
 			JsonMod_Logger($hash, 2, 'error while evaluating readingList: %s', $@);
 			return;
 		};
 		if (keys %{$newReadings}) {
+			my @newReadings;
+			my @oldReadings = split ',', ReadingsVal($name, '.computedReadings', '');
 			readingsBeginUpdate($hash);
 			foreach my $k (keys %{$newReadings}) {
 				readingsBulkUpdate($hash, $k, $newReadings->{$k});
+				push @newReadings, $k;
 			};
 			# not used anymore
 			foreach my $k (keys %{$oldReadings}) {
-				readingsDelete($hash, $k) if ($oldReadings->{$k} == 0);
+				readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
 			};
+			readingsBulkUpdate($hash, '.computedReadings', join ',', @newReadings);
 			readingsEndUpdate($hash, 1);
 		};
 	};
