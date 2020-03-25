@@ -46,7 +46,7 @@ package main;
 use strict;
 use warnings;
 
-sub ascAPIget($@) {
+sub ascAPIget {
     my ( $getCommand, $shutterDev, $value ) = @_;
 
     return AutoShuttersControl_ascAPIget( $getCommand, $shutterDev, $value );
@@ -57,7 +57,7 @@ package FHEM::AutoShuttersControl;
 
 use strict;
 use warnings;
-use POSIX;
+use POSIX qw(strftime);
 use utf8;
 use Encode;
 use FHEM::Meta;
@@ -273,7 +273,7 @@ my %posSetCmds = (
 my $shutters = new ASC_Shutters();
 my $ascDev   = new ASC_Dev();
 
-sub ascAPIget($@) {
+sub ascAPIget {
     my ( $getCommand, $shutterDev, $value ) = @_;
 
     my $getter = 'get' . $getCommand;
@@ -291,7 +291,7 @@ sub ascAPIget($@) {
     }
 }
 
-sub Initialize($) {
+sub Initialize {
     my ($hash) = @_;
 
 ## Da ich mit package arbeite müssen in die Initialize für die jeweiligen hash Fn Funktionen der Funktionsname
@@ -328,7 +328,7 @@ sub Initialize($) {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub Define($$) {
+sub Define {
     my ( $hash, $def ) = @_;
     my @a = split( '[ \t][ \t]*', $def );
 
@@ -374,7 +374,7 @@ sub Define($$) {
     return undef;
 }
 
-sub Undef($$) {
+sub Undef {
     my ( $hash, $arg ) = @_;
 
     my $name = $hash->{NAME};
@@ -389,7 +389,7 @@ sub Undef($$) {
     return undef;
 }
 
-sub Attr(@) {
+sub Attr {
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
 
     #     my $hash = $defs{$name};
@@ -397,7 +397,7 @@ sub Attr(@) {
     return undef;
 }
 
-sub Notify($$) {
+sub Notify {
     my ( $hash, $dev ) = @_;
     my $name = $hash->{NAME};
 
@@ -510,7 +510,7 @@ sub Notify($$) {
     return;
 }
 
-sub EventProcessingGeneral($$$) {
+sub EventProcessingGeneral {
     my ( $hash, $devname, $events ) = @_;
     my $name = $hash->{NAME};
 
@@ -553,24 +553,40 @@ sub EventProcessingGeneral($$$) {
         }
     }
     else {    # alles was kein Devicenamen mit übergeben hat landet hier
-        if ( $events =~
-m#^ATTR\s(.*)\s(ASC_Roommate_Device|ASC_WindowRec|ASC_residentsDev|ASC_rainSensor|ASC_windSensor|ASC_BrightnessSensor|ASC_ExternalTrigger|ASC_twilightDevice)\s(.*)$#
+        if (
+            $events =~ m{^ATTR\s(.*)
+             \s(ASC_Roommate_Device|ASC_WindowRec|ASC_residentsDev|ASC_rainSensor
+                |ASC_windSensor|ASC_BrightnessSensor|ASC_ExternalTrigger
+                |ASC_twilightDevice)
+             \s(.*)$}xms
           )
         {     # wurde den Attributen unserer Rolläden ein Wert zugewiesen ?
             AddNotifyDev( $hash, $3, $1, $2 ) if ( $3 ne 'none' );
             Log3( $name, 4,
                 "AutoShuttersControl ($name) - EventProcessing: ATTR" );
         }
-        elsif ( $events =~
-m#^DELETEATTR\s(.*)\s(ASC_Roommate_Device|ASC_WindowRec|ASC_residentsDev|ASC_rainSensor|ASC_windSensor|ASC_BrightnessSensor|ASC_ExternalTrigger|ASC_twilightDevice)$#
+        elsif (
+            $events =~ m{^DELETEATTR
+                \s(.*)\s(ASC_Roommate_Device
+                    |ASC_WindowRec|ASC_residentsDev|ASC_rainSensor
+                    |ASC_windSensor|ASC_BrightnessSensor|ASC_ExternalTrigger
+                    |ASC_twilightDevice)
+                $}xms
           )
-        {     # wurde das Attribut unserer Rolläden gelöscht ?
+        {    # wurde das Attribut unserer Rolläden gelöscht ?
             Log3( $name, 4,
                 "AutoShuttersControl ($name) - EventProcessing: DELETEATTR" );
             DeleteNotifyDev( $hash, $1, $2 );
         }
-        elsif ( $events =~
-m#^(DELETEATTR|ATTR)\s(.*)\s(ASC_Time_Up_WE_Holiday|ASC_Up|ASC_Down|ASC_AutoAstroModeMorning|ASC_AutoAstroModeMorningHorizon|ASC_PrivacyDownValue_beforeNightClose|ASC_PrivacyUpValue_beforeDayOpen|ASC_AutoAstroModeEvening|ASC_AutoAstroModeEveningHorizon|ASC_Time_Up_Early|ASC_Time_Up_Late|ASC_Time_Down_Early|ASC_Time_Down_Late)(.*)?#
+        elsif (
+            $events =~ m{^(DELETEATTR|ATTR)
+                \s(.*)\s(ASC_Time_Up_WE_Holiday|ASC_Up|ASC_Down
+                    |ASC_AutoAstroModeMorning|ASC_AutoAstroModeMorningHorizon
+                    |ASC_PrivacyDownValue_beforeNightClose
+                    |ASC_PrivacyUpValue_beforeDayOpen|ASC_AutoAstroModeEvening
+                    |ASC_AutoAstroModeEveningHorizon|ASC_Time_Up_Early
+                    |ASC_Time_Up_Late|ASC_Time_Down_Early|ASC_Time_Down_Late)
+                (.*)?}xms
           )
         {
             CreateSunRiseSetShuttersTimer( $hash, $2 )
@@ -580,8 +596,11 @@ m#^(DELETEATTR|ATTR)\s(.*)\s(ASC_Time_Up_WE_Holiday|ASC_Up|ASC_Down|ASC_AutoAstr
                     and $ascDev->getSunriseTimeWeHoliday eq 'on' )
               );
         }
-        elsif ( $events =~
-m#^(DELETEATTR|ATTR)\s(.*)\s(ASC_autoAstroModeMorning|ASC_autoAstroModeMorningHorizon|ASC_autoAstroModeEvening|ASC_autoAstroModeEveningHorizon)(.*)?#
+        elsif (
+            $events =~ m{^(DELETEATTR|ATTR)
+                \s(.*)\s(ASC_autoAstroModeMorning|ASC_autoAstroModeMorningHorizon
+                    |ASC_autoAstroModeEvening|ASC_autoAstroModeEveningHorizon)
+                (.*)?}xms
           )
         {
             RenewSunRiseSetShuttersTimer($hash);
@@ -589,7 +608,7 @@ m#^(DELETEATTR|ATTR)\s(.*)\s(ASC_autoAstroModeMorning|ASC_autoAstroModeMorningHo
     }
 }
 
-sub Set($$@) {
+sub Set {
     my ( $hash, $name, @aa ) = @_;
     my ( $cmd, @args ) = @aa;
 
@@ -676,7 +695,7 @@ sub Set($$@) {
     return undef;
 }
 
-sub Get($$@) {
+sub Get {
     my ( $hash, $name, @aa ) = @_;
 
     my ( $cmd, @args ) = @aa;
@@ -696,7 +715,7 @@ sub Get($$@) {
     }
 }
 
-sub ShuttersDeviceScan($) {
+sub ShuttersDeviceScan {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -787,7 +806,7 @@ sub ShuttersDeviceScan($) {
 }
 
 ## Die Funktion schreibt in das Moduldevice Readings welche Rolläden in welchen Räumen erfasst wurden.
-sub WriteReadingsShuttersList($) {
+sub WriteReadingsShuttersList {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -828,7 +847,7 @@ sub WriteReadingsShuttersList($) {
     readingsEndUpdate( $hash, 0 );
 }
 
-sub UserAttributs_Readings_ForShutters($$) {
+sub UserAttributs_Readings_ForShutters {
     my ( $hash, $cmd ) = @_;
     my $name = $hash->{NAME};
 
@@ -900,7 +919,7 @@ sub UserAttributs_Readings_ForShutters($$) {
 }
 
 ## Fügt dem NOTIFYDEV Hash weitere Devices hinzu
-sub AddNotifyDev($@) {
+sub AddNotifyDev {
     ### Beispielaufruf: AddNotifyDev( $hash, $3, $1, $2 ) if ( $3 ne 'none' );
     my ( $hash, $dev, $shuttersDev, $shuttersAttr ) = @_;
 
@@ -930,7 +949,7 @@ sub AddNotifyDev($@) {
 }
 
 ## entfernt aus dem NOTIFYDEV Hash Devices welche als Wert in Attributen steckten
-sub DeleteNotifyDev($@) {
+sub DeleteNotifyDev {
     my ( $hash, $shuttersDev, $shuttersAttr ) = @_;
     my $name = $hash->{NAME};
 
@@ -960,7 +979,7 @@ sub DeleteNotifyDev($@) {
 }
 
 ## Sub zum steuern der Rolläden bei einem Fenster Event
-sub EventProcessingWindowRec($@) {
+sub EventProcessingWindowRec {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
@@ -1141,7 +1160,7 @@ sub EventProcessingWindowRec($@) {
 }
 
 ## Sub zum steuern der Rolladen bei einem Bewohner/Roommate Event
-sub EventProcessingRoommate($@) {
+sub EventProcessingRoommate {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
@@ -1356,7 +1375,7 @@ sub EventProcessingRoommate($@) {
     }
 }
 
-sub EventProcessingResidents($@) {
+sub EventProcessingResidents {
     my ( $hash, $device, $events ) = @_;
 
     my $name                   = $device;
@@ -1562,7 +1581,7 @@ sub EventProcessingResidents($@) {
     }
 }
 
-sub EventProcessingRain($@) {
+sub EventProcessingRain {
 
     #### Ist noch nicht fertig, es fehlt noch das verzögerte Prüfen auf erhalten bleiben des getriggerten Wertes.
 
@@ -1584,7 +1603,7 @@ sub EventProcessingRain($@) {
     }
 }
 
-sub RainProtection(@) {
+sub RainProtection {
     my ( $hash, $val, $triggerMax, $closedPos ) = @_;
 
     foreach my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
@@ -1623,7 +1642,7 @@ sub RainProtection(@) {
     }
 }
 
-sub EventProcessingWind($@) {
+sub EventProcessingWind {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
@@ -1696,7 +1715,7 @@ sub EventProcessingWind($@) {
 }
 ##########
 
-sub EventProcessingBrightness($@) {
+sub EventProcessingBrightness {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
@@ -1733,6 +1752,7 @@ sub EventProcessingBrightness($@) {
                         )
                         and IsWe()
                         and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                        and $shutters->getTimeUpWeHoliday eq '01:25'
                     )
                 )
                 and int( gettimeofday() / 86400 ) == int(
@@ -1807,7 +1827,10 @@ sub EventProcessingBrightness($@) {
                         and (
                             not IsWe()
                             or ( IsWe()
-                                and $ascDev->getSunriseTimeWeHoliday eq 'off' )
+                                and $ascDev->getSunriseTimeWeHoliday eq 'off'
+                                  or (  $ascDev->getSunriseTimeWeHoliday eq 'on'
+                                    and $shutters->getTimeUpWeHoliday eq '01:25' )
+                            )
                         )
                     )
                     or (
@@ -1817,6 +1840,7 @@ sub EventProcessingBrightness($@) {
                         )
                         and IsWe()
                         and $ascDev->getSunriseTimeWeHoliday eq 'on'
+                        and $shutters->getTimeUpWeHoliday ne '01:25'
                     )
                 )
                 and int( gettimeofday() / 86400 ) == int(
@@ -2068,7 +2092,7 @@ sub EventProcessingBrightness($@) {
     }
 }
 
-sub EventProcessingShadingBrightness($@) {
+sub EventProcessingShadingBrightness {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
@@ -2127,7 +2151,7 @@ sub EventProcessingShadingBrightness($@) {
     }
 }
 
-sub EventProcessingTwilightDevice($@) {
+sub EventProcessingTwilightDevice {
     my ( $hash, $device, $events ) = @_;
 
     #     Twilight
@@ -2199,7 +2223,7 @@ sub EventProcessingTwilightDevice($@) {
     }
 }
 
-sub ShadingProcessing($@) {
+sub ShadingProcessing {
 ### angleMinus ist $shutters->getShadingAzimuthLeft
 ### anglePlus ist $shutters->getShadingAzimuthRight
 ### winPos ist die Fensterposition $shutters->getDirection
@@ -2384,7 +2408,7 @@ sub ShadingProcessing($@) {
       );
 }
 
-sub ShadingProcessingDriveCommand($$) {
+sub ShadingProcessingDriveCommand {
     my ( $hash, $shuttersDev ) = @_;
 
     my $name = $hash->{NAME};
@@ -2416,7 +2440,7 @@ sub ShadingProcessingDriveCommand($$) {
                 $shutters->setLastDrive('shading in');
                 ShuttersCommandSet( $hash, $shuttersDev, $getShadingPos );
 
-                ASC_Debug( 'ShadingProcessing: '
+                ASC_Debug( 'ShadingProcessingDriveCommand: '
                       . $shutters->getShuttersDev
                       . ' - Der aktuelle Beschattungsstatus ist: '
                       . $shutters->getShadingStatus
@@ -2444,7 +2468,7 @@ sub ShadingProcessingDriveCommand($$) {
                 )
             );
 
-            ASC_Debug( 'ShadingProcessing: '
+            ASC_Debug( 'ShadingProcessingDriveCommand: '
                   . $shutters->getShuttersDev
                   . ' - Der aktuelle Beschattungsstatus ist: '
                   . $shutters->getShadingStatus
@@ -2458,7 +2482,7 @@ sub ShadingProcessingDriveCommand($$) {
               . $shutters->getShadingStatus );
 
         ASC_Debug(
-                'ShadingProcessing: '
+                'ShadingProcessingDriveCommand: '
               . $shutters->getShuttersDev
               . ' - Der aktuelle Beschattungsstatus ist: '
               . $shutters->getShadingStatus
@@ -2470,7 +2494,7 @@ sub ShadingProcessingDriveCommand($$) {
     }
 }
 
-sub EventProcessingPartyMode($) {
+sub EventProcessingPartyMode {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -2520,7 +2544,7 @@ sub EventProcessingPartyMode($) {
     }
 }
 
-sub EventProcessingAdvShuttersClose($) {
+sub EventProcessingAdvShuttersClose {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -2544,7 +2568,7 @@ sub EventProcessingAdvShuttersClose($) {
     }
 }
 
-sub EventProcessingShutters($@) {
+sub EventProcessingShutters {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
@@ -2604,7 +2628,7 @@ sub EventProcessingShutters($@) {
     );
 }
 
-sub EventProcessingExternalTriggerDevice($@) {
+sub EventProcessingExternalTriggerDevice {
     my ( $hash, $shuttersDev, $events ) = @_;
     my $name = $hash->{NAME};
 
@@ -2657,7 +2681,7 @@ sub EventProcessingExternalTriggerDevice($@) {
 }
 
 # Sub für das Zusammensetzen der Rolläden Steuerbefehle
-sub ShuttersCommandSet($$$) {
+sub ShuttersCommandSet {
     my ( $hash, $shuttersDev, $posValue ) = @_;
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
@@ -2736,7 +2760,7 @@ sub ShuttersCommandSet($$$) {
 }
 
 ## Sub welche die InternalTimer nach entsprechenden Sunset oder Sunrise zusammen stellt
-sub CreateSunRiseSetShuttersTimer($$) {
+sub CreateSunRiseSetShuttersTimer {
     my ( $hash, $shuttersDev ) = @_;
     my $name            = $hash->{NAME};
     my $shuttersDevHash = $defs{$shuttersDev};
@@ -2850,7 +2874,7 @@ sub CreateSunRiseSetShuttersTimer($$) {
 }
 
 ## Funktion zum neu setzen der Timer und der Readings für Sunset/Rise
-sub RenewSunRiseSetShuttersTimer($) {
+sub RenewSunRiseSetShuttersTimer {
     my $hash = shift;
 
     foreach ( @{ $hash->{helper}{shuttersList} } ) {
@@ -2945,7 +2969,7 @@ sub RenewSunRiseSetShuttersTimer($) {
 }
 
 ## Funktion zum hardwareseitigen setzen des lock-out oder blocking beim Rolladen selbst
-sub HardewareBlockForShutters($$) {
+sub HardewareBlockForShutters {
     my ( $hash, $cmd ) = @_;
     foreach ( @{ $hash->{helper}{shuttersList} } ) {
         $shutters->setShuttersDev($_);
@@ -2954,7 +2978,7 @@ sub HardewareBlockForShutters($$) {
 }
 
 ## Funktion für das wiggle aller Shutters zusammen
-sub wiggleAll($) {
+sub wiggleAll {
     my $hash = shift;
 
     foreach ( @{ $hash->{helper}{shuttersList} } ) {
@@ -2962,7 +2986,7 @@ sub wiggleAll($) {
     }
 }
 
-sub wiggle($$) {
+sub wiggle {
     my ( $hash, $shuttersDev ) = @_;
     $shutters->setShuttersDev($shuttersDev);
     $shutters->setNoDelay(1);
@@ -3001,7 +3025,7 @@ sub wiggle($$) {
 ####
 
 ## Funktion welche beim Ablaufen des Timers für Sunset aufgerufen werden soll
-sub SunSetShuttersAfterTimerFn($) {
+sub SunSetShuttersAfterTimerFn {
     my $funcHash    = shift;
     my $hash        = $funcHash->{hash};
     my $shuttersDev = $funcHash->{shuttersdevice};
@@ -3071,7 +3095,7 @@ sub SunSetShuttersAfterTimerFn($) {
 }
 
 ## Funktion welche beim Ablaufen des Timers für Sunrise aufgerufen werden soll
-sub SunRiseShuttersAfterTimerFn($) {
+sub SunRiseShuttersAfterTimerFn {
     my $funcHash    = shift;
     my $hash        = $funcHash->{hash};
     my $shuttersDev = $funcHash->{shuttersdevice};
@@ -3171,7 +3195,7 @@ sub SunRiseShuttersAfterTimerFn($) {
     CreateSunRiseSetShuttersTimer( $hash, $shuttersDev );
 }
 
-sub CreateNewNotifyDev($) {
+sub CreateNewNotifyDev {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -3213,7 +3237,7 @@ sub CreateNewNotifyDev($) {
     $hash->{NOTIFYDEV} = $hash->{NOTIFYDEV} . $shuttersList;
 }
 
-sub ShuttersInformation($@) {
+sub ShuttersInformation {
 
     my ( $FW_wname, $d, $room, $pageHash ) = @_;
     my $hash = $defs{$d};
@@ -3300,7 +3324,7 @@ sub ShuttersInformation($@) {
     return $ret;
 }
 
-sub GetMonitoredDevs($) {
+sub GetMonitoredDevs {
     my $hash       = shift;
     my $notifydevs = eval {
         decode_json( ReadingsVal( $hash->{NAME}, '.monitoredDevs', 'none' ) );
@@ -3348,7 +3372,7 @@ sub GetMonitoredDevs($) {
 ## my little helper
 #################################
 
-sub PositionValueWindowRec($$) {
+sub PositionValueWindowRec {
     my ( $shuttersDev, $posValue ) = @_;
 
     if ( CheckIfShuttersWindowRecOpen($shuttersDev) == 1
@@ -3379,7 +3403,7 @@ sub PositionValueWindowRec($$) {
     return $posValue;
 }
 
-sub AutoSearchTwilightDev($) {
+sub AutoSearchTwilightDev {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -3392,7 +3416,7 @@ sub AutoSearchTwilightDev($) {
     }
 }
 
-sub GetAttrValues($@) {
+sub GetAttrValues {
     my ( $dev, $attribut, $default ) = @_;
 
     my @values = split( ' ',
@@ -3418,7 +3442,7 @@ sub GetAttrValues($@) {
 }
 
 # Hilfsfunktion welche meinen ReadingString zum finden der getriggerten Devices und der Zurdnung was das Device überhaupt ist und zu welchen Rolladen es gehört aus liest und das Device extraiert
-sub ExtractNotifyDevFromEvent($$$) {
+sub ExtractNotifyDevFromEvent {
     my ( $hash, $shuttersDev, $shuttersAttr ) = @_;
     my %notifyDevs;
     while ( my $notifyDev = each %{ $hash->{monitoredDevs} } ) {
@@ -3446,7 +3470,7 @@ sub ExtractNotifyDevFromEvent($$$) {
 }
 
 ## Ist Tag oder Nacht für den entsprechende Rolladen
-sub _IsDay($) {
+sub _IsDay {
     my ($shuttersDev) = @_;
     $shutters->setShuttersDev($shuttersDev);
 
@@ -3566,7 +3590,7 @@ sub _IsDay($) {
     return $respIsDay;
 }
 
-sub ShuttersSunrise($$) {
+sub ShuttersSunrise {
     my ( $shuttersDev, $tm ) =
       @_;    # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
     my $autoAstroMode;
@@ -3590,11 +3614,11 @@ sub ShuttersSunrise($$) {
 
     if ( $tm eq 'unix' ) {
         if ( $shutters->getUp eq 'astro' ) {
-            if (    ( IsWe() or IsWeTomorrow() )
+            if (    ( IsWe() or IsWe('tomorrow') )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
-                if ( not IsWeTomorrow() ) {
+                if ( not IsWe('tomorrow') ) {
                     if (
                         IsWe()
                         and int( gettimeofday() / 86400 ) == int(
@@ -3781,11 +3805,11 @@ sub ShuttersSunrise($$) {
             }
             if (    defined($oldFuncHash)
                 and ref($oldFuncHash) eq 'HASH'
-                and ( IsWe() or IsWeTomorrow() )
+                and ( IsWe() or IsWe('tomorrow') )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
-                if ( not IsWeTomorrow() ) {
+                if ( not IsWe('tomorrow') ) {
                     if (
                         int( gettimeofday() / 86400 ) == int(
                             (
@@ -3818,11 +3842,11 @@ sub ShuttersSunrise($$) {
             }
         }
         elsif ( $shutters->getUp eq 'time' ) {
-            if (    ( IsWe() or IsWeTomorrow() )
+            if (    ( IsWe() or IsWe('tomorrow') )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
-                if ( not IsWeTomorrow() ) {
+                if ( not IsWe('tomorrow') ) {
                     if (
                         int( gettimeofday() / 86400 ) == int(
                             computeAlignTime( '24:00',
@@ -3900,37 +3924,43 @@ sub ShuttersSunrise($$) {
             }
         }
         elsif ( $shutters->getUp eq 'brightness' ) {
-            if (    ( IsWe() or IsWeTomorrow() )
+            if (    ( IsWe() or IsWe('tomorrow') )
                 and $ascDev->getSunriseTimeWeHoliday eq 'on'
                 and $shutters->getTimeUpWeHoliday ne '01:25' )
             {
-                if ( not IsWeTomorrow() ) {
+                if ( not IsWe('tomorrow') ) {
                     if (
                         IsWe()
                         and int( gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                computeAlignTime(
+                                    '24:00', $shutters->getTimeUpWeHoliday
+                                )
                             ) / 86400
                         )
                       )
                     {
                         $shuttersSunriseUnixtime =
-                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpWeHoliday );
                     }
                     elsif (
                         int( gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime( '24:00', $shutters->getTimeUpLate )
+                                computeAlignTime(
+                                    '24:00', $shutters->getTimeUpLate
+                                )
                             ) / 86400
                         )
                       )
                     {
                         $shuttersSunriseUnixtime =
-                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpWeHoliday );
                     }
                     else {
                         $shuttersSunriseUnixtime =
-                            computeAlignTime( '24:00', $shutters->getTimeUpLate );
+                          computeAlignTime( '24:00', $shutters->getTimeUpLate );
                     }
                 }
                 else {
@@ -3939,53 +3969,62 @@ sub ShuttersSunrise($$) {
                         and (
                             int( gettimeofday() / 86400 ) == int(
                                 (
-                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                    computeAlignTime(
+                                        '24:00', $shutters->getTimeUpWeHoliday
+                                    )
                                 ) / 86400
                             )
                             or int( gettimeofday() / 86400 ) != int(
                                 (
-                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                    computeAlignTime(
+                                        '24:00', $shutters->getTimeUpWeHoliday
+                                    )
                                 ) / 86400
                             )
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = 
-                            computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                        $shuttersSunriseUnixtime =
+                          computeAlignTime( '24:00',
+                            $shutters->getTimeUpWeHoliday );
                     }
                     elsif (
                         int( gettimeofday() / 86400 ) == int(
                             (
-                                computeAlignTime( '24:00', $shutters->getTimeUpLate )
+                                computeAlignTime(
+                                    '24:00', $shutters->getTimeUpLate
+                                )
                             ) / 86400
                         )
                       )
                     {
-                        $shuttersSunriseUnixtime = 
-                            computeAlignTime( '24:00', $shutters->getTimeUpLate );
+                        $shuttersSunriseUnixtime =
+                          computeAlignTime( '24:00', $shutters->getTimeUpLate );
                     }
                     else {
                         if (
                             int( gettimeofday() / 86400 ) == int(
                                 (
-                                    computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday )
+                                    computeAlignTime(
+                                        '24:00', $shutters->getTimeUpWeHoliday
+                                    )
                                 ) / 86400
                             )
                           )
                         {
                             $shuttersSunriseUnixtime =
-                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                              computeAlignTime( '24:00',
+                                $shutters->getTimeUpWeHoliday );
                         }
                         else {
                             $shuttersSunriseUnixtime =
-                                computeAlignTime( '24:00', $shutters->getTimeUpWeHoliday );
+                              computeAlignTime( '24:00',
+                                $shutters->getTimeUpWeHoliday );
                         }
                     }
                 }
             }
             else {
-        
-        
 
                 $shuttersSunriseUnixtime =
                   computeAlignTime( '24:00', $shutters->getTimeUpLate );
@@ -4002,7 +4041,7 @@ sub ShuttersSunrise($$) {
     }
 }
 
-sub IsAfterShuttersTimeBlocking($) {
+sub IsAfterShuttersTimeBlocking {
     my ($shuttersDev) = @_;
     $shutters->setShuttersDev($shuttersDev);
 
@@ -4025,7 +4064,7 @@ sub IsAfterShuttersTimeBlocking($) {
     else { return 1 }
 }
 
-sub IsAfterShuttersManualBlocking($) {
+sub IsAfterShuttersManualBlocking {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
@@ -4050,7 +4089,7 @@ sub IsAfterShuttersManualBlocking($) {
     else { return 1 }
 }
 
-sub ShuttersSunset($$) {
+sub ShuttersSunset {
     my ( $shuttersDev, $tm ) =
       @_;    # Tm steht für Timemode und bedeutet Realzeit oder Unixzeit
     my $autoAstroMode;
@@ -4114,7 +4153,7 @@ sub ShuttersSunset($$) {
 }
 
 ## Kontrolliert ob das Fenster von einem bestimmten Rolladen offen ist
-sub CheckIfShuttersWindowRecOpen($) {
+sub CheckIfShuttersWindowRecOpen {
     my $shuttersDev = shift;
     $shutters->setShuttersDev($shuttersDev);
 
@@ -4132,8 +4171,8 @@ sub CheckIfShuttersWindowRecOpen($) {
     }    # CK: covers: close|closed
 }
 
-sub makeReadingName($) {
-    my ($rname) = @_;
+sub makeReadingName {
+    my ($rname) = shift;
     my %charHash = (
         chr(0xe4) => "ae",    # ä
         chr(0xc4) => "Ae",    # Ä
@@ -4151,7 +4190,7 @@ sub makeReadingName($) {
     return $rname;
 }
 
-sub TimeMin2Sec($) {
+sub TimeMin2Sec {
     my $min = shift;
     my $sec;
 
@@ -4159,17 +4198,11 @@ sub TimeMin2Sec($) {
     return $sec;
 }
 
-sub IsWe() {
-    my $we = main::IsWe();
-    return $we;
+sub IsWe {
+    return main::IsWe( shift, shift );
 }
 
-sub IsWeTomorrow() {
-    my $we = main::IsWe('tomorrow');
-    return $we;
-}
-
-sub _SetCmdFn($) {
+sub _SetCmdFn {
     my $h           = shift;
     my $shuttersDev = $h->{shuttersDev};
     my $posValue    = $h->{posValue};
@@ -4224,7 +4257,7 @@ sub _SetCmdFn($) {
         and $shutters->getSelfDefenseAbsentTimerrun );
 }
 
-sub _setShuttersLastDriveDelayed($) {
+sub _setShuttersLastDriveDelayed {
     my $h = shift;
 
     my $shuttersDevHash = $h->{devHash};
@@ -4234,7 +4267,7 @@ sub _setShuttersLastDriveDelayed($) {
         $lastDrive, 1 );
 }
 
-sub ASC_Debug($) {
+sub ASC_Debug {
     return
       unless ( AttrVal( $ascDev->getName, 'ASC_debug', 0 ) );
 
@@ -4248,14 +4281,14 @@ sub ASC_Debug($) {
     );
 }
 
-sub _averageBrightness(@) {
+sub _averageBrightness {
     my @input = @_;
     use List::Util qw(sum);
 
     return int( sum(@input) / @input );
 }
 
-sub _perlCodeCheck($) {
+sub _perlCodeCheck {
     my $exec = shift;
     my $val  = undef;
 
@@ -4266,7 +4299,7 @@ sub _perlCodeCheck($) {
     return $val;
 }
 
-sub PrivacyUpTime($$) {
+sub PrivacyUpTime {
     my ( $shuttersDevHash, $shuttersSunriseUnixtime ) = @_;
     my $privacyUpUnixtime;
 
@@ -4307,7 +4340,7 @@ sub PrivacyUpTime($$) {
     return $shuttersSunriseUnixtime;
 }
 
-sub PrivacyDownTime($$) {
+sub PrivacyDownTime {
     my ( $shuttersDevHash, $shuttersSunsetUnixtime ) = @_;
     my $privacyDownUnixtime;
 
@@ -4371,7 +4404,7 @@ sub _IsAdv {
     return $adv;
 }
 
-sub DevStateIcon($) {
+sub DevStateIcon {
     my ($hash) = @_;
     $hash = $defs{$hash} if ( ref($hash) ne 'HASH' );
 
@@ -8038,7 +8071,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.20",
+  "version": "v0.8.21",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
