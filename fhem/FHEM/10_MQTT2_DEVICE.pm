@@ -544,7 +544,7 @@ MQTT2_DEVICE_addReading($$)
     my ($re,$code) = split(" ", $line,2);
     return "Bad line >$line< for $name" if(!defined($re) || !defined($code));
     eval { "Hallo" =~ m/^$re$/ };
-    return "Bad regexp $re: $@" if($@);
+    return "Bad regexp >$re< for $name: $@" if($@);
     if($cid && $re =~ m/^$cid:/) {
       $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
     } else {
