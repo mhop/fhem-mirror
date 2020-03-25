@@ -29,6 +29,7 @@ use warnings;
 use utf8;
 use Time::Local qw( timelocal timegm );
 use Text::Balanced qw ( extract_codeblock extract_delimited );
+use Unicode::Normalize qw( NFD );
 use HttpUtils;
 
 #use Memory::Usage;
@@ -421,6 +422,23 @@ sub JsonMod_DoReadings {
 		};
 	};
 
+	# sanitize reading names to comply with the rules
+	# (allowed chars: A-Za-z/\d_\.-)
+	my sub sanitizedSetReading {
+		my ($r, $v) = @_;
+
+		# convert into valid reading
+		$r = Unicode::Normalize::NFD($r);
+		$r =~ s/([^A-Za-z0-9\/_\.-])//g;
+		# prevent a totally stripped reading name
+		# todo, log it?
+		$r = "MASKED_$_index" unless($r); 
+		$v//='';
+
+		$newReadings->{$r} = $v;
+		$oldReadings->{$r} = 1;
+	};
+
 	my sub multi {
 		my ($value, @refs) = @_;
 		die ('jsonPath result not a list') if (ref($value) ne 'ARRAY');
@@ -434,8 +452,9 @@ sub JsonMod_DoReadings {
 				push @reading, $ref->($element);
 			};
 			$_index++;
-			$newReadings->{$reading[0]} = $reading[1];
-			$oldReadings->{$reading[0]} = 1;
+			sanitizedSetReading($reading[0], $reading[1]);
+			# $newReadings->{$reading[0]} = $reading[1];
+			# $oldReadings->{$reading[0]} = 1;
 		};
 	};
 
@@ -448,8 +467,9 @@ sub JsonMod_DoReadings {
 
 		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
 		$value //= $default;
-		$newReadings->{$reading} = $value;
-		$oldReadings->{$reading} = 1;
+		sanitizedSetReading($reading, $value);
+		# $newReadings->{$reading} = $value;
+		# $oldReadings->{$reading} = 1;
 		return;
 	};
 
