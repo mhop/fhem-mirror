@@ -3,7 +3,6 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
 
 sub CommandXmlList($$);
 sub XmlEscape($);

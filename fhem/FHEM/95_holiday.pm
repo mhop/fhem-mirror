@@ -4,7 +4,6 @@ package main;
 
 use strict;
 use warnings;
-use POSIX;
 
 sub holiday_refresh($;$$);
 

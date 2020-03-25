@@ -5,7 +5,6 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
 
 sub CommandJsonList2($$);
 
