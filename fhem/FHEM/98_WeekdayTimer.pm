@@ -208,7 +208,7 @@ sub WeekdayTimer_GetHashIndirekt ($$) {
   my ($myHash, $function) = @_;
 
   if (!defined($myHash->{HASH})) {
-    Log 3, "[$function] myHash not valid";
+    Log3 $myHash, 3, "[$function] myHash not valid";
     return undef;
   };
   return $myHash->{HASH};
@@ -1517,7 +1517,6 @@ sub WeekdayTimer_GetWeekprofileReadingTriplett($$) {
       "runtime" : {
          "requires" : {
             "Data::Dumper" : "0",
-            "POSIX" : "0",
             "Time::Local" : "0",
             "strict" : "0",
             "warnings" : "0"

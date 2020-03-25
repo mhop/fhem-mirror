@@ -31,34 +31,6 @@ package main;
   use Time::HiRes qw(gettimeofday);
   use Time::Local 'timelocal_nocheck';
 
-# forward declarations ########################################################
-sub RandomTimer_Initialize($);
-
-sub RandomTimer_Define($$);
-sub RandomTimer_Undef($$);
-sub RandomTimer_Set($@);
-sub RandomTimer_Attr($$$);
-
-sub RandomTimer_addDays ($$);
-sub RandomTimer_device_switch ($);
-sub RandomTimer_device_toggle ($);
-sub RandomTimer_disableDown($);
-sub RandomTimer_down($);
-sub RandomTimer_Exec($);
-sub RandomTimer_getSecsToNextAbschaltTest($);
-sub RandomTimer_isAktive ($);
-sub RandomTimer_isDisabled($);
-sub RandomTimer_schaltZeitenErmitteln ($$);
-sub RandomTimer_setActive($$);
-sub RandomTimer_setState($);
-sub RandomTimer_setSwitchmode ($$);
-sub RandomTimer_SetTimer($);
-sub RandomTimer_startZeitErmitteln  ($$);
-sub RandomTimer_stopTimeReached($);
-sub RandomTimer_stopZeitErmitteln  ($$);
-sub RandomTimer_Wakeup();
-sub RandomTimer_zeitBerechnen  ($$$$);
-
 # initialize ##################################################################
 sub RandomTimer_Initialize($) {
   my ($hash) = @_;
@@ -310,7 +282,7 @@ sub RandomTimer_Exec($) {
          RandomTimer_down($hash);
          RandomTimer_setActive($hash, 0);
          if ( AttrVal($hash->{NAME}, "runonce", -1) eq 1 ) {
-            Log 3, "[".$hash->{NAME}. "]" ."runonceMode";
+            Log3 $hash, 3, "[".$hash->{NAME}. "]" ."runonceMode";
             fhem ("delete $hash->{NAME}") ;
          }
          RandomTimer_setState($hash);
@@ -585,7 +557,7 @@ sub RandomTimer_GetHashIndirekt ($$) {
   my ($myHash, $function) = @_;
 
   if (!defined($myHash->{HASH})) {
-    Log 3, "[$function] myHash not valid";
+    Log3 $myHash, 3, "[$function] myHash not valid";
     return undef;
   };
   return $myHash->{HASH};
