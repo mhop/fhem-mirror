@@ -6227,13 +6227,13 @@ sub getWindMin {
 sub getWindProtection {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_WindProtection', 'on' );
+    return AttrVal( $self->{shuttersDev}, 'ASC_WindProtection', 'off' );
 }
 
 sub getRainProtection {
     my $self = shift;
 
-    return AttrVal( $self->{shuttersDev}, 'ASC_RainProtection', 'on' );
+    return AttrVal( $self->{shuttersDev}, 'ASC_RainProtection', 'off' );
 }
 
 sub getModeUp {
@@ -7511,6 +7511,9 @@ sub getBlockAscDrivesAfterManual {
             <li><strong>ASC_WindProtection on|off</strong> - Shutter is protected by the wind protection. Defaults
                 to off.
             </li>
+            <li><strong>ASC_RainProtection on|off</strong> - Shutter is protected by the rain protection. Defaults
+                to off.
+            </li>
             <li><strong>ASC_Roommate_Device</strong> - Comma separated list of <em>ROOMMATE</em> devices, representing
                 the inhabitants of the room to which the shutter belongs. Especially useful for bedrooms. Defaults
                 to none.
@@ -7953,7 +7956,8 @@ sub getBlockAscDrivesAfterManual {
             <li><strong>ASC_PrivacyUp_Pos</strong> - Position den Rollladens f&uuml;r den morgendlichen Sichtschutz (default: 50) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
             <li><strong>ASC_PrivacyDown_Pos</strong> - Position den Rollladens f&uuml;r den abendlichen Sichtschutz (default: 50) !!!Verwendung von Perlcode ist möglich, dieser muss in {} eingeschlossen sein. Rückgabewert muss eine positive Zahl/Dezimalzahl sein!!!</li>
             <li><strong>ASC_ExternalTrigger</strong> - DEVICE:READING VALUEACTIVE:VALUEINACTIVE POSACTIVE:POSINACTIVE, Beispiel: "WohnzimmerTV:state on:off 66:100" bedeutet das wenn ein "state:on" Event kommt soll das Rollo in Position 66 fahren, kommt ein "state:off" Event soll es in Position 100 fahren. Es ist m&ouml;glich die POSINACTIVE weg zu lassen dann f&auml;hrt das Rollo in LastStatus Position.</li>
-            <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. on=JA, off=NEIN.</li>
+            <li><strong>ASC_WindProtection - on/off</strong> - soll der Rollladen beim Windschutz beachtet werden. on=JA, off=NEIN. (default off)</li>
+            <li><strong>ASC_RainProtection - on/off</strong> - soll der Rollladen beim Regenschutz beachtet werden. on=JA, off=NEIN. (default off)</li>
             <li><strong>ASC_Roommate_Device</strong> - mit Komma getrennte Namen des/der Roommate Device/s, welche den/die Bewohner des Raumes vom Rollladen wiedergibt. Es macht nur Sinn in Schlaf- oder Kinderzimmern (default: none)</li>
             <li><strong>ASC_Adv - on/off</strong> bei on wird das runterfahren des Rollos w&auml;hrend der Weihnachtszeit (1. Advent bis 6. Januar) ausgesetzt! Durch set ASCDEVICE advDriveDown werden alle ausgesetzten Fahrten nachgeholt.</li>
             <li><strong>ASC_Roommate_Reading</strong> - das Reading zum Roommate Device, welches den Status wieder gibt (default: state)</li>
