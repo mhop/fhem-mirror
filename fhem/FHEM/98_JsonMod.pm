@@ -277,13 +277,13 @@ sub JsonMod_DoReadings {
 	
 	my sub jsonPathf {
 		# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
-		no if $] >= 5.022, q|warnings|, qw( redundant missing );
+		no if $] >= 5.022, 'warnings', qw( redundant missing );
 		#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 		my ($jsonPathExpression, $format) = @_;
 		$format //= '%s';
 		my $value = $path->get($jsonPathExpression)->getResultValue();
 		#$path->get($jsonPathExpression)->getResultNormVal();
-		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}) > 0);
+		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
 		if (defined($value)) {
 			return sprintf($format, $value);
 		} else {
@@ -294,16 +294,6 @@ sub JsonMod_DoReadings {
 	my sub jsonPath {
 		my ($jsonPathExpression) = @_;
 		return $path->get($jsonPathExpression)->getResultValue();
-	};
-
-	# depraced
-	my sub singleReading {
-		my ($reading, $value, $default) = @_;
-		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}) > 0);
-		$value //= $default;
-		$newReadings->{$reading} = $value;
-		$oldReadings->{$reading} = 1;
-		return;
 	};
 
 	my sub concat {
@@ -324,64 +314,104 @@ sub JsonMod_DoReadings {
 		};
 	};
 
+	# my sub propertyf {
+	# 	my ($p, $default, $format) = @_;
+	# 	$default //= '';
+	# 	$format //= '';
+	# 	return sub {
+	# 		my ($o) = @_;
+	# 		if (ref($o) eq 'CODE') {
+	# 			return $o->($p, $default);
+	# 		} elsif (ref($o) eq 'HASH') {
+	# 			my $result = $o->{$p} if (exists($o->{$p}));
+	# 			if (defined($result)) {
+	# 				if (ref($result) eq '') {
+	# 					return sprintf ($format, $result);
+	# 				} else {
+	# 					return $result;
+	# 				};
+	# 			} else {
+	# 				return $default;
+	# 			};
+	# 		} elsif (ref($o) eq 'ARRAY') {
+	# 			my $result = $o->[$p] if ((scalar @{$o}) > ($p + 0));
+	# 			if (defined($result)) {
+	# 				if (ref($result) eq '') {
+	# 					return sprintf ($format, $result);
+	# 				} else {
+	# 					return $result;
+	# 				};
+	# 			} else {
+	# 				return $default;
+	# 			};
+	# 		} elsif (ref($o) eq '') {
+	# 			return $o;
+	# 		} else {
+	# 			die('syntax');
+	# 		};
+	# 	};
+	# };
+
 	my sub propertyf {
-		my ($p, $default, $format) = @_;
+		my ($propertyPath, $default, $format) = @_;
 		$default //= '';
-		$format //= '';
+		$format //= '%s';
 		return sub {
 			my ($o) = @_;
-			if (ref($o) eq 'CODE') {
-				return $o->($p, $default);
-			} elsif (ref($o) eq 'HASH') {
-				my $result = $o->{$p} if (exists($o->{$p}));
-				if (defined($result)) {
-					if (ref($result) eq '') {
-						return sprintf ($format, $result);
+			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
+			$default = $default->($o) if (ref($default) eq 'CODE');
+			$format = $format->($o) if (ref($format) eq 'CODE');
+
+			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
+				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
+				if (defined($presult)) {
+					if (ref($presult) eq 'ARRAY') {
+						if (scalar(@{$presult})) {
+							no if $] >= 5.022, 'warnings', qw( redundant missing );
+							return sprintf($format, $presult->[0]); # the first element if multiple. be gentle ;)
+						} else {
+							return $default;
+						};
 					} else {
-						return $result;
+						return $presult;
 					};
-				} else {
-					return $default;
 				};
-			} elsif (ref($o) eq 'ARRAY') {
-				my $result = $o->[$p] if ((scalar @{$o}) > ($p + 0));
-				if (defined($result)) {
-					if (ref($result) eq '') {
-						return sprintf ($format, $result);
-					} else {
-						return $result;
-					};
-				} else {
-					return $default;
-				};
-			} elsif (ref($o) eq '') {
-				return $o;
-			} else {
-				die('syntax');
-			};
+		 	} else {
+		 		no if $] >= 5.022, 'warnings', qw( redundant missing );
+		 		return sprintf($format, $o);
+		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
+		 	};
 		};
 	};
 
 	my sub property {
-		my ($p, $default) = @_;
+		my ($propertyPath, $default) = @_;
 		$default //= '';
 		return sub {
 			my ($o) = @_;
-			if (ref($o) eq 'CODE') {
-				return $o->($p, $default);
-			} elsif (ref($o) eq 'HASH') {
-				return $o->{$p} if (exists($o->{$p}));
-				return $default;
-			} elsif (ref($o) eq 'ARRAY') {
-				return $o->[$p] if ((scalar @{$o}) > ($p + 0));
-				return $default;
-			} elsif (ref($o) eq '') {
-				return $o;
-			} else {
-				die('syntax');
-			};
+			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
+			$default = $default->($o) if (ref($default) eq 'CODE');
+
+			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
+				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
+				if (defined($presult)) {
+					if (ref($presult) eq 'ARRAY') {
+						if (scalar(@{$presult})) {
+							return $presult->[0]; # the first hit if many. be gentle ;)
+						} else {
+							return $default;
+						};
+					} else {
+						return $presult;
+					};
+				};
+		 	} else {
+		 		return $o;
+		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
+		 	};
 		};
 	};
+
 
 	my $_index = 0;
 	my sub index {
@@ -412,9 +442,11 @@ sub JsonMod_DoReadings {
 	# value  (mostly jsonPath) / reading name / default if value is not available
 	my sub single {
 		my ($value, $reading, $default) = @_;
-		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}) > 0);
-		#use Data::Dumper;
-		#print $value;
+		$value = $value->() if (ref($value) eq 'CODE');
+		$reading = $reading->() if (ref($reading) eq 'CODE');
+		$default = $default->() if (ref($default) eq 'CODE');
+
+		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
 		$value //= $default;
 		$newReadings->{$reading} = $value;
 		$oldReadings->{$reading} = 1;
@@ -560,7 +592,7 @@ sub JsonMod_Logger {
 	my ($hash, $verbose, $message, @args) = @_;
 	my $name = $hash->{'NAME'};
 	# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
-	no if $] >= 5.022, q|warnings|, qw( redundant missing );
+	no if $] >= 5.022, 'warnings', qw( redundant missing );
 	#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 	Log3 ($name, $verbose, sprintf('[%s] '.$message, $name, @args));
 	return;
@@ -893,10 +925,13 @@ use strict;
 use warnings;
 use utf8;
 use Text::Balanced qw ( extract_codeblock extract_delimited );
+use Scalar::Util qw( blessed );
 
 sub new {
 	my ($class, $o, $root) = @_;
 
+	# special case for JSON 'true' / 'false'
+	$o = "$o" if (blessed($o) and blessed($o) eq 'JSON::PP::Boolean');
 	my $t = ref($o);
 	if ($t eq 'HASH') {
 		return JsonMod::JSON::Path::HNode->new($o, $root);
