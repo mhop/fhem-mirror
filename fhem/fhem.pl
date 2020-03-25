@@ -5262,7 +5262,7 @@ hashKeyRename($$$)
     my $val = $hash->{$k};
     next if($k !~ m/$r2/ || !defined($repl{$1}));
     $k =~ s/$r2/$repl{$1}/;
-    $ret{makeReadingName($k)} = $val;
+    $ret{$k} = $val;
   }
   return \%ret;
 }
@@ -5285,7 +5285,7 @@ json2reading($$;$$$)
   if($ret && ref $ret eq "HASH") {
     readingsBeginUpdate($hash);
     foreach my $k (keys %{$ret}) {
-      readingsBulkUpdate($hash, $k, $ret->{$k});
+      readingsBulkUpdate($hash, makeReadingName($k), $ret->{$k});
     }
     readingsEndUpdate($hash, 1);
   }
