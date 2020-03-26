@@ -28,12 +28,14 @@ package main;
 
 use strict;
 use warnings;
+use 5.010;
 use Time::HiRes qw(gettimeofday);
+use POSIX qw(strftime);
 use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.14";
+my $version = "0.9.15";
 
 ################################################################################
 #
@@ -49,53 +51,52 @@ sub WUup_Initialize {
     $hash->{SetFn}   = "WUup_Set";
     $hash->{AttrFn}  = "WUup_Attr";
     $hash->{AttrList} =
-        "disable:1 "
-      . "disabledForIntervals "
-      . "interval "
-      . "unit_windspeed:km/h,m/s "
-      . "unit_solarradiation:W/m²,lux "
-      . "round "
-      . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
-      . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
-      . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
-      . "wuwindspdmph_avg2m wuwindspeedmph wuAqPM2.5 wuAqPM10 "
-      . $readingFnAttributes;
+          "disable:1,0 "
+        . "disabledForIntervals "
+        . "interval "
+        . "unit_windspeed:km/h,m/s "
+        . "unit_solarradiation:W/m²,lux "
+        . "round "
+        . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
+        . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
+        . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
+        . "wuwindspdmph_avg2m wuwindspeedmph wuAqPM2.5 wuAqPM10 "
+        . $readingFnAttributes;
     $hash->{VERSION} = $version;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub WUup_Define {
-    my ( $hash, $def ) = @_;
+    my $hash = shift;
+    my $def  = shift;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
 
-    my @a = split( "[ \t][ \t]*", $def );
+    my @param = split( "[ \t][ \t]*", $def );
 
     return "syntax: define <name> WUup <stationID> <password>"
-      if ( int(@a) != 4 );
+        if ( int(@param) != 4 );
 
     my $name = $hash->{NAME};
 
     $hash->{VERSION}  = $version;
     $hash->{INTERVAL} = 300;
 
-    $hash->{helper}{stationid}    = $a[2];
-    $hash->{helper}{password}     = $a[3];
+    $hash->{helper}{stationid}    = $param[2];
+    $hash->{helper}{password}     = $param[3];
     $hash->{helper}{softwaretype} = 'FHEM';
     $hash->{helper}{url} =
-"https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
+        "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
     $hash->{helper}{url_rf} =
-"https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php";
+        "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php";
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
-    $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
-    $attr{$name}{unit_windspeed} = "km/h"
-      if ( !defined( $attr{$name}{unit_windspeed} ) );
-    $attr{$name}{unit_solarradiation} = "lux"
-      if ( !defined( $attr{$name}{unit_solarradiation} ) );
-    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
+    $attr{$name}{room} //= "Weather";
+    $attr{$name}{unit_windspeed} //= "km/h";
+    $attr{$name}{unit_solarradiation} //= "lux";
+    $attr{$name}{round} //= 4;
 
     RemoveInternalTimer($hash);
 
@@ -106,79 +107,78 @@ sub WUup_Define {
         InternalTimer( gettimeofday(), "WUup_stateRequestTimer", $hash, 0 );
     }
 
-    Log3 $name, 3, "WUup ($name): defined";
+    Log3( $name, 3, "WUup ($name): defined" );
 
-    return undef;
+    return;
 }
 
 sub WUup_Undef {
-    my ( $hash, $arg ) = @_;
-    RemoveInternalTimer($hash);
-    return undef;
+    RemoveInternalTimer(shift);
+    return;
 }
 
 sub WUup_Set {
-    my ( $hash, $name, $cmd, @args ) = @_;
+    my $hash = shift;
+    my $name = shift;
+    my $cmd  = shift // return qq{"set $name needs at least one argument};
 
-    return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
-
-    if ( $cmd eq "update" ) {
-        WUup_stateRequestTimer($hash);
-    }
-    else {
-        return "Unknown argument $cmd, choose one of update:noArg";
-    }
+    return WUup_stateRequestTimer($hash) if ( $cmd eq "update" );
+    return "Unknown argument $cmd, choose one of update:noArg";
 }
 
 sub WUup_Attr {
-    my ( $cmd, $name, $attrName, $attrVal ) = @_;
-    my $hash = $defs{$name};
+    my $cmd      = shift;
+    my $name     = shift;
+    my $attrName = shift;
+    my $attrVal  = shift;
+    my $hash     = $defs{$name};
 
     if ( $attrName eq "disable" ) {
         if ( $cmd eq "set" and $attrVal eq "1" ) {
             readingsSingleUpdate( $hash, "state", "disabled", 1 );
-            Log3 $name, 3, "WUup ($name) - disabled";
+            Log3( $name, 3, "WUup ($name) - disabled" );
         }
 
         elsif ( $cmd eq "del" ) {
             readingsSingleUpdate( $hash, "state", "active", 1 );
-            Log3 $name, 3, "WUup ($name) - enabled";
+            Log3( $name, 3, "WUup ($name) - enabled" );
         }
     }
 
     if ( $attrName eq "disabledForIntervals" ) {
         if ( $cmd eq "set" ) {
             readingsSingleUpdate( $hash, "state", "unknown", 1 );
-            Log3 $name, 3, "WUup ($name) - disabledForIntervals";
+            Log3( $name, 3, "WUup ($name) - disabledForIntervals" );
         }
 
         elsif ( $cmd eq "del" ) {
             readingsSingleUpdate( $hash, "state", "active", 1 );
-            Log3 $name, 3, "WUup ($name) - enabled";
+            Log3( $name, 3, "WUup ($name) - enabled" );
         }
     }
 
     if ( $attrName eq "interval" ) {
         if ( $cmd eq "set" ) {
             if ( $attrVal < 3 ) {
-                Log3 $name, 1,
-"WUup ($name) - interval too small, please use something >= 3 (sec), default is 300 (sec).";
+                Log3( $name, 1,
+                    "WUup ($name) - interval too small, please use something >= 3 (sec), default is 300 (sec)."
+                );
                 return
-"interval too small, please use something >= 3 (sec), default is 300 (sec)";
+                    "interval too small, please use something >= 3 (sec), default is 300 (sec)";
             }
             else {
                 $hash->{INTERVAL} = $attrVal;
-                Log3 $name, 4, "WUup ($name) - set interval to $attrVal";
+                Log3( $name, 4, "WUup ($name) - set interval to $attrVal" );
             }
         }
 
         elsif ( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
-            Log3 $name, 4, "WUup ($name) - set interval to default";
+            Log3( $name, 4, "WUup ($name) - set interval to default" );
         }
     }
 
-    return undef;
+    return;
 }
 
 sub WUup_stateRequestTimer {
@@ -187,13 +187,12 @@ sub WUup_stateRequestTimer {
 
     if ( !IsDisabled($name) ) {
         readingsSingleUpdate( $hash, "state", "active", 1 )
-          if (
-            (
-                   ReadingsVal( $name, "state", 0 ) eq "defined"
+            if (
+            (      ReadingsVal( $name, "state", 0 ) eq "defined"
                 or ReadingsVal( $name, "state", 0 ) eq "disabled"
                 or ReadingsVal( $name, "state", 0 ) eq "Unknown"
             )
-          );
+            );
 
         WUup_send($hash);
 
@@ -205,15 +204,15 @@ sub WUup_stateRequestTimer {
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
         "WUup_stateRequestTimer", $hash, 1 );
 
-    Log3 $name, 5,
-      "Sub WUup_stateRequestTimer ($name) - Request Timer is called";
+    Log3( $name, 5,
+        "Sub WUup_stateRequestTimer ($name) - Request Timer is called" );
 }
 
 sub WUup_send {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
     my $version = $hash->{VERSION};
-    my $url     = "";
+    my $url     = q{};
     if ( $hash->{INTERVAL} < 300 ) {
         $url = $hash->{helper}{url_rf};
     }
@@ -226,13 +225,9 @@ sub WUup_send {
     $datestring =~ s/:/%3A/g;
     $url .= "&dateutc=" . $datestring;
 
-    $attr{$name}{unit_windspeed} = "km/h"
-      if ( !defined( $attr{$name}{unit_windspeed} ) );
-
-    $attr{$name}{unit_solarradiation} = "lux"
-      if ( !defined( $attr{$name}{unit_solarradiation} ) );
-
-    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
+    $attr{$name}{unit_windspeed} //= "km/h";
+    $attr{$name}{unit_solarradiation} //= "lux";
+    $attr{$name}{round} //= 4;
 
     my ( $data, $d, $r, $o );
     my $a   = $attr{$name};
@@ -242,7 +237,7 @@ sub WUup_send {
         $key = substr( $key, 2, length($key) - 2 );
         ( $d, $r, $o ) = split( ":", $value );
         if ( defined($r) ) {
-            $o = ( defined($o) ) ? $o : 0;
+            $o //= 0;
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
         if ( $key =~ /\w+f$/ ) {
@@ -251,12 +246,13 @@ sub WUup_send {
         elsif ( $key =~ /\w+mph.*/ ) {
 
             if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
-                Log3 $name, 5, "WUup ($name) - windspeed unit is m/s";
+                Log3( $name, 5, "WUup ($name) - windspeed unit is m/s" );
                 $value =
-                  UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ), $rnd );
+                    UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ),
+                    $rnd );
             }
             else {
-                Log3 $name, 5, "WUup ($name) - windspeed unit is km/h";
+                Log3( $name, 5, "WUup ($name) - windspeed unit is km/h" );
                 $value = UConv::kph2mph( $value, $rnd );
             }
         }
@@ -269,11 +265,12 @@ sub WUup_send {
         elsif ( $key eq "solarradiation" ) {
 
             if ( $attr{$name}{unit_solarradiation} eq "lux" ) {
-                Log3 $name, 5, "WUup ($name) - solarradiation unit is lux";
+                Log3( $name, 5, "WUup ($name) - solarradiation unit is lux" );
                 $value = UConv::lux2wpsm( $value, $rnd );
             }
             else {
-                Log3 $name, 5, "WUup ($name) - solarradiation unit is W/m²";
+                Log3( $name, 5,
+                    "WUup ($name) - solarradiation unit is W/m²" );
             }
         }
         $data .= "&$key=$value";
@@ -282,7 +279,7 @@ sub WUup_send {
     readingsBeginUpdate($hash);
     if ( defined($data) ) {
         readingsBulkUpdate( $hash, "data", $data );
-        Log3 $name, 4, "WUup ($name) - data sent: $data";
+        Log3( $name, 4, "WUup ($name) - data sent: $data" );
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
@@ -295,18 +292,18 @@ sub WUup_send {
             hash    => $hash,
             method  => "GET",
             header =>
-              "agent: FHEM-WUup/$version\r\nUser-Agent: FHEM-WUup/$version",
+                "agent: FHEM-WUup/$version\r\nUser-Agent: FHEM-WUup/$version",
             callback => \&WUup_receive
         };
 
-        Log3 $name, 5, "WUup ($name) - full URL: $url";
+        Log3( $name, 5, "WUup ($name) - full URL: $url" );
         HttpUtils_NonblockingGet($param);
 
     }
     else {
         CommandDeleteReading( undef, "$name data" );
         CommandDeleteReading( undef, "$name response" );
-        Log3 $name, 3, "WUup ($name) - no data";
+        Log3( $name, 3, "WUup ($name) - no data" );
         readingsBulkUpdate( $hash, "state", "defined" );
 
     }
@@ -316,18 +313,22 @@ sub WUup_send {
 }
 
 sub WUup_receive {
-    my ( $param, $err, $data ) = @_;
-    my $hash = $param->{hash};
-    my $name = $hash->{NAME};
+    my $param = shift;
+    my $err   = shift;
+    my $data  = shift;
+    my $hash  = $param->{hash};
+    my $name  = $hash->{NAME};
 
-    if ( $err ne "" ) {
-        Log3 $name, 3,
-          "WUup ($name) - error while requesting " . $param->{url} . " - $err";
+    if ( $err ne q{} ) {
+        Log3( $name, 3,
+                  "WUup ($name) - error while requesting "
+                . $param->{url}
+                . " - $err" );
         readingsSingleUpdate( $hash, "state",    "ERROR", undef );
         readingsSingleUpdate( $hash, "response", $err,    undef );
     }
-    elsif ( $data ne "" ) {
-        Log3 $name, 4, "WUup ($name) - server response: $data";
+    elsif ( $data ne q{} ) {
+        Log3( $name, 4, "WUup ($name) - server response: $data" );
         readingsSingleUpdate( $hash, "state",    "active", undef );
         readingsSingleUpdate( $hash, "response", $data,    undef );
     }
@@ -367,6 +368,7 @@ sub WUup_receive {
 # 2019-07-09 add WIKI to Meta data
 # 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
 # 2020-03-25 remove prototypes
+# 2020-03-26 code cleanup
 #
 ################################################################################
 
@@ -600,7 +602,7 @@ sub WUup_receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.14",
+  "version": "v0.9.15",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
@@ -624,8 +626,9 @@ sub WUup_receive {
         "FHEM::Meta": 0,
         "HttpUtils": 0,
         "UConv": 0,
+        "POSIX": 0,
         "Time::HiRes": 0,
-        "perl": 5.014
+        "perl": 5.010
       },
       "recommends": {
       },
