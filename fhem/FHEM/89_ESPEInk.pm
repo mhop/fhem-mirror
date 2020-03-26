@@ -2024,7 +2024,7 @@ sub ESPEInk_Upload(@) {
 			and a WLAN driver board (<a href="https://www.waveshare.com/wiki/E-Paper_ESP8266_Driver_Board">Wiki Waveshare Driver Board</a>).
 			The driver board needs the installation of an adruino sketch as described in the Wiki (see link before). After this the module together with the 
 			eInk display only needs power supply. The data exchange between FHEM and the display is done via WLAN.
-			The module further needs installation of the GD library for perl (see installation instructions at <a href="https://metacpan.org/pod/GD">GD for Perl</a> and at <a href="https://metacpan.org/pod/XML::LibRSVG)">LibRSVG for Perl</a>).
+			The module further needs installation of the GD library for perl (see installation instructions at <a href="https://metacpan.org/pod/GD">GD for Perl</a> and at <a href="https://metacpan.org/pod/Image::LibRSVG)">Image::LibRSVG for Perl</a>).
     </ul>
     <br>
     
