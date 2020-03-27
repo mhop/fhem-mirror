@@ -5256,7 +5256,8 @@ hashKeyRename($$$)
   my ($hash, $r1, $r2) = @_;
   my (%repl, %ret);
   for my $k (keys %{$hash}) {
-    $repl{$1} = $2 if("$k:$hash->{$k}" =~ m/$r1/ && defined($1) && defined($2));
+    $repl{$1} = $2 if(defined($hash->{$k}) &&
+       "$k:$hash->{$k}" =~ m/$r1/ && defined($1) && defined($2));
   }
   for my $k (keys %{$hash}) {
     my $val = $hash->{$k};
