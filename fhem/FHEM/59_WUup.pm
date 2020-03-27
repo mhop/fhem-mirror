@@ -93,10 +93,10 @@ sub WUup_Define {
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
-    $attr{$name}{room} //= "Weather";
-    $attr{$name}{unit_windspeed} //= "km/h";
+    $attr{$name}{room}                //= "Weather";
+    $attr{$name}{unit_windspeed}      //= "km/h";
     $attr{$name}{unit_solarradiation} //= "lux";
-    $attr{$name}{round} //= 4;
+    $attr{$name}{round}               //= 4;
 
     RemoveInternalTimer($hash);
 
@@ -113,7 +113,8 @@ sub WUup_Define {
 }
 
 sub WUup_Undef {
-    RemoveInternalTimer(shift);
+    my $hash = shift;
+    RemoveInternalTimer($hash);
     return;
 }
 
@@ -206,6 +207,8 @@ sub WUup_stateRequestTimer {
 
     Log3( $name, 5,
         "Sub WUup_stateRequestTimer ($name) - Request Timer is called" );
+
+    return;
 }
 
 sub WUup_send {
@@ -225,9 +228,9 @@ sub WUup_send {
     $datestring =~ s/:/%3A/g;
     $url .= "&dateutc=" . $datestring;
 
-    $attr{$name}{unit_windspeed} //= "km/h";
+    $attr{$name}{unit_windspeed}      //= "km/h";
     $attr{$name}{unit_solarradiation} //= "lux";
-    $attr{$name}{round} //= 4;
+    $attr{$name}{round}               //= 4;
 
     my ( $data, $d, $r, $o );
     my $a   = $attr{$name};
@@ -332,6 +335,7 @@ sub WUup_receive {
         readingsSingleUpdate( $hash, "state",    "active", undef );
         readingsSingleUpdate( $hash, "response", $data,    undef );
     }
+    return;
 }
 
 1;
