@@ -27,11 +27,11 @@ use feature qw( lexical_subs );
 use strict;
 use warnings;
 use utf8;
-use Time::Local qw( timelocal timegm );
-use Text::Balanced qw ( extract_codeblock extract_delimited );
-use Unicode::Normalize qw( NFD );
-use List::Util qw( any );
 use HttpUtils;
+use List::Util qw( any );
+use Text::Balanced qw ( extract_codeblock extract_delimited );
+use Time::Local qw( timelocal timegm );
+use Unicode::Normalize qw( NFD );
 
 #use Memory::Usage;
 
@@ -58,8 +58,6 @@ sub JsonMod_Initialize {
 	$hash->{'SetFn'}				= 'JsonMod_Set';
 	$hash->{'AttrFn'}				= 'JsonMod_Attr';
 	$hash->{'NotifyFn'}				= 'JsonMod_Notify';
-	$hash->{'NOTIFYDEV'}			= 'TYPE=Global';
-	#$hash->{'NotifyOrderPrefix'}	= "50-";
 	$hash->{'AttrList'}				= join(' ', @attrList)." $readingFnAttributes ";
 
 	return undef;
@@ -79,9 +77,11 @@ sub JsonMod_Define {
 
 	return "no FUUID, is fhem up to date?" if (not $hash->{'FUUID'});
 	return "wrong source definition" if ($source !~ m/^(https:|http:|file:)/);
-	$hash->{'CONFIG'}->{'SOURCE'} = $source;
 
+	$hash->{'CONFIG'}->{'SOURCE'} = $source;
+	($hash->{'NOTIFYDEV'}) = devspec2array('TYPE=Global');
 	InternalTimer(0, \&JsonMod_Run, $hash) if ($init_done);
+
 	return;
 };
 
@@ -429,20 +429,29 @@ sub JsonMod_DoReadings {
 		my ($r, $v) = @_;
 
 		# convert into valid reading
+		#printf "0 %s %s %s %s\n", $r, length($r), $v, length($v);
 		$r = Unicode::Normalize::NFD($r);
+		utf8::encode($r) if utf8::is_utf8($r);
+		$r =~ s/\s/_/g;	# whitespace 
 		$r =~ s/([^A-Za-z0-9\/_\.-])//g;
 		# prevent a totally stripped reading name
 		# todo, log it?
-		$r = "MASKED_$_index" unless($r); 
+		$r = "_Identifier_$_index" unless($r);
 		$v//='';
-
+		utf8::encode($v) if utf8::is_utf8($v);
 		$newReadings->{$r} = $v;
 		$oldReadings->{$r} = 1;
+		#printf "1 %s %s %s %s\n", $r, length($r), $v, length($v);
 	};
 
 	my sub multi {
 		my ($value, @refs) = @_;
 		die ('jsonPath result not a list') if (ref($value) ne 'ARRAY');
+
+		# if ($name eq 'irantest') {
+		# 	use Data::Dumper;
+		# 	print Dumper $value;
+		# }
 
 		$_index = 0;
 		foreach my $element (@{$value}) {
@@ -486,10 +495,11 @@ sub JsonMod_DoReadings {
 			my @oldReadings = split ',', ReadingsVal($name, '.computedReadings', '');
 			readingsBeginUpdate($hash);
 			foreach my $k (keys %{$newReadings}) {
+				#sanitizedSetReading($reading, $value);
 				readingsBulkUpdate($hash, $k, $newReadings->{$k});
 				push @newReadings, $k;
 			};
-			# not used anymore
+			# reading is not used anymore
 			foreach my $k (keys %{$oldReadings}) {
 				readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
 			};
@@ -558,7 +568,7 @@ sub JsonMod_ApiRequest {
 	if ($header) {
 		$header =~ s/(\[.+?\])/(exists($hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}))?${$hash->{'CONFIG'}->{'SECRET'}->{substr($1,1,length($1)-2)}}:$1/eg;
 	};
-	$header .= "\r\nAccept: application/json" unless ($header =~ m'Accept: application/json');
+	$header .= "\r\nAccept: application/json\r\nAccept-Charset: utf-8, iso-8859-1" unless ($header =~ m'Accept: application/json');
 	$param->{'header'} = $header;
 	$param->{'loglevel'} = AttrVal($name, 'verbose', 3);
 	$param->{'timeout'} = AttrVal($name, 'httpTimeout', 30);
@@ -599,6 +609,29 @@ sub JsonMod_ApiResponse {
 		JsonMod_Logger($hash, 2, 'http request error: %s', $err);
 		return doError($err);
 	};
+
+	my ($content, $encoding);
+	foreach my $header (split /\r\n/, $param->{'httpheader'}) {
+		last if (($content, $encoding) = $header =~ m/^Content-Type:\s([^;]+).*charset=(.+)/);
+	};
+
+	# RESPONSE Content-Type:... charset=
+	#
+	# we need to care only if the result is NOT utf8.
+	# if it is utf8 then StreamReader will take care and
+	# convert it and set the utf8 flag if, and only if, 
+	# non ascii code points are seen for each individual
+	# element (keys, values) of the resulting object.
+	# As a result all string functions like length and so on
+	# are able to operate correct.
+	# 
+	# at each 'exit' to the outer world we need to check then
+	# bool = utf8::is_utf8(string)
+	# if true: utf8::encode(string);
+
+	my $enc = Encode::find_encoding($encoding)->name();
+	Encode::from_to($data, $encoding, 'UTF-8') unless ($enc eq 'utf-8-strict');
+	JsonMod_Logger($hash, 3, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
 
 	my $rs = JsonMod::JSON::StreamReader->new()->parse($data);
 	if (not $rs or ((ref($rs) ne 'HASH') and ref($rs) ne 'ARRAY')) {
@@ -945,6 +978,88 @@ sub DESTROY {
 	delete $self->{'root'};	
 };
 
+# package JsonMod::Unicode::Node;
+
+# use strict;
+# use warnings;
+# use utf8;
+# use Scalar::Util qw( blessed );
+
+# sub new {
+# 	my ($class, $o, $direction, $encoding) = @_;
+# 	# special case for JSON 'true' / 'false'
+# 	$o = "$o" if (blessed($o) and blessed($o) eq 'JSON::PP::Boolean');
+# 	my $t = ref($o);
+# 	if ($t eq 'HASH') {
+# 		return JsonMod::Unicode::HNode->new($o, $direction, $encoding);
+# 	} elsif ($t eq 'ARRAY') {
+# 		return JsonMod::Unicode::ANode->new($o, $direction, $encoding);
+# 	} elsif ($t eq '') {
+# 		return JsonMod::Unicode::VNode->new($o, $direction, $encoding);
+# 	};
+# };
+
+# package JsonMod::Unicode::HNode;
+
+# use strict;
+# use warnings;
+# use utf8;
+# use parent -norequire, qw( JsonMod::Unicode::Node );
+
+# sub new {
+# 	my ($class, $o, $direction, $encoding) = @_;
+# 	my $self = bless {}, $class;
+# 	$encoding //= 'UTF-8';
+# 	my $converter = Encode::find_encoding($encoding);
+# 	my $result = {};
+# 	my $dec;
+# 	foreach my $k (keys %{$o}) {
+# 		$dec = $converter->decode($k) if (not $direction and ref($converter)); # outside to Unicode
+# 		$dec = $converter->encode($k) if ($direction and ref($converter)); # Unicode to outside
+# 		$dec //= $k; # in case of en- decoding failure
+# 		$result->{$dec} = JsonMod::Unicode::Node->new($o->{$k}, $direction, $encoding);
+# 	};
+# 	return $result;
+# };
+
+# package JsonMod::Unicode::ANode;
+
+# use strict;
+# use warnings;
+# use utf8;
+# use parent -norequire, qw( JsonMod::Unicode::Node );
+
+# sub new {
+# 	my ($class, $o, $direction, $encoding) = @_;
+# 	my $self = bless {}, $class;
+# 	#$encoding //= 'UTF-8';
+# 	#my $converter = Encode::find_encoding($encoding);
+# 	my $result = [];
+# 	for my $i (0 .. scalar(@{$o}) -1) {
+# 		push @{$result}, JsonMod::Unicode::Node->new($o->[$i], $direction, $encoding);
+# 	};
+# 	return $result;
+# };
+
+# package JsonMod::Unicode::VNode;
+
+# use strict;
+# use warnings;
+# use utf8;
+# use parent -norequire, qw( JsonMod::Unicode::Node );
+
+# sub new {
+# 	my ($class, $o, $direction, $encoding) = @_;
+# 	my $self = bless {}, $class;
+# 	$encoding //= 'UTF-8';
+# 	my $converter = Encode::find_encoding($encoding);
+# 	printf "value %s %s\n", $o, $converter;
+# 	$o = $converter->decode($o) if (not $direction and ref($converter)); # outside to Unicode
+# 	$o = $converter->encode($o) if ($direction and ref($converter)); # Unicode to outside
+# 	printf "value2 %s %s\n", $o, length($o);
+# 	return $o;
+# };
+
 package JsonMod::JSON::Path::Node;
 
 use strict;
@@ -1105,7 +1220,9 @@ sub new {
 sub get {
 	my ($self, $path, $normalized, $query) = @_;
 	my ($property, $deep);
+	#print "array1 [$path] [$property] [$normalized]\n";
 	($path, $property, $deep) = $self->getNextProperty($path);
+	#print "array2 [$path] [$property] [$normalized]\n";
 
 	if (ord($property) eq ord('?')) {
 		my $filter = JsonMod::JSON::Path::Query::Filter->new($self)->get($property);
@@ -1322,7 +1439,7 @@ sub filter {
 		# numeric or string
 		if ($fnt == 0 or $fnt == 1) {
 			foreach my $e (@{$list}) {
-				$a = $e->[1]; # -> val
+				$a = $e->[1] //= ''; # -> val, undef possible because JSON NULL
 				$b = $right;
 				if ($fn->()) { # call the test
 					my $r = extract_codeblock($e->[0], '[]');
@@ -1336,7 +1453,7 @@ sub filter {
 				push @b, $_;
 			};
 			foreach my $e (@{$list}) {
-				$a = $e->[1]; # -> val
+				$a = $e->[1] //= ''; # -> val
 				if ($fn->()) { # call the test
 					my $r = extract_codeblock($e->[0], '[]');
 					push @{$result}, substr($r, 1, length($r) - 2); # remove []
