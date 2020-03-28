@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $
+# $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.39.0"  => "28.03.2020  option 'writeToDBInTime' for function 'sumValue' and 'averageValue' ",
   "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
                             "option of delEntries / reduceLog is used, minor fix for sqlCmdHistory ",
   "8.37.0"  => "20.03.2020  add column header for free selects (sqlCmd) ",
@@ -555,8 +556,8 @@ sub DbRep_Set($@) {
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
-                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB,writeToDBSingle ":"").
-                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB,writeToDBSingle ":"").
+                (($hash->{ROLE} ne "Agent")?"sumValue:display,writeToDB,writeToDBSingle,writeToDBInTime ":"").
+                (($hash->{ROLE} ne "Agent")?"averageValue:display,writeToDB,writeToDBSingle,writeToDBInTime ":"").
                 (($hash->{ROLE} ne "Agent")?"changeValue ":"").
                 (($hash->{ROLE} ne "Agent")?"delDoublets:adviceDelete,delete ":"").
                 (($hash->{ROLE} ne "Agent")?"delEntries ":"").
@@ -2800,7 +2801,7 @@ sub averval_DoParse($) {
  my $st = [gettimeofday];
       
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
- my ($arrstr,$wrstr,@rsf,@rsn);
+ my ($arrstr,$wrstr,@rsf,@rsn,@wsf,@wsn);
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
@@ -2835,13 +2836,14 @@ sub averval_DoParse($) {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
-             $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
-             $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
          }
+         @wsf    = split(" ",$runtime_string_first);
+         @wsn    = split(" ",$runtime_string_next);
+         $wrstr .= $runtime_string."#".$line[0]."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
      
      } elsif ($acf eq "avgDailyMeanGWS") {
          # Berechnung des Tagesmittelwertes (Temperatur) nach der Vorschrift des deutschen Wetterdienstes
@@ -2895,14 +2897,15 @@ sub averval_DoParse($) {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
-             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
-             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
-         }         
-     
+         }
+         @wsf    = split(" ",$runtime_string_first);
+         @wsn    = split(" ",$runtime_string_next);
+         $wrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
+              
      } elsif ($acf eq "avgTimeWeightMean") {
          # zeitgewichteten Mittelwert berechnen
          # http://massmatics.de/merkzettel/#!837:Gewichteter_Mittelwert
@@ -2983,13 +2986,14 @@ sub averval_DoParse($) {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
-             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."|";
-             $wrstr  .= $runtime_string."#".$sum."#".$rsf[0]."#".$rsn[0]."|";                            # Kombi zum Rückschreiben in die DB
-         } 
+         }
+         @wsf    = split(" ",$runtime_string_first);
+         @wsn    = split(" ",$runtime_string_next);
+         $wrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB         
      }
  }   
   
@@ -4169,7 +4173,7 @@ sub sumval_DoParse($) {
  my $st = [gettimeofday];  
 
  # DB-Abfrage zeilenweise für jeden Array-Eintrag
- my ($arrstr,$wrstr,@rsf,@rsn);
+ my ($arrstr,$wrstr,@rsf,@rsn,@wsf,@wsn);
  foreach my $row (@ts) {
      my @a                     = split("#", $row);
      my $runtime_string        = $a[0];
@@ -4202,13 +4206,14 @@ sub sumval_DoParse($) {
          @rsf     = split(/[ :]/,$runtime_string_first);
          @rsn     = split(/[ :]/,$runtime_string_next);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
-         $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
      } else {
          @rsf     = split(" ",$runtime_string_first);
          @rsn     = split(" ",$runtime_string_next);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
-         $wrstr  .= $runtime_string."#".$line[0]."#".$rsf[0]."#".$rsn[0]."|";    # Kombi zum Rückschreiben in die DB
      }
+     @wsf    = split(" ",$runtime_string_first);
+     @wsn    = split(" ",$runtime_string_next);
+     $wrstr .= $runtime_string."#".$line[0]."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB         
  }
 
  $sth->finish;
@@ -10824,26 +10829,26 @@ sub DbRep_OutputWriteToDB($$$$$) {
           $rsn               = $a[3];                             # Runtime String next - Datum / Zeit für DB-Speicherung
           ($ndate,$ntime)    = split("_",$rsn);
           $ntime             =~ s/-/:/g if($ntime);
+
+          if($aggr =~ /no|day|week|month|year/) {
+              $time  = "00:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                            # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+              $ntime = "23:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+              ($year,$mon,$mday) = split("-", $ndate);
+              $corr              = ($i != $ele) ? 86400 : 0;
+              $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-$corr;
+              ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
           
-          if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
-              if($aggr =~ /no|day|week|month|year/) {
-                  $time  = "00:00:01";                            # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-                  $ntime = "23:59:59";
+          } elsif ($aggr =~ /hour/) {
+              $hour  = (split(":", $time))[0];
+              $time  = "$hour:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+              $ntime = "$hour:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+              if ($ntime eq "23:59:59") {
                   ($year,$mon,$mday) = split("-", $ndate);
-                  $corr              = ($i != $ele) ? 86400 : 0;
-                  $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-$corr;
-                  ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
-              } elsif ($aggr =~ /hour/) {
-                  $hour  = $time;
-                  $time  = "$hour:00:01";                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-                  $ntime = "$hour:59:59";
-                  if ($ntime eq "23:59:59") {
-                      ($year,$mon,$mday) = split("-", $ndate);
-                      $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-86400;
-                      ($ndate,undef)     = split(" ",FmtDateTime($t1));
-                  }
+                  $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-86400;
+                  ($ndate,undef)     = split(" ",FmtDateTime($t1));
               }
           }
+
           if (defined $value) {
               # Daten auf maximale Länge beschneiden (DbLog-Funktion !)
               ($device,$type,$event,$reading,$value,$unit) = DbLog_cutCol($dbloghash,$device,$type,$event,$reading,$value,$unit);
@@ -11351,12 +11356,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 21429 2020-03-15 15:23:50Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11861,7 +11866,7 @@ return;
                                
                                </li> <br>
  
-    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b>
+    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b>
                                  - calculates an average value of the database field "VALUE" in the time limits 
 	                             of the possible time.*-attributes. <br><br>
                                  
@@ -11871,10 +11876,18 @@ return;
                                  is used for Averaging defined. <br><br>
                                  
                                  If none or the option <b>display</b> is specified, the results are only displayed. With 
-                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
-                                 with a new reading name into the database. <br>
-                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
-                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 the options <b>writeToDB</b>, <b>writeToDBSingle</b> or <b>writeToDBInTime</b> the calculation results are written
+                                 with a new reading name into the database. <br><br>
+                                 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps 00:00:01 and 23:59:59 within the respective evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp 23:59:59 at the end of an evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
+  								   </table>
+	                               </ul>
+	                               <br>
                                  
                                  The new reading name is formed from a prefix and the original reading name, 
 								 where the original reading name can be replaced by the attribute "readingNameMap".
@@ -13090,7 +13103,7 @@ return;
 	                                
                                  </li><br><br>                                   
 
-    <li><b> sumValue [display | writeToDB | writeToDBSingle] </b>      
+    <li><b> sumValue [display | writeToDB | writeToDBSingle | writeToDBInTime] </b>      
                                  - Calculates the total values of the database field "VALUE" in the time limits 
 	                             of the possible time.*-attributes. <br><br>
                                  
@@ -13099,10 +13112,18 @@ return;
                                  into the database.  <br><br>
                                  
                                  If none or the option <b>display</b> is specified, the results are only displayed. With 
-                                 the options <b>writeToDB</b> or <b>writeToDBSingle</b> the calculation results are written
-                                 with a new reading name into the database. <br>
-                                 <b>writeToDB</b> writes one value each at the beginning and end of an evaluation period.
-                                 <b>writeToDBSingle</b> writes only one value at the end of an evaluation period. <br><br>
+                                 the options <b>writeToDB</b>, <b>writeToDBSingle</b> or <b>writeToDBInTime</b> the calculation results are written
+                                 with a new reading name into the database. <br><br>
+                                 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps 00:00:01 and 23:59:59 within the respective evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp 23:59:59 at the end of an evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
+  								   </table>
+	                               </ul>
+	                               <br>
                                  
                                  The new reading name is formed from a prefix and the original reading name, 
 								 where the original reading name can be replaced by the attribute "readingNameMap". 
@@ -14381,7 +14402,7 @@ sub bdump {
                                
                                </li> <br>
                                
-    <li><b> averageValue [display | writeToDB | writeToDBSingle]</b> 
+    <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b> 
                                  - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen 
 	                             der möglichen time.*-Attribute. <br><br>
                                  
@@ -14391,10 +14412,18 @@ sub bdump {
                                  Mittelwertermittlung definiert. <br><br>
                                  
                                  Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
-                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
-                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
-                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 den Optionen <b>writeToDB</b>, <b>writeToDBSingle</b> bzw. <b>writeToDBInTime</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br><br>
+                                 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln 00:00:01 und 23:59:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel 23:59:59 am Ende einer Auswertungsperiode</td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode </td></tr>
+  								   </table>
+	                               </ul>
+	                               <br>
                                  
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
@@ -15640,7 +15669,7 @@ sub bdump {
 	                                
                                  </li><br><br>
 								 
-    <li><b> sumValue [display | writeToDB | writeToDBSingle]</b>     
+    <li><b> sumValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b>     
                                  - Berechnet die Summenwerte des Datenbankfelds "VALUE" in den Zeitgrenzen 
 	                             der möglichen time.*-Attribute. <br><br>
                                  
@@ -15649,10 +15678,18 @@ sub bdump {
 								 Readings in die Datenbank geschrieben werden.  <br><br>
                                  
                                  Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
-                                 den Optionen <b>writeToDB</b> bzw. <b>writeToDBSingle</b> werden die Berechnungsergebnisse 
-                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br>
-                                 <b>writeToDB</b> schreibt jeweils einen Wert am Anfang und am Ende einer Auswertungsperiode.
-                                 <b>writeToDBSingle</b> schreibt nur einen Wert am Ende einer Auswertungsperiode. <br><br>
+                                 den Optionen <b>writeToDB</b>, <b>writeToDBSingle</b> bzw. <b>writeToDBInTime</b> werden die Berechnungsergebnisse 
+                                 mit einem neuen Readingnamen in der Datenbank gespeichert. <br><br>
+                                 
+	                               <ul>
+                                   <table>  
+                                   <colgroup> <col width=10%> <col width=90%> </colgroup>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln 00:00:01 und 23:59:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel 23:59:59 am Ende einer Auswertungsperiode</td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode </td></tr>
+  								   </table>
+	                               </ul>
+	                               <br>
                                  
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
 								 wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann. 
