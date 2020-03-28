@@ -516,7 +516,6 @@ FHEM/98_ModbusElsnerWS.pm    klaus.schauer        Sonstiges
 FHEM/98_ModbusSET.pm         StefanStrobel        Sonstiges
 FHEM/98_ModbusTrovis5576.pm  Reinerlein           Heizungssteuerung/Raumklima
 FHEM/98_monitoring.pm        igami                Automatisierung
-FHEM/98_MSwitch.pm           Byte09               Automatisierung
 FHEM/98_notice.pm            mfr69bs              Sonstiges
 FHEM/98_PHC.pm               StefanStrobel        Sonstiges
 FHEM/98_PID20.pm             John                 Automatisierung
@@ -530,7 +529,6 @@ FHEM/98_readingsWatcher	     Wzut		  Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
 FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
-FHEM/98_Siro.pm              Byte09 / Dr. Smag    Sonstige Systeme
 FHEM/98_statistics.pm        tupol                Unterstützende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         Automatisierung
 FHEM/98_SVG.pm               rudolfkoenig         Frontends/SVG/Plots/logProxy
