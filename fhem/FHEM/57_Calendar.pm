@@ -1084,9 +1084,10 @@ sub createEvent($) {
 # 20120520T185202Z: date/time string in ISO8601 format, time zone GMT
 # 20121129T222200: date/time string in ISO8601 format, time zone local
 # 20120520:         a date string has no time zone associated
-sub tm($$) {
-  my ($self, $t)= @_;
+sub tm($$;$) {
+  my ($self, $t, $eod)= @_;
   return undef if(!$t);
+  $eod= 0 unless defined($eod);
   ##main::Debug "convert >$t<";
   my ($year,$month,$day)= (substr($t,0,4), substr($t,4,2),substr($t,6,2));
   if(length($t)>8) {
@@ -1101,8 +1102,27 @@ sub tm($$) {
       }
   } else {
       ##main::Debug "$day.$month.$year";
-      return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
+      if($eod) {
+        # treat a date without time component as end of day, i.e. start of next day, for comparisons
+        return main::fhemTimeLocal(0,0,0,$day+1,$month-1,$year-1900); # fhemTimeLocal can handle days after end of month
+      } else {
+        return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
+      }
   }
+}
+
+# compare a date/time string in ISO8601 format with a point in time
+# date/time string < point in time
+sub before($$) {
+  my ($self, $t, $pit) = @_;
+  # include the whole day if the time component is missing in the date/time string
+  return $self->tm($t,1) < $pit;
+}
+
+# date/time string > point in time
+sub after($$) {
+  my ($self, $t, $pit) = @_;
+  return $self->tm($t,0) > $pit;
 }
 
 #      DURATION RFC2445
@@ -2937,7 +2957,7 @@ sub Calendar_UpdateCalendar($$) {
             # non recurring event
             next if(
               $v->hasKey("DTEND") &&
-              $v->tm($v->value("DTEND")) < $cutoffLowerBound
+              $v->before($v->value("DTEND"), $cutoffLowerBound)
               );
           } else {
             # recurring event, inspect
@@ -2945,8 +2965,7 @@ sub Calendar_UpdateCalendar($$) {
             my @rrparts= split(";", $rrule);
             my %r= map { split("=", $_); } @rrparts;
             if(exists($r{"UNTIL"})) {
-              next if($v->tm($r{"UNTIL"}) < $cutoffLowerBound)
-              #main::Debug "UNTIL exists with " . $v->tm($r{"UNTIL"}) . " <=> $cutoffLowerBound";
+              next if($v->before($r{"UNTIL"},$cutoffLowerBound))
             }
           }
         }
@@ -2954,7 +2973,7 @@ sub Calendar_UpdateCalendar($$) {
         if($cutoffUpperBound) {
           next if(
             $v->hasKey("DTSTART") &&
-            $v->tm($v->value("DTSTART")) > $cutoffUpperBound
+            $v->after($v->value("DTSTART"), $cutoffUpperBound)
             );
         }
 
