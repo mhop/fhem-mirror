@@ -81,7 +81,6 @@ sub JsonMod_Define {
 	$hash->{'CONFIG'}->{'SOURCE'} = $source;
 	($hash->{'NOTIFYDEV'}) = devspec2array('TYPE=Global');
 	InternalTimer(0, \&JsonMod_Run, $hash) if ($init_done);
-
 	return;
 };
 
@@ -437,7 +436,7 @@ sub JsonMod_DoReadings {
 		# prevent a totally stripped reading name
 		# todo, log it?
 		$r = "_Identifier_$_index" unless($r);
-		$v//='';
+		$v //='';
 		utf8::encode($v) if utf8::is_utf8($v);
 		$newReadings->{$r} = $v;
 		$oldReadings->{$r} = 1;
@@ -484,6 +483,9 @@ sub JsonMod_DoReadings {
 	};
 
 	if (my $readingList = AttrVal($name, 'readingList', '')) {
+		# data from "ouside"
+		utf8::decode($readingList);
+		#JsonMod_Logger ($hash, 1, 'readingList: %s', $readingList);
 		# support for perl expressions within
 		my $NAME = $name; 
 		if (not eval $readingList and $@) {
@@ -631,7 +633,7 @@ sub JsonMod_ApiResponse {
 
 	my $enc = Encode::find_encoding($encoding)->name();
 	Encode::from_to($data, $encoding, 'UTF-8') unless ($enc eq 'utf-8-strict');
-	JsonMod_Logger($hash, 3, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
+	JsonMod_Logger($hash, 4, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
 
 	my $rs = JsonMod::JSON::StreamReader->new()->parse($data);
 	if (not $rs or ((ref($rs) ne 'HASH') and ref($rs) ne 'ARRAY')) {
@@ -650,9 +652,13 @@ sub JsonMod_ApiResponse {
 sub JsonMod_Logger {
 	my ($hash, $verbose, $message, @args) = @_;
 	my $name = $hash->{'NAME'};
+	# Unicode support for log files
+	utf8::encode($message) if utf8::is_utf8($message);
+	for my $i (0 .. scalar(@args)) {
+		utf8::encode($args[$i]) if utf8::is_utf8($args[$i]);
+	};
 	# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
 	no if $] >= 5.022, 'warnings', qw( redundant missing );
-	#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
 	Log3 ($name, $verbose, sprintf('[%s] '.$message, $name, @args));
 	return;
 };
