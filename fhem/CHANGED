@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  71_YAMAHA_AVR: use correct dsp command for RX-V2065 model
  - change:  57_Calendar: treatment of cutoffOlderThan amended for series
                          end dates without time specification
  - change:  59_WUup: code cleanup
