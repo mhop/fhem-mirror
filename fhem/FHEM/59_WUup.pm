@@ -93,22 +93,6 @@ sub WUup_Define {
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
-    #$attr{$name}{room}                //= "Weather";
-    CommandAttr( undef, "$name room Weather" )
-        if ( AttrVal( $name, "room", "" ) eq q{} );
-
-    #$attr{$name}{unit_windspeed}      //= "km/h";
-    CommandAttr( undef, "$name unit_windspeed km/h" )
-        if ( AttrVal( $name, "unit_windspeed", "" ) eq q{} );
-
-    #$attr{$name}{unit_solarradiation} //= "lux";
-    CommandAttr( undef, "$name unit_solarradiation lux" )
-        if ( AttrVal( $name, "unit_solarradiation", "" ) eq q{} );
-
-    #$attr{$name}{round}               //= 4;
-    CommandAttr( undef, "$name round 4" )
-        if ( AttrVal( $name, "round", "" ) eq q{} );
-
     RemoveInternalTimer($hash);
 
     if ($init_done) {
@@ -223,10 +207,10 @@ sub WUup_stateRequestTimer {
 }
 
 sub WUup_send {
-    my ($hash)  = @_;
-    my $name    = $hash->{NAME};
-    my $version = $hash->{VERSION};
-    my $url     = q{};
+    my ($hash) = @_;
+    my $name   = $hash->{NAME};
+    my $ver    = $hash->{VERSION};
+    my $url    = q{};
     if ( $hash->{INTERVAL} < 300 ) {
         $url = $hash->{helper}{url_rf};
     }
@@ -237,24 +221,16 @@ sub WUup_send {
     $url .= "&PASSWORD=" . $hash->{helper}{password};
     my $datestring = strftime "%F+%T", gmtime;
 
-    $datestring =~ s/:/%3A/g;
+    $datestring =~ s{:}
+                    {%3A}gxms;
+
     $url .= "&dateutc=" . $datestring;
 
-    #$attr{$name}{unit_windspeed}      //= "km/h";
-    CommandAttr( undef, "$name unit_windspeed km/h" )
-        if ( AttrVal( $name, "unit_windspeed", "" ) eq q{} );
-
-    #$attr{$name}{unit_solarradiation} //= "lux";
-    CommandAttr( undef, "$name unit_solarradiation lux" )
-        if ( AttrVal( $name, "unit_solarradiation", "" ) eq q{} );
-
-    #$attr{$name}{round}               //= 4;
-    CommandAttr( undef, "$name round 4" )
-        if ( AttrVal( $name, "round", "" ) eq q{} );
-
     my ( $data, $d, $r, $o );
-    my $a   = $attr{$name};
-    my $rnd = $attr{$name}{round};
+    my $a                   = $attr{$name};
+    my $unit_windspeed      = AttrVal( $name, 'unit_windspeed', 'km/h' );
+    my $unit_solarradiation = AttrVal( $name, 'unit_solarradiation', 'lux' );
+    my $rnd                 = AttrVal( $name, 'round', 4 );
     while ( my ( $key, $value ) = each(%$a) ) {
         next if substr( $key, 0, 2 ) ne 'wu';
         $key = substr( $key, 2, length($key) - 2 );
@@ -263,12 +239,12 @@ sub WUup_send {
             $o //= 0;
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
-        if ( $key =~ /\w+f$/ ) {
+        if ( $key =~ m{\w+f \z}xms ) {
             $value = UConv::c2f( $value, $rnd );
         }
-        elsif ( $key =~ /\w+mph.*/ ) {
+        elsif ( $key =~ m{\w+mph [^\n]*}xms ) {
 
-            if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
+            if ( $unit_windspeed eq "m/s" ) {
                 Log3( $name, 5, "WUup ($name) - windspeed unit is m/s" );
                 $value =
                     UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ),
@@ -282,12 +258,12 @@ sub WUup_send {
         elsif ( $key eq "baromin" ) {
             $value = UConv::hpa2inhg( $value, $rnd );
         }
-        elsif ( $key =~ /.*rainin$/ ) {
+        elsif ( $key =~ m{rainin \z}xms ) {
             $value = UConv::mm2in( $value, $rnd );
         }
         elsif ( $key eq "solarradiation" ) {
 
-            if ( $attr{$name}{unit_solarradiation} eq "lux" ) {
+            if ( $unit_solarradiation eq "lux" ) {
                 Log3( $name, 5, "WUup ($name) - solarradiation unit is lux" );
                 $value = UConv::lux2wpsm( $value, $rnd );
             }
@@ -310,12 +286,11 @@ sub WUup_send {
             $url .= "&realtime=1&rtfreq=" . $hash->{INTERVAL};
         }
         my $param = {
-            url     => $url,
-            timeout => 6,
-            hash    => $hash,
-            method  => "GET",
-            header =>
-                "agent: FHEM-WUup/$version\r\nUser-Agent: FHEM-WUup/$version",
+            url      => $url,
+            timeout  => 6,
+            hash     => $hash,
+            method   => "GET",
+            header   => "agent: FHEM-WUup/$ver\r\nUser-Agent: FHEM-WUup/$ver",
             callback => \&WUup_receive
         };
 
@@ -393,7 +368,7 @@ sub WUup_receive {
 # 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
 # 2020-03-25 remove prototypes
 # 2020-03-26 code cleanup
-# 2020-03-30 use CommandAttr for default attributes
+# 2020-03-30 remove default attributes, use of internal defaults
 #
 ################################################################################
 
