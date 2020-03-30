@@ -5910,15 +5910,15 @@ sub expfile_ParseDone($) {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  my $ds   = $device." -- " if ($device);
-  my $rds  = $reading." -- " if ($reading);
+  my $ds            = $device." -- " if ($device);
+  my $rds           = $reading." -- " if ($reading);
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE(S) -- ";
+  my $state         = $erread?$erread:"done";
   
-  my $state = $erread?$erread:"done";
-  readingsBeginUpdate($hash);
-  ReadingsBulkUpdateValue ($hash, $export_string, $nrows); 
+  readingsBeginUpdate        ($hash);
+  ReadingsBulkUpdateValue    ($hash, $export_string, $nrows); 
   ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate          ($hash, 1);
   
 return;
 }
@@ -10913,7 +10913,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
-          $value             = defined($a[1])?(looks_like_number($a[1])?sprintf("%.4f",$a[1]):$a[1]):undef;     # Version 8.32.2
+          $value             = defined($a[1])?((looks_like_number($a[1])?sprintf("%.4f",$a[1]):undef)):undef;                     # in Version 8.40.0 geändert
           $rsf               = $a[2];                             # Runtime String first - Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
