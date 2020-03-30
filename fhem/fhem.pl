@@ -2873,7 +2873,7 @@ CommandAttr($$)
   @a = split(" ", $param, 3) if($param);
 
   return "Usage: attr [-a|-r] <name> <attrname> [<attrvalue>]\n$namedef"
-           if(@a && @a < 2);
+           if(@a < 2);
   my $a1 = $a[1];
   return "$a[0]: bad attribute name '$a1' (allowed chars: A-Za-z/\\d_\\.-)"
            if($featurelevel > 5.9 && !goodReadingName($a1) && $a1 ne "?");
@@ -2917,11 +2917,12 @@ CommandAttr($$)
     if($append && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       $attrVal = $attr{$sdev}{$attrName} . 
                         ($attrVal =~ m/^,/ ? $attrVal : " $attrVal");
-    }
-    if($remove && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+
+    } elsif($remove && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       my $v = $attr{$sdev}{$attrName};
       $v =~ s/\b$attrVal\b//;
       $attrVal = $v;
+
     }
 
     if($attrName eq 'disable' && $attrVal eq 'toggle') {
