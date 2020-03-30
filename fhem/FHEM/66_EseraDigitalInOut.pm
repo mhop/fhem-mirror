@@ -33,7 +33,7 @@ use strict;
 use warnings;
 use SetExtensions;
 
-my %deviceSpecs = ("DS2408" => 8, "11220" => 8, "11228" => 8, "11229" => 8, "11216" => 8, "SYS1" => 4, "SYS2" => 5);
+my %deviceSpecs = ("DS2408" => 8, "11220" => 8, "11228" => 8, "11229" => 8, "11216" => 8, "11233" => 2, "SYS1" => 4, "SYS2" => 5);
 
 sub 
 EseraDigitalInOut_Initialize($) 
@@ -331,6 +331,7 @@ EseraDigitalInOut_setOutput($$$$)
   
   if (($hash->{DEVICE_TYPE} eq "DS2408") || 
       ($hash->{DEVICE_TYPE} eq "11220") ||
+      ($hash->{DEVICE_TYPE} eq "11233") ||
       ($hash->{DEVICE_TYPE} eq "11228") ||
       ($hash->{DEVICE_TYPE} eq "11229"))
   {
@@ -503,7 +504,8 @@ EseraDigitalInOut_ParseForOneDevice($$$$$$)
         readingsSingleUpdate($rhash, $nameOfReading, $readingValue, 1);
       }
     }
-    elsif (($deviceType eq "11220") || ($deviceType eq "11228")) # 8 channel digital output with push buttons
+    elsif (($deviceType eq "11220") || ($deviceType eq "11228") || ($deviceType eq "11233")) 
+    # 8 channel / 2 channel digital output with push buttons
     {
       if ($readingId == 2)
       {
@@ -611,7 +613,7 @@ EseraDigitalInOut_Parse($$)
     return @list;
   }
   elsif (($deviceType eq "DS2408") or ($deviceType eq "11216") or
-         ($deviceType eq "11220") or  
+         ($deviceType eq "11220") or ($deviceType eq "11233") or  
          ($deviceType eq "11228") or ($deviceType eq "11229") or
          ($deviceType eq "SYS1") or ($deviceType eq "SYS2"))
   {
@@ -654,6 +656,7 @@ EseraDigitalInOut_Attr(@)
     <ul> 
       <li>DS2408</li>
       <li>11220/11228 (Esera "Digital Out 8-Channel with push-button interface")</li> 
+      <li>11233 (Esera "Digital Out 2-Channel with push-button interface")</li> 
       <li>11229 (Esera "Digital Out 8-Channel")</li> 
       <li>11216 (Esera "8-Channel Digital Input DC")</li>
       <li>SYS1 (Esera Controller 2, digital input, not listed by "get devices")</li>

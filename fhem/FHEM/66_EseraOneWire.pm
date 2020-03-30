@@ -84,7 +84,7 @@ EseraOneWire_Initialize($)
 
 
   $hash->{Clients} = ":EseraDigitalInOut:EseraTemp:EseraMulti:EseraAnalogInOut:EseraIButton:EseraCount:EseraShutter:";
-  $hash->{MatchList} = { "1:EseraDigitalInOut" => "^DS2408|^11220|^11228|^11229|^11216|^SYS1|^SYS2",
+  $hash->{MatchList} = { "1:EseraDigitalInOut" => "^DS2408|^11220|^11233|^11228|^11229|^11216|^SYS1|^SYS2",
                          "2:EseraTemp" => "^DS1820",
                          "3:EseraMulti" => "^DS2438|^11121|^11134|^11135",
                          "4:EseraAnalogInOut" => "^SYS3",
