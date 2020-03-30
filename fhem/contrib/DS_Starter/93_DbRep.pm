@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.0"  => "30.03.2020  new attribute 'autoForward' ",
   "8.39.0"  => "28.03.2020  option 'writeToDBInTime' for function 'sumValue' and 'averageValue' ",
   "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
                             "option of delEntries / reduceLog is used, minor fix for sqlCmdHistory ",
@@ -195,6 +196,9 @@ our %DbRep_vNotesIntern = (
 
 # Version History extern:
 our %DbRep_vNotesExtern = ( 
+  "8.40.0"  => "30.03.2020 The option 'writeToDBInTime' is provided for function 'sumValue' and 'averageValue'. ".
+                           "A new attribute 'autoForward' is implemented. Now it is possible to transfer the results from the DbRep-Device to another one. ".
+                           "Please see also this (german) <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Readingwerte_von_DbRep_in_ein_anderes_Device_.C3.BCbertragen\">Wiki article</a> ",
   "8.36.0"  => "19.03.2020 Some simplifications for fast mutable module usage is built in, such as possible command option older than / newer than days for reduceLog and delEntries function. ".
                            "A new option \"writeToDBSingle\" for functions averageValue, sumValue is built in as well as a new sqlSpecial \"recentReadingsOfDevice\". ",
   "8.32.0"  => "29.01.2020 A new option \"deleteOther\" is available for commands \"maxValue\" and \"minValue\". Now it is possible to delete all values except the ".
@@ -387,6 +391,7 @@ sub DbRep_Initialize($) {
  $hash->{AttrList} =   "disable:1,0 ".
                        "reading ".                       
                        "allowDeletion:1,0 ".
+                       "autoForward:textField-long ".
                        "averageCalcForm:avgArithmeticMean,avgDailyMeanGWS,avgTimeWeightMean ".
                        "countEntriesDetail:1,0 ".
                        "device " .
@@ -509,7 +514,7 @@ sub DbRep_Define($@) {
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+int(rand(45)), 'DbRep_firstconnect', "$name||onBoot|", 0);
    
-return undef;
+return;
 }
 
 ###################################################################################
@@ -974,7 +979,7 @@ sub DbRep_Set($@) {
       return "$setlist";
   }  
   
-return undef;
+return;
 }
 
 ###################################################################################
@@ -1165,7 +1170,7 @@ sub DbRep_Get($@) {
       return "$getlist";
   } 
   
-return undef;
+return;
 }
 
 ###################################################################################
@@ -1185,6 +1190,7 @@ sub DbRep_Attr($$$$) {
     # nicht erlaubte / nicht setzbare Attribute wenn role = Agent
     my @agentnoattr = qw(aggregation
                          allowDeletion
+                         autoForward
 						 dumpDirLocal
                          reading
                          readingNameMap
@@ -1321,6 +1327,21 @@ sub DbRep_Attr($$$$) {
 		if ($aName =~ /valueFilter/) {
             eval { "Hallo" =~ m/$aVal/ };
             return "Bad regexp: $@" if($@);
+        }
+        
+        if ($aName eq "autoForward") {
+            my $em = "Usage of $aName is wrong. The function has to be specified as ". 
+                     "\"{ <destination-device> => \"<source-reading (Regex)> => [=> destination-reading]\" }\". ".
+                     "The specification can be made in several lines separated by comma.";
+            if($aVal !~ m/^\{.*(=>)+?.*\}$/s) {return $em;}
+            my $av = eval $aVal;
+            if($@) {
+                Log3($name, 2, "$name - Error while evaluate: ".$@);
+                return $@;
+            } 
+            if(ref($av) ne "HASH") {
+                return $em;
+            }            
         }
         
 		if ($aName =~ /seqDoubletsVariance/) {
@@ -5114,7 +5135,7 @@ sub fetchrows_DoParse($) {
  # SQL-Startzeit
  my $st = [gettimeofday];
  
- eval{$sth->execute();};	 
+ eval{$sth->execute();};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
@@ -8798,9 +8819,9 @@ sub DbRep_reduceLog($) {
 							my $th = ($c <= 2000)?100:($c <= 30000)?1000:10000;
                             for my $hourHash (@averageUpd) {
                                 for my $hourKey (keys %$hourHash) {
-                                    if ($hourHash->{$hourKey}->[0]) { # true if reading is a number 
+                                    if ($hourHash->{$hourKey}->[0]) {                                             # true if reading is a number 
                                         ($updDate,$updHour) = $hourHash->{$hourKey}->[0] =~ /(.*\d+)\s(\d{2}):/;
-                                        if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {  # true if reading has multiple records this hour
+                                        if (scalar(@{$hourHash->{$hourKey}->[4]}) > 1) {                          # true if reading has multiple records this hour
                                             for (@{$hourHash->{$hourKey}->[4]}) { $sum += $_; }
                                             $average = sprintf('%.3f', $sum/scalar(@{$hourHash->{$hourKey}->[4]}) );
                                             $sum = 0;
@@ -9778,7 +9799,8 @@ sub ReadingsSingleUpdateValue ($$$$) {
  my $name = $hash->{NAME};
  
  readingsSingleUpdate($hash, $reading, $val, $ev);
- DbRep_userexit($name, $reading, $val);
+ DbRep_userexit      ($name, $reading, $val);
+ DbRep_autoForward   ($name, $reading, $val);
 
 return;
 }
@@ -9792,7 +9814,8 @@ sub ReadingsBulkUpdateValue ($$$) {
  my $name = $hash->{NAME};
  
  readingsBulkUpdate($hash, $reading, $val);
- DbRep_userexit($name, $reading, $val);
+ DbRep_userexit    ($name, $reading, $val);
+ DbRep_autoForward ($name, $reading, $val);
 
 return;
 }
@@ -9807,21 +9830,88 @@ sub ReadingsBulkUpdateTimeState ($$$$) {
  
  if(AttrVal($name, "showproctime", undef)) {
      readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt)) if(defined($brt)); 
-     DbRep_userexit($name, "background_processing_time", sprintf("%.4f",$brt)) if(defined($brt));  
-     readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(defined($rt)); 
-     DbRep_userexit($name, "sql_processing_time", sprintf("%.4f",$rt)) if(defined($rt)); 
+     DbRep_userexit    ($name, "background_processing_time", sprintf("%.4f",$brt)) if(defined($brt));  
+     readingsBulkUpdate($hash, "sql_processing_time",        sprintf("%.4f",$rt))  if(defined($rt)); 
+     DbRep_userexit    ($name, "sql_processing_time",        sprintf("%.4f",$rt))  if(defined($rt)); 
  }
   
  readingsBulkUpdate($hash, "state", $sval);
- DbRep_userexit($name, "state", $sval);
+ DbRep_userexit    ($name, "state", $sval);
+ DbRep_autoForward ($name, "state", $sval);
 
+return;
+}
+
+####################################################################################################
+#               Übertragen von Readings und Ergebniswerten in ein anderes Device
+#    
+#   autoForward Attribut:
+#    	
+#   {
+#     "<source-reading> => "<dest.device>" [=> <dest.-reading>]",
+#     "<source-reading> => "<dest.device>" [=> <dest.-reading>]",
+#     ....
+#   }
+####################################################################################################
+sub DbRep_autoForward ($$$) {
+  my ($name,$reading,$value) = @_;
+  my $hash = $defs{$name};
+  my $av   = AttrVal($name, "autoForward", "");
+  my ($sr,$af);
+ 
+  return if(!$av);
+ 
+  $av =~ m/^\{(.*)\}/s;
+  $av = $1;
+  $av =~ s/["\n]//g;
+
+  my @a = split(",",$av);
+  
+  $av   = "{ ";
+  my $i = 0;
+  foreach (@a) {
+      $av .= "\"$i\" => \"$_\",";
+      $i++;
+  }
+  $av .= " }";
+    
+  $af = eval $av;
+  if($@ || ref($af) ne "HASH") {
+      Log3($name, 2, "$name - Values specified in attribute \"autoForward\" are not defined as HASH ... exiting !") if(ref($af) ne "HASH");
+      Log3($name, 2, "$name - Error while evaluate: ".$@) if($@);
+      return;
+  }
+ 
+  foreach my $key (keys %{$af}) {
+      my ($srr,$ddev,$dr) = split("=>", $af->{$key});
+      $srr  = DbRep_trim($srr)  if($srr);
+      $ddev = DbRep_trim($ddev) if($ddev);
+      $dr   = DbRep_trim($dr)   if($dr);
+      next if(!$ddev);
+      if(!$defs{$ddev}) {                                                          # Vorhandensein Destination Device prüfen
+          Log3($name, 2, "$name - WARNING - Forward reading \"$reading\" not possible, device \"$ddev\" doesn't exist");
+          next;
+      }
+     
+      if(!$srr || $reading !~ /^$srr$/) {
+          # Log3($name, 4, "$name - Reading \"$reading\" doesn't match autoForward-Regex: ".($srr?$srr:"")." - no forward to \"$ddev\" ");
+          next;         
+      }
+     
+      eval { $sr = $srr };
+      $dr = $dr ? $dr : ($sr ne ".*") ? $sr : $reading;                            # Destination Reading = Source Reading wenn Destination Reading nicht angegeben
+      $dr = makeReadingName($dr);                                                  # Destination Readingname validieren / entfernt aus dem übergebenen Readingname alle ungültigen Zeichen und ersetzt diese durch einen Unterstrich "_"
+      Log3($name, 4, "$name - Forward reading \"$reading\" to \"$ddev:$dr\" ");
+      CommandSetReading(undef, "$ddev $dr $value");
+  }
+			 
 return;
 }
 
 ####################################################################################################
 #  Anzeige von laufenden Blocking Prozessen
 ####################################################################################################
-sub DbRep_getblockinginfo($@) {
+sub DbRep_getblockinginfo ($) {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
@@ -9868,7 +9958,7 @@ sub DbRep_getblockinginfo($@) {
   ReadingsBulkUpdateValue ($hash,"Blocking_Count",$#rows+1);	
 
   ReadingsBulkUpdateTimeState($hash,undef,undef,"done");
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate          ($hash, 1);
   
 return;
 }
@@ -10165,6 +10255,7 @@ sub DbRep_userexit ($$$) {
      $cmd  = "{".$cmd."}";
 	 my $r = AnalyzeCommandChain(undef, $cmd);
  }
+ 
 return;
 }
 
@@ -11143,15 +11234,17 @@ sub DbRep_WriteToDB($$$@) {
       
   if (lc($DbLogType) =~ m(history)) {
       # insert history mit/ohne primary key
-      if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
-          eval { $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-      } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
-          eval { $sth_ih = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-      } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
-          eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-      } else {
-          eval { $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-      }
+      eval {
+          if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
+              $sth_ih = $dbh->prepare_cached("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+          } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
+              $sth_ih = $dbh->prepare_cached("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+          } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+              $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING");
+          } else {
+              $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+          }
+      };
       if ($@) {
           $err = $@;
           Log3 ($name, 2, "DbRep $name - $@");
@@ -11604,14 +11697,14 @@ sub DbRep_modAssociatedWith ($$$) {
       foreach my $e (@edvs) {
           $e       =~ s/%/\.*/g if($e !~ /^%$/);                      # SQL Wildcard % auflösen 
           @edvspcs = devspec2array($e);
-          @edvspcs = map {s/\.\*/%/g; $_; } @edvspcs;
+          @edvspcs = map { my $e = $_; $e =~ s/\.\*/%/xg; } @edvspcs;
 		  if((map {$_ =~ /%/;} @edvspcs) && $edevice !~ /^%$/) {      # Devices mit Wildcard (%) aussortieren, die nicht aufgelöst werden konnten
 		      $edevswc .= "|" if($edevswc);
 			  $edevswc .= join(" ",@edvspcs);
 		  } else {
 			  $edevs .= "|" if($edevs);
-			  $edevs .= join("|",@edvspcs);	 
-		  }
+			  $edevs .= join("|",@edvspcs);
+          }
       }                                           
   }
   
@@ -13409,6 +13502,35 @@ return $ret;
 
   <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - unlocks the delete-function  </li> <br>
+  
+  <li><b>autoForward </b>   - if activated, the result threads of a function are transferred to one or more devices. <br>
+                              The definition takes the form: <br>
+                              
+                              <pre>
+{
+  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+  ...
+}                               
+                              </pre>
+                              
+                              Wildcards (.*) are permitted in the specification <b>&lt;source-reading&gt;</b>. <br><br>
+                              
+                              <ul>
+							    <b>Example:</b>
+								<pre>
+{
+  ".*"        => "Dum.Rep.All",             
+  ".*AVGAM.*" => "Dum.Rep     => average",  
+  ".*SUM.*"   => "Dum.Rep.Sum => summary",
+}  
+# all readings are transferred to device "Dum.Rep.All", reading name remains in the target 
+# readings with "AVGAM" in the name are transferred to the "Dum.Rep" device in the reading "average" 
+# readings with "SUM" in the name are transferred to the device "Dum.Rep.Sum" in the reading "summary"
+                              </pre>
+                              
+                              </ul>                              
+                              </li> <br>
 
   <a name="averageCalcForm"></a>  
   <li><b>averageCalcForm </b> - specifies the calculation variant of average peak by "averageValue". <br><br>
@@ -15984,6 +16106,37 @@ return $ret;
   
   <a name="allowDeletion"></a>
   <li><b>allowDeletion </b>   - schaltet die Löschfunktion des Moduls frei   </li> <br>
+  
+  <a name="autoForward"></a>
+  <li><b>autoForward </b>   - wenn aktiviert, werden die Ergebnisreadings einer Funktion in ein oder mehrere Devices 
+                              übertragen. <br>
+                              Die Definition erfolgt in der Form: <br>
+                              
+                              <pre>
+{
+  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+  "&lt;source-reading&gt; => "&lt;dest.device&gt; [=> &lt;dest.-reading&gt;]",
+  ...
+}                               
+                              </pre>
+                              
+                              In der Angabe <b>&lt;source-reading&gt;</b> sind Wildcards (.*) erlaubt. <br><br>
+                              
+                              <ul>
+							    <b>Beispiel:</b>
+								<pre>
+{
+  ".*"        => "Dum.Rep.All",             
+  ".*AVGAM.*" => "Dum.Rep     => average",  
+  ".*SUM.*"   => "Dum.Rep.Sum => summary",
+}  
+# alle Readings werden zum Device "Dum.Rep.All" übertragen, Readingname bleibt im Ziel erhalten 
+# Readings mit "AVGAM" im Namen werden zum Device "Dum.Rep" in das Reading "average" übertragen
+# Readings mit "SUM" im Namen werden zum Device "Dum.Rep.Sum" in das Reading "summary" übertragen
+                              </pre>
+                              
+                              </ul>                              
+                              </li> <br>
   
   <a name="averageCalcForm"></a>
   <li><b>averageCalcForm </b> - legt die Berechnungsvariante für die Ermittlung des Durchschnittswertes mit "averageValue" 
