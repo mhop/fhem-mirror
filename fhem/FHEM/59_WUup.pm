@@ -35,7 +35,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = "0.9.15";
+my $version = "0.9.16";
 
 ################################################################################
 #
@@ -93,10 +93,21 @@ sub WUup_Define {
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
-    $attr{$name}{room}                //= "Weather";
-    $attr{$name}{unit_windspeed}      //= "km/h";
-    $attr{$name}{unit_solarradiation} //= "lux";
-    $attr{$name}{round}               //= 4;
+    #$attr{$name}{room}                //= "Weather";
+    CommandAttr( undef, "$name room Weather" )
+        if ( AttrVal( $name, "room", "" ) eq q{} );
+
+    #$attr{$name}{unit_windspeed}      //= "km/h";
+    CommandAttr( undef, "$name unit_windspeed km/h" )
+        if ( AttrVal( $name, "unit_windspeed", "" ) eq q{} );
+
+    #$attr{$name}{unit_solarradiation} //= "lux";
+    CommandAttr( undef, "$name unit_solarradiation lux" )
+        if ( AttrVal( $name, "unit_solarradiation", "" ) eq q{} );
+
+    #$attr{$name}{round}               //= 4;
+    CommandAttr( undef, "$name round 4" )
+        if ( AttrVal( $name, "round", "" ) eq q{} );
 
     RemoveInternalTimer($hash);
 
@@ -225,12 +236,21 @@ sub WUup_send {
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
     my $datestring = strftime "%F+%T", gmtime;
+
     $datestring =~ s/:/%3A/g;
     $url .= "&dateutc=" . $datestring;
 
-    $attr{$name}{unit_windspeed}      //= "km/h";
-    $attr{$name}{unit_solarradiation} //= "lux";
-    $attr{$name}{round}               //= 4;
+    #$attr{$name}{unit_windspeed}      //= "km/h";
+    CommandAttr( undef, "$name unit_windspeed km/h" )
+        if ( AttrVal( $name, "unit_windspeed", "" ) eq q{} );
+
+    #$attr{$name}{unit_solarradiation} //= "lux";
+    CommandAttr( undef, "$name unit_solarradiation lux" )
+        if ( AttrVal( $name, "unit_solarradiation", "" ) eq q{} );
+
+    #$attr{$name}{round}               //= 4;
+    CommandAttr( undef, "$name round 4" )
+        if ( AttrVal( $name, "round", "" ) eq q{} );
 
     my ( $data, $d, $r, $o );
     my $a   = $attr{$name};
@@ -373,6 +393,7 @@ sub WUup_receive {
 # 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
 # 2020-03-25 remove prototypes
 # 2020-03-26 code cleanup
+# 2020-03-30 use CommandAttr for default attributes
 #
 ################################################################################
 
@@ -606,7 +627,7 @@ sub WUup_receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.15",
+  "version": "v0.9.16",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
