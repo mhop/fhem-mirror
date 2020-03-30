@@ -1484,6 +1484,8 @@ use warnings;
 use utf8;
 use Time::Local qw ( timelocal );
 
+no warnings qw( experimental::lexical_subs );
+
 # static and helper
 sub normalizeTime {
 	my ($m, $h, $d) = @_;
