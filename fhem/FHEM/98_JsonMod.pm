@@ -631,7 +631,8 @@ sub JsonMod_ApiResponse {
 	# bool = utf8::is_utf8(string)
 	# if true: utf8::encode(string);
 
-	my $enc = Encode::find_encoding($encoding)->name();
+	my $enc = Encode::find_encoding($encoding);
+	$enc = (defined($enc))?$enc->name():'utf-8-strict'; # precaution required in case of invalid respone
 	Encode::from_to($data, $encoding, 'UTF-8') unless ($enc eq 'utf-8-strict');
 	JsonMod_Logger($hash, 4, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
 
