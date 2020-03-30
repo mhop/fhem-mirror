@@ -1,4 +1,4 @@
-REV 21536
+REV 21538
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-03-29_07:45:03 332381 ./CHANGED
+UPD 2020-03-30_07:45:02 332451 ./CHANGED
 UPD 2020-03-29_07:45:03 42671 ./MAINTAINER.txt
 UPD 2020-02-26_07:45:03 40054 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -379,7 +379,7 @@ UPD 2020-02-03_07:45:02 39432 FHEM/71_DENON_AVR_ZONE.pm
 UPD 2017-05-29_07:45:02 63897 FHEM/71_ONKYO_AVR_ZONE.pm
 UPD 2019-02-26_07:45:02 96052 FHEM/71_PHILIPS_AUDIO.pm
 UPD 2017-06-27_07:45:02 24467 FHEM/71_PIONEERAVRZONE.pm
-UPD 2018-10-17_07:45:02 166011 FHEM/71_YAMAHA_AVR.pm
+UPD 2020-03-30_07:45:02 166400 FHEM/71_YAMAHA_AVR.pm
 UPD 2017-09-27_07:45:02 51988 FHEM/71_YAMAHA_BD.pm
 UPD 2020-02-19_07:45:03 265225 FHEM/71_YAMAHA_MC.pm
 UPD 2019-07-13_07:45:02 131256 FHEM/71_YAMAHA_NP.pm
@@ -755,8 +755,8 @@ UPD 2020-03-29_07:45:07 4255184 docs/commandref.html
 UPD 2020-03-29_07:45:09 2620822 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-03-29_07:45:10 231848 docs/commandref_modular.html
-UPD 2020-03-29_07:45:11 242795 docs/commandref_modular_DE.html
+UPD 2020-03-30_07:45:10 231848 docs/commandref_modular.html
+UPD 2020-03-30_07:45:11 242795 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
