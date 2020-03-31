@@ -254,7 +254,7 @@ sub _cfgDB_readConfig() {
 	my %dbconfig;
 ## no critic
 	eval join("", @config) ;
-## critic
+## use critic
 
 	my $cfgDB_dbconn	= $dbconfig{connection};
 	my $cfgDB_dbuser	= $dbconfig{user};
