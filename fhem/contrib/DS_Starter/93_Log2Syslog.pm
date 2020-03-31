@@ -1,9 +1,9 @@
 ##########################################################################################################################
-# $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $
+# $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
-#       (c) 2017-2019 by Heiko Maaz
+#       (c) 2017-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
@@ -35,12 +35,14 @@ use warnings;
 use TcpServerUtils;
 use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
-eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
-eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use IO::Socket::INET;1"                                         or my $MissModulSocket = "IO::Socket::INET";
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom   = "Net::Domain";
+eval "use FHEM::Meta;1"                                               or my $modMetaAbsent   = 1;
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553 ",
+  "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
   "5.8.1"  => "23.07.2019  attribute waitForEOF rename to useEOF, useEOF also for type sender ",
   "5.8.0"  => "20.07.2019  attribute waitForEOF, solution for Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
   "5.7.0"  => "20.07.2019  change logging and chomp received data, use raw parse format if automatic mode don't detect a valid format, ".
@@ -441,36 +443,40 @@ return;
 sub Log2Syslog_Read($@) {
   my ($hash,$reread) = @_;
   my $socket         = $hash->{SERVERSOCKET};
-  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen);  
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen,$rhash);  
   
   return if($init_done != 1);
   
-  # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
+  # maximale Länge des (Syslog)-Frames als Begrenzung falls kein EOF
   # vom Sender initiiert wird (Endlosschleife vermeiden)
+  # Grundeinstellungen
   $mlen = 16384;
   $len  = 8192;
+  
+  if($hash->{TEMPORARY}) {
+      my $sname = $hash->{SNAME};
+      $rhash    = $defs{$sname};
+  } else {
+      $rhash = $hash;
+  }
+          
+  my $pp = $rhash->{PROFILE};
+  if($pp =~ /BSD/) {                                                    # Framelänge BSD-Format
+      $len = $RFC3164len{DL};
+  } elsif ($pp =~ /IETF/) {                                             # Framelänge IETF-Format   
+      $len = $RFC5425len{DL};     
+  } 
 
   if($hash->{TEMPORARY}) {
       # temporäre Instanz angelegt durch TcpServer_Accept
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
-  my $name     = $hash->{NAME};
+  my $name   = $hash->{NAME};
   return if(IsDisabled($name) || Log2Syslog_IsMemLock($hash));
-  my $pp       = $hash->{PROFILE};
-  my $mevt     = AttrVal($name, "makeEvent", "intern");                   # wie soll Reading/Event erstellt werden
-  my $sevevt   = AttrVal($name, "respectSeverity", "");                   # welcher Schweregrad soll berücksichtigt werden (default: alle)
-    
-  if($pp =~ /BSD/) {
-      # BSD-Format
-      $len = $RFC3164len{DL};
-  
-  } elsif ($pp =~ /IETF/) {
-      # IETF-Format   
-      $len = $RFC5425len{DL};     
+  my $mevt   = AttrVal($name, "makeEvent", "intern");                   # wie soll Reading/Event erstellt werden
+  my $sevevt = AttrVal($name, "respectSeverity", "");                   # welcher Schweregrad soll berücksichtigt werden (default: alle)
       
-  } 
-  
   if($socket) {
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
@@ -516,15 +522,12 @@ sub Log2Syslog_Read($@) {
           } else {
               return if($sevevt && $sevevt !~ m/$sev/);                                 # Message nicht berücksichtigen
               $st = "active";
-              if($mevt =~ /intern/) {
-                  # kein Reading, nur Event
+              if($mevt =~ /intern/) {                                                   # kein Reading, nur Event
                   $pl = "$phost: $pl";
                   Log2Syslog_Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {
-                  # Reading, Event abhängig von event-on-.*
+              } elsif ($mevt =~ /reading/) {                                            # Reading, Event abhängig von event-on-.*
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-              } else {
-                  # Reading ohne Event
+              } else {                                                                  # Reading ohne Event
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
               }
           }
@@ -581,7 +584,7 @@ sub Log2Syslog_getifdata($$@) {
           unless($socket->recv($data, $len)) {
               Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
               $data = '' if(length($data) == 0);
-              $st = "receive error - see logfile";
+              $st   = "receive error - see logfile";
           } else {
               my $dl = length($data);
               chomp $data;
@@ -603,12 +606,12 @@ sub Log2Syslog_getifdata($$@) {
               return ($st,$data,$hash);
           }
           
-          # Child, $hash ist Hash der temporären Instanz
-          my $sname   = $hash->{SNAME};
-          my $cname   = $hash->{NAME};
-          my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
-          my $uef     = AttrVal($sname, "useEOF", 0);
-          my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
+          # Child, $hash ist Hash der temporären Instanz, $shash und $sname von dem originalen Device
+          my $sname = $hash->{SNAME};
+          my $cname = $hash->{NAME};
+          my $shash = $defs{$sname};                                # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+          my $uef   = AttrVal($sname, "useEOF", 0);
+          my $tlsv  = ReadingsVal($sname,"SSL_Version",'');
 
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
@@ -616,31 +619,27 @@ sub Log2Syslog_getifdata($$@) {
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $uef, SSL: $tlsv");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
           
-          $st = ReadingsVal($sname,"state","active");
+          $st   = ReadingsVal($sname,"state","active");
           my $c = $hash->{CD};
           if($c) {
               $shash->{HELPER}{TCPPADDR} = $hash->{PEER};             
               my $buf;  	  		  
               my $off = 0;
-              $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
+              $ret = sysread($c, $buf, $len);                       # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
-              if(!defined($ret) && $! == EWOULDBLOCK){
-                  # error
+              if(!defined($ret) && $! == EWOULDBLOCK){              # error
                   $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
                   $hash = $shash;
                   Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $sname - ERROR - TCP stack error:  $!");   
                   return ($st,undef,$hash); 
 
-              } elsif (!$ret) {
-                  # EOF or error
+              } elsif (!$ret) {                                     # EOF or error
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
-                  if(!defined($ret)) {
-                      # error
+                  if(!defined($ret)) {                              # error
                       CommandDelete(undef, $cname);
                       $hash = $shash;
                       return ($st,undef,$hash);
-                  } else {
-                      # EOF
+                  } else {                                          # EOF
                       $eof  = 1;
                       $data = $hash->{BUF};
                       CommandDelete(undef, $cname);     
@@ -659,7 +658,7 @@ sub Log2Syslog_getifdata($$@) {
                   }
               }
               
-              $buforun = (length($hash->{BUF}) >= $mlen)?1:0;
+              $buforun = (length($hash->{BUF}) >= $mlen)?1:0 if($hash->{BUF});
               
               if(!$uef || $hash->{SSL} || $buforun) {
                   $data = $hash->{BUF};
@@ -672,9 +671,10 @@ sub Log2Syslog_getifdata($$@) {
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
                   }
                   return ($st,$data,$hash);
+              
               } else {
                   if($eof) {
-                      $hash = $shash;
+                      $hash  = $shash;
                       my $dl = length($data); 
                       chomp $data;
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars after EOF ready to parse:\n$data") if($data);
@@ -684,7 +684,7 @@ sub Log2Syslog_getifdata($$@) {
           }
           
       } else {
-          $st = "error - no socket opened";
+          $st   = "error - no socket opened";
           $data = '';
           return ($st,$data,$hash); 
       }
@@ -2142,20 +2142,19 @@ sub Log2Syslog_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19029 2019-03-25 20:01:23Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 19905 2019-07-28 10:42:28Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
       }
-  } else {
-	  # herkömmliche Modulstruktur
+  } else {                                                                            # herkömmliche Modulstruktur
 	  $hash->{VERSION} = $v;
   }
   
