@@ -241,6 +241,7 @@ my @configs  = split(/;;/,$configs);
 my $count    = @configs;
 my $fhemhost = hostname;
 
+## no critic
 if ($count > 1) {
    foreach my $c (@configs) {
       next unless $c =~ m/^%dbconfig.*/;
@@ -252,6 +253,7 @@ if ($count > 1) {
 } else {
    eval $configs[0];
 }
+## use critic
 
 my $cfgDB_dbconn    = $dbconfig{connection};
 my $cfgDB_dbuser    = $dbconfig{user};
@@ -438,7 +440,7 @@ sub cfgDB_ReadAll($) {
 	# AnalyzeCommandChain for all entries
 	$ret = _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
-	return undef;
+	return;
 }
 
 # save running configuration to version 0
@@ -736,7 +738,7 @@ sub _cfgDB_Execute($@) {
 		push @ret, $tret if(defined($tret));
 	}
 	return join("\n", @ret) if(@ret);
-	return undef;
+	return;
 }
 
 # read all entries from fhemconfig
@@ -995,7 +997,7 @@ sub _cfgDB_Reorg(;$$) {
 	_cfgDB_InsertLine($fhem_dbh,$uuid,"attr configdb lastReorg $ts",-1); 
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
+	eval { qx(sqlite3 $cfgDB_filename vacuum) } if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
 	return " Result after database reorg:\n"._cfgDB_Info(undef);
 }
