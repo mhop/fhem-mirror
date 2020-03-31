@@ -58,7 +58,7 @@ name:zigbee2mqtt_bridge
 desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 order:L_01 
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
  $\DEVICETOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
@@ -107,10 +107,10 @@ attr DEVICE model zigbee2mqtt_bridge
 #Contributed by aperoap, https://forum.fhem.de/index.php/topic,94494.msg992467.html#msg992467
 name:zigbee2mqtt_router_only_device
 desc: For zigbee2mqtt pure router devices, e.g. a CC2531 flashed with router firmware. To get information on device going offline, set "availability_timeout" to a reasonable value in zigbee2mqtt's configuration.yaml.
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02a1
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","mqtt_device") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:rc_GREEN offline:rc_RED
@@ -126,10 +126,10 @@ attr DEVICE model zigbee2mqtt_router_only_device
 # A dimmable light connected via zigbee2mqtt
 name:zigbee2mqtt_light_dimmer
 desc: A dimmable light connected via zigbee2mqtt <br>Tested with: Tradfri LED1650R5 + LED1649C5, Osram Lightify W32
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {zigbee2mqtt_devStateIcon255($name)}
@@ -146,11 +146,11 @@ attr DEVICE model zigbee2mqtt_light_dimmer
 
 # A dimmable color light connected via zigbee2mqtt
 name:zigbee2mqtt_light_cct
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: A dimmable light with color temperature via zigbee2mqtt<br>Tested with: tradfri FLOALT panel WS 30x90
 order:L_02b
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 attr DEVICE webCmd toggle:on:off:brightness:color_temp
@@ -166,11 +166,11 @@ attr DEVICE model zigbee2mqtt_light_cct
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgb_hex
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
 order:L_02c
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -188,11 +188,11 @@ set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgb_hex
 
 name:zigbee2mqtt_light_rgb_rgb
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
 order:L_02c
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -210,11 +210,11 @@ attr DEVICE model zigbee2mqtt_light_rgb_rgb
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_hex
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>tested with Mueller Light tint RGBW bulb
 order:L_02d
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -236,11 +236,11 @@ attr DEVICE model zigbee2mqtt_light_rgbw_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbw_rgb
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02d1
 desc: A dimmable rgbw light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Experimental, still untested
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -260,10 +260,10 @@ attr DEVICE model zigbee2mqtt_light_rgbw_rgb
 #source post: https://forum.fhem.de/index.php/topic,96985.msg902627.html#msg902627
 name:zigbee2mqtt_light_rgbcct_hex
 desc: A dimmable rgb light connected via zigbee2mqtt <br>rgb value is encoded as HEX value<br>Experimental, still untested
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02e
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -282,11 +282,11 @@ attr DEVICE model zigbee2mqtt_light_rgbcct_hex
 
 #source post: https://forum.fhem.de/index.php/topic,97303.msg905935.html#msg905935
 name:zigbee2mqtt_light_rgbcct_rgb
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_02e1
 desc: A dimmable rgb-cct light connected via zigbee2mqtt <br>rgb values will be sent as individual values r,g and b<br>Tested with: RGB-CCT GL-C-008
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to hue_filled_white_and_color_e27_b22;{ AttrVal("DEVICE","icon","hue_filled_white_and_color_e27_b22") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {lc ReadingsVal($name,"state",0)}
@@ -304,10 +304,10 @@ set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model zigbee2mqtt_light_rgbcct_rgb
 
 name:zigbee2mqtt_smokeDetector
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_03
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to secur_smoke_detector;{ AttrVal("DEVICE","icon","secur_smoke_detector") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -316,8 +316,10 @@ attr DEVICE stateFormat smoke
 attr DEVICE model zigbee2mqtt_smokeDetector
 
 name:zigbee2mqtt_hueMotionSensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_04
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat T: temperature_weather B: illuminance L: linkquality
@@ -328,11 +330,11 @@ set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=motion HOME
 attr DEVICE model zigbee2mqtt_hueMotionSensor
 
 name:zigbee2mqtt_plug
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: Should work e.g. with Osram smart+plug <br>Untested updated version
 order:L_05
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
@@ -346,11 +348,11 @@ set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model zigbee2mqtt_plug
 
 name:zigbee2mqtt_plug_w_energy_measuring
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc: Preliminary version reserved for plugs with energy measuring features like innr SP 120 <br>NOTE: needs to be completed!
 order:L_05a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 set DEVICE attrTemplate zigbee2mqtt_smart+plug
@@ -361,11 +363,11 @@ attr DEVICE model zigbee2mqtt_plug_w_energy_measuring
 
 # zigbee2mqtt 2 channel device
 name:zigbee2mqtt_2channel_split
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc:For zigbee2mqtt 2 channel device. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested updated version, should work with LLKZMK11LM, Ubisys S2 (-R), 
 order:L_05c
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
@@ -395,11 +397,11 @@ attr DEVICE_CH2 model zigbee2mqtt_2channel_split
 
 # zigbee2mqtt 2 channel device with buttons, forum #102866
 name:zigbee2mqtt_2channel_split_w_buttons
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc:For zigbee2mqtt 2 channel device with 2 buttons. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested version, should work with Xiaomi QBKG12LM
 order:L_05d
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
 set DEVICE attrTemplate zigbee2mqtt_2channel_split
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -415,10 +417,10 @@ attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_split_w_buttons
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_06
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
 #attr DEVICE genericDeviceType contact
 attr DEVICE eventMap true:close false:open
@@ -426,15 +428,15 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
-set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING= "ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
 attr DEVICE model zigbee2mqtt_ContactSensor
 
 name:zigbee2mqtt_TempHumHpaSensor
 desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara WSDCGQ11LM Temperature Humidity Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_07
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -446,10 +448,10 @@ attr DEVICE model zigbee2mqtt_TempHumHpaSensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_TempHumSensor
 desc: Temp/hum sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia WSDCGQ01LM Temperature Humidity Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_07a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat {sprintf ("Temperature: %.1f°C Humidity: %.1f%%", ReadingsVal($name,"temperature",0), ReadingsVal($name,"humidity",0)) }
@@ -461,10 +463,10 @@ attr DEVICE model zigbee2mqtt_TempHumSensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_Human_Motion_Sensor
 desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara RTCGQ11LM Human Motion Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_08
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -477,11 +479,10 @@ attr DEVICE model zigbee2mqtt_Human_Motion_Sensor
 # Osram Lightify, Smart+ Motion Sensor
 name:zigbee2mqtt_TempMotion_sensor
 desc: Temperature and motion sensor via zigbee2mqtt <br>Tested with: Osram Lightify Motion Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_08a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
-par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE stateFormat Motion: occupancy T: temperature
@@ -492,10 +493,10 @@ attr DEVICE model zigbee2mqtt_TempMotion_sensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_Motion_Sensor
 desc: Smart motion sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara DJT11LM Smart Motion Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_09
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","people_sensor") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -507,10 +508,10 @@ attr DEVICE model zigbee2mqtt_Motion_Sensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_Water_Leak_Sensor
 desc: Water leak sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara SJCGQ11LM Water Leak Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_10
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](.*):, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 attr DEVICE stateFormat Leak: state
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
@@ -521,10 +522,10 @@ attr DEVICE model zigbee2mqtt_Water_Leak_Sensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198
 name:zigbee2mqtt_Light_Switch
 desc: Smart light switch 2btn via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG02LM 2btn Smart Light Switch
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_11
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat click
@@ -537,10 +538,11 @@ attr DEVICE model zigbee2mqtt_Light_Switch
 #source post: https://forum.fhem.de/index.php/topic,94495.msg916789.html#msg916789
 name:zigbee2mqtt_Wireless_Button
 desc: Wireless button via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG12LM wireless switch with gyroscope
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_12
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click Action: action
@@ -551,10 +553,10 @@ attr DEVICE model zigbee2mqtt_Wireless_Button
 
 name:zigbee2mqtt_wireless_button_old
 desc: Wireless button without gyro via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG11LM wireless button
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_13
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
 attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click
@@ -565,10 +567,10 @@ attr DEVICE model zigbee2mqtt_wireless_button_old
 
 name:zigbee2mqtt_aqara_cube
 desc: Aqara smarthome cube via zigbee2mqtt <br>Tested with: Xiaomi Aqara MFKZQ01LM smarthome cube
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_14
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 attr DEVICE stateFormat Action: action
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
@@ -578,10 +580,10 @@ attr DEVICE model zigbee2mqtt_aqara_cube
 #source post: https://forum.fhem.de/index.php/topic,94494.msg983905.html#msg983905
 name:zigbee2mqtt_AlarmSensor
 desc: Alarm  sensor via zigbee2mqtt <br>Can report actions drop, tilt or vibration as well as x,y,z coordinates of its movement.<br>Sensitivity can be set to low, medium or high.<br>Tested with: Xiaomi DJT11LM Vibration Sensor
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=zigbee.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_15
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/]([^/]+).*:, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/]+).+, ? $1 : undef }
 par:ICON;ICON as set, defaults to secur_alarm;{ AttrVal("DEVICE","icon","secur_alarm") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
@@ -2394,7 +2396,7 @@ attr DEVICE model esp_milight_hub_bridge
 #rgbw-bulb
 name:esp_milight_hub_rgbw_bulb
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
 order:X_011
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
@@ -2430,7 +2432,7 @@ attr DEVICE model esp_milight_hub_rgbw_bulb
 #rgbw-group
 name:esp_milight_hub_make_rgbw_group
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
 order:X_01a
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
@@ -2460,7 +2462,7 @@ attr milight_REMOTE_ID_0 model esp_milight_hub_make_rgbw_group
 #rgbw_cct-bulb
 name:esp_milight_hub_rgb_cct_bulb
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br><a href="https://forum.fhem.de/index.php/topic,86932.msg877986.html#msg877986">Source: Forum</a>
 order:X_01a1
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
@@ -2503,7 +2505,7 @@ attr DEVICE model esp_milight_hub_rgb_cct_bulb
 #cct-only-bulb
 name:esp_milight_hub_cct_only_bulb
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br>simple CCT device
 order:X_01b
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
@@ -2539,7 +2541,7 @@ attr DEVICE model esp_milight_hub_cct_only_bulb
 #rgbw-bulb
 name:esp_milight_hub_max_features_bulb
 prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $devices[0];;return 0}
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=milight.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
 order:X_01x
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
@@ -2790,7 +2792,7 @@ attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
 #source post: https://forum.fhem.de/index.php/topic,94495.msg1020111.html#msg1020111
 name:owntracks_device
 desc:A device tracked by OwnTracks
-filter:TYPE=MQTT2_DEVICE:FILTER=CID=owntracks.*
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~owntracks.*
 order:O_01
 par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/]([^/:]+).*:, ? $1 : undef }
 par:DEV_ID;DeviceID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/][^/:]+[/]([^/:]+).*:, ? $1 : undef }
