@@ -4618,7 +4618,7 @@ readingsBeginUpdate($)
   $hash->{".updateTime"} = $now; # in seconds since the epoch
   $hash->{".updateTimestamp"} = $fmtDateTime;
 
-  $hash->{CHANGED}= () if(!defined($hash->{CHANGED}));
+  $hash->{CHANGED}= [] if(!defined($hash->{CHANGED}));
   return $fmtDateTime;
 }
 
