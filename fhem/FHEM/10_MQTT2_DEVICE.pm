@@ -312,7 +312,7 @@ MQTT2_buildCmd($$$)
   my ($hash, $a, $cmd) = @_;
 
   shift @{$a};
-  if($cmd =~ m/^{.*}\s+$/) {
+  if($cmd =~ m/^{.*}\s*$/) {
     $cmd = EvalSpecials($cmd,
       ("%EVENT"       => join(" ",@{$a}),
        "%NAME"        => $hash->{NAME},
