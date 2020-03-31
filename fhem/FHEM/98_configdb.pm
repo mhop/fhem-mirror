@@ -10,18 +10,18 @@ use configDB;
 
 no if $] >= 5.017011, warnings => 'experimental';
 
-sub CommandConfigdb($$);
+sub CommandConfigdb;
 sub _cfgDB_readConfig();
 
 my @pathname;
 
-sub configdb_Initialize($$) {
+sub configdb_Initialize {
   my %hash = (  Fn => "CommandConfigdb",
                Hlp => "help     ,access additional functions from configDB" );
   $cmds{configdb} = \%hash;
 }
 
-sub CommandConfigdb($$) {
+sub CommandConfigdb {
 	my ($cl, $param) = @_;
 
 	my @a = split("[ \t][ \t]*", $param);
@@ -106,7 +106,7 @@ sub CommandConfigdb($$) {
 					Log3 (4,undef,"configDB: exporting $f");
 					my ($path,$file) = $f =~ m|^(.*[/\\])([^/\\]+?)$|;
 					$path = "/tmp/$path";
-					eval qx(mkdir -p $path) unless (-e "$path");
+					eval { qx(mkdir -p $path) } unless (-e "$path");
 					$ret .= _cfgDB_Fileexport $f; 
 					$ret .= "\n";
 				}
@@ -241,17 +241,17 @@ sub CommandConfigdb($$) {
 }
 
 sub _cfgDB_readConfig() {
-	if(!open(CONFIG, 'configDB.conf')) {
+	if(!open(my $CONFIG, '<', 'configDB.conf')) {
 		Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 		return 0;
 	}
-	my @config=<CONFIG>;
-	close(CONFIG);
+	my @config=<$CONFIG>;
+	close($CONFIG);
 
 	use vars qw(%configDB);
 
 	my %dbconfig;
-	eval join("", @config);
+	eval { join("", @config) };
 
 	my $cfgDB_dbconn	= $dbconfig{connection};
 	my $cfgDB_dbuser	= $dbconfig{user};
