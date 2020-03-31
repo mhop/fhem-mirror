@@ -564,12 +564,12 @@ sub cfgDB_MigrationImport() {
 	my $modpath = AttrVal("global","modpath",".");
 
 # find eventTypes file
-	$filename = '';
+#	$filename = '';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=eventTypes');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, $filename;
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
 	}
 
 # import templateDB.gplot
@@ -583,60 +583,60 @@ sub cfgDB_MigrationImport() {
 	push @files, $filename;
 
 # find used gplot files
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=SVG','GPLOTFILE');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, "$modpath/www/gplot/".$filename.".gplot";
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, "$modpath/www/gplot/".$fn.".gplot";
 	}
 
 # find DbLog configs
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=DbLog','CONFIGURATION');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, $filename;
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
 	}
 
 # find RSS layouts
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=RSS','LAYOUTFILE');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, $filename;
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
 	}
 
 # find InfoPanel layouts
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=InfoPanel','LAYOUTFILE');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, $filename;
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
 	}
 
 # find weekprofile configurations
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=weekprofile','CONFIGFILE');
-	foreach $filename (@def) {
-		next unless $filename;
-		push @files, $filename;
+	foreach my $fn (@def) {
+		next unless $fn;
+		push @files, $fn;
 	}
 
 # find holiday files
-	$filename ='';
+#	$filename ='';
 	@def = '';
 	@def = _cfgDB_findDef('TYPE=holiday','NAME');
-	foreach $filename (@def) {
-		next unless $filename;
-		if(defined($defs{$filename}{HOLIDAYFILE})) {
-           push @files, $defs{$filename}{HOLIDAYFILE};
+	foreach my $fn (@def) {
+		next unless $fn;
+		if(defined($defs{$fn}{HOLIDAYFILE})) {
+           push @files, $defs{$fn}{HOLIDAYFILE};
 		} else {
-           push @files, "$modpath/FHEM/".$filename.".holiday";
+           push @files, "$modpath/FHEM/".$fn.".holiday";
 		}
 	}
 
@@ -646,12 +646,12 @@ sub cfgDB_MigrationImport() {
 
 
 # do the import
-	$filename = '';
-	foreach $filename (@files) {
-		if ( -r $filename ) {
-			my $filesize = -s $filename;
-			_cfgDB_binFileimport($filename,$filesize);
-			$ret .= "importing: $filename\n";
+#	$filename = '';
+	foreach my $fn (@files) {
+		if ( -r $fn ) {
+			my $filesize = -s $fn;
+			_cfgDB_binFileimport($fn,$filesize);
+			$ret .= "importing: $fn\n";
 		}
 	}
 
