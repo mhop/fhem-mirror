@@ -1201,10 +1201,10 @@ sub _cfgDB_Fileexport($;$) {
 	return "No data found for file $filename" unless $counter;
 	return ($blobContent,$counter) if $raw;
 	
-	open( FILE,">$filename" );
-		binmode(FILE);
-		print FILE $blobContent;
-	close( FILE );
+	open( my $f,">","$filename" );
+		binmode($f);
+		print $f $blobContent;
+	close( $f );
 	return "$counter bytes written from database into file $filename";
 }
 
@@ -1213,11 +1213,11 @@ sub _cfgDB_binFileimport($$;$) {
 	my ($filename,$filesize,$doDelete) = @_;
 	$doDelete = (defined($doDelete)) ? 1 : 0;
 
-	open (inFile,"<$filename") || die $!;
+	open (my $inFile,"<","$filename") || die $!;
 		my $blobContent;
-		binmode(inFile);
-		my $readBytes = read(inFile, $blobContent, $filesize);
-	close(inFile);
+		binmode($inFile);
+		my $readBytes = read($inFile, $blobContent, $filesize);
+	close($inFile);
 	$blobContent = encode_base64($blobContent);
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
