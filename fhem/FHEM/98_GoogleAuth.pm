@@ -106,7 +106,7 @@ sub GoogleAuth_Define {
 
   Log3($hash,4,"googleAuth $name: defined");
   readingsSingleUpdate($hash,'state','defined',1);
-  return undef;
+  return;
 }
 
 sub GoogleAuth_Delete {
@@ -133,7 +133,7 @@ sub GoogleAuth_Set {
   } else { 
     return $usage 
   }
-  return undef;
+  return;
 }
 
 sub GoogleAuth_Get {
@@ -194,7 +194,7 @@ sub _ga_make_url {
      $label        =~ s/\s/\%20/g;
   my $qrsize        = AttrVal($name,'ga_qrSize','200x200');
   my $secret_base32 = getKeyValue("googleAuth$name");
-  return undef unless defined($secret_base32);
+  return unless defined($secret_base32);
   my $url           = "otpauth://totp/$label?secret=$secret_base32&issuer=FHEM";
   my $qr_url        = "https://chart.googleapis.com/chart?cht=qr&chs=$qrsize"."&chl=";
      $qr_url       .= uri_escape($url);

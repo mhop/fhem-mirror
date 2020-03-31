@@ -155,7 +155,7 @@ sub InfoPanel_Initialize {
     $hash->{AttrList} .= "title noscript showTime:1,0 ";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
 
-    return undef;
+    return;
 }
 
 sub btIP_Define {
@@ -173,7 +173,7 @@ sub btIP_Define {
   btIP_readLayout($hash);
 
   readingsSingleUpdate($hash,'state','defined',1);
-  return undef;
+  return;
 }
 
 sub btIP_Undef {
@@ -181,7 +181,7 @@ sub btIP_Undef {
     # check if last device
     my $url = '/btip';
     delete $data{FWEXT}{$url} if int(devspec2array('TYPE=InfoPanel')) == 1;
-	return undef;
+	return;
 }
 
 sub btIP_Set {
@@ -254,7 +254,7 @@ sub btIP_Notify {
 
   Log3(undef, 4, "InfoPanel: $hash->{NAME} reread layout after edit.");
   undef = btIP_readLayout($hash);
-  return undef;
+  return;
 }
 
 sub btIP_readLayout {
