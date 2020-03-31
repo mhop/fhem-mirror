@@ -241,17 +241,20 @@ sub CommandConfigdb {
 }
 
 sub _cfgDB_readConfig() {
-	if(!open(my $CONFIG, '<', 'configDB.conf')) {
+	my ($conf,@config);
+	if(!open($conf, '<', 'configDB.conf')) {
 		Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 		return 0;
 	}
-	my @config=<$CONFIG>;
-	close($CONFIG);
+	my @config=<$conf>;
+	close($conf);
 
 	use vars qw(%configDB);
 
 	my %dbconfig;
-	eval { join("", @config) };
+## no critic
+	eval join("", @config) ;
+## critic
 
 	my $cfgDB_dbconn	= $dbconfig{connection};
 	my $cfgDB_dbuser	= $dbconfig{user};
