@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  93_Log2Syslog: fix warning uninitialized value, some code review
  - feature: 93_DbRep: option 'writeToDBInTime' for function 'sumValue' and 
                       'averageValue', new attribute 'autoForward'
  - change:  59_WUup: remove default attributes, use of internal defaults

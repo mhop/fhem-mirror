@@ -21,8 +21,6 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       The module is based on idea and input from betateilchen 92_rsyslog.pm
-#
 #       Implements the Syslog Protocol of RFC 5424  https://tools.ietf.org/html/rfc5424
 #       and RFC 3164 https://tools.ietf.org/html/rfc3164 and
 #       TLS Transport according to RFC5425 https://tools.ietf.org/pdf/rfc5425.pdf as well

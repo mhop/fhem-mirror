@@ -3,7 +3,7 @@
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
-#       (c) 2017-2019 by Heiko Maaz
+#       (c) 2017-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
@@ -21,8 +21,6 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       The module is based on idea and input from betateilchen 92_rsyslog.pm
-#
 #       Implements the Syslog Protocol of RFC 5424  https://tools.ietf.org/html/rfc5424
 #       and RFC 3164 https://tools.ietf.org/html/rfc3164 and
 #       TLS Transport according to RFC5425 https://tools.ietf.org/pdf/rfc5425.pdf as well
@@ -35,12 +33,13 @@ use warnings;
 use TcpServerUtils;
 use Scalar::Util qw(looks_like_number);
 use Encode qw(encode_utf8);
-eval "use IO::Socket::INET;1" or my $MissModulSocket = "IO::Socket::INET";
-eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom = "Net::Domain";
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
+eval "use IO::Socket::INET;1"                                         or my $MissModulSocket = "IO::Socket::INET";   ## no critic 
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom   = "Net::Domain";        ## no critic 
+eval "use FHEM::Meta;1"                                               or my $modMetaAbsent   = 1;                    ## no critic 
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
   "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
   "5.8.1"  => "23.07.2019  attribute waitForEOF rename to useEOF, useEOF also for type sender ",
   "5.8.0"  => "20.07.2019  attribute waitForEOF, solution for Forum: https://forum.fhem.de/index.php/topic,75426.msg958836.html#msg958836 ",
@@ -364,7 +363,7 @@ sub Log2Syslog_Define($@) {
   
   Log2Syslog_trate($hash);                                    # regelm. Berechnung Transfer Rate starten 
       
-return undef;
+return;
 }
 
 #################################################################################################
@@ -442,36 +441,40 @@ return;
 sub Log2Syslog_Read($@) {
   my ($hash,$reread) = @_;
   my $socket         = $hash->{SERVERSOCKET};
-  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen);  
+  my ($err,$sev,$data,$ts,$phost,$pl,$ignore,$st,$len,$mlen,$evt,$pen,$rhash);  
   
   return if($init_done != 1);
   
-  # maximale Länge des Syslog-Frames als Begrenzung falls kein EOF
+  # maximale Länge des (Syslog)-Frames als Begrenzung falls kein EOF
   # vom Sender initiiert wird (Endlosschleife vermeiden)
+  # Grundeinstellungen
   $mlen = 16384;
   $len  = 8192;
+  
+  if($hash->{TEMPORARY}) {
+      my $sname = $hash->{SNAME};
+      $rhash    = $defs{$sname};
+  } else {
+      $rhash = $hash;
+  }
+          
+  my $pp = $rhash->{PROFILE};
+  if($pp =~ /BSD/) {                                                    # Framelänge BSD-Format
+      $len = $RFC3164len{DL};
+  } elsif ($pp =~ /IETF/) {                                             # Framelänge IETF-Format   
+      $len = $RFC5425len{DL};     
+  } 
 
   if($hash->{TEMPORARY}) {
       # temporäre Instanz angelegt durch TcpServer_Accept
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
-  my $name     = $hash->{NAME};
+  my $name   = $hash->{NAME};
   return if(IsDisabled($name) || Log2Syslog_IsMemLock($hash));
-  my $pp       = $hash->{PROFILE};
-  my $mevt     = AttrVal($name, "makeEvent", "intern");                   # wie soll Reading/Event erstellt werden
-  my $sevevt   = AttrVal($name, "respectSeverity", "");                   # welcher Schweregrad soll berücksichtigt werden (default: alle)
-    
-  if($pp =~ /BSD/) {
-      # BSD-Format
-      $len = $RFC3164len{DL};
-  
-  } elsif ($pp =~ /IETF/) {
-      # IETF-Format   
-      $len = $RFC5425len{DL};     
+  my $mevt   = AttrVal($name, "makeEvent", "intern");                   # wie soll Reading/Event erstellt werden
+  my $sevevt = AttrVal($name, "respectSeverity", "");                   # welcher Schweregrad soll berücksichtigt werden (default: alle)
       
-  } 
-  
   if($socket) {
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
@@ -504,7 +507,7 @@ sub Log2Syslog_Read($@) {
           @load = split("[\r\n]",$data);
       }
       
-      foreach my $line (@load) {       
+      for my $line (@load) {       
           ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$line);       
           $hash->{SEQNO}++;
           if($err) {
@@ -517,15 +520,12 @@ sub Log2Syslog_Read($@) {
           } else {
               return if($sevevt && $sevevt !~ m/$sev/);                                 # Message nicht berücksichtigen
               $st = "active";
-              if($mevt =~ /intern/) {
-                  # kein Reading, nur Event
+              if($mevt =~ /intern/) {                                                   # kein Reading, nur Event
                   $pl = "$phost: $pl";
                   Log2Syslog_Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {
-                  # Reading, Event abhängig von event-on-.*
+              } elsif ($mevt =~ /reading/) {                                            # Reading, Event abhängig von event-on-.*
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
-              } else {
-                  # Reading ohne Event
+              } else {                                                                  # Reading ohne Event
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
               }
           }
@@ -582,7 +582,7 @@ sub Log2Syslog_getifdata($$@) {
           unless($socket->recv($data, $len)) {
               Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Seq \"$hash->{SEQNO}\" invalid data: $data"); 
               $data = '' if(length($data) == 0);
-              $st = "receive error - see logfile";
+              $st   = "receive error - see logfile";
           } else {
               my $dl = length($data);
               chomp $data;
@@ -604,12 +604,12 @@ sub Log2Syslog_getifdata($$@) {
               return ($st,$data,$hash);
           }
           
-          # Child, $hash ist Hash der temporären Instanz
-          my $sname   = $hash->{SNAME};
-          my $cname   = $hash->{NAME};
-          my $shash   = $defs{$sname};                             # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
-          my $uef     = AttrVal($sname, "useEOF", 0);
-          my $tlsv    = ReadingsVal($sname,"SSL_Version",'');
+          # Child, $hash ist Hash der temporären Instanz, $shash und $sname von dem originalen Device
+          my $sname = $hash->{SNAME};
+          my $cname = $hash->{NAME};
+          my $shash = $defs{$sname};                                # Hash des Log2Syslog-Devices bei temporärer TCP-Serverinstanz 
+          my $uef   = AttrVal($sname, "useEOF", 0);
+          my $tlsv  = ReadingsVal($sname,"SSL_Version",'');
 
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - ####################################################### ");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - #########        new Syslog TCP Receive       ######### ");
@@ -617,31 +617,27 @@ sub Log2Syslog_getifdata($$@) {
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - await EOF: $uef, SSL: $tlsv");
           Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - childname: $cname");
           
-          $st = ReadingsVal($sname,"state","active");
+          $st   = ReadingsVal($sname,"state","active");
           my $c = $hash->{CD};
           if($c) {
               $shash->{HELPER}{TCPPADDR} = $hash->{PEER};             
               my $buf;  	  		  
               my $off = 0;
-              $ret = sysread($c, $buf, $len);  # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
+              $ret = sysread($c, $buf, $len);                       # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
-              if(!defined($ret) && $! == EWOULDBLOCK){
-                  # error
+              if(!defined($ret) && $! == EWOULDBLOCK){              # error
                   $hash->{wantWrite} = 1 if(TcpServer_WantWrite($hash));
                   $hash = $shash;
                   Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $sname - ERROR - TCP stack error:  $!");   
                   return ($st,undef,$hash); 
 
-              } elsif (!$ret) {
-                  # EOF or error
+              } elsif (!$ret) {                                     # EOF or error
                   Log2Syslog_Log3slog ($shash, 4, "Log2Syslog $sname - Connection closed for $cname: ".(defined($ret) ? 'EOF' : $!));
-                  if(!defined($ret)) {
-                      # error
+                  if(!defined($ret)) {                              # error
                       CommandDelete(undef, $cname);
                       $hash = $shash;
                       return ($st,undef,$hash);
-                  } else {
-                      # EOF
+                  } else {                                          # EOF
                       $eof  = 1;
                       $data = $hash->{BUF};
                       CommandDelete(undef, $cname);     
@@ -673,9 +669,10 @@ sub Log2Syslog_getifdata($$@) {
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
                   }
                   return ($st,$data,$hash);
+              
               } else {
                   if($eof) {
-                      $hash = $shash;
+                      $hash  = $shash;
                       my $dl = length($data); 
                       chomp $data;
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars after EOF ready to parse:\n$data") if($data);
@@ -685,7 +682,7 @@ sub Log2Syslog_getifdata($$@) {
           }
           
       } else {
-          $st = "error - no socket opened";
+          $st   = "error - no socket opened";
           $data = '';
           return ($st,$data,$hash); 
       }
@@ -820,7 +817,7 @@ sub Log2Syslog_parsePayload($$) {
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - error parse msg -> $data");          
           }
           
-		  no warnings 'uninitialized'; 
+		  no warnings 'uninitialized';                               ##no critic
           Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  use warnings;
@@ -829,7 +826,7 @@ sub Log2Syslog_parsePayload($$) {
           # Payload zusammenstellen für Event/Reading
           $pl = "";
           my $i = 0;
-          foreach my $f (@evf) {
+          for my $f (@evf) {
               if(${$fh{$f}}) { 
 		          $pl .= " || " if($i);
                   $pl .= "$f: ".${$fh{$f}};
@@ -881,7 +878,7 @@ sub Log2Syslog_parsePayload($$) {
       if(!$prival || !$date || !$time) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");  
-	      no warnings 'uninitialized'; 
+	      no warnings 'uninitialized';                                                     ##no critic
           Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
 		  use warnings;          
       } else {
@@ -903,7 +900,7 @@ sub Log2Syslog_parsePayload($$) {
           $mid    = substr($mid,0, ($RFC5425len{MID}-1));
           $host   = substr($host,0, ($RFC5425len{HST}-1));
       
-	      no warnings 'uninitialized'; 
+	      no warnings 'uninitialized';                                 ##no critic
           Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
           $host = "" if($host eq "-");
 		  use warnings;
@@ -912,7 +909,7 @@ sub Log2Syslog_parsePayload($$) {
           # Payload zusammenstellen für Event/Reading
           $pl = "";
           my $i = 0;
-          foreach my $f (@evf) {
+          for my $f (@evf) {
               if(${$fh{$f}}) { 
 		          $pl .= " || " if($i);
                   $pl .= "$f: ".${$fh{$f}};
@@ -948,7 +945,7 @@ sub Log2Syslog_parsePayload($$) {
               Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - error parse msg -> $data");          
           }
             
-		  no warnings 'uninitialized'; 
+		  no warnings 'uninitialized';                         ##no critic
           Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
           $host = "" if($host eq "-");
 		  use warnings;
@@ -957,7 +954,7 @@ sub Log2Syslog_parsePayload($$) {
           # Payload zusammenstellen für Event/Reading
           $pl = "";
           my $i = 0;
-          foreach my $f (@evf) {
+          for my $f (@evf) {
               if(${$fh{$f}}) { 
 		          $pl .= " || " if($i);
                   $pl .= "$f: ".${$fh{$f}};
@@ -993,7 +990,7 @@ sub Log2Syslog_parsePayload($$) {
           my $SDFIELD      = "";
           my $IGNORE       = 0;
 
- 	      eval $parseFn;
+ 	      eval $parseFn;                                        ##no critic
           if($@) {
               Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name -> error parseFn: $@"); 
               $err = 1;
@@ -1033,7 +1030,7 @@ sub Log2Syslog_parsePayload($$) {
           # Payload zusammenstellen für Event/Reading
           $pl = "";
           my $i = 0;
-          foreach my $f (@evf) {
+          for my $f (@evf) {
               if(${$fh{$f}}) { 
 		          $pl .= " || " if($i);
                   $pl .= "$f: ".${$fh{$f}};
@@ -1091,7 +1088,7 @@ sub Log2Syslog_Undef($$) {
   Log2Syslog_closesock($hash,1);    # Clientsocket schließen 
   Log2Syslog_downServer($hash,1);   # Serversocket schließen, kill children
 
-return undef;
+return;
 }
 
 ###############################################################################
@@ -1114,8 +1111,7 @@ sub Log2Syslog_downServer($;$) {
       
       if($delchildren) {
           my @children = devspec2array($name."_.*");
-          foreach (@children) {
-              my $child = $_;
+          for my $child (@children) {
               if($child ne $name."_.*") {
                   CommandDelete(undef, $child); 
                   Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - child instance $child deleted."); 
@@ -1146,7 +1142,8 @@ return;
 sub Log2Syslog_Delete($$) {
   my ($hash, $arg) = @_;
   delete $logInform{$hash->{NAME}};
-return undef;
+  
+return;
 }
 
 ###############################################################################
@@ -1190,7 +1187,7 @@ sub Log2Syslog_Set($@) {
       return "$setlist";
   }  
   
-return undef;
+return;
 }
 
 ###############################################################################
@@ -1256,7 +1253,7 @@ sub Log2Syslog_Get($@) {
               }
           }          
           $i = 0;
-          foreach my $key (Log2Syslog_sortVersion("desc",keys %hs)) {
+          for my $key (Log2Syslog_sortVersion("desc",keys %hs)) {
               $val0 = $hs{$key};
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
               $ret .= "</tr>";
@@ -1281,7 +1278,7 @@ sub Log2Syslog_Get($@) {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";
           $i = 0;
-          foreach my $key (Log2Syslog_sortVersion("desc",keys %Log2Syslog_vNotesExtern)) {
+          for my $key (Log2Syslog_sortVersion("desc",keys %Log2Syslog_vNotesExtern)) {
               ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
@@ -1307,7 +1304,7 @@ sub Log2Syslog_Get($@) {
       return "$getlist";
   } 
   
-return undef;
+return;
 }
 
 ###############################################################################
@@ -1454,7 +1451,7 @@ sub Log2Syslog_Attr ($$$$) {
     }
     
     if ($aName =~ /makeEvent/) {
-        foreach my $key(keys%{$defs{$name}{READINGS}}) {
+        for my $key(keys%{$defs{$name}{READINGS}}) {
             delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_Err_No/);
         }
     }    
@@ -1722,7 +1719,7 @@ sub Log2Syslog_opensock ($;$$) {
   my $ssldbg   = AttrVal($name, "ssldebug", 0);
   my ($sock,$lo,$lof,$sslver,$sslalgo);
   
-  return undef if($init_done != 1 || $hash->{MODEL} !~ /Sender/);
+  return if($init_done != 1 || $hash->{MODEL} !~ /Sender/);
   
   if($hash->{CLIENTSOCKET}) {
       return($hash->{CLIENTSOCKET},$st);
@@ -1736,7 +1733,7 @@ sub Log2Syslog_opensock ($;$$) {
 	  $attr{$name}{protocol} = "TCP" if(AttrVal($name, "protocol", "UDP") ne "TCP");
 	  $sslver  = "n.a.";
       $sslalgo = "n.a.";
-	  eval "use IO::Socket::SSL";
+	  eval "use IO::Socket::SSL";                                ##no critic
 	  if($@) {
           $st = "$@";
       } else {
@@ -1774,7 +1771,7 @@ sub Log2Syslog_opensock ($;$$) {
       # erstellt ungesicherte Socket Verbindung
 	  $sslver  = "n.a.";
       $sslalgo = "n.a.";
-      $sock    = new IO::Socket::INET (PeerHost => $host, PeerPort => $port, Proto => $protocol, Timeout => $timeout ); 
+      $sock    = IO::Socket::INET->new(PeerHost => $host, PeerPort => $port, Proto => $protocol, Timeout => $timeout ); 
 
       if (!$sock) {
 	      undef $sock;
@@ -1888,7 +1885,7 @@ sub Log2Syslog_setprival ($$;$) {
           $ees =~ s/[\n]//g;
           $ees =~ s/,,/_ESC_/g;
           my @excl = split(",",$ees);
-          foreach my $e (@excl) {
+          for my $e (@excl) {
               # Negativliste abarbeiten
               $e =~ s/_ESC_/,/g;
               Log2Syslog_trim($e);
@@ -1919,7 +1916,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
   my $cdl    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
   
-  return undef,undef if(!$otp);
+  return if(!$otp);
   my $pid = $hash->{SEQNO};                                 # PayloadID zur Nachverfolgung der Eventabfolge 
   $hash->{SEQNO}++;
 
@@ -1931,11 +1928,11 @@ sub Log2Syslog_setpayload ($$$$$$) {
 	  $month  = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
 	  $day    =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
 	  my $tag = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
-	  no warnings 'uninitialized'; 
-      $tag = $tag."[$pid]: ".$cdl;                           # TAG-Feld um PID und Content-Delimiter ergänzen
-      $data  = "<$prival>$month $day $time $myhost $tag$otp";
+	  no warnings 'uninitialized';                           ##no critic
+      $tag  = $tag."[$pid]: ".$cdl;                          # TAG-Feld um PID und Content-Delimiter ergänzen
+      $data = "<$prival>$month $day $time $myhost $tag$otp";
 	  use warnings;
-	  $data = substr($data,0, ($RFC3164len{DL}-1));         # Länge Total begrenzen
+	  $data = substr($data,0, ($RFC3164len{DL}-1));          # Länge Total begrenzen
   }
   
   if ($lf eq "IETF") {
@@ -1953,7 +1950,7 @@ sub Log2Syslog_setpayload ($$$$$$) {
       $mid    = substr($mid,0, ($RFC5425len{MID}-1));
       $myfqdn = substr($myfqdn,0, ($RFC5425len{HST}-1));
       
-      no warnings 'uninitialized';
+      no warnings 'uninitialized';                          ##no critic
       if ($IETFver == 1) {
           $data = "<$prival>$IETFver $tim $myfqdn $ident $pid $mid $sdfield $cdl$otp";
       }
@@ -2011,7 +2008,7 @@ sub Log2Syslog_Log3slog($$$) {
     print "$tim $loglevel: $text\n";
   }
 
-return undef;
+return;
 }
 
 ###############################################################################
@@ -2056,7 +2053,7 @@ sub Log2Syslog_evalPeer($) {
   } 
   my ($phost,$paddr,$pport, $pipaddr);
   
-  no warnings 'uninitialized';
+  no warnings 'uninitialized';                 ##no critic
   if($protocol =~ /tcp/) {
       $pipaddr = $hash->{HELPER}{TCPPADDR};    # gespeicherte IP-Adresse 
       $phost = $hash->{HIPCACHE}{$pipaddr};    # zuerst IP/Host-Kombination aus Cache nehmen falls vorhanden     
@@ -2143,20 +2140,19 @@ sub Log2Syslog_setVersionInfo($) {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
 	      use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
       }
-  } else {
-	  # herkömmliche Modulstruktur
+  } else {                                                                            # herkömmliche Modulstruktur
 	  $hash->{VERSION} = $v;
   }
   
