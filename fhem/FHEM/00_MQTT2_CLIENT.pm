@@ -550,7 +550,9 @@ MQTT2_CLIENT_getStr($$)
       json2nameValue($EVENT, 'SENSOR_', $JSONMAP). Which one is better depends
       on the attached devices and on the personal taste, and it is only
       relevant for json payload. For non-json payload there is no difference
-      between simple and complex.
+      between simple and complex.<br>
+      Default is no, as in absence of an MQTT2_DEVICE with a bridgeRegexp
+      attribute it is not really useful.
       </li></br>
 
     <a name="clientId"></a>
