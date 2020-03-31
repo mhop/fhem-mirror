@@ -33,7 +33,7 @@ my @noModelList = qw(readingsgroup lacrosse zwdongle wol weekdaytimer
    cul_rfr solarview lw12 tscul knx dummy at archetype pushover twilight 
    notify cloneDummy structure FHEMWEB hminfo);
 
-sub fheminfo_Initialize($$) {
+sub fheminfo_Initialize {
   my %hash = (
     Fn  => "CommandFheminfo",
     Hlp => "[send],show or send Fhem statistics",
@@ -42,7 +42,7 @@ sub fheminfo_Initialize($$) {
   $cmds{fheminfo} = \%hash;
 }
 
-sub CommandFheminfo($$) {
+sub CommandFheminfo {
   my ($cl,$param) = @_;
   my @args = split("[ \t]+", $param);
   $args[0] = defined($args[0]) ? lc($args[0]) : "";
@@ -73,7 +73,7 @@ sub CommandFheminfo($$) {
 ################################################################
 # tools
 #
-sub _fi2_Count() {
+sub _fi2_Count {
    my $uniqueID = getUniqueId();
    my $os       = $^O;
    my $perl     = sprintf("%vd", $^V);
@@ -154,7 +154,7 @@ sub _fi2_Count() {
    return;
 }
 
-sub _fi2_Send($) {
+sub _fi2_Send {
    my ($cl) = shift;
    $cl //= undef;
    my $sendType = defined($cl) ? 'nonblocking' : 'blocking';
@@ -188,7 +188,7 @@ sub _fi2_Send($) {
    return;
 }
 
-sub _fi2_TelnetTable($) {
+sub _fi2_TelnetTable {
   my ($doSend) = shift;
   my $str;
   $str .= "Following statistics data will be sent to server:\n(see Logfile level 4 for server response)\n\n" if($doSend == 1);
@@ -214,7 +214,7 @@ sub _fi2_TelnetTable($) {
   return $str;
 }
 
-sub _fi2_HtmlTable($) {
+sub _fi2_HtmlTable {
    my ($doSend) = shift;
    my $result  = "<html><table>";
       $result .= "<tr><td colspan='3'>Following statistics data will be sent to server:</br>(see Logfile level 4 for server response)</td></tr>" if($doSend == 1);
@@ -242,7 +242,7 @@ sub _fi2_HtmlTable($) {
    return $result;
 }
 
-sub _fi2_findRev() {
+sub _fi2_findRev {
    my $cf = 'controls_fhem.txt';
    my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
    my ($err, @content) = FileRead({FileName => $filename, ForceType => "file"});
@@ -251,7 +251,7 @@ sub _fi2_findRev() {
    return $rev;
 }
 
-sub _fi2_zwave($) {
+sub _fi2_zwave {
   my ($zwave) = @_;
 
   local *getVal = sub { return $_[0] =~ m/$_[1]\s*=\s*"([^"]*)"/ ? $1 : "unknown" };
@@ -288,7 +288,7 @@ sub _fi2_zwave($) {
   return $zwave;
 }
 
-sub _fi2_shortId() {
+sub _fi2_shortId {
   return substr($fhemInfo{$c_system}{'uniqueID'},0,3)."...";
 }
 
