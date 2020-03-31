@@ -40,6 +40,7 @@ MQTT2_DEVICE_Initialize($)
     imageLink
     jsonMap:textField-long
     model
+    periodicCmd
     readingList:textField-long
     setExtensionsEvent:1,0
     setList:textField-long
@@ -498,7 +499,50 @@ MQTT2_DEVICE_Attr($$)
     }
   }
 
+  if($attrName eq "periodicCmd") {
+    if($type eq "set") {
+      if($init_done) {
+        my ($gets,undef) = MQTT2_getCmdHash(AttrVal($dev, "getList", ""));
+        my ($sets,undef) = MQTT2_getCmdHash(AttrVal($dev, "setList", ""));
+        for my $np (split(" ", $param)) {
+          return "$np ist not of the form cmd:period" if($np !~ m/(.*):(.*)/);
+          return "$1 is neither a get nor a set command"
+                if(!$gets->{$1} && !$sets->{$1});
+          return "$2 (from $np) is not an integer" if($2 !~ m/^\d+$/);
+        }
+      }
+      RemoveInternalTimer($hash);
+      $hash->{periodicCounter} = 0 if(!$hash->{periodicCounter});
+      InternalTimer(time()+60, "MQTT2_DEVICE_periodic", $hash, 0);
+    } else {
+      RemoveInternalTimer($hash);
+    }
+  }
+
   return undef;
+}
+
+sub
+MQTT2_DEVICE_periodic()
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $param = AttrVal($name, "periodicCmd", "");
+  return if(!$param);
+  my ($gets,undef) = MQTT2_getCmdHash(AttrVal($name, "getList", ""));
+  my $cnt = ++$hash->{periodicCounter};
+  for my $np (split(" ", $param)) {
+    next if($np !~ m/(.*):(.*)/ || $cnt % int($2));
+    my $cmd = $1;
+    my $ret;
+    if($gets->{$cmd}) {
+      $ret = MQTT2_DEVICE_Get($hash, $name, $cmd);
+    } else {
+      $ret = MQTT2_DEVICE_Set($hash, $name, $cmd);
+    }
+    Log3 $hash, 3, "$name periodicCmd $cmd: $ret" if($ret);
+  }
+  InternalTimer(time()+60, "MQTT2_DEVICE_periodic", $hash, 0);
 }
 
 sub
@@ -596,6 +640,8 @@ MQTT2_DEVICE_Undef($$)
     $modules{MQTT2_DEVICE}{defptr}{cid}{$hash->{CID}} = \@nh;
   }
   MQTT2_DEVICE_setBridgeRegexp();
+  RemoveInternalTimer($hash->{asyncGet}) if($hash->{asyncGet});
+  RemoveInternalTimer($hash) if($hash->{periodicCounter});
   return undef;
 }
 
@@ -949,6 +995,14 @@ zigbee2mqtt_devStateIcon255($;$$)
       </code></ul>
       The special newReading value of 0 will prevent creating a reading for
       oldReading.
+      </li><br>
+
+    <a name="periodicCmd"></a>
+    <li>periodicCmd &lt;cmd1&gt;:&lt;period1&gt; &lt;cmd2&gt;:&lt;period2&gt;...
+      <br>
+      periodically execute the get or set command. The command will not take
+      any arguments, create a new command without argument, if necessary.
+      period is measured in minutes, and it must be an integer.
       </li><br>
 
     <a name="readingList"></a>
