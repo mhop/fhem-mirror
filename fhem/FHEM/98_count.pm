@@ -4,12 +4,12 @@ package main;
 use strict;
 use warnings;
 
-sub count_Initialize($$) {
+sub count_Initialize {
   $cmds{count} = {  Fn => "CommandCount",
                       Hlp=>"[filter],count devices"};
 }
 
-sub CommandCount($$)
+sub CommandCount
 {
   my ($cl, $param) = @_;
   my $str = "";

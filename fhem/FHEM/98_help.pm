@@ -15,7 +15,7 @@ sub cref_fill_list;
 sub cref_findInfo;
 
 
-sub help_Initialize($$) {
+sub help_Initialize {
   my %hash = (  Fn => "CommandHelp",
 		   Hlp => "[<moduleName>],get help (this screen or module dependent docu)",
 		   InternalCmds => cref_internals() );
@@ -241,8 +241,8 @@ sub cref_fill_list(){
       $l =~ s/^[0-9][0-9]_//;
       $mods{$l} = "$modDir/$of";
       $modIdx{$l} = "device";
-      open(MOD, "$modDir/$of") || die("Cant open $modDir/$l");
-      while(my $cl = <MOD>) {
+      open(my $MOD, "<", "$modDir/$of") || die("Cant open $modDir/$l");
+      while(my $cl = <$MOD>) {
         if($cl =~ m/^=item\s+(helper|command|device)/) {
           $modIdx{$l} = $1;
           last;
@@ -263,7 +263,7 @@ sub cref_findInfo {
   my ($modPath,$mod) = @_;
   my ($l,@line,$found,$text);
   my ($err,@text) = FileRead({FileName => "$modPath/MAINTAINER.txt", ForceType => 'file'});
-  foreach $l (@text) {
+  foreach my $l (@text) {
     @line = split("[ \t][ \t]*", $l,3);
     $found = ($l =~ m/.._$mod.pm/i);
 #    $found = ($l =~ m/_$mod/i);
