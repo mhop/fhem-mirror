@@ -133,18 +133,20 @@ sub btIP_getURL;
 
 ######################################
 
-sub InfoPanel_Initialize($) {
+sub InfoPanel_Initialize {
     my ($hash) = @_;
 
-    eval "use MIME::Base64";
+## no critic
+    eval "use MIME::Base64" ;
     $useImgTools = 0 if($@);
     Log3(undef,4,"InfoPanel: MIME::Base64 missing.") unless $useImgTools;
     eval "use Image::Info qw(image_info dim)";
     $useImgTools = 0 if($@);
     Log3(undef,4,"InfoPanel: Image::Info missing.") unless $useImgTools;
+## use critic
 
     $hash->{DefFn}     = "btIP_Define";
-	$hash->{UndefFn}   = "btIP_Undef";
+    $hash->{UndefFn}   = "btIP_Undef";
     $hash->{SetFn}     = "btIP_Set";
     $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
@@ -529,7 +531,8 @@ sub btIP_itemLine {
 sub btIP_itemLongpoll {
   my ($id,$x,$y,$text,%params)= @_;
   my ($iconName,undef,undef) = FW_dev2image($id);
-  my $iconURL = FW_IconURL($iconName) if defined($iconName);
+  my $iconURL;
+     $iconURL = FW_IconURL($iconName) if defined($iconName);
   my $color   = substr($params{rgb},0,6);
   my $opacity = hex(substr($params{rgb},6,2))/255;
   my $output  = "<div informId=\"$id\" style=\"position:absolute; top:${y}px; left:${x}px; ";
@@ -779,10 +782,10 @@ sub btIP_FileRead {
    if(!$counter) {
       Log3(undef,4,"InfoPanel: reading from filesystem");
       my $length = -s "$file";
-      open(GRAFIK, "<", $file) or die("File not found $!");
-      binmode(GRAFIK);
-      $counter = read(GRAFIK, $data, $length);
-      close(GRAFIK);
+      open(my $GRAFIK, "<", $file) or die("File not found $!");
+      binmode($GRAFIK);
+      $counter = read($GRAFIK, $data, $length);
+      close($GRAFIK);
       Log3(undef,4,"InfoPanel: file not found in filesystem") unless $counter;
    }
    return "" unless $counter;
