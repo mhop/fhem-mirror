@@ -61,7 +61,7 @@ order:L_01
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
- $\DEVICETOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
+  BASE_TOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
   devicelist:noArg log $\DEVICETOPIC/bridge/config/devices\
   networkmap_raw:noArg raw $\DEVICETOPIC/bridge/networkmap raw\
@@ -1982,6 +1982,8 @@ attr DEVICE setList\
   off:noArg shellies/DEVNAME/light/0/command off\
   on:noArg shellies/DEVNAME/light/0/command on\
   pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}\
+  dimUp:noArg { my $num=ReadingsNum($NAME,'pct',0)+10;; "shellies/DEVNAME/light/0/set \{\"turn\": \"on\", \"brightness\": $num\}";; }\
+  dimDown:noArg { my $num=ReadingsNum($NAME,'pct',0)-10;; "shellies/DEVNAME/light/0/set \{\"turn\": \"on\", \"brightness\": $num\}";; }\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
