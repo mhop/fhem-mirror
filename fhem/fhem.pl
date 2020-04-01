@@ -192,13 +192,13 @@ sub CommandTrigger($$);
 
 # configDB special
 sub cfgDB_Init;
-sub cfgDB_ReadAll($);
+sub cfgDB_ReadAll;
 sub cfgDB_SaveState;
 sub cfgDB_SaveCfg;
-sub cfgDB_AttrRead($);
-sub cfgDB_ReadFile($);
-sub cfgDB_UpdateFile($);
-sub cfgDB_WriteFile($@);
+sub cfgDB_AttrRead;
+sub cfgDB_FileRead;
+sub cfgDB_FileUpdate;
+sub cfgDB_FileWrite;
 
 ##################################################
 # Variables:
