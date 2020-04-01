@@ -1762,6 +1762,16 @@ CancelDelayedShutdown($)
 }
 
 sub
+DoDelayedShutdown($)
+{
+  my ($hash) = @_;
+  return CommandShutdown($hash->{cl},$hash->{param},undef,1,$hash->{exitValue})
+     if(!keys %delayedShutdowns || 
+        $hash->{waitingFor}++ >= $hash->{maxShutdownDelay});
+  InternalTimer(gettimeofday()+1, "DoDelayedShutdown", $hash, 0);
+}
+
+sub
 DelayedShutdown($$$)
 {
   my ($cl, $param, $exitValue) = @_;
@@ -1771,22 +1781,15 @@ DelayedShutdown($$$)
     $delayedShutdowns{$d} = 1 if(CallFn($d, "DelayedShutdownFn", $defs{$d}));
   }
   return 0 if(!keys %delayedShutdowns);
-  
-  my $waitingFor = 0;
-  my $maxShutdownDelay = AttrVal("global", "maxShutdownDelay", 10);
-  my $checkList;
 
+  my $maxShutdownDelay = AttrVal("global", "maxShutdownDelay", 10);
   Log 1, "Server shutdown delayed due to ".join(",", keys %delayedShutdowns).
                 " for max $maxShutdownDelay sec";
   DoTrigger("global", "DELAYEDSHUTDOWN", 1);
 
-  $checkList = sub()
-  {
-     return CommandShutdown($cl, $param, undef, 1, $exitValue)
-             if(!keys %delayedShutdowns || $waitingFor++ >= $maxShutdownDelay);
-     InternalTimer(gettimeofday()+1, $checkList, undef, 0);
-  };
-  $checkList->();
+  DoDelayedShutdown(
+        { cl=>$cl, param=>$param, exitValue=>$exitValue, 
+          waitingFor=>0, maxShutdownDelay=>$maxShutdownDelay } );
   return 1;
 }
 
