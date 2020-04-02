@@ -93,10 +93,10 @@ our %Log2Syslog_vNotesIntern = (
   "2.4.1"  => "21.08.2017  changes in Log2Syslog_charfilter, change PROCID to \$hash->{SEQNO} ".
                            "switch to non-blocking in subs event/Log2Syslog_fhemlog",
   "2.4.0"  => "20.08.2017  new sub Log2Syslog_Log3slog for entries in local fhemlog only -> verbose support",
-  "2.3.1"  => "19.08.2017  commandref revised",
+  "2.3.1"  => "19.08.2017  commandref revised ",
   "2.3.0"  => "18.08.2017  new parameter 'ident' in DEF, sub setidex, Log2Syslog_charfilter",
-  "2.2.0"  => "17.08.2017  set BSD data length, set only acceptable characters (USASCII) in payload,
-                           commandref revised",
+  "2.2.0"  => "17.08.2017  set BSD data length, set only acceptable characters (USASCII) in payload ".
+                           "commandref revised ",
   "2.1.0"  => "17.08.2017  sub Log2Syslog_opensock created",
   "2.0.0"  => "16.08.2017  create syslog without SYS::SYSLOG",
   "1.1.1"  => "13.08.2017  registrate Log2Syslog_fhemlog to %loginform in case of sending fhem-log ".
@@ -489,7 +489,7 @@ sub Log2Syslog_Read {
           # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           my $i = 0;
           $mlen = $+{mlen};
-	      $tail = $+{tail};	      
+	      $tail = $+{tail}; 
           $msg  = substr($tail,0,$mlen);
           chomp $msg;
           push @load, $msg;
@@ -499,7 +499,7 @@ sub Log2Syslog_Read {
           while($tail && $tail =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
               $i++;
               $mlen = $+{mlen};
-              $tail = $+{tail};	      
+              $tail = $+{tail};
               $msg  = substr($tail,0,$mlen);
               chomp $msg;
               push @load, $msg;
@@ -601,7 +601,7 @@ sub Log2Syslog_getifdata {
                   my $sslver  = $nhash->{CD}->get_sslversion();
                   my $sslalgo = $nhash->{CD}->get_fingerprint(); 
                   readingsSingleUpdate($hash, "SSL_Version", $sslver, 1);
-                  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);	  
+                  readingsSingleUpdate($hash, "SSL_Algorithm", $sslalgo, 1);
               }
               return ($st,$data,$hash);
           }
@@ -623,7 +623,7 @@ sub Log2Syslog_getifdata {
           my $c = $hash->{CD};
           if($c) {
               $shash->{HELPER}{TCPPADDR} = $hash->{PEER};             
-              my $buf;  	  		  
+              my $buf;
               my $off = 0;
               $ret = sysread($c, $buf, $len);                       # returns undef on error, 0 at end of file and Integer, number of bytes read on success.                
               
@@ -828,7 +828,7 @@ sub Log2Syslog_parsePayload {
                   $pl .= "$f: ".${$fh{$f}};
                   $i++;
               }
-          }  	  
+          }
       }
       
   } elsif ($pp eq "IETF") {
@@ -1089,7 +1089,7 @@ sub Log2Syslog_parsePayload {
           Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - no parseFn defined."); 
       }
   
-  }	elsif ($pp eq "unknown") { 
+  } elsif ($pp eq "unknown") { 
       $err = 1;
       Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - Message format could not be detected automatically. PLease check and set attribute \"parseProfile\" manually.");   
   }
@@ -1204,7 +1204,7 @@ sub Log2Syslog_Set {
   my $prop = $a[2];
   
   my $setlist = "Unknown argument $opt, choose one of ".
-                "reopen:noArg ".	
+                "reopen:noArg ".
                 (($hash->{MODEL} =~ /Sender/)?"sendTestMessage ":"")
                 ;
   
@@ -1223,11 +1223,11 @@ sub Log2Syslog_Set {
         $hash->{HELPER}{MEMLOCK} = 1;
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);     
         
-        Log2Syslog_closesock ($hash,1);                                                         # Clientsocket schließen
+        Log2Syslog_closesock ($hash,1);                                                        # Clientsocket schließen
         Log2Syslog_downServer($hash,1);                                                        # Serversocket schließen     
         if($hash->{MODEL} =~ /Collector/) {                                                    # Serversocket öffnen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);  
-            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0	
         }
 		
   } else {
@@ -1248,7 +1248,7 @@ sub Log2Syslog_Get {
   my $prop    = $a[2];
   my $getlist = "Unknown argument $opt, choose one of ".
                 (($hash->{MODEL} !~ /Collector/)?"certInfo:noArg ":"").
-                "versionNotes "				
+                "versionNotes "
                 ;
 
   return if(AttrVal($name, "disable", "") eq "1");
@@ -1366,11 +1366,11 @@ sub Log2Syslog_Attr {
     # aName and aVal are Attribute name and value
 
 	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/) {
-         return qq{"$aName" is only valid for model "Collector"};	
+         return qq{"$aName" is only valid for model "Collector"};
 	}
     
 	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/) {
-         return qq{"$aName" is only valid for model "Sender"};	
+         return qq{"$aName" is only valid for model "Sender"};
 	}
     
     if ($aName eq "disable") {
@@ -1401,7 +1401,7 @@ sub Log2Syslog_Attr {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-        if ($do == 0) {		
+        if ($do == 0) {
             delete $hash->{SSL};
 		} else {
             if($hash->{MODEL} =~ /Collector/) {
@@ -1416,7 +1416,7 @@ sub Log2Syslog_Attr {
         Log2Syslog_downServer($hash,1);                                                        # Serversocket schließen     
         if($hash->{MODEL} =~ /Collector/) {
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);     # Serversocket öffnen
-            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
         }              
     }
     
@@ -1437,7 +1437,7 @@ sub Log2Syslog_Attr {
             return qq{$aName "$aVal" is not valid because off privileged ports are only usable by super users. Use a port number grater than 1023.} if($aVal < 1024);
             Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
-            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
         } elsif ($aName =~ /port/ && $hash->{MODEL} !~ /Collector/) {
             Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen               
         }
@@ -1565,7 +1565,7 @@ sub Log2Syslog_eventlog {
 	      my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
           my ($date,$time) = split(" ",$tim);
 	  
-	      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {				  
+	      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {
               my $otp             = "$n $txt";
               $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	          ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt);
@@ -1575,15 +1575,15 @@ sub Log2Syslog_eventlog {
                   next;        
               }
 
-	          ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");	
-              next if(!$data);			  
+	          ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");
+              next if(!$data);
           
 			  my $ret = syswrite ($sock,$data);
 			  if($ret && $ret > 0) {      
-				  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
+				  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");
               } else {
                   my $err = $!;
-				  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
+				  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");
                   $st = "write error: $err";                 
 			  }
           }
@@ -1629,7 +1629,7 @@ sub Log2Syslog_fhemlog {
   $date =~ s/\./-/g;
   my $tim = $date." ".$time;
   
-  if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {  	
+  if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {
       my $otp             = "$vbose: $txt";
       $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	  ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt,$vbose);
@@ -1639,7 +1639,7 @@ sub Log2Syslog_fhemlog {
           return;        
       }
 	  
-      ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
+      ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");
 	  return if(!$data);
       
       ($sock,$st) = Log2Syslog_opensock($hash,0);
@@ -1647,11 +1647,11 @@ sub Log2Syslog_fhemlog {
       if ($sock) {
 	      $ret = syswrite($sock,$data) if($data);
 		  if($ret && $ret > 0) {  
-		      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");	
+		      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");
           } else {
-              my $err = $!;
-			  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");	
-              $st = "write error: $err";             
+              $err = $!;
+              $st  = "write error: $err"; 
+			  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");        
 	      }  
           
           my $uef = AttrVal($name, "useEOF", 0);
@@ -1691,8 +1691,8 @@ sub Log2Syslog_sendTestMsg {
       $otp    = "$tim $otp" if AttrVal($name,'addTimestamp',0);
 	  $prival = "14";
 	  
-      ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");	
-	  return if(!$data);
+      ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"fhem");
+      return if(!$data);
   }  
     
   ($sock,$st) = Log2Syslog_opensock($hash,0);
@@ -1703,9 +1703,9 @@ sub Log2Syslog_sendTestMsg {
 	      Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid sent\n");
           $st = "maintenance";          
       } else {
-          my $err = $!;
-	      Log2Syslog_Log3slog($name, 3, "$name - Warning - Payload sequence $pid NOT sent: $err\n");	
-          $st = "write error: $err";              
+          $err = $!;
+          $st  = "write error: $err"; 
+	      Log2Syslog_Log3slog($name, 3, "$name - Warning - Payload sequence $pid NOT sent: $err\n");           
 	  }  
       
       my $uef = AttrVal($name, "useEOF", 0);
@@ -1923,13 +1923,11 @@ sub Log2Syslog_setprival {
       $sv = 7 if ($vbose == 5);
   }
   
-  if (lc($txt) =~ m/error/) {
-      # error condition
+  if (lc($txt) =~ m/error/) {                      # error condition und exludes anwenden
       $do = 1;
       my $ees = AttrVal($name, "exclErrCond", "");
       if($ees) {
-          $ees =~ m/^\s*(.*)\s*$/s;
-          $ees = $1;
+          $ees = Log2Syslog_trim($ees);
           $ees =~ s/[\n]//g;
           $ees =~ s/,,/_ESC_/g;
           my @excl = split(",",$ees);
@@ -2264,7 +2262,7 @@ our %Log2Syslog_vHintsExt_de = (
   to receive Syslog-messages of other devices which are able to send Syslog. <br>
   The syslog protocol has been implemented according the specifications of <a href="https://tools.ietf.org/html/rfc5424"> RFC5424 (IETF)</a>,
   <a href="https://tools.ietf.org/html/rfc3164"> RFC3164 (BSD)</a> and the TLS transport protocol according to 
-  <a href="https://tools.ietf.org/pdf/rfc5425.pdf"> RFC5425</a>. <br>	
+  <a href="https://tools.ietf.org/pdf/rfc5425.pdf"> RFC5425</a>. <br>
   <br>
   
   <b>Prerequisits</b>
