@@ -1792,12 +1792,12 @@ sub Log2Syslog_opensock {
 		      $sock->blocking(1);
               $IO::Socket::SSL::DEBUG = $ssldbg;
 		      eval { IO::Socket::SSL->start_SSL($sock, 
-						    			        SSL_verify_mode => 0,
-		                                        SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2",
-								    	        SSL_hostname => $host,
-									            SSL_veriycn_scheme => "rfc5425",
+						    			        SSL_verify_mode          => 0,
+		                                        SSL_version              => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2",
+								    	        SSL_hostname             => $host,
+									            SSL_veriycn_scheme       => "rfc5425",
 									            SSL_veriycn_publicsuffix => '',
-												Timeout => $timeout
+												Timeout                  => $timeout
 									            ) || undef $sock; };
               $IO::Socket::SSL::DEBUG = 0;
 		      if($@) {
