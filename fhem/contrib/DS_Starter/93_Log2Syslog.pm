@@ -1198,7 +1198,7 @@ return;
 ###############################################################################
 sub Log2Syslog_Set {
   my ($hash, @a) = @_;
-  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  return qq{"set X" needs at least one argument} if ( @a < 2 );
   my $name = $a[0];
   my $opt  = $a[1];
   my $prop = $a[2];
