@@ -701,7 +701,6 @@ sub Log2Syslog_parsePayload {
   my ($hash,$data) = @_;
   my $name         = $hash->{NAME};
   my $pp           = AttrVal($name, "parseProfile", $hash->{PROFILE});
-  my $pr           = (AttrVal($name, "protocol", "UDP"));
   my $severity     = "";
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
@@ -736,8 +735,6 @@ sub Log2Syslog_parsePayload {
   
   Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - raw message -> $data");
   
-  # my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
-  # $year = $year+1900;
   my $year = strftime "%Y", localtime;                                              # aktuelles Jahr
   
   if($pp =~ /^Automatic/) {
@@ -781,7 +778,7 @@ sub Log2Syslog_parsePayload {
       $tail   = $+{tail};  
       if( $Mmm && $dd && $time ) {
           my $month = $Log2Syslog_BSDMonth{$Mmm};
-          $day      = (length($dd) == 1)?("0".$dd):$dd;
+          $day      = sprintf("%02d",$dd);   
           $ts       = "$year-$month-$day $time";
       }      
       if($ts) {
@@ -818,11 +815,9 @@ sub Log2Syslog_parsePayload {
               Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - ERROR parse msg -> $data");          
           }
           
-		  no warnings 'uninitialized';                               ##no critic
-          Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, MM: $Mmm, Day: $dd, TIME: $time, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
-          $host = "" if($host eq "-");
-		  use warnings;
-		  $phost = $host?$host:$phost;
+          $host  = "" if(!$host || $host eq "-");           
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: ".($fac // '').", SEV: ".($sev // '').", TS: ".($ts // '').", HOST: ".($host // '').", ID: ".($id // '').", CONT: ".($cont // ''));
+		  $phost = $host if($host);
           
           # Payload zusammenstellen für Event/Reading
           $pl = "";
@@ -879,9 +874,7 @@ sub Log2Syslog_parsePayload {
       if(!$prival || !$date || !$time) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");  
-	      no warnings 'uninitialized';                                                     ##no critic
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: $prival, IETF: $ietf, DATE: $date, TIME: $time, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
-		  use warnings;          
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: ".($prival // '').", IETF: ".($ietf // '').", DATE: ".($date // '').", TIME: ".($time // '').", HOST: ".($host // '').", ID: ".($id // '').", PID: ".($pid // '').", MID: ".($mid // '').", SDFIELD: ".($sdfield // '').", CONT: ".($cont // ''));        
       } else {
           $ts = "$date $time";
       
@@ -901,11 +894,9 @@ sub Log2Syslog_parsePayload {
           $mid  = substr($mid,0, ($RFC5425len{MID}-1));
           $host = substr($host,0, ($RFC5425len{HST}-1));
       
-	      no warnings 'uninitialized';                                 ##no critic
-          Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, SDFIELD: $sdfield, CONT: $cont");
-          $host = "" if($host eq "-");
-		  use warnings;
-	      $phost = $host?$host:$phost;
+          $host  = "" if(!$host || $host eq "-");           
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: ".($fac // '').", SEV: ".($sev // '').", TS: ".($ts // '').", HOST: ".($host // '').", ID: ".($id // '').", CONT: ".($cont // ''));
+	      $phost = $host if($host);
           
           # Payload zusammenstellen für Event/Reading
           $pl   = "";
@@ -946,11 +937,9 @@ sub Log2Syslog_parsePayload {
               Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");          
           }
             
-		  no warnings 'uninitialized';                         ##no critic
-          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, CONT: $cont");
-          $host = "" if($host eq "-");
-		  use warnings;
-	      $phost = $host?$host:$phost;
+          $host  = "" if(!$host || $host eq "-");           
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: ".($fac // '').", SEV: ".($sev // '').", TS: ".($ts // '').", HOST: ".($host // '').", ID: ".($id // '').", CONT: ".($cont // ''));
+          $phost = $host if($host);
           
           # Payload zusammenstellen für Event/Reading
           $pl   = "";
@@ -981,7 +970,7 @@ sub Log2Syslog_parsePayload {
           $host =~ s/^(.*):$/$1/xe if($host);                            # ":" am Ende exen
           if($Mmm && $dd && $time) {
               my $month = $Log2Syslog_BSDMonth{$Mmm};
-              $day      = (length($dd) == 1)?("0".$dd):$dd;
+              $day      = sprintf("%02d",$dd);
               $ts       = "$year-$month-$day $time";
           }
           
@@ -1006,8 +995,8 @@ sub Log2Syslog_parsePayload {
           }
            
           $host = "" if(!$host || $host eq "-");           
-          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: ".($fac?$fac:'').", SEV: ".($sev?$sev:'').", TS: ".($ts?$ts:'').", HOST: $host, ID: ".($id?$id:'').", CONT: ".($cont?$cont:''));
-	      # $phost = $host?$host:$phost;                                # kein $host setzen da $host nicht Standard Name (s.o.)
+          Log2Syslog_Log3slog($name, 4, "$name - parsed message -> FAC: ".($fac // '').", SEV: ".($sev // '').", TS: ".($ts // '').", HOST: ".($host // '').", ID: ".($id // '').", CONT: ".($cont // ''));
+	      # $phost = $host if($host);                                   # kein $host setzen da $host nicht Standard Name (s.o.)
           
           # Payload zusammenstellen für Event/Reading
           $pl   = "";
@@ -1021,9 +1010,9 @@ sub Log2Syslog_parsePayload {
           }          
       }
   
-  } elsif ($pp eq "ParseFn") {                                # user spezifisches Parsing
+  } elsif ($pp eq "ParseFn") {                                          # user spezifisches Parsing
       my $parseFn = AttrVal( $name, "parseFn", "" );
-      $ts = TimeNow();
+      $ts         = TimeNow();
       
       if( $parseFn =~ m/^\s*(\{.*\})\s*$/s ) {
           $parseFn = $1;
@@ -1078,11 +1067,11 @@ sub Log2Syslog_parsePayload {
           }
 
           Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, CONT: $cont");
-		  $phost = $host?$host:$phost;
+		  $phost = $host if($host);                           
           
           # auszugebene Felder im Event/Reading
           my $ef = "PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT"; 
-          @evf = split(",",AttrVal($name, "outputFields", $ef));    
+          @evf   = split(",",AttrVal($name, "outputFields", $ef));    
           
           # Payload zusammenstellen für Event/Reading
           $pl   = "";
@@ -1142,7 +1131,7 @@ sub Log2Syslog_Undef {
   
   RemoveInternalTimer($hash);
   
-  Log2Syslog_closesock ($hash,1);    # Clientsocket schließen 
+  Log2Syslog_closesock ($hash,1);   # Clientsocket schließen 
   Log2Syslog_downServer($hash,1);   # Serversocket schließen, kill children
 
 return;
