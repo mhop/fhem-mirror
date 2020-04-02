@@ -39,7 +39,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
-  "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (remove prototypes) ",
+  "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
   "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
   "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
   "5.8.1"  => "23.07.2019  attribute waitForEOF rename to useEOF, useEOF also for type sender ",
@@ -1198,8 +1198,8 @@ return;
 ###############################################################################
 sub Log2Syslog_Set {
   my ($hash, @a) = @_;
-  return qq{"set X" needs at least one argument} if ( @a < 2 );
-  my $name = $a[0];
+  my $name       = $a[0];
+  return qq{"set $name" needs at least one argument} if ( @a < 2 );
   my $opt  = $a[1];
   my $prop = $a[2];
   
@@ -1366,16 +1366,16 @@ sub Log2Syslog_Attr {
     # aName and aVal are Attribute name and value
 
 	if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/) {
-         return "\"$aName\" is only valid for model \"Collector\"";
+         return qq{"$aName" is only valid for model "Collector"};	
 	}
     
 	if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/) {
-        return "\"$aName\" is only valid for model \"Sender\"";
+         return qq{"$aName" is only valid for model "Sender"};	
 	}
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
-            return "Mode \"$aVal\" is only valid for model \"Sender\"" if($aVal eq "maintenance" && $hash->{MODEL} !~ /Sender/);
+            return qq{Mode "$aVal" is only valid for model "Sender"} if($aVal eq "maintenance" && $hash->{MODEL} !~ /Sender/);
             $do = $aVal?1:0;
         }
         $do = 0 if($cmd eq "del");
@@ -1434,7 +1434,7 @@ sub Log2Syslog_Attr {
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
         
         if($aName =~ /port/ && $hash->{MODEL} =~ /Collector/ && $init_done) {
-            return "$aName \"$aVal\" is not valid because privileged ports are only usable by super users. Use a port grater than 1023."  if($aVal < 1024);
+            return qq{$aName "$aVal" is not valid because off privileged ports are only usable by super users. Use a port number grater than 1023.} if($aVal < 1024);
             Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0			
@@ -1484,7 +1484,7 @@ sub Log2Syslog_Attr {
     
 	if ($aName =~ /parseProfile/) {
           if ($cmd eq "set" && $aVal =~ /ParseFn/) {
-              return "You have to define a parse-function via attribute \"parseFn\" first !" if(!AttrVal($name,"parseFn",""));
+              return qq{You have to define a parse-function via attribute "parseFn" first !} if(!AttrVal($name,"parseFn",""));
 	      }
           if ($cmd eq "set") {
               $hash->{PROFILE} = $aVal;
@@ -1495,7 +1495,7 @@ sub Log2Syslog_Attr {
     }
     
     if ($cmd eq "del" && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
-          return "You use a parse-function via attribute \"parseProfile\". Please change/delete attribute \"parseProfile\" first !";
+          return qq{You use a parse-function via attribute "parseProfile". Please change/delete attribute "parseProfile" first !};
     }
     
     if ($aName =~ /makeEvent/) {
@@ -2185,6 +2185,7 @@ sub Log2Syslog_setVersionInfo {
   my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
+  $hash->{MODEL}          .= " v$v";
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
