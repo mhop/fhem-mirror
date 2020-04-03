@@ -401,7 +401,7 @@ sub SMARTMON_readDeviceData($%) {
         $hash->{DEVICE_SERIAL}=$v;
       }
       if($k eq "Firmware Version") {
-        $hash->{DEVICE_FIRMARE}=$v;
+        $hash->{DEVICE_FIRMWARE}=$v;
       }
       if($k eq "User Capacity") {
         $hash->{DEVICE_CAPACITY}=$v;
