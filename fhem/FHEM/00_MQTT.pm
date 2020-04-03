@@ -449,6 +449,8 @@ sub Start($) {
 
 sub Stop($) {
   my $hash = shift;
+
+  $hash->{".reconnectmark"} = 0;
   
   my $cstate=ReadingsVal($hash->{NAME},"connection","");
   if($cstate eq "disconnected" || $cstate eq "timed-out") {
@@ -459,6 +461,7 @@ sub Stop($) {
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
   readingsSingleUpdate($hash,"connection","disconnected",1);
+  readingsSingleUpdate($hash,"state","disconnected",1);
 }
 
 sub Ready($) {
@@ -482,11 +485,13 @@ sub Init($) {
   readingsSingleUpdate($hash,"connection","connecting",1);
   $hash->{ping_received}=1;
   Timer($hash);
+  $hash->{".reconnectmark"} = 1;
   return undef;
 }
 
 sub Timer($) {
   my $hash = shift;
+  #Log3($hash->{NAME},1,">>> timer ");
   RemoveInternalTimer($hash);
   unless ($hash->{ping_received}) {
     onTimeout($hash);
@@ -494,6 +499,15 @@ sub Timer($) {
     GP_ForallClients($hash,\&notify_client_connection_timeout);
   }
   $hash->{ping_received} = 0;
+
+  #Log3($hash->{NAME},1,">>> reconnect mark: ".$hash->{".reconnectmark"});
+  #Log3($hash->{NAME},1,">>> state: ".ReadingsVal($hash->{NAME}, "state", ""));
+  if($hash->{".reconnectmark"} eq 1) {
+    if(ReadingsVal($hash->{NAME}, "state", "") eq "disconnected") {
+      #Log3($hash->{NAME},1,">>> reconnect ");
+      Start($hash);
+    }
+  }
   InternalTimer(gettimeofday()+$hash->{timeout}, "MQTT::Timer", $hash, 0);
   send_ping($hash);
 }
