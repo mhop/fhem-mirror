@@ -1,4 +1,4 @@
-REV 21575
+REV 21582
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-04-02_07:45:03 332932 ./CHANGED
+UPD 2020-04-03_07:45:03 333055 ./CHANGED
 UPD 2020-03-29_07:45:03 42671 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -464,7 +464,7 @@ UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-03-23_07:45:03 427624 FHEM/93_DbLog.pm
 UPD 2020-03-31_07:45:02 886625 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
-UPD 2020-04-01_07:45:03 157380 FHEM/93_Log2Syslog.pm
+UPD 2020-04-03_07:45:03 160823 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
 UPD 2017-09-13_07:45:02 7907 FHEM/93_RFHEM.pm
 UPD 2019-12-31_07:45:05 52071 FHEM/94_PWM.pm
@@ -751,12 +751,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-04-01_07:45:07 4258398 docs/commandref.html
-UPD 2020-04-02_07:45:09 2623601 docs/commandref_DE.html
+UPD 2020-04-03_07:45:07 4258541 docs/commandref.html
+UPD 2020-04-03_07:45:09 2623740 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-04-02_07:45:10 231872 docs/commandref_modular.html
-UPD 2020-04-02_07:45:11 242819 docs/commandref_modular_DE.html
+UPD 2020-04-03_07:45:11 231872 docs/commandref_modular.html
+UPD 2020-04-03_07:45:12 242819 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
