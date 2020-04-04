@@ -300,7 +300,7 @@ sub SMARTMON_obtainParameters($) {
 
   # /usr/sbin/smartctl in /etc/sudoers aufnehmen
   # fhem ALL=(ALL) NOPASSWD: [...,] /usr/sbin/smartctl 
-  # Natuerlich muss der user auch der Gruppe "sudo" angehören.
+  # Natuerlich muss der user auch der Gruppe "sudo" angehÃ¶ren.
 
   # Health  
   my $param="";
@@ -579,7 +579,7 @@ sub SMARTMON_execute($$) {
 =pod
 =item device
 =item summary    provides some statistics about the S.M.A.R.T. capable drive
-=item summary_DE liefert einige Statistiken ueber S.M.A.R.T. kompatible Geräte
+=item summary_DE liefert einige Statistiken ueber S.M.A.R.T. kompatible Ger&auml;te
 =begin html
 
 <!-- ================================ -->
@@ -667,7 +667,7 @@ sub SMARTMON_execute($$) {
     </li>
     <br>
     </ul><br>
-    For more information see cmartctrl documentation.
+    For more information see smartctrl documentation.
   </ul>
 <!-- ================================ -->
 
@@ -759,7 +759,7 @@ sub SMARTMON_execute($$) {
     </li>
     <br>
     </ul><br>
-    F&uuml;r weitere Informationen wird die cmartctrl-Dokumentation empfohlen.
+    F&uuml;r weitere Informationen wird die smartctrl-Dokumentation empfohlen.
 
   </ul>
 
