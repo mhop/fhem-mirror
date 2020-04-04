@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
- - feature: 93_Log2Syslog: Parser UniFi Controller Syslog and Netconsole 
+ - bugfix:  73_DoorBird: Use of uninitialized value line 2398 & 2407
+ - feature: 93_Log2Syslog: Parser UniFi Controller Syslog and Netconsole
                            messages, code review
  - feature: 73_AutoShuttersControl: Code Review and change shading logic
                                     for night
