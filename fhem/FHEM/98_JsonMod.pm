@@ -305,10 +305,10 @@ sub JsonMod_DoReadings {
 			foreach my $arg (@args) {
 				if (ref($arg) eq 'CODE') {
 					$result .= $arg->($o);
-				} elsif (ref($arg) eq '') {
-					$result .= $arg;
+				} elsif (ref($arg) eq 'ARRAY' and @{$arg}) {
+					$result .= $arg->[0];
 				} else {
-					die('syntax');
+					$result .= $arg;
 				};
 			};
 			return $result;
