@@ -24,7 +24,7 @@ FB_doCheckPW($$$)
 {
   my ($host, $user, $pw) = @_;
   my $data = GetFileFromURL(FB_host2URL($host)."login_sid.lua",undef,undef,1);
-  return undef if(!$data);
+  return if(!$data);
 
   my $chl="";
   $chl = $1 if($data =~ /<Challenge>(\w+)<\/Challenge>/i);
@@ -48,8 +48,9 @@ FB_doCheckPW($$$)
     $url .= "?username=$user" if($user);
 
     $data = GetFileFromURL($url, undef, $data, 1);
+    return if(!$data);
     my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
-    $sid = undef if($sid =~ m/^0*$/);
+    return if($sid =~ m/^0*$/);
     return $sid;
   }
 }
