@@ -6586,14 +6586,14 @@ sub getAutoAstroModeMorningHorizon {
     my $self = shift;
 
     return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeMorningHorizon',
-        'none' );
+        0 );
 }
 
 sub getAutoAstroModeEveningHorizon {
     my $self = shift;
 
     return AttrVal( $self->{shuttersDev}, 'ASC_AutoAstroModeEveningHorizon',
-        'none' );
+        0 );
 }
 
 sub getUp {
