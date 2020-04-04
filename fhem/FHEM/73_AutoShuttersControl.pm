@@ -2952,7 +2952,8 @@ sub CreateSunRiseSetShuttersTimer {
     }
     else {
         CommandDeleteReading( undef, $shuttersDev . ' ASC_Time_PrivacyDriveUp' )
-          if ( ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveUp', 'none' ) );
+          if ( ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveUp', 'none' )
+            ne 'none' );
     }
 
     ## Abfrage für die Sichtschutzfahrt am Abend vor dem eigentlichen kompletten schließen
@@ -2964,7 +2965,8 @@ sub CreateSunRiseSetShuttersTimer {
         CommandDeleteReading( undef,
             $shuttersDev . ' ASC_Time_PrivacyDriveDown' )
           if (
-            ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' ) );
+            ReadingsVal( $shuttersDev, 'ASC_Time_PrivacyDriveDown', 'none' )
+              ne 'none' );
     }
 
     ## kleine Hilfe für InternalTimer damit ich alle benötigten Variablen an die Funktion übergeben kann welche von Internal Timer aufgerufen wird.
@@ -4447,7 +4449,7 @@ sub ASC_Debug {
 }
 
 sub _averageBrightness {
-    my @input = shift;
+    my @input = @_;
     use List::Util qw(sum);
 
     return int( sum(@input) / @input );
@@ -8326,7 +8328,7 @@ sub getBlockAscDrivesAfterManual {
                 </br>Damit die Beschattung Funktion hat, m&uuml;ssen folgende Anforderungen erf&uuml;llt sein.
                 </br><strong>Im ASC Device</strong> das Reading "controlShading" mit dem Wert on, sowie ein Astro/Twilight Device im Attribut "ASC_twilightDevice" und das Attribut "ASC_tempSensor".
                 </br><strong>In den Rollladendevices</strong> ben&ouml;tigt ihr ein Helligkeitssensor als Attribut "ASC_BrightnessSensor", sofern noch nicht vorhanden. Findet der Sensor nur f&uuml;r die Beschattung Verwendung ist der Wert DEVICENAME[:READING] ausreichend.
-                </br>Alle weiteren Attribute sind optional und wenn nicht gesetzt mit Default-Werten belegt. Ihr solltet sie dennoch einmal anschauen und entsprechend Euren Gegebenheiten setzen. Die Werte f&uumlr; die Fensterposition und den Vor- Nachlaufwinkel sowie die Grenzwerte f&uuml;r die StateChange_Cloudy und StateChange_Sunny solltet ihr besondere Beachtung dabei schenken.
+                </br>Alle weiteren Attribute sind optional und wenn nicht gesetzt mit Default-Werten belegt. Ihr solltet sie dennoch einmal anschauen und entsprechend Euren Gegebenheiten setzen. Die Werte f&uuml;r die Fensterposition und den Vor- Nachlaufwinkel sowie die Grenzwerte f&uuml;r die StateChange_Cloudy und StateChange_Sunny solltet ihr besondere Beachtung dabei schenken.
                 <li><strong>ASC_Shading_InOutAzimuth</strong> - Azimut Wert ab dem bei &Uuml;berschreiten Beschattet und bei Unterschreiten Endschattet werden soll. (default: 95:265)</li>
                 <li><strong>ASC_Shading_MinMax_Elevation</strong> - ab welcher min H&ouml;he des Sonnenstandes soll beschattet und ab welcher max H&ouml;he wieder beendet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 25.0:100.0)</li>
                 <li><strong>ASC_Shading_Min_OutsideTemperature</strong> - ab welcher Temperatur soll Beschattet werden, immer in Abh&auml;ngigkeit der anderen einbezogenen Sensorwerte (default: 18)</li>
@@ -8432,7 +8434,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.23",
+  "version": "v0.8.24",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
