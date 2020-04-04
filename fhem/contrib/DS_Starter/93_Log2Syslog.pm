@@ -499,12 +499,12 @@ sub Log2Syslog_Read {
           my $i = 0;
           $mlen = $+{mlen};
           $tail = $+{tail}; 
-          $msg  = substr($tail,0,$mlen);
+          $msg  = substr($tail,0,$mlen-(length($mlen)+1));
           chomp $msg;
           push @load, $msg;
           
           if(length($tail) >= $mlen) {
-              $tail = substr($tail,$mlen); 
+              $tail = substr($tail,$mlen-(length($mlen)+1)); 
           } else {
               $tail = "";
           }  
@@ -515,11 +515,11 @@ sub Log2Syslog_Read {
               $i++;
               $mlen = $+{mlen};
               $tail = $+{tail};
-              $msg  = substr($tail,0,$mlen);
+              $msg  = substr($tail,0,$mlen-(length($mlen)+1));
               chomp $msg;
               push @load, $msg;
               next if(!$tail);
-              $tail = substr($tail,$mlen);           
+              $tail = substr($tail,$mlen-(length($mlen)+1));           
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
           }   
       } else {
