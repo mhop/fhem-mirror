@@ -1,5 +1,5 @@
 ##########################################################################################################################
-# $Id: 93_Log2Syslog.pm 21567 2020-03-31 20:03:58Z DS_Starter $
+# $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
@@ -21,9 +21,13 @@
 #       You should have received a copy of the GNU General Public License
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#       Implements the Syslog Protocol of RFC 5424  https://tools.ietf.org/html/rfc5424
-#       and RFC 3164 https://tools.ietf.org/html/rfc3164 and
-#       TLS Transport according to RFC5425 https://tools.ietf.org/pdf/rfc5425.pdf as well
+#       The module is inspired by 92_rsyslog.pm (betateilchen)
+#
+#       Implements the Syslog Protocol according to RFCs:
+#       RFC 5424  https://tools.ietf.org/html/rfc5424
+#       RFC 3164 https://tools.ietf.org/html/rfc3164 and
+#       TLS Transport according to RFC 5425 https://tools.ietf.org/pdf/rfc5425.pdf
+#       Date and Time according to RFC 3339 https://tools.ietf.org/html/rfc3339
 #
 ##########################################################################################################################
 package main;
@@ -39,6 +43,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
+  "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, minor fixes  ",
   "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
   "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
   "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
@@ -107,6 +112,8 @@ our %Log2Syslog_vNotesIntern = (
 
 # Versions History extern:
 our %Log2Syslog_vNotesExtern = (
+  "5.10.0" => "04.04.2020 The new attribute 'timeSpec' can be set to send and receive/parse messages according to UTC or Local time format. ".
+                          "Please refer to <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">Date and Time on the Internet: Timestamps</a> for further information  ",
   "5.9.0"  => "01.04.2020 The new option \"UniFi\" of attribute \"parseProfil\" provedes a new Parser for UniFi Controller Syslog messages ".
                           "and Netconsole messages. It was tested with UniFi AP-AC-Lite but should run with all Unifi products. ",
   "5.8.1"  => "23.07.2019 New attribute \"useParsefilter\" to remove other characters than ASCII from payload before parse it. ".
@@ -286,6 +293,7 @@ sub Log2Syslog_Initialize {
                       "sslCertPrefix ".
 					  "TLS:1,0 ".
 					  "timeout ".
+                      "timeSpec:Local,UTC ".
                       "useParsefilter:0,1 ".
                       "useEOF:1,0 ".
                       $readingFnAttributes
@@ -314,7 +322,9 @@ sub Log2Syslog_Define {
   
   $hash->{MYHOST} = hostname();                            # eigener Host (lt. RFC nur Hostname f. BSD)
   my $myfqdn = hostfqdn();                                 # MYFQDN eigener Host (f. IETF)
-  $hash->{MYFQDN} = $myfqdn?$myfqdn:$hash->{MYHOST};       
+  $myfqdn    =~ s/\.$//x if($myfqdn);
+  
+  $hash->{MYFQDN} = $myfqdn // $hash->{MYHOST};       
   
   if(int(@a)-3 < 0){
       # Einrichtung Servermode (Collector)
@@ -485,8 +495,7 @@ sub Log2Syslog_Read {
   if($data) {      
       # parse Payload 
       my (@load,$mlen,$msg,$tail);
-      if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
-          # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {                   # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           my $i = 0;
           $mlen = $+{mlen};
 	      $tail = $+{tail}; 
@@ -503,6 +512,7 @@ sub Log2Syslog_Read {
               $msg  = substr($tail,0,$mlen);
               chomp $msg;
               push @load, $msg;
+              next if(!$tail);
               $tail = substr($tail,$mlen);           
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
           }   
@@ -510,7 +520,8 @@ sub Log2Syslog_Read {
           @load = split("[\r\n]",$data);
       }
       
-      for my $line (@load) {       
+      for my $line (@load) {
+          next if(!$line);      
           ($err,$ignore,$sev,$phost,$ts,$pl) = Log2Syslog_parsePayload($hash,$line);       
           $hash->{SEQNO}++;
           if($err) {
@@ -705,7 +716,7 @@ sub Log2Syslog_parsePayload {
   my $facility     = "";  
   my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
   my $ignore       = 0;
-  my ($Mmm,$dd,$day,$ietf,$err,$pl,$tail);
+  my ($to,$Mmm,$dd,$day,$ietf,$err,$pl,$tail);
   
   $data = Log2Syslog_parsefilter($data) if(AttrVal($name,"useParsefilter",0));       # Steuerzeichen werden entfernt (Achtung auch CR/LF)
 
@@ -842,11 +853,12 @@ sub Log2Syslog_parsePayload {
       if($prival && $ietf) {
           # Standard IETF-Syslog incl. VERSION
           if($ietf == 1) {
-              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;      
+              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;      
               $prival  = $+{prival};      # must
               $ietf    = $+{ietf};        # should
               $date    = $+{date};        # must
               $time    = $+{time};        # must
+              $to      = $+{to};          # Time Offset (UTC etc.) 
               $host    = $+{host};        # should 
               $id      = $+{id};          # should
               $pid     = $+{pid};         # should
@@ -859,10 +871,11 @@ sub Log2Syslog_parsePayload {
           }
       } else {
           # IETF-Syslog ohne VERSION
-          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
+          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
           $prival  = $+{prival};      # must
           $date    = $+{date};        # must
           $time    = $+{time};        # must
+          $to      = $+{to};          # Time Offset (UTC etc.) 
           $host    = $+{host};        # should 
           $id      = $+{id};          # should
           $pid     = $+{pid};         # should
@@ -874,9 +887,10 @@ sub Log2Syslog_parsePayload {
       if(!$prival || !$date || !$time) {
           $err = 1;
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");  
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: ".($prival // '').", IETF: ".($ietf // '').", DATE: ".($date // '').", TIME: ".($time // '').", HOST: ".($host // '').", ID: ".($id // '').", PID: ".($pid // '').", MID: ".($mid // '').", SDFIELD: ".($sdfield // '').", CONT: ".($cont // ''));        
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: ".($prival // '').", IETF: ".($ietf // '').", DATE: ".($date // '').", TIME: ".($time // '').", OFFSET: ".($to // '').", HOST: ".($host // '').", ID: ".($id // '').", PID: ".($pid // '').", MID: ".($mid // '').", SDFIELD: ".($sdfield // '').", CONT: ".($cont // ''));        
       } else {
-          $ts = "$date $time";
+          $ts = Log2Syslog_getTimeFromOffset ($name,$to,$date,$time);
+          #$ts = "$date $time";
       
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -889,9 +903,9 @@ sub Log2Syslog_parsePayload {
           }
       
           # Längenbegrenzung nach RFC5424
-          $id   = substr($id,0, ($RFC5425len{ID}-1));
-          $pid  = substr($pid,0, ($RFC5425len{PID}-1));
-          $mid  = substr($mid,0, ($RFC5425len{MID}-1));
+          $id   = substr($id,0,   ($RFC5425len{ID}-1));
+          $pid  = substr($pid,0,  ($RFC5425len{PID}-1));
+          $mid  = substr($mid,0,  ($RFC5425len{MID}-1));
           $host = substr($host,0, ($RFC5425len{HST}-1));
       
           $host  = "" if(!$host || $host eq "-");           
@@ -1045,7 +1059,7 @@ sub Log2Syslog_parsePayload {
           $prival  = $PRIVAL  if($PRIVAL =~ /\d{1,3}/);
           $date    = $DATE    if($DATE   =~ /^(\d{4})-(\d{2})-(\d{2})$/);
           $time    = $TIME    if($TIME   =~ /^(\d{2}):(\d{2}):(\d{2})$/);          
-          $ts      = ($TS =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/)?$TS:($date && $time)?"$date $time":$ts;
+          $ts      = ($TS =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) ? $TS : ($date && $time) ? "$date $time" : $ts;
  	      $host    = $HOST    if(defined $HOST);
 	      $id      = $ID      if(defined $ID);
           $pid     = $PID     if(defined $PID);
@@ -1096,6 +1110,63 @@ sub Log2Syslog_parsePayload {
 
 return ($err,$ignore,$sev,$phost,$ts,$pl);
 }
+
+################################################################
+#   Berechne Zeit vom Offset (Empfang) 
+#   Offset     = local Time - UTC
+#   local Time = Offset     + UTC  
+#   UTC        = local time - Offset
+#
+#   Übergabe: $to, $date, $time
+#   $to    = Offset (z.B. +02:00)
+#   $date  = Datum YYYY-MM-DD
+#   $time  = HH:MM:SS
+#
+################################################################
+sub Log2Syslog_getTimeFromOffset {
+ my ($name,$to,$date,$time) = @_;
+ 
+ my $dt = "$date $time";
+ return ($dt) if(!$to);
+ 
+ my $tz = AttrVal($name, "timeSpec", "Local");
+ 
+ my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/;
+ return $dt if(!$year || !$month ||!$mday);
+ my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/;
+ return $dt if(!$hour || !$min ||!$sec);
+ 
+ $year -= 1900;
+ $month--;
+ 
+ my ($offset,$utc);
+ my $localts = fhemTimeLocal($sec, $min, $hour, $mday, $month, $year);
+ 
+ if($to =~ /Z/ && $tz ne "UTC") {                      # Zulu Time wurde geliefert -> Umrechnung auf Local
+     $offset = fhemTzOffset($localts);                 # Offset zwischen Localtime und UTC
+     $utc    = $localts - $offset;
+     $dt     = strftime ("%Y-%m-%d %H:%M:%S", localtime($utc));
+ }
+ 
+ if($to =~ /[+-:0-9]/) {
+     my $sign  = substr($to, 0, 1);
+     $to       = substr $to, 1;
+     my($h,$m) = split(":", $to);
+     $offset   = 3600*$h + 60*$m;
+     
+     if($tz eq "UTC") {
+         $utc = $localts - $offset;
+     
+     } else {
+         $utc = $localts - $offset + fhemTzOffset($localts);       
+     }
+     $dt = strftime ("%Y-%m-%d %H:%M:%S", localtime($utc));  
+ }
+ 
+ Log2Syslog_Log3slog ($defs{$name}, 4, "Log2Syslog $name - module time zone: $tz, converted time: $dt"); 
+ 
+return ($dt);
+}  
 
 #################################################################################################
 #                       Syslog Collector Events erzeugen
@@ -1984,16 +2055,16 @@ sub Log2Syslog_setpayload {
   if ($lf eq "IETF") {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       
-      my $IETFver = 1;                                      # Version von syslog Protokoll Spec RFC5424
-	  my $mid     = "FHEM";                                 # message ID, identify protocol of message, e.g. for firewall filter
-	  my $tim     = $date."T".$time; 
+      my $IETFver = 1;                                                    # Version von syslog Protokoll Spec RFC5424
+	  my $mid     = "FHEM";                                               # message ID, identify protocol of message, e.g. for firewall filter
+	  my $tim     = Log2Syslog_timeToRFC3339 ($name,$date,$time);         # Zeit gemäß RFC 3339 formatieren
       my $sdfield = "[version\@Log2Syslog version=\"$hash->{HELPER}{VERSION}\"]";
       $otp        = Encode::encode_utf8($otp);
-      
+
       # Längenbegrenzung nach RFC5424
-      $ident  = substr($ident,0, ($RFC5425len{ID}-1));
-      $pid    = substr($pid,0, ($RFC5425len{PID}-1));
-      $mid    = substr($mid,0, ($RFC5425len{MID}-1));
+      $ident  = substr($ident,0,  ($RFC5425len{ID}-1));
+      $pid    = substr($pid,0,    ($RFC5425len{PID}-1));
+      $mid    = substr($mid,0,    ($RFC5425len{MID}-1));
       $myfqdn = substr($myfqdn,0, ($RFC5425len{HST}-1));
       
       no warnings 'uninitialized';                          ##no critic
@@ -2018,6 +2089,48 @@ sub Log2Syslog_setpayload {
   Log2Syslog_Log3slog($name, 4, "$name - Payload sequence $pid created:\n$ldat");
   
 return($data,$pid);
+}
+
+################################################################
+#    Offset berechnen und zu Time hinzufügen (Senden) 
+#    RFC 3339: https://tools.ietf.org/html/rfc3339
+################################################################
+sub Log2Syslog_timeToRFC3339 {
+ my ($name,$date,$time) = @_;
+ 
+ my $dt = $date."T".$time;
+ my $tz = AttrVal($name, "timeSpec", "Local");
+ 
+ my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/;
+ return $dt if(!$year || !$month ||!$mday);
+ my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/;
+ return $dt if(!$hour || !$min ||!$sec);
+ 
+ $year -= 1900;
+ $month--;
+ 
+ my $utc;
+ my $sign = "+";
+ my $localts = fhemTimeLocal($sec, $min, $hour, $mday, $month, $year);
+ my $offset  = fhemTzOffset($localts);
+ 
+ if($tz ne "UTC") {                                                # Offset zwischen Localtime und UTC ermitteln und an Zeit anhängen    
+     if($offset =~ /[+-]/) {
+         $sign   = substr($offset, 0, 1);
+         $offset = substr $offset, 1;
+     }
+     my $h   = int($offset/3600);
+     my $m   = ($offset-($h*3600))/60;
+     $offset = $sign.sprintf("%02.0f", $h).":".sprintf("%02.0f", $m);
+     $dt     = strftime ("%Y-%m-%dT%H:%M:%S$offset", localtime($localts));
+ } else {                                                          # auf UTC umrechnen
+     $utc = $localts - $offset;
+     $dt  = strftime ("%Y-%m-%dT%H:%M:%SZ", localtime($utc));
+ }
+
+ Log2Syslog_Log3slog ($defs{$name}, 4, "Log2Syslog $name - module time zone: $tz, converted time: $dt"); 
+ 
+return ($dt);
 }
 
 ###############################################################################
@@ -2188,12 +2301,12 @@ sub Log2Syslog_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21567 2020-03-31 20:03:58Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21567 2020-03-31 20:03:58Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2218,6 +2331,17 @@ return ($str);
 }
 
 ################################################################
+#   Check aktuelle Zeit auf Sommer/Winterzeit
+#   return 1 wenn Sommerzeit (daylight saving time)
+################################################################
+sub Log2Syslog_isDst {
+ 
+ my @l = localtime(time);
+ 
+return ($l[8]);
+} 
+
+################################################################
 #               Payload for Parsen filtern 
 ################################################################
 sub Log2Syslog_parsefilter { 
@@ -2232,8 +2356,9 @@ return($s);
 #                                       Hint Hash EN           
 #############################################################################################
 our %Log2Syslog_vHintsExt_en = (
-  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protocol",
-  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> protocol",
+  "4" => "The guidelines for usage of <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Date and Time on the Internet: Timestamps</a>",
+  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protocol</a>",
+  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD) protocol</a>",
   "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
 );
 
@@ -2241,7 +2366,8 @@ our %Log2Syslog_vHintsExt_en = (
 #                                       Hint Hash DE         
 #############################################################################################
 our %Log2Syslog_vHintsExt_de = (
-  "3" => "Die Beschreibung des <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425</a> TLS Transport Protokoll",
+  "4" => "Die Richtlinien zur Verwendung von <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Datum und Zeit im Internet: Timestamps</a>",
+  "3" => "Die Beschreibung des <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protokoll</a>",
   "2" => "Die Grundlagen des <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> Protokolls",
   "1" => "Informationen über das <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> Syslog Protokoll"
 );
@@ -2939,6 +3065,28 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <li><b>useParsefilter</b><br>
         <br>
         If activated, all non-ASCII characters are deleted before parsing the message.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="timeSpec"></a>
+    <li><b>timeSpec [Local | UTC]</b><br>
+        <br>
+        Use of the local or UTC time format in the device. 
+        Only received time datagrams that have the specification according to RFC 3339 are converted accordingly.
+        The time specification for data transmission (model Sender) always corresponds to the set time format. <br>
+        Default: Local. <br><br>
+        
+        <ul>
+          <b>Examples of supported time specifications</b> <br>
+          2019-04-12T23:20:50.52Z    <br>
+          2019-12-19T16:39:57-08:00  <br>
+          2020-01-01T12:00:27+00:20  <br>
+          2020-04-04T16:33:10+00:00  <br>
+        </ul>
+        
     </li>
     </ul>
     <br>
@@ -3675,7 +3823,30 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <li><b>timeout</b><br>
         <br>
         Das Attribut ist nur für "Sender" verwendbar.
-        Timeout für die Verbindung zum Syslog-Server (TCP). Default: 0.5s.
+        Timeout für die Verbindung zum Syslog-Server (TCP). <br>
+        Default: 0.5s.
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
+	<a name="timeSpec"></a>
+    <li><b>timeSpec [Local | UTC]</b><br>
+        <br>
+        Verwendung des lokalen bzw. UTC Zeitformats im Device. 
+        Nur empfangene Zeitdatagramme, die die Spezifikation gemäß RFC 3339 aufweisen, werden entsprechend umgewandelt.
+        Die Zeitspezifikation beim Datenversand (Model Sender) erfolgt immer entsprechend des eingestellten Zeitformats. <br>
+        Default: Local. <br><br>
+        
+        <ul>
+          <b>Beispiele unterstützter Zeitspezifikationen</b> <br>
+          2019-04-12T23:20:50.52Z    <br>
+          2019-12-19T16:39:57-08:00  <br>
+          2020-01-01T12:00:27+00:20  <br>
+          2020-04-04T16:33:10+00:00  <br>
+        </ul>
+        
     </li>
     </ul>
     <br>
