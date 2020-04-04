@@ -1883,7 +1883,7 @@ sub DoorBird_RenewSessionID($) {
 		### If the VideoStream has been activated
 		if (ReadingsVal($name, ".VideoURL", "") ne "") {
 			### Refresh Video URL
-			DoorBird_Live_Video($hash, undef);
+			DoorBird_Live_Video($hash, "on");
 			
 			### Log Entry for debugging purposes
 			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - VideoUrl refreshed";
@@ -1892,7 +1892,7 @@ sub DoorBird_RenewSessionID($) {
 		### If the AudioStream has been activated
 		if (ReadingsVal($name, ".AudioURL", "") ne "") {
 			### Refresh Video URL
-			DoorBird_Live_Audio($hash, undef);
+			DoorBird_Live_Audio($hash, "on");
 			
 			### Log Entry for debugging purposes
 			Log3 $name, 5, $name. " : DoorBird_RenewSessionID - AudioUrl refreshed";
