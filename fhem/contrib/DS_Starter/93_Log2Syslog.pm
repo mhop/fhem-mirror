@@ -2829,24 +2829,26 @@ attr &lt;name&gt; exclErrCond Error: none,
         
         <ul>  
         <table>  
-        <colgroup> <col width=20%> <col width=80%> </colgroup>
-        <tr><td> $PRIVAL  </td><td> "" (0 ... 191) </td></tr>
-        <tr><td> $FAC     </td><td> "" (0 ... 23) </td></tr>
-        <tr><td> $SEV     </td><td> "" (0 ... 7) </td></tr>
-        <tr><td> $TS      </td><td> Timestamp (YYYY-MM-DD hh:mm:ss) </td></tr>
-        <tr><td> $HOST    </td><td> "" </td></tr>
-        <tr><td> $DATE    </td><td> "" (YYYY-MM-DD) </td></tr>
-        <tr><td> $TIME    </td><td> "" (hh:mm:ss) </td></tr>
-        <tr><td> $ID      </td><td> "" </td></tr>
-        <tr><td> $PID     </td><td> "" </td></tr>
-        <tr><td> $MID     </td><td> "" </td></tr>
-        <tr><td> $SDFIELD </td><td> "" </td></tr>
-        <tr><td> $CONT    </td><td> "" </td></tr>
-        <tr><td> $DATA    </td><td> provided raw-data of received Syslog-message (no evaluation of value return!) </td></tr>
-        <tr><td> $IGNORE  </td><td> 0 (0|1), if $IGNORE==1 the Syslog-dataset is ignored </td></tr>
+        <colgroup> <col width=15%> <col width=30%> <col width=45%> </colgroup>
+        <tr><td> <b>Variable</b>  </td><td> <b>Transfer value</b>    </td><td> <b>expected return format </b>     </td></tr>
+        <tr><td> $PRIVAL          </td><td> ""                       </td><td> (0 ... 191)                        </td></tr>
+        <tr><td> $FAC             </td><td> ""                       </td><td> (0 ... 23)                         </td></tr>
+        <tr><td> $SEV             </td><td> ""                       </td><td> (0 ... 7)                          </td></tr>
+        <tr><td> $TS              </td><td> Timestamp                </td><td> (YYYY-MM-DD hh:mm:ss)              </td></tr>
+        <tr><td> $HOST            </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $DATE            </td><td> ""                       </td><td> (YYYY-MM-DD)                       </td></tr>
+        <tr><td> $TIME            </td><td> ""                       </td><td> (hh:mm:ss)                         </td></tr>
+        <tr><td> $ID              </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $PID             </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $MID             </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $SDFIELD         </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $CONT            </td><td> ""                       </td><td>                                    </td></tr>
+        <tr><td> $DATA            </td><td> Raw data of the message  </td><td> no return evaluation               </td></tr>
+        <tr><td> $IGNORE          </td><td> 0                        </td><td> (0|1), if $IGNORE==1 
+                                                                               the syslog record  ignores         </td></tr>                                           
         </table>
         </ul>
-        <br>  
+        <br>
 
         The names of the variables corresponding to the field names and their primary meaning  denoted in attribute 
         <b>"parseProfile"</b> (explanation of the field data). <br><br>
@@ -3598,21 +3600,24 @@ attr &lt;name&gt; exclErrCond Error: none,
         
         <ul>  
         <table>  
-        <colgroup> <col width=20%> <col width=80%> </colgroup>
-        <tr><td> $PRIVAL  </td><td> "" (0 ... 191) </td></tr>
-        <tr><td> $FAC     </td><td> "" (0 ... 23) </td></tr>
-        <tr><td> $SEV     </td><td> "" (0 ... 7) </td></tr>
-        <tr><td> $TS      </td><td> Zeitstempel (YYYY-MM-DD hh:mm:ss) </td></tr>
-        <tr><td> $HOST    </td><td> "" </td></tr>
-        <tr><td> $DATE    </td><td> "" (YYYY-MM-DD) </td></tr>
-        <tr><td> $TIME    </td><td> "" (hh:mm:ss) </td></tr>
-        <tr><td> $ID      </td><td> "" </td></tr>
-        <tr><td> $PID     </td><td> "" </td></tr>
-        <tr><td> $MID     </td><td> "" </td></tr>
-        <tr><td> $SDFIELD </td><td> "" </td></tr>
-        <tr><td> $CONT    </td><td> "" </td></tr>
-        <tr><td> $DATA    </td><td> übergebene Rohdaten der Syslog-Mitteilung (keine Rückgabeauswertung!) </td></tr>
-        <tr><td> $IGNORE  </td><td> 0 (0|1), wenn $IGNORE==1 wird der Syslog-Datensatz ignoriert </td></tr>
+        <colgroup> <col width=15%> <col width=25%> <col width=60%> </colgroup>
+        <tr><td> <b>Variable</b>  </td><td> <b>Übergabewert</b>   </td><td> <b>erwartetes Rückgabeformat </b>  </td></tr>
+        <tr><td> $PRIVAL          </td><td> ""                    </td><td> (0 ... 191)                        </td></tr>
+        <tr><td> $FAC             </td><td> ""                    </td><td> (0 ... 23)                         </td></tr>
+        <tr><td> $SEV             </td><td> ""                    </td><td> (0 ... 7)                          </td></tr>
+        <tr><td> $TS              </td><td> Zeitstempel           </td><td> (YYYY-MM-DD hh:mm:ss)              </td></tr>
+        <tr><td> $HOST            </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $DATE            </td><td> ""                    </td><td> (YYYY-MM-DD)                       </td></tr>
+        <tr><td> $TIME            </td><td> ""                    </td><td> (hh:mm:ss)                         </td></tr>
+        <tr><td> $ID              </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $PID             </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $MID             </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $SDFIELD         </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $CONT            </td><td> ""                    </td><td>                                    </td></tr>
+        <tr><td> $DATA            </td><td> Rohdaten der Message  </td><td> keine Rückgabeauswertung           </td></tr>
+        <tr><td> $IGNORE          </td><td> 0                     </td><td> (0|1), wenn $IGNORE==1 
+                                                                            wird der Syslog-Datensatz 
+                                                                            ignoriert                          </td></tr>
         </table>
         </ul>
         <br>  
