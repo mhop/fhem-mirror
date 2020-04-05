@@ -494,34 +494,41 @@ sub Log2Syslog_Read {
   
   if($data) {      
       # parse Payload 
-      my (@load,$mlen,$msg,$tail);
-      if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {                   # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      my (@load,$ocount,$msg,$tail);
+      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {                   # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
-          my $i = 0;
-          $mlen = $+{mlen};
-          $tail = $+{tail}; 
-          $msg  = substr($tail,0,$mlen-(length($mlen)+1));
+          my $i   = 0;
+          $ocount = $+{ocount};
+          $tail   = $+{tail}; 
+          $msg    = substr($tail,0,$ocount-(1+length $ocount));
           chomp $msg;
           push @load, $msg;
           
-          if(length($tail) >= $mlen) {
-              $tail = substr($tail,$mlen-(length($mlen)+1)); 
+          if(length($tail) >= $ocount-(1+length $ocount)) {
+              $tail = substr($tail,$ocount-(1+length $ocount)); 
           } else {
               $tail = "";
           }  
           
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail \n"); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTET$i : $ocount"); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i   : $msg");
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSGLEN$i: ".length($msg)); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i  : $tail");
           
-          while($tail && $tail =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
+          while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {
               $i++;
-              $mlen = $+{mlen};
-              $tail = $+{tail};
-              $msg  = substr($tail,0,$mlen-(length($mlen)+1));
+              $ocount = $+{ocount};
+              $tail   = $+{tail};
+              $msg    = substr($tail,0,$ocount-(1+length $ocount));
               chomp $msg;
               push @load, $msg;
               next if(!$tail);
-              $tail = substr($tail,$mlen-(length($mlen)+1));           
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail");             
+              $tail = substr($tail,$ocount-(1+length $ocount));   
+              
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTET$i : $ocount"); 
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i   : $msg");
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSGLEN$i: ".length($msg)); 
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i  : $tail");        
           }   
       } else {
           @load = split("[\r\n]",$data);
