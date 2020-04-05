@@ -36,14 +36,14 @@ use strict;
 use warnings;
 use TcpServerUtils;
 use Scalar::Util qw(looks_like_number);
-use Encode qw(encode_utf8);
+use Encode qw(encode_utf8 decode_utf8);
 eval "use IO::Socket::INET;1"                                         or my $MissModulSocket = "IO::Socket::INET";   ## no critic 
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom   = "Net::Domain";        ## no critic 
 eval "use FHEM::Meta;1"                                               or my $modMetaAbsent   = 1;                    ## no critic 
 
 # Versions History intern:
-our %Log2Syslog_vNotesIntern = (
-  "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes  ",
+my %Log2Syslog_vNotesIntern = (
+  "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes (e.g. for Octet Count) ",
   "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
   "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
   "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
@@ -111,7 +111,7 @@ our %Log2Syslog_vNotesIntern = (
 );
 
 # Versions History extern:
-our %Log2Syslog_vNotesExtern = (
+my %Log2Syslog_vNotesExtern = (
   "5.10.0" => "04.04.2020 The new attribute 'timeSpec' can be set to send and receive/parse messages according to UTC or Local time format. ".
                           "Please refer to <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">Date and Time on the Internet: Timestamps</a> for further information  ",
   "5.9.0"  => "01.04.2020 The new option \"UniFi\" of attribute \"parseProfil\" provedes a new Parser for UniFi Controller Syslog messages ".
@@ -165,7 +165,7 @@ our %Log2Syslog_vNotesExtern = (
 );
 
 # Mappinghash BSD-Formatierung Monat
-our %Log2Syslog_BSDMonth = (
+my %Log2Syslog_BSDMonth = (
   "01" => "Jan",
   "02" => "Feb",
   "03" => "Mar",
@@ -253,12 +253,24 @@ my %RFC5425len = ("DL"  => 8192,          # max. Lange Message insgesamt mit TLS
                   "MID" => 32             # max. Länge MSGID
                   );
                   
+my %Log2Syslog_vHintsExt_en = (
+  "4" => "The guidelines for usage of <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Date and Time on the Internet: Timestamps</a>",
+  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protocol</a>",
+  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD) protocol</a>",
+  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
+);
+
+my %Log2Syslog_vHintsExt_de = (
+  "4" => "Die Richtlinien zur Verwendung von <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Datum und Zeit im Internet: Timestamps</a>",
+  "3" => "Die Beschreibung des <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protokoll</a>",
+  "2" => "Die Grundlagen des <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> Protokolls",
+  "1" => "Informationen über das <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> Syslog Protokoll"
+);
+                  
 ###############################################################################
 # Forward declarations
 #
 sub Log2Syslog_Log3slog;
-use vars qw(%Log2Syslog_vHintsExt_en);
-use vars qw(%Log2Syslog_vHintsExt_de);
 
 ###############################################################################
 sub Log2Syslog_Initialize {
@@ -500,7 +512,11 @@ sub Log2Syslog_Read {
           my $i   = 0;
           $ocount = $+{ocount};
           $tail   = $+{tail}; 
-          $msg    = substr($tail,0,$ocount);
+          if(length($tail) >= $ocount) {
+              $msg = substr($tail,0,$ocount);
+          } else {
+              $msg = $tail;
+          }
           push @load, $msg;
           $tail = substr($tail,$ocount); 
           
@@ -2355,26 +2371,6 @@ sub Log2Syslog_parsefilter {
   
 return($s);
 }
-
-#############################################################################################
-#                                       Hint Hash EN           
-#############################################################################################
-our %Log2Syslog_vHintsExt_en = (
-  "4" => "The guidelines for usage of <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Date and Time on the Internet: Timestamps</a>",
-  "3" => "The <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protocol</a>",
-  "2" => "The basics of <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD) protocol</a>",
-  "1" => "Informations about <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> syslog protocol"
-);
-
-#############################################################################################
-#                                       Hint Hash DE         
-#############################################################################################
-our %Log2Syslog_vHintsExt_de = (
-  "4" => "Die Richtlinien zur Verwendung von <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">RFC5425 Datum und Zeit im Internet: Timestamps</a>",
-  "3" => "Die Beschreibung des <a href=\"https://tools.ietf.org/pdf/rfc5425.pdf\">RFC5425 TLS Transport Protokoll</a>",
-  "2" => "Die Grundlagen des <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> Protokolls",
-  "1" => "Informationen über das <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> Syslog Protokoll"
-);
 
 1;
 
