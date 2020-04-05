@@ -492,43 +492,36 @@ sub Log2Syslog_Read {
       ($st,$data,$hash) = Log2Syslog_getifdata($hash,$len,$mlen,$reread);
   }
   
-  if($data) {      
-      # parse Payload 
+  if($data) {                                                           # parse Payload 
       my (@load,$ocount,$msg,$tail);
-      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {                   # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {                  # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
+          use bytes;
           my $i   = 0;
           $ocount = $+{ocount};
           $tail   = $+{tail}; 
-          $msg    = substr($tail,0,$ocount-(1+length $ocount));
-          chomp $msg;
+          $msg    = substr($tail,0,$ocount);
           push @load, $msg;
+          $tail = substr($tail,$ocount); 
           
-          if(length($tail) >= $ocount-(1+length $ocount)) {
-              $tail = substr($tail,$ocount-(1+length $ocount)); 
-          } else {
-              $tail = "";
-          }  
-          
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTET$i : $ocount"); 
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i   : $msg");
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSGLEN$i: ".length($msg)); 
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i  : $tail");
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i       : $msg");
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LENGTH_MSG$i: ".length($msg)); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i      : $tail");
           
           while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
-              $msg    = substr($tail,0,$ocount-(1+length $ocount));
-              chomp $msg;
+              $msg    = substr($tail,0,$ocount);
               push @load, $msg;
               next if(!$tail);
-              $tail = substr($tail,$ocount-(1+length $ocount));   
+              $tail = substr($tail,$ocount);   
               
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTET$i : $ocount"); 
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i   : $msg");
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSGLEN$i: ".length($msg)); 
-              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i  : $tail");        
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i       : $msg");
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LENGTH_MSG$i: ".length($msg)); 
+              Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i      : $tail");  
           }   
       } else {
           @load = split("[\r\n]",$data);
@@ -612,7 +605,6 @@ sub Log2Syslog_getifdata {
               $st   = "receive error - see logfile";
           } else {
               my $dl = length($data);
-              chomp $data;
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - Buffer ".$dl." chars ready to parse:\n$data");
           } 
           return ($st,$data,$hash);  
@@ -691,7 +683,6 @@ sub Log2Syslog_getifdata {
                   $hash = $shash;
                   if($data) {
                       my $dl = length($data); 
-                      chomp $data;
                       Log2Syslog_Log3slog ($shash, 2, "Log2Syslog $sname - WARNING - Buffer overrun ! Enforce parse data.") if($buforun);
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars ready to parse:\n$data");
                   }
@@ -701,7 +692,6 @@ sub Log2Syslog_getifdata {
                   if($eof) {
                       $hash  = $shash;
                       my $dl = length($data); 
-                      chomp $data;
                       Log2Syslog_Log3slog ($shash, 5, "Log2Syslog $sname - Buffer $dl chars after EOF ready to parse:\n$data") if($data);
                       return ($st,$data,$hash);                      
                   }
