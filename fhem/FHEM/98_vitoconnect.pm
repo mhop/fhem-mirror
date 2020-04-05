@@ -142,6 +142,10 @@
 # 2019-12-25		heating.solar.power.cumulativeProduced.value, heating.circuits.X.geofencing.active, heating.circuits.X.geofencing.status hinzugefügt
 #                   Behoben: Readings wurden nicht mehr aktualisiert, wenn Resource an weiteren Stellen nicht als JSON interpretiert werden konnte(Forum: #390)
 #
+# 2020-03-02      Bei Aktionen wird nicht mehr auf defined($data) sondern auf ne "" getestet.
+# 2020-04-05      s.o. 2. Versuch 
+#
+#
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
 #                 Nicht bei jedem Lesen neu einloggen (wenn möglich)
@@ -159,7 +163,6 @@
 #							heating.dhw.temperature.hysteresis.setHysteresis action: hysteresis und
 #							heating.dhw.temperature.temp2.setTargetTemperature action: temperature implementieren
 #
-
 
 package main;
 use strict;
@@ -182,13 +185,9 @@ my $apiURLBase = 'https://api.viessmann-platform.io';
 my $general = '/general-management/installations?expanded=true&';
 my $callback_uri = "vicare://oauth-callback/everest"; 
 
-#my $RequestList2 = {
-#    "heating.boiler.serial.value" 												=> "Kessel_Seriennummer"
-#};
-
 my $RequestList = {
     "heating.boiler.serial.value" 										=> "Kessel_Seriennummer",
-    "heating.boiler.temperature.value"									=> "Kesseltemperatur_exact",
+    "heating.boiler.temperature.value"									=> "Kessel_Solltemperatur",
     "heating.boiler.sensors.temperature.commonSupply.status"			=> "Kessel_Common_Supply",
     "heating.boiler.sensors.temperature.commonSupply.value"				=> "Kessel_Common_Supply_Temperatur",
     "heating.boiler.sensors.temperature.main.status" 					=> "Kessel_Status",
@@ -516,7 +515,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  	  if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK2-Heizkurve-Niveau") {
@@ -533,7 +532,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Heizkurve-Niveau") {
@@ -550,7 +549,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;		
 	} elsif ($opt eq "HK1-Heizkurve-Steigung") {
@@ -567,7 +566,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK2-Heizkurve-Steigung") {
@@ -584,7 +583,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;		
 	} elsif ($opt eq "HK3-Heizkurve-Steigung") {
@@ -601,7 +600,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;		
 	} elsif ($opt eq "HK1-Urlaub_Start") {
@@ -619,7 +618,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK2-Urlaub_Start") {
@@ -637,7 +636,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Urlaub_Start") {
@@ -655,7 +654,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK1-Urlaub_Ende") {
@@ -672,7 +671,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK2-Urlaub_Ende") {
@@ -689,7 +688,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Urlaub_Ende") {
@@ -706,7 +705,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK1-Urlaub_unschedule") {
@@ -722,7 +721,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;		
 	} elsif ($opt eq "HK2-Urlaub_unschedule") {
@@ -738,7 +737,7 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Urlaub_unschedule") {
@@ -754,8 +753,8 @@ sub vitoconnect_Set($@) {
       };
       # Log3 $name, 1, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
-  		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
+  	   if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  	   } else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;			
 	} elsif ($opt eq "HK1-Betriebsart") {
 		vitoconnect_action($hash);
@@ -769,7 +768,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  	  if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK2-Betriebsart") {
@@ -783,7 +782,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK3-Betriebsart") {
@@ -798,7 +797,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK1-Solltemperatur_comfort_aktiv") {
@@ -812,7 +811,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;	
 	} elsif ($opt eq "HK2-Solltemperatur_comfort_aktiv") {
@@ -827,7 +826,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;
 	} elsif ($opt eq "HK3-Solltemperatur_comfort_aktiv") {
@@ -842,7 +841,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;		
 	} elsif ($opt eq "HK1-Solltemperatur_comfort") {
@@ -857,7 +856,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK2-Solltemperatur_comfort") {
@@ -872,7 +871,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Solltemperatur_comfort") {
@@ -888,7 +887,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;		
 	} elsif ($opt eq "HK1-Solltemperatur_eco_aktiv") {
@@ -903,7 +902,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;
 	} elsif ($opt eq "HK2-Solltemperatur_eco_aktiv") {
@@ -918,7 +917,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;
 	} elsif ($opt eq "HK3-Solltemperatur_eco_aktiv") {
@@ -933,7 +932,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
 		return undef;
 	} elsif ($opt eq "HK1-Solltemperatur_normal") {
@@ -949,8 +948,8 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
-  		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
+  	  if ($err ne "") { Log3 $name, 1, "$name $opt $args[0]: Fehler während der Befehlsausführung: err= $err data= $data";
+  		} else { Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;
 	} elsif ($opt eq "HK2-Solltemperatur_normal") {
 		vitoconnect_action($hash);
@@ -965,7 +964,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Solltemperatur_normal") {
@@ -981,7 +980,7 @@ sub vitoconnect_Set($@) {
       };
       #Log3 $name, 3, "$name: $param->{data}"; 
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne "" || defined($data)) {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
+  		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name $opt $args[0]: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK1-Solltemperatur_reduziert") {
@@ -996,7 +995,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK2-Solltemperatur_reduziert") {
@@ -1011,7 +1010,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "HK3-Solltemperatur_reduziert") {
@@ -1026,7 +1025,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "WW-einmaliges_Aufladen") {
@@ -1041,7 +1040,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
    	};
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err  ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 5, "set $name $opt $args[0]"; }   
 		return undef;
 	} elsif ($opt eq "WW-Zirkulationspumpe_Zeitplan") {
@@ -1060,7 +1059,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	} elsif ($opt eq "WW-Solltemperatur") {
@@ -1075,7 +1074,7 @@ sub vitoconnect_Set($@) {
 			sslargs    => {SSL_verify_mode => 0},
       };
       (my $err, my $data) = HttpUtils_BlockingGet($param);
-  		if ($err ne ""|| defined($data)) { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
+  		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
 		return undef;	
 	}
