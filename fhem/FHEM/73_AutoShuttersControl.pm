@@ -663,7 +663,7 @@ sub Set {
         RenewSunRiseSetShuttersTimer($hash);
     }
     elsif ( lc $cmd eq 'renewtimer' ) {
-        return "usage: $cmd" if ( scalar( @{$a} ) > 0 );
+        return "usage: $cmd" if ( scalar( @{$a} ) > 1 );
         CreateSunRiseSetShuttersTimer( $hash, $a->[0] );
     }
     elsif ( lc $cmd eq 'scanforshutters' ) {
@@ -1110,7 +1110,8 @@ sub EventProcessingWindowRec {
               )
             {
                 if (   $shutters->getIfInShading
-                    && $shutters->getShadingPos != $shutters->getStatus )
+                    && $shutters->getShadingPos != $shutters->getStatus
+                    && $shutters->getShadingMode ne 'absent' )
                 {
                     $shutters->setLastDrive('shading in');
                     $shutters->setNoDelay(1);
@@ -8434,7 +8435,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.24",
+  "version": "v0.8.25",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
