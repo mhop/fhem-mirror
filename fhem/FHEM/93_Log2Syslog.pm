@@ -28,6 +28,7 @@
 #       RFC 3164 https://tools.ietf.org/html/rfc3164 and
 #       TLS Transport according to RFC 5425 https://tools.ietf.org/pdf/rfc5425.pdf
 #       Date and Time according to RFC 3339 https://tools.ietf.org/html/rfc3339
+#       RFC 6587 Transmission of Syslog Messages over TCP
 #
 ##########################################################################################################################
 package main;
