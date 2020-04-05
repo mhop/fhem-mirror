@@ -496,6 +496,7 @@ sub Log2Syslog_Read {
       # parse Payload 
       my (@load,$mlen,$msg,$tail);
       if($data =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {                   # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+          Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
           my $i = 0;
           $mlen = $+{mlen};
           $tail = $+{tail}; 
@@ -509,7 +510,7 @@ sub Log2Syslog_Read {
               $tail = "";
           }  
           
-          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail"); 
+          Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> LEN$i: $mlen, MSG$i: $msg, TAIL$i: $tail \n"); 
           
           while($tail && $tail =~ /^(?<mlen>(\d+))\s(?<tail>.*)/s) {
               $i++;
