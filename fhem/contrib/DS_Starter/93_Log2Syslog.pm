@@ -43,7 +43,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 our %Log2Syslog_vNotesIntern = (
-  "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, minor fixes  ",
+  "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes  ",
   "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
   "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
   "5.8.2"  => "28.07.2019  fix warning uninitialized value in numeric ge (>=) at line 662 ",
@@ -1146,9 +1146,9 @@ sub Log2Syslog_getTimeFromOffset {
  my $tz = AttrVal($name, "timeSpec", "Local");
  
  my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/;
- return $dt if(!$year || !$month ||!$mday);
+ return $dt if(!$year || !$month || !$mday);
  my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/;
- return $dt if(!$hour || !$min ||!$sec);
+ return $dt if(!$hour || !$min || !$sec);
  
  $year -= 1900;
  $month--;
