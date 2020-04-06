@@ -340,15 +340,14 @@ sub Log2Syslog_Define {
   
   $hash->{MYFQDN} = $myfqdn // $hash->{MYHOST};       
   
-  if(int(@a)-3 < 0){
-      # Einrichtung Servermode (Collector)
+  if(int(@a)-3 < 0){                                       # Einrichtung Servermode (Collector)
       $hash->{MODEL}   = "Collector";
       $hash->{PROFILE} = "Automatic";                          
       readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);  # Fehlerzähler für Parse-Errors auf 0
       Log2Syslog_Log3slog  ($hash, 3, "Log2Syslog $name - entering Syslog servermode ..."); 
       Log2Syslog_initServer("$name,global");
-  } else {
-      # Sendermode
+  
+  } else {                                                 # Sendermode
       $hash->{MODEL} = "Sender";
       Log2Syslog_setidrex($hash,$a[3]) if($a[3]);
       Log2Syslog_setidrex($hash,$a[4]) if($a[4]);
@@ -409,6 +408,7 @@ sub Log2Syslog_initServer {
       InternalTimer(gettimeofday()+1, "Log2Syslog_initServer", "$name,$global", 0);
       return;
   }
+  
   # Inititialisierung FHEM ist fertig -> Attribute geladen
   my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 1514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
