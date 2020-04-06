@@ -1,5 +1,5 @@
 ##########################################################################################################################
-# $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $
+# $Id: 93_Log2Syslog.pm 21611 2020-04-05 21:00:33Z DS_Starter $
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
@@ -28,6 +28,7 @@
 #       RFC 3164 https://tools.ietf.org/html/rfc3164 and
 #       TLS Transport according to RFC 5425 https://tools.ietf.org/pdf/rfc5425.pdf
 #       Date and Time according to RFC 3339 https://tools.ietf.org/html/rfc3339
+#       RFC 6587 Transmission of Syslog Messages over TCP
 #
 ##########################################################################################################################
 package main;
@@ -43,6 +44,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 my %Log2Syslog_vNotesIntern = (
+  "5.10.1" => "06.04.2020  support time-secfrac of RFC 3339, minor fix ",
   "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes (e.g. for Octet Count) ",
   "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
   "5.8.3"  => "31.03.2020  fix warning uninitialized value \$pp in pattern match (m//) at line 465, Forum: topic,75426.msg1036553.html#msg1036553, some code review ",
@@ -444,7 +446,7 @@ sub Log2Syslog_initServer {
   $hash->{PROTOCOL}         = $protocol;
   $hash->{SEQNO}            = 1;                            # PROCID wird kontinuierlich pro empfangenen Datensatz hochgezählt
   $hash->{HELPER}{OLDSEQNO} = $hash->{SEQNO};               # Init Sequenznummer f. Ratenbestimmung
-  $hash->{INTERFACE}        = $lh?$lh:"global";
+  $hash->{INTERFACE}        = $lh // "global";
   
   Log2Syslog_Log3slog  ($hash, 3, "Log2Syslog $name - port $hash->{PORT}/$protocol opened for Syslog Collector on interface \"$hash->{INTERFACE}\"");
   readingsSingleUpdate ($hash, "state", "initialized", 1);
@@ -512,13 +514,13 @@ sub Log2Syslog_Read {
           my $i   = 0;
           $ocount = $+{ocount};
           $tail   = $+{tail}; 
-          if(length($tail) >= $ocount) {
-              $msg = substr($tail,0,$ocount);
-          } else {
-              $msg = $tail;
-          }
+          $msg    = substr($tail,0,$ocount);
           push @load, $msg;
-          $tail = substr($tail,$ocount); 
+          if(length($tail) >= $ocount) {
+              $tail = substr($tail,$ocount);
+          } else {
+              $tail = "";
+          }
           
           Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
           Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i       : $msg");
@@ -745,8 +747,8 @@ sub Log2Syslog_parsePayload {
   
   # Hash zur Umwandlung Felder in deren Variablen
   my ($prival,$ts,$host,$date,$time,$id,$pid,$mid,$sdfield,$cont);
-  my $fac = "";
-  my $sev = "";
+  my ($fac,$sev,$msec) = ("","","");
+
   my %fh = (PRIVAL  => \$prival,
             FAC     => \$fac,
             SEV     => \$sev,
@@ -873,11 +875,12 @@ sub Log2Syslog_parsePayload {
       if($prival && $ietf) {
           # Standard IETF-Syslog incl. VERSION
           if($ietf == 1) {
-              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;      
+              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;      
               $prival  = $+{prival};      # must
               $ietf    = $+{ietf};        # should
               $date    = $+{date};        # must
               $time    = $+{time};        # must
+              $msec    = $+{msec};        # can
               $to      = $+{to};          # Time Offset (UTC etc.) 
               $host    = $+{host};        # should 
               $id      = $+{id};          # should
@@ -891,10 +894,11 @@ sub Log2Syslog_parsePayload {
           }
       } else {
           # IETF-Syslog ohne VERSION
-          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
+          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
           $prival  = $+{prival};      # must
           $date    = $+{date};        # must
           $time    = $+{time};        # must
+          $msec    = $+{msec};        # can
           $to      = $+{to};          # Time Offset (UTC etc.) 
           $host    = $+{host};        # should 
           $id      = $+{id};          # should
@@ -909,7 +913,7 @@ sub Log2Syslog_parsePayload {
           Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");  
           Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: ".($prival // '').", IETF: ".($ietf // '').", DATE: ".($date // '').", TIME: ".($time // '').", OFFSET: ".($to // '').", HOST: ".($host // '').", ID: ".($id // '').", PID: ".($pid // '').", MID: ".($mid // '').", SDFIELD: ".($sdfield // '').", CONT: ".($cont // ''));        
       } else {
-          $ts = Log2Syslog_getTimeFromOffset ($name,$to,$date,$time);
+          $ts = Log2Syslog_getTimeFromOffset ($name,$to,$date,$time,$msec);
           #$ts = "$date $time";
       
           if(looks_like_number($prival)) {
@@ -1144,7 +1148,7 @@ return ($err,$ignore,$sev,$phost,$ts,$pl);
 #
 ################################################################
 sub Log2Syslog_getTimeFromOffset {
- my ($name,$to,$date,$time) = @_;
+ my ($name,$to,$date,$time,$msec) = @_;
  
  my $dt = "$date $time";
  return ($dt) if(!$to);
@@ -1161,7 +1165,8 @@ sub Log2Syslog_getTimeFromOffset {
  
  my ($offset,$utc);
  my $localts = fhemTimeLocal($sec, $min, $hour, $mday, $month, $year);
- 
+ $localts   .= $msec if($msec && $msec =~ /^\.\d+/);
+
  if($to =~ /Z/ && $tz ne "UTC") {                      # Zulu Time wurde geliefert -> Umrechnung auf Local
      $offset = fhemTzOffset($localts);                 # Offset zwischen Localtime und UTC
      $utc    = $localts - $offset;
@@ -1513,7 +1518,7 @@ sub Log2Syslog_Attr {
     
     if ($aName =~ /rateCalcRerun/) {
         unless ($aVal =~ /^[0-9]+$/) { return "Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
-        $_[3] = 60 if($aVal < 60);
+        return qq{Value of "$aName" must be >= 60. Please correct it} if($aVal < 60);
         RemoveInternalTimer($hash, "Log2Syslog_trate");
         InternalTimer(gettimeofday()+5, "Log2Syslog_trate", $hash, 0);
     }
@@ -1551,9 +1556,8 @@ sub Log2Syslog_Attr {
     }
     
     if ($cmd eq "set" && $aName =~ /parseFn/) {
-         $_[3] = "{$aVal}" if($aVal !~ m/^\{.*\}$/s);
-         $aVal = $_[3];
-          my %specials = (
+         return qq{The function syntax is wrong. "$aName" must be enclosed by "{...}".} if($aVal !~ m/^\{.*\}$/s);
+         my %specials = (
              "%IGNORE"  => "0",
              "%DATA"    => "1",
              "%PRIVAL"  => "1",
@@ -1568,9 +1572,9 @@ sub Log2Syslog_Attr {
              "%FAC"     => "1",
              "%SDFIELD" => "1",
              "%SEV"     => "1"
-          );
-          my $err = perlSyntaxCheck($aVal, %specials);
-          return $err if($err);
+         );
+         my $err = perlSyntaxCheck($aVal, %specials);
+         return $err if($err);
     }
     
     if ($aName =~ /parseProfile/) {
@@ -1626,8 +1630,6 @@ sub Log2Syslog_eventlog {
   my ($prival,$data,$sock,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      # $st = AttrVal($name, "disable", "0"); 
-      # $st = ($st =~ /maintenance/)?$st:"disabled";
       my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
       readingsSingleUpdate($hash, "state", $st, $evt);
       $hash->{HELPER}{OLDSTATE} = $st;
@@ -1703,8 +1705,6 @@ sub Log2Syslog_fhemlog {
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
-      # $st = AttrVal($name, "disable", "1"); 
-      # $st = ($st =~ /maintenance/)?$st:"disabled";
       my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
       readingsSingleUpdate($hash, "state", $st, $evt);
       $hash->{HELPER}{OLDSTATE} = $st;
@@ -2047,8 +2047,8 @@ sub Log2Syslog_setpayload {
   my ($hash,$prival,$date,$time,$otp,$lt) = @_;
   my $name   = $hash->{NAME};
   my $ident  = ($hash->{HELPER}{IDENT}?$hash->{HELPER}{IDENT}:$name)."_".$lt;
-  my $myhost = $hash->{MYHOST}?$hash->{MYHOST}:"0.0.0.0";
-  my $myfqdn = $hash->{MYFQDN}?$hash->{MYFQDN}:$myhost;
+  my $myhost = $hash->{MYHOST} // "0.0.0.0";
+  my $myfqdn = $hash->{MYFQDN} // $myhost;
   my $lf     = AttrVal($name, "logFormat", "IETF");
   my $cdl    = AttrVal($name, "contDelimiter", "");         # Trennzeichen vor Content (z.B. für Synology nötig)
   my $data;
@@ -2321,12 +2321,12 @@ sub Log2Syslog_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21611 2020-04-05 21:00:33Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21582 2020-04-02 20:59:26Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21611 2020-04-05 21:00:33Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2817,7 +2817,7 @@ attr &lt;name&gt; exclErrCond Error: none,
         The following variables are commited to the function. They can be used for programming, processing and for 
         value return. Variables which are provided as blank, are marked as "". <br>
         In case of restrictions the expected format of variables return is specified in "()".
-        Otherwise the variable is usable for free.        
+        Otherwise the variable is usable for free. The function must be enclosed by { }.     
         <br><br>
         
         <ul>  
@@ -2968,9 +2968,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <a name="rateCalcRerun"></a>
     <li><b>rateCalcRerun &lt;Zeit in Sekunden&gt; </b><br>
         <br>
-        Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds (>=60).  
-        Values less than 60 seconds are corrected to 60 seconds automatically.        
-        Default is 60 seconds.
+        Rerun cycle for calculation of log transfer rate (Reading "Transfered_logs_per_minute") in seconds (>=60).     
+        Default: 60 seconds.
     </li>
     </ul>
     <br>
@@ -3588,7 +3587,7 @@ attr &lt;name&gt; exclErrCond Error: none,
         empfangene Syslog-Meldung angewendet. Der Funktion werden folgende Variablen übergeben die zur Verarbeitung
         und zur Werterückgabe genutzt werden können. Leer übergebene Variablen sind als "" gekennzeichnet. <br>
         Das erwartete Rückgabeformat einer Variable wird in "()" angegeben sofern sie Restriktionen unterliegt.
-        Ansonsten ist die Variable frei verfügbar.        
+        Ansonsten ist die Variable frei verfügbar. Die Funktion ist in { } einzuschließen.        
         <br><br>
         
         <ul>  
@@ -3740,9 +3739,8 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <a name="rateCalcRerun"></a>
     <li><b>rateCalcRerun &lt;Zeit in Sekunden&gt; </b><br>
         <br>
-        Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden (>=60).
-        Eingegebene Werte <60 Sekunden werden automatisch auf 60 Sekunden korrigiert.        
-        Default sind 60 Sekunden.
+        Wiederholungszyklus für die Bestimmung der Log-Transferrate (Reading "Transfered_logs_per_minute") in Sekunden (>=60).        
+        Default: 60 Sekunden.
     </li>
     </ul>
     <br>
