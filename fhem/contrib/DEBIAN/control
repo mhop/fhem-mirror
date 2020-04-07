@@ -10,4 +10,4 @@ Priority: extra
 Architecture: all
 Homepage: http://www.fhem.de
 Depends: perl-base (>= 5.6.2), libdevice-serialport-perl (>= 1.0), libwww-perl (>= 1.0), libio-socket-ssl-perl (>= 1.0), libcgi-pm-perl, libjson-perl, sqlite3, libdbd-sqlite3-perl, libtext-diff-perl
-Suggests: libtimedate-perl, libmail-imapclient-perl, libgd-graph-perl, libtext-csv-perl, libxml-simple-perl, liblist-moreutils-perl, ttf-liberation, libimage-librsvg-perl, libgd-text-perl, libsocket6-perl, libio-socket-inet6-perl, libmime-base64-perl, libimage-info-perl, libusb-1.0-0-dev, libarchive-extract-perl, libarchive-zip-perl
+Suggests: libtimedate-perl, libmail-imapclient-perl, libgd-graph-perl, libtext-csv-perl, libxml-simple-perl, liblist-moreutils-perl, fonts-liberation, libimage-librsvg-perl, libgd-text-perl, libsocket6-perl, libio-socket-inet6-perl, libmime-base64-perl, libimage-info-perl, libusb-1.0-0-dev, libarchive-extract-perl, libarchive-zip-perl
