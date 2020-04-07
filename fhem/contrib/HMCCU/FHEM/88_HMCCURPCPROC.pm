@@ -445,7 +445,7 @@ sub HMCCURPCPROC_DelayedShutdown ($)
 	my $hmccu_hash = $hash->{IODev};
 	my $ifname = $hash->{rpcinterface};
 	
-	my $delay = max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
+	my $delay = HMCCU_Max (AttrVal ("global", "maxShutdownDelay", 10)-2, 0);
 
 	# Shutdown RPC server
 	if (defined ($hmccu_hash) && exists ($hmccu_hash->{hmccu}{interfaces}{$ifname}{manager}) &&

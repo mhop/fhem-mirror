@@ -205,17 +205,14 @@ use vars qw(%HMCCU_SCRIPTS);
 
 %HMCCU_ATTR = (
 	'BLIND' => {
-		'ccureadingname' => 'LEVEL$:pct',
 		'webCmd' => 'up:down:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
-		'ccureadingname' => 'LEVEL$:pct',
 		'webCmd' => 'up:down:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
-		'ccureadingname' => 'LEVEL$:pct',
 		'webCmd' => 'up:down:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
@@ -228,7 +225,6 @@ use vars qw(%HMCCU_SCRIPTS);
 		'widgetOverride' => 'toggle:uzsuToggle,off,on'
 	},
 	'DIMMER' => {
-		'ccureadingname' => 'LEVEL$:pct',
 		'webCmd' => 'pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
@@ -238,19 +234,16 @@ use vars qw(%HMCCU_SCRIPTS);
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
-		'ccureadingname' => 'SET_TEMPERATURE$:desired-temp;ACTUAL_TEMPERATURE$:measured-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
-		'ccureadingname' => 'SET_TEMPERATURE$:desired-temp;ACTUAL_TEMPERATURE$:measured-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
-		'ccureadingname' => 'SET_POINT_TEMPERATURE$:desired-temp;ACTUAL_TEMPERATURE$:measured-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
