@@ -293,6 +293,17 @@
 #   RCnoName20_17E9 minus  MS;P0=233;P1=-7903;P3=-278;P5=-738;P6=679;D=0105050563056363636363630563050563050505050505630563050505630505;CP=0;SP=1;R=71;O;m1;
 #}
 ###############################################################################################################################################################################
+# - Remote control Momento for wireless digital picture frame [Protocol 97]
+#{  elektron-bbs 2020-03-21
+#		0x0000064147
+#     iiiiiiibss - i = 7 nibbles ident, b = 1 nibble button code, s = 1 byte checksum over 4 bytes
+#   Short press repeatedly message 3 times, long press repeatedly until release.
+#   When sending, the original message is not reproduced, but the recipient also reacts to the messages generated in this way.
+#   Momento_0000064 play/pause MU;P0=-294;P1=237;P2=5829;P3=-3887;P4=1001;P5=-523;P6=504;P7=-995;D=01010101010101010101010234545454545454545454545454545454545454545456767454567454545456745456745456745454523454545454545454545454545454545454545454545676745456745454545674545674545674545452345454545454545454545454545454545454545454567674545674545454567454;CP=4;R=45;O; 
+#   Momento_0000064 power      MU;P0=-998;P1=-273;P2=256;P3=5830;P4=-3906;P5=991;P6=-527;P7=508;D=12121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121345656565656565656565656565656565656565656567070565670565656565670567056565670707034565656565656565656565656565656565656565656707056567;CP=2;R=40;O;
+#   Momento_0000064 up         MU;P0=-1005;P1=-272;P2=258;P3=5856;P4=-3902;P5=1001;P6=-520;P7=508;D=0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121213456565656565656565656565656565656565656565670705656705656567056565670565670567056345656565656565656565656565656565656565656567070565;CP=2;R=63;O;
+#}
+###############################################################################################################################################################################
 # !!! ToDo´s !!!
 #     - LED lights, counter battery-h reading --> commandref hour_counter module
 #     -
@@ -637,6 +648,22 @@ my %models = (
 										Protocol 	=> "P20",
 										Typ				=> "remote"
 									},
+	"Momento" =>	{	"0001" => "power",
+									"0010" => "play/pause",
+									"0011" => "back",
+									"0100" => "up",
+									"0101" => "menu",
+									"0110" => "left",
+									"0111" => "ok",
+									"1000" => "right",
+									"1001" => "down",
+									"1010" => "info",
+									"1011" => "mode",
+									"1100" => "help",
+									hex_lengh	=> "10",
+									Protocol 	=> "P97",
+									Typ				=> "remote"
+								},
 	"unknown" =>	{	Protocol	=> "any",
 									hex_lengh	=> "",
 									Typ				=> "not_exist"
@@ -646,7 +673,7 @@ my %models = (
 #############################
 sub SD_UT_Initialize($) {
 	my ($hash) = @_;
-	$hash->{Match}			= "^P(?:14|20|26|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95)#.*";
+	$hash->{Match}			= "^P(?:14|20|26|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95|97)#.*";
 	$hash->{DefFn}			= "SD_UT_Define";
 	$hash->{UndefFn}		= "SD_UT_Undef";
 	$hash->{ParseFn}		= "SD_UT_Parse";
@@ -660,6 +687,7 @@ sub SD_UT_Initialize($) {
 		"MD_2003R.*"	 => {ATTR => "model:MD_2003R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"MD_210R.*"	 => {ATTR => "model:MD_210R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"MD_2018R.*"	 => {ATTR => "model:MD_2018R", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
+		"Momento.*"	 => {ATTR => "model:Momento", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"OR28V.*"	 => {ATTR => "model:OR28V", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"RCnoName20.*"	 => {ATTR => "model:RCnoName20", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
 		"Techmar.*"	 => {ATTR => "model:Techmar", FILTER => "%NAME", autocreateThreshold => "3:180", GPLOT => ""},
@@ -718,8 +746,12 @@ sub SD_UT_Define($$) {
 
 	### [6] checks MD_2003R | MD_210R | MD_2018R ###
 	return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){6}" if (($a[2] eq "MD_2003R" || $a[2] eq "MD_210R" || $a[2] eq "MD_2018R") && not $a[3] =~ /^[0-9a-fA-F]{6}/s);
-	### [7] checks Hoermann HSM4 | Krinner_LUMIX ###
-	return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){7}" if (($a[2] eq "HSM4" || $a[2] eq "Krinner_LUMIX") && not $a[3] =~ /^[0-9a-fA-F]{7}/s);
+	
+	### [7] checks Hoermann HSM4 | Krinner_LUMIX | Momento ###
+	if (($a[2] eq "HSM4" || $a[2] eq "Krinner_LUMIX" || $a[2] eq "Momento") && not $a[3] =~ /^[0-9a-fA-F]{7}/s) {
+		return "Wrong HEX-Value! ($a[3]) $a[2]  Hex-value to short or long (must be 7 chars) or not hex (0-9 | a-f | A-F){7}";
+	}
+
 	### [7] checks Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx (tristate code)###
 	return "Wrong tristate code! ($a[3]) $a[2] code to short or long (must be 7 chars) or values not 0, 1 or F" if (($a[2] eq "Tedsen_SKX1xx" || $a[2] eq "Tedsen_SKX2xx" || $a[2] eq "Tedsen_SKX4xx" || $a[2] eq "Tedsen_SKX6xx") && not $a[3] =~ /^[01fF]{7}$/s);
 	### [8 nibble] checks Techmar ###
@@ -886,6 +918,11 @@ sub SD_UT_Set($$$@) {
 			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 bits
 			$msg = $models{$model}{Protocol} . "#" . $adr;
 			$msgEnd = "#R" . $repeats;
+		############ Momento ############
+		} elsif ($model eq "Momento") {
+			my $adr = sprintf( "%028b", hex($definition[1]));	# argument 1 - adress to binary with 28 bits
+			$msg = $models{$model}{Protocol} . "#" . $adr;
+			$msgEnd = "#R" . $repeats;
 		############ xavax ############
 		} elsif ($model eq "xavax") {
 			my $adr = sprintf( "%016b", hex($definition[1]));	# argument 1 - adress to binary with 16 bits
@@ -921,6 +958,13 @@ sub SD_UT_Set($$$@) {
 				my $save2 = $save;
 				$save2 =~ tr/01/10/;									# invert message (nibble6 invert = nibble4)
 				$msg .= $save."0000".$save2.$msgEnd;	# 0000 = nibble5 every?
+			############ Momento ############
+			} elsif ($model eq "Momento") {
+				$definition[1] .= sprintf('%X', oct("0b$save"));	# button
+				my $sum = hex(substr($definition[1],0,2)) + hex(substr($definition[1],2,2)) + hex(substr($definition[1],4,2)) + hex(substr($definition[1],6,2));
+				$msg .= $save . sprintf ("%08b",$sum) . $msgEnd;
+				Log3 $name, 5, "$ioname: $name SD_UT_Set $definition[1] " . sprintf('%X', $sum);
+			############ Techmar ############
 			} elsif ($model eq "Techmar") {
 				my $invert = $save;
 				$invert =~ tr/01/10/;									# invert byte 4 (byte5 = inverted byte 4)
@@ -1249,6 +1293,19 @@ sub SD_UT_Parse($$) {
 			$model = "xavax";
 			$name = "xavax_" . $deviceCode;
 		}
+		if (!$def && $protocol == 97) {
+			### Remote control Momento [P97] ###
+			my $sum = hex(substr($rawData,0,2)) + hex(substr($rawData,2,2)) + hex(substr($rawData,4,2)) + hex(substr($rawData,6,2));
+			if ($sum != hex(substr($rawData,8,2))) {
+				Log3 $iohash, 3, "$ioname: SD_UT_Parse device Momento - ERROR checksum $sum != " . hex(substr($rawData,8,2));
+				return "";
+			}
+			$deviceCode = substr($rawData,0,7);
+			$devicedef = "Momento " . $deviceCode;
+			$def = $modules{SD_UT}{defptr}{$devicedef};
+			$model = "Momento";
+			$name = "Momento_" . $deviceCode;
+		}
 	}
 
 	if ($hlen == 11 && $protocol == 69) {
@@ -1312,7 +1369,7 @@ sub SD_UT_Parse($$) {
 	readingsBeginUpdate($hash);
 
 	############ Westinghouse_Delancey RH787T ############ Protocol 83 or 30 ############
-  	if ($model eq "RH787T" && ($protocol == 83 || $protocol == 30)) {
+  if ($model eq "RH787T" && ($protocol == 83 || $protocol == 30)) {
 		$state = substr($bitData,6,6);
 		$deviceCode = substr($bitData,1,4);
 
@@ -1510,6 +1567,10 @@ sub SD_UT_Parse($$) {
 	} elsif ($model eq "xavax" && $protocol == 26) {
 		$state = substr($bitData,32,8);
 		$deviceCode = substr($rawData,0,4);
+	### Remote control Momento [P97] ###
+	} elsif ($model eq "Momento" && $protocol == 97) {
+		$state = substr($bitData,28,4);
+		$deviceCode = substr($rawData,0,7);
 	############ unknown ############
 	} else {
 		readingsBulkUpdate($hash, "state", "???");
@@ -1794,6 +1855,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - Manax RCS250&nbsp;&nbsp;&nbsp;<small>(module model: RC_10 | protocol 90)</small></ul>
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(module model: OR28V | protocol 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(module model: RC_10 | protocol 90)</small></ul>
+	 <ul> - Momento (remote control for wireless digital picture frame)&nbsp;&nbsp;&nbsp;<small>(module model: Momento | protocol 97)</small></ul>
 	 <ul> - NEFF or Refsta Topdraft (Tecnowind) kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: SF01_01319004 | protocol 86)</small></ul>
 	 <ul> - Novy Cloud 230 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840039 | protocol 86)</small></ul>
 	 <ul> - Novy Pureline 6830 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840029 | protocol 86)</small></ul>
@@ -2027,7 +2089,7 @@ sub SD_UT_tristate2bin($) {
 	<ul><a name="model"></a>
 		<li>model<br>
 		The attribute indicates the model type of your device.<br>
-		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li>
+		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Momento, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li>
 	</ul><br>
 	<ul><li><a name="repeats">repeats</a><br>
 	This attribute can be used to adjust how many repetitions are sent. Default is 5.</li></ul><br>
@@ -2036,7 +2098,7 @@ sub SD_UT_tristate2bin($) {
 	<small><u>exception:</u></small> The model Novy_840039 has a preset clock pulse of 375. You can manually adjust this individually with the attribute.</li></ul><br>
 
 	<b><i>Generated readings of the models</i></b><br>
-	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
+	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Momento | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
 	<li>deviceCode<br>
 	Device code of the system</li>
 	<li>LastAction<br>
@@ -2098,6 +2160,7 @@ sub SD_UT_tristate2bin($) {
 	 <ul> - Manax RCS250&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10 | Protokoll 90)</small></ul>
 	 <ul> - Medion OR28V&nbsp;&nbsp;&nbsp;<small>(Modulmodel: OR28V | Protokoll 68)</small></ul>
 	 <ul> - mumbi AFS300-s (remote control RC-10 | random code wireless switch RCS-22GS)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10 | Protokoll 90)</small></ul>
+	 <ul> - Momento (Fernbedienung f&uuml;r digitalen Bilderrahmen)&nbsp;&nbsp;&nbsp;<small>(module model: Momento | protocol 97)</small></ul>
 	 <ul> - NEFF oder Refsta Topdraft (Tecnowind) Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: SF01_01319004 | Protokoll 86)</small></ul>
 	 <ul> - Novy Cloud 230 Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Novy_840039 | Protokoll 86)</small></ul>
 	 <ul> - Novy Pureline 6830 Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Novy_840029 | Protokoll 86)</small></ul>
@@ -2331,7 +2394,7 @@ sub SD_UT_tristate2bin($) {
 	<ul><li><a href="#IODev">IODev</a></li></ul><br>
 	<ul><li><a name="model">model</a><br>
 		Das Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes.<br>
-		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li><a name=" "></a>
+		(unknown, Buttons_five, CAME_TOP_432EV, Chilitec_22640, KL_RF01, HS1-868-BS, HSM4, QUIGG_DMV, LED_XM21_0, Momento, Novy_840029, Novy_840039, OR28V, RC_10, RH787T, SA_434_1_mini, SF01_01319004, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031)</li><a name=" "></a>
 	</ul><br>
 	<ul><li><a name="repeats">repeats</a><br>
 	Mit diesem Attribut kann angepasst werden, wie viele Wiederholungen sendet werden. Standard ist 5.</li></ul><br>
@@ -2340,7 +2403,7 @@ sub SD_UT_tristate2bin($) {
 	<small><u>Ausnahme:</u></small> Das Model Novy_840039 hat einen voreingestellten Clockpulse von 375. Diesen kann man manuell mit dem Attribut individuell anpassen.</li></ul><br>
 
 	<b><i>Generierte Readings der Modelle</i></b><br>
-	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
+	<ul><u>Buttons_five | CAME_TOP_432EV | Chilitec_22640 | HSM4 | KL_RF01 | LED_XM21_0 | Momento | Novy_840029 | Novy_840039 | OR28V | QUIGG_DMV | RC_10 | RH787T | SF01_01319004 | SF01_01319004_Typ2 | TR_502MSV</u><br>
 	<li>deviceCode<br>
 	Ger&auml;teCode des Systemes</li>
 	<li>LastAction<br>
