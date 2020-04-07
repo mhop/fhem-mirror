@@ -2,8 +2,6 @@
 # $Id$
 package main;
 
-# TODO: test SSL
-
 use strict;
 use warnings;
 use TcpServerUtils;
@@ -326,7 +324,7 @@ MQTT2_SERVER_Read($@)
     $hash->{subscriptions} = {};
     $defs{$sname}{clients}{$cname} = 1;
 
-    Log3 $sname, 4, "  $cname $hash->{cid} $cpt V:$hash->{protoNum} $desc";
+    Log3 $sname, 4, "  $cname cid:$hash->{cid} $cpt V:$hash->{protoNum} $desc";
     MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 0), $dump); # CONNACK+OK
 
   ####################################
