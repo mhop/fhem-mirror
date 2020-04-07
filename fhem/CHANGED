@@ -1,5 +1,25 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - featire: SD_ProtocolData.pm v1.1.7
+    new protocol 97 Momento remote control for wireless digital picture frame
+    new protocol 58 Weather F007-T 
+    new protocol 27 for EuroChron EFTH-800 
+    new protocol 26 - Remote control xavax 00111939
+    new protocol 20 - Remote control diesel heating
+ - feature: 00_SIGNALduino.pm version 3.4.2
+    automatic load cc1101 config after change value or restart
+    made multiple get commands more easy and robust to handle
+    extended cc1101 settings to ccconf reading
+- bugfix: 00_SIGNALduino.pm version 3.4.2
+    several retrys to initialize the SIGNALduino 
+    flash via http: Fixed Filename extraction of URL 
+    bug fixed set sduino cc1101_rAmpl 42 
+    Allow lower case letters for hex values ​​in set / get cc1101_reg
+- change:
+    filtered possible set/get commands per device type 
+    added meta information to 00_SIGNALduino.pm 
+    patable list values adapted to values allowed per frequency
+    ranges
  - new:     70_HYDRAWISE: New module for controlling Hunter Hydrawise irrigation
  - feature: 93_Log2Syslog: support time-secfrac of RFC 3339, minor fix
  - feature: 93_Log2Syslog: new attribute 'timeSpec', send and parse messages

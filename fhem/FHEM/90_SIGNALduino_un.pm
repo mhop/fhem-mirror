@@ -23,7 +23,7 @@ SIGNALduino_un_Initialize($)
   my ($hash) = @_;
 
 
-  $hash->{Match}     = '^[u]\d+#.*';
+  $hash->{Match}     = '^[u]\d+(?:.\d)?#.*';
   $hash->{DefFn}     = "SIGNALduino_un_Define";
   $hash->{UndefFn}   = "SIGNALduino_un_Undef";
   $hash->{AttrFn}    = "SIGNALduino_un_Attr";
@@ -182,6 +182,8 @@ SIGNALduino_un_Parse($$)
 		$bitDataInvert =~ tr/01/10/; 			# invert message and check if it is possible to deocde now
 		my $rawDataInvert = SIGNALduino_b2h($bitDataInvert);
 		
+		my $seconds = ReadingsAge($name, "state", 0);
+
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "state", $rawData,0);
 		readingsBulkUpdate($hash, "bitMsg", $bitData);
@@ -191,6 +193,7 @@ SIGNALduino_un_Parse($$)
 		readingsBulkUpdate($hash, "hexMsg_invert", $rawDataInvert);
 		readingsBulkUpdate($hash, "hexCount_or_nibble", $hexcount);
 		readingsBulkUpdate($hash, "lastInputDev", $ioname);
+		readingsBulkUpdate($hash, "past_seconds", $seconds);
 		readingsEndUpdate($hash, 1); 		# Notify is done by Dispatch
 		
 		### Example Logfile ###

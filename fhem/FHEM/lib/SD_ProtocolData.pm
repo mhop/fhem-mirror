@@ -8,7 +8,7 @@
 # id          => ' '       # number of the protocol definition, each number only once use (accepted no .)
 # knownFreqs	=> ' '       # known receiver frequency 433.92 | 868.35 (some sensor families or remote send on more frequencies)
 #
-# Time for one, zero, start, sync, float and pause are calculated by clockabs * value = result in microseconds, positive value stands for high signal, negative value stands for low signal
+# Time for one, zero, start, sync, float, end and pause are calculated by clockabs * value = result in microseconds, positive value stands for high signal, negative value stands for low signal
 # clockrange  => [ , ]     # only MC signals | min , max of pulse / pause times in microseconds
 # clockabs    => ' '       # only MU + MS signals | value for calculation of pulse / pause times in microseconds
 # clockabs    => '-1'      # only MS signals | value pulse / pause times is automatically
@@ -18,7 +18,10 @@
 # preSync     => [ , ]     # only MU + MS - value pair or more for preamble pulse of signal
 # sync        => [ , ]     # only MS - value pair or more for sync pulse of signal
 # float       => [ , ]     # only MU + MS signals | Convert 0F -> 01 (F) to be compatible with CUL
-# pause       => [ ]       # delay when sending between two signals (clockabs * pause must be < 32768
+# pause       => [ ]       # only MU + MS signals, delay when sending between two repeats (clockabs * pause must be < 32768)
+# end         => [ ]       # only MU + MS - value or more for end pulse of signal for sending
+# msgIntro    => ' '       # only MC - make combined message msgIntro.MC for sending ('SR;P0=-2560;P1=2560;P3=-640;D=10101010101010113;',)
+# msgOutro    => ' '       # only MC - make combined message MC.msgOutro for sending ('SR;P0=-8500;D=0;',)
 #
 # length_min  => ' '       # minimum number of bits of message length
 # length_max  => ' '       # maximum number of bits of message length
@@ -52,10 +55,10 @@
 # polarity    => 'invert'  # only MC signals | invert bits of the signal
 #
 ##### notice #### or #### info ############################################################################################################
-# !!! Between the keys and values ​​no tabs not equal to a width of 8 or please use spaces !!!
+# !!! Between the keys and values ​​no tabs, please use spaces !!!
 # !!! Please use first unused id for new protocols !!!
-# ID´s are currently unused: 20 | 54 | 78
-# ID´s need to be revised (preamble u): 5|6|19|21|22|23|24|25|26|27|28|31|36|40|42|52|56|59|63
+# ID´s are currently unused: 78
+# ID´s need to be revised (preamble u): 5|19|21|22|23|24|25|28|31|36|40|52|54|56|59|63
 ###########################################################################################################################################
 # Please provide at least three messages for each new MU/MC/MS protocol and a URL of issue in GitHub or discussion in FHEM Forum
 # https://forum.fhem.de/index.php/topic,58396.975.html | https://github.com/RFD-FHEM/RFFHEM
@@ -66,19 +69,18 @@ package lib::SD_ProtocolData;
 	use strict;
 	use warnings;
 	
-	our $VERSION = '1.10';
+	our $VERSION = '1.17';
 	our %protocols = (
 		"0"	=>	## various weather sensors (500 | 9100)
-						# ABS700 | Id:79 T: 3.3 Bat:low                MS;P1=-7949;P2=492;P3=-1978;P4=-3970;D=21232423232424242423232323232324242423232323232424;CP=2;SP=1;R=245;O;
 						# Mebus | Id:237 Ch:1 T: 1.9 Bat:low           MS;P0=-9298;P1=495;P2=-1980;P3=-4239;D=1012121312131313121313121312121212121212131212131312131212;CP=1;SP=0;R=223;O;m2;
 						# GT_WT_02 | Id:163 Ch:1 T: 2.9 H: 86 Bat:ok   MS;P0=531;P1=-9027;P3=-4126;P4=-2078;D=0103040304040403030404040404040404040404030303040303040304030304030304040403;CP=0;SP=1;R=249;O;m2;
 						# Prologue | Id:145 Ch:0 T: 2.6, Bat:ok        MS;P0=-4152;P1=643;P2=-2068;P3=-9066;D=1310121210121212101210101212121212121212121212121010121012121212121012101212;CP=1;SP=3;R=220;O;m2;
 						# Prologue | Id:145 Ch:0 T: 2.7, Bat:ok        MS;P0=-4149;P2=-9098;P3=628;P4=-2076;D=3230343430343434303430303434343434343434343434343030343030343434343034303434;CP=3;SP=2;R=218;O;m2;
 			{
 				name						=> 'weather (v1)',
-				comment					=> 'temperature / humidity or other sensors',
+				comment						=> 'temperature / humidity or other sensors',
 				id							=> '0',
-				knownFreqs      => '433.92',
+				knownFreqs 					=> '433.92',
 				one							=> [1,-7],
 				zero						=> [1,-3],
 				sync						=> [1,-16],
@@ -174,6 +176,27 @@ package lib::SD_ProtocolData;
 				length_min		=> '32',
 				length_max		=> '36',
 				paddingbits		=> '8',				 # pad up to 8 bits, default is 4
+			},
+		"0.5"	=>	## various weather sensors (475 | 8000)
+							# ABS700 | Id:79 T: 3.3 Bat:low     MS;P1=-7949;P2=492;P3=-1978;P4=-3970;D=21232423232424242423232323232324242423232323232424;CP=2;SP=1;R=245;O;
+							#	ABS700 | Id:69 T: 9.3 Bat:low     MS;P1=-7948;P2=471;P3=-1997;P4=-3964;D=21232423232324232423232323242323242423232323232424;CP=2;SP=1;R=246;O;m2;
+			{
+				name						=> 'weather (v6)',
+				comment					=> 'temperature / humidity or other sensors | ABS700',
+				id							=> '0.5',
+				knownFreqs			=> '433.92',
+				one							=> [1,-8],
+				zero						=> [1,-4],
+				sync						=> [1,-16],
+				clockabs			  => 475,
+				format					=> 'twostate',	# not used now
+				preamble				=> 's',					# prepend to converted message
+				postamble				=> '00',				# Append to converted message
+				clientmodule		=> 'CUL_TCM97001',
+				#modulematch		=> '^s[A-Fa-f0-9]+',
+				length_min			=> '24',
+				length_max			=> '24',
+				paddingbits			=> '8',					# pad up to 8 bits, default is 4
 			},
 			"1"	=>	## Conrad RSL
 							# on   MS;P1=1154;P2=-697;P3=559;P4=-1303;P5=-7173;D=351234341234341212341212123412343412341234341234343434343434343434;CP=3;SP=5;R=247;O;
@@ -322,7 +345,7 @@ package lib::SD_ProtocolData;
 				name         => 'TCM 218943',
 				comment      => 'Weatherstation TCM 218943, Eurochron',
 				id           => '6',
-				knownFreqs   => '434.92',
+				knownFreqs   => '433.92',
 				one          => [1,-5],
 				zero         => [1,-10],
 				sync         => [1,-32],
@@ -375,23 +398,35 @@ package lib::SD_ProtocolData;
 				remove_zero			=> 1,						# Removes leading zeros from output
 			},
 		"9"	=>	## Funk Wetterstation CTW600
+						### ! some message are decode as protocol 42 and 75 !
+						## WH3080 | UV: 4 Lux: 57970 | @Ralf
+						# MU;P0=-1424;P1=1417;P2=-1058;P3=453;P4=-24774;P6=288;P7=-788;D=01212121232343232323232323232123232323232121232121212123212121232123212321232121212123212121232321232321212121232323212321212121212121212323467323232323232323212323232323212123212121212321212123212321232123212121212321212123232123232121212123232321232121;CP=3;R=247;O;
+						## WH1080
+						# https://forum.fhem.de/index.php/topic,39451.msg844155.html#msg844155 | https://forum.fhem.de/index.php/topic,39451.msg848667.html#msg848667 @maddinthebrain
+						# MU;P0=-31072;P1=486;P2=-986;P3=1454;D=01212121212121212321232321232123232121232323212121212123232123232123212321232123232323232321232323232323212323232323232323232123212121212321232323232323232323212321212321232301212121212121212321232321232123232121232323212121212123232123232123212321232123;CP=1;R=29;O;
+						## CTW600
+						# https://forum.fhem.de/index.php/topic,39451.msg917042.html#msg917042 @greewoo
+						#	MU;P0=-96;P1=800;P2=-985;P3=485;P4=1421;P5=-8608;D=0123232323232323242324232324242324232324242324242324232323242324242323232324242424242424242424242424242424242424242424242424242424242424242424242424242424242324242424232323235;CP=4;R=0;
 			{
-				name					=> 'CTW 600',
-				comment					=> 'FunkWS WH1080/WH3080/CTW600',
-				id					=> '9',
-				knownFreqs				=> '433.92 | 868.35',
-				zero					=> [3,-2],
-				one					=> [1,-2],
+				name						=> 'weather',
+				comment					=> 'Weatherstation WH1080, WH3080, CTW600',
+				id							=> '9',
+				knownFreqs			=> '433.92 | 868.35',
+				zero						=> [3,-2],
+				one							=> [1,-2],
 				clockabs				=> 480,					# -1 = auto undef=noclock
 				format					=> 'pwm',				# tristate can't be migrated from bin into hex!
 				preamble				=> 'P9#',				# prepend to converted message
-				clientmodule			=> 'SD_WS09',
+				clientmodule		=> 'SD_WS09',
 				#modulematch			=> '^u9#.....',
 				length_min			=> '60',
 				length_max			=> '120',
 				reconstructBit  => '1',
 			},
 		"10"	=>	## Oregon Scientific 2
+							# https://forum.fhem.de/index.php/topic,60170.msg875919.html#msg875919 @David1
+							# MC;LL=-973;LH=984;SL=-478;SH=493;D=EF7E2DCC00000283AF5DF7CFEFEF7E2DCC;C=487;L=134;R=33;s5;b0;
+							#	MC;LL=-975;LH=976;SL=-491;SH=491;D=BEF9FDFDEFC5B98000005075EBBEF9FDFDEFC5;C=488;L=152;R=34;s1;b0;O;w;
 			{
 				name						=> 'Oregon Scientific v2|v3',
 				comment					=> 'temperature / humidity or other sensors',
@@ -641,32 +676,28 @@ package lib::SD_ProtocolData;
 				length_min		=> '19',
 				length_max		=> '23',					# not confirmed, length one more as MU Message
 			},
-		# "20"	=>	## Livolo
-							# # https://github.com/RFD-FHEM/RFFHEM/issues/29
-							# # MU;P0=-195;P1=151;P2=475;P3=-333;D=0101010101 02 01010101010101310101310101010101310101 02 01010101010101010101010101010101010101 02 01010101010101010101010101010101010101 02 010101010101013101013101;CP=1;
-							# #
-							# # protocol sends 24 to 47 pulses per message.
-							# # First pulse is the header and is 595 μs long. All subsequent pulses are either 170 μs (short pulse) or 340 μs (long pulse) long.
-							# # Two subsequent short pulses correspond to bit 0, one long pulse corresponds to bit 1. There is no footer. The message is repeated for about 1 second.
-							# #             _____________                 ___                 _______
-							# # Start bit: |             |___|    bit 0: |   |___|    bit 1: |       |___|
-			# {
-				# name					=> 'Livolo',
-				# comment				=> 'remote control / dimmmer / switch ...',
-				# id						=> '20',
-				# knownFreqs		=> '',
-				# one						=> [3],
-				# zero					=> [1],
-				# start					=> [5],
-				# clockabs			=> 110,						#can be 90-140
-				# format				=> 'twostate',
-				# preamble			=> 'u20#',				# prepend to converted message
-				# #clientmodule	=> '',
-				# #modulematch	=> '',
-				# length_min		=> '16',
-				# #length_max		=> '',						# missing
-				# filterfunc		=> 'SIGNALduino_filterSign',
-			# },
+		"20"	=>	## Remote control with 4 buttons for diesel heating
+							# https://forum.fhem.de/index.php/topic,58397.msg999475.html#msg999475 @ fhem_user0815 2019-12-04
+							# RCnoName20_17E9 on     MS;P0=-740;P2=686;P3=-283;P5=229;P6=-7889;D=5650505023502323232323235023505023505050235050502323502323505050;CP=5;SP=6;R=67;O;m2;
+							# RCnoName20_17E9 off    MS;P1=-754;P2=213;P4=681;P5=-283;P6=-7869;D=2621212145214545454545452145212145212121212145214521212121452121;CP=2;SP=6;R=69;O;m2;
+							# RCnoName20_17E9 plus   MS;P1=-744;P2=221;P3=679;P4=-278;P5=-7860;D=2521212134213434343434342134212134212121213421212134343434212121;CP=2;SP=5;R=66;O;m2;
+							# RCnoName20_17E9 minus  MS;P0=233;P1=-7903;P3=-278;P5=-738;P6=679;D=0105050563056363636363630563050563050505050505630563050505630505;CP=0;SP=1;R=71;O;m1;
+			{
+				name         => 'RCnoName20',
+				comment      => 'Remote control with 4 buttons for diesel heating',
+				id           => '20',
+				knownFreqs   => '433.92',
+				one          => [3,-1],  # 720,-240
+				zero         => [1,-3],  # 240,-720
+				sync         => [1,-33], # 240,-7920
+				clockabs     => 240,
+				format       => 'twostate',
+				preamble     => 'P20#',
+				clientmodule => 'SD_UT',
+				modulematch  => '^P20#.{8}',
+				length_min   => '31',
+				length_max   => '32',
+			},
 		"21"	=>	## Einhell Garagentor
 							# https://forum.fhem.de/index.php?topic=42373.0 @Ellert | user have no RAWMSG
 							# static adress: Bit 1-28 | channel remote Bit 29-32 | repeats 31 | pause 20 ms
@@ -765,42 +796,53 @@ package lib::SD_ProtocolData;
 				length_min		=> '24',
 				length_max		=> '50',					# message has only 24 bit, but we get more than one message, calculation has to be corrected
 			},
-		"26"	=>	## some remote code, send by flamingo style remote controls
-							# https://forum.fhem.de/index.php/topic,43292.msg352982.html#msg352982
-							# u26#322BE3   MU;P0=1086;P1=-433;P2=327;P3=-1194;P4=-2318;P5=2988;D=01012323010123010101230123012323232323010101232324010123230101230101012301230123232323230101012323240101232301012301010123012301232323232301010123232401012323010123010101230123012323232323010101232353;CP=2;
+		"26"	=>	## xavax 00111939 Funksteckdosen Set
+							# https://github.com/RFD-FHEM/RFFHEM/issues/717 @codeartisan-de 2019-12-14
+							# xavax_DAAB2554 Ch1_on   MU;P0=412;P1=-534;P2=-1356;P3=-20601;P4=3360;P5=-3470;D=01020102010201020201010201010201020102010201020101020101010102020203010145020201020201020102010201020102020101020101020102010201020102010102010101010202020301014502020102020102010201020102010202010102010102010201020102010201010201010101020202030101450202;CP=0;R=0;O;
+							# xavax_DAAB2554 Ch1_off  MU;P0=-3504;P1=416;P2=-1356;P3=-535;P4=-20816;P5=3324;D=01212131212131213121312131213121213131213131213121312131213121313131212121213131314131350121213121213121312131213121312121313121313121312131213121312131313121212121313131413135012121312121312131213121312131212131312131312131213121312131213131312121212131;CP=1;R=50;O;
+							# xavax_DAAB2554 Ch2_on   MU;P0=5656;P1=-21857;P2=413;P3=-1354;P4=-536;P6=3350;P7=-3487;D=01232423232424232424232423242324232423242424232424232423232124246723232423232423242324232423242323242423242423242324232423242324242423242423242323212424672323242323242324232423242324232324242324242324232423242324232424242324242324232321242467232324232324;CP=2;R=0;O;
+							# xavax_DAAB2554 Ch2_off  MU;P0=3371;P1=-3479;P2=420;P3=-31868;P4=-541;P5=272;P6=-1343;P7=-20621;D=23245426242426242624262426242624242624262624262424272424012626242626242624262426242624262624242624242624262426242624262424262426262426242427242401262624262624262426242624262426262424262424262426242624262426242426242626242624242724240126262426262426242624;CP=2;R=45;O;
 			{
-				name					=> 'remote',
-				id						=> '26',
-				knownFreqs		=> '',
-				one						=> [1,-3],
-				zero					=> [3,-1],
-				# sync				=> [1,-6],				# Message is not provided as MS, due to small fact
-				start					=> [1,-6],				# Message is not provided as MS, due to small fact
-				clockabs			=> 380,						#ca 380
-				format				=> 'twostate',
-				preamble			=> 'u26#',				# prepend to converted message
-				#clientmodule	=> '',
-				#modulematch	=> '',
-				length_min		=> '24',
-				length_max		=> '24',					# message has only 24 bit, but we get more than one message, calculation has to be corrected
+				name          => 'xavax',
+				comment       => 'Remote control xavax 00111939',
+				id            => '26',
+				knownFreqs    => '433.92',
+				one           => [1,-3],            # 460,-1380
+				zero          => [1,-1],            # 460,-460
+				start         => [1,-1,1,-1,7,-7],  # 460,-460,460,-460,3220,-3220
+				# end           => [1],     # 460 - end funktioniert nicht (wird erst nach pause angehangen), ein bit ans Ende haengen geht, dann aber pause 44 statt 45
+				pause         => [-44],             # -20700 mit end, 20240 mit bit 0 am Ende
+				clockabs      => 460,
+				format        => 'twostate',
+				preamble      => 'P26#',
+				clientmodule  => 'SD_UT',
+				modulematch   => '^P26#.{10}',
+				length_min    => '40',
+				length_max    => '40',
 			},
-		"27"	=>	## some remote code, send by flamingo style remote controls
-							# https://forum.fhem.de/index.php/topic,43292.msg352982.html#msg352982
-							# u27#322BE3   MU;P0=963;P1=-559;P2=393;P3=-1134;P4=2990;P5=-7172;D=01012323010123010101230123012323232323010101232345010123230101230101012301230123232323230101012323450101232301012301010123012301232323232301010123234501012323010123010101230123012323232323010101232323;CP=2;
+		"27"	=>	## Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800 (433 MHz)
+							# SD_WS_27_TH_2 - T: 15.5 H: 48 - MU;P0=-224;P1=258;P2=-487;P3=505;P4=-4884;P5=743;P6=-718;D=0121212301212303030301212123012123012123030123030121212121230121230121212121212121230301214565656561212123012121230121230303030121212301212301212303012303012121212123012123012121212121212123030121;CP=1;R=53;
+							# SD_WS_27_TH_3 - T:  3.8 H: 76 - MU;P0=-241;P1=251;P2=-470;P3=500;P4=-4868;P5=743;P6=-718;D=012121212303030123012301212123012121212301212303012121212121230303012303012123030303012123014565656561212301212121230303012301230121212301212121230121230301212121212123030301230301212303030301212301;CP=1;R=23;
+							# SD_WS_27_TH_3 - T:  5.3 H: 75 - MU;P0=-240;P1=253;P2=-487;P3=489;P4=-4860;P5=746;P6=-725;D=012121212303030123012301212123012121212303012301230121212121230303012301230303012303030301214565656561212301212121230303012301230121212301212121230301230123012121212123030301230123030301230303030121;CP=1;R=19;
+							# short pulse of 244 us followed by a 488 us gap is a 0 bit
+							# long pulse of 488 us followed by a 244 us gap is a 1 bit
+							# sync preamble of pulse, gap, 732 us each, repeated 4 times
+							# sensor sends two messages at intervals of about 57-58 seconds
 			{
-				name						=> 'remote',
-				id							=> '27',
-				knownFreqs      => '',
-				one							=> [1,-2],
-				zero						=> [2,-1],
-				start						=> [6,-15],				# Message is not provided as MS, worakround is start
-				clockabs				=> 480,						#ca 480
-				format					=> 'twostate',
-				preamble				=> 'u27#',				# prepend to converted message
-				#clientmodule		=> '',
-				#modulematch		=> '',
-				length_min			=> '24',
-				length_max			=> '24',
+				name            => 'EFTH-800',
+				comment         => 'EuroChron weatherstation EFTH-800',
+				id              => '27',
+				knownFreqs      => '433.92',
+				one             => [2,-1],
+				zero            => [1,-2],
+				start           => [3,-3,3,-3,3,-3,3,-3],
+				clockabs        => '244',
+				format          => 'twostate',
+				preamble        => 'W27#',
+				clientmodule    => 'SD_WS',
+				modulematch     => '^W27#.{12}',
+				length_min      => '48',	# 48 Bit + 1 Puls am Ende
+				length_max      => '48',
 			},
 		"28"	=>	## some remote code, send by aldi IC Ledspots
 			{
@@ -857,26 +899,24 @@ package lib::SD_ProtocolData;
 				length_min		=> '12',
 				length_max		=> '12',				# message has only 10 bit but is paddet to 12
 			},
-		"31"	=>	## Pollin ISOTRONIC - 12 Tasten remote
-							# remote basicadresse with 12bit -> changed if push reset behind battery cover
-							# https://github.com/RFD-FHEM/RFFHEM/issues/44 @kaihs
-							# u31#891EE   MU;P0=-9584;P1=592;P2=-665;P3=1223;P4=-1311;D=01234141412341412341414123232323412323234;CP=1;R=0;
-							# u31#891FE   MU;P0=-12724;P1=597;P2=-667;P3=1253;P4=-1331;D=01234141412341412341414123232323232323232;CP=1;R=0;
+		"31"  =>	## LED Controller LTECH, LED M Serie RF RGBW - M4 & M4-5A
+							# https://forum.fhem.de/index.php/topic,107868.msg1018434.html#msg1018434 | https://forum.fhem.de/index.php/topic,107868.msg1020521.html#msg1020521 @Devirex
+							## note: command length 299, now - not supported by all firmware versions
+							# MU;P0=-16118;P1=315;P2=-281;P4=-1204;P5=-563;P6=618;P7=1204;D=01212121212121212121214151562151515151515151515621515621515626262156262626262626262626215626262626262626262626262626262151515151515151515151515151515151515151515151515626262626262626215151515151515156215156262626262626262626262621570121212121212121212121;CP=1;R=26;O;
+							# MU;P0=-32001;P1=314;P2=-285;P3=-1224;P4=-573;P5=601;P6=1204;P7=-15304;CP=1;R=31;D=012121212121212121212131414521414141414141414145214145214145252521452525252525252525252145252525252525252525252525252521414141414141414141414141414141452141414141414145252525252525252141414141414141414525252141452525252525214145214671212121212121212121213141452;p;i;
 			{
-				name					=> 'Pollin ISOTRONIC',
-				comment				=> 'remote control model 58608 with 12 buttons',
-				id						=> '31',
-				knownFreqs		=> '',
-				one						=> [-1,2],
-				zero					=> [-2,1],
-				start					=> [-18,1],
-				clockabs			=> 600,
-				format				=> 'twostate',
-				preamble			=> 'u31#',				# prepend to converted message
-				#clientmodule	=> '',
-				#modulematch	=> '',
-				length_min		=> '19',
-				length_max		=> '20',
+				name            => 'LTECH',
+				comment					=> 'remote control for LED Controller M4-5A',
+				id              => '31',
+				knownFreqs      => '433.92',
+				one             => [1,-1.8],
+				zero            => [2,-0.9],
+				start           => [1,-0.9, 1,-0.9, 1,-3.8],
+				preSync         => [1,-0.9, 1,-0.9, 1,-0.9, 1,-0.9, 1,-0.9, 1,-0.9, 1,-0.9, 1,-0.9],
+				end             => [3.8, -51],
+				clockabs        => 315,
+				format          => 'twostate',
+				preamble        => 'u31#',
 			},
 		"32"	=>	## FreeTec PE-6946
 							# ! some message are decode as protocol 40 and protocol 62 !
@@ -981,21 +1021,29 @@ package lib::SD_ProtocolData;
 							## LIBRA GmbH (LIDL) TR-502MSV
 							# no decode!   MU;P0=-12064;P1=71;P2=-669;P3=1351;P4=-1319;D=012323414141234123232323232323232323232323;
 							# Ch1_off      MU;P0=697;P1=-1352;P2=-679;P3=1343;D=01010101010231023232323232323232323232323;CP=0;R=27;
+							## Mandolyn Funksteckdosen Set
+							# https://github.com/RFD-FHEM/RFFHEM/issues/716 @codeartisan-de
+							## Pollin ISOTRONIC - 12 Tasten remote | model 58608 | SD_UT model QUIGG_DMV ???
+							# remote basicadresse with 12bit -> changed if push reset behind battery cover
+							# https://github.com/RFD-FHEM/RFFHEM/issues/44 @kaihs
+							# Ch1_on       MU;P0=-9584;P1=592;P2=-665;P3=1223;P4=-1311;D=01234141412341412341414123232323412323234;CP=1;R=0;
+							# Ch1_off      MU;P0=-12724;P1=597;P2=-667;P3=1253;P4=-1331;D=01234141412341412341414123232323232323232;CP=1;R=0;
 			{
-				name					=> 'QUIGG | LIBRA',
-				comment				=> 'remote control DMV-7000, TR-502MSV',
+				name					=> 'QUIGG | LIBRA | Mandolyn | Pollin ISOTRONIC',
+				comment				=> 'remote control DMV-7000, TR-502MSV, 58608',
 				id						=> '34',
 				knownFreqs		=> '433.92',
 				one						=> [-1,2],
 				zero					=> [-2,1],
 				start					=> [1],
 				pause					=> [-15],   # 9900
-				clockabs			=> '660',
+				clockabs			=> '635',
 				format				=> 'twostate',
 				preamble			=> 'P34#',
 				clientmodule	=> 'SD_UT',
+				reconstructBit => '1',
 				#modulematch	=> '',
-				length_min		=> '20',
+				length_min		=> '19',
 				length_max		=> '20',
 			},
 		"35"	=>	## Homeeasy
@@ -1191,6 +1239,7 @@ package lib::SD_ProtocolData;
 				frequency			=> '10AB85550A',
 			},
 		"44"	=>	## Bresser Temeo Trend
+							# MU;P0=32001;P1=-1939;P2=1967;P3=3896;P4=-3895;D=01213424242124212121242121242121212124212424212121212121242421212421242121242124242421242421242424242124212124242424242421212424212424212121242121212;CP=2;R=39;
 			{
 				name					=> 'BresserTemeo',
 				comment				=> 'temperature / humidity sensor',
@@ -1309,48 +1358,93 @@ package lib::SD_ProtocolData;
 				length_min			=> '47',
 				length_max			=> '48',
 			},
-		"49"	=>	## QUIGG / ALDI GT-9000
-							# ! some message are decode as protocol 27 !
-							# https://github.com/RFD-FHEM/RFFHEM/issues/93 @TiEr92
-							# U49#8B2DB0   MU;P0=-563;P1=479;P2=991;P3=-423;P4=361;P5=-1053;P6=3008;P7=-7110;D=2345454523452323454523452323452323452323454545456720151515201520201515201520201520201520201515151567201515152015202015152015202015202015202015151515672015151520152020151520152020152020152020151515156720151515201520201515201520201520201520201515151;CP=1;R=21;
+		"49"	=>	## QUIGG GT-9000, EASY HOME RCT DS1 CR-A, uniTEC 48110 and other
+							# The remote sends 8 messages in 2 different formats.
+							# SIGNALduino decodes 4 messages from remote control as MS then ...
+							# https://github.com/RFD-FHEM/RFFHEM/issues/667 - Oct 19, 2019
+							# DMSG: 5A98B0   MS;P0=-437;P3=-1194;P4=1056;P6=297;P7=-2319;D=67634063404063406340636340406363634063404063636363;CP=6;SP=7;R=37;
+							# DMSG: 887F92   MS;P1=-2313;P2=1127;P3=-405;P4=379;P5=-1154;D=41234545452345454545232323232323232345452345452345;CP=4;SP=1;R=251;
+							# DMSG: E6D12E   MS;P0=1062;P1=-1176;P2=315;P3=-2283;P4=-433;D=23040404212104042104042104212121042121042104040421;CP=2;SP=3;R=26;
 			{
-				name						=> 'QUIGG_GT-9000',
-				comment					=> 'remote control',
-				id							=> '49',
-				knownFreqs      => '',
-				clockabs				=> 400,
-				one							=> [2,-1.2],
-				zero						=> [1,-3],
-				start						=> [6,-15],
-				format					=> 'twostate',
-				preamble				=> 'U49#',						# prepend to converted message
-				#clientmodule		=> '',
-				modulematch			=> '^U49#.*',
-				length_min			=> '22',
-				length_max			=> '28',
+				name            => 'GT-9000',
+				comment         => 'Remote control EASY HOME RCT DS1 CR-A',
+				id              => '49',
+				knownFreqs      => '433.92',
+				clockabs        => 383,
+				one             => [3,-1],  # 1150,-385 (timings from salae logic)
+				zero            => [1,-3],  # 385,-1150 (timings from salae logic)
+				sync            => [1,-6],  # 385,-2295 (timings from salae logic)
+				format          => 'twostate',
+				preamble        => 'P49#',
+				clientmodule    => 'SD_GT',
+				modulematch     => '^P49.*',
+				length_min      => '24',
+				length_max      => '24',
+			},
+		"49.1"	=>	## QUIGG GT-9000
+							# ... decodes 4 messages as MU
+							# https://github.com/RFD-FHEM/RFFHEM/issues/667 @Ralf9 from https://forum.fhem.de/index.php/topic,104506.msg985295.html
+							# DMSG: 8B2DB0   MU;P0=-563;P1=479;P2=991;P3=-423;P4=361;P5=-1053;P6=3008;P7=-7110;D=2345454523452323454523452323452323452323454545456720151515201520201515201520201520201520201515151567201515152015202015152015202015202015202015151515672015151520152020151520152020152020152020151515156720151515201520201515201520201520201520201515151;CP=1;R=21;
+							# DMSG: 887F90   MU;P0=-565;P1=489;P2=991;P3=-423;P4=359;P5=-1047;P6=3000;P7=-7118;D=2345454523454545452323232323232323454523454545456720151515201515151520202020202020201515201515151567201515152015151515202020202020202015152015151515672015151520151515152020202020202020151520151515156720151515201515151520202020202020201515201515151;CP=1;R=17;
+			{
+				name            => 'GT-9000',
+				comment         => 'Remote control is traded under different names',
+				id              => '49.1',
+				knownFreqs      => '433.92',
+				clockabs        => 515,
+				one             => [2,-1],  # 1025,-515  (timings from salae logic)
+				zero            => [1,-2],  # 515,-1030  (timings from salae logic)
+				start           => [6,-14],	# 3075,-7200 (timings from salae logic)
+				format          => 'twostate',
+				preamble        => 'P49#',
+				clientmodule    => 'SD_GT',
+				modulematch     => '^P49.*',
+				length_min      => '24',
+				length_max      => '24',
+			},
+		"49.2"	=>	## Tec Star Modell 2335191R
+							# SIGNALduino decodes 4 messages from remote control as MU then ... 49.1
+							# https://forum.fhem.de/index.php/topic,43292.msg352982.html#msg352982 - Nov 01, 2015
+							# message was receive with older firmware
+							# DMSG: CA627C   MU;P0=1092;P1=-429;P2=335;P3=-1184;P4=-2316;P5=2996;D=010123230123012323010123232301232301010101012323240101232301230123230101232323012323010101010123232401012323012301232301012323230123230101010101232355;CP=2;
+							# DMSG: C9AFAC   MU;P0=328;P1=-428;P3=1090;P4=-1190;P5=-2310;D=010131040431310431043131313131043104313104040531310404310404313104310431313131310431043131040405313104043104043131043104313131313104310431310404053131040431040431310431043131313131043104313104042;CP=0;
+			{
+				name            => 'GT-9000',
+				comment         => 'Remote control Tec Star Modell 2335191R',
+				id              => '49.2',
+				knownFreqs      => '433.92',
+				clockabs        => 383,
+				one             => [3,-1],
+				zero            => [1,-3],
+				start           => [1,-6],  # Message is not provided as MS
+				format          => 'twostate',
+				preamble        => 'P49#',
+				clientmodule    => 'SD_GT',
+				modulematch     => '^P49.*',
+				length_min      => '24',
+				length_max      => '24',
 			},
 		"50"	=>	## Opus XT300
 							# https://github.com/RFD-FHEM/RFFHEM/issues/99 @sidey79
 							# Ch:1 T: 25 H: 5   MU;P0=248;P1=-21400;P2=545;P3=-925;P4=1368;P5=-12308;D=01232323232323232343234323432343234343434343234323432343434343432323232323232323232343432323432345232323232323232343234323432343234343434343234323432343434343432323232323232323232343432323432345232323232323232343234323432343234343434343234323432343434343;CP=2;O;
 							# CH:1 T: 18 H: 5   W50#FF55053AFF93    MU;P2=-962;P4=508;P5=1339;P6=-12350;D=46424242424242424252425242524252425252525252425242525242424252425242424242424242424252524252524240;CP=4;R=0;
 							# CH:3 T: 18 H: 5   W50#FF57053AFF95    MU;P2=510;P3=-947;P5=1334;P6=-12248;D=26232323232323232353235323532323235353535353235323535323232353235323232323232323232353532353235320;CP=2;R=0;
-
 			{
-				name					=> 'Opus_XT300',
-				comment					=> 'sensor for ground humidity',
-				id						=> '50',
-				knownFreqs				=> '433.92',
-				clockabs				=> 500,
-				zero					=> [3,-2],
-				one						=> [1,-2],
-				# start				  	=> [-25],				# Wenn das startsignal empfangen wird, fehlt das 1 bit
-				reconstructBit			=> '1',
-				format					=> 'twostate',
-				preamble				=> 'W50#',				# prepend to converted message
-				clientmodule			=> 'SD_WS',
-				modulematch				=> '^W50#.*',
-				length_min				=> '47',
-				length_max				=> '48',
+				name           => 'Opus_XT300',
+				comment        => 'sensor for ground humidity',
+				id             => '50',
+				knownFreqs     => '433.92',
+				clockabs       => 500,
+				zero           => [3,-2],
+				one            => [1,-2],
+				# start          => [-25],				# Wenn das startsignal empfangen wird, fehlt das 1 bit
+				reconstructBit  => '1',
+				format          => 'twostate',
+				preamble        => 'W50#',				# prepend to converted message
+				clientmodule    => 'SD_WS',
+				modulematch     => '^W50#.*',
+				length_min      => '47',
+				length_max      => '48',
 			},
 		"51"	=>	## weather sensors
 							# https://github.com/RFD-FHEM/RFFHEM/issues/118 @Stertzi
@@ -1383,17 +1477,19 @@ package lib::SD_ProtocolData;
 		"52"	=>	## Oregon Scientific PIR Protocol
 							# https://forum.fhem.de/index.php/topic,63604.msg548256.html#msg548256 @Ralf_W.
 							# u52#00012AE7   MC;LL=-1045;LH=1153;SL=-494;SH=606;D=FFFED518;C=549;L=30;
+							## note: unfortunately, the user is no longer in possession of a SIGNALduino
 							#
 							# FFFED5 = Adresse, die per DIP einstellt wird, FFF ändert sich nie
 							# 1 = Kanal, per gesondertem DIP, bei mir bei beiden 1 (CH 1) oder 3 (CH 2)
 							# C = wechselt, 0, 4, 8, C - dann fängt es wieder mit 0 an und wiederholt sich bei jeder Bewegung
 			{
 				name						=> 'Oregon Scientific PIR',
+				comment					=> 'JMR868 / NR868',
 				id							=> '52',
-				knownFreqs      => '',
+				knownFreqs      => '433.92',
 				clockrange			=> [470,640],							# min , max
 				format					=> 'manchester',					# tristate can't be migrated from bin into hex!
-				clientmodule		=> 'OREGON',
+				#clientmodule		=> '',                    # OREGON module not for Motion Detectors
 				modulematch			=> '^u52#F{3}|0{3}.*',
 				preamble				=> 'u52#',
 				length_min			=> '30',
@@ -1421,6 +1517,52 @@ package lib::SD_ProtocolData;
 				modulematch   => '^W53#.*',
 				length_min    => '42',
 				length_max    => '44',
+			},
+		"54"	=>	## TFA Drop 30.3233.01 - Rain gauge
+							# Rain sensor 30.3233.01 for base station 47.3005.01
+							# https://github.com/merbanan/rtl_433/blob/master/src/devices/tfa_drop_30.3233.c | https://forum.fhem.de/index.php/topic,107998.0.html @sido
+							# @sido
+							# SD_WS_54_R_D9C43 R: 73.66   MU;P1=247;P2=-750;P3=722;P4=-489;P5=491;P6=-236;P7=-2184;D=1232141456565656145656141456565614141456141414145656141414141456561414141456561414145614561456145614141414141414145614145656145614141732321414565656561456561414565656141414561414141456561414141414565614141414565614141456145614561456141414141414141456141;CP=1;R=55;O;
+							# SD_WS_54_R_D9C43 R: 74.422  MU;P0=-1672;P1=740;P2=-724;P3=260;P4=-468;P5=504;P6=-230;D=012123434565656563456563434565656343434563434343456563434343456345634343434565634565656345634563456343434343434343456563434345634345656;CP=3;R=4;
+							# @punker
+							# SD_WS_54_R_896E1 R: 28.702  MU;P0=-242;P1=-2076;P2=-13292;P3=242;P4=-718;P5=748;P6=-494;P7=481;CP=3;R=29;D=23454363670707036363670363670367070367070703636363670363636363670363636707036367070707036703670367036363636363636363636707036703636363154543636707070363636703636703670703670707036363636703636363636703636367070363670707070367036703670363636363636363636367;O;
+							# SD_WS_54_R_896E1 R: 29.464  MU;P0=-236;P1=493;P2=235;P3=-503;P4=-2076;P5=734;P6=-728;CP=2;R=11;D=0101023101023245656232310101023232310232310231010231010102323232310232323232310102323101023102310231023102310231023232323232323232323101010231010232;e;i;
+			{
+				name           => 'TFA 30.3233.01',
+				comment        => 'Rain sensor',
+				id             => '54',
+				knownFreqs     => '433.92',
+				one            => [2,-1],
+				zero           => [1,-2],
+				start          => [3,-3],	# message provided as MU
+				clockabs       => 250,
+				reconstructBit => '1',
+				clientmodule   => 'SD_WS',
+				format         => 'twostate',
+				preamble       => 'W54#',
+				length_min     => '64',
+				length_max     => '68',
+			},
+		"54.1" => ## TFA Drop 30.3233.01 - Rain gauge
+							# Rain sensor 30.3233.01 for base station 47.3005.01
+							# https://github.com/merbanan/rtl_433/blob/master/src/devices/tfa_drop_30.3233.c | https://forum.fhem.de/index.php/topic,107998.0.html @punker
+							# @punker
+							# SD_WS_54_R_896E1 R: 28.702  MS;P0=-241;P1=486;P2=241;P3=-488;P4=-2098;P5=738;P6=-730;D=24565623231010102323231023231023101023101010232323231023232323231023232310102323101010102310231023102323232323232323232310102310232323;CP=2;SP=4;R=30;O;b=19;s=1;m0;
+							# SD_WS_54_R_896E1 R: 29.464  MS;P0=-491;P1=242;P2=476;P3=-248;P4=-2096;P5=721;P6=-745;D=14565610102323231010102310102310232310232323101010102310101010102323101023231023102310231023102310231010101010101010101023232310232310;CP=1;SP=4;R=10;O;b=135;s=1;m0;
+			{
+				name           => 'TFA 30.3233.01',
+				comment        => 'Rain sensor',
+				id             => '54.1',
+				knownFreqs     => '433.92',
+				one            => [2,-1],
+				zero           => [1,-2],
+				sync           => [3,-3],	# message provided as MS
+				clockabs       => 250,
+				clientmodule   => 'SD_WS',
+				format         => 'twostate',
+				preamble       => 'W54#',
+				length_min     => '64',
+				length_max     => '68',
 			},
 		"55"	=>	## QUIGG GT-1000
 			{
@@ -1475,22 +1617,27 @@ package lib::SD_ProtocolData;
 				method					=> \&lib::SD_Protocols::MCRAW,	# Call to process this message
 				polarity				=> 'invert',
 			},
-		"58"	=>	## TFA 30.3208.0
-							# Ch:2 T: 18.9 H: 69 Bat:ok   MC;LL=-981;LH=964;SL=-480;SH=520;D=002BA37EBDBBA24F0015D1BF5EDDD127800AE8DFAF6EE893C;C=486;L=194;
+		"58"	=>	## TFA 30.3208.02, 30.3228.02, 30.3229.02, Froggit/Renkforce FT007TH, FT007PF, FT007T, FT007TP, Ambient Weather F007-TH, F007-T, F007-TP
+							# SD_WS_58_TH_200_2 Ch: 2 T: 18.9 H: 69 Bat: ok   MC;LL=-981;LH=964;SL=-480;SH=520;D=002BA37EBDBBA24F0015D1BF5EDDD127800AE8DFAF6EE893C;C=486;L=194;
+							# Froggit FT007T - https://forum.fhem.de/index.php/topic,58397.msg1023517.html#msg1023517
+							# SD_WS_58_T_135_2 Ch: 2 T: 22.2 Bat: ok   MC;LL=-1047;LH=903;SL=-545;SH=449;D=800AE5E3AE7FD44BC00572F1D73FEA25E002B9788;C=494;L=161;
+							# SD_WS_58_T_135_2 Ch: 2 T: 22.3 Bat: ok   MC;LL=-1047;LH=902;SL=-546;SH=452;D=0015CBC75CF7AA8F800AE5E3AE7BD547C00572F1D0;C=487;L=165;
+							# Renkforce FT007TH  - https://forum.fhem.de/index.php/topic,65680.msg963889.html#msg963889
+							# SD_WS_58_TH_84_2 Ch: 2 T: 23.9 H: 58 Bat: ok   MC;LL=-1005;LH=946;SL=-505;SH=496;D=0015D55F5C0E2B47800AEAAFAE0715A3C0057557D7;C=487;L=168;R=0;
 			{
-				name				=> 'TFA 30.3208.0',
-				comment				=> 'temperature / humidity sensor',
-				id				=> '58',
-				knownFreqs			=> '433.92',
-				clockrange			=> [460,520],			# min , max
-				format				=> 'manchester',	# tristate can't be migrated from bin into hex!
-				clientmodule			=> 'SD_WS',
-				modulematch			=> '^W58*',
-				preamble			=> 'W58#',
-				length_min			=> '52',	# 54
-				length_max			=> '52',	# 136
-				method				=> \&main::SIGNALduino_MCTFA, # Call to process this message
-				polarity			=> 'invert',
+				name         => 'TFA 30.3208.0',
+				comment      => 'Temperature/humidity sensors (TFA 30.3208.02, 30.3228.02, 30.3229.02, Froggit/Renkforce FT007xx, Ambient Weather F007-xx)',
+				id           => '58',
+				knownFreqs   => '433.92',
+				clockrange   => [460,520],
+				format       => 'manchester',
+				clientmodule => 'SD_WS',
+				modulematch  => '^W58*',
+				preamble     => 'W58#',
+				length_min   => '52',	# 54
+				length_max   => '52',	# 136
+				method       => \&main::SIGNALduino_MCTFA,
+				polarity     => 'invert',
 			},
 		"59"	=>	## AK-HD-4 remote | 4 Buttons
 							# https://github.com/RFD-FHEM/RFFHEM/issues/133 @stevedee78
@@ -1500,7 +1647,7 @@ package lib::SD_ProtocolData;
 				name						=> 'AK-HD-4',
 				comment					=> 'remote control with 4 buttons',
 				id							=> '59',
-				knownFreqs      => '',
+				knownFreqs      => '433.92',
 				clockabs				=> 230,
 				zero						=> [-4,1],
 				one							=> [-1,4],
@@ -1906,7 +2053,6 @@ package lib::SD_ProtocolData;
 							# LED_XM21_0 | off   MU;P0=-189;P1=115;P4=422;D=0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101040404040101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010104040404010101010;CP=1;R=73;O;
 							# LED_XM21_0 | off   MU;P0=-203;P1=412;P2=114;D=01010101020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020101010102020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020200;CP=2;R=74;
 							# LED_XM21_0 | off   MU;P0=-210;P1=106;P3=413;D=0101010101010101010303030301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101030303030100;CP=1;R=80;
-
 			{
 				name					=> 'LED XM21',
 				comment				=> 'remote with 2-buttons for LED X-MAS light string',
@@ -2039,28 +2185,29 @@ package lib::SD_ProtocolData;
 				length_max		=> '12',
 			},
 		"82"	=>	## Fernotron shutters and light switches
-							# https://github.com/RFD-FHEM/RFFHEM/issues/257
-							# MU;P0=-32001;P1=435;P2=-379;P4=-3201;P5=831;P6=-778;D=01212121212121214525252525252521652161452525252525252161652141652521652521652521614165252165252165216521416521616165216525216141652161616521652165214165252161616521652161416525216161652161652141616525252165252521614161652525216525216521452165252525252525;CP=1;O;
+							# https://github.com/RFD-FHEM/RFFHEM/issues/257 @zwiebert
+							# down | MU;P0=-200;P1=21748;P2=-25008;P3=410;P4=-388;P5=-3189;P6=811;P7=-785;CP=3;D=012343434343434343564646464376464646437356464646437646464376435643737373764376464373564373737376437643764356437373737373737643735643737373737373737643564376464376464646464356437646437646464373735376437646464646464643537643764646464643737353737646464646437643735373764646464643737643;e;
+							# stop | MU;P0=-32001;P1=441;P2=-355;P3=-3153;P4=842;P5=-757;CP=1;D=0121212121212121342424242154242424215134242424215424242154213421515151542154242151342151515154215421542134215151515151515421513421515151515151515421342154242421542424242134215424242154242151513151542424242424242421315154242424242421515131542424215424215421513154242421542421515421;e;
 							# the messages received are usual missing 12 bits at the end for some reason. So the checksum byte is missing.
 							# Fernotron protocol is unidirectional. Here we can only receive messages from controllers send to receivers.
 			{
-				name					=> 'Fernotron',
-				comment					=> 'shutters and light switches',
-				id						=> '82',				# protocol number
-				knownFreqs				=> '',
-				developId				=> 'm',
-				dispatchBin				=> '1',
-				paddingbits				=> '1',     		# disable padding
+				name          => 'Fernotron',
+				comment       => 'shutters and light switches',
+				id            => '82',
+				knownFreqs    => '',
+				developId     => 'm',
+				dispatchBin   => '1',
+				paddingbits   => '1',     		# disable padding
 				one						=> [1,-2],			# on=400us, off=800us
 				zero					=> [2,-1],			# on=800us, off=400us
 				float					=> [1,-8],			# on=400us, off=3200us. the preamble and each 10bit word has one [1,-8] in front
 				pause					=> [1,-1],			# preamble (5x)
-				clockabs				=> 400,				# 400us
-				format					=> 'twostate',
-				preamble				=> 'P82#',			# prepend our protocol number to converted message
-				clientmodule			=> 'Fernotron',
-				length_min				=> '100',			# actual 120 bit (12 x 10bit words to decode 6 bytes data), but last 20 are for checksum
-				length_max				=> '3360',			# 3360 bit (336 x 10bit words to decode 168 bytes data) for full timer message
+				clockabs      => 400,				  # 400us
+				format        => 'twostate',
+				preamble      => 'P82#',			# prepend our protocol number to converted message
+				clientmodule  => 'Fernotron',
+				length_min    => '100',			  # actual 120 bit (12 x 10bit words to decode 6 bytes data), but last 20 are for checksum
+				length_max    => '3360',			# 3360 bit (336 x 10bit words to decode 168 bytes data) for full timer message
 			},
 		"83"	=>	## Remote control RH787T based on MOSDESIGN SEMICONDUCTOR CORP (CMOS ASIC encoder) M1EN compatible HT12E
 							# for example Westinghouse Deckenventilator Delancey, 6 speed buttons, @zwiebelxxl
@@ -2147,6 +2294,11 @@ package lib::SD_ProtocolData;
 							# Novy 840029 | minus button          MU;P0=-8032;P1=364;P2=-398;P3=700;P4=-760;P5=-15980;D=0123412341234123412341412351234123412341234123414123512341234123412341234141235123412341234123412341412351234123412341234123414123;CP=1;R=40;
 							# Novy 840029 | power button          MU;P0=-756;P1=718;P2=354;P3=-395;P4=-16056;D=01020202310231310202 42 310231023102310231020202310231310202 42 31023102310231023102020231023131020242310231023102310231020202310231310202;CP=2;R=41;
 							# Novy 840029 | novy button           MU;P0=706;P1=-763;P2=370;P3=-405;P4=-15980;D=0123012301230304230123012301230123012303042;CP=2;R=42;
+							### remote control Novy 840039 for Novy Cloud 230 kitchen hood:
+							#	https://github.com/RFD-FHEM/RFFHEM/issues/792 | https://forum.fhem.de/index.php/topic,107867.0.html @Devirex
+							# note: !! Clockpulse is 375, value from ID 86 350 it does not work !!
+							# Novy 840039 | power_button          MU;P0=-749;P1=378;P2=-456;P3=684;P4=-16081;D=01230101012301232301014123012301230123012301010123012323010141230123012301230123010101230123230101412;CP=1;R=66; 
+							#	Novy 840039 | cooking_light on      MU;P0=-750;P1=375;P2=-418;P3=682;P4=-16059;P5=290;P6=-5060;D=0123010123010123010123412305230123012301230101230101230101234123012301230123012301012301012301012341230123012301230123010123010123010123416505230123010123010123010123412;
 							### Neff Transmitter SF01 01319004 (SF01_01319004) 433,92 MHz
 							# https://github.com/RFD-FHEM/RFFHEM/issues/376 @fhemjcm
 							# SF01_01319004 | light_on_off        MU;P0=-707;P1=332;P2=-376;P3=670;P5=-15243;D=01012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301232301010123510123012323232301230123012323010101235101230123232323012301230123230101012351012301232323230123012301;CP=1;R=3;O;
@@ -2162,7 +2314,7 @@ package lib::SD_ProtocolData;
 							# SF01_01319004_Typ2 | interval       MU;P0=-334;P1=709;P2=-152;P3=-663;P4=379;P5=-15226;P6=250;D=01210134010134340101013434340101340134540101340101343401010134343401013601365401013401013434010101343434010134013454010134010134340101013434340101340134540101340101343401010134343401013401345401013401013434010101343434010134013454010134010134340101013434;CP=4;O;
 			{
 				name					=> 'BOSCH | CAME | Novy | Neff | Refsta Topdraft',
-				comment				=> 'remote control CAME TOP 432EV, Novy 840029, BOSCH / Neff or Refsta Topdraft SF01 01319004',
+				comment				=> 'remote control CAME TOP 432EV, Novy 840029 & 840039, BOSCH / Neff or Refsta Topdraft SF01 01319004',
 				id						=> '86',
 				knownFreqs		=> '433.92',
 				one						=> [-2,1],
@@ -2217,12 +2369,18 @@ package lib::SD_ProtocolData;
 							# P88#00C7922B9D6020024 | button=two   MS;P1=417;P3=847;P4=-442;P5=-858;P7=-4258;D=1734343434343434341515343434151515153434153434153434341534153415151534341515153415341515343434343434341534343434343434343434341534341;CP=1;SP=7;R=25;e;m1;
 							# P88#F82542039D6020014 | button=three MS;P0=-855;P1=852;P2=-433;P3=432;P5=-17236;P6=-4250;D=363030303030121212121230121230123012301212121230121212121212123030301212303030123012303012121212121212301212121212121212121212123012353232323232323232323232;CP=3;SP=6;R=29;O;s=36;m0;
 							# P88#DB06531F9D6020084 | button=four  MS;P0=-17496;P1=435;P2=-438;P4=-4269;P5=-845;P6=850;D=141515621515621515626262626215156262156215626215156262621515151515156262151515621562151562626262626262156262626262626262621562626262101212121212121212121212;CP=1;SP=4;R=34;O;m1;
+							## remote enjoy motors HS-8, HS-1 / RIO HS-8 | three buttons
+							# Modulation = GFSK | Frequenz = 868.302 MHz | Bandwidth = 58.036 kHz | Deviation = 25.391 kHz | Datarate = 24.796 kHz
+							# https://forum.fhem.de/index.php/topic,107239.0.html | https://github.com/fhem/SD_Keeloq/issues/19
+							# P88#31EB8B8A008B48058 | button=up    MS;P1=399;P2=-421;P3=-4034;P4=800;P5=-815;P6=-15516;D=1342421515424242151515154215421515154242421542151515424242154215424242424242424242154242421542151542154242154242424242424242154215161212121212121212121212;CP=1;SP=3;R=86;O;m2;
+							# P88#54F58AA3008B48038 | button=down  MS;P1=415;P2=-400;P3=-4034;P4=810;P5=-803;P6=-15468;D=1342154215421542421515151542154215154242421542154215421542424215154242424242424242154242421542151542154242154242424242424242421515161212121212121212121212;CP=1;SP=3;R=84;O;m2;
+							# P88#CBDA84D2008B48018 | button=stop  MS;P1=417;P2=-400;P3=-4032;P4=-789;P5=811;P6=-15540;D=1314145252145214141414521414521452145252525214525214145214525214525252525252525252145252521452141452145252145252525252525252525214161212121212121212121212;CP=1;SP=3;R=86;O;m2;
 							## KeeLoq is a registered trademark of Microchip Technology Inc.
 			{
 				name					=> 'HCS300/HCS301',
-				comment				=> 'remote controls Aurel TX-nM-HCS, Rademacher RP-S1-HS-RF11, SCS Sentinel PR3-4207-002, Waeco MA650_TX',
+				comment				=> 'remote controls Aurel TX-nM-HCS, enjoy motors HS, Rademacher RP-S1-HS-RF11, SCS Sentinel PR3-4207-002, Waeco MA650_TX',
 				id						=> '88',
-				knownFreqs		=> '433.92',
+				knownFreqs		=> '433.92 | 868.35',
 				one						=> [1,-2],        # PWM bit pulse width typ. 1.2 mS
 				zero					=> [2,-1],				# PWM bit pulse width typ. 1.2 mS
 				preSync				=> [1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1, 1,-1,],	# 11 pulses preambel, 1 sync, 66 data, pause ... repeat
@@ -2232,7 +2390,7 @@ package lib::SD_ProtocolData;
 				reconstructBit	=> '1',
 				format				=> 'twostate',
 				preamble			=> 'P88#',
-				clientmodule			=> 'SD_Keeloq',
+				clientmodule  => 'SD_Keeloq',
 				length_min		=> '65',
 				length_max		=> '78',
 			},
@@ -2434,9 +2592,61 @@ package lib::SD_ProtocolData;
 				length_max      => '49',
 				method          => \&main::SIGNALduino_GROTHE,
 			},
+		"97"	=>	# Momento, remote control for wireless digital picture frame - elektron-bbs 2020-03-21
+							# Short press repeatedly message 3 times, long press repeatedly until release.
+							# When sending, the original message is not reproduced, but the recipient also reacts to the messages generated in this way.
+							# Momento_0000064 play/pause MU;P0=-294;P1=237;P2=5829;P3=-3887;P4=1001;P5=-523;P6=504;P7=-995;D=01010101010101010101010234545454545454545454545454545454545454545456767454567454545456745456745456745454523454545454545454545454545454545454545454545676745456745454545674545674545674545452345454545454545454545454545454545454545454567674545674545454567454;CP=4;R=45;O; 
+							# Momento_0000064 power      MU;P0=-998;P1=-273;P2=256;P3=5830;P4=-3906;P5=991;P6=-527;P7=508;D=12121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121345656565656565656565656565656565656565656567070565670565656565670567056565670707034565656565656565656565656565656565656565656707056567;CP=2;R=40;O;
+							# Momento_0000064 up         MU;P0=-1005;P1=-272;P2=258;P3=5856;P4=-3902;P5=1001;P6=-520;P7=508;D=0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121213456565656565656565656565656565656565656565670705656705656567056565670565670567056345656565656565656565656565656565656565656567070565;CP=2;R=63;O;
+			{
+				name            => 'Momento',
+				comment         => 'Remote control for wireless digital picture frame',
+				id              => '97',
+				knownFreqs      => '433.92',
+				one             => [2,-4],		# 500, -1000
+				zero            => [4,-2],		# 1000, -500
+				start           => [23,-15],	# 5750, -3750
+				clockabs        => 250,
+				format          => 'twostate',
+				preamble        => 'P97#',
+				clientmodule    => 'SD_UT',
+				length_min      => '40',
+				length_max      => '40',
+			},
+		########################################################################
+		#### ### old information from incomplete implemented protocols #### ####
+
+		# ""	=>	## Livolo
+							# https://github.com/RFD-FHEM/RFFHEM/issues/29
+							# MU;P0=-195;P1=151;P2=475;P3=-333;D=0101010101 02 01010101010101310101310101010101310101 02 01010101010101010101010101010101010101 02 01010101010101010101010101010101010101 02 010101010101013101013101;CP=1;
+							#
+							# protocol sends 24 to 47 pulses per message.
+							# First pulse is the header and is 595 μs long. All subsequent pulses are either 170 μs (short pulse) or 340 μs (long pulse) long.
+							# Two subsequent short pulses correspond to bit 0, one long pulse corresponds to bit 1. There is no footer. The message is repeated for about 1 second.
+							#
+							# Start bit: |             |___|    bit 0: |   |___|    bit 1: |       |___|
+			# {
+				# name          => 'Livolo',
+				# comment       => 'remote control / dimmmer / switch ...',
+				# id            => '',
+				# knownFreqs    => '',
+				# one           => [3],
+				# zero          => [1],
+				# start         => [5],
+				# clockabs      => 110,						#can be 90-140
+				# format        => 'twostate',
+				# preamble      => 'uXX#',				# prepend to converted message
+				# #clientmodule  => '',
+				# #modulematch   => '',
+				# length_min    => '16',
+				# #length_max   => '',						# missing
+				# filterfunc    => 'SIGNALduino_filterSign',
+			# },
+
+		########################################################################
+
 	);
 	sub getProtocolList	{	
 		return \%protocols;	
 	}
-
 }
