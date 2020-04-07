@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix: 14_SD_WS_09.pm: WindDirAverage 
+ - feature: 14_SD_WS_09.pm: support for WH2315 
  - feature: 14_SD_UT.pm 
      new model Novy_840039
      new remote control xavax 00111939
