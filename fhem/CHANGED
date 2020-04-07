@@ -1,5 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 14_SD_UT.pm 
+     new model Novy_840039
+     new remote control xavax 00111939
+     new remote control with 4 buttons for diesel heating
+ - change: 14_SD_UT.pm
+     model Novy_840039, rename button text power_button to power_on_off
+     remove sort option
+ - bugfix: 14_SD_UT.pm
+     fix UTClock for all models
+     TR-502MSV bugfix, ident was only 8 bit, must be 12 bit long
+     RC_10 button set all work after renaming the device
  - featire: SD_ProtocolData.pm v1.1.7
     new protocol 97 Momento remote control for wireless digital picture frame
     new protocol 58 Weather F007-T 
