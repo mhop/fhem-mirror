@@ -2,6 +2,14 @@
 #
 ##############################################
 #
+# 2020.04.08 v0.1.1
+# - CHANGE:  Keepalive aktiviert
+# - BUG:     set "NPM_login new"
+# - FEATURE: Unterstützung A3RBAYBE7VM004 ECHO Studio
+#            Unterstützung A3SSG6GR8UU7SN ECHO SUB
+#            Unterstützung A1HNT9YTOBE735 Telekom Smart Speaker
+#            set sounds: (Sounds gemäß Routine-Übersicht)
+# 
 # 2019.12.24 v0.1.0
 # - FEATURE: Unterstützung A1Z88NGR2BK6A2 ECHO Show 8
 #            Unterstützung A2JKHJ0PX4J3L3 ECHO FireTv Cube 4K
@@ -781,7 +789,7 @@ sub echodevice_Set($@) {
 		}
 		else {
 			$usage .= 'volume:slider,0,1,100 play:noArg pause:noArg next:noArg previous:noArg forward:noArg rewind:noArg shuffle:on,off repeat:on,off dnd:on,off volume_alarm:slider,0,1,100 ';
-			$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
+			$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter sounds:glocken,kirchenglocke,summer,tuerklingel_1,tuerklingel_2,tuerklingel_3,jubelnde_menschenmenge,publikumsapplaus,flugzeug,katastrophenalarm,motoren_an,schilde_hoch,sirenen,zappen,boing_1,boing_2,kamera,lufthupe,quitschende_tuer,tickende_uhr,trompete,hahn,hundegebell,katzenmauzen,loewengebruell,wolfsgeheul,gruselig_quitschende_tuer,weihnachtsglocken tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
 			
 			$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
 			
@@ -1486,6 +1494,11 @@ sub echodevice_Set($@) {
 		return echodevice_getHelpText("no arg") if ( !defined($a[0]) );
 		echodevice_SendCommand($hash,$command,join(' ',@a));
 	}
+
+    elsif($command eq "sounds"){
+		return echodevice_getHelpText("no arg") if ( !defined($a[0]) );
+		echodevice_SendCommand($hash,$command,join(' ',@a));
+	}
 	
 	elsif($command eq "info"){
 		return echodevice_getHelpText("no arg") if ( !defined($a[0]) );
@@ -1858,6 +1871,16 @@ sub echodevice_SendCommand($$$) {
 		$SendMetode = "POST";		
 	}
 
+    elsif ($type eq "sounds" ) {
+
+		#Allgemeine Veariablen
+		$SendUrl   .= "/api/behaviors/preview";
+		$SendMetode = "POST";	
+		
+		$SendData = echodevice_getsequenceJson($hash,lc($SendData),"");
+		$SendDataL  = $SendData;
+	}
+
 	elsif ($type eq "info" ) {
 
 		#Allgemeine Veariablen
@@ -2054,7 +2077,7 @@ sub echodevice_HandleCmdQueue($) {
 					   header          => $AmazonHeader,
                        timeout         => 10,
                        noshutdown      => 1,
-                       keepalive       => 0,
+                       keepalive       => 1,
 					   method          => $param->{method},
 					   data            => $param->{data},
 					   CL              => $param->{CL},
@@ -4119,6 +4142,8 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A3VRME03NAXFUB" || $ModelNumber eq "Echo Flex")				{return "Echo Flex";}
 	elsif($ModelNumber eq "A3FX4UWTP28V1P" || $ModelNumber eq "Echo")					{return "Echo Gen3";}
 	elsif($ModelNumber eq "A30YDR2MK8HMRV" || $ModelNumber eq "Echo")					{return "Echo Gen3";}
+	elsif($ModelNumber eq "A3RBAYBE7VM004" || $ModelNumber eq "Echo Studio")			{return "Echo Studio";}
+	elsif($ModelNumber eq "A3SSG6GR8UU7SN" || $ModelNumber eq "Echo Sub")				{return "Echo Sub";}
 	elsif($ModelNumber eq "AILBSA2LNTOYL"  || $ModelNumber eq "Reverb")					{return "Reverb";}
 	elsif($ModelNumber eq "A15ERDAKK5HQQG" || $ModelNumber eq "Sonos Display")			{return "Sonos Display";}
 	elsif($ModelNumber eq "A2OSP3UA4VC85F" || $ModelNumber eq "Sonos One")				{return "Sonos One";}
@@ -4144,6 +4169,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A21Z3CGI8UIP0F" || $ModelNumber eq "HEOS")                   {return "HEOS";}
 	elsif($ModelNumber eq "AKOAGQTKAS9YB"  || $ModelNumber eq "Echo Connect")			{return "Echo Connect";}
 	elsif($ModelNumber eq "A3NTO4JLV9QWRB" || $ModelNumber eq "Gigaset L800HX")			{return "Gigaset L800HX";}
+	elsif($ModelNumber eq "A1HNT9YTOBE735" || $ModelNumber eq "Telekom Smart Speaker")	{return "Telekom Smart Speaker";}
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
@@ -4312,17 +4338,51 @@ sub echodevice_getsequenceJson($$$) {
 		$BereichValue  = '\"textToSpeak\":\"'.$Parameter.'\",';
 	}
 	
-	elsif(lc($Bereich) eq "erzaehle_geschichte")      {$BereichString = '\"type\":\"Alexa.TellStory.Play\"';}
-	elsif(lc($Bereich) eq "erzaehle_witz")            {$BereichString = '\"type\":\"Alexa.Joke.Play\"';}
-	elsif(lc($Bereich) eq "erzaehle_was_neues")       {$BereichString = '\"type\":\"Alexa.GoodMorning.Play\"';}
-	elsif(lc($Bereich) eq "singe_song")               {$BereichString = '\"type\":\"Alexa.SingASong.Play\"';}
-	elsif(lc($Bereich) eq "beliebig_auf_wiedersehen") {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodbye/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_bestaetigung")    {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-confirmations/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_geburtstag")      {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-birthday/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_gute_nacht")      {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodnight/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_guten_morgen")    {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodmorning/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_ich_bin_zuhause") {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-iamhome/alexa.cannedtts.speak.curatedtts-random\",';}
-	elsif(lc($Bereich) eq "beliebig_kompliment")      {$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-compliments/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "erzaehle_geschichte")		{$BereichString = '\"type\":\"Alexa.TellStory.Play\"';}
+	elsif(lc($Bereich) eq "erzaehle_witz")				{$BereichString = '\"type\":\"Alexa.Joke.Play\"';}
+	elsif(lc($Bereich) eq "erzaehle_was_neues")			{$BereichString = '\"type\":\"Alexa.GoodMorning.Play\"';}
+	elsif(lc($Bereich) eq "singe_song")					{$BereichString = '\"type\":\"Alexa.SingASong.Play\"';}
+	elsif(lc($Bereich) eq "beliebig_auf_wiedersehen")	{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodbye/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_bestaetigung")		{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-confirmations/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_geburtstag")		{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-birthday/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_gute_nacht")		{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodnight/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_guten_morgen")		{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-goodmorning/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_ich_bin_zuhause")	{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-iamhome/alexa.cannedtts.speak.curatedtts-random\",';}
+	elsif(lc($Bereich) eq "beliebig_kompliment")      	{$BereichString = '\"type\":\"Alexa.CannedTts.Speak\"';$BereichValue  = '\"cannedTtsStringId\":\"alexa.cannedtts.speak.curatedtts-category-compliments/alexa.cannedtts.speak.curatedtts-random\",';}
+    #
+    elsif(lc($Bereich) eq "glocken")      				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"bell_02\",';}
+    elsif(lc($Bereich) eq "kirchenglocke")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_church_bell_1x_02\",';}
+    elsif(lc($Bereich) eq "summer")						{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"buzzers_pistols_01\",';}
+    elsif(lc($Bereich) eq "tuerklingel_1")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_doorbell_01\",';}
+    elsif(lc($Bereich) eq "tuerklingel_2")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_doorbell_chime_01\",';}
+    elsif(lc($Bereich) eq "tuerklingel_3")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_doorbell_chime_02\",';}
+    #
+    elsif(lc($Bereich) eq "jubelnde_menschenmenge")		{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_large_crowd_cheer_01\",';}
+    elsif(lc($Bereich) eq "publikumsapplaus")			{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_crowd_applause_01\",';}
+    #
+    elsif(lc($Bereich) eq "flugzeug")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"futuristic_10\",';}
+    elsif(lc($Bereich) eq "katastrophenalarm")			{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_scifi_alarm_04\",';}
+    elsif(lc($Bereich) eq "motoren_an")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_scifi_engines_on_02\",';}
+    elsif(lc($Bereich) eq "schilde_hoch")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_scifi_sheilds_up_01\",';}
+    elsif(lc($Bereich) eq "sirenen")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_scifi_alarm_01\",';}
+    elsif(lc($Bereich) eq "zappen")						{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"zap_01\",';}
+    #
+    elsif(lc($Bereich) eq "boing_1")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"boing_01\",';}
+    elsif(lc($Bereich) eq "boing_2")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"boing_03\",';}
+    elsif(lc($Bereich) eq "kamera")						{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"camera_01\",';}
+    elsif(lc($Bereich) eq "lufthupe")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"air_horn_03\",';}
+    elsif(lc($Bereich) eq "quitschende_tuer")			{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"squeaky_12\",';}
+    elsif(lc($Bereich) eq "tickende_uhr")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"clock_01\",';}
+    elsif(lc($Bereich) eq "trompete")					{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_trumpet_bugle_04\",';}
+    #
+    elsif(lc($Bereich) eq "hahn")						{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_rooster_crow_01\",';}
+    elsif(lc($Bereich) eq "hundegebell")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_dog_med_bark_1x_02\",';}
+    elsif(lc($Bereich) eq "katzenmauzen")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_cat_meow_1x_01\",';}
+    elsif(lc($Bereich) eq "loewengebruell")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_lion_roar_02\",';}
+    elsif(lc($Bereich) eq "wolfsgeheul")				{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"amzn_sfx_wolf_howl_02\",';}
+    #
+    elsif(lc($Bereich) eq "gruselig_quitschende_tuer")	{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"horror_10\",';}
+    elsif(lc($Bereich) eq "weihnachtsglocken")			{$BereichString = '\"type\":\"Alexa.Sound\"';$BereichValue  = '\"soundStringId\":\"christmas_05\",';}
 	
 	$ResultString   = '{"behaviorId":"PREVIEW","sequenceJson":"{\"@type\":\"com.amazon.alexa.behaviors.model.Sequence\",\"startNode\":{\"@type\":\"com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode\",' . $BereichString . ',\"operationPayload\":{\"deviceType\":\"' . $hash->{helper}{DEVICETYPE} . '\",\"deviceSerialNumber\":\"' . $hash->{helper}{".SERIAL"} . '\",'.$BereichValue .'\"locale\":\"de-DE\",\"customerId\":\"' . $hash->{IODev}->{helper}{".CUSTOMER"} .'\"}}}","status":"ENABLED"}';	
 	
@@ -4582,11 +4642,11 @@ sub echodevice_NPMLoginNew($){
 			
 		if ($line ne "") {Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Result $line"} 
 		else {$LoopCount +=1;}
-		
+
 		$Loop = "2" if (index($line, "Please check credentials") != -1) ;
+		$Loop = "2" if (index($line, "Proxy-Server listening on port") != -1) ;
 		$Loop = "3" if (index($line, "Final Registraton Result") != -1) ;
 		$Loop = "4" if ($line eq "" && $LoopCount > 100);
-	
 	} while ($Loop eq "1");
 	
 	if ($Loop eq "2") {
@@ -4595,6 +4655,7 @@ sub echodevice_NPMLoginNew($){
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
 		$InstallResult .= "</html>";
 		$InstallResult =~ s/'/&#x0027/g;
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Result: Bitte den Link anklicken und die Amazonanmeldung durchfuehren.";
 		InternalTimer(gettimeofday() + 3 , "echodevice_NPMWaitForCookie" , $hash, 0);
 		return $InstallResult;
 	}
@@ -4603,6 +4664,8 @@ sub echodevice_NPMLoginNew($){
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
 		$InstallResult .= "</html>";
 		$InstallResult =~ s/'/&#x0027/g;
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Result: Refreshtoken wurde erfolgreich erstellt.";
+		InternalTimer(gettimeofday() + 3 , "echodevice_NPMWaitForCookie" , $hash, 0);
 		return $InstallResult;
 	}
 	elsif($Loop eq "4") {
@@ -4610,9 +4673,11 @@ sub echodevice_NPMLoginNew($){
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
 		$InstallResult .= "</html>";
 		$InstallResult =~ s/'/&#x0027/g;
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Result: Es ist ein Fehler aufgetreten!! Bitte das FHEM Log pruefen.";
 		return $InstallResult;
 	}
 	else {
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Result: Es ist ein Fehler aufgetreten!! Bitte das FHEM Log pruefen.!!!!!!";
 		return $InstallResult;
 	}
 	
@@ -4700,16 +4765,28 @@ sub echodevice_NPMLoginRefresh($){
 	# Skript ausführen
 	close CMD;
 	#Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] start" ;
-	open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &' or die $@;
+	#$filename = "test";
+	
+	#$filename  = "cache/alexa-cookie/66refresh-cookie.js";
+	open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &';
+	
+	while(<CMD>) {
+		if (index($_, "amazon.de") != -1) {last;}
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] ERROR Start CMD=$_" ;
+	}
+	
+	close CMD;
+	
+	##open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &' or die $@;
 	
 	#system("node ./cache/alexa-cookie/refresh-cookie.js &");
 	
-	my $line;
-	my $Loop = "1";
-	do {
-		#Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] started" ;
+	#my $line;
+	#my $Loop = "1";
+	#do {
+	#	Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] started" ;
 		$Loop = "2";
-	} while ($Loop eq "1");
+	#} while ($Loop eq "1");
 	
 	#Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] stop" ;
 	
