@@ -40,6 +40,7 @@ MQTT2_CLIENT_Initialize($)
     clientId
     disable:1,0
     disabledForIntervals
+    ignoreRegexp
     lwt
     lwtRetain
     keepaliveTimeout
@@ -207,8 +208,16 @@ MQTT2_CLIENT_Attr(@)
     $hash->{SSL} = $param[0] ? $param[0] : 1;
   }
 
+  if($type eq "set" && $attrName eq "ignoreRegexp") {
+    my $re = join(" ",@param);
+    return "bad $devName ignoreRegexp: $re" if($re eq "1" || $re =~ m/^\*/);
+    eval { "Hallo" =~ m/$re/ };
+    return "bad $devName ignoreRegexp: $re: $@" if($@);
+  }
+
   if($attrName eq "clientId") {
-    $hash->{clientId} = $param[0];
+    delete($hash->{clientId});
+    $hash->{clientId} = $param[0] if($type eq "set");
   }
 
   if($attrName eq "sslargs") {
@@ -362,6 +371,10 @@ MQTT2_CLIENT_Read($@)
 
     if(!IsDisabled($name)) {
       $val = "" if(!defined($val));
+
+      my $ir = AttrVal($name, "ignoreRegexp", undef);
+      next if(defined($ir) && "$tp:$val" =~ m/$ir/);
+
       my $ac = AttrVal($name, "autocreate", "no");
       $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
@@ -537,7 +550,7 @@ MQTT2_CLIENT_getStr($$)
   <b>Attributes</b>
   <ul>
 
-    <a name="autocreate"></a>
+    <a name="MQTT_CLIENTautocreate"></a>
     <li>autocreate [no|simple|complex]<br>
       if set to simple/complex, at least one MQTT2_DEVICE will be created, and
       its readingsList will be expanded upon reception of published messages.
@@ -555,7 +568,7 @@ MQTT2_CLIENT_getStr($$)
       attribute it is not really useful.
       </li></br>
 
-    <a name="clientId"></a>
+    <a name="MQTT_CLIENTclientId"></a>
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId. If not set, the name of the MQTT2_CLIENT instance
       is used, after deleting everything outside 0-9a-zA-Z
@@ -566,65 +579,70 @@ MQTT2_CLIENT_getStr($$)
       disable dispatching of messages.
       </li><br>
 
-    <a name="lwt"></a>
+    <a name="MQTT2_CLIENTignoreRegexp"></a>
+    <li>ignoreRegexp<br>
+      if $topic:$message matches ignoreRegexp, then it will be silently ignored.
+      </li>
+
+    <a name="MQTT_CLIENTlwt"></a>
     <li>lwt &lt;topic&gt; &lt;message&gt; <br>
       set the LWT (last will and testament) topic and message, default is empty.
       </li></br>
 
-    <a name="keepaliveTimeout"></a>
+    <a name="MQTT_CLIENTkeepaliveTimeout"></a>
     <li>keepaliveTimeout &lt;seconds;&gt;<br>
       number of seconds for sending keepalive messages, 0 disables it.
       The broker will disconnect, if there were no messages for
       1.5 * keepaliveTimeout seconds.
       </li></br>
 
-    <a name="lwtRetain"></a>
+    <a name="MQTT_CLIENTlwtRetain"></a>
     <li>lwtRetain<br>
       if set, the lwt retain flag is set
       </li></br>
 
-    <a name="mqttVersion"></a>
+    <a name="MQTT_CLIENTmqttVersion"></a>
     <li>mqttVersion 3.1,3.1.1<br>
       set the MQTT protocol version in the CONNECT header, default is 3.1
       </li></br>
 
-    <a name="msgAfterConnect"></a>
+    <a name="MQTT_CLIENTmsgAfterConnect"></a>
     <li>msgAfterConnect [-r] topic message<br>
       publish the topic after each connect or reconnect.<br>
       If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
-    <a name="msgBeforeDisconnect"></a>
+    <a name="MQTT_CLIENTmsgBeforeDisconnect"></a>
     <li>msgBeforeDisconnect [-r] topic message<br>
       publish the topic bofore each disconnect.<br>
       If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
-    <a name="rawEvents"></a>
+    <a name="MQTT_CLIENTrawEvents"></a>
     <li>rawEvents &lt;topic-regexp&gt;<br>
       send all messages as events attributed to this MQTT2_CLIENT instance.
       Should only be used, if there is no MQTT2_DEVICE to process the topic.
       </li><br>
 
-    <a name="subscriptions"></a>
+    <a name="MQTT_CLIENTsubscriptions"></a>
     <li>subscriptions &lt;subscriptions&gt;<br>
       space separated list of MQTT subscriptions, default is #<br>
       Note: if the value is the literal setByTheProgram, then the value sent by
       the client (e.g. MQTT_GENERIC_BRIDGE) is used.
       </li><br>
 
-    <a name="SSL"></a>
+    <a name="MQTT_CLIENTSSL"></a>
     <li>SSL<br>
       Enable SSL (i.e. TLS)
       </li><br>
 
-    <a name="sslargs"></a>
+    <a name="MQTT_CLIENTsslargs"></a>
     <li>sslargs<br>
       a list of space separated tuples of key:value, where key is one of the
       possible options documented in perldoc IO::Socket::SSL
       </li><br>
 
-    <a name="username"></a>
+    <a name="MQTT_CLIENTusername"></a>
     <li>username &lt;username&gt;<br>
       set the username. The password is set via the set command, and is stored
       separately, see above.

@@ -306,7 +306,12 @@ FW_jqueryReadyFn()
       $("#content")
         .append("<div id='workbench' style='display:none'></div>");
       $("#content > #workbench").html(data);
-      var aTag = $("#content > #workbench").find("a[name="+val+"]");
+
+      var mtype = $("#content > #workbench a[name]").attr("name"), aTag;
+      if(mtype)
+        aTag = $("#content > #workbench").find("a[name="+mtype+val+"]");
+      if(!$(aTag).length) // old style syntax without type
+        aTag = $("#content > #workbench").find("a[name="+val+"]");
       if($(aTag).length) {
         var liTag = $(aTag).next("li");
         if(!$(liTag).length)
