@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 37_echodevice.pm 
+     CHANGE:  Keepalive aktiviert
+     BUG:     set "NPM_login new"
+     FEATURE: Unterstützung A3RBAYBE7VM004 ECHO Studio
+              Unterstützung A3SSG6GR8UU7SN ECHO SUB
+              Unterstützung A1HNT9YTOBE735 Telekom Smart Speaker
+              set sounds: (Sounds gemäß Routine-Übersicht)
  - feature: 14_SD_UT.pm 
      new model Momento
  - bugfix: 14_SD_WS_09.pm: WindDirAverage 
