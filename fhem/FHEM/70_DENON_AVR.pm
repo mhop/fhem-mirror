@@ -1002,7 +1002,10 @@ sub DENON_AVR_ParseDeviceinfoResponse {
   my $name = $hash->{NAME};
   my $return;
 
-  if($err ne "") {
+  if($err ne '' || $data =~ m/Error 403/) {
+      if ( $err eq '' ) {
+        $err = 'Error 403: Forbidden';
+      }
       Log3 $name, 0, "DENON_AVR ($name) - Error while requesting ".$param->{url}." - $err";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, 'httpState', 'ERROR', 0);
