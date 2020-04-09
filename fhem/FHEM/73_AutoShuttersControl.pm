@@ -2511,11 +2511,11 @@ sub ShadingProcessingDriveCommand {
             && $getShadingPos != $getStatus )
         {
             if (
-                !$shutters->getQueryShuttersPos($getShadingPos)
-                && !(
+#                 !$shutters->getQueryShuttersPos($getShadingPos)
+#                 && !(
                     CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                     && $shutters->getShuttersPlace eq 'terrace'
-                )
+#                 )
               )
             {
                 $shutters->setLastDrive('shading in');
@@ -8435,7 +8435,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.25",
+  "version": "v0.8.26",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

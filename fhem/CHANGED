@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix : 73_AutoShuttersControl: fix shading drive if current position under
+                                    shading position
  - feature: 37_echodevice.pm 
      CHANGE:  Keepalive aktiviert
      BUG:     set "NPM_login new"
