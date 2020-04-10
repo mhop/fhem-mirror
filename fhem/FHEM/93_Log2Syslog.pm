@@ -44,6 +44,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 my %Log2Syslog_vNotesIntern = (
+  "5.10.2" => "08.04.2020  code changes to stabilize send process, minor fixes ",
   "5.10.1" => "06.04.2020  support time-secfrac of RFC 3339, minor fix ",
   "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes (e.g. for Octet Count) ",
   "5.9.0"  => "01.04.2020  Parser UniFi Controller Syslog (BSD Format) and Netconsole messages, more code review (e.g. remove prototypes) ",
@@ -531,10 +532,14 @@ sub Log2Syslog_Read {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
+              next if(!$tail);
               $msg    = substr($tail,0,$ocount);
               push @load, $msg;
-              next if(!$tail);
-              $tail = substr($tail,$ocount);   
+              if(length($tail) >= $ocount) {
+                  $tail = substr($tail,$ocount);
+              } else {
+                  $tail = "";
+              }   
               
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
               Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name -> MSG$i       : $msg");
@@ -736,7 +741,7 @@ sub Log2Syslog_parsePayload {
   my $pp           = AttrVal($name, "parseProfile", $hash->{PROFILE});
   my $severity     = "";
   my $facility     = "";  
-  my @evf          = split(",",AttrVal($name, "outputFields", "FAC,SEV,ID,CONT"));   # auszugebene Felder im Event/Reading
+  my @evf          = split q{,},AttrVal($name, "outputFields", "FAC,SEV,ID,CONT");   # auszugebene Felder im Event/Reading
   my $ignore       = 0;
   my ($to,$Mmm,$dd,$day,$ietf,$err,$pl,$tail);
   
@@ -1381,7 +1386,7 @@ sub Log2Syslog_Get {
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";  
           if($prop && $prop =~ /[\d]+/) {
-              my @hints = split(",",$prop);
+              my @hints = split q{,},$prop;
               foreach (@hints) {
                   if(AttrVal("global","language","EN") eq "DE") {
                       $hs{$_} = $Log2Syslog_vHintsExt_de{$_};
@@ -1423,12 +1428,11 @@ sub Log2Syslog_Get {
           $ret .= "<tr class=\"even\">";
           $i = 0;
           for my $key (Log2Syslog_sortVersion("desc",keys %Log2Syslog_vNotesExtern)) {
-              ($val0,$val1) = split(/\s/,$Log2Syslog_vNotesExtern{$key},2);
-              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-              $ret .= "</tr>";
+              ($val0,$val1) = split q{\s+},$Log2Syslog_vNotesExtern{$key},2;
+              $ret         .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+              $ret         .= "</tr>";
               $i++;
-              if ($i & 1) {
-                  # $i ist ungerade
+              if ($i & 1) {                             # $i ist ungerade
                   $ret .= "<tr class=\"odd\">";
               } else {
                   $ret .= "<tr class=\"even\">";
@@ -1523,19 +1527,25 @@ sub Log2Syslog_Attr {
         InternalTimer(gettimeofday()+5, "Log2Syslog_trate", $hash, 0);
     }
     
-    if ($cmd eq "set" && $aName =~ /port|timeout/) {
-        if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
+    if ($cmd eq "set") {
+        if($aName =~ /port/) {
+            if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
+            
+            $hash->{HELPER}{MEMLOCK} = 1;
+            InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
+            
+            if($hash->{MODEL} =~ /Collector/ && $init_done) {
+                return qq{$aName "$aVal" is not valid because off privileged ports are only usable by super users. Use a port number grater than 1023.} if($aVal < 1024);
+                Log2Syslog_downServer($hash,1);                                                    # Serversocket schließen
+                InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
+                readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
+            } elsif ($hash->{MODEL} !~ /Collector/) {
+                Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen               
+            }
+        }
         
-        $hash->{HELPER}{MEMLOCK} = 1;
-        InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
-        
-        if($aName =~ /port/ && $hash->{MODEL} =~ /Collector/ && $init_done) {
-            return qq{$aName "$aVal" is not valid because off privileged ports are only usable by super users. Use a port number grater than 1023.} if($aVal < 1024);
-            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
-            InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
-            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
-        } elsif ($aName =~ /port/ && $hash->{MODEL} !~ /Collector/) {
-            Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen               
+        if($aName =~ /timeout/) {
+            if($aVal !~ m/^\d+(.\d+)?$/) { return qq{The value of "$aName" is not valid. Use only integer or fractions of numbers like "0.7".}; }
         }
     }
     
@@ -1547,7 +1557,7 @@ sub Log2Syslog_Attr {
         InternalTimer(gettimeofday()+2, "Log2Syslog_deleteMemLock", $hash, 0);
         
         if($hash->{MODEL} eq "Collector") {
-            Log2Syslog_downServer($hash,1);                                                      # Serversocket schließen
+            Log2Syslog_downServer($hash,1);                                                    # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
         } else {
@@ -1627,6 +1637,7 @@ sub Log2Syslog_eventlog {
   my $rex     = $hash->{HELPER}{EVNTLOG};
   my $st      = ReadingsVal($name,"state","active");
   my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my $uef     = AttrVal($name, "useEOF", 0);
   my ($prival,$data,$sock,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
@@ -1647,44 +1658,36 @@ sub Log2Syslog_eventlog {
   my $max = int(@{$events});
   my $tn  = $dev->{NTFY_TRIGGERTIME};
   my $ct  = $dev->{CHANGETIME};
+ 
+  for (my $i = 0; $i < $max; $i++) {
+      my $txt = $events->[$i];
+      $txt = "" if(!defined($txt));
+      $txt = Log2Syslog_charfilter($hash,$txt);
+      my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
+      my ($date,$time) = split q{ }, $tim;
   
-  ($sock,$st) = Log2Syslog_opensock($hash,0);
-    
-  if($sock) { 
-      for (my $i = 0; $i < $max; $i++) {
-          my $txt = $events->[$i];
-          $txt = "" if(!defined($txt));
-          $txt = Log2Syslog_charfilter($hash,$txt);
-          my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
-          my ($date,$time) = split(" ",$tim);
-      
-          if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {
-              my $otp             = "$n $txt";
-              $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-              ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt);
-              if($sendsev && $sendsev !~ m/$sevAstxt/) {
-                  # nicht senden wenn Severity nicht in "respectSeverity" enthalten
-                  Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
-                  next;        
-              }
-
-              ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");
-              next if(!$data);
-          
-              my $ret = syswrite ($sock,$data);
-              if($ret && $ret > 0) {      
-                  Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");
-              } else {
-                  my $err = $!;
-                  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");
-                  $st = "write error: $err";                 
-              }
+      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {
+          my $otp             = "$n $txt";
+          $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
+          ($prival,$sevAstxt) = Log2Syslog_setprival($hash,$txt);
+          if($sendsev && $sendsev !~ m/$sevAstxt/) {                                 # nicht senden wenn Severity nicht in "respectSeverity" enthalten
+              Log2Syslog_Log3slog($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
+              next;        
           }
-      } 
-   
-      my $uef = AttrVal($name, "useEOF", 0);
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
-  }
+
+          ($data,$pid) = Log2Syslog_setpayload($hash,$prival,$date,$time,$otp,"event");
+          next if(!$data);
+          
+          ($sock,$st) = Log2Syslog_opensock($hash,0);
+          
+          if ($sock) {
+              my $err = Log2Syslog_writeToSocket ($name,$sock,$data,$pid);
+              $st     = $err if($err); 
+              
+              Log2Syslog_closesock($hash) if($uef);
+          }
+      }
+  } 
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
   readingsSingleUpdate($hash, "state", $st, $evt);
@@ -1702,6 +1705,7 @@ sub Log2Syslog_fhemlog {
   my $rex     = $hash->{HELPER}{FHEMLOG};
   my $st      = ReadingsVal($name,"state","active");
   my $sendsev = AttrVal($name, "respectSeverity", "");              # Nachrichten welcher Schweregrade sollen gesendet werden
+  my $uef     = AttrVal($name, "useEOF", 0);
   my ($prival,$sock,$err,$ret,$data,$pid,$sevAstxt);
   
   if(IsDisabled($name)) {
@@ -1736,17 +1740,10 @@ sub Log2Syslog_fhemlog {
       ($sock,$st) = Log2Syslog_opensock($hash,0);
       
       if ($sock) {
-          $ret = syswrite($sock,$data) if($data);
-          if($ret && $ret > 0) {  
-              Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent\n");
-          } else {
-              $err = $!;
-              $st  = "write error: $err"; 
-              Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $err\n");        
-          }  
+          my $err = Log2Syslog_writeToSocket ($name,$sock,$data,$pid);
+          $st     = $err if($err); 
           
-          my $uef = AttrVal($name, "useEOF", 0);
-          Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
+          Log2Syslog_closesock($hash) if($uef);
       }
   }
   
@@ -1774,7 +1771,7 @@ sub Log2Syslog_sendTestMsg {
   
   } else {   
       $ts = TimeNow();
-      ($date,$time) = split(" ",$ts);
+      ($date,$time) = split q{ }, $ts;
       $date =~ s/\./-/g;
       $tim = $date." ".$time;
     
@@ -1800,7 +1797,7 @@ sub Log2Syslog_sendTestMsg {
       }  
       
       my $uef = AttrVal($name, "useEOF", 0);
-      Log2Syslog_closesock($hash) if($st =~ /^write error:.*/ || $uef);
+      Log2Syslog_closesock($hash) if($uef);
   }
   
   my $evt = ($st eq $hash->{HELPER}{OLDSTATE})?0:1;
@@ -1817,7 +1814,7 @@ sub Log2Syslog_setidrex {
   my ($hash,$a) = @_;
      
   $hash->{HELPER}{EVNTLOG} = (split("event:",$a))[1] if(lc($a) =~ m/^event:.*/);
-  $hash->{HELPER}{FHEMLOG} = (split("fhem:",$a))[1] if(lc($a) =~ m/^fhem:.*/);
+  $hash->{HELPER}{FHEMLOG} = (split("fhem:", $a))[1] if(lc($a) =~ m/^fhem:.*/);
   $hash->{HELPER}{IDENT}   = (split("ident:",$a))[1] if(lc($a) =~ m/^ident:.*/);
   
 return;
@@ -1850,19 +1847,26 @@ return($txt);
 sub Log2Syslog_opensock { 
   my ($hash,$supresslog)   = @_;
   my $name     = $hash->{NAME};
-  my $host     = $hash->{PEERHOST};
-  my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 514);
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
+  my $port     = AttrVal($name, "TLS", 0)?AttrVal($name, "port", 6514):AttrVal($name, "port", 514);
   my $st       = "active";
-  my $timeout  = AttrVal($name, "timeout", 0.5);
-  my $ssldbg   = AttrVal($name, "ssldebug", 0);
-  my ($sock,$lo,$lof,$sslver,$sslalgo);
+      
+  if($hash->{CLIENTSOCKET}) {
+      if($protocol eq "tcp") {
+          my $sock = $hash->{CLIENTSOCKET};
+          return($hash->{CLIENTSOCKET},$st) if($sock->connected());
+          Log2Syslog_closesock ($hash);
+      } else {
+          return($hash->{CLIENTSOCKET},$st);
+      }
+  }
   
   return if($init_done != 1 || $hash->{MODEL} !~ /Sender/);
   
-  if($hash->{CLIENTSOCKET}) {
-      return($hash->{CLIENTSOCKET},$st);
-  }
+  my $host     = $hash->{PEERHOST};
+  my $timeout  = AttrVal($name, "timeout", 0.5);
+  my $ssldbg   = AttrVal($name, "ssldebug", 0);
+  my ($sock,$lo,$lof,$sslver,$sslalgo);
   
   Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Opening client socket on port \"$port\" ...") if(!$supresslog);
  
@@ -1934,13 +1938,39 @@ sub Log2Syslog_opensock {
       $hash->{HELPER}{SSLALGO} = $sslalgo;
   }
   
-  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lo") if($lo);
+  Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lo")  if($lo);
   Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - $lof") if($lof && !$supresslog && !$hash->{CLIENTSOCKET});
   
   $hash->{CLIENTSOCKET} = $sock if($sock);
     
 return($sock,$st);
 }
+
+################################################################
+#            schreibt Daten in geöffneten Socket
+################################################################
+sub Log2Syslog_writeToSocket {
+  my ($name,$sock,$data,$pid) = @_;
+  my $hash = $defs{$name};
+  
+  use bytes;
+  my $err = "";
+  my $ld  = length $data;
+  my $ret = syswrite ($sock,$data);
+  
+  if(defined $ret && $ret == $ld) {
+      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent. ($ret bytes)\n");      
+  } elsif (defined $ret && $ret != $ld) {
+      Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT completely sent: $ret of $ld bytes \n"); 
+  } else {
+      my $e = $!;
+      $err  = "write error: $e";    
+      Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT sent: $e\n");   
+      delete($hash->{CLIENTSOCKET});      
+  }
+ 
+return ($err);
+} 
 
 ###############################################################################
 #                          Socket schließen
@@ -1952,19 +1982,25 @@ sub Log2Syslog_closesock {
   my $evt;
 
   my $sock = $hash->{CLIENTSOCKET};
-  if($sock) {
-      Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Closing client socket ...") if($dolog);
-      shutdown($sock, 1);
-      if(AttrVal($hash->{NAME}, "TLS", 0) && ReadingsVal($name,"SSL_Algorithm", "n.a.") ne "n.a.") {
-          $sock->close(SSL_no_shutdown => 1);
-          $hash->{HELPER}{SSLVER}  = "n.a.";
-          $hash->{HELPER}{SSLALGO} = "n.a.";
-          readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
-          readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
-      } else {
+  
+  if($sock) {     
+      if (!$sock->connected()) {
           $sock->close();
+          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Client socket already disconnected ... closed.") if($dolog);
+      } else {
+          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Closing client socket ...") if($dolog);
+          shutdown($sock, 1);
+          if(AttrVal($hash->{NAME}, "TLS", 0) && ReadingsVal($name,"SSL_Algorithm", "n.a.") ne "n.a.") {
+              $sock->close(SSL_no_shutdown => 1);
+              $hash->{HELPER}{SSLVER}  = "n.a.";
+              $hash->{HELPER}{SSLALGO} = "n.a.";
+              readingsSingleUpdate($hash, "SSL_Version", "n.a.", 1);
+              readingsSingleUpdate($hash, "SSL_Algorithm", "n.a.", 1);
+          } else {
+              $sock->close();
+          }
+          Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Client socket closed ...") if($dolog);
       }
-      Log2Syslog_Log3slog ($hash, 3, "Log2Syslog $name - Client socket closed ...") if($dolog);
 
       delete($hash->{CLIENTSOCKET});
       
