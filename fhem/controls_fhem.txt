@@ -1,4 +1,4 @@
-REV 21629
+REV 21632
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-04-09_07:45:02 335606 ./CHANGED
+UPD 2020-04-10_07:45:02 335796 ./CHANGED
 UPD 2020-03-29_07:45:03 42671 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -344,7 +344,7 @@ UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
 UPD 2020-03-23_07:45:03 89340 FHEM/70_BOTVAC.pm
 UPD 2020-03-09_07:45:03 90968 FHEM/70_BRAVIA.pm
 UPD 2019-11-07_07:45:03 10716 FHEM/70_CanOverEthernet.pm
-UPD 2020-03-04_07:45:02 132569 FHEM/70_DENON_AVR.pm
+UPD 2020-04-10_07:45:02 132667 FHEM/70_DENON_AVR.pm
 UPD 2017-04-23_07:45:02 6641 FHEM/70_EGPM.pm
 UPD 2019-03-23_07:45:03 123026 FHEM/70_ENIGMA2.pm
 UPD 2020-04-08_07:45:02 36211 FHEM/70_HYDRAWISE.pm
@@ -391,7 +391,7 @@ UPD 2018-10-01_07:45:02 221693 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
 UPD 2019-08-26_07:45:03 162302 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2020-04-06_07:45:02 322905 FHEM/73_AutoShuttersControl.pm
+UPD 2020-04-10_07:45:02 322911 FHEM/73_AutoShuttersControl.pm
 UPD 2020-04-05_07:45:02 187284 FHEM/73_DoorBird.pm
 UPD 2020-03-10_07:45:03 96019 FHEM/73_ElectricityCalculator.pm
 UPD 2020-02-28_07:45:03 42853 FHEM/73_GardenaSmartBridge.pm
@@ -755,8 +755,8 @@ UPD 2020-04-09_07:45:06 4267104 docs/commandref.html
 UPD 2020-04-08_07:45:09 2632284 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-04-09_07:45:10 232355 docs/commandref_modular.html
-UPD 2020-04-09_07:45:11 243306 docs/commandref_modular_DE.html
+UPD 2020-04-10_07:45:10 232355 docs/commandref_modular.html
+UPD 2020-04-10_07:45:11 243306 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
