@@ -922,7 +922,7 @@ defmod configure_DEVICEattrTemplate_at at +00:00:20 set IO_DEV publish CMNDTOPIC
 attr DEVICE setList \
    close:noArg CMNDTOPIC/ShutterClose1\
    open:noArg CMNDTOPIC/ShutterOpen1\
-   half:noArg CMNDTOPIC/ShutterSetHalfway1 50\
+   half:noArg CMNDTOPIC/ShutterPosition1 50\
    pct:slider,0,1,100 CMNDTOPIC/ShutterPosition1 $EVTPART1\
    stop:noArg CMNDTOPIC/ShutterStop1\
    resetClose:noArg CMNDTOPIC/ShutterSetClose1\
@@ -1982,8 +1982,9 @@ attr DEVICE setList\
   off:noArg shellies/DEVNAME/light/0/command off\
   on:noArg shellies/DEVNAME/light/0/command on\
   pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}\
-  dimUp:noArg { my $num=ReadingsNum($NAME,'pct',0)+10;; "shellies/DEVNAME/light/0/set \{\"turn\": \"on\", \"brightness\": $num\}";; }\
-  dimDown:noArg { my $num=ReadingsNum($NAME,'pct',0)-10;; "shellies/DEVNAME/light/0/set \{\"turn\": \"on\", \"brightness\": $num\}";; }\
+  int(ReadingsNum($NAME,'pct',0)/10)*10-10
+  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)+10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
+  dimdown:noArg my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)-10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
@@ -2617,14 +2618,14 @@ par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVIC
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE bridgeRegexp\
-  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* "oMQTTgw_BT"\
-  BASE_ID/DEVNAME/433toMQTT:.* "oMQTTgw_433"\
-  BASE_ID/DEVNAME/IRtoMQTT:.* "oMQTTgw_IR"\
-  BASE_ID/DEVNAME/CLIMAtoMQTT/([a-zA-Z0-9]+):.* "DEVNAME_$1"
+  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+)[:/].* "oMQTTgw_BT"\
+  BASE_ID/DEVNAME/433toMQTT[:/].* "oMQTTgw_433"\
+  BASE_ID/DEVNAME/IRtoMQTT[:/].* "oMQTTgw_IR"\
+  BASE_ID/DEVNAME/CLIMAtoMQTT/([a-zA-Z0-9]+)[:/].* "DEVNAME_$1"
 attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
-  BASE_ID/DEVNAME/SYStoMQTT:.* { json2nameValue($EVENT,'Sys_')}\
+  BASE_ID/DEVNAME/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
   homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : undef }
 attr DEVICE setList\
   restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
@@ -2645,8 +2646,9 @@ order:X_02a
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
 attr DEVICE readingList\
-BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),;;json2nameValue($EVENT,"$1"."_") }\
-BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
+  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),; json2nameValue($EVENT,"$1"."_") }\
+  BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+)/[^:]+:.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+)/([^:]+),; { "${1}_$2"=>$EVENT }}\
+  BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
@@ -2654,6 +2656,7 @@ attr DEVICE setList\
   BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
   BT_minrssi:slider,-110,1,0 BASE_ID/DEVNAME/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
   deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
+attr DEVICE periodicCmd deleteReadings:1440
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
 
@@ -2960,6 +2963,36 @@ attr DEVICE comment For questions about the use of different widgets for color s
 set DEVICE attrTemplate speechcontrol_type_light_255
 farewell:template has been applied successfully. <br>Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
+
+###########################################
+#source post: https://forum.fhem.de/index.php/topic,109946.0.html
+name:McLighting
+filter:TYPE=MQTT2_DEVICE
+desc:To control a McLighting device, see https://github.com/toblum/McLighting/wiki for details).
+order:m_01
+par:BASE_ID;BASE_ID typically is CID of FHEM Device;{ AttrVal("DEVICE","readingList","") =~ m,(.+?)(?=:), ? $1 : undef }
+par:DEVNAME;DEVNAME is Hostname as configured in McLighting;{ AttrVal("DEVICE","readingList","") =~ m,(?:\:)(.*)(?:/out), ? $1 : undef }
+par:ICON;ICON as set, defaults to light_led_stripe_rgb;{ AttrVal("DEVICE","icon","light_led_stripe_rgb") }
+attr DEVICE icon ICON
+attr DEVICE setList\
+  on:noArg DEVNAME/in =all\
+  off:noArg DEVNAME/in =off\
+  rgb:colorpicker,RGB DEVNAME/in *$EVTPART1\
+  brightness:colorpicker,BRI,0,1,255 DEVNAME/in %$EVTPART1\
+  speed:colorpicker,BRI,0,1,255 DEVNAME/in ?$EVTPART1\
+  effect:selectnumbers,0,1,59,0,lin DEVNAME/in /$EVTPART1
+attr DEVICE readingList \
+  BASE_ID:DEVNAME/out:.* out\
+  BASE_ID:home/DEVNAME_ha/state/out:.* { json2nameValue($EVENT) }
+attr DEVICE event-on-change-reading .*
+attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
+attr DEVICE eventMap /effect 0:Static/effect 1:Blink/effect 2:Breath/effect 3:ColorWipe/effect 11:Rainbow/effect 12:RainbowCycle/effect 29:BlinkRainbow/effect 33:chaseRainbow/
+attr DEVICE webCmd rgb:brightness:speed
+attr DEVICE setStateList on off
+attr DEVICE userReadings  rgb:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",0),ReadingsVal($name,"color_g",0),ReadingsVal($name,"color_b",0))}
+attr DEVICE comment Note: webCmd and eventMap are just examples; adopt this to your needs.
+attr DEVICE model McLighting
+
 
 #source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
 name:go_eCharger
