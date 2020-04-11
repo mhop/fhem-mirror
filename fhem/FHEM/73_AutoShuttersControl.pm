@@ -2510,8 +2510,12 @@ sub ShadingProcessingDriveCommand {
         if (   $shutters->getShadingStatus eq 'in'
             && $getShadingPos != $getStatus )
         {
-            if ( !CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-                && $shutters->getShuttersPlace eq 'terrace' )
+            if (
+                !(
+                    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+                    && $shutters->getShuttersPlace eq 'terrace'
+                )
+              )
             {
                 $shutters->setLastDrive('shading in');
                 ShuttersCommandSet( $hash, $shuttersDev, $getShadingPos );
