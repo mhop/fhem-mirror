@@ -1117,8 +1117,11 @@ sub EventProcessingWindowRec {
                     $shutters->setNoDelay(1);
                     $shutters->setDriveCmd( $shutters->getShadingPos );
                 }
-                elsif ($shutters->getStatus != $shutters->getOpenPos
-                    || $shutters->getStatus != $shutters->getLastManPos )
+                elsif (
+                    !$shutters->getIfInShading
+                    && (   $shutters->getStatus != $shutters->getOpenPos
+                        || $shutters->getStatus != $shutters->getLastManPos )
+                  )
                 {
                     if ( $shutters->getPrivacyDownStatus == 2 ) {
                         $shutters->setLastDrive(
@@ -1210,15 +1213,7 @@ sub EventProcessingWindowRec {
             if ( defined($posValue) && $posValue ) {
                 $shutters->setLastDrive($setLastDrive);
                 $shutters->setNoDelay(1);
-                $shutters->setDriveCmd(
-
-            #                     (
-            #                           $shutters->getShuttersPlace eq 'terrace'
-            #                         ? $shutters->getOpenPos
-                    $posValue
-
-                      #                     )
-                );
+                $shutters->setDriveCmd($posValue);
             }
         }
     }
@@ -2404,14 +2399,7 @@ sub ShadingProcessing {
           if ( $shutters->getShadingStatus eq 'in'
             || $shutters->getShadingStatus eq 'in reserved' );
 
-        if (
-            (
-                $shutters->getShadingStatus eq 'out reserved'
-                and
-                ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp )
-            ) > $shutters->getShadingWaitingPeriod
-          )
-        {
+        if ( $shutters->getShadingStatus eq 'out reserved' ) {
             $shutters->setShadingStatus('out');
             $shutters->setShadingLastStatus('in')
               if ( $shutters->getShadingLastStatus eq 'out' );
@@ -2443,11 +2431,7 @@ sub ShadingProcessing {
           if ( $shutters->getShadingStatus eq 'out'
             || $shutters->getShadingStatus eq 'out reserved' );
 
-        if ( $shutters->getShadingStatus eq 'in reserved'
-            and
-            ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) >
-            ( $shutters->getShadingWaitingPeriod / 2 ) )
-        {
+        if ( $shutters->getShadingStatus eq 'in reserved' ) {
             $shutters->setShadingStatus('in');
             $shutters->setShadingLastStatus('out')
               if ( $shutters->getShadingLastStatus eq 'in' );
@@ -2481,6 +2465,8 @@ sub ShadingProcessing {
             || (   $shutters->getShadingStatus eq 'in'
                 && $shutters->getShadingLastStatus eq 'out' )
         )
+        && $shutters->getRoommatesStatus ne 'asleep'
+        && $shutters->getRoommatesStatus ne 'gotosleep'
       );
 
     return;
@@ -2502,32 +2488,25 @@ sub ShadingProcessingDriveCommand {
     if (   $shutters->getShadingMode eq 'always'
         || $shutters->getShadingMode eq $homemode )
     {
-        $shutters->setShadingStatus( $shutters->getShadingStatus )
-          if (
-            ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) >
-            ( $shutters->getShadingWaitingPeriod / 2 ) );
+        $shutters->setShadingStatus( $shutters->getShadingStatus );
 
-        if (   $shutters->getShadingStatus eq 'in'
-            && $getShadingPos != $getStatus )
+        if (
+               $shutters->getShadingStatus eq 'in'
+            && $getShadingPos != $getStatus
+            && ( CheckIfShuttersWindowRecOpen($shuttersDev) != 2
+                || $shutters->getShuttersPlace ne 'terrace' )
+          )
         {
-            if (
-                !(
-                    CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-                    && $shutters->getShuttersPlace eq 'terrace'
-                )
-              )
-            {
-                $shutters->setLastDrive('shading in');
-                ShuttersCommandSet( $hash, $shuttersDev, $getShadingPos );
+            $shutters->setLastDrive('shading in');
+            ShuttersCommandSet( $hash, $shuttersDev, $getShadingPos );
 
-                ASC_Debug( 'ShadingProcessingDriveCommand: '
-                      . $shutters->getShuttersDev
-                      . ' - Der aktuelle Beschattungsstatus ist: '
-                      . $shutters->getShadingStatus
-                      . ' und somit wird nun in die Position: '
-                      . $getShadingPos
-                      . ' zum Beschatten gefahren' );
-            }
+            ASC_Debug( 'ShadingProcessingDriveCommand: '
+                  . $shutters->getShuttersDev
+                  . ' - Der aktuelle Beschattungsstatus ist: '
+                  . $shutters->getShadingStatus
+                  . ' und somit wird nun in die Position: '
+                  . $getShadingPos
+                  . ' zum Beschatten gefahren' );
         }
         elsif ($shutters->getShadingStatus eq 'out'
             && $getShadingPos == $getStatus )
@@ -2796,14 +2775,12 @@ sub ShuttersCommandSet {
 
     if (
         (
-            $posValue == $shutters->getShadingPos
-            && (
-                   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
-                && $shutters->getShuttersPlace eq 'terrace'
-                && (   $shutters->getLockOut eq 'soft'
-                    || $shutters->getLockOut eq 'hard' )
-                && !$shutters->getQueryShuttersPos($posValue)
-            )
+               $posValue == $shutters->getShadingPos
+            && CheckIfShuttersWindowRecOpen($shuttersDev) == 2
+            && $shutters->getShuttersPlace eq 'terrace'
+            && (   $shutters->getLockOut eq 'soft'
+                || $shutters->getLockOut eq 'hard' )
+            && !$shutters->getQueryShuttersPos($posValue)
         )
         || (
             $posValue != $shutters->getShadingPos
