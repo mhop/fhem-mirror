@@ -613,9 +613,9 @@ EOF
       Das optionale <code>{N}</code> nach dem * bedeutet, dass der Befehl genau
       <i>N-mal</i> wiederholt werden soll.<br>
 
-      &lt;timespec&gt; ist entweder HH:MM, HH:MM:SS oder {perlfunc()}.  perlfunc
-      muss ein String in timedet Format zurueckliefern.  Achtung: {perlfunc()}
-      darf keine Leerzeichen enthalten.<br>
+      &lt;timespec&gt; ist entweder HH:MM, HH:MM:SS oder {perlfunc()}.
+      perlfunc muss ein String in timedet Format zur&uuml;ckliefern.  Achtung:
+      {perlfunc()} darf keine Leerzeichen enthalten.<br>
 
       &lt;datespec&gt; ist entweder ISO8601 (YYYY-MM-DDTHH:MM:SS) oder Anzahl
       der Sekunden seit 1970.
@@ -721,7 +721,7 @@ EOF
         Nur f&uuml;r relative Definitionen: Stellt den Zeitpunkt der
         Ausf&uuml;hrung des Befehls so, dass er auch zur alignTime
         ausgef&uuml;hrt wird.  Dieses Argument ist ein timespec. Siehe oben
-        f&uuml; die Definition<br>
+        f&uuml;r die Definition<br>
 
         Beispiel:<br>
         <ul>
@@ -735,9 +735,9 @@ EOF
     <li>computeAfterInit<br>
         Falls perlfunc() im timespec Readings or Statusinformationen
         ben&ouml;gt, dann wird sie eine falsche Zeit beim FHEM-Start
-        zurueckliefern, da zu diesem Zeitpunkt die Readings noch nicht aktiv
+        zur&uuml;ckliefern, da zu diesem Zeitpunkt die Readings noch nicht aktiv
         sind. Mit gesetztem computeAfterInit wird perlfunc nach Setzen aller
-        Readings erneut ausgefuehrt. (Siehe Forum #56706)
+        Readings erneut ausgef&uuml;hrt. (Siehe Forum #56706)
         </li><br>
 
     <a name="disable"></a>
