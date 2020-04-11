@@ -44,6 +44,7 @@ eval "use FHEM::Meta;1"                                               or my $mod
 
 # Versions History intern:
 my %Log2Syslog_vNotesIntern = (
+  "5.10.3" => "11.04.2020  new reading 'Parse_Err_LastData', change octet count read ",
   "5.10.2" => "08.04.2020  code changes to stabilize send process, minor fixes ",
   "5.10.1" => "06.04.2020  support time-secfrac of RFC 3339, minor fix ",
   "5.10.0" => "04.04.2020  new attribute 'timeSpec', send and parse messages according to UTC or Local time, some minor fixes (e.g. for Octet Count) ",
@@ -345,6 +346,7 @@ sub Log2Syslog_Define {
       $hash->{MODEL}   = "Collector";
       $hash->{PROFILE} = "Automatic";                          
       readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);  # Fehlerzähler für Parse-Errors auf 0
+      readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
       Log2Syslog_Log3slog  ($hash, 3, "Log2Syslog $name - entering Syslog servermode ..."); 
       Log2Syslog_initServer("$name,global");
   
@@ -434,7 +436,7 @@ sub Log2Syslog_initServer {
       $hash->{FD}   = $hash->{SERVERSOCKET}->fileno();
       $hash->{PORT} = $hash->{SERVERSOCKET}->sockport();           
   } else {
-      $lh = "global" if(!$lh);
+      $lh     = "global" if(!$lh);
       my $ret = TcpServer_Open($hash,$port,$lh);
       if($ret) {        
           $err = "Can't open Syslog TCP Collector at $port: $ret";
@@ -511,7 +513,6 @@ sub Log2Syslog_Read {
       my (@load,$ocount,$msg,$tail);
       if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {                  # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log2Syslog_Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
-          use bytes;
           my $i   = 0;
           $ocount = $+{ocount};
           $tail   = $+{tail}; 
@@ -532,7 +533,7 @@ sub Log2Syslog_Read {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
-              next if(!$tail);
+              next if(!$tail); 
               $msg    = substr($tail,0,$ocount);
               push @load, $msg;
               if(length($tail) >= $ocount) {
@@ -795,7 +796,8 @@ sub Log2Syslog_parsePayload {
           $hash->{PROFILE} = "Automatic - detected format: $pp";
           Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Message format \"$pp\" detected. Try Parsing ... ");
       } else {
-          Log2Syslog_Log3slog($name, 2, "Log2Syslog $name - WARNING - no message format is detected, \"raw\" is used instead. You can specify the correct profile by attribute \"parseProfile\" !");
+          Log2Syslog_Log3slog($name, 2, "Log2Syslog $name - WARNING - no message format is detected (see reading \"Parse_Err_LastData\"), \"raw\" is used instead. You can specify the correct profile by attribute \"parseProfile\" !");
+          readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);
       }
   }
   
@@ -850,7 +852,8 @@ sub Log2Syslog_parsePayload {
               $sev      = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - ERROR parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - ERROR parse msg -> $data"); 
+              readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);              
           }
           
           $host  = "" if(!$host || $host eq "-");           
@@ -915,8 +918,9 @@ sub Log2Syslog_parsePayload {
       
       if(!$prival || !$date || !$time) {
           $err = 1;
-          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");  
+          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");          
           Log2Syslog_Log3slog ($hash, 5, "Log2Syslog $name - parsed fields -> PRI: ".($prival // '').", IETF: ".($ietf // '').", DATE: ".($date // '').", TIME: ".($time // '').", OFFSET: ".($to // '').", HOST: ".($host // '').", ID: ".($id // '').", PID: ".($pid // '').", MID: ".($mid // '').", SDFIELD: ".($sdfield // '').", CONT: ".($cont // ''));        
+          readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);
       } else {
           $ts = Log2Syslog_getTimeFromOffset ($name,$to,$date,$time,$msec);
           #$ts = "$date $time";
@@ -977,7 +981,8 @@ sub Log2Syslog_parsePayload {
               $sev      = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");
+              readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);              
           }
             
           $host  = "" if(!$host || $host eq "-");           
@@ -1024,7 +1029,8 @@ sub Log2Syslog_parsePayload {
       
       if(!$prival) {
           $err = 1;
-          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");           
+          Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");   
+          readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);          
       
       } else {      
           if(looks_like_number($prival)) {
@@ -1106,7 +1112,8 @@ sub Log2Syslog_parsePayload {
               $sev      = $Log2Syslog_Severity{$severity};
           } else {
               $err = 1;
-              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");          
+              Log2Syslog_Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");
+              readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);              
           }
 
           Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - parsed message -> FAC: $fac, SEV: $sev, TS: $ts, HOST: $host, ID: $id, PID: $pid, MID: $mid, CONT: $cont");
@@ -1135,6 +1142,7 @@ sub Log2Syslog_parsePayload {
   } elsif ($pp eq "unknown") { 
       $err = 1;
       Log2Syslog_Log3slog ($hash, 1, "Log2Syslog $name - Message format could not be detected automatically. PLease check and set attribute \"parseProfile\" manually.");   
+      readingsSingleUpdate($hash, "Parse_Err_LastData", $data, 0);
   }
 
 return ($err,$ignore,$sev,$phost,$ts,$pl);
@@ -1329,6 +1337,7 @@ sub Log2Syslog_Set {
         if($hash->{MODEL} =~ /Collector/) {                                                    # Serversocket öffnen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);  
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0    
+            readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
         }
         
   } else {
@@ -1560,6 +1569,7 @@ sub Log2Syslog_Attr {
             Log2Syslog_downServer($hash,1);                                                    # Serversocket schließen
             InternalTimer(gettimeofday()+0.5, "Log2Syslog_initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
+            readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
         } else {
             Log2Syslog_closesock($hash,1);                                                     # Clientsocket schließen  
         }
@@ -1596,7 +1606,8 @@ sub Log2Syslog_Attr {
           } else {
               $hash->{PROFILE} = "Automatic";
           }
-          readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);  # Fehlerzähler für Parse-Errors auf 0
+          readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                              # Fehlerzähler für Parse-Errors auf 0
+          readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);  
     }
     
     if ($cmd eq "del" && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
@@ -1605,7 +1616,7 @@ sub Log2Syslog_Attr {
     
     if ($aName =~ /makeEvent/) {
         for my $key(keys%{$defs{$name}{READINGS}}) {
-            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_Err_No/);
+            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_.*/);
         }
     }    
     
@@ -1959,7 +1970,7 @@ sub Log2Syslog_writeToSocket {
   my $ret = syswrite ($sock,$data);
   
   if(defined $ret && $ret == $ld) {
-      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent. ($ret bytes)\n");      
+      Log2Syslog_Log3slog($name, 4, "Log2Syslog $name - Payload sequence $pid sent. ($ret of $ld bytes)\n");      
   } elsif (defined $ret && $ret != $ld) {
       Log2Syslog_Log3slog($name, 3, "Log2Syslog $name - Warning - Payload sequence $pid NOT completely sent: $ret of $ld bytes \n"); 
   } else {
@@ -3172,6 +3183,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
       <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> the last successful parsed Syslog-message from &lt;Host&gt; </td></tr>
+      <tr><td><b>Parse_Err_LastData</b>             </td><td> the last record where the set parseProfile could not be applied successfully </td></tr>
       <tr><td><b>Parse_Err_No</b>                   </td><td> the number of parse errors since start </td></tr>
       <tr><td><b>SSL_Algorithm</b>                  </td><td> used SSL algorithm if SSL is enabled and active </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> the used TLS-version if encryption is enabled and is active</td></tr>
@@ -3946,6 +3958,7 @@ $CONT = (split(">",$CONT))[1] if($CONT =~ /^<.*>.*$/);
     <table>  
     <colgroup> <col width=35%> <col width=65%> </colgroup>
       <tr><td><b>MSG_&lt;Host&gt;</b>               </td><td> die letzte erfolgreich geparste Syslog-Message von &lt;Host&gt; </td></tr>
+      <tr><td><b>Parse_Err_LastData</b>             </td><td> der letzte Datensatz bei dem das eingestellte parseProfile nicht erfolgreich angewendet werden konnte </td></tr>
       <tr><td><b>Parse_Err_No</b>                   </td><td> die Anzahl der Parse-Fehler seit Start </td></tr>
       <tr><td><b>SSL_Algorithm</b>                  </td><td> der verwendete SSL Algorithmus wenn SSL eingeschaltet und aktiv ist </td></tr>
       <tr><td><b>SSL_Version</b>                    </td><td> die verwendete TLS-Version wenn die Verschlüsselung aktiv ist</td></tr>
