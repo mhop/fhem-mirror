@@ -5961,6 +5961,11 @@ restoreDir_saveFile($$)
 
   return if(!$restoreDir || !$fName);
 
+  if($^O eq "MSWin32") { # Forum #110071
+    $fName =~ s,^.:,,g;
+    $fName =~ s,\\,/,g;
+  }
+
   my $root = $attr{global}{modpath};
   restoreDir_mkDir($root, "$restoreDir/$fName", 1);
   if(!copy($fName, "$root/$restoreDir/$fName")) {
