@@ -169,6 +169,9 @@
 #   Corrected Eol
 # 2.9 2019-05-23  allow \s, addtl silenCmds, fixes 
 
+#   FIX: correct parsemodesend for inMsg with multiple lines - msg1041326
+#
+#
 #   
 ##############################################################################
 # TASKS 
@@ -1778,10 +1781,10 @@ sub TelegramBot_SendIt($$$$$;$$$)
         $parseMode = "HTML";
       } elsif ( $parseMode == 3 ) {
         $parseMode = 0;
-        if ( $msg =~ /^markdown(.*)$/i ) {
+        if ( $msg =~ /^markdown(.*)$/is ) {
           $msg = $1;
           $parseMode = "Markdown";
-        } elsif ( $msg =~ /^HTML(.*)$/i ) {
+        } elsif ( $msg =~ /^HTML(.*)$/is ) {
           $msg = $1;
           $parseMode = "HTML";
         }
