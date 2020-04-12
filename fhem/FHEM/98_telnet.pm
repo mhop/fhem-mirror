@@ -258,8 +258,11 @@ telnet_Read($)
     } else {
       $hash->{showPrompt} = 1;                  # Empty return
       if(!$hash->{motdDisplayed}) {
-        my $motd = $attr{global}{motd};
-        push @ret, $motd if($motd && $motd ne "none");
+        my $motd = AttrVal("global", "motd", "");
+        my $gie = $defs{global}{init_errors};
+        if($motd ne "none" && ($motd || $gie)) {
+          push @ret, "$motd\n$gie";
+        }
         $hash->{motdDisplayed} = 1;
       }
     }

@@ -1165,9 +1165,10 @@ FW_answerCall($)
       $srVal = FW_showRoom(); 
 
     } else {
-      my $motd = AttrVal("global","motd","none");
-      if($motd ne "none") {
-        FW_addContent("><pre class='motd'>$motd</pre></div");
+      my $motd = AttrVal("global", "motd", "");
+      my $gie = $defs{global}{init_errors};
+      if($motd ne "none" && ($motd || $gie)) {
+        FW_addContent("><pre class='motd'>$motd\n$gie</pre></div");
       }
     }
   }

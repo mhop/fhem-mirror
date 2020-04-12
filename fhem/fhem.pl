@@ -600,15 +600,14 @@ if(gettimeofday() < 2*3600) {
 require RTypes;
 RTypes_Initialize();
 
-my $cfgErrMsg = "Messages collected while initializing FHEM:";
-my $cfgRet="";
+$defs{global}{init_errors}="";
 if(configDBUsed()) {
   my $ret = cfgDB_ReadAll(undef);
-  $cfgRet .= "configDB: $ret\n" if($ret);
+  $defs{global}{init_errors} .= "configDB: $ret\n" if($ret);
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
-  $cfgRet .= "configfile: $ret\n" if($ret);
+  $defs{global}{init_errors} .= "configfile: $ret\n" if($ret);
 
   my $stateFile = $attr{global}{statefile};
   if($stateFile) {
@@ -616,7 +615,7 @@ if(configDBUsed()) {
     $stateFile = ResolveDateWildcards($stateFile, @t);
     if(-r $stateFile) {
       $ret = CommandInclude(undef, $stateFile);
-      $cfgRet .= "$stateFile: $ret\n" if($ret);
+      $defs{global}{init_errors} .= "$stateFile: $ret\n" if($ret);
     }
   }
 }
@@ -644,17 +643,14 @@ foreach my $d (keys %defs) {
   }
 }
 
-if($cfgRet) {
-  $attr{global}{autosave} = 0;
-  $attr{global}{motd} = "$cfgErrMsg\n$cfgRet\nAutosave deactivated";
-  Log 1, $cfgRet;
-
-} elsif($attr{global}{motd} && $attr{global}{motd} =~ m/^$cfgErrMsg/) {
-  $attr{global}{motd} = "";
-
-} else {
-  SecurityCheck();
-
+my $init_errors_first = ($defs{global}{init_errors} ? 1 : 0);
+SecurityCheck();
+if($defs{global}{init_errors}) {
+  $attr{global}{autosave} = 0 if($init_errors_first);
+  $defs{global}{init_errors} = "Messages collected while initializing FHEM:".
+                 "$defs{global}{init_errors}\n".
+                 ($init_errors_first ? "Autosave deactivated" : "");
+  Log 1, $defs{global}{init_errors} if(AttrVal("global","motd","") ne "none");
 }
 
 
@@ -5976,7 +5972,6 @@ restoreDir_saveFile($$)
 sub
 SecurityCheck()
 {
-  return if(AttrVal("global", "motd", "") eq "none");
   my @fnd;
   foreach my $sdev (keys %defs) {
     next if($defs{$sdev}{TEMPORARY});
@@ -6005,9 +6000,7 @@ SecurityCheck()
   if(@fnd) {
     unshift(@fnd, "SecurityCheck:");
     push(@fnd, "You can disable this message with attr global motd none");
-    $attr{global}{motd} = join("\n", @fnd);
-  } elsif(AttrVal('global','motd','') =~ m/^SecurityCheck/) {
-    delete $attr{global}{motd};
+    $defs{global}{init_errors} .= join("\n", @fnd);
   }
 }
 
