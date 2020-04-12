@@ -145,6 +145,7 @@
 # 2020-03-02      Bei Aktionen wird nicht mehr auf defined($data) sondern auf ne "" getestet.
 # 2020-04-05      s.o. 2. Versuch 
 #
+# 2020-04-09      my $dir = path(AttrVal("global","logdir","log")); 
 #
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
@@ -1304,7 +1305,7 @@ sub vitoconnect_getGwCallback($) {
 			return;
 		} 
       if ($hash->{".logResponseOnce"}) {
-      	my $dir = path("log"); 
+      	my $dir = path(AttrVal("global","logdir","log"));  
 			my $file = $dir->child("gw.json"); 
 			my $file_handle = $file->openw_utf8();
 			$file_handle->print(Dumper($decode_json));
@@ -1356,7 +1357,7 @@ sub vitoconnect_getResourceCallback($) {
 		Log3 $name, 4, "$name - getResourceCallback went ok";
    	    Log3 $name, 5, "Received response: $response_body\n";
    	    my $decode_json = eval{decode_json($response_body)};
-          if($@) { 
+        if($@) { 
 		  Log3 $name, 1, "$name - JSON error while request: $@";
 		  InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
           return; } 
@@ -1364,13 +1365,13 @@ sub vitoconnect_getResourceCallback($) {
       
  		###########################################      
         if ($hash->{".logResponseOnce"}) {
-      	  my $dir = path("log"); 
-			  my $file = $dir->child("entities.json"); 
-		      my $file_handle = $file->openw_utf8();
-			  #$file_handle->print(Dumper($items));
-			  $file_handle->print( Dumper(@{$items->{entities}} ));
-			  my $file2 = $dir->child("actions.json"); 
-			  $file_handle2 = $file2->openw_utf8();
+      	  my $dir = path(AttrVal("global","logdir","log"));  
+		  my $file = $dir->child("entities.json"); 
+		  my $file_handle = $file->openw_utf8();
+		  #$file_handle->print(Dumper($items));
+		  $file_handle->print( Dumper(@{$items->{entities}} ));
+		  my $file2 = $dir->child("actions.json"); 
+		  $file_handle2 = $file2->openw_utf8();
 		}
 				
 		###########################################
