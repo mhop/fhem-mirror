@@ -54,7 +54,7 @@ alexa_Initialize($)
                       #"alexaFHEM-filter ".
                       "alexaFHEM-host alexaFHEM-sshUser ".
                       "nrarchive ".
-                      "disable:1 disabledForIntervals ".
+                      "disable:1,0 disabledForIntervals ".
                       $readingFnAttributes;
 
   $hash->{FW_detailFn} = "alexa_detailFn";
@@ -117,6 +117,16 @@ alexa_AttrDefaults($)
 }
 
 sub
+alexa_InitLog($) {
+  my $name = shift;
+  if( $attr{global}{logdir} ) {
+    CommandAttr(undef, "$name alexaFHEM-log %L/alexa-%Y-%m-%d.log") if( !AttrVal($name, 'alexaFHEM-log', undef ) );
+  } else {
+    CommandAttr(undef, "$name alexaFHEM-log ./log/alexa-%Y-%m-%d.log") if( !AttrVal($name, 'alexaFHEM-log', undef ) );
+  }
+}
+
+sub
 alexa_Define($$)
 {
   my ($hash, $def) = @_;
@@ -144,12 +154,6 @@ alexa_Define($$)
 
   $hash->{NOTIFYDEV} = "global,global:npmjs.*alexa-fhem.*";
 
-  if( $attr{global}{logdir} ) {
-    CommandAttr(undef, "$name alexaFHEM-log %L/alexa-%Y-%m-%d.log") if( !AttrVal($name, 'alexaFHEM-log', undef ) );
-  } else {
-    CommandAttr(undef, "$name alexaFHEM-log ./log/alexa-%Y-%m-%d.log") if( !AttrVal($name, 'alexaFHEM-log', undef ) );
-  }
-
   #CommandAttr(undef, "$name alexaFHEM-filter alexaName=..*") if( !AttrVal($name, 'alexaFHEM-filter', undef ) );
 
   if( !AttrVal($name, 'devStateIcon', undef ) ) {
@@ -162,6 +166,7 @@ alexa_Define($$)
                        };
 
   if( $init_done ) {
+    alexa_InitLog($name);
     CoProcess::start($hash);
   } else {
     $hash->{STATE} = 'active';
@@ -186,6 +191,7 @@ alexa_Notify($$)
     return undef;
 
   } elsif( grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}) ) {
+    alexa_InitLog($hash->{NAME});
     CoProcess::start($hash);
     return undef;
   }
