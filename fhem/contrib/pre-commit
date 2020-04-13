@@ -67,8 +67,9 @@ foreach my $row (split("\n", $fList)) {
         die("Cant svnlook cat $fName:$!\n");
 
     while(my $l = <FILE>) {
-       $hasId = ($l =~ /#.*?\$Id(?:\:.+)?\$/);
-       last if($hasId);
+      $hasId = ($l =~ /#.*?\$Id(?:\:.+)?\$/) if(!$hasId);
+      err $fName, "DevIo must be loaded via use (Forum #110125)."
+        if($l =~ m/require.*modpath.*DevIo.pm/);
     }
     close(FILE);
     err $fName, "file has no SVN Id as comment" unless($hasId);

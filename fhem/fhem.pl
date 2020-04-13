@@ -5585,7 +5585,7 @@ fhemFork()
       if($h->{DBH} && $h->{TYPE} eq 'DbLog'); #Forum #43271
     TcpServer_Close($h) if($h->{SERVERSOCKET});
     if($h->{DeviceName}) {
-      require "$attr{global}{modpath}/FHEM/DevIo.pm";
+      require "DevIo.pm";
       DevIo_CloseDev($h,1);
     }
   }
