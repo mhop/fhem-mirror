@@ -2,6 +2,9 @@
 # $Id$
 package main;
 
+use strict;
+use warnings;
+
 sub DevIo_CloseDev($@);
 sub DevIo_Disconnected($);
 sub DevIo_Expect($$$);
@@ -113,9 +116,9 @@ DevIo_TimeoutRead($$;$$)
     my $nfound = select($rin, undef, undef, $timeout);
     last if($nfound <= 0);      # timeout
     my $r = DevIo_DoSimpleRead($hash);
-    last if(!defined($r) || ($r == "" && $hash->{TCPDev}));
+    last if(!defined($r) || ($r eq "" && $hash->{TCPDev}));
     $answer .= $r;
-    last if(length($anser) >= $maxlen || ($regexp && $answer =~ m/$regexp/));
+    last if(length($answer) >= $maxlen || ($regexp && $answer =~ m/$regexp/));
   }
   return $answer;
 }
@@ -271,6 +274,7 @@ DevIo_OpenDev($$$;$)
     return undef;
   };
   
+  $baudrate = "" if(!defined($baudrate));
   if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
     $baudrate = $1 if(defined($1));
     $databits = $3 if(defined($3));
