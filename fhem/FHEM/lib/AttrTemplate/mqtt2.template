@@ -763,7 +763,9 @@ attr DEVICE_CH2 setList \
   toggle:noArg CMNDTOPIC/POWER2 2\
   Color:colorpicker,RGB CMNDTOPIC/COLOR\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
-  white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }
+  white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }\
+  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {CMNDTOPIC/Dimmer $num}; }\
+  dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {CMNDTOPIC/Dimmer $num}; }
 attr DEVICE_CH2 readingList \
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER2:.* state
@@ -1302,6 +1304,8 @@ attr DEVICE setList\
   toggle:noArg CMNDTOPIC/POWER1 2\
   Color:colorpicker,RGB CMNDTOPIC/COLOR\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
+  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {CMNDTOPIC/Dimmer $num}; }\
+  dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {CMNDTOPIC/Dimmer $num}; }\
   white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }\
   saturation:colorpicker,BRI,0,1,100 CMNDTOPIC/HSBCOLOR2\
   Speed:colorpicker,BRI,0,1,20 CMNDTOPIC/SPEED\
@@ -1341,6 +1345,8 @@ attr DEVICE setList\
   toggle:noArg CMNDTOPIC/POWER1 2\
   Color:colorpicker,RGB CMNDTOPIC/COLOR\
   pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
+  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {CMNDTOPIC/Dimmer $num}; }\
+  dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {CMNDTOPIC/Dimmer $num}; }\
   white:colorpicker,BRI,0,5,100 { "CMNDTOPIC/COLOR ". sprintf("000000%02X",$EVTPART1*2.55) }\
   CT:colorpicker,CT,153,5,500 CMNDTOPIC/CT
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 Channel_5:0
@@ -1368,7 +1374,9 @@ attr DEVICE setList\
   on:noArg CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2\
   CT:colorpicker,CT,153,5,500 CMNDTOPIC/CT\
-  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER
+  pct:colorpicker,BRI,0,5,100 CMNDTOPIC/DIMMER\
+  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {CMNDTOPIC/Dimmer $num}; }\
+  dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {CMNDTOPIC/Dimmer $num}; }
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1983,8 +1991,8 @@ attr DEVICE setList\
   on:noArg shellies/DEVNAME/light/0/command on\
   pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}\
   int(ReadingsNum($NAME,'pct',0)/10)*10-10
-  dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)+10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
-  dimdown:noArg my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)-10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
+    dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
+  dimdown:noArg my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
@@ -2980,14 +2988,14 @@ attr DEVICE setList\
   rgb:colorpicker,RGB DEVNAME/in *$EVTPART1\
   brightness:colorpicker,BRI,0,1,255 DEVNAME/in %$EVTPART1\
   speed:colorpicker,BRI,0,1,255 DEVNAME/in ?$EVTPART1\
-  effect:selectnumbers,0,1,59,0,lin DEVNAME/in /$EVTPART1
+  effect_nr:selectnumbers,0,1,59,0,lin DEVNAME/in /$EVTPART1\
+  effect:rainbow,rainbowCycle,theaterchase,theaterchaseRainbow,tv DEVNAME/in =$EVTPART1
 attr DEVICE readingList \
-  BASE_ID:DEVNAME/out:.* out\
-  BASE_ID:home/DEVNAME_ha/state/out:.* { json2nameValue($EVENT) }
+  DEVNAME/out:.* out\
+  home/DEVNAME_ha/state/out:.* { json2nameValue($EVENT) }
 attr DEVICE event-on-change-reading .*
 attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
-attr DEVICE eventMap /effect 0:Static/effect 1:Blink/effect 2:Breath/effect 3:ColorWipe/effect 11:Rainbow/effect 12:RainbowCycle/effect 29:BlinkRainbow/effect 33:chaseRainbow/
-attr DEVICE webCmd rgb:brightness:speed
+attr DEVICE webCmd rgb:brightness:speed:effect
 attr DEVICE setStateList on off
 attr DEVICE userReadings  rgb:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",0),ReadingsVal($name,"color_g",0),ReadingsVal($name,"color_b",0))}
 attr DEVICE comment Note: webCmd and eventMap are just examples; adopt this to your needs.
