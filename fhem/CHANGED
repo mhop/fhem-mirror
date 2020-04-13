@@ -1,13 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: rollback Notify Fn, fix shading
+                                    out/in reserved
  - feature: 72_FB_CALLMONITOR: new reading/event "calls_count" which reflects
                                the number of active calls in parallel
- - bugfix: 50_TelegramBot: parsemode corrected for multiple lines - msg1041326
- - change: 37_echodevice.pm more loginformations set "NPM_login new" 
+ - bugfix:  50_TelegramBot: parsemode corrected for multiple lines - msg1041326
+ - change:  37_echodevice.pm more loginformations set "NPM_login new" 
  - change:  93_Log2Syslog: new reading 'Parse_Err_LastData', minor changes
  - change:  93_Log2Syslog: some code changes and reviews
- - bugfix: 70_DENON_AVR: fixed HTTP 403 (thx justme1968)
- - bugfix : 73_AutoShuttersControl: fix shading drive if current position under
+ - bugfix:  70_DENON_AVR: fixed HTTP 403 (thx justme1968)
+ - bugfix:  73_AutoShuttersControl: fix shading drive if current position under
                                     shading position
  - feature: 37_echodevice.pm 
      CHANGE:  Keepalive aktiviert
@@ -18,16 +20,16 @@
               set sounds: (Sounds gemäß Routine-Übersicht)
  - feature: 14_SD_UT.pm 
      new model Momento
- - bugfix: 14_SD_WS_09.pm: WindDirAverage 
+ - bugfix:  14_SD_WS_09.pm: WindDirAverage 
  - feature: 14_SD_WS_09.pm: support for WH2315 
  - feature: 14_SD_UT.pm 
      new model Novy_840039
      new remote control xavax 00111939
      new remote control with 4 buttons for diesel heating
- - change: 14_SD_UT.pm
+ - change:  14_SD_UT.pm
      model Novy_840039, rename button text power_button to power_on_off
      remove sort option
- - bugfix: 14_SD_UT.pm
+ - bugfix:  14_SD_UT.pm
      fix UTClock for all models
      TR-502MSV bugfix, ident was only 8 bit, must be 12 bit long
      RC_10 button set all work after renaming the device
