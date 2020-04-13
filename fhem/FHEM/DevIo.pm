@@ -247,7 +247,9 @@ DevIo_OpenDev($$$;$)
     my $ret;
     if($initfn) {
       my $hadFD = defined($hash->{FD});
+      no strict "refs";
       $ret = &$initfn($hash);
+      use strict "refs";
       if($ret) {
         if($hadFD && !defined($hash->{FD})) { # Forum #54732 / ser2net
           DevIo_Disconnected($hash);
