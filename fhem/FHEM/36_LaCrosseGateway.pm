@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
+use DevIo;
 
 my $clients = ":PCA301:EC3000:LaCrosse:Level:EMT7110:KeyValueProtocol:CapacitiveLevel";
 
@@ -21,9 +22,7 @@ my %matchList = (
 
 sub LaCrosseGateway_Initialize($) {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
+  
   $hash->{ReadFn}         = "LaCrosseGateway_Read";
   $hash->{WriteFn}        = "LaCrosseGateway_Write";
   $hash->{ReadyFn}        = "LaCrosseGateway_Ready";
@@ -70,7 +69,8 @@ sub LaCrosseGateway_Notify($$) {
 }
 
 #=======================================================================================
-sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
+sub LaCrosseGateway_Define($$) {
+  my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
   if(@a != 3) {
@@ -87,6 +87,8 @@ sub LaCrosseGateway_Define($$) {my ($hash, $def) = @_;
   $hash->{Clients} = $clients;
   $hash->{MatchList} = \%matchList;
   $hash->{TIMEOUT} = 0.5;
+  ###$hash->{TIMEOUT} = 1.0;
+  ###$hash->{devioLoglevel} = 4;
 
   if( !defined( $attr{$name}{usbFlashCommand} ) ) {
     $attr{$name}{usbFlashCommand} = "./FHEM/firmware/esptool.py -b 921600 -p [PORT] write_flash -ff 80m -fm dio -fs 4MB-c1 0x00000 [BINFILE] > [LOGFILE] 2>&1"
@@ -334,7 +336,7 @@ sub LaCrosseGateway_StartNextion($) {
       LaCrosseGateway_LogOTA($_);
     }
   }
-    
+  
   return $name;
 }
 
@@ -351,7 +353,7 @@ sub LaCrosseGateway_Set($@) {
   if ($cmd eq "raw") {
     Log3 $name, 4, "set $name $cmd $arg";
     LaCrosseGateway_SimpleWrite($hash, $arg);
-  } 
+  }
   elsif ($cmd eq "flash") {
     CallFn("WEB", "ActivateInformFn", $hash, "global");
     DevIo_CloseDev($hash);
@@ -366,7 +368,7 @@ sub LaCrosseGateway_Set($@) {
     readingsSingleUpdate($hash, "state", "disconnected", 1);
     $hash->{helper}{FLASHING} = 1;
     $hash->{helper}{RUNNING_PID} = BlockingCall("LaCrosseGateway_StartNextion", $name . "|" . $arg, "LaCrosseGateway_UploadDone", 1200, "LaCrosseGateway_UploadError", $hash);
-    return undef; 
+    return undef;
   }
   elsif ($cmd eq "LaCrossePairForSec") {
     my @args = split(' ', $arg);
@@ -374,7 +376,7 @@ sub LaCrosseGateway_Set($@) {
     return "Usage: set $name LaCrossePairForSec <seconds_active> [ignore_battery]" if(!$arg || $args[0] !~ m/^\d+$/ || ($args[1] && $args[1] ne "ignore_battery") );
     $hash->{LaCrossePair} = $args[1]?2:1;
     InternalTimer(gettimeofday()+$args[0], "LaCrosseGateway_RemoveLaCrossePair", $hash, 0);
-  } 
+  }
   elsif ($cmd eq "connect") {
     DevIo_CloseDev($hash);
     return LaCrosseGateway_Connect($hash);
@@ -395,7 +397,7 @@ sub LaCrosseGateway_Set($@) {
   }
   elsif ($cmd eq "parse") {
     LaCrosseGateway_Parse($hash, $hash, $name, $arg);
-  } 
+  }
   else {
     return "Unknown argument $cmd, choose one of ".$list;
   }
@@ -517,7 +519,7 @@ sub LaCrosseGateway_HandleKVP($$) {
     readingsBulkUpdate($hash, "CPU-Temperature", $1);
   }
   
-  if(AttrVal($name, "loopTimeReadings", "0") == "1") {
+  if(AttrVal($name, "loopTimeReadings", "0") eq '1') {
     if($kvp =~ m/LD\.Min=(.*?)(\,|\ ,)/) {
       readingsBulkUpdate($hash, "LD.Min", $1);
     }
@@ -629,7 +631,7 @@ sub LaCrosseGateway_Parse($$$$) {
   my $filter = AttrVal($name, "filter", undef);
   if(defined($filter)) {
     return if ($msg =~ m/$filter/);
-  }  
+  }
 
   if ($msg =~ m/^LGW/) {
     if ($msg =~ /ALIVE/) {
@@ -741,12 +743,19 @@ sub LaCrosseGateway_Connect($;$) {
   my $name = $hash->{NAME};
   
   DevIo_CloseDev($hash);
+  ###if(DevIo_IsOpen($hash)) {
+  ###  DevIo_CloseDev($hash);
+  ###}
   
   $mode = 0 if!($mode);
   my $enabled = AttrVal($name, "disable", "0") != "1" && !defined($hash->{helper}{FLASHING});
   if($enabled) {
     $hash->{nextOpenDelay} = 2;
-    my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit");
+    ###my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit");
+    my $ret = DevIo_OpenDev($hash, $mode, "LaCrosseGateway_DoInit", sub($$){
+      my ($h, $e) = @_;
+      ####Log 3, "LGW: " . $h->{NAME} . " " . $e;
+    });
     return $ret;
   }
   
