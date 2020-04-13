@@ -2657,26 +2657,26 @@ ZWave_ccsParse($$)
 {
   my ($t, $p) = @_;
 
-  return "ccsChanged:$p" if($t == "05");
+  return "ccsChanged:$p" if($t eq '05');
 
-  if($t == "08" && $p =~ m/^(..)(..)$/) {
-    my $ret = ($1 eq "00" ? "no" : ($1 eq "01" ? "temporary" : "permanent"));
-    $ret .= ", ". ($2 eq "79" ? "frost protection" :
-                  ($2 eq "7a" ? "energy saving" : "unused"));
+  if($t eq '08' && $p =~ m/^(..)(..)$/) {
+    my $ret = ($1 eq '00' ? 'no' : ($1 eq '01' ? 'temporary' : 'permanent'));
+    $ret .= ", ". ($2 eq "79" ? 'frost protection' :
+                  ($2 eq "7a" ? 'energy saving' : 'unused'));
     return "ccsOverride:$ret";
   }
 
-  if($t == "03") {
+  if($t eq '03') {
     $p =~ /^(..)(.*$)/;
-    my $n = "ccs_".$zwave_wd[hex($1)];
+    my $n = 'ccs_'.$zwave_wd[hex($1)];
     $p = $2;
     my @v;
     while($p =~ m/^(..)(..)(..)(.*)$/) {
-      last if($3 eq "7f"); # unused
+      last if($3 eq '7f'); # unused
       $p = $4;
       my $t = hex($3);
-      $t = ($t == 0x7a ? "energySave" : $t >= 0x80 ? -(255-$t)/10 : $t/10);
-      push @v, sprintf("%02d:%02d %0.1f", hex($1), hex($2), $t);
+      $t = ($t == 0x7a ? 'energySave' : $t >= 0x80 ? -(255-$t)/10 : $t/10);
+      push @v, sprintf('%02d:%02d %0.1f', hex($1), hex($2), $t);
     }
     return "$n:".(@v ? join(" ",@v) : "N/A");
   }
