@@ -531,17 +531,16 @@ FB_CALLMONITOR_Read($)
         }    
         
         $hash->{helper}{TEMP}{$array[2]}{".last-event"} = $array[1];
-       
+        
+        readingsBeginUpdate($hash);
         unless($hash->{helper}{TEMP}{$array[2]}{".deflected"})
         {
-            readingsBeginUpdate($hash);
             readingsBulkUpdate($hash, "event", lc($array[1]));
             
             foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
             {
                 readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key}) unless($key =~ /^\./);
             }
-            readingsEndUpdate($hash, 1);
         }
         else
         {
@@ -552,6 +551,9 @@ FB_CALLMONITOR_Read($)
         {
             delete($hash->{helper}{TEMP}{$array[2]});
         } 
+
+        readingsBulkUpdate($hash, "calls_count", scalar keys %{$hash->{helper}{TEMP}});
+        readingsEndUpdate($hash, 1);
     }
     
     $hash->{PARTIAL} = $buffer;
@@ -2484,6 +2486,7 @@ sub FB_CALLMONITOR_sendKeepAlive($)
   <li><b>internal_number</b> - The internal number (fixed line, VoIP number, ...) on which the participant is calling (event: ring) or is used for calling (event: call)</li>
   <li><b>internal_connection</b> - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take or perform the call</li>
   <li><b>external_connection</b> - The external connection ("POTS" =&gt; fixed line, "SIPx" =&gt; VoIP account, "ISDN", "GSM" =&gt; mobile call via GSM/UMTS stick) which is used to take or perform the call</li>
+  <li><b>calls_count</b> - The number of active calls in parallel. The value 0 means, there is no active call currently.</li>
   <li><b>call_duration</b> - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
   <li><b>call_id</b> - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
   <li><b>missed_call</b> - This event will be raised in case of a incoming call, which is not answered. If available, also the name of the calling number will be displayed.</li>
@@ -2669,6 +2672,7 @@ sub FB_CALLMONITOR_sendKeepAlive($)
   <li><b>internal_number</b> - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
   <li><b>internal_connection</b> - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
   <li><b>external_connection</b> - Der externe Anschluss welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren  ("POTS" =&gt; analoges Festnetz, "SIPx" =&gt; VoIP Nummer, "ISDN", "GSM" =&gt; Mobilfunk via GSM/UMTS-Stick)</li>
+  <li><b>calls_count</b> - Die Anzahl aller aktiven Verbindungen (gleichzeitig). Ist der Wert 0, so wird gerade kein Gespr&auml;ch gef&uuml;hrt.</li>
   <li><b>call_duration</b> - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
   <li><b>call_id</b> - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei zwei oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   <li><b>missed_call</b> - Dieses Event wird nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Sofern der Name dazu bekannt ist, wird dieser ebenfalls mit angezeigt.</li>
