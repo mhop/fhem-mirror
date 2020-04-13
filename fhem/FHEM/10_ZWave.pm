@@ -5659,7 +5659,7 @@ ZWave_firmwareUpdateParse($$$)
   }
   
   Log3 $hash, 3, "ZWave_firmwareUpdateParse: CMD: $cmd MSG: $msg Version: $classVersion";
-  if($cmd == '02') 
+  if($cmd eq '02') 
   {
     $ret  = "fwMd: ";
     $hash->{FW_UPDATE_DATA}->{MAN_ID} = substr($msg,0, 4) if(defined $hash->{FW_UPDATE_DATA});
@@ -5718,7 +5718,7 @@ ZWave_firmwareUpdateParse($$$)
       return $ret; # retun reading
     }
   }
-  elsif($cmd == '04')
+  elsif($cmd eq '04')
   {
     #FIRMWARE_UPDATE_MD_REQUEST_GET
     RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
@@ -5738,7 +5738,7 @@ ZWave_firmwareUpdateParse($$$)
       return 1; #Veto
     }
   }
-  elsif($cmd == '05')
+  elsif($cmd eq '05')
   {
     #FIRMWARE_UPDATE_MD_GET
     RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
@@ -5761,7 +5761,7 @@ ZWave_firmwareUpdateParse($$$)
       return 1; #Veto
     }
   }
-  elsif($cmd == '07')
+  elsif($cmd eq '07')
   {
     #FIRMWARE_UPDATE_MD_STATUS_REPORT
     RemoveInternalTimer($hash->{FW_UPDATE_DATA}->{TIMER});
