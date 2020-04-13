@@ -17,6 +17,7 @@
 
 package main;
 
+#use version 0.77; our $VERSION = version->declare('v3.4.3');
 
 use strict;
 use warnings;
@@ -41,7 +42,7 @@ SD_WS_Maverick_Initialize($)
   $hash->{UndefFn}   = "SD_WS_Maverick_Undef";
   $hash->{ParseFn}   = "SD_WS_Maverick_Parse";
   $hash->{AttrFn}	   = "SD_WS_Maverick_Attr";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 inactivityinterval " .
+  $hash->{AttrList}  = "do_not_notify:1,0 ignore:0,1 showtime:1,0 inactivityinterval " .
                         "$readingFnAttributes ";
   $hash->{AutoCreate} =
         { "SD_WS_Maverick.*" => { ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", FILTER => "%NAME",  autocreateThreshold => "2:180"} };
@@ -254,15 +255,7 @@ sub SD_WS_Maverick_Attr(@)
   my ($cmd,$name,$attr_name,$attr_value) = @_;
   my $hash = $defs{$name};
   if($cmd eq "set") {
-    if($attr_name eq "IODev") {
-      # Make possible to use the same code for different logical devices when they
-      # are received through different physical devices.
-      my $iohash = $defs{$attr_value};
-      my $cde = $hash->{CODE};
-      delete($modules{SD_WS_Maverick}{defptr}{$cde});
-      $modules{SD_WS_Maverick}{defptr}{$iohash->{NAME} . "." . $cde} = $hash;
-    }
-    elsif($attr_name eq "inactivityinterval") {
+    if($attr_name eq "inactivityinterval") {
       if (!looks_like_number($attr_value) || int($attr_value) < 60 || int($attr_value) > 3600) {
           return "$name: Value \"$attr_value\" is not allowed.\n"
                  ."inactivityinterval must be a number between 60 and 3600."

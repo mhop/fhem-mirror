@@ -29,6 +29,8 @@
 
 package main;
 
+#use version 0.77; our $VERSION = version->declare('v3.4.3');
+
 use strict;
 use warnings;
 # use Digest::CRC qw(crc);
@@ -48,8 +50,7 @@ sub SD_WS_Initialize($)
 	$hash->{DefFn}		= "SD_WS_Define";
 	$hash->{UndefFn}	= "SD_WS_Undef";
 	$hash->{ParseFn}	= "SD_WS_Parse";
-	$hash->{AttrFn}		= "SD_WS_Attr";
-	$hash->{AttrList}	= "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
+	$hash->{AttrList}	= "do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
 											"model:E0001PA,S522,TX-EZ6,other " .
                       "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
                       "max-deviation-hum:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
@@ -1127,21 +1128,6 @@ sub SD_WS_Parse($$)
 	
 	return $name;
 
-}
-
-sub SD_WS_Attr(@)
-{
-	my @a = @_;
-	
-	# Make possible to use the same code for different logical devices when they
-	# are received through different physical devices.
-	return  if($a[0] ne "set" || $a[2] ne "IODev");
-	my $hash = $defs{$a[1]};
-	my $iohash = $defs{$a[3]};
-	my $cde = $hash->{CODE};
-	delete($modules{SD_WS}{defptr}{$cde});
-	$modules{SD_WS}{defptr}{$iohash->{NAME} . "." . $cde} = $hash;
-	return undef;
 }
 
 # Pruefsummenberechnung "reverse Galois LFSR with byte reflection"
