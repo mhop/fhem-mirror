@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  00_SIGNALduino:
+      Workaround, sending muliple commands causes collison Forum: #110035
+      Fixed docs and return value for get raw command
+      fixed use DevIo Forum #110125
  - bugfix:  73_AutoShuttersControl: rollback Notify Fn, fix shading
                                     out/in reserved
  - feature: 72_FB_CALLMONITOR: new reading/event "calls_count" which reflects
