@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use DevIo;
 use ZWLib;
 use vars qw($FW_ME);
 
@@ -80,8 +81,6 @@ sub
 ZWDongle_Initialize($)
 {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "ZWDongle_Read";

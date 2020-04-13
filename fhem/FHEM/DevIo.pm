@@ -3,7 +3,6 @@
 package main;
 
 use strict;
-use warnings;
 
 sub DevIo_CloseDev($@);
 sub DevIo_Disconnected($);
