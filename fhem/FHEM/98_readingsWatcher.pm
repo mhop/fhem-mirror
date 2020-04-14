@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 #
 #
+#  2.1.1  =>  14.04.20 remove List::Utils
 #  2.1.0  =>  06.04.20
 #  2.0.0  =>  05.04.20 perlcritic -4 / PBP
 #  1.7.1  =>  25.01.20 fix ErrorValue 0
@@ -42,7 +43,6 @@ use warnings;
 use utf8;
 use GPUtils qw(GP_Import GP_Export); # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday);
-use List::Util qw(uniq);
 
 BEGIN
 {
@@ -158,7 +158,7 @@ sub Undefine {
 
 	delFromAttrList('readingsWatcher'); # global -> userattr
 	# wer hat alles ein Attribut readingsWatcher gesetzt ?
-	foreach (devspec2array("readingsWatcher!=")) {
+	foreach (devspec2array('readingsWatcher!=')) {
 	    delFromDevAttrList($_, 'readingsWatcher');  # aufräumen
 	}
     }
@@ -315,11 +315,11 @@ sub formatStateList {
     foreach (@devs) {
 	my ($d,$r,$t,$s,$g)  = split(',', $_);
 	# die tatsächlichen Breiten aus den vorhandenen Werten ermitteln
-	$dw = length($d) if (length($d) > $dw);
-	$rw = length($r) if (length($r) > $rw);
-	$tw = length($t) if (length($t) > $tw);
-	$sw = length($s) if (length($s) > $sw);
-	$aw = length($g) if (length($g) > $aw);
+	$dw = (length($d) > $dw) ? length($d) : $dw;
+	$rw = (length($r) > $rw) ? length($r) : $rw;
+	$tw = (length($t) > $tw) ? length($t) : $tw;
+	$sw = (length($s) > $sw) ? length($s) : $sw;
+	$aw = (length($g) > $aw) ? length($g) : $aw;
     }
 
     my $head  = 'Device '  .(' ' x ($dw-6))
@@ -428,7 +428,7 @@ sub OnTimer {
 
 	next if (!$rSA || IsDisabled($device) || IsIgnored($device));
 
-	push @devices, $device;  # if  !grep {/$device/} @devices;  keine doppelten Namen
+	push @devices, $device;
 
 	$or_and = 1 if (index($rSA,'+') != -1); # Readings als AND auswerten
 	$rSA =~ s/\+/,/g ; # eventuell vorhandene + auch in Komma wandeln
@@ -439,16 +439,29 @@ sub OnTimer {
 
 	my $ok_device = 0;
 
-	foreach (split(';', $rSA)) {
+	foreach (split(';', $rSA)) { #Anzahl Regelsätze im Device
 
 	    my ($timeout, $errorValue, @readings_ar) = split(',',  $_);
 
 	    if (@readings_ar) {
-		$ok_device  = 1;
-		$timeout    = int($timeout);
+
+		$timeout = int($timeout);
+
+		if ($timeout > 1) {
+		    $ok_device  = 1;
+		}
+		else {
+		    if (@readings_ar == 1) {
+			Log3 $hash,2,"$name, invalid timeout value $timeout for reading $device $readings_ar[0]";
+		    }
+		    else {
+			Log3 $hash,2,"$name, invalid timeout value $timeout for readings $device ".join(',',@readings_ar);
+		    }
+		    @readings_ar = (); # das werten wir danach im foreach erst gar nicht mehr aus
+		}
 	    }
 
-	    foreach my $reading (@readings_ar) { # alle zu überwachenden Readings
+	    foreach my $reading (@readings_ar) { # alle zu überwachenden Readings in einem Regelsatz
 
 		$reading =~ s/ //g;
 		my $state = 0;
@@ -465,26 +478,24 @@ sub OnTimer {
 
 		    $readings_count++;
 
-		    if (($age > $timeout) && ($timeout > 0)) {
-
-			push @toDevs, $device; # if (!grep {/$device/} @toDevs);
+		    if ($age > $timeout) {
+                        push @toDevs, $device if  !grep {/$device/} @toDevs; # keine doppelten Namen
 			$timeOutState = 'timeout';
-			$d_d++; # Device Tote
+			$d_d ++; # Device Tote
 			my $rts = ReadingsTimestamp($device, $reading, 0);
 			setReadingsVal($defs{$device}, $reading, $errorValue, $rts) if ($rts && ($errorValue ne '')); # leise setzen ohne Event
 			$defs{$device}->{STATE} = $errorValue if ($state && ($errorValue ne ''));
 		    }
 		    else {
-			$d_a++; # Device Lebende
+			$d_a ++; # Device Lebende
 			$timeOutState = 'ok';
 		    }
 
 		    my $d_r = $device.'_'.$reading;
 
-		    readingsBulkUpdate($hash, $d_r, $timeOutState) if ($timeout > 0);
-		    $readingsList =~ s/$d_r,// if ($readingsList); # das Reading aus der Liste streichen, leer solange noch kein Device das Attr hat !
+		    readingsBulkUpdate($hash, $d_r, $timeOutState) if ($timeOutState);
 
-		    Log3 $hash,2,"name, invalid timeout value $timeout for reading $device $reading" if ($timeout < 1);
+		    $readingsList =~ s/$d_r,// if ($readingsList); # das Reading aus der Liste streichen, leer solange noch kein Device das Attr hat !
 		}
 		else {
 		    setReadingsVal($defs{$device},$reading,'unknown',TimeNow()) if ($errorValue); # leise setzen ohne Event
@@ -492,8 +503,10 @@ sub OnTimer {
 		    Log3 $hash,3,"$name, reading Timestamp for $reading not found on device $device";
 		    readingsBulkUpdate($hash, $device.'_'.$reading, 'no Timestamp');
 		}
-	    }
-	} # Anzahl Readings Sätze im Device
+	    } # Readings in einem Regelsatz
+	} # Anzahl Regelsätze im Device
+
+	push @toDevs , $device  if ($d_d);
 
 	if ($ok_device && $timeOutState) {
 	    my $error;
@@ -515,11 +528,8 @@ sub OnTimer {
 	}
     } # foreach device
 
-    # eventuell doppelte Einträge aus allen vier Listen entfernen
-    @devices  = List::Util::uniq @devices  if (@devices);
-    @toDevs   = List::Util::uniq @toDevs   if (@toDevs);
-    @skipDevs = List::Util::uniq @skipDevs if (@skipDevs);
-    @deadDevs = List::Util::uniq @deadDevs if (@deadDevs);
+    # eventuell doppelte Einträge aus der Timeout Liste entfernen
+    # @toDevs   = uniq @toDevs if (@toDevs   > 1);
 
     readingsBulkUpdate($hash, 'readings' , $readings_count);
     readingsBulkUpdate($hash, 'devices'  , int(@devices));
@@ -533,10 +543,10 @@ sub OnTimer {
     # Vorwahl via Attribut deleteUnusedReadings
     clearReadings($name,$readingsList) if ($readingsList);
 
-    (@devices)  ? readingsBulkUpdate($hash, '.associatedWith' , join(',', @devices))  : readingsDelete($hash,        '.associatedWith');
-    (@toDevs)   ? readingsBulkUpdate($hash, 'timeoutDevs',      join(',', @toDevs))   : readingsBulkUpdate($hash, 'toDevs',     'none');
-    (@deadDevs) ? readingsBulkUpdate($hash, 'deadDevs',         join(',', @deadDevs)) : readingsBulkUpdate($hash, 'deadDevs',   'none');
-    (@skipDevs) ? readingsBulkUpdate($hash, 'skippedDevs',      join(',', @skipDevs)) : readingsBulkUpdate($hash, 'skippedDevs','none');
+    (@devices)  ? readingsBulkUpdate($hash, '.associatedWith', join(',', @devices))  : readingsDelete($hash, '.associatedWith');
+    (@toDevs)   ? readingsBulkUpdate($hash, 'timeoutDevs',     join(',', @toDevs))   : readingsBulkUpdate($hash, 'timeoutDevs', 'none');
+    (@deadDevs) ? readingsBulkUpdate($hash, 'deadDevs',        join(',', @deadDevs)) : readingsBulkUpdate($hash, 'deadDevs',    'none');
+    (@skipDevs) ? readingsBulkUpdate($hash, 'skippedDevs',     join(',', @skipDevs)) : readingsBulkUpdate($hash, 'skippedDevs', 'none');
 
     readingsEndUpdate($hash, 1);
 
@@ -738,7 +748,7 @@ sub clearReadings {
     "supervision",
     "überwachung"
   ],
-  "version": "2.1.0",
+  "version": "2.1.1",
   "release_status": "stable",
   "author": [
     "Wzut"
