@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.04.14 v0.1.3
+# - CHANGE:  Mehr Loginfos bei set "NPM_login new" 
+#
 # 2020.04.12 v0.1.2
 # - CHANGE:  Mehr Loginfos bei set "NPM_login new" 
 #
@@ -375,7 +378,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.2";
+my $ModulVersion     = "0.1.3";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -4519,10 +4522,15 @@ sub echodevice_NPMLoginNew($){
 	foreach my $ipLine (@ips) {
 		my ($interface, undef, $ipParts) = split(' ', $ipLine);
 		my ($ip) = split('/', $ipParts);
-		Log3 $name, 4, "[$name] [echodevice_NPMLoginNew] Check Interface=$interface IP=$ip";
-		if ($interface ne 'lo') {
-			$OwnIP = $ip if (!(index($ip, ":") != -1));
-			Log3 $name, 4, "[$name] [echodevice_NPMLoginNew]   Result Interface=$interface IP=$ip";
+		Log3 $name, 3, "[$name] [echodevice_NPMLoginNew] Check Interface=$interface IP=$ip";
+		if ($interface ne 'lo' and (!(index($interface, "tun") != -1))) {
+			if (!(index($ip, ":") != -1)) {
+				$OwnIP = $ip ;
+				Log3 $name, 3, "[$name] [echodevice_NPMLoginNew]   Result Interface=$interface IP=$ip";
+			}
+		}
+		else {
+			Log3 $name, 3, "[$name] [echodevice_NPMLoginNew]   Ignor Interface=$interface IP=$ip";
 		}
 	}
 
