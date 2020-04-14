@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.023
+#  Version 4.3.024
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.023';
+my $HMCCU_VERSION = '4.3.024';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -1440,7 +1440,7 @@ sub HMCCU_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "avar clear delete execute hmscript cleardefaults:noArg datapoint defaults:noArg ".
+	my $options = "var clear delete execute hmscript cleardefaults:noArg datapoint defaults:noArg ".
 		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg authentication ".
 		"prgActivate prgDeactivate";
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: corrected var command
  - bugfix:  73_AutoShuttersControl: fix roommate absent
                                     and add code stable ti shading fn
  - change:  14_SD_WS_Maverick.pm: Attribute "IODev" in module deleted.
