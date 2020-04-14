@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 20559 2019-11-22 14:19:34Z DS_Starter $
+# $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2019 by Heiko Maaz
+#       (c) 2015-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -54,6 +54,8 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.2.2"  => "14.04.2020  increase read timeout of Redis server cache, fix autocreate bug with https ",
+  "9.2.1"  => "24.02.2020  set compatibility to SVS version 8.2.7 ",
   "9.2.0"  => "10.12.2019  attribute \"recChatTxt\" for sending recordings by SSChatBot ",
   "9.1.0"  => "08.12.2019  attribute \"snapChatTxt\" for sending snapshots by SSChatBot ",
   "9.0.6"  => "26.11.2019  minor code change ",
@@ -317,7 +319,7 @@ our %SSCam_vNotesExtern = (
 );
 
 # getestete SVS-Version
-my $compstat = "8.2.6";
+my $compstat = "8.2.7";
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -5886,8 +5888,7 @@ sub SSCam_camop_parse ($) {
                                 }
                             }
                         } else {                            
-                            for my $kn ($ss..($sgn-1)) {
-                                # next if $kn >= $hash->{HELPER}{SNAPLIMIT};                                                  
+                            for my $kn ($ss..($sgn-1)) {                                                 
                                 $g = SSCam_cache($name, "c_read", "{SNAPOLDHASH}{$sn}{snapid}");                       
                                 SSCam_cache($name, "c_write", "{SNAPHASH}{$kn}{snapid}", $g) if(defined $g);
                                 SSCam_cache($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}");
@@ -6962,23 +6963,23 @@ sub SSCam_Autocreate ($$) {
 
    if(!$camhash) {
        $camname = "SSCam.".makeDeviceName($sn);                     # erlaubten Kameranamen für FHEM erzeugen
-       my $arg = $hash->{SERVERADDR}." ".$hash->{SERVERPORT};
-       $cmd = "$camname $type $sn $arg";
+       my $arg  = $hash->{SERVERADDR}." ".$hash->{SERVERPORT}." ".$hash->{PROTOCOL};
+       $cmd     = "$camname $type $sn $arg";
        Log3($name, 2, "$name - Autocreate camera: define $cmd");
-       $err = CommandDefine(undef, $cmd);
+       $err     = CommandDefine(undef, $cmd);
        
        if($err) {
            Log3($name, 1, "ERROR: $err");
        } else {
-           my $room = AttrVal($name, "room", "SSCam");
-           my $session =  AttrVal($name, "session", "DSM");
-           CommandAttr(undef,"$camname room $room");
-           CommandAttr(undef,"$camname session $session");
-           CommandAttr(undef,"$camname icon it_camera");
-           CommandAttr(undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
-           CommandAttr(undef,"$camname pollcaminfoall 210");
-           CommandAttr(undef,"$camname pollnologging 1");	
-           CommandAttr(undef,"$camname httptimeout 20");
+           my $room    = AttrVal($name, "room", "SSCam");
+           my $session = AttrVal($name, "session", "DSM");
+           CommandAttr (undef,"$camname room $room");
+           CommandAttr (undef,"$camname session $session");
+           CommandAttr (undef,"$camname icon it_camera");
+           CommandAttr (undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
+           CommandAttr (undef,"$camname pollcaminfoall 210");
+           CommandAttr (undef,"$camname pollnologging 1");	
+           CommandAttr (undef,"$camname httptimeout 20");
 
            # Credentials abrufen und setzen
            my ($success, $username, $password) = SSCam_getcredentials($hash,0,"svs");
@@ -10148,8 +10149,8 @@ sub SSCam_cache ($$;$$) {
               return 0;
           }
           my $cto = 0.5;
-          my $rto = 0.5;
-          my $wto = 0.5;
+          my $rto = 2.0;
+          my $wto = 1.0;
           my %Redispars = ( cnx_timeout   => $cto,
                             read_timeout  => $rto,
                             write_timeout => $wto
@@ -10175,6 +10176,7 @@ sub SSCam_cache ($$;$$) {
           $cache = CHI->new( driver        => 'Redis',
                              namespace     => $fuuid,
                              server        => "$server:$port",
+                             reconnect     => 1,
                              on_set_error  => 'warn',
                              on_get_error  => 'warn',
                              redis_options => \%Redispars,
@@ -10276,9 +10278,13 @@ sub SSCam_cache ($$;$$) {
   # aus Cache lesen
   if($op eq "c_read") {
       my $g = $cache->get($key);
-      $brt = tv_interval($bst);
-      Log3($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));      
-      return $g;
+      $brt  = tv_interval($bst);
+      Log3($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+      if(!$g) {
+          return "";     
+      } else {      
+          return $g;
+      }
   }
   
   # einen Key entfernen
@@ -10334,12 +10340,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 20559 2019-11-22 14:19:34Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 20559 2019-11-22 14:19:34Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
