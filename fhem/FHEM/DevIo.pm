@@ -234,7 +234,9 @@ DevIo_OpenDev($$$;$)
   my $doCb = sub ($) {
     my ($r) = @_;
     Log3 $name, 1, "$name: Can't connect to $dev: $r" if(!$reopen && $r);
+    no strict "refs";
     $callback->($hash,$r) if($callback);
+    use strict "refs";
     return $r;
   };
 
