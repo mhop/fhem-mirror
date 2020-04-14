@@ -486,6 +486,7 @@ sub SMAEM_DoParse ($) {
     my $length;
     my ($b,$c,$d,$e);                                                        # OBIS Klassen
     
+    no warnings qw(overflow portable);
     while (substr($hex,$i,8) ne "00000000" && $i<=($dl*2)) {
         $b = hex(substr($hex,$i,2));
         $c = hex(substr($hex,$i+2,2));
@@ -501,6 +502,7 @@ sub SMAEM_DoParse ($) {
         $obis->{"1:".$c.".".$d.".".$e} = hex(substr($hex,$i+8,$length));
         $i = $i + 8 + $length;
     }
+    use warnings;
     
     Log3 ($name, 5, "SMAEM $name - OBIS metrics identified:");
     my @ui;                                                                  # Array für "unknown items"
