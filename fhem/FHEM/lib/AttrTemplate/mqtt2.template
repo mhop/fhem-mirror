@@ -2976,31 +2976,36 @@ attr DEVICE model wled_controller
 #source post: https://forum.fhem.de/index.php/topic,109946.0.html
 name:McLighting
 filter:TYPE=MQTT2_DEVICE
-desc:To control a McLighting device, see https://github.com/toblum/McLighting/wiki for details).
+desc:To control a McLighting device, see https://github.com/FabLab-Luenen/McLighting/wiki for details).
 order:m_01
 par:BASE_ID;BASE_ID typically is CID of FHEM Device;{ AttrVal("DEVICE","readingList","") =~ m,(.+?)(?=:), ? $1 : undef }
 par:DEVNAME;DEVNAME is Hostname as configured in McLighting;{ AttrVal("DEVICE","readingList","") =~ m,(?:\:)(.*)(?:/out), ? $1 : undef }
 par:ICON;ICON as set, defaults to light_led_stripe_rgb;{ AttrVal("DEVICE","icon","light_led_stripe_rgb") }
 attr DEVICE icon ICON
 attr DEVICE setList\
-  on:noArg DEVNAME/in =all\
-  off:noArg DEVNAME/in =off\
-  rgb:colorpicker,RGB DEVNAME/in *$EVTPART1\
+  on:noArg DEVNAME/in /on\
+  off:noArg DEVNAME/in /off\
+  rgb:colorpicker,RGB DEVNAME/in #$EVTPART1\
+  rgb_nr2:colorpicker,RGB DEVNAME/in ##$EVTPART1\
+  rgb_nr3:colorpicker,RGB DEVNAME/in ###$EVTPART1\
   brightness:colorpicker,BRI,0,1,255 DEVNAME/in %$EVTPART1\
   speed:colorpicker,BRI,0,1,255 DEVNAME/in ?$EVTPART1\
-  effect_nr:selectnumbers,0,1,59,0,lin DEVNAME/in /$EVTPART1\
-  effect:rainbow,rainbowCycle,theaterchase,theaterchaseRainbow,tv DEVNAME/in =$EVTPART1
+  effect:selectnumbers,0,1,59,0,lin DEVNAME/in /$EVTPART1
 attr DEVICE readingList \
   DEVNAME/out:.* out\
-  home/DEVNAME_ha/state/out:.* { json2nameValue($EVENT) }
-attr DEVICE event-on-change-reading .*
+  home/DEVNAME_ha/state/out:.* { json2nameValue($EVENT) }\
+  DEVNAME/config:.* config
+attr DEVICE eventMap /effect 0:Static/effect 7:ColorWipeRandom/effect 11:Rainbow/effect 12:RainbowCycle/effect 33:ChaseRainbow/effect 39:ColorSweepRandom/
 attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
 attr DEVICE webCmd rgb:brightness:speed:effect
 attr DEVICE setStateList on off
-attr DEVICE userReadings  rgb:color_r.* {Color::rgb2hex(ReadingsVal($name,"color_r",0),ReadingsVal($name,"color_g",0),ReadingsVal($name,"color_b",0))}
-attr DEVICE comment Note: webCmd and eventMap are just examples; adopt this to your needs.
+attr DEVICE userReadings rgb:color_b.* {Color::rgb2hex(ReadingsVal($name,"color_r",0),ReadingsVal($name,"color_g",0),ReadingsVal($name,"color_b",0))},\
+rgb_nr2:color_b2.* {Color::rgb2hex(ReadingsVal($name,"color_r2",0),ReadingsVal($name,"color_g2",0),ReadingsVal($name,"color_b2",0))},\
+rgb_nr3:color_b3.* {Color::rgb2hex(ReadingsVal($name,"color_r3",0),ReadingsVal($name,"color_g3",0),ReadingsVal($name,"color_b3",0))}
+attr DEVICE comment Note: FabLab-Luenen/McLighting v3.1 needed because of API changes\
+Note: ENABLE_HOMEASSISTANT should be enabled, since more MQTT messages will be send \
+Note: webCmd and eventMap are just examples - adopt this to your needs.
 attr DEVICE model McLighting
-
 
 #source post: https://forum.fhem.de/index.php/topic,105457.msg993924.html#msg993924
 name:go_eCharger
