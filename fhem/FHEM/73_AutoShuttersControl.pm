@@ -1355,14 +1355,23 @@ sub EventProcessingRoommate {
             && (  !$shutters->getIsDay
                 || $shutters->getDown eq 'roommate'
                 || $shutters->getShadingMode eq 'absent'
-                || $shutters->getUp eq 'absent' )
+                || $shutters->getModeUp eq 'absent'
+                || $shutters->getModeDown eq 'absent' )
           )
         {
+            Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessingRoommate absent: $shuttersDev"
+            );
+
             if (   ( $shutters->getIsDay || $shutters->getUp eq 'roommate' )
                 && $shutters->getIfInShading
                 && !$shutters->getQueryShuttersPos( $shutters->getShadingPos )
                 && $shutters->getShadingMode eq 'absent' )
             {
+                Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessingRoommate Shading: $shuttersDev"
+                );
+
                 $shutters->setLastDrive('shading in');
                 ShuttersCommandSet( $hash, $shuttersDev,
                     $shutters->getShadingPos );
@@ -1371,17 +1380,30 @@ sub EventProcessingRoommate {
                 && $getModeDown eq 'absent'
                 && $getRoommatesStatus eq 'absent' )
             {
+                Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessingRoommate Down: $shuttersDev"
+                );
+
                 $shutters->setLastDrive('roommate absent');
                 ShuttersCommandSet( $hash, $shuttersDev,
                     $shutters->getClosedPos );
             }
             elsif ($shutters->getIsDay
-                && $shutters->getUp eq 'absent' )
+                && $shutters->getModeUp eq 'absent'
+                && $getRoommatesStatus eq 'absent' )
             {
+                Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessingRoommate Up: $shuttersDev"
+                );
+
                 $shutters->setLastDrive('roommate absent');
                 ShuttersCommandSet( $hash, $shuttersDev,
                     $shutters->getOpenPos );
             }
+
+            Log3( $name, 4,
+"AutoShuttersControl ($name) - EventProcessingRoommate NICHTS: $shuttersDev"
+            );
         }
     }
 
@@ -2439,6 +2461,7 @@ sub ShadingProcessing {
         )
         && $shutters->getRoommatesStatus ne 'asleep'
         && $shutters->getRoommatesStatus ne 'gotosleep'
+        && ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) < 2
       );
 
     return;
