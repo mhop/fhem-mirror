@@ -11304,7 +11304,7 @@ sub EnOcean_Parse($$)
           push @event, "3:state:unknown";
           push @event, "3:endPosition" . sprintf('%02d', $channel) . ":unknown";
           push @event, "3:position" . sprintf('%02d', $channel) . ":unknown";
-          push @event, "3:position:" . $db[3];
+          push @event, "3:position:unknown";
         } else {
           push @event, "3:state:" . $db[3];
           push @event, "3:endPosition" . sprintf('%02d', $channel) . ":not_reached";
