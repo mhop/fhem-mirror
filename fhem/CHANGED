@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  37_echodevice.pm more loginformations set "NPM_login new" 
  - bugfix:  88_HMCCU: corrected var command
  - bugfix:  73_AutoShuttersControl: fix roommate absent
                                     and add code stable ti shading fn
