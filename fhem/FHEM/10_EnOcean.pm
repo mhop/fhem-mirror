@@ -11313,6 +11313,7 @@ sub EnOcean_Parse($$)
         }
         if ($db[2] == 127) {
           push @event, "3:anglePos" . sprintf('%02d', $channel) . ":unknown";
+          push @event, "3:anglePos:unknown";
         } else {
           push @event, "3:anglePos" . sprintf('%02d', $channel) . ":" . $db[2];
           push @event, "3:anglePos:" . $db[2];
