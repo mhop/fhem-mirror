@@ -24,18 +24,45 @@
 #
 ################################################################################
 
-package main;
+package FHEM::WUup;    ## no critic ( RequireFilenameMatchesPackage )
 
 use strict;
 use warnings;
 use 5.010;
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
-use HttpUtils;
 use UConv;
 use FHEM::Meta;
+use GPUtils qw(GP_Import GP_Export);
 
-my $version = q(0.9.18);
+## Import der FHEM Funktionen
+#-- Run before package compilation
+BEGIN {
+    # Import from main context
+    GP_Import(
+        qw( attr
+            AttrVal
+            CommandDeleteReading
+            defs
+            HttpUtils_NonblockingGet
+            init_done
+            InternalTimer
+            IsDisabled
+            Log3
+            readingFnAttributes
+            readingsBeginUpdate
+            readingsBulkUpdate
+            readingsEndUpdate
+            readingsSingleUpdate
+            ReadingsVal
+            RemoveInternalTimer )
+    );
+}
+
+#-- Export to main context with different name
+GP_Export(qw( Initialize ));
+
+my $version = q(0.10.0);
 
 ################################################################################
 #
@@ -43,13 +70,13 @@ my $version = q(0.9.18);
 #
 ################################################################################
 
-sub WUup_Initialize {
+sub Initialize {
     my ($hash) = @_;
 
-    $hash->{DefFn}   = 'WUup_Define';
-    $hash->{UndefFn} = 'WUup_Undef';
-    $hash->{SetFn}   = 'WUup_Set';
-    $hash->{AttrFn}  = 'WUup_Attr';
+    $hash->{DefFn}   = \&Define;
+    $hash->{UndefFn} = \&Undef;
+    $hash->{SetFn}   = \&Set;
+    $hash->{AttrFn}  = \&Attr;
     $hash->{AttrList} =
           'disable:1,0 '
         . 'disabledForIntervals '
@@ -68,7 +95,7 @@ sub WUup_Initialize {
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub WUup_Define {
+sub Define {
     my $hash = shift;
     my $def  = shift;
 
@@ -97,30 +124,30 @@ sub WUup_Define {
     RemoveInternalTimer($hash);
 
     $init_done
-        ? WUup_stateRequestTimer($hash)
-        : InternalTimer( gettimeofday(), 'WUup_stateRequestTimer', $hash, 0 );
+        ? &stateRequestTimer($hash)
+        : InternalTimer( gettimeofday(), \&stateRequestTimer, $hash, 0 );
 
     Log3( $name, 3, qq{WUup ($name): defined} );
 
     return;
 }
 
-sub WUup_Undef {
+sub Undef {
     my $hash = shift;
     RemoveInternalTimer($hash);
     return;
 }
 
-sub WUup_Set {
+sub Set {
     my $hash = shift;
     my $name = shift;
     my $cmd  = shift // return qq{set $name needs at least one argument};
 
-    return WUup_stateRequestTimer($hash) if ( $cmd eq 'update' );
+    return &stateRequestTimer($hash) if ( $cmd eq 'update' );
     return qq{Unknown argument $cmd, choose one of update:noArg};
 }
 
-sub WUup_Attr {
+sub Attr {
     my $cmd      = shift;
     my $name     = shift;
     my $attrName = shift;
@@ -128,7 +155,7 @@ sub WUup_Attr {
     my $hash     = $defs{$name};
 
     if ( $attrName eq 'disable' ) {
-        if ( $cmd eq 'set' and $attrVal eq '1' ) {
+        if ( $cmd eq 'set' and $attrVal == 1 ) {
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
             Log3( $name, 3, qq{WUup ($name) - disabled} );
         }
@@ -172,7 +199,7 @@ sub WUup_Attr {
     return;
 }
 
-sub WUup_stateRequestTimer {
+sub stateRequestTimer {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
@@ -185,7 +212,7 @@ sub WUup_stateRequestTimer {
             )
             );
 
-        WUup_send($hash);
+        sendtowu($hash);
 
     }
     else {
@@ -193,15 +220,15 @@ sub WUup_stateRequestTimer {
     }
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
-        'WUup_stateRequestTimer', $hash, 1 );
+        \&stateRequestTimer, $hash, 1 );
 
     Log3( $name, 5,
-        qq{Sub WUup_stateRequestTimer ($name) - Request Timer is called} );
+        qq{Sub stateRequestTimer ($name) - Request Timer is called} );
 
     return;
 }
 
-sub WUup_send {
+sub sendtowu {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
     my $ver    = $hash->{VERSION};
@@ -267,7 +294,7 @@ sub WUup_send {
             hash     => $hash,
             method   => 'GET',
             header   => "agent: FHEM-WUup/$ver\r\nUser-Agent: FHEM-WUup/$ver",
-            callback => \&WUup_receive
+            callback => \&receive
         };
 
         Log3( $name, 5, qq{WUup ($name) - full URL: $url} );
@@ -284,7 +311,7 @@ sub WUup_send {
     return;
 }
 
-sub WUup_receive {
+sub receive {
     my $param = shift;
     my $err   = shift;
     my $data  = shift;
@@ -574,7 +601,7 @@ sub WUup_receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.18",
+  "version": "v0.10.0",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
@@ -596,7 +623,6 @@ sub WUup_receive {
       "requires": {
         "FHEM": 0,
         "FHEM::Meta": 0,
-        "HttpUtils": 0,
         "UConv": 0,
         "POSIX": 0,
         "Time::HiRes": 0,
