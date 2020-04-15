@@ -577,7 +577,7 @@ FB_CALLMONITOR_Read($)
             delete($hash->{helper}{TEMP}{$array[2]});
         } 
 
-        readingsBulkUpdate($hash, "calls_count", scalar grep { not $hash->{helper}{TEMP}{$_}{".filtered"} } keys %{$hash->{helper}{TEMP}});
+        readingsBulkUpdate($hash, "calls_count", scalar grep { not ($hash->{helper}{TEMP}{$_}{".filtered"} or $hash->{helper}{TEMP}{$_}{".deflected"}) } keys %{$hash->{helper}{TEMP}});
         readingsEndUpdate($hash, 1);
     }
     
