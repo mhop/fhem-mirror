@@ -62,6 +62,7 @@ FB_CALLMONITOR_Initialize($)
                          "local-area-code ".
                          "country-code ".
                          "remove-leading-zero:0,1 ".
+                         "internal-number-filter ".
                          "answMachine-is-missed-call:0,1 ".
                          "check-deflections:0,1 ".
                          "reverse-search-cache-file ".
@@ -427,7 +428,6 @@ FB_CALLMONITOR_Read($)
     
         my $external_number = undef;
         my $reverse_search = undef;
-        my $is_deflected = undef;
 
         Log3 $name, 5, "FB_CALLMONITOR ($name) - received data: $data"; 
         
@@ -436,7 +436,7 @@ FB_CALLMONITOR_Read($)
         $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
         $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
         
-        $is_deflected = FB_CALLMONITOR_checkNumberForDeflection($hash, $external_number) if($array[1] eq "RING");
+        Log3 $name, 4, "FB_CALLMONITOR ($name) - received event ".$array[1]." for call id ".$array[2].(defined($external_number) ? " (external number: $external_number)" : ""); 
         
         if(defined($external_number))
         {
@@ -494,7 +494,12 @@ FB_CALLMONITOR_Read($)
             if(my $contact_image = FB_CALLMONITOR_getContactImage($hash, $hash->{helper}{TEMP}{$array[2]}{external_number}))
             {
                 $hash->{helper}{TEMP}{$array[2]}{contact_image} = $contact_image;
-            }            
+            }   
+            
+            if(FB_CALLMONITOR_checkNumberIsFiltered($hash, $hash->{helper}{TEMP}{$array[2]}{internal_number}))
+            {
+                $hash->{helper}{TEMP}{$array[2]}{".filtered"} = 1           
+            }
         }
         
         if($array[1] eq "CALL")
@@ -508,7 +513,7 @@ FB_CALLMONITOR_Read($)
         {
             $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[5];
             $hash->{helper}{TEMP}{$array[2]}{direction} = "incoming";
-            $hash->{helper}{TEMP}{$array[2]}{".deflected"} = $is_deflected;
+            $hash->{helper}{TEMP}{$array[2]}{".deflected"} = FB_CALLMONITOR_checkNumberForDeflection($hash, $external_number);
         }
        
         if($array[1] eq "CONNECT" and not exists($hash->{helper}{TEMP}{$array[2]}{internal_connection}))
@@ -532,27 +537,47 @@ FB_CALLMONITOR_Read($)
         
         $hash->{helper}{TEMP}{$array[2]}{".last-event"} = $array[1];
         
-        readingsBeginUpdate($hash);
-        unless($hash->{helper}{TEMP}{$array[2]}{".deflected"})
+        # skip readings/event generation if call does not matched a configured internal number filter
+        if($hash->{helper}{TEMP}{$array[2]}{".filtered"})
         {
-            readingsBulkUpdate($hash, "event", lc($array[1]));
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - skipped creating readings/events because number does not match configured attribute internal-number-filter";
             
-            foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
+            if($array[1] eq "DISCONNECT")
             {
-                readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key}) unless($key =~ /^\./);
-            }
-        }
-        else
-        {
-            Log3 $name, 4, "FB_CALLMONITOR ($name) - skipped creating readings/events due to deflection match";
+                delete($hash->{helper}{TEMP}{$array[2]});
+            } 
+            
+            next;
         }
         
+        # skip readings/event generation if call is deflected
+        if($hash->{helper}{TEMP}{$array[2]}{".deflected"})
+        {
+            Log3 $name, 4, "FB_CALLMONITOR ($name) - skipped creating readings/events due to deflection match";
+            
+            if($array[1] eq "DISCONNECT")
+            {
+                delete($hash->{helper}{TEMP}{$array[2]});
+            } 
+            
+            next;
+        }
+        
+        # create readings/events
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "event", lc($array[1]));
+        
+        foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
+        {
+            readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key}) unless($key =~ /^\./);
+        }
+  
         if($array[1] eq "DISCONNECT")
         {
             delete($hash->{helper}{TEMP}{$array[2]});
         } 
 
-        readingsBulkUpdate($hash, "calls_count", scalar keys %{$hash->{helper}{TEMP}});
+        readingsBulkUpdate($hash, "calls_count", scalar grep { not $hash->{helper}{TEMP}{$_}{".filtered"} } keys %{$hash->{helper}{TEMP}});
         readingsEndUpdate($hash, 1);
     }
     
@@ -625,6 +650,21 @@ FB_CALLMONITOR_Attr($@)
         {
             return "invalid value $value for $attrib. Allowed values are: none,5m,10m,15m,30m,1h";
         }
+        
+        if($attrib eq "internal-number-filter")
+        {
+            if($value !~ /^\d+(?:,\d+)*$/)
+            {
+                return 'invalid value $value for $attrib. It should contain a single internal number or a comma separated list of multiple internal numbers. (e.g. "12345" or "12345,56789")';
+            }
+            
+            delete($hash->{helper}{INTERNAL_FILTER});
+
+            foreach my $item (split("[ \t,][ \t,]*",$value))
+            {
+                $hash->{helper}{INTERNAL_FILTER}{$item} = 1;
+            }
+        } 
     }
     elsif($cmd eq "del")
     {
@@ -641,6 +681,11 @@ FB_CALLMONITOR_Attr($@)
         if($attrib eq "reverse-search-text-file")
         {
             delete($hash->{helper}{TEXTFILE});
+        }
+        
+        if($attrib eq "internal-number-filter")
+        {
+           delete($hash->{helper}{INTERNAL_FILTER});
         }
         
         if($attrib eq "disable")
@@ -2277,6 +2322,19 @@ sub FB_CALLMONITOR_checkNumberForDeflection($$)
     return $ret;
 }
 
+sub FB_CALLMONITOR_checkNumberIsFiltered($$)
+{
+    my ($hash, $number) = @_;
+    my $name = $hash->{NAME};
+    
+    if(exists($hash->{helper}{INTERNAL_FILTER}) and not exists($hash->{helper}{INTERNAL_FILTER}{$number}))
+    {
+        return 1;
+    }
+    
+    return 0;     
+}
+
 sub FB_CALLMONITOR_sendKeepAlive($)
 {
     my ($hash) = @_;
@@ -2395,6 +2453,12 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     <br><br>
     Possible values: 0 =&gt; disabled, 1 =&gt; enabled (answering machine calls will be treated as "missed call").<br>
     Default Value is 0 (disabled)<br><br>
+    <li><a name="FB_CALLMONITOR_internal-number-filter">internal-number-filter</a> &lt;number&gt;[,&lt;number&gt;,...]</li>
+    If set, only calls for the configured internal number (according to reading "internal_number") will be processed.
+    Valid values are one particular internal number or a comma separated list of multiple internal numbers. 
+    Calls internal numbers, which are not listed here, will be ignored and not processed.
+    If this attribute is not set, all calls will be processed (no filtering).
+    <br><br>per default, internal number filtering is disabled.<br><br>
     <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,textfile,dasoertliche.de,11880.com,search.ch,dasschnelle.at,herold.at)</li>
     Enables the reverse searching of the external number (at dial and call receiving).
     This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. 
@@ -2570,8 +2634,14 @@ sub FB_CALLMONITOR_sendKeepAlive($)
     <li><a name="FB_CALLMONITOR_answMachine-is-missed-call">answMachine-is-missed-call</a> 0,1</li>
     Sofern aktiviert, werden Anrufe, welche durch einen internen Anrufbeantworter beantwortet werden, als "unbeantworteter Anruf" gewertet (siehe Reading "missed_call" unter <a href="#FB_CALLMONITOR_events">Generated Events</a>).
     <br><br>
-    M&ouml;gliche Werte: 0 =&gt; deaktiviert, 1 =&gt; aktiviert (Anrufbeantworter gilt als "unbeantworteter Anruf").<br>
+    M&ouml;gliche Werte: 0 =&gt; deaktiviert, 1 =&gt; aktiviert (Anrufbeantworter gilt als "unbeantworteter Anruf").<br><br>
     Standardwert ist 0 (deaktiviert)<br><br>
+    <li><a name="FB_CALLMONITOR_internal-number-filter">internal-number-filter</a> &lt;Nummer&gt;[&lt;Nummer&gt;,...]</li>
+    Sofern gesetzt, werden nur Gespr&auml;che für die konfigurierten internen Rufnummern verarbeitet.
+    G&uuml;ltige Werte sind eine einzelne interne Rufnummer oder eine komma-separierte Liste von mehreren internen Rufnummern.
+    Gespr&auml;che für interne Rufnummern, welche nicht in dieser Liste enthalten sind, werden ignoriert und nicht verarbeitet.
+    Wenn dieses Attribut nicht konfiguriert ist, werden alle Gespr&auml;che regul&auml;r verarbeitet.<br><br>
+    Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (nicht gesetzt)<br><br>
     <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,dasoertliche.de,11880.com,search.ch,dasschnelle.at,herold.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
     Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
