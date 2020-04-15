@@ -35,7 +35,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = q(0.9.17);
+my $version = q(0.9.18);
 
 ################################################################################
 #
@@ -96,12 +96,9 @@ sub WUup_Define {
 
     RemoveInternalTimer($hash);
 
-    if ($init_done) {
-        WUup_stateRequestTimer($hash);
-    }
-    else {
-        InternalTimer( gettimeofday(), 'WUup_stateRequestTimer', $hash, 0 );
-    }
+    $init_done
+        ? WUup_stateRequestTimer($hash)
+        : InternalTimer( gettimeofday(), 'WUup_stateRequestTimer', $hash, 0 );
 
     Log3( $name, 3, qq{WUup ($name): defined} );
 
@@ -135,7 +132,6 @@ sub WUup_Attr {
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
             Log3( $name, 3, qq{WUup ($name) - disabled} );
         }
-
         elsif ( $cmd eq 'del' ) {
             readingsSingleUpdate( $hash, 'state', 'active', 1 );
             Log3( $name, 3, qq{WUup ($name) - enabled} );
@@ -147,7 +143,6 @@ sub WUup_Attr {
             readingsSingleUpdate( $hash, 'state', 'unknown', 1 );
             Log3( $name, 3, qq{WUup ($name) - disabledForIntervals} );
         }
-
         elsif ( $cmd eq 'del' ) {
             readingsSingleUpdate( $hash, 'state', 'active', 1 );
             Log3( $name, 3, qq{WUup ($name) - enabled} );
@@ -168,7 +163,6 @@ sub WUup_Attr {
                 Log3( $name, 4, qq{WUup ($name) - set interval to $attrVal} );
             }
         }
-
         elsif ( $cmd eq 'del' ) {
             $hash->{INTERVAL} = 300;
             Log3( $name, 4, qq{WUup ($name) - set interval to default} );
@@ -211,19 +205,14 @@ sub WUup_send {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
     my $ver    = $hash->{VERSION};
-    my $url    = q{};
-    if ( $hash->{INTERVAL} < 300 ) {
-        $url = $hash->{helper}{url_rf};
-    }
-    else {
-        $url = $hash->{helper}{url};
-    }
-    $url .= "?ID=$hash->{helper}{stationid}";
-    $url .= "&PASSWORD=$hash->{helper}{password}";
+    my $url    = $hash->{INTERVAL} < 300
+               ? $hash->{helper}{url_rf}
+               : $hash->{helper}{url};
+    $url       .= "?ID=$hash->{helper}{stationid}";
+    $url       .= "&PASSWORD=$hash->{helper}{password}";
+    
     my $datestring = strftime "%F+%T", gmtime;
-
-    $datestring =~ s{:}
-                    {%3A}gxms;
+    $datestring    =~ s{:}{%3A}gxms;
 
     $url .= "&dateutc=$datestring";
 
@@ -232,61 +221,46 @@ sub WUup_send {
     my $unit_windspeed      = AttrVal( $name, 'unit_windspeed', 'km/h' );
     my $unit_solarradiation = AttrVal( $name, 'unit_solarradiation', 'lux' );
     my $rnd                 = AttrVal( $name, 'round', 4 );
+    
     while ( my ( $key, $value ) = each(%$a) ) {
         next if substr( $key, 0, 2 ) ne 'wu';
         $key = substr( $key, 2, length($key) - 2 );
         ( $d, $r, $o ) = split( ":", $value );
+        
         if ( defined($r) ) {
             $o //= 0;
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
-        if ( $key =~ m{\w+f \z}xms ) {
-            $value = UConv::c2f( $value, $rnd );
-        }
-        if ( $key =~ m{\w+mph [^\n]*}xms ) {
 
-            if ( $unit_windspeed eq 'm/s' ) {
-                Log3( $name, 5, qq{WUup ($name) - windspeed unit is m/s} );
-                $value =
-                    UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ),
-                    $rnd );
-            }
-            else {
-                Log3( $name, 5, qq{WUup ($name) - windspeed unit is km/h} );
-                $value = UConv::kph2mph( $value, $rnd );
-            }
-        }
-        if ( $key eq 'baromin' ) {
-            $value = UConv::hpa2inhg( $value, $rnd );
-        }
-        if ( $key =~ m{rainin \z}xms ) {
-            $value = UConv::mm2in( $value, $rnd );
-        }
-        if ( $key eq 'solarradiation' ) {
+        my $mph_metric =
+            $key =~ m{\w+mph [^\n]*}xms && $unit_windspeed eq 'm/s';
+        my $lux_radiation =
+            $key eq 'solarradiation'    && $unit_solarradiation eq 'lux';
 
-            if ( $unit_solarradiation eq 'lux' ) {
-                Log3( $name, 5,
-                    qq{WUup ($name) - solarradiation unit is lux} );
-                $value = UConv::lux2wpsm( $value, $rnd );
-            }
-            else {
-                Log3( $name, 5,
-                    qq{WUup ($name) - solarradiation unit is W/m²} );
-            }
-        }
+        $value = $key =~ m{\w+f \z}xms       ? UConv::c2f( $value, $rnd )
+               : $key =~ m{\w+mph [^\n]*}xms ? UConv::kph2mph( $value, $rnd )
+               : $key eq 'baromin'           ? UConv::hpa2inhg( $value, $rnd )
+               : $key =~ m{rainin \z}xms     ? UConv::mm2in( $value, $rnd )
+               : $mph_metric                 ? UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ), $rnd )
+               : $lux_radiation              ? UConv::lux2wpsm( $value, $rnd )
+               : $value;
+
         $data .= "&$key=$value";
     }
 
     readingsBeginUpdate($hash);
+    
     if ( defined($data) ) {
         readingsBulkUpdate( $hash, 'data', $data );
         Log3( $name, 4, qq{WUup ($name) - data sent: $data} );
         $url .= $data;
         $url .= "&softwaretype=$hash->{helper}{softwaretype}";
         $url .= '&action=updateraw';
+        
         if ( $hash->{INTERVAL} < 300 ) {
             $url .= "&realtime=1&rtfreq=$hash->{INTERVAL}";
         }
+        
         my $param = {
             url      => $url,
             timeout  => 6,
@@ -298,14 +272,12 @@ sub WUup_send {
 
         Log3( $name, 5, qq{WUup ($name) - full URL: $url} );
         HttpUtils_NonblockingGet($param);
-
     }
     else {
         CommandDeleteReading( undef, "$name data" );
         CommandDeleteReading( undef, "$name response" );
         Log3( $name, 3, qq{WUup ($name) - no data} );
         readingsBulkUpdate( $hash, 'state', 'defined' );
-
     }
     readingsEndUpdate( $hash, 1 );
 
@@ -602,7 +574,7 @@ sub WUup_receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.17",
+  "version": "v0.9.18",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
@@ -640,8 +612,17 @@ sub WUup_receive {
     "x_wiki" : {
       "title" : "Wetter und Wettervorhersagen - Eigene Wetterdaten hochladen",
       "web" : "https://wiki.fhem.de/wiki/Wetter_und_Wettervorhersagen#Eigene_Wetterdaten_hochladen"
+     },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/fhem/WUup.git",
+      "web": "https://github.com/mahowi/WUup/blob/master/FHEM/59_WUup.pm",
+      "x_branch": "master",
+      "x_filepath": "FHEM/",
+      "x_raw": "https://raw.githubusercontent.com/mahowi/WUup/master/FHEM/59_WUup.pm"
      }
-  }
+  },
+  "x_support_status": "supported"
 }
 =end :application/json;q=META.json
 
