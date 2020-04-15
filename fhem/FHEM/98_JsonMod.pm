@@ -46,6 +46,7 @@ sub JsonMod_Initialize {
 	 	@attrList = qw(
 			httpHeader:textField-long
 			httpTimeout
+			update-on-start:0,1
 			readingList:textField-long
 			disable:0,1
 			interval
@@ -87,7 +88,8 @@ sub JsonMod_Define {
 # reread / temporary remove
 sub JsonMod_Undef {
 	my ($hash, $name) = @_;
-	RemoveInternalTimer($hash, \&JsonMod_DoTimer);
+	#RemoveInternalTimer($hash, \&JsonMod_DoTimer);
+	JsonMod_StopTimer($hash);
 	return;
 };
 
@@ -110,7 +112,7 @@ sub JsonMod_Run {
 	my $cron = AttrVal($name, 'interval', '0 * * * *');
 	$hash->{'CONFIG'}->{'CRON'} = \$cron;
 	JsonMod_StartTimer($hash);
-	JsonMod_ApiRequest($hash);
+	JsonMod_ApiRequest($hash) if AttrVal($name, 'update-on-start', 0);
 	return;
 };
 
@@ -531,6 +533,7 @@ sub JsonMod_StopTimer {
 	my ($hash) = @_;
 	$hash->{'NEXT'} = 'NEVER';
 	RemoveInternalTimer($hash, \&JsonMod_DoTimer);
+	RemoveInternalTimer($hash, \&JsonMod_ApiRequest);
 	return;
 };
 
@@ -572,7 +575,8 @@ sub JsonMod_ApiRequest {
 	};
 	$header .= "\r\nAccept: application/json\r\nAccept-Charset: utf-8, iso-8859-1" unless ($header =~ m'Accept: application/json');
 	$param->{'header'} = $header;
-	$param->{'loglevel'} = AttrVal($name, 'verbose', 3);
+	#$param->{'loglevel'} = AttrVal($name, 'verbose', 3);
+	$param->{'NAME'} = $name;
 	$param->{'timeout'} = AttrVal($name, 'httpTimeout', 30);
 	HttpUtils_NonblockingGet($param);
 	return;
@@ -631,10 +635,21 @@ sub JsonMod_ApiResponse {
 	# bool = utf8::is_utf8(string)
 	# if true: utf8::encode(string);
 
+
 	my $enc = Encode::find_encoding($encoding);
 	$enc = (defined($enc))?$enc->name():'utf-8-strict'; # precaution required in case of invalid respone
 	Encode::from_to($data, $encoding, 'UTF-8') unless ($enc eq 'utf-8-strict');
 	JsonMod_Logger($hash, 4, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
+
+	$data = "testtäüötü(bla);";
+	utf8::encode($data);
+
+	# JsonP handling
+	my ($jsonP, $remain, $jsFn) = extract_codeblock($data, '()', '(?s)^[^(]+');
+	if ($jsonP and $jsonP =~ m/^\((.*)\)$/ and $1) {
+		$data = $1;
+	};
+	return;
 
 	my $rs = JsonMod::JSON::StreamReader->new()->parse($data);
 	if (not $rs or ((ref($rs) ne 'HASH') and ref($rs) ne 'ARRAY')) {
@@ -660,6 +675,7 @@ sub JsonMod_Logger {
 	};
 	# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
 	no if $] >= 5.022, 'warnings', qw( redundant missing );
+	no warnings "uninitialized";
 	Log3 ($name, $verbose, sprintf('[%s] '.$message, $name, @args));
 	return;
 };
