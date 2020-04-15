@@ -641,15 +641,11 @@ sub JsonMod_ApiResponse {
 	Encode::from_to($data, $encoding, 'UTF-8') unless ($enc eq 'utf-8-strict');
 	JsonMod_Logger($hash, 4, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
 
-	$data = "testtäüötü(bla);";
-	utf8::encode($data);
-
 	# JsonP handling
 	my ($jsonP, $remain, $jsFn) = extract_codeblock($data, '()', '(?s)^[^(]+');
 	if ($jsonP and $jsonP =~ m/^\((.*)\)$/ and $1) {
 		$data = $1;
 	};
-	return;
 
 	my $rs = JsonMod::JSON::StreamReader->new()->parse($data);
 	if (not $rs or ((ref($rs) ne 'HASH') and ref($rs) ne 'ARRAY')) {
