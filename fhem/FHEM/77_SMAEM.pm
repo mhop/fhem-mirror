@@ -29,15 +29,12 @@ package main;
 
 use strict;
 use warnings;
-use bignum;
 use IO::Socket::Multicast;
-eval "use IO::Interface;1" or my $IOInterfaceAbsent = 1;
 use Blocking;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "4.1.0" => "17.03.2020  add define option <interface> ",
   "4.0.1" => "10.02.2020  fix perl warning Forum: https://forum.fhem.de/index.php/topic,51569.msg1021988.html#msg1021988",
   "4.0.0" => "16.12.2019  change module to OBIS metric resolution, change Readings Lx_THD to Lx_Strom, FirmwareVersion to SoftwareVersion ".
                           "new attribute \"noCoprocess\", many internal code changes ",
@@ -169,9 +166,6 @@ sub SMAEM_Define ($$) {
   my ($success, $gridin_sum, $gridout_sum);
   my $socket;
   
-  my @a  = split("[ \t][ \t]*", $def);
-  my $if = $a[2] ? $a[2] : "";
-  
   $hash->{INTERVAL}              = 60;
   $hash->{HELPER}{FAULTEDCYCLES} = 0;
   $hash->{HELPER}{STARTTIME}     = time();
@@ -191,15 +185,7 @@ sub SMAEM_Define ($$) {
   
   Log3 $hash, 3, "SMAEM $name - Multicast socket opened";
   
-  if($a[2]) {
-      eval { $socket->mcast_add('239.12.255.254',$if); };
-	  if ($@) {
-          return "Socket error in define ('239.12.255.254',$if): $@";         
-      }
-  } else {
-      $socket->mcast_add('239.12.255.254');
-  }
-  
+  $socket->mcast_add('239.12.255.254');
 
   $hash->{TCPDev} = $socket;
   $hash->{FD}     = $socket->fileno();
@@ -207,8 +193,6 @@ sub SMAEM_Define ($$) {
   $selectlist{"$name"} = $hash;
   
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
-  
-  Log3($name, 3, "$name - The perl module \"IO::Interface\" is missing. You should install it.") if($IOInterfaceAbsent);
   
   # Versionsinformationen setzen
   SMAEM_setVersionInfo($hash);
@@ -1100,10 +1084,9 @@ return;
 <a name="SMAEMdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; SMAEM [&lt;interface&gt;]</code><br>
+    <code>define &lt;name&gt; SMAEM </code><br>
     <br>
     Defines a SMA Energy Meter (SMAEM), a bidirectional energy meter/counter used in photovoltaics. 
-	The optional parameter <b>interface</b> defines a specific network interface to use, e.g. "eth0".
     <br><br>
     You need at least one SMAEM on your local subnet or behind a multicast enabled network of routers to receive multicast messages from the SMAEM over the
     multicast group 239.12.255.254 on udp/9522. Multicast messages are sent by SMAEM once a second (firmware 1.02.04.R, March 2016).
@@ -1126,8 +1109,8 @@ return;
 <b>Set </b>
 <ul>
   <li><b>reset</b> <br>
-  The automatically created file "cacheSMAEM" is deleted. The file is reinitialized by the module. 
-  This function is used to reset a possible error state of the device, but can also be executed at any time.  
+  The automatically generated file "cacheSMAEM" will be deleted. Then the file will be recreated again by the module.
+  This function is used to reset the device in possible case of error condition, but may be executed at all times.  
   </li>
   <br>  
 </ul>
@@ -1210,10 +1193,9 @@ return;
 <a name="SMAEMdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; SMAEM [&lt;Interface&gt;]</code><br>
+    <code>define &lt;name&gt; SMAEM </code><br>
     <br>
-    Definiert ein SMA Energy Meter (SMAEM), einen bidirektionalen Stromzähler, der häufig in Photovolatikanlagen der Firma SMA zum Einsatz kommt.
-    Der optionale Parameter <b>Interface</b> legt das zu benutzende Netzwerk-Interface fest, zum Beispiel "eth0". 
+    Definiert ein SMA Energy Meter (SMAEM), einen bidirektionalen Stromzähler, der häufig in Photovolatikanlagen der Firma SMA zum Einsatz kommt. 
     <br><br>
     Sie brauchen mindest ein SMAEM in Ihrem lokalen Netzwerk oder hinter einen multicastfähigen Netz von Routern, um die Daten des SMAEM über die
     Multicastgruppe 239.12.255.254 auf udp/9522 zu empfangen. Die Multicastpakete werden vom SMAEM einmal pro Sekunde ausgesendet (firmware 1.02.04.R, März 2016).
@@ -1351,12 +1333,10 @@ return;
       "requires": {
         "FHEM": 5.00918799,
         "perl": 5.014,
-        "bignum": 0,
         "IO::Socket::Multicast": 0,
         "Blocking": 0      
       },
       "recommends": {
-	    "IO::Interface": 0,
         "FHEM::Meta": 0
       },
       "suggests": {
