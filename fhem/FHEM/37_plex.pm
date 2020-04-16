@@ -1052,7 +1052,7 @@ plex_Set($$@)
       my $server = ReadingsVal($name,'server', undef);
       return 'no current server' if( !$server );
 
-      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/stop?type=video", "playback" ) if( $cmd == 'watched' );
+      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/stop?type=video", "playback" ) if( $cmd eq 'watched' );
 
       my $entry = plex_serverOf($hash, $server, 1);
       return "unknown server: $server" if( !$entry );
