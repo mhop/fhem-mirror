@@ -58,7 +58,7 @@ use constant DEFAULT_RSSI_THRESHOLD     => 10;
 use constant RSSI_WINDOW                => 10;
 
 use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.9';
+use constant VERSION                    => '0.92';
 
 use constant PIDFILE                    => '/var/run/' . ME . '.pid';
 
@@ -75,6 +75,7 @@ my @clients = ();
 my ($log_level, $log_target);
 my $debug;
 my ($beacons_hcitool, $beacons_hcidump) : shared = (0, 0);
+my $restart_hcitool :shared;
 
 sub syslogw {
   return if (scalar(@_) < 2);
@@ -207,9 +208,15 @@ sub update_device($$$) {
 sub bluetooth_scan_thread($$) {
   my ($device, $legacy_mode) = @_;
   my $hcitool;
+  $restart_hcitool = 0;
   for(;;) {
+    ($beacons_hcitool, $beacons_hcidump) = (0, 0);
     my $pid = open($hcitool, "-|", "stdbuf -oL hcitool -i " . $device . " lescan --duplicates 2>&1") || die('Unable to start scanning. Please make sure hcitool and stdbuf are installed!');
     while (<$hcitool>) {
+      if ($restart_hcitool) {
+        $restart_hcitool = 0;
+        last();
+      }
       chomp($_);
       if ($_ eq 'LE Scan ...') {
         syslogw(LOG_INFO, "Received '%s'.", $_);
@@ -249,7 +256,12 @@ sub bluetooth_dump_thread($) {
     
     while (<$hcidump>) {
       chomp($_);
-      if ($_ =~ m/^>/) {
+    if ($_ =~ m/^< HCI Command: / && $beacons_hcitool > 0) { # Ignore initial settings, i. e. before first beacon
+      # https://forum.fhem.de/index.php/topic,75559.msg1007719.html#msg1007719
+      syslogw(LOG_WARNING, "Received '%s', telling hcidump to restart...", $_);
+      $state = HCIDUMP_STATE_NONE;
+      $restart_hcitool = 1;
+    } elsif ($_ =~ m/^>/) {
         if ($current_mac) {
           #printf("DEBUG: mac: %s, name: '%s', rssi: %s\n", $current_mac, $current_name, $current_rssi);
           
@@ -334,20 +346,20 @@ sub handle_command($$) {
       $client->{'next_check'} = 0; #now
     }
     print $current_client "command accepted\n"
-	} elsif ($buf =~ m/^\s*ping\s*$/) {
-			syslogw(LOG_DEBUG, "Received ping command from client %s:%i.", $current_client->peerhost(), $current_client->peerport());
-			my ($min_age, $max_age, $devices) = gather_stats();
-			print $current_client sprintf("pong [clients=%i;devices=%i;min_age=%s;max_age=%s;beacons_hcitool=%i;beacons_hcidump=%i;beacons_diff=%i]\n",
-				scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
-			return(1);
-	} elsif ($buf =~ m/^\s*stop\s*$/) {
+  } elsif ($buf =~ m/^\s*ping\s*$/) {
+      syslogw(LOG_DEBUG, "Received ping command from client %s:%i.", $current_client->peerhost(), $current_client->peerport());
+      my ($min_age, $max_age, $devices) = gather_stats();
+      print $current_client sprintf("pong [clients=%i;devices=%i;min_age=%s;max_age=%s;beacons_hcitool=%i;beacons_hcidump=%i;beacons_diff=%i]\n",
+        scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
+      return(1);
+  } elsif ($buf =~ m/^\s*stop\s*$/) {
     # Stop does not make sense when scanning permanently
     syslogw(LOG_DEBUG, "Received stop command from client %s:%i. Pretending to care and ignoring...", $current_client->peerhost(), $current_client->peerport());
     print $current_client "no command running\n" # ToDo: Does the FHEM module even care?
   } else {
     syslogw(LOG_WARNING, "Received unknown command: '%s'.", $buf);
   }
-	return(0);
+  return(0);
 }
 
 sub gather_stats() {
@@ -361,11 +373,11 @@ sub gather_stats() {
       $max_age = $age if (!defined($max_age) || $age > $max_age);
     }
   }
-	return($min_age, $max_age, $devices);
+  return($min_age, $max_age, $devices);
 }
 
 sub stats_task() {
-	my ($min_age, $max_age, $devices) = gather_stats();
+  my ($min_age, $max_age, $devices) = gather_stats();
   syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s), received beacons (hcitool/hcidump/difference): %i/%i/%i",
     scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
 }
@@ -404,15 +416,15 @@ sub cleanup_task() {
 openlog(ME, 'pid', LOG_USER);
 (my $device, my $daemonize, my $listen_address, my $listen_port, $log_level, $log_target, $debug, my $legacy_mode, my $rssi_threshold) = parse_options();
 
-  local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
-    syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
-    unlink(PIDFILE) if (-e PIDFILE);
-    closelog();
-    exit(1);
-  };
+local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
+  syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
+  unlink(PIDFILE) if (-e PIDFILE);
+  closelog();
+  exit(1);
+};
 
 syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, legacy mode: %i, rssi threshold: %i, log level: %i, debug: %i).",
-    VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $log_level, $debug);
+  VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $log_level, $debug);
 
 sanity_check($legacy_mode);
 daemonize('root', 'root', PIDFILE) if $daemonize;
@@ -449,13 +461,12 @@ for(;;) {
       syslogw(LOG_INFO, "Connection from %s:%s. Connected clients: %i.", $client_socket->peerhost(), $client_socket->peerport(), $select->count()-1);
     } else {
       sysread ($current_client, my $buf, INET_RECV_BUFFER);
-			
-			my $disconnect;
+      my $disconnect;
       if ($buf) {
         chomp($buf);
         $disconnect = handle_command($buf, $current_client);
       }
-			if (!$buf || $disconnect) {
+    if (!$buf || $disconnect) {
         $select->remove($current_client);
         @clients = grep {$_->{'handle'} != $current_client} @clients;
         syslogw(LOG_INFO, "Client %s:%s disconnected. Connected clients: %i.", $current_client->peerhost(), $current_client->peerport(), $select->count()-1);
