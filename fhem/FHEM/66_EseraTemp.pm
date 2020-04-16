@@ -176,8 +176,12 @@ EseraTemp_Parse($$)
     }
     else
     {
-      my $nameOfReading = "temperature";
-      readingsSingleUpdate($rhash, $nameOfReading, $value / 100.0, 1);
+      Log3 $rname, 5, "EseraTemp ($rname) - parse, value ".$value." readingId ".$readingId;
+      if ($readingId == 0)
+      {      
+        my $nameOfReading = "temperature";
+        readingsSingleUpdate($rhash, $nameOfReading, $value / 100.0, 1);
+      }
     }
            
     my @list;
