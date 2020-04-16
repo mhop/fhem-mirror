@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 #
 #
+#  2.1.2  =>  16.04.20 remove undef value for ReadingsAge
 #  2.1.1  =>  14.04.20 remove List::Utils
 #  2.1.0  =>  06.04.20
 #  2.0.0  =>  05.04.20 perlcritic -4 / PBP
@@ -97,11 +98,11 @@ if (-e $attr{global}{modpath}.'/FHEM/Meta.pm') {
 sub Initialize {
 
     my $hash = shift;
-    $hash->{GetFn}     = "FHEM::readingsWatcher::Get";
-    $hash->{SetFn}     = "FHEM::readingsWatcher::Set";
-    $hash->{DefFn}     = "FHEM::readingsWatcher::Define";
-    $hash->{UndefFn}   = "FHEM::readingsWatcher::Undefine";
-    $hash->{AttrFn}    = "FHEM::readingsWatcher::Attr";
+    $hash->{GetFn}     = \&FHEM::readingsWatcher::Get;
+    $hash->{SetFn}     = \&FHEM::readingsWatcher::Set;
+    $hash->{DefFn}     = \&FHEM::readingsWatcher::Define;
+    $hash->{UndefFn}   = \&FHEM::readingsWatcher::Undefine;
+    $hash->{AttrFn}    = \&FHEM::readingsWatcher::Attr;
     $hash->{AttrList}  = "disable:0,1 interval deleteUnusedReadings:1,0 readingActivity ".$readingFnAttributes;
 
     return  FHEM::Meta::InitMod( __FILE__, $hash ) if ($hasmeta);
@@ -258,7 +259,7 @@ sub IsValidDevice {
 
     foreach (split(';', shift)) { # Anzahl Regelsätze pro Device, meist nur einer
 
-	$_ =~ s/\+/,/g; # OR Readings wie normale Readingsliste behandeln
+	$_ =~ s/\+/,/xg; # OR Readings wie normale Readingsliste behandeln
 	$_ =~ s/ //g;
 
 	my ($timeout,undef,@readings) = split(',', $_); # der ggf. vorhandene Ersatzstring wird hier nicht benötigt
@@ -330,7 +331,7 @@ sub formatStateList {
 
     my $separator = ('-' x length($head));
 
-    while ( $head =~ m/\|/g ) { # alle | Positionen durch + ersetzen
+    while ( $head =~ m{\|}xg ) { # alle | Positionen durch + ersetzen
 	substr $separator, (pos($head)-1), 1, '+';
     }
 
@@ -431,7 +432,7 @@ sub OnTimer {
 	push @devices, $device;
 
 	$or_and = 1 if (index($rSA,'+') != -1); # Readings als AND auswerten
-	$rSA =~ s/\+/,/g ; # eventuell vorhandene + auch in Komma wandeln
+	$rSA =~ s/\+/,/xg ; # eventuell vorhandene + auch in Komma wandeln
 
 	# rSA: timeout, errorValue, reading1, reading2, reading3, ...
 	#      120,---,temperature,humidity,battery
@@ -472,15 +473,14 @@ sub OnTimer {
 		    $state   = 1;
 		}
 
-		my $age = ReadingsAge($device, $reading, undef);
+		my $age = ReadingsAge($device, $reading, '');
 
-		if (defined($age)) {
+		if ($age ne '') {
 
 		    $readings_count++;
 
 		    if ($age > $timeout) {
-                        push @toDevs, $device if  !grep {/$device/} @toDevs; # keine doppelten Namen
-			$timeOutState = 'timeout';
+    			$timeOutState = 'timeout';
 			$d_d ++; # Device Tote
 			my $rts = ReadingsTimestamp($device, $reading, 0);
 			setReadingsVal($defs{$device}, $reading, $errorValue, $rts) if ($rts && ($errorValue ne '')); # leise setzen ohne Event
@@ -495,7 +495,7 @@ sub OnTimer {
 
 		    readingsBulkUpdate($hash, $d_r, $timeOutState) if ($timeOutState);
 
-		    $readingsList =~ s/$d_r,// if ($readingsList); # das Reading aus der Liste streichen, leer solange noch kein Device das Attr hat !
+		    $readingsList =~ s/$d_r,//xms if ($readingsList); # das Reading aus der Liste streichen, leer solange noch kein Device das Attr hat !
 		}
 		else {
 		    setReadingsVal($defs{$device},$reading,'unknown',TimeNow()) if ($errorValue); # leise setzen ohne Event
@@ -528,9 +528,6 @@ sub OnTimer {
 	}
     } # foreach device
 
-    # eventuell doppelte Einträge aus der Timeout Liste entfernen
-    # @toDevs   = uniq @toDevs if (@toDevs   > 1);
-
     readingsBulkUpdate($hash, 'readings' , $readings_count);
     readingsBulkUpdate($hash, 'devices'  , int(@devices));
     readingsBulkUpdate($hash, 'alive'    , $alive_count);
@@ -554,6 +551,8 @@ sub OnTimer {
 }
 
 #####################################################################################
+
+
 
 sub clearReadings {
 
