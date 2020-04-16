@@ -344,6 +344,8 @@ HUEDevice_moveToBridge($$$) {
     my $name = $hash->{NAME};
     my $old = AttrVal( $name, 'IODev', '<unknown>' );
 
+    next if( $old eq $new );
+
     Log3 $name, 2, "moving $name [$serial] from $old to $new";
 
     HUEDevice_IODevChanged($hash, undef, $new, $new_id);
@@ -351,7 +353,7 @@ HUEDevice_moveToBridge($$$) {
 
     $found = 1;
     last;
-    }
+  }
 
   return $found;
 }
