@@ -62,8 +62,6 @@ BEGIN {
 #-- Export to main context with different name
 GP_Export(qw( Initialize ));
 
-my $version = q(0.10.0);
-
 ################################################################################
 #
 # Main routines
@@ -90,7 +88,6 @@ sub Initialize {
         . 'wuwindgustmph wuwindgustmph_10m wuwindspdmph_avg2m wuwindspeedmph '
         . 'wuAqPM2.5 wuAqPM10 '
         . $readingFnAttributes;
-    $hash->{VERSION} = $version;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
@@ -100,6 +97,10 @@ sub Define {
     my $def  = shift;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    
+    ## no critic ( ProhibitComplexVersion )
+    use version 0.77; our $VERSION = version->new( FHEM::Meta::Get( $hash, 'version' ) )->normal;
+    ## use critic
 
     my @param = split( "[ \t][ \t]*", $def );
 
@@ -108,7 +109,7 @@ sub Define {
 
     my $name = $hash->{NAME};
 
-    $hash->{VERSION}  = $version;
+    $hash->{VERSION}  = $VERSION;
     $hash->{INTERVAL} = 300;
 
     $hash->{helper}{stationid}    = $param[2];
@@ -337,37 +338,6 @@ sub receive {
 ################################################################################
 #
 # Documentation
-#
-################################################################################
-#
-# Changelog:
-#
-# 2017-01-23 initial release
-# 2017-02-10 added german docu
-# 2017-02-22 fixed bug when module cannot get reenabled after disabling
-#            added disabledForIntervals
-#            changed attribute WUInterval to interval
-#            default interval 300
-# 2017-02-23 added attribute unit_windspeed
-#            converted units rounded to 4 decimal places
-# 2017-03-16 implemented non-blocking mode
-# 2017-08-16 integrated RapidFire mode (thanks to Scooty66)
-# 2017-10-10 added windspdmph_avg2m, winddir_avg2m, windgustmph_10m,
-#            windgustdir_10m (thanks to Aeroschmelz for reminding me)
-#            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
-# 2017-10-16 fixed attributes
-# 2017-10-19 added set-command "update"
-# 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
-# 2018-04-10 added attribute round
-# 2018-04-13 added AqPM2.5 and AqPM10
-# 2018-08-15 added attribute unit_solarradiation
-# 2019-07-04 replaced link to API documentation
-# 2019-07-05 add Meta support
-# 2019-07-09 add WIKI to Meta data
-# 2020-03-12 use UConv to calculate solarradiation from lux to W/m²
-# 2020-03-25 remove prototypes
-# 2020-03-26 code cleanup
-# 2020-03-30 remove default attributes, use of internal defaults
 #
 ################################################################################
 
@@ -601,7 +571,7 @@ sub receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.10.0",
+  "version": "v0.10.1",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
