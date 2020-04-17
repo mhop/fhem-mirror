@@ -6000,6 +6000,7 @@ SecurityCheck()
   if(@fnd) {
     unshift(@fnd, "SecurityCheck:");
     push(@fnd, "You can disable this message with attr global motd none");
+    $defs{global}{init_errors}  =~ s/SecurityCheck:.*motd none//s;
     $defs{global}{init_errors} .= join("\n", @fnd);
   }
 }
