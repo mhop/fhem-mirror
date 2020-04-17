@@ -694,8 +694,8 @@
     <Product config="fibaro/fgwds221.xml" id="1000" name="FGWDS221 Walli Double Switch" type="1B01"/>
     <Product config="fibaro/fgwd111.xml" id="1000" name="FGWD111 Walli Dimmer" type="1C01"/>
     <Product config="fibaro/fgwr111.xml" id="1000" name="FGWR111 Walli Roller Shutter" type="1d01"/>
-    <Product config="fibaro/fgrgbw422.xml" id="1000" name="FGRGBW-442" type="0902"/>
-    <Product config="fibaro/fgrgbw422.xml" id="2000" name="FGRGBW-442" type="0902"/>
+    <Product config="fibaro/fgrgbw442.xml" id="1000" name="FGRGBW-442" type="0902"/>
+    <Product config="fibaro/fgrgbw442.xml" id="2000" name="FGRGBW-442" type="0902"/>
   </Manufacturer>
   <Manufacturer id="0295" name="fifthplay nv"></Manufacturer>
   <Manufacturer id="0138" name="First Alert (BRK Brands Inc)">
