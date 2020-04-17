@@ -1,6 +1,6 @@
 #########################################################################
 # $Id$ 
-# fhem Modul für Vissmann API. Based on investigation of "thetrueavatar"
+# fhem Modul für Viessmann API. Based on investigation of "thetrueavatar"
 # (https://github.com/thetrueavatar/Viessmann-Api)
 #   
 #     This file is part of fhem.
@@ -146,6 +146,9 @@
 # 2020-04-05      s.o. 2. Versuch 
 #
 # 2020-04-09      my $dir = path(AttrVal("global","logdir","log")); 
+#
+# 2020-04-17      "Viessmann" Tippfehler gefixt
+#                 Prototypen und "undef"s entfernt
 #
 #   ToDo:         timeout konfigurierbar machen
 #						"set"s für Schedules zum Steuern der Heizung implementieren
@@ -415,7 +418,7 @@ my $RequestList = {
 };
 
 
-sub vitoconnect_Initialize($) {
+sub vitoconnect_Initialize {
     my ($hash) = @_;
     $hash->{DefFn}      = 'vitoconnect_Define';
     $hash->{UndefFn}    = 'vitoconnect_Undef';
@@ -434,9 +437,10 @@ sub vitoconnect_Initialize($) {
     ."vitoconnect_raw_readings:0,1 "
     ."vitoconnect_actions_active:0,1 "
     .$readingFnAttributes;
+	return;	
 }
 
-sub vitoconnect_Define($$) {
+sub vitoconnect_Define {
     my ($hash, $def) = @_;
     my $name = $hash->{NAME};
     my @param = split('[ \t]+', $def);
@@ -466,22 +470,22 @@ sub vitoconnect_Define($$) {
 	 #}   
     
 	 InternalTimer(gettimeofday()+10, "vitoconnect_GetUpdate", $hash);   
-    return undef;
+    return;
 }
 
-sub vitoconnect_Undef($$) {
+sub vitoconnect_Undef {
     my ($hash, $arg) = @_; 
     RemoveInternalTimer($hash);
-    return undef;
+    return;
 }
 
-sub vitoconnect_Get($@) {
+sub vitoconnect_Get {
 	my ($hash, $name, $opt, @args) = @_;
 	return "get $name needs at least one argument" unless (defined($opt));
-	return undef;
+	return;
 }
 
-sub vitoconnect_Set($@) {
+sub vitoconnect_Set {
 	my ($hash, $name, $opt, @args) = @_;
 	my $access_token = $hash->{".access_token"};
 	my $installation = $hash->{".installation"};
@@ -490,20 +494,20 @@ sub vitoconnect_Set($@) {
 	return "set $name needs at least one argument" unless (defined($opt));
 	if ($opt eq "update"){
 		RemoveInternalTimer($hash); 
-		vitoconnect_GetUpdate($hash); return undef;
+		vitoconnect_GetUpdate($hash); return;
 	} elsif ($opt eq "logResponseOnce") {
 		$hash->{".logResponseOnce"} = 1;
 		RemoveInternalTimer($hash); 
 		vitoconnect_GetUpdate($hash);
-		return undef;	
+		return;	
 	} elsif ($opt eq "clearReadings") {
 		AnalyzeCommand ($hash, "deletereading $name .*");
-		return undef;
+		return;
 	} elsif ($opt eq "password") {
 		my $err = vitoconnect_StoreKeyValue($hash, "passwd", $args[0]); return $err if ($err);
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK1-Heizkurve-Niveau") {
-		my $slope = ReadingsVal ($name, "HK1-Heizkurve-Steigung", undef);
+		my $slope = ReadingsVal ($name, "HK1-Heizkurve-Steigung", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.heating.curve/setCurve",
@@ -518,9 +522,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   	  if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK2-Heizkurve-Niveau") {
-		my $slope = ReadingsVal ($name, "HK2-Heizkurve-Steigung", undef);
+		my $slope = ReadingsVal ($name, "HK2-Heizkurve-Steigung", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.heating.curve/setCurve",
@@ -535,9 +539,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Heizkurve-Niveau") {
-		my $slope = ReadingsVal ($name, "HK3-Heizkurve-Steigung", undef);
+		my $slope = ReadingsVal ($name, "HK3-Heizkurve-Steigung", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.2.heating.curve/setCurve",
@@ -552,9 +556,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK1-Heizkurve-Steigung") {
-		my $shift = ReadingsVal ($name, "HK1-Heizkurve-Niveau", undef);
+		my $shift = ReadingsVal ($name, "HK1-Heizkurve-Niveau", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.heating.curve/setCurve",
@@ -569,9 +573,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK2-Heizkurve-Steigung") {
-		my $shift = ReadingsVal ($name, "HK2-Heizkurve-Niveau", undef);
+		my $shift = ReadingsVal ($name, "HK2-Heizkurve-Niveau", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.heating.curve/setCurve",
@@ -586,9 +590,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK3-Heizkurve-Steigung") {
-		my $shift = ReadingsVal ($name, "HK3-Heizkurve-Niveau", undef);
+		my $shift = ReadingsVal ($name, "HK3-Heizkurve-Niveau", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.2.heating.curve/setCurve",
@@ -603,9 +607,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK1-Urlaub_Start") {
-		my $end = ReadingsVal ($name, "HK1-Urlaub_Ende", undef);
+		my $end = ReadingsVal ($name, "HK1-Urlaub_Ende", "");
 		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
 		vitoconnect_action($hash);
 		my $param = {
@@ -621,9 +625,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK2-Urlaub_Start") {
-		my $end = ReadingsVal ($name, "HK2-Urlaub_Ende", undef);
+		my $end = ReadingsVal ($name, "HK2-Urlaub_Ende", "");
 		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
       vitoconnect_action($hash);
 		my $param = {
@@ -639,9 +643,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Urlaub_Start") {
-		my $end = ReadingsVal ($name, "HK3-Urlaub_Ende", undef);
+		my $end = ReadingsVal ($name, "HK3-Urlaub_Ende", "");
 		if ($end eq ""){my $t = Time::Piece->strptime($args[0], "%Y-%m-%d"); $t += ONE_DAY; $end = $t->strftime("%Y-%m-%d");}
 	   vitoconnect_action($hash);
 		my $param = {
@@ -657,9 +661,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK1-Urlaub_Ende") {
-		my $start = ReadingsVal ($name, "HK1-Urlaub_Start", undef);
+		my $start = ReadingsVal ($name, "HK1-Urlaub_Start", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.0.operating.programs.holiday/schedule",
@@ -674,9 +678,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK2-Urlaub_Ende") {
-		my $start = ReadingsVal ($name, "HK2-Urlaub_Start", undef);
+		my $start = ReadingsVal ($name, "HK2-Urlaub_Start", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.1.operating.programs.holiday/schedule",
@@ -691,9 +695,9 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Urlaub_Ende") {
-		my $start = ReadingsVal ($name, "HK3-Urlaub_Start", undef);
+		my $start = ReadingsVal ($name, "HK3-Urlaub_Start", "");
 		vitoconnect_action($hash);
 		my $param = {
 			url        => "https://api.viessmann-platform.io/operational-data/v1/installations/$installation/gateways/$gw/devices/0/features/heating.circuits.2.operating.programs.holiday/schedule",
@@ -708,7 +712,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK1-Urlaub_unschedule") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -724,7 +728,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK2-Urlaub_unschedule") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -740,7 +744,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Urlaub_unschedule") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -756,7 +760,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   	   if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   	   } else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;			
+		return;			
 	} elsif ($opt eq "HK1-Betriebsart") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -771,7 +775,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   	  if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK2-Betriebsart") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -785,7 +789,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK3-Betriebsart") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -800,7 +804,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK1-Solltemperatur_comfort_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -814,7 +818,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK2-Solltemperatur_comfort_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -829,7 +833,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;
+		return;
 	} elsif ($opt eq "HK3-Solltemperatur_comfort_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -844,7 +848,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK1-Solltemperatur_comfort") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -859,7 +863,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK2-Solltemperatur_comfort") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -874,7 +878,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Solltemperatur_comfort") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -890,7 +894,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;		
+		return;		
 	} elsif ($opt eq "HK1-Solltemperatur_eco_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -905,7 +909,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;
+		return;
 	} elsif ($opt eq "HK2-Solltemperatur_eco_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -920,7 +924,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;
+		return;
 	} elsif ($opt eq "HK3-Solltemperatur_eco_aktiv") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -935,7 +939,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }   
-		return undef;
+		return;
 	} elsif ($opt eq "HK1-Solltemperatur_normal") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -951,7 +955,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   	  if ($err ne "") { Log3 $name, 1, "$name $opt $args[0]: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else { Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;
+		return;
 	} elsif ($opt eq "HK2-Solltemperatur_normal") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -967,7 +971,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Solltemperatur_normal") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -983,7 +987,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") {	Log3 $name, 1, "$name $opt $args[0]: Fehler während der Befehlsausführung: err= $err data= $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK1-Solltemperatur_reduziert") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -998,7 +1002,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK2-Solltemperatur_reduziert") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -1013,7 +1017,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "HK3-Solltemperatur_reduziert") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -1028,7 +1032,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "WW-einmaliges_Aufladen") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -1043,7 +1047,7 @@ sub vitoconnect_Set($@) {
    	(my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err  ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else { Log3 $name, 5, "set $name $opt $args[0]"; }   
-		return undef;
+		return;
 	} elsif ($opt eq "WW-Zirkulationspumpe_Zeitplan") {
 		return "not implemented";	
 	} elsif ($opt eq "WW-ZeitplanDhwSchedule") {
@@ -1062,7 +1066,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "" || $data ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	} elsif ($opt eq "WW-Solltemperatur") {
 		vitoconnect_action($hash);
 		my $param = {
@@ -1077,7 +1081,7 @@ sub vitoconnect_Set($@) {
       (my $err, my $data) = HttpUtils_BlockingGet($param);
   		if ($err ne "") { Log3 $name, 1, "set $name $opt $args[0]: Fehler während der Befehlsausführung: $err :: $data";
   		} else {	Log3 $name, 3, "set $name $opt $args[0]"; }
-		return undef;	
+		return;	
 	}
 	my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password logResponseOnce:noArg " .
 				"WW-einmaliges_Aufladen:activate,deactivate " .
@@ -1133,7 +1137,7 @@ sub vitoconnect_Set($@) {
 	return $val;
 }	
 
-sub vitoconnect_Attr(@) {
+sub vitoconnect_Attr {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
 	if($cmd eq "set") {
    	if($attr_name eq "vitoconnect_raw_readings") {
@@ -1156,11 +1160,11 @@ sub vitoconnect_Attr(@) {
 		    # return "Unknown attr $attr_name";
 		}
 	}
-	return undef;
+	return;
 }
 
 # Subs
-sub vitoconnect_GetUpdate($) {
+sub vitoconnect_GetUpdate {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Log3 $name, 4, "$name - GetUpdate called ...";
@@ -1168,10 +1172,10 @@ sub vitoconnect_GetUpdate($) {
 		Log3 $name, 4, "$name: device disabled";
 		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash); 
 	} else {	vitoconnect_getCode($hash); } 	
-	return undef;
+	return;
 }
 
-sub vitoconnect_getCode($) {
+sub vitoconnect_getCode {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
@@ -1192,10 +1196,10 @@ sub vitoconnect_getCode($) {
    #Log3 $name, 4, "$name: user=$param->{user} passwd=$param->{pwd}";
    # Log3 $name, 5, Dumper($hash);
    HttpUtils_NonblockingGet($param);
-   return undef;
+   return;
 }
 
-sub vitoconnect_getCodeCallback ($) {
+sub vitoconnect_getCodeCallback {
 	my ($param, $err, $response_body) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
@@ -1224,10 +1228,10 @@ sub vitoconnect_getCodeCallback ($) {
 		# neuen Timer starten in einem konfigurierten Interval.
 		InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
 	}
-	return undef;
+	return;
 }
 
-sub vitoconnect_getAccessToken($) {
+sub vitoconnect_getAccessToken {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $param = {
@@ -1241,10 +1245,10 @@ sub vitoconnect_getAccessToken($) {
       callback   => \&vitoconnect_getAccessTokenCallback     
       };
 	HttpUtils_NonblockingGet($param);
-	return undef;
+	return;
 }
 
-sub vitoconnect_getAccessTokenCallback($) {
+sub vitoconnect_getAccessTokenCallback {
 	my ($param, $err, $response_body) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
@@ -1264,17 +1268,17 @@ sub vitoconnect_getAccessTokenCallback($) {
          Log3 $name, 5, "$name: Access Token: $access_token";
          vitoconnect_getGw($hash);
       } else {
-      	Log3 $name, 1, "$name: Access Token: undef";
+      	Log3 $name, 1, "$name: Access Token: nicht definiert";
       	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
       } 
     } else {
     	Log3 $name, 1, "$name: getAccessToken: An error occured: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
     }
-	return undef;
+	return ;
 }
 
-sub vitoconnect_getGw($) {
+sub vitoconnect_getGw {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $access_token = $hash->{".access_token"};
@@ -1287,10 +1291,10 @@ sub vitoconnect_getGw($) {
       callback   => \&vitoconnect_getGwCallback     
       };
 	HttpUtils_NonblockingGet($param);
-	return undef;
+	return;
 }
 
-sub vitoconnect_getGwCallback($) {
+sub vitoconnect_getGwCallback {
 	my ($param, $err, $response_body) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
@@ -1325,10 +1329,10 @@ sub vitoconnect_getGwCallback($) {
 	  Log3 $name, 1, "$name: An error occured: $err";
       InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
    }	
-	return undef;
+	return;
 }
 
-sub vitoconnect_getResource($) {
+sub vitoconnect_getResource {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $access_token = $hash->{".access_token"};
@@ -1343,14 +1347,14 @@ sub vitoconnect_getResource($) {
       callback   => \&vitoconnect_getResourceCallback     
       };
   	HttpUtils_NonblockingGet($param);
-	return undef;
+	return;
 }
 
-sub vitoconnect_getResourceCallback($) { 
+sub vitoconnect_getResourceCallback { 
 	my ($param, $err, $response_body) = @_;
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
-	my $file_handle2 = undef;
+	my $file_handle2 = "";
 
 	readingsBeginUpdate($hash);		
 	if ($err eq "") {
@@ -1383,7 +1387,7 @@ sub vitoconnect_getResourceCallback($) {
 			my @Keys = keys( %Properties );
 			for my $Key ( @Keys ) {
 				my $Reading = $RequestList->{$FieldName.".".$Key};
-				if ( !defined($Reading) || AttrVal($name,'vitoconnect_raw_readings',undef) eq "1" )  {
+				if ( !defined($Reading) || AttrVal($name,'vitoconnect_raw_readings',0) eq "1" )  {
 					$Reading = $FieldName.".".$Key; }
 				# Log3 $name, 5, "Property: $FieldName $Key";
 				my $Type = $Properties{$Key}{type};
@@ -1428,7 +1432,7 @@ sub vitoconnect_getResourceCallback($) {
 				}	
 			}
 			###########################################
-			if (AttrVal($name,'vitoconnect_actions_active',undef) eq "1" )  {
+			if (AttrVal($name,'vitoconnect_actions_active',0) eq "1" )  {
 				my @actions =  @{$item->{actions}};
 				if (@actions) {
 					if ($hash->{".logResponseOnce"}) { $file_handle2->print(Dumper(@actions)); }
@@ -1452,10 +1456,10 @@ sub vitoconnect_getResourceCallback($) {
 	readingsEndUpdate($hash, 1);
 	InternalTimer(gettimeofday()+$hash->{intervall}, "vitoconnect_GetUpdate", $hash);
 	$hash->{".logResponseOnce"} = 0;
-	return undef;
+	return;
 }
 
-sub vitoconnect_action($) {
+sub vitoconnect_action {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $isiwebuserid = $hash->{user};
@@ -1528,11 +1532,11 @@ sub vitoconnect_action($) {
       $gw = $decode_json->{entities}[0]->{entities}[0]->{properties}->{serial};
       Log3 $name, 4, "$name: installation: $installation :: gw: $gw"
    } else { Log3 $name, 1, "$name: An error occured: $err"; }	
-   return undef;
+   return;
 }
 
 
-sub vitoconnect_StoreKeyValue($$$) {
+sub vitoconnect_StoreKeyValue {
 ###################################################
 # checks and stores obfuscated keys like passwords 
 # based on / copied from FRITZBOX_storePassword
@@ -1552,9 +1556,9 @@ sub vitoconnect_StoreKeyValue($$$) {
     }    
     my $err = setKeyValue($index, $enc);
     return "error while saving the value - $err" if(defined($err));
-    return undef;
+    return;
 } 
-sub vitoconnect_ReadKeyValue($$) {
+sub vitoconnect_ReadKeyValue {
 #####################################################
 # reads obfuscated value 
 
@@ -1571,7 +1575,7 @@ sub vitoconnect_ReadKeyValue($$) {
 
    if ( defined($err) ) {
       Log3 $name, 1, "$name: ReadKeyValue is unable to read value from file: $err";
-      return undef;
+      return;
    }  
     
    if ( defined($value) ) {
@@ -1588,7 +1592,7 @@ sub vitoconnect_ReadKeyValue($$) {
       return $dec;
    } else {
       Log3 $name, 1, "$name: ReadKeyValue could not find key $kName in file";
-      return undef;
+      return;
    }
    return;
 } 
@@ -1597,14 +1601,14 @@ sub vitoconnect_ReadKeyValue($$) {
 
 =pod
 =item device
-=item summary support for Vissmann API
-=item summary_DE Unterstützung für die Vissmann API
+=item summary support for Viessmann API
+=item summary_DE Unterstützung für die Viessmann API
 =begin html
 
 <a name="vitoconnect"></a>
 <h3>vitoconnect</h3>
 <ul>
-    <i>vitoconnect</i> implements a device for the Vissmann API <a href="https://www.vissmann.de/de/vissmann-apps/vitoconnect.html">Vitoconnect100</a>
+    <i>vitoconnect</i> implements a device for the Viessmann API <a href="https://www.viessmann.de/de/viessmann-apps/vitoconnect.html">Vitoconnect100</a>
     based on investigation of <a href="https://github.com/thetrueavatar/Viessmann-Api">thetrueavatar</a><br>
     
 	 You need the user and password from the ViCare App account.<br>
@@ -1646,7 +1650,7 @@ sub vitoconnect_ReadKeyValue($$) {
       <li><code>password <passwd></code><br>
         store password in key store</li>
     	<li><code>logResponseOnce</code><br>
-        dumps the json response of Vissmann server to entities.json, gw.json, actions.json in FHEM log directory</li>
+        dumps the json response of Viessmann server to entities.json, gw.json, actions.json in FHEM log directory</li>
         
       <li><code>HK1-Heizkurve-Niveau shift</code><br>
       set shift of heating curve</li>
@@ -1710,7 +1714,7 @@ sub vitoconnect_ReadKeyValue($$) {
         Attributes:
         <ul>
 				<li><i>disable</i>:<br>         
-                stop communication with Vissmann server  
+                stop communication with Viessmann server  
             </li>
             <li><i>verbose</i>:<br>         
                 set the verbosity level  
