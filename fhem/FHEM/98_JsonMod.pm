@@ -642,7 +642,7 @@ sub JsonMod_ApiResponse {
 	JsonMod_Logger($hash, 4, 'api encoding is %s, designated encoder is %s', $encoding, $enc);
 
 	# JsonP handling
-	my ($jsonP, $remain, $jsFn) = extract_codeblock($data, '()', '(?s)^[^(]+');
+	my ($jsonP, $remain, $jsFn) = extract_codeblock($data, '()', '(?s)^[^([{]+');
 	if ($jsonP and $jsonP =~ m/^\((.*)\)$/ and $1) {
 		$data = $1;
 	};
