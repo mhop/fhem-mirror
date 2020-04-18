@@ -66,7 +66,7 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 use Time::Local;
-our $VERSION = '1.6.6';
+our $VERSION = '1.6.7';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -316,7 +316,7 @@ sub Set($@) {
 
         my $duration = join( " ", @args );
         $payload = '"name":"start_override_timer","parameters":{"duration":'
-          . $duration . '}';
+          . $duration * 60 . '}';
 
     }
     elsif ( lc $cmd eq 'startpoint' ) {
@@ -368,7 +368,7 @@ sub Set($@) {
             '"properties":{"name":"watering_timer_'
           . $valve_id
           . '","value":{"state":"manual","duration":'
-          . $duration
+          . $duration * 60
           . ',"valve_id":'
           . $valve_id . '}}';
     }
@@ -396,7 +396,7 @@ sub Set($@) {
 
         my $list = '';
         $list .=
-'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,60,1440 startpoint'
+'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,1,60 startpoint'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
 
         $list .= 'manualOverride:slider,0,1,59 cancelOverride:noArg'
@@ -680,7 +680,7 @@ sub ReadingLangGerman($$) {
         'paused'               => 'pausiert',
         'ok_searching'         => 'suche Ladestation',
         'ok_charging'          => 'lädt',
-        'ok_leaving'           => 'mähen',
+        'ok_leaving'           => 'unterwegs zum Startpunkt',
         'wait_updating'        => 'wird aktualisiert ...',
         'wait_power_up'        => 'wird eingeschaltet ...',
         'parked_timer'         => 'geparkt nach Zeitplan',

@@ -63,7 +63,7 @@ use POSIX;
 use FHEM::Meta;
 
 use HttpUtils;
-our $VERSION = '1.6.7';
+our $VERSION = '1.6.8';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
@@ -1126,7 +1126,8 @@ sub createHttpValueStrings($@) {
     if ( $payload eq '{}' ) {
         $method = 'GET';
         $uri .= '/locations/?user_id=' . $hash->{helper}{user_id}
-          if ( not defined( $hash->{helper}{locations_id} ) );
+          if (  exists($hash->{helper}{user_id})
+            and not defined( $hash->{helper}{locations_id} ) );
         readingsSingleUpdate( $hash, 'state', 'fetch locationId', 1 )
           if ( not defined( $hash->{helper}{locations_id} ) );
         $uri .= '/sessions' if ( not defined( $hash->{helper}{session_id} ) );
