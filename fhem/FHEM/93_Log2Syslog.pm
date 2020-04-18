@@ -51,12 +51,10 @@ BEGIN {
   GP_Import( 
       qw(
           attr
-          AttrVal
-          readingFnAttributes
+          AttrVal 
+          currlogfile                        # String-Variable
           CommandDelete
           defs
-          logInform
-          readyfnlist
           deviceEvents
           devspec2array
           DoTrigger
@@ -65,11 +63,15 @@ BEGIN {
           init_done
           InternalTimer
           IsDisabled
+          logInform
+          logopened                          # String-Variable
           Log3            
           modules   
           notifyRegexpChanged 
           OpenLogfile
-          perlSyntaxCheck          
+          perlSyntaxCheck  
+          readyfnlist    
+          readingFnAttributes          
           RemoveInternalTimer
           readingsBeginUpdate
           readingsBulkUpdate
@@ -83,7 +85,7 @@ BEGIN {
           TcpServer_Accept
           TcpServer_Close
           TcpServer_SetSSL
-          TimeNow          
+          TimeNow            
       )
   );
   
@@ -98,12 +100,13 @@ BEGIN {
       qw(
           Initialize
       )
-);
-  
+  );
+
 }
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.0" => "16.04.2020  improve IETF octet count again, internal code changes for PBP ",
   "5.11.0" => "14.04.2020  switch to packages, improve IETF octet count ",
   "5.10.3" => "11.04.2020  new reading 'Parse_Err_LastData', change octet count read ",
   "5.10.2" => "08.04.2020  code changes to stabilize send process, minor fixes ",
@@ -331,11 +334,6 @@ my %vHintsExt_de = (
   "2" => "Die Grundlagen des <a href=\"https://tools.ietf.org/html/rfc3164\">RFC3164 (BSD)</a> Protokolls",
   "1" => "Informationen über das <a href=\"https://tools.ietf.org/html/rfc5424\">RFC5424 (IETF)</a> Syslog Protokoll"
 );
-                  
-###############################################################################
-# Forward declarations
-#
-# sub Log3slog;
 
 ###############################################################################
 sub Initialize {
@@ -416,13 +414,13 @@ sub Define {
       setidrex($hash,$a[4]) if($a[4]);
       setidrex($hash,$a[5]) if($a[5]);
       
-      eval { "Hallo" =~ m/^$hash->{HELPER}{EVNTLOG}$/ } if($hash->{HELPER}{EVNTLOG});
+      eval { "Hallo" =~ m/^$hash->{HELPER}{EVNTLOG}$/x } if($hash->{HELPER}{EVNTLOG});
       return "Bad regexp: $@" if($@);
-      eval { "Hallo" =~ m/^$hash->{HELPER}{FHEMLOG}$/ } if($hash->{HELPER}{FHEMLOG});
+      eval { "Hallo" =~ m/^$hash->{HELPER}{FHEMLOG}$/x } if($hash->{HELPER}{FHEMLOG});
       return "Bad regexp: $@" if($@);
   
       return "Bad regexp: starting with *" 
-         if((defined($hash->{HELPER}{EVNTLOG}) && $hash->{HELPER}{EVNTLOG} =~ m/^\*/) || (defined($hash->{HELPER}{FHEMLOG}) && $hash->{HELPER}{FHEMLOG} =~ m/^\*/));
+         if((defined($hash->{HELPER}{EVNTLOG}) && $hash->{HELPER}{EVNTLOG} =~ m/^\*/x) || (defined($hash->{HELPER}{FHEMLOG}) && $hash->{HELPER}{FHEMLOG} =~ m/^\*/x));
   
       # nur Events dieser Devices an NotifyFn weiterleiten, NOTIFYDEV wird gesetzt wenn möglich
       notifyRegexpChanged($hash, $hash->{HELPER}{EVNTLOG}) if($hash->{HELPER}{EVNTLOG});
@@ -555,8 +553,7 @@ sub Read {
       $len = $RFC5425len{DL};     
   } 
 
-  if($hash->{TEMPORARY}) {
-      # temporäre Instanz angelegt durch TcpServer_Accept
+  if($hash->{TEMPORARY}) {                                              # temporäre Instanz angelegt durch TcpServer_Accept
       ($st,$data,$hash) = getIfData($hash,$len,$mlen,$reread);
   }
   
@@ -571,8 +568,9 @@ sub Read {
   
   if($data) {                                                           # parse Payload 
       my (@load,$ocount,$msg,$tail);
-      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {                  # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/sx) {                  # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
+          use bytes;
           my $i   = 0;
           $ocount = $+{ocount};
           $tail   = $+{tail}; 
@@ -581,7 +579,7 @@ sub Read {
           if(length($tail) >= $ocount) {
               $tail = substr($tail,$ocount);
           } else {
-              $tail = "";
+              $tail = substr($tail,length($msg));
           }
           
           Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
@@ -589,7 +587,7 @@ sub Read {
           Log3slog ($hash, 5, "Log2Syslog $name -> LENGTH_MSG$i: ".length($msg)); 
           Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i      : $tail");
           
-          while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>.*)/s) {
+          while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>.*)/sx) {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
@@ -599,7 +597,7 @@ sub Read {
               if(length($tail) >= $ocount) {
                   $tail = substr($tail,$ocount);
               } else {
-                  $tail = "";
+                  $tail = substr($tail,length($msg));
               }   
               
               Log3slog ($hash, 5, "Log2Syslog $name -> OCTETCOUNT$i: $ocount"); 
@@ -611,7 +609,7 @@ sub Read {
       } else {
           @load = split("[\r\n]",$data);
       }
-      
+
       for my $line (@load) {
           next if(!$line);      
           ($err,$ignore,$sev,$phost,$ts,$pl) = parsePayload($hash,$line);       
@@ -624,12 +622,12 @@ sub Read {
           } elsif ($ignore) {
               Log3slog ($hash, 5, "Log2Syslog $name -> dataset was ignored by parseFn");
           } else {
-              return if($sevevt && $sevevt !~ m/$sev/);                                 # Message nicht berücksichtigen
+              return if($sevevt && $sevevt !~ m/$sev/x);                                # Message nicht berücksichtigen
               $st = "active";
               if($mevt =~ /intern/) {                                                   # kein Reading, nur Event
                   $pl = "$phost: $pl";
                   Trigger($hash,$ts,$pl);
-              } elsif ($mevt =~ /reading/) {                                            # Reading, Event abhängig von event-on-.*
+              } elsif ($mevt =~ /reading/x) {                                           # Reading, Event abhängig von event-on-.*
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 1);
               } else {                                                                  # Reading ohne Event
                   readingsSingleUpdate($hash, "MSG_$phost", $pl, 0);
@@ -837,17 +835,18 @@ sub parsePayload {
   
   my $year = strftime "%Y", localtime;                                              # aktuelles Jahr
   
-  if($pp =~ /^Automatic/) {
+  if($pp =~ /^Automatic/x) {
       Log3slog($name, 4, "Log2Syslog $name - Analyze message format automatically ...");
-      $pp   = "raw"; 
-      $data =~ /^<(?<prival>\d{1,3})>(?<tail>\w{3}).*$/;
-      $tail = $+{tail};
+      $pp     = "raw"; 
+      $data   =~ /^<(?<prival>\d{1,3})>(?<tail>\w{3}).*$/x;
+      $prival = $+{prival};
+      $tail   = $+{tail};
       # Test auf BSD-Format
-      if($tail && " Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec " =~ /\s$tail\s/) {
+      if($tail && " Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec " =~ /\s$tail\s/x) {
           $pp = "BSD";
       } else {
           # Test auf IETF-Format
-          $data   =~ /^((?<ocount>(\d+))\s)?<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2}).*$/;
+          $data   =~ /^((?<ocount>(\d+))\s)?<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2}).*$/x;
           $ocount = $+{ocount};      # can octet count
           $prival = $+{prival};      # must
           $date   = $+{date};        # must
@@ -870,10 +869,10 @@ sub parsePayload {
   } elsif ($pp eq "BSD") { 
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
       # Beispiel data "<$prival>$month $day $time $myhost $id: $otp"
-      $data   =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/;
+      $data   =~ /^<(?<prival>\d{1,3})>(?<tail>.*)$/x;
       $prival = $+{prival};        # must
       $tail   = $+{tail}; 
-      $tail   =~ /^((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<tail>.*)$/;
+      $tail   =~ /^((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<tail>.*)$/x;
       $Mmm    = $+{month};         # can
       $dd     = $+{day};           # can
       $time   = $+{time};          # can
@@ -885,11 +884,11 @@ sub parsePayload {
       }      
       if($ts) {
           # Annahme: wenn Timestamp gesetzt, wird der Rest der Message ebenfalls dem Standard entsprechen
-          $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/;
+          $tail =~ /^(?<host>[^\s]*)?\s(?<tail>.*)$/x;
           $host = $+{host};          # can 
           $tail = $+{tail};
           # ein TAG-Feld (id) ist so aufgebaut->  sshd[27010]:
-          $tail =~ /^((?<id>(\w+\[\w+\])):)?\s(?<cont>(.*))$/; 
+          $tail =~ /^((?<id>(\w+\[\w+\])):)?\s(?<cont>(.*))$/x; 
           $id   = $+{id};            # can
           if($id) {
               $id   = substr($id,0, ($RFC3164len{TAG}-1));           # Länge TAG-Feld nach RFC begrenzen
@@ -906,7 +905,7 @@ sub parsePayload {
           $err = 1;
           Log3slog ($hash, 2, "Log2Syslog $name - ERROR parse msg -> $data");  
       } else {
-          $cont =~ s/^(:\s*)(.*)$/$2/;
+          $cont =~ s/^(:\s*)(.*)$/$2/x;
           if(looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
               $severity = $prival-($facility*8);
@@ -938,21 +937,22 @@ sub parsePayload {
       # IETF Protokollformat https://tools.ietf.org/html/rfc5424 
       # Beispiel data "<14>1 2018-08-09T21:45:08+02:00 SDS1 Connection - - [synolog@6574 synotype="Connection" luser="apiuser" event="User [apiuser\] logged in from [192.168.2.45\] via [DSM\]."][meta sequenceId="1"] ﻿apiuser: User [apiuser] logged in from [192.168.2.45] via [DSM].";
       # $data =~ /^<(?<prival>\d{1,3})>(?<ietf>\d+)\s(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})\S*\s(?<host>\S*)\s(?<id>\S*)\s(?<pid>\S*)\s(?<mid>\S*)\s(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
-      $data   =~ /^((?<ocount>(\d+))\s)?<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s(?<cont>.*)$/;
+      $data   =~ /^((?<ocount>(\d+))\s)?<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s(?<cont>.*)$/x;
       $ocount = $+{ocount};      # can (octet count)
       $prival = $+{prival};      # must
       $ietf   = $+{ietf};        # should      
       if($ocount) {
+          use bytes;
           $data = substr($data,1+length($ocount),$ocount);
-          Log3slog ($hash, 4, "Log2Syslog $name - IETF second level Octet Count Datagramm detected");
+          Log3slog ($hash, 4, "Log2Syslog $name - IETF second level Octet Count Datagramm detected...");
           Log3slog ($hash, 4, "Log2Syslog $name - OCTETCOUNT: $ocount");
-          Log3slog ($hash, 4, "Log2Syslog $name - MSG: $data");
+          Log3slog ($hash, 4, "Log2Syslog $name - MSG       : $data");
       }
       
       if($prival && $ietf) {
           # Standard IETF-Syslog incl. VERSION
           if($ietf == 1) {
-              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/;
+              $data    =~ /^<(?<prival>\d{1,3})>(?<ietf>\d{0,2})\s?(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))\s(?<cont>.*)$/x;
               $prival  = $+{prival};      # must
               $ietf    = $+{ietf};        # should
               $date    = $+{date};        # must
@@ -971,7 +971,7 @@ sub parsePayload {
           }
       } else {
           # IETF-Syslog ohne VERSION
-          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/;
+          $data    =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})T(?<time>\d{2}:\d{2}:\d{2})(?<msec>\.\d+)?(?<to>\S*)?\s(?<host>\S*)\s(?<id>\S*)\s?(?<pid>\S*)\s?(?<mid>\S*)\s?(?<sdfield>(\[.*?(?!\\\]).\]|-))?\s(?<cont>.*)$/x;
           $prival  = $+{prival};      # must
           $date    = $+{date};        # must
           $time    = $+{time};        # must
@@ -1028,7 +1028,7 @@ sub parsePayload {
   } elsif ($pp eq "TPLink-Switch") {
       # Parser für TPLink Switch
       # Beispiel data "<131>2018-08-10 09:03:58 10.0.x.y 31890 Login the web by admin on web (10.0.x.y).";
-      $data   =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S*)\s(?<id>\S*)\s(?<cont>.*)$/;
+      $data   =~ /^<(?<prival>\d{1,3})>(?<date>\d{4}-\d{2}-\d{2})\s(?<time>\d{2}:\d{2}:\d{2})\s(?<host>\S*)\s(?<id>\S*)\s(?<cont>.*)$/x;
       $prival = $+{prival};      # must
       $date   = $+{date};        # must
       $time   = $+{time};        # must
@@ -1073,7 +1073,7 @@ sub parsePayload {
       # Parser UniFi Controller Syslog (BSD Format) und Netconsole Messages, getestet mit UniFi AP-AC-Lite
       # Bsp raw message -> <30>Apr  1 14:28:56 U7LT,18e829a6549a,v4.0.80.10875: hostapd: ath0: STA 3c:71:bf:2c:80:7d RADIUS: starting accounting session EC85E55866B13F6F
       $ts     = TimeNow();
-      $data   =~ /^<(?<prival>\d{1,3})>((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<host>[^\s]*)?\s((:)?(?<id>([^:]*)):)?(?<cont>.*)$/;
+      $data   =~ /^<(?<prival>\d{1,3})>((?<month>\w{3})\s+(?<day>\d{1,2})\s+(?<time>\d{2}:\d{2}:\d{2}))?\s+(?<host>[^\s]*)?\s((:)?(?<id>([^:]*)):)?(?<cont>.*)$/x;
       $prival = $+{prival};                      
       if($prival) {                                                      # Syslog-Message
           $Mmm  = $+{month};      
@@ -1131,7 +1131,7 @@ sub parsePayload {
       my $parseFn = AttrVal( $name, "parseFn", "" );
       $ts         = TimeNow();
       
-      if( $parseFn =~ m/^\s*(\{.*\})\s*$/s ) {
+      if( $parseFn =~ m/^\s*(\{.*\})\s*$/sx ) {
           $parseFn = $1;
       } else {
           $parseFn = '';
@@ -1159,10 +1159,10 @@ sub parsePayload {
               $err = 1;
           }
                  
-          $prival  = $PRIVAL  if($PRIVAL =~ /\d{1,3}/);
-          $date    = $DATE    if($DATE   =~ /^(\d{4})-(\d{2})-(\d{2})$/);
-          $time    = $TIME    if($TIME   =~ /^(\d{2}):(\d{2}):(\d{2})$/);          
-          $ts      = ($TS =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/) ? $TS : ($date && $time) ? "$date $time" : $ts;
+          $prival  = $PRIVAL  if($PRIVAL =~ /\d{1,3}/x);
+          $date    = $DATE    if($DATE   =~ /^(\d{4})-(\d{2})-(\d{2})$/x);
+          $time    = $TIME    if($TIME   =~ /^(\d{2}):(\d{2}):(\d{2})$/x);          
+          $ts      = ($TS =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/x) ? $TS : ($date && $time) ? "$date $time" : $ts;
           $host    = $HOST    if(defined $HOST);
           $id      = $ID      if(defined $ID);
           $pid     = $PID     if(defined $PID);
@@ -1171,7 +1171,7 @@ sub parsePayload {
           $fac     = $FAC     if(defined $FAC);
           $sev     = $SEV     if(defined $SEV);
           $sdfield = $SDFIELD if(defined $SDFIELD);
-          $ignore  = $IGNORE  if($IGNORE =~ /\d/);
+          $ignore  = $IGNORE  if($IGNORE =~ /\d/x);
           
           if($prival && looks_like_number($prival)) {
               $facility = int($prival/8) if($prival >= 0 && $prival <= 191);
@@ -1236,9 +1236,9 @@ sub getTimeFromOffset {
  
  my $tz = AttrVal($name, "timeSpec", "Local");
  
- my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/;
+ my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/x;
  return $dt if(!$year || !$month || !$mday);
- my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/;
+ my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/x;
  return $dt if(!$hour || !$min || !$sec);
  
  $year -= 1900;
@@ -1246,7 +1246,7 @@ sub getTimeFromOffset {
  
  my ($offset,$utc);
  my $localts = fhemTimeLocal($sec, $min, $hour, $mday, $month, $year);
- $localts   .= $msec if($msec && $msec =~ /^\.\d+/);
+ $localts   .= $msec if($msec && $msec =~ /^\.\d+/x);
 
  if($to =~ /Z/ && $tz ne "UTC") {                      # Zulu Time wurde geliefert -> Umrechnung auf Local
      $offset = fhemTzOffset($localts);                 # Offset zwischen Localtime und UTC
@@ -1254,7 +1254,7 @@ sub getTimeFromOffset {
      $dt     = strftime ("%Y-%m-%d %H:%M:%S", localtime($utc));
  }
  
- if($to =~ /[+-:0-9]/) {
+ if($to =~ /[+-:0-9]/x) {
      my $sign  = substr($to, 0, 1);
      $to       = substr $to, 1;
      my($h,$m) = split(":", $to);
@@ -1456,12 +1456,12 @@ sub Get {
       $ret  = "<html>";
   
       # Hints
-      if(!$prop || $prop =~ /hints/i || $prop =~ /[\d]+/) {
+      if(!$prop || $prop =~ /hints/i || $prop =~ /[\d]+/x) {
           $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
           $ret .= "<table class=\"block wide internals\">";
           $ret .= "<tbody>";
           $ret .= "<tr class=\"even\">";  
-          if($prop && $prop =~ /[\d]+/) {
+          if($prop && $prop =~ /[\d]+/x) {
               my @hints = split q{,},$prop;
               foreach (@hints) {
                   if(AttrVal("global","language","EN") eq "DE") {
@@ -1541,11 +1541,11 @@ sub Attr {
     # $name is device name
     # aName and aVal are Attribute name and value
 
-    if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/ && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/x && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/x) {
          return qq{"$aName" is only valid for model "Collector"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/ && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/) {
+    if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/x && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/x) {
          return qq{"$aName" is only valid for model "Sender"};
     }
     
@@ -1597,7 +1597,7 @@ sub Attr {
     }
     
     if ($aName =~ /rateCalcRerun/) {
-        unless ($aVal =~ /^[0-9]+$/) { return "Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
+        unless ($aVal =~ /^[0-9]+$/x) { return "Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         return qq{Value of "$aName" must be >= 60. Please correct it} if($aVal < 60);
         RemoveInternalTimer($hash, \&calcTrate);
         InternalTimer(gettimeofday()+5, \&calcTrate, $hash, 0);
@@ -1605,7 +1605,7 @@ sub Attr {
     
     if ($cmd eq "set") {
         if($aName =~ /port/) {
-            if($aVal !~ m/^\d+$/) { return " The Value of \"$aName\" is not valid. Use only figures !";}
+            if($aVal !~ m/^\d+$/x) { return " The Value of \"$aName\" is not valid. Use only figures !";}
             
             $hash->{HELPER}{MEMLOCK} = 1;
             InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);
@@ -1621,7 +1621,7 @@ sub Attr {
         }
         
         if($aName =~ /timeout/) {
-            if($aVal !~ m/^\d+(.\d+)?$/) { return qq{The value of "$aName" is not valid. Use only integer or fractions of numbers like "0.7".}; }
+            if($aVal !~ m/^\d+(.\d+)?$/x) { return qq{The value of "$aName" is not valid. Use only integer or fractions of numbers like "0.7".}; }
         }
     }
     
@@ -1643,7 +1643,7 @@ sub Attr {
     }
     
     if ($cmd eq "set" && $aName =~ /parseFn/) {
-         return qq{The function syntax is wrong. "$aName" must be enclosed by "{...}".} if($aVal !~ m/^\{.*\}$/s);
+         return qq{The function syntax is wrong. "$aName" must be enclosed by "{...}".} if($aVal !~ m/^\{.*\}$/sx);
          my %specials = (
              "%IGNORE"  => "0",
              "%DATA"    => "1",
@@ -1683,7 +1683,7 @@ sub Attr {
     
     if ($aName =~ /makeEvent/) {
         for my $key(keys%{$defs{$name}{READINGS}}) {
-            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_.*/);
+            delete($defs{$name}{READINGS}{$key}) if($key !~ /state|Transfered_logs_per_minute|SSL_.*|Parse_.*/x);
         }
     }    
     
@@ -1699,7 +1699,7 @@ sub DbLogSplit {
   my ($reading, $value, $unit);
 
   # sds1.myds.me: <14>Jul 19 21:16:58 SDS1 Connection: User [Heiko] from [SFHEIKO1(192.168.2.205)] via [CIFS(SMB3)] accessed shared folder [photo].
-  ($reading,$value) = split(/: /,$event,2);
+  ($reading,$value) = split(/: /x,$event,2);
   $unit             = "";
   
 return ($reading, $value, $unit);
@@ -1744,11 +1744,11 @@ sub eventLog {
       my $tim          = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
       my ($date,$time) = split q{ }, $tim;
   
-      if($n =~ m/^$rex$/ || "$n:$txt" =~ m/^$rex$/ || "$tim:$n:$txt" =~ m/^$rex$/) {
+      if($n =~ m/^$rex$/x || "$n:$txt" =~ m/^$rex$/x || "$tim:$n:$txt" =~ m/^$rex$/x) {
           my $otp             = "$n $txt";
           $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
           ($prival,$sevAstxt) = setPrival($hash,$txt);
-          if($sendsev && $sendsev !~ m/$sevAstxt/) {                                 # nicht senden wenn Severity nicht in "respectSeverity" enthalten
+          if($sendsev && $sendsev !~ m/$sevAstxt/x) {                                 # nicht senden wenn Severity nicht in "respectSeverity" enthalten
               Log3slog ($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
               next;        
           }
@@ -1799,14 +1799,14 @@ sub fhemLog {
     
   my ($date,$time,$vbose,undef,$txt) = split(" ",$raw,5);
   $txt    = charFilter($hash,$txt);
-  $date   =~ s/\./-/g;
+  $date   =~ s/\./-/gx;
   my $tim = $date." ".$time;
   
-  if($txt =~ m/^$rex$/ || "$vbose: $txt" =~ m/^$rex$/) {
+  if($txt =~ m/^$rex$/x || "$vbose: $txt" =~ m/^$rex$/x) {
       my $otp             = "$vbose: $txt";
       $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
       ($prival,$sevAstxt) = setPrival($hash,$txt,$vbose);
-      if($sendsev && $sendsev !~ m/$sevAstxt/) {
+      if($sendsev && $sendsev !~ m/$sevAstxt/x) {
           # nicht senden wenn Severity nicht in "respectSeverity" enthalten
           Log3slog ($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
           return;        
@@ -1818,8 +1818,8 @@ sub fhemLog {
       ($sock,$st) = openSocket($hash,0);
       
       if ($sock) {
-          my $err = writeToSocket ($name,$sock,$data,$pid);
-          $st     = $err if($err); 
+          $err = writeToSocket ($name,$sock,$data,$pid);
+          $st  = $err if($err); 
           
           closeSocket($hash) if($uef);
       }
@@ -1850,7 +1850,7 @@ sub sendTestMsg {
   } else {   
       $ts = TimeNow();
       ($date,$time) = split q{ }, $ts;
-      $date =~ s/\./-/g;
+      $date =~ s/\./-/gx;
       $tim = $date." ".$time;
     
       $otp    = "Test message from FHEM Syslog Client from ($hash->{MYHOST})";
@@ -1891,9 +1891,9 @@ return;
 sub setidrex { 
   my ($hash,$a) = @_;
      
-  $hash->{HELPER}{EVNTLOG} = (split("event:",$a))[1] if(lc($a) =~ m/^event:.*/);
-  $hash->{HELPER}{FHEMLOG} = (split("fhem:", $a))[1] if(lc($a) =~ m/^fhem:.*/);
-  $hash->{HELPER}{IDENT}   = (split("ident:",$a))[1] if(lc($a) =~ m/^ident:.*/);
+  $hash->{HELPER}{EVNTLOG} = (split("event:",$a))[1] if(lc($a) =~ m/^event:.*/x);
+  $hash->{HELPER}{FHEMLOG} = (split("fhem:", $a))[1] if(lc($a) =~ m/^fhem:.*/x);
+  $hash->{HELPER}{IDENT}   = (split("ident:",$a))[1] if(lc($a) =~ m/^ident:.*/x);
   
 return;
 }
@@ -1906,14 +1906,14 @@ sub charFilter {
   my $name   = $hash->{NAME};
 
   # nur erwünschte Zeichen in payload, ASCII %d32-126
-  $txt =~ s/ß/ss/g;
-  $txt =~ s/ä/ae/g;
-  $txt =~ s/ö/oe/g;
-  $txt =~ s/ü/ue/g;
-  $txt =~ s/Ä/Ae/g;
-  $txt =~ s/Ö/Oe/g;
-  $txt =~ s/Ü/Ue/g;
-  $txt =~ s/€/EUR/g;
+  $txt =~ s/ß/ss/gx;
+  $txt =~ s/ä/ae/gx;
+  $txt =~ s/ö/oe/gx;
+  $txt =~ s/ü/ue/gx;
+  $txt =~ s/Ä/Ae/gx;
+  $txt =~ s/Ö/Oe/gx;
+  $txt =~ s/Ü/Ue/gx;
+  $txt =~ s/€/EUR/gx;
   $txt =~ tr/ A-Za-z0-9!"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~//cd;      
   
 return($txt);
@@ -2133,14 +2133,14 @@ sub setPrival {
       my $ees = AttrVal($name, "exclErrCond", "");
       if($ees) {
           $ees = trim($ees);
-          $ees =~ s/[\n]//g;
-          $ees =~ s/,,/_ESC_/g;
+          $ees =~ s/[\n]//gx;
+          $ees =~ s/,,/_ESC_/gx;
           my @excl = split(",",$ees);
           for my $e (@excl) {
               # Negativliste abarbeiten
               $e =~ s/_ESC_/,/g;
               trim($e);
-              $do = 0 if($txt =~ m/^$e$/);        
+              $do = 0 if($txt =~ m/^$e$/x);        
           }
       }
       $sv = 3 if($do); 
@@ -2175,9 +2175,9 @@ sub setPayload {
   
   if ($lf eq "BSD") {
       # BSD Protokollformat https://tools.ietf.org/html/rfc3164
-      $time   = (split(/\./,$time))[0] if($time =~ m/\./);   # msec ist nicht erlaubt
+      $time   = (split(/\./x,$time))[0] if($time =~ m/\./x); # msec ist nicht erlaubt
       $month  = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
-      $day    =~ s/0/ / if($day =~ m/^0.*$/);                # in Tagen < 10 muss 0 durch Space ersetzt werden
+      $day    =~ s/0/ / if($day =~ m/^0.*$/x);               # in Tagen < 10 muss 0 durch Space ersetzt werden
       my $tag = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
       no warnings 'uninitialized';                           ##no critic
       $tag  = $tag."[$pid]: ".$cdl;                          # TAG-Feld um PID und Content-Delimiter ergänzen
@@ -2208,7 +2208,7 @@ sub setPayload {
       use warnings;
   }
   
-  if($data =~ /\s$/) {$data =~ s/\s$//;}
+  if($data =~ /\s$/x) {$data =~ s/\s$//x;}
   $data = $data."\n";
   my $dl = length($data);                               # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
   
@@ -2235,9 +2235,9 @@ sub timeToRFC3339 {
  my $dt = $date."T".$time;
  my $tz = AttrVal($name, "timeSpec", "Local");
  
- my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/;
+ my ($year,$month,$mday) = $date =~ /(\d{4})-(\d{2})-(\d{2})/x;
  return $dt if(!$year || !$month ||!$mday);
- my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/;
+ my ($hour,$min,$sec)    = $time =~ /(\d{2}):(\d{2}):(\d{2})/x;
  return $dt if(!$hour || !$min ||!$sec);
  
  $year -= 1900;
@@ -2249,7 +2249,7 @@ sub timeToRFC3339 {
  my $offset  = fhemTzOffset($localts);
  
  if($tz ne "UTC") {                                                # Offset zwischen Localtime und UTC ermitteln und an Zeit anhängen    
-     if($offset =~ /[+-]/) {
+     if($offset =~ /[+-]/x) {
          $sign   = substr($offset, 0, 1);
          $offset = substr $offset, 1;
      }
@@ -2272,7 +2272,6 @@ return ($dt);
 ###############################################################################
 sub Log3slog {
   my ($dev, $loglevel, $text) = @_;
-  our ($logopened,$currlogfile);
   
   $dev = $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
      
@@ -2405,11 +2404,11 @@ sub sortVersion {
 
   my @sorted = map {$_->[0]}
                sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./]} @versions;
+               map {[$_, pack "C*", split /\./x]} @versions;
              
   @sorted = map {join ".", unpack "C*", $_}
             sort
-            map {pack "C*", split /\./} @versions;
+            map {pack "C*", split /\./x} @versions;
   
   if($sseq eq "desc") {
       @sorted = reverse @sorted;
@@ -2436,7 +2435,7 @@ sub setVersionInfo {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{Log2Syslog}{META}}
       if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
@@ -2459,7 +2458,7 @@ return;
 sub trim {
  my $str = shift;
  
- $str =~ s/^\s+|\s+$//g;
+ $str =~ s/^\s+|\s+$//gx;
  
 return ($str);
 }

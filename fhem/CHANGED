@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_Log2Syslog: improve IETF octet count, some code changes for PBP
  - feature: 66_EseraOneWire: support multi sensor 11133
  - change:  59_WUup: switch to packages
  - feature: 72_FB_CALLMONITOR: new attribute "internal-number-filter" to
