@@ -52,7 +52,7 @@ BEGIN {
       qw(
           attr
           AttrVal 
-          currlogfile                        # String-Variable
+          currlogfile                        
           CommandDelete
           defs
           deviceEvents
@@ -64,7 +64,7 @@ BEGIN {
           InternalTimer
           IsDisabled
           logInform
-          logopened                          # String-Variable
+          logopened                          
           Log3            
           modules   
           notifyRegexpChanged 
@@ -86,7 +86,7 @@ BEGIN {
           TcpServer_Close
           TcpServer_SetSSL
           TimeNow            
-      )
+        )
   );
   
   # Export to main context with different name
