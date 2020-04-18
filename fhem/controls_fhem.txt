@@ -1,4 +1,4 @@
-REV 21706
+REV 21711
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2020-04-17_07:45:02 337412 ./CHANGED
 UPD 2020-04-16_07:45:03 42122 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-04-14_07:45:12 161240 ./fhem.pl
+UPD 2020-04-18_07:45:11 161307 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-04-14_07:45:03 57876 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -498,7 +498,7 @@ UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
 UPD 2020-01-13_07:45:03 188373 FHEM/98_Installer.pm
 UPD 2020-03-26_07:45:03 4873 FHEM/98_JsonList2.pm
-UPD 2020-04-16_07:45:03 51745 FHEM/98_JsonMod.pm
+UPD 2020-04-18_07:45:02 51747 FHEM/98_JsonMod.pm
 UPD 2020-01-09_07:45:02 43856 FHEM/98_MAX_Temperature.pm
 UPD 2016-03-12_07:45:14 49251 FHEM/98_MaxScanner.pm
 UPD 2019-08-17_07:45:03 34506 FHEM/98_MediaList.pm
@@ -563,7 +563,7 @@ UPD 2020-03-10_07:45:03 89436 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
-UPD 2020-04-13_07:45:02 88584 FHEM/98_vitoconnect.pm
+UPD 2020-04-18_07:45:02 88263 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
 UPD 2020-03-08_07:45:03 66390 FHEM/98_weekprofile.pm
 UPD 2019-02-26_07:45:02 21036 FHEM/99_SUNRISE_EL.pm
@@ -717,9 +717,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2020-04-15_07:45:02 6864 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-04-18_07:45:02 6742 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-04-13_07:45:02 148569 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-04-18_07:45:02 148569 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -743,12 +743,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-04-17_07:45:06 4258980 docs/commandref.html
+UPD 2020-04-18_07:45:06 4258985 docs/commandref.html
 UPD 2020-04-17_07:45:08 2631306 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-03-14_07:45:02 89858 docs/commandref_frame_DE.html
-UPD 2020-04-17_07:45:09 230950 docs/commandref_modular.html
-UPD 2020-04-17_07:45:10 241884 docs/commandref_modular_DE.html
+UPD 2020-04-18_07:45:09 230951 docs/commandref_modular.html
+UPD 2020-04-18_07:45:10 241885 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
