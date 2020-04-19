@@ -5831,7 +5831,8 @@ goodReadingName($)
 {
   my ($name) = @_;
   return undef if(!$name);
-  return ($name =~ m/^[a-z0-9._\-\/]+$/i || $name =~ m/^\./);
+  return ($name =~ m/^[a-z0-9._\-\/]+$/i || 
+          $name =~ m/^\.[^\s]*$/);
 }
 
 sub
@@ -5839,7 +5840,10 @@ makeReadingName($) # Convert non-valid characters to _
 {
   my ($name) = @_;
   $name = "UNDEFINED" if(!defined($name));
-  return $name if($name =~ m/^\./);
+  if($name =~ m/^\./) {
+    $name =~ s/\s/_/g;
+    return $name;
+  }
   $name =~ s/[^a-z0-9._\-\/]/_/gi;
   return $name;
 }
