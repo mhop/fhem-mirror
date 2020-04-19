@@ -2416,7 +2416,12 @@ CommandSetReading($$)
     my $b1 = $b[1];
     return "$sdev: bad reading name '$b1' (allowed chars: A-Za-z/\\d_\\.-)"
       if(!goodReadingName($b1));
-    readingsSingleUpdate($defs{$sdev}, $b1, $b[2], 1);
+
+    if($hash->{".updateTime"}) { # Called from userReadings, #110375
+      setReadingsVal($hash, $b1, $b[2], TimeNow());
+    } else {
+      readingsSingleUpdate($hash, $b1, $b[2], 1);
+    }
   }
   return join("\n", @rets);
 }
