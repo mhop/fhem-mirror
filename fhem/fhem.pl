@@ -2418,7 +2418,8 @@ CommandSetReading($$)
       if(!goodReadingName($b1));
 
     if($hash->{".updateTime"}) { # Called from userReadings, #110375
-      setReadingsVal($hash, $b1, $b[2], TimeNow());
+      Log 1, "'setreading $def' called form userReadings is prohibited";
+      return;
     } else {
       readingsSingleUpdate($hash, $b1, $b[2], 1);
     }
