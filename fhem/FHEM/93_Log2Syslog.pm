@@ -462,11 +462,11 @@ sub initServer {
   my $hash           = $defs{$name};
   my $err;
 
-  RemoveInternalTimer($hash, \&initServer);
+  RemoveInternalTimer($hash, "FHEM::Log2Syslog::initServer");
   return if(IsDisabled($name) || $hash->{SERVERSOCKET});
   
   if($init_done != 1 || isMemLock($hash)) {
-      InternalTimer(gettimeofday()+1, \&initServer, "$name,$global", 0);
+      InternalTimer(gettimeofday()+1, "FHEM::Log2Syslog::initServer", "$name,$global", 0);
       return;
   }
   
@@ -1398,12 +1398,12 @@ sub Set {
   
   } elsif($opt =~ /reopen/) {
         $hash->{HELPER}{MEMLOCK} = 1;
-        InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);     
+        InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);     
         
         closeSocket ($hash,1);                                                                 # Clientsocket schließen
         downServer  ($hash,1);                                                                 # Serversocket schließen     
         if($hash->{MODEL} =~ /Collector/) {                                                    # Serversocket öffnen
-            InternalTimer(gettimeofday()+0.5, \&deleteMemLock, $hash, 0);  
+            InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);  
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0    
             readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
         }
@@ -1558,12 +1558,12 @@ sub Attr {
         $st = ($do&&$aVal=~/maintenance/)?"maintenance":($do&&$aVal==1)?"disabled":"initialized";
         
         $hash->{HELPER}{MEMLOCK} = 1;
-        InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);
+        InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);
         
         if($do==0 || $aVal=~/maintenance/) {
             if($hash->{MODEL} =~ /Collector/) {
                 downServer($hash,1);                                                 # Serversocket schließen und wieder öffnen
-                InternalTimer(gettimeofday()+0.5, \&initServer, "$name,global", 0);                 
+                InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);                 
             } 
         } else {
             closeSocket($hash,1);                                                    # Clientsocket schließen 
@@ -1586,21 +1586,21 @@ sub Attr {
             }
         }
         $hash->{HELPER}{MEMLOCK} = 1;
-        InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);     
+        InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);     
         
         closeSocket($hash,1);                                                        # Clientsocket schließen
         downServer ($hash,1);                                                        # Serversocket schließen     
         if($hash->{MODEL} =~ /Collector/) {
-            InternalTimer(gettimeofday()+0.5, \&initServer, "$name,global", 0);                # Serversocket öffnen
-            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
+            InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);  # Serversocket öffnen
+            readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                    # Fehlerzähler für Parse-Errors auf 0
         }              
     }
     
     if ($aName =~ /rateCalcRerun/) {
         unless ($aVal =~ /^[0-9]+$/x) { return "Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
         return qq{Value of "$aName" must be >= 60. Please correct it} if($aVal < 60);
-        RemoveInternalTimer($hash, \&calcTrate);
-        InternalTimer(gettimeofday()+5, \&calcTrate, $hash, 0);
+        RemoveInternalTimer($hash, "FHEM::Log2Syslog::calcTrate");
+        InternalTimer(gettimeofday()+5, "FHEM::Log2Syslog::calcTrate", $hash, 0);
     }
     
     if ($cmd eq "set") {
@@ -1608,12 +1608,12 @@ sub Attr {
             if($aVal !~ m/^\d+$/x) { return " The Value of \"$aName\" is not valid. Use only figures !";}
             
             $hash->{HELPER}{MEMLOCK} = 1;
-            InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);
+            InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);
             
             if($hash->{MODEL} =~ /Collector/ && $init_done) {
                 return qq{$aName "$aVal" is not valid because off privileged ports are only usable by super users. Use a port number grater than 1023.} if($aVal < 1024);
                 downServer($hash,1);                                                               # Serversocket schließen
-                InternalTimer(gettimeofday()+0.5, \&initServer, "$name,global", 0);
+                InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);
                 readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
             } elsif ($hash->{MODEL} !~ /Collector/) {
                 closeSocket($hash,1);                                                              # Clientsocket schließen               
@@ -1630,11 +1630,11 @@ sub Attr {
             $attr{$name}{TLS} = 0 if(AttrVal($name, "TLS", 0));        
         }
         $hash->{HELPER}{MEMLOCK} = 1;
-        InternalTimer(gettimeofday()+2, \&deleteMemLock, $hash, 0);
+        InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);
         
         if($hash->{MODEL} eq "Collector") {
             downServer($hash,1);                                                               # Serversocket schließen
-            InternalTimer(gettimeofday()+0.5, \&initServer, "$name,global", 0);
+            InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
             readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
         } else {
@@ -2325,8 +2325,8 @@ sub calcTrate {
       }
   }
   
-RemoveInternalTimer($hash, \&calcTrate);
-InternalTimer(gettimeofday()+$rerun, \&calcTrate, $hash, 0);
+RemoveInternalTimer($hash, "FHEM::Log2Syslog::calcTrate");
+InternalTimer(gettimeofday()+$rerun, "FHEM::Log2Syslog::calcTrate", $hash, 0);
 
 return; 
 }
@@ -2388,7 +2388,7 @@ return ($ret);
 sub deleteMemLock {
   my ($hash) = @_;
   
-  RemoveInternalTimer($hash, \&deleteMemLock);
+  RemoveInternalTimer($hash, "FHEM::Log2Syslog::deleteMemLock");
   delete($hash->{HELPER}{MEMLOCK});
 
 return; 
