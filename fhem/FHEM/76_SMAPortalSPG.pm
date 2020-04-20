@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       76_SMAPortalSPG.pm
 #
-#       (c) 2019 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+#       (c) 2019-2020 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module is used by module 76_SMAPortal to create graphic devices.
 #       It can't be used standalone without any SMAPortal-Device.
@@ -24,16 +24,81 @@
 #       along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #########################################################################################################################
-
-package main;
+package FHEM::SMAPortalSPG;                               ## no critic 'package'
 
 use strict;
 use warnings;
+use GPUtils qw(GP_Import GP_Export);                      # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday);
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1; 
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;         ## no critic 'eval'
+
+# Run before module compilation
+BEGIN {
+  # Import from main::
+  GP_Import( 
+      qw(
+          AnalyzePerlCommand
+          AttrVal
+          AttrNum
+          defs
+          delFromDevAttrList
+          delFromAttrList
+          devspec2array
+          deviceEvents
+          Debug
+          FmtDateTime
+          FmtTime
+          FW_makeImage
+          fhemTimeGm
+          getKeyValue
+          gettimeofday
+          genUUID
+          init_done
+          InternalTimer
+          IsDisabled
+          Log
+          Log3    
+          makeReadingName          
+          modules          
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsDelete
+          readingsEndUpdate
+          ReadingsNum
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          readingFnAttributes
+          setKeyValue
+          sortTopicNum
+          TimeNow
+          Value
+          json2nameValue     
+          FW_directNotify      
+        )
+  );
+  
+  # Export to main context with different name
+  #     my $pkg  = caller(0);
+  #     my $main = $pkg;
+  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+  #     foreach (@_) {
+  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
+  #     }
+  GP_Export(
+      qw(
+          Initialize
+          pageAsHtml
+        )
+  );  
+  
+}
 
 # Versions History intern
-our %SMAPortalSPG_vNotesIntern = (
+my %vNotesIntern = (
+  "1.6.0"  => "19.04.2020  switch to pachages, some improvements according to PBP ",
   "1.5.0"  => "07.07.2019  new attributes headerAlignment, headerDetail ",
   "1.4.0"  => "26.06.2019  support for FTUI-Widget ",
   "1.3.0"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
@@ -43,13 +108,18 @@ our %SMAPortalSPG_vNotesIntern = (
 );
 
 ################################################################
-sub SMAPortalSPG_Initialize($) {
+sub Initialize {
   my ($hash) = @_;
 
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
   
-  $hash->{DefFn}              = "SMAPortalSPG_Define";
-  $hash->{GetFn}              = "SMAPortalSPG_Get";
+  $hash->{DefFn}              = \&Define;
+  $hash->{GetFn}              = \&Get;
+  $hash->{RenameFn}           = \&Rename;
+  $hash->{CopyFn}             = \&Copy;
+  $hash->{FW_summaryFn}       = \&FwFn;
+  $hash->{FW_detailFn}        = \&FwFn;
+  $hash->{AttrFn}             = \&Attr;
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "beamColor:colorpicker,RGB ".
@@ -78,11 +148,7 @@ sub SMAPortalSPG_Initialize($) {
                                 "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".                                
                                 $readingFnAttributes;
-  $hash->{RenameFn}           = "SMAPortalSPG_Rename";
-  $hash->{CopyFn}             = "SMAPortalSPG_Copy";
-  $hash->{FW_summaryFn}       = "SMAPortalSPG_FwFn";
-  $hash->{FW_detailFn}        = "SMAPortalSPG_FwFn";
-  $hash->{AttrFn}             = "SMAPortalSPG_Attr";
+
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
 
   # $hash->{FW_addDetailToSummary} = 1;
@@ -96,7 +162,7 @@ return;
 ###############################################################
 #                  SMAPortalSPG Define
 ###############################################################
-sub SMAPortalSPG_Define($$) {
+sub Define {
   my ($hash, $def) = @_;
   my ($name, $type, $link) = split("[ \t]+", $def, 3);
   
@@ -111,36 +177,39 @@ sub SMAPortalSPG_Define($$) {
   $hash->{LINK}                   = $link;
   
   # Versionsinformationen setzen
-  SMAPortalSPG_setVersionInfo($hash);
+  setVersionInfo($hash);
   
   readingsSingleUpdate($hash,"state", "initialized", 1);                           # Init für "state" 
   
-return undef;
+return;
 }
 
 ###############################################################
 #                  SMAPortalSPG Get
 ###############################################################
-sub SMAPortalSPG_Get($@) {
+sub Get {
  my ($hash, @a) = @_;
  return "\"get X\" needs at least an argument" if ( @a < 2 );
  my $name = shift @a;
  my $cmd  = shift @a;
+ 
+ my $getlist = "Unknown argument $cmd, choose one of ".
+               "html:noArg ".
+               "ftui:noArg ";
        
  if ($cmd eq "html") {
-     return SMAPortalSPG_AsHtml($hash);
+     return pageAsHtml($hash);
  } 
  
  if ($cmd eq "ftui") {
-     return SMAPortalSPG_AsHtml($hash,"ftui");
+     return pageAsHtml($hash,"ftui");
  } 
  
-return undef;
-return "Unknown argument $cmd, choose one of html:noArg";
+return;
 }
 
 ################################################################
-sub SMAPortalSPG_Rename($$) {
+sub Rename {
 	my ($new_name,$old_name) = @_;
     my $hash = $defs{$new_name};
     
@@ -151,7 +220,7 @@ return;
 }
 
 ################################################################
-sub SMAPortalSPG_Copy($$) {
+sub Copy {
 	my ($old_name,$new_name) = @_;
     my $hash = $defs{$new_name};
     
@@ -162,7 +231,7 @@ return;
 }
 
 ################################################################
-sub SMAPortalSPG_Attr($$$$) {
+sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val);
@@ -191,11 +260,11 @@ sub SMAPortalSPG_Attr($$$$) {
         $_[2] = "consumerAdviceIcon";
     }
 
-return undef;
+return;
 }
 
 ################################################################
-sub SMAPortalSPG_FwFn($;$$$) {
+sub FwFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   my $link   = $hash->{LINK};
@@ -227,7 +296,7 @@ sub SMAPortalSPG_FwFn($;$$$) {
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
   my $al = AttrVal($d, "autoRefresh", 0);
   if($al) {  
-      InternalTimer(gettimeofday()+$al, "SMAPortalSPG_refresh", $hash, 0);
+      InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
       Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
 
@@ -235,7 +304,7 @@ return $ret;
 }
 
 ################################################################
-sub SMAPortalSPG_refresh($) { 
+sub pageRefresh { 
   my ($hash) = @_;
   my $d      = $hash->{NAME};
   
@@ -245,7 +314,7 @@ sub SMAPortalSPG_refresh($) {
   
   my $al = AttrVal($d, "autoRefresh", 0);
   if($al) {      
-      InternalTimer(gettimeofday()+$al, "SMAPortalSPG_refresh", $hash, 0);
+      InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
       Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   } else {
       RemoveInternalTimer($hash);
@@ -258,11 +327,11 @@ return;
 #                          Versionierungen des Moduls setzen
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
-sub SMAPortalSPG_setVersionInfo($) {
+sub setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
-  my $v                    = (sortTopicNum("desc",keys %SMAPortalSPG_vNotesIntern))[0];
+  my $v                    = (sortTopicNum("desc",keys %vNotesIntern))[0];
   my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
@@ -292,14 +361,13 @@ return;
 ################################################################
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
-sub SMAPortalSPG_AsHtml($;$) { 
+sub pageAsHtml { 
   my ($hash,$ftui) = @_;
   my $name         = $hash->{NAME};
   my $link         = $hash->{LINK};
   my $height;
 
-  if ($ftui && $ftui eq "ftui") {
-      # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
+  if ($ftui && $ftui eq "ftui") {                                        # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
       my $s = substr($link,0,length($link)-2);
       $link = $s.",'$ftui')}";
   }
