@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.04.20 v0.1.4
+# - CHANGE:  Keepalive aktiviert (cookielogin6)
+#
 # 2020.04.14 v0.1.3
 # - CHANGE:  Mehr Loginfos bei set "NPM_login new" 
 #
@@ -378,7 +381,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.3";
+my $ModulVersion     = "0.1.4";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -2288,6 +2291,7 @@ sub echodevice_SendLoginCommand($$$) {
 		$param->{header}      = 'Cookie: '.$hash->{helper}{".COOKIE"};
 		$param->{callback}    = \&echodevice_ParseAuth;
 		$param->{noshutdown}  = 1;
+		$param->{keepalive}   = 1;
 		$param->{type}        = $type;
 		$param->{hash}        = $hash;
 		$param->{timeout}     = 10;
