@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 #
 #
+#  2.1.3  =>  20.04.20 remove all $_ , add attribut delimiter
 #  2.1.2  =>  16.04.20 remove undef value for ReadingsAge
 #  2.1.1  =>  14.04.20 remove List::Utils
 #  2.1.0  =>  06.04.20
@@ -44,6 +45,7 @@ use warnings;
 use utf8;
 use GPUtils qw(GP_Import GP_Export); # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday);
+
 
 BEGIN
 {
@@ -103,7 +105,9 @@ sub Initialize {
     $hash->{DefFn}     = \&FHEM::readingsWatcher::Define;
     $hash->{UndefFn}   = \&FHEM::readingsWatcher::Undefine;
     $hash->{AttrFn}    = \&FHEM::readingsWatcher::Attr;
-    $hash->{AttrList}  = "disable:0,1 interval deleteUnusedReadings:1,0 readingActivity ".$readingFnAttributes;
+    $hash->{AttrList}  = 'disable:0,1 interval deleteUnusedReadings:1,0 '
+			.'readingActivity delimiter:-,--,_,__ '
+			.$readingFnAttributes;
 
     return  FHEM::Meta::InitMod( __FILE__, $hash ) if ($hasmeta);
 
@@ -159,8 +163,8 @@ sub Undefine {
 
 	delFromAttrList('readingsWatcher'); # global -> userattr
 	# wer hat alles ein Attribut readingsWatcher gesetzt ?
-	foreach (devspec2array('readingsWatcher!=')) {
-	    delFromDevAttrList($_, 'readingsWatcher');  # aufräumen
+	foreach my $dev (devspec2array('readingsWatcher!=')) {
+	    delFromDevAttrList($dev, 'readingsWatcher');  # aufräumen
 	}
     }
  
@@ -196,11 +200,11 @@ sub Set {
     }
 
     if  ($cmd eq 'clearReadings') {
-
-	foreach (keys %{$defs{$name}{READINGS}}) { # alle eigenen Readings
-	    if ($_ =~ /_/) { # device_reading
-		readingsDelete($hash, $_);
-		Log3 $hash,4,"$name, delete reading ".$_;
+	my $delimiter = AttrVal($name,'delimiter','_');
+	foreach my $reading (keys %{$defs{$name}{READINGS}}) { # alle eigenen Readings
+	    if (index($reading, $delimiter) != -1) { # device_reading
+		readingsDelete($hash, $reading);
+		Log3 $hash,4,"$name, delete reading $reading";
 	    }
 	}
 
@@ -231,7 +235,7 @@ sub getStateList {
 
     my @devs;
 
-    foreach my $device (devspec2array("readingsWatcher!=")) {
+    foreach my $device (devspec2array('readingsWatcher!=')) {
 	my $rSA  = ($device ne  $name) ? AttrVal($device, 'readingsWatcher', '') : '';
 
 	next if (!$rSA);
@@ -243,7 +247,7 @@ sub getStateList {
 	    push @devs, "$device,-,-,ignored,-";
 	}
 	else { # valid device
-	    push @devs , IsValidDevice($device,$rSA);
+	    push @devs , IsValidDevice($device, $rSA);
 	}
     }
 
@@ -257,41 +261,37 @@ sub IsValidDevice {
     my $device = shift;
     my @devs;
 
-    foreach (split(';', shift)) { # Anzahl Regelsätze pro Device, meist nur einer
+    foreach my $rs (split(';', shift)) { # Anzahl Regelsätze pro Device, meist nur einer
 
-	$_ =~ s/\+/,/xg; # OR Readings wie normale Readingsliste behandeln
-	$_ =~ s/ //g;
+	$rs =~ s/\+/,/xg; # OR Readings wie normale Readingsliste behandeln
+	$rs =~ s/ //g;
 
-	my ($timeout,undef,@readings) = split(',', $_); # der ggf. vorhandene Ersatzstring wird hier nicht benötigt
+	my ($timeout,undef,@readings) = split(',', $rs); # der ggf. vorhandene Ersatzstring wird hier nicht benötigt
 
-	if (!@readings) {
-	    push @devs, "$device,-,-,wrong parameters,-";
-	}
-	else {
-	    foreach my $reading (@readings) { # alle zu überwachenden Readings
+	return "$device,-,-,wrong parameters,-" if (!@readings);
 
-		my ($age,$state);
+	foreach my $reading (@readings) { # alle zu überwachenden Readings
 
-		$reading =~ s/ //g;
+	    my ($age,$state);
 
-		if (($reading eq 'state') && (ReadingsVal($device, 'state', '') eq 'inactive')) {
+	    $reading =~ s/ //g;
 
-		    $state   = 'inactive';
-		    $age     = '-';
+	    if (($reading eq 'state') && (ReadingsVal($device, 'state', '') eq 'inactive')) {
+		$state   = 'inactive';
+		$age     = '-';
+	    }
+	    else {
+		$age = ReadingsAge($device, $reading, undef);
+
+		if (!defined($age)) {
+		    $state   = 'unknown';
+		    $age     = 'undef';
 		}
 		else {
-		    $age = ReadingsAge($device, $reading, undef);
-
-		    if (!defined($age)) {
-			$state   = 'unknown';
-			$age     = 'undef';
-		    }
-		    else {
-			$state = (int($age) > int($timeout)) ? 'timeout' : 'ok';
-		    }
+		    $state = (int($age) > int($timeout)) ? 'timeout' : 'ok';
 		}
-		push @devs, "$device,$reading,$timeout,$state,$age";
 	    }
+	    push @devs, "$device,$reading,$timeout,$state,$age";
 	}
     }
 
@@ -313,8 +313,8 @@ sub formatStateList {
 
     my ($dw,$rw,$tw,$sw,$aw) = (6,7,7,5,3); # Startbreiten, bzw. Mindestbreite durch Überschrift
 
-    foreach (@devs) {
-	my ($d,$r,$t,$s,$g)  = split(',', $_);
+    foreach my $dev (@devs) {
+	my ($d,$r,$t,$s,$g)  = split(',', $dev);
 	# die tatsächlichen Breiten aus den vorhandenen Werten ermitteln
 	$dw = (length($d) > $dw) ? length($d) : $dw;
 	$rw = (length($r) > $rw) ? length($r) : $rw;
@@ -338,8 +338,8 @@ sub formatStateList {
     $head .= "\n".$separator."\n";
 
     my $s;
-    foreach (@devs) {
-	my ($d,$r,$t,$e,$g)  = split(',', $_);
+    foreach my $dev (@devs) {
+	my ($d,$r,$t,$e,$g)  = split(',', $dev);
 
 	$s .= $d . (' ' x ($dw - length($d))).' ';       # left-align Device
 	$s .= '| '. $r . (' ' x ($rw - length($r))).' '; # left-align Reading
@@ -365,12 +365,13 @@ sub Attr {
     if ($cmd eq 'set')
     {
 	if ($attrName eq 'disable') {
+	    RemoveInternalTimer($hash);
 	    readingsSingleUpdate($hash, 'state', 'disabled', 1) if (int($attrVal) == 1);
-	    OnTimer($hash) if (int($attrVal) == 0);
+	    InternalTimer(gettimeofday() + 2, 'FHEM::readingsWatcher::OnTimer', $hash, 0) if (int($attrVal) == 0);
 	    return;
 	}
 
-	if (($attrName eq 'readingActivity') && ($attrVal eq 'state')) {
+	if (($attrName eq 'readingActivity') && (lc($attrVal) eq 'state')) {
 	    my $error = 'forbidden value state !';
 	    Log3 $hash,1,"$name, readingActivity $error";
 	    return $error;
@@ -378,7 +379,8 @@ sub Attr {
     }
 
     if (($cmd eq 'del') && ($attrName eq 'disable')) {
-	    OnTimer($hash);
+	RemoveInternalTimer($hash);
+	InternalTimer(gettimeofday() + 2, 'FHEM::readingsWatcher::OnTimer', $hash, 0);
     }
 
     return;
@@ -413,8 +415,10 @@ sub OnTimer {
     $alive //= 'alive'; # if (!defined($alive));
     $readingActifity = ''  if ($readingActifity eq 'none');
 
-    foreach (keys %{$defs{$name}{READINGS}}) { # alle eigenen Readings
-	$readingsList .=  $_ .',' if ( $_ =~ /_/ );  # nur die Readings mit _ im Namen (Device_Reading)
+    my $delimiter = AttrVal($name,'delimiter','_'); # -, --, _, __
+
+    foreach my $reading (keys %{$defs{$name}{READINGS}}) { # alle eigenen Readings
+	$readingsList .=  $reading .',' if (index($reading, $delimiter) != -1);  # nur die Readings mit _ im Namen (Device_Reading)
     }
 
     readingsBeginUpdate($hash);
@@ -440,9 +444,9 @@ sub OnTimer {
 
 	my $ok_device = 0;
 
-	foreach (split(';', $rSA)) { #Anzahl Regelsätze im Device
+	foreach my $sets (split(';', $rSA)) { #Anzahl Regelsätze im Device
 
-	    my ($timeout, $errorValue, @readings_ar) = split(',',  $_);
+	    my ($timeout, $errorValue, @readings_ar) = split(',',  $sets);
 
 	    if (@readings_ar) {
 
@@ -474,6 +478,7 @@ sub OnTimer {
 		}
 
 		my $age = ReadingsAge($device, $reading, '');
+		my $d_r = $device.$delimiter.$reading;
 
 		if ($age ne '') {
 
@@ -491,8 +496,6 @@ sub OnTimer {
 			$timeOutState = 'ok';
 		    }
 
-		    my $d_r = $device.'_'.$reading;
-
 		    readingsBulkUpdate($hash, $d_r, $timeOutState) if ($timeOutState);
 
 		    $readingsList =~ s/$d_r,//xms if ($readingsList); # das Reading aus der Liste streichen, leer solange noch kein Device das Attr hat !
@@ -501,7 +504,7 @@ sub OnTimer {
 		    setReadingsVal($defs{$device},$reading,'unknown',TimeNow()) if ($errorValue); # leise setzen ohne Event
 		    $defs{$device}->{STATE} = 'unknown' if ($errorValue && $state);
 		    Log3 $hash,3,"$name, reading Timestamp for $reading not found on device $device";
-		    readingsBulkUpdate($hash, $device.'_'.$reading, 'no Timestamp');
+		    readingsBulkUpdate($hash, $d_r, 'no Timestamp');
 		}
 	    } # Readings in einem Regelsatz
 	} # Anzahl Regelsätze im Device
@@ -563,13 +566,11 @@ sub clearReadings {
     {
 	next if (!$reading);
 
-	if (AttrNum($name, 'deleteUnusedReadings', 1))
-	{
+	if (AttrNum($name, 'deleteUnusedReadings', 1)) {
 	    readingsDelete($hash, $reading);
 	    Log3 $hash, 3, "$name, delete unused reading $reading";
 	}
-	else
-	{
+	else {
 	    readingsBulkUpdate($hash, $reading, 'unused');
 	    Log3 $hash, 4, "$name, unused reading $reading";
 	}
@@ -582,11 +583,13 @@ sub clearReadings {
 
 1;
 
-=pod
-=encoding utf8
+__END__
 
+=pod
+=over
+=encoding utf8
 =item helper
-=item summary    cyclical watching of readings updates
+=item summary cyclical watching of readings updates
 =item summary_DE zyklische Überwachung von Readings auf Aktualisierung
 =begin html
 
@@ -641,6 +644,7 @@ sub clearReadings {
   <ul>
      <br>
      <ul>
+       <a name="delimiter"></a><li><b>delimiter</b><br>separator for reading names ( e.g. device_reading) default _</li><br>
        <a name="disable"></a><li><b>disable</b><br>deactivate/activate the device</li><br>
        <a name="interval"></a><li><b>interval &lt;seconds&gt;</b><br>Time interval for continuous check (default 60)</li><br>
        <a name="deleteUnusedReadings"></a><li><b>deleteUnusedReadings</b><br>delete unused readings (default 1)</li><br>
@@ -713,6 +717,7 @@ sub clearReadings {
   <ul>
      <br>
      <ul>
+       <a name="delimiter"></a><li><b>delimiter</b><br>Trennzeichen für Reading Namen (z.b. device_reading) default _</li><br>
        <a name="disable"></a><li><b>disable</b><br>Deaktiviert das Device</li><br>
        <a name="interval"></a><li><b>interval &lt;Sekunden&gt;</b> (default 60)<br>Zeitintervall zur kontinuierlichen Überprüfung</li><br>
        <a name="deleteUnusedReadings"></a><li><b>deleteUnusedReadings</b> (default 1)<br>Readings mit dem Wert unused werden automatisch gelöscht</li><br>
@@ -747,7 +752,7 @@ sub clearReadings {
     "supervision",
     "überwachung"
   ],
-  "version": "2.1.1",
+  "version": "2.1.3",
   "release_status": "stable",
   "author": [
     "Wzut"
@@ -762,9 +767,8 @@ sub clearReadings {
       "requires": {
         "FHEM": 5.00918799,
         "GPUtils": 0,
-        "Time::HiRes": 0,
-        "List::Util": 0
-      },
+        "Time::HiRes": 0
+	},
       "recommends": {
         "FHEM::Meta": 0
       },
@@ -775,6 +779,5 @@ sub clearReadings {
 }
 =end :application/json;q=META.json
 
+=back
 =cut
-
-
