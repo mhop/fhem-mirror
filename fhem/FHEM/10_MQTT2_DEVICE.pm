@@ -169,7 +169,7 @@ MQTT2_DEVICE_Parse($$)
           if($ret && ref $ret eq "HASH") {
             readingsBeginUpdate($hash);
             foreach my $k (keys %{$ret}) {
-              readingsBulkUpdate($hash, $k, $ret->{$k});
+              readingsBulkUpdate($hash, makeReadingName($k), $ret->{$k});
               my $msg = ($ret->{$k} ? $ret->{$k} : "");
               push(@retData, "$k $msg");
               checkForGet($hash, $k, $ret->{$k});
