@@ -1212,8 +1212,9 @@ SVG_getData($$$$$)
 
   foreach my $src (@{$srcDesc->{order}}) {
     my $s = $srcDesc->{src}{$src};
-    my $fname = ($defs{$d}{LOGDEVICE} && $src eq $defs{$d}{LOGDEVICE} ?
-                $defs{$d}{LOGFILE} : "CURRENT");
+    my $fname = ($defs{$d}{LOGDEVICE} && $src eq $defs{$d}{LOGDEVICE}) ||
+                ($defs{$src} && $defs{$src}{TYPE} eq "DbLog") ?
+                $defs{$d}{LOGFILE} : "CURRENT";
     my $cmd = "get $src $fname INT $f $t ".$s->{arg};
     FW_fC($cmd, 1);
     if($showData) {
