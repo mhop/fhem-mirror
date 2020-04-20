@@ -1,4 +1,4 @@
-# $Id$
+﻿# $Id$
 ##############################################################################
 #
 #      98_DSBMobile.pm
@@ -54,7 +54,8 @@ sub DSBMobile_Initialize($) {
 
     $hash->{DefFn}   = "DSBMobile_Define";
     $hash->{UndefFn} = "DSBMobile_Undefine";
-    $hash->{GetFn}   = "DSBMobile_Get";
+
+    #$hash->{GetFn}   = "DSBMobile_Get";
 
     #$hash->{SetFn}   = "DSBMobile_Set";
     $hash->{AttrFn} = "DSBMobile_Attr";
@@ -67,7 +68,9 @@ sub DSBMobile_Initialize($) {
             . "dsb_classReading "
             . "dsb_outputFormat:textField-long " );
     $hash->{AttrList} = join( " ", @DSBMobile_attr ) . " " . $readingFnAttributes;
+
     return FHEM::Meta::InitMod( __FILE__, $hash );
+
 }
 
 #####################################
@@ -90,11 +93,19 @@ sub DSBMobile_Define($@) {
 
     $hash->{NAME} = $name;
 
+    #Temporary death of DSBMobile module ###
+
+    Log3 $name, 3, "[$name] DSBMobile API was changed thus the Module currently can't be used and is disabled";
+    CommandAttr( undef, $name . " dsb_interval 0" );
+    $hash->{STATE} = 'Currently unavailable';
+    return;
+
     #start timer
     if ( AttrNum( $name, "dsb_interval", 0 ) > 0 && $init_done ) {
         my $next = int( gettimeofday() ) + 1;
         InternalTimer( $next, 'DSBMobile_ProcessTimer', $hash, 0 );
     }
+    return;
 }
 ###################################
 sub DSBMobile_Undefine($$) {
@@ -215,12 +226,12 @@ sub DSBMobile_getDataCallback($) {
 
     Log3 $name, 5, "[$name] 1st nonblocking HTTP Call returning";
     Log3 $name, 5, "[$name] GetData - received $data";
-    my $j   = decode_json($data);
+    my $j = DSBMobile_safe_decode_json( $hash, $data );
     my $d64 = decode_base64( $j->{d} );
     my $json;
     IO::Uncompress::Gunzip::gunzip \$d64 => \$json;
     $json = latin1ToUtf8($json);
-    my $res = decode_json($json);
+    my $res = DSBMobile_safe_decode_json( $hash, $json );
     if ( $res->{Resultcode} == 1 ) {
         readingsSingleUpdate( $hash, "error", $res->{ResultStatusInfo}, 0 );
         return undef;
@@ -255,18 +266,12 @@ sub DSBMobile_getDataCallback($) {
                 my $d = $topic->{Root}{Childs};
 
                 for my $tile (@$d) {
-                    my $subtile = $tile->{Childs};
-                    my $i = 1;
-                    for my $stile (@$subtile) {
-                        my %au = (
-                            title => $tile->{Title}.$i,
-                            url   => $stile->{Detail},
-                            date  => $stile->{Date}                            
-                        );
-                        $i++;
-                        push( @aus, \%au );
-                    }
-                    
+                    my %au = (
+                        title => $tile->{Title},
+                        url   => $tile->{Childs}[0]->{Detail},
+                        date  => $tile->{Childs}[0]->{Date}
+                    );
+                    push( @aus, \%au );
                 }
             }
         }
@@ -686,6 +691,22 @@ sub DSBMobile_simpleHTML($;$) {
     $ret .= "</table>";
     return $ret;
 
+}
+
+sub DSBMobile_safe_decode_json($$) {
+    my ( $hash, $data ) = @_;
+    my $name = $hash->{NAME};
+
+    my $json = undef;
+    eval {
+        $json = decode_json($data);
+        1;
+    } or do {
+        my $error = $@ || 'Unknown failure';
+        Log3 $name, 1, "[$name] - Received invalid JSON: $error";
+
+    };
+    return $json;
 }
 ###################################
 sub DSBMobile_tableHTML($;$) {
