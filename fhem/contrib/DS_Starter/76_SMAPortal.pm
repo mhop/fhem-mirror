@@ -1077,7 +1077,7 @@ sub ParseData {                                                    ## no critic 
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 ($name, 2, "$name - $state");
   } else {
-      $hash->{HELPER}{LASTLDSUCCTIME} = FmtDateTime(time());
+      $hash->{HELPER}{LASTLDSUCCTIME} = FmtDateTime(time()) if($getp ne "none");
   }
   
   readingsBeginUpdate($hash);
