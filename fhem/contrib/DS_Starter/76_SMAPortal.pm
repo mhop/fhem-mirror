@@ -133,7 +133,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval ",  
+  "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
   "2.5.0"  => "25.08.2019  change switch consumer to on<->automatic only in graphic overview, Forum: https://forum.fhem.de/index.php/topic,102112.msg969002.html#msg969002",
@@ -512,8 +512,7 @@ sub getcredentials {
     my ($success, $username, $passwd, $index, $retcode, $credstr);
     my (@key,$len,$i);
     
-    if ($boot) {
-        # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
+    if ($boot) {                                                                        # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
         $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
         ($retcode, $credstr) = getKeyValue($index);
     
@@ -522,17 +521,14 @@ sub getcredentials {
             $success = 0;
         }  
 
-        if ($credstr) {
-            # beim Boot scrambled Credentials in den RAM laden
-            $hash->{HELPER}{CREDENTIALS} = $credstr;
+        if ($credstr) {                                                                 # beim Boot scrambled Credentials in den RAM laden
+            $hash->{HELPER}{".CREDENTIALS"} = $credstr;
     
-            # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-            $hash->{CREDENTIALS} = "Set";
+            $hash->{CREDENTIALS} = "Set";                                               # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
             $success = 1;
         }
-    } else {
-        # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
-        $credstr = $hash->{HELPER}{CREDENTIALS};
+    } else {                                                                            # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+        $credstr = $hash->{HELPER}{".CREDENTIALS"} // $hash->{HELPER}{CREDENTIALS};     # Kompatibilität zu Versionen vor 2.6.1 
         
         if($credstr) {
             # Beginn Descramble-Routine
