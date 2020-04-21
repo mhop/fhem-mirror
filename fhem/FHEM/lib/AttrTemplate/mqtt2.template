@@ -51,6 +51,19 @@ setreading DEVCID associatedWith DEVICE
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVCID model MQTT2_CLIENT_general_bridge
 
+###############
+#MQTT2 IO ignoreRegexp
+#
+name:MQTT2_IO_ignoreRegexp_homeassistant
+filter:TYPE=MQTT2_DEVICE
+desc:experimental first version...
+order:000002
+par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : $old =~ m,homeassistant/.*/config:.*, ? $old : $old.' \nhomeassistant/.*/config:.*'  }
+attr IODEVNAME NEWIGNOREREGEXP
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+farewell:template has been applied successfully. Check further extending the brigeRegexp by yourself!
+
 ###########################################
 # zigbee2mqtt
 # The zigbee2mqtt bridge device (entire hex id of devices as bridgeRegexp)
@@ -713,7 +726,7 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef).sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
@@ -1318,7 +1331,7 @@ attr DEVICE readingList \
   TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? undef :{"saturation"=>$2} : undef }\
+  STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? return : { "saturation"=>$2 } : return }\
   STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
 attr DEVICE webCmd pct:white:Color
@@ -1387,7 +1400,7 @@ attr DEVICE readingList \
   STATTOPIC/POWER1:.* state
 attr DEVICE jsonMap POWER1:0 Dimmer:pct Channel_4:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0
 attr DEVICE webCmd pct:CT
-attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",undef,"pct","state")}
+attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",'',"pct","state")}
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_cct_led
@@ -1462,7 +1475,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $light = ReadingsVal($name,"state","off");; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a></div>" }
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
@@ -1512,10 +1525,10 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0:.* relay0\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/relay/0/power:.* relay_0_power\
-  shellies/DEVNAME/relay/0/power:.* { my $compare = $EVTPART0 < 100 ? "off":"on"; ReadingsVal($NAME,"loadState","off") ne $compare ? { 'loadState' => $compare } : undef }\
+  shellies/DEVNAME/relay/0/power:.* { my $compare = $EVTPART0 < 100 ? "off":"on"; ReadingsVal($NAME,"loadState","off") ne $compare ? { 'loadState' => $compare } : return }\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
@@ -1564,7 +1577,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/roller/0:.* state\
   shellies/DEVNAME/input/1:.* input1\
   shellies/DEVNAME/input/0:.* input0
@@ -1598,7 +1611,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/roller/0:.* current\
   shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
   shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
@@ -1609,7 +1622,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature
-attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; $con = 100 - $con if $con =~ /\d+/;; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","unknown");; $con = 100 - $con if $con =~ /\d+/;; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
@@ -1638,7 +1651,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/status/0/rollers:.* power\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/roller/0:.* current\
   shellies/DEVNAME/roller/0:open {{'state' => 'opening'}}\
   shellies/DEVNAME/roller/0:close {{'state' => 'closing'}}\
@@ -1649,7 +1662,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/overtemperature:.* overtemperature
-attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","undef");; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
+attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","unknown");; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
@@ -1693,7 +1706,7 @@ attr DEVICE readingList shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/input/0:.* input_0\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/relay/0/power:.* relay_0_power\
   shellies/DEVNAME/relay/0/energy:.* {'relay_0_energy' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/temperature:.* temperature\
@@ -1705,7 +1718,7 @@ attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/input/1:.* input_1\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/relay/1/power:.* relay_1_power\
   shellies/DEVNAME/relay/1/energy:.* {'relay_1_energy' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/temperature:.* temperature\
@@ -1794,7 +1807,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/input/3:.* input3\
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/relay/0/power:.* power0\
   shellies/DEVNAME/relay/1/power:.* power1\
   shellies/DEVNAME/relay/2/power:.* power2\
@@ -1905,7 +1918,7 @@ deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}\
   shellies/DEVNAME/color/0:.* state\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
@@ -1926,7 +1939,7 @@ attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVEN
   shellies/DEVNAME/white/0:.* state\
   shellies/DEVNAME/white/0/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
@@ -2002,7 +2015,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/overload:.* overload\
   shellies/DEVNAME/loaderror:.* loaderror\
-  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : undef }
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE webCmd pct:on:off
 attr DEVICE jsonMap brightness:pct
 attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "true"?"10px-kreis-rot":"10px-kreis-gruen";; my $light = ReadingsVal($name,"ison","false") eq "true"?"on":"off";; my $cons = ReadingsVal($name,"light_0_power","unknown");; FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Leistung: $cons</div>"}
@@ -2203,14 +2216,14 @@ setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
 setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
 setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
-attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH4 readingList STATETOPIC.* { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH5 readingList STATETOPIC.* { $EVENT =~ /output...[01]{4}([01])[01]{3}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH6 readingList STATETOPIC.* { $EVENT =~ /output...[01]{5}([01])[01]{2}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH7 readingList STATETOPIC.* { $EVENT =~ /output...[01]{6}([01])[01]/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
-attr DEVICE_CH8 readingList STATETOPIC.* { $EVENT =~ /output...[01]{7}([01])/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH4 readingList STATETOPIC.* { $EVENT =~ /output...[01]{3}([01])[01]{4}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH5 readingList STATETOPIC.* { $EVENT =~ /output...[01]{4}([01])[01]{3}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH6 readingList STATETOPIC.* { $EVENT =~ /output...[01]{5}([01])[01]{2}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH7 readingList STATETOPIC.* { $EVENT =~ /output...[01]{6}([01])[01]/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
+attr DEVICE_CH8 readingList STATETOPIC.* { $EVENT =~ /output...[01]{7}([01])/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE setList on:noArg CMNDTOPIC setr=1xxxxxxx\
   off:noArg CMNDTOPIC setr=0xxxxxxx
 attr DEVICE_CH2 setList on:noArg CMNDTOPIC setr=x1xxxxxx\
@@ -2241,7 +2254,7 @@ attr DEVICE icon ICON
 attr DEVICE setStateList on off
 attr DEVICE jsonMap input:0
 attr DEVICE readingList STATETOPIC.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE userReadings out1:output:.* { $event =~ m/(.).......$/;;ReadingsVal($name,"out1",undef) ne $1 ? $1 : undef }, out2:output:.* { $event =~ m/.(.)......$/;;;;ReadingsVal($name,"out2",undef) ne $1 ? $1 : undef }, out3:output:.* { $event =~ m/..(.).....$/;;ReadingsVal($name,"out3",undef) ne $1 ? $1 : undef }, out4:output:.* { $event =~ m/...(.)....$/;;ReadingsVal($name,"out4",undef) ne $1 ? $1 : undef }, out5:output:.* { $event =~ m/....(.)...$/;;ReadingsVal($name,"out5",undef) ne $1 ? $1 : undef }, out6:output:.* { $event =~ m/.....(.)..$/;;ReadingsVal($name,"out6",undef) ne $1 ? $1 : undef }, out7:output:.* { $event =~ m/......(.).$/;;ReadingsVal($name,"out7",undef) ne $1 ? $1 : undef }, out8:output:.* { $event =~ m/.......(.)$/;;ReadingsVal($name,"out8",undef) ne $1 ? $1 : undef }
+attr DEVICE userReadings out1:output:.* { $event =~ m/(.).......$/;;ReadingsVal($name,"out1","unknown") ne $1 ? $1 : return }, out2:output:.* { $event =~ m/.(.)......$/;;;;ReadingsVal($name,"out2","unknown") ne $1 ? $1 : return }, out3:output:.* { $event =~ m/..(.).....$/;;ReadingsVal($name,"out3","unknown") ne $1 ? $1 : return }, out4:output:.* { $event =~ m/...(.)....$/;;ReadingsVal($name,"out4","unknown") ne $1 ? $1 : return }, out5:output:.* { $event =~ m/....(.)...$/;;ReadingsVal($name,"out5","unknown") ne $1 ? $1 : return }, out6:output:.* { $event =~ m/.....(.)..$/;;ReadingsVal($name,"out6","unknown") ne $1 ? $1 : return }, out7:output:.* { $event =~ m/......(.).$/;;ReadingsVal($name,"out7","unknown") ne $1 ? $1 : return }, out8:output:.* { $event =~ m/.......(.)$/;;ReadingsVal($name,"out8","unknown") ne $1 ? $1 : return }
 attr DEVICE setList out1:0,1 {my $command = $EVTPART1."xxxxxxx";; "CMNDTOPIC setr=$command"}\
   out2:0,1 {my $command = "x".$EVTPART1."xxxxxx";; "CMNDTOPIC setr=$command"}\
   out3:0,1 {my $command = "xx".$EVTPART1."xxxxx";; "CMNDTOPIC setr=$command"}\
@@ -2634,7 +2647,7 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
-  homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : undef }
+  homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : return }
 attr DEVICE setList\
   restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
 
@@ -2656,7 +2669,7 @@ par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,
 attr DEVICE readingList\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),; json2nameValue($EVENT,"$1"."_") }\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+)/[^:]+:.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+)/([^:]+),; { "${1}_$2"=>$EVENT }}\
-  BASE_ID/home_presence/DEVNAME:.* { return undef unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
+  BASE_ID/home_presence/DEVNAME:.* { return unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
@@ -2674,8 +2687,8 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your gtag. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02a1
 #par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
-par:BT_ID;Pls. enter your bluetooth device ID; {undef}
-par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
+par:BT_ID;Pls. enter your bluetooth device ID; {return}
+par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : return }
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
 defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
 #attr OMG_BT_ID readingList READINGLISTOLD
@@ -2733,8 +2746,8 @@ deletereading -q OMG_DEVCID (?!associatedWith).*
 defmod OMG_DEVCID MQTT2_\DEVICE DEVCID
 attr OMG_DEVCID autocreate 0
 attr OMG_DEVCID readingList\
-  BASE_ID/DEVNAME/433toMQTT:.* { $EVENT =~ m,..value..(ONCOMMANDREGEX)..protocol..\d..length..\d+..delay..\d+.,? {"state"=>"on"} : $EVENT =~ m,..value..(OFFCOMMANDREGEX)..protocol..\d..length..\d+..delay..\d+., ? {"state"=>"off"}:undef }\
-  BASE_ID/DEVNAME/433toMQTT:.* { $EVENT =~ m,..value..([\d]+)..protocol..\d..length..\d+..delay..\d+.,? {"received_code"=>"$1"}:undef }
+  BASE_ID/DEVNAME/433toMQTT:.* { $EVENT =~ m,..value..(ONCOMMANDREGEX)..protocol..\d..length..\d+..delay..\d+.,? {"state"=>"on"} : $EVENT =~ m,..value..(OFFCOMMANDREGEX)..protocol..\d..length..\d+..delay..\d+., ? {"state"=>"off"}:return }\
+  BASE_ID/DEVNAME/433toMQTT:.* { $EVENT =~ m,..value..([\d]+)..protocol..\d..length..\d+..delay..\d+.,? {"received_code"=>"$1"}:return }
 attr OMG_DEVCID setList\
   on:noArg BASE_ID/DEVNAME/commands/MQTTto433 {ON_COMMAND}\
   off:noArg BASE_ID/DEVNAME/commands/MQTTto433 {OFF_COMMAND}
@@ -2944,24 +2957,26 @@ par:DEVNAME;Device name as configured;{ AttrVal("DEVICE","readingList","") =~ m,
 par:ICON;ICON as set, defaults to hue_filled_iris;{ AttrVal("DEVICE","icon","hue_filled_iris") }
 attr DEVICE icon ICON
 attr DEVICE setList\
-  on:noArg BASE_ID/DEVNAME status on\
-  off:noArg BASE_ID/DEVNAME status off\
-  toggle:noArg BASE_ID/DEVNAME status t\
+  on:noArg BASE_ID/DEVNAME on\
+  off:noArg BASE_ID/DEVNAME off\
+  toggle:noArg BASE_ID/DEVNAME t\
   rgb:colorpicker,RGB BASE_ID/DEVNAME/col #$EVTPART1\
   brightness:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME\
   speed:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api http://DEVNAME/win&SX=$EVTPART1\
   intensity:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api http://DEVNAME/win&IX=$EVTPART1\
   palette:selectnumbers,0,1,46,0,lin BASE_ID/DEVNAME/api http://DEVNAME/win&FP=$EVTPART1\
-  effect:selectnumbers,0,1,101,0,lin BASE_ID/DEVNAME/api http://DEVNAME/win&FX=$EVTPART1\
+  effect:selectnumbers,0,1,101,0,lin BASE_ID/DEVNAME/api FX=$EVTPART1\
   loadPreset:selectnumbers,0,1,3,0,lin BASE_ID/DEVNAME/api http://DEVNAME/win&PL=$EVTPART1  
 attr DEVICE readingList \
+  BASE_ID/DEVNAME/status:.* LWT\
   BASE_ID/DEVNAME/g:.* brightness\
-  BASE_ID/DEVNAME/c:.* {{"rgb"=>substr("$EVENT",1,6)}}\
+  BASE_ID/DEVNAME/g:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
+  BASE_ID/DEVNAME/c:.* { {"rgb"=>substr("$EVENT",1,6)} }\
   BASE_ID/DEVNAME/v:.* api\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<sx>)([\d]+)(?=<\/sx>), ? $1 eq ReadingsVal($NAME,"speed","unknown") ? undef : {"speed"=>$1} : undef }\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<ix>)([\d]+)(?=<\/ix>), ? $1 eq ReadingsVal($NAME,"intensity","unknown") ? undef : {"intensity"=>$1} : undef }\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fp>)([\d]+)(?=<\/fp>), ? $1 eq ReadingsVal($NAME,"palette","unknown") ? undef : {"palette"=>$1} : undef }\
-  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fx>)([\d]+)(?=<\/fx>), ? $1 eq ReadingsVal($NAME,"effect","unknown") ? undef :{"effect"=>"$1"} : undef }
+  BASE_ID/DEVNAME/v:.* { $EVENT =~ m,(?<=<sx>)([\d]+)(?=<\/sx>), ? $1 eq ReadingsVal($NAME,"speed","unknown") ? return : {"speed"=>$1} : return; }\
+  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<ix>)([\d]+)(?=<\/ix>), ? $1 eq ReadingsVal($NAME,"intensity","unknown") ? return : {"intensity"=>$1} : return }\
+  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fp>)([\d]+)(?=<\/fp>), ? $1 eq ReadingsVal($NAME,"palette","unknown") ? return : {"palette"=>$1} : return }\
+  BASE_ID/DEVNAME/v:.* {$EVENT =~ m,(?<=<fx>)([\d]+)(?=<\/fx>), ? $1 eq ReadingsVal($NAME,"effect","unknown") ? return :{"effect"=>"$1"} : return }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE devStateIcon {Color::devStateIcon( $name, "rgb", "rgb", "brightness", "state" )}
 attr DEVICE eventMap /effect 0:Solid/effect 2:Breathe/effect 63:Pride/effect 48:Police/
