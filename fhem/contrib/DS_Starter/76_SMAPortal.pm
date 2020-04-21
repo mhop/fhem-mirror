@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 20064 2019-08-26 17:22:39Z DS_Starter $
+# $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -131,11 +131,9 @@ BEGIN {
   
 }
 
-# Standardvariablen und Forward-Deklaration
-# use vars qw($FW_ME);                                    # webname (default is fhem)
-
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
   "2.5.0"  => "25.08.2019  change switch consumer to on<->automatic only in graphic overview, Forum: https://forum.fhem.de/index.php/topic,102112.msg969002.html#msg969002",
@@ -672,16 +670,16 @@ return;
 ################################################################
 sub GetSetData {                                                       ## no critic 'complexity'
   my ($string) = @_;
-  my ($name,$getp,$setp) = split("\\|",$string);
-  my $hash               = $defs{$name}; 
-  my $login_state        = 0;
-  my $useragent          = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
-  my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
-  my $v5d                = AttrVal($name, "verbose5Data", "none");   
-  my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
+  my ($name,$getp,$setp)   = split("\\|",$string);
+  my $hash                 = $defs{$name}; 
+  my $login_state          = 0;
+  my $useragent            = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
+  my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
+  my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
   my ($ccyeardata_content) = ("");
   my $state                = "ok";
-  my ($reread,$retry)      = (0,0);
+  my ($reread,$retry)      = (0,0);  
+  my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
   my ($livedata_content,$d,$op); 
   
   if($setp ne "none") {
@@ -974,11 +972,11 @@ sub ParseData {                                                    ## no critic 
         
           if ($new_val && $k !~ /__type/ix) {
               if($k =~ /^FeedIn$/x) {
-                  $new_val = $new_val." W";
+                  $new_val     = $new_val." W";
                   $FeedIn_done = 1        
               }
               if($k =~ /^GridConsumption$/x) {
-                  $new_val = $new_val." W";
+                  $new_val              = $new_val." W";
                   $GridConsumption_done = 1;
               }
               if($k =~ /^PV$/x) {
@@ -986,30 +984,30 @@ sub ParseData {                                                    ## no critic 
                   $PV_done = 1; 
               }
               if($k =~ /^AutarkyQuote$/x) {
-                  $new_val = $new_val." %";
+                  $new_val           = $new_val." %";
                   $AutarkyQuote_done = 1;
               }
               if($k =~ /^SelfConsumption$/x) {
-                  $new_val = $new_val." W";
+                  $new_val              = $new_val." W";
                   $SelfConsumption_done = 1;
               } 
               if($k =~ /^SelfConsumptionQuote$/x) {              
-                  $new_val = $new_val." %";
+                  $new_val                   = $new_val." %";
                   $SelfConsumptionQuote_done = 1; 
               }
               if($k =~ /^SelfSupply$/x) {
-                  $new_val = $new_val." W";
+                  $new_val         = $new_val." W";
                   $SelfSupply_done = 1;
               }
               if($k =~ /^TotalConsumption$/x) {
                   $new_val = $new_val." W";
               }
               if($k =~ /^BatteryIn$/x) {
-                  $new_val = $new_val." W";
+                  $new_val   = $new_val." W";
                   $batteryin = 1;
               }
               if($k =~ /^BatteryOut$/x) {
-                  $new_val = $new_val." W";
+                  $new_val    = $new_val." W";
                   $batteryout = 1;
               }        
               
@@ -1073,22 +1071,24 @@ sub ParseData {                                                    ## no critic 
       extractWeatherData($hash,$weatherdata_content);
   }
   
-  my $pv = ReadingsNum($name, "L1_PV", 0);
-  my $fi = ReadingsNum($name, "L1_FeedIn", 0);
-  my $gc = ReadingsNum($name, "L1_GridConsumption", 0);
+  my $pv  = ReadingsNum($name, "L1_PV", 0);
+  my $fi  = ReadingsNum($name, "L1_FeedIn", 0);
+  my $gc  = ReadingsNum($name, "L1_GridConsumption", 0);
   my $sum = $fi-$gc;
   
   if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 ($name, 2, "$name - $state");
+  } else {
+      $hash->{HELPER}{LASTLDSUCCTIME} = FmtDateTime(time());
   }
   
   readingsBeginUpdate($hash);
   if($login_state) {
       if($setp ne "none") {
           my ($d,$op) = split(":",$setp);
-          $op = ($op eq "auto")?"off (automatic)":$op;
+          $op         = ($op eq "auto")?"off (automatic)":$op;
           readingsBulkUpdate($hash, "L3_${d}_Switch", $op);
       }
       readingsBulkUpdate($hash, "state", $state);
@@ -1224,8 +1224,8 @@ sub extractForecastData {                                          ## no critic 
       
       # Use also old data to integrate daily PV and Consumption
       if ($current_day == $fc_day) {
-         $PV_sum      += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV in Wh
-         $consum_sum  += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast in Wh
+         $PV_sum     += int($fc_obj->{'PvMeanPower'}->{'Amount'});                 # integrator of daily PV in Wh
+         $consum_sum += int($fc_obj->{'ConsumptionForecast'}->{'Amount'}/3600);    # integrator of daily Consumption forecast in Wh
       }
 
       # Don't use old data
@@ -1233,27 +1233,27 @@ sub extractForecastData {                                          ## no critic 
 
       # Sum up for the next few hours (4 hours total, this is current hour plus the next 3 hours)
       if ($obj_nr < 4) {
-         $nextFewHoursSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};                   # Wh
-         $nextFewHoursSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;    # Wh
-         $nextFewHoursSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;   # Wh
-         $nextFewHoursSum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;         
+         $nextFewHoursSum{'PV'}          += $fc_obj->{'PvMeanPower'}->{'Amount'};                   # Wh
+         $nextFewHoursSum{'Consumption'} += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;    # Wh
+         $nextFewHoursSum{'Total'}       += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;   # Wh
+         $nextFewHoursSum{'ConsumpRcmd'} += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;         
       }
 
       # If data is for the rest of the current day
       if ( $current_day == $fc_day ) {
-         $restOfDaySum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'};                      # Wh
-         $restOfDaySum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;       # Wh
-         $restOfDaySum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;      # Wh
-         $restOfDaySum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0; 
+         $restOfDaySum{'PV'}          += $fc_obj->{'PvMeanPower'}->{'Amount'};                      # Wh
+         $restOfDaySum{'Consumption'} += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;       # Wh
+         $restOfDaySum{'Total'}       += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;      # Wh
+         $restOfDaySum{'ConsumpRcmd'} += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0; 
      }
       
       # If data is for the next day (quick and dirty: current day different from this object's day)
       # Assuming only the current day and the next day are returned from Sunny Portal
       if ( $current_day != $fc_day ) {
-         $tomorrowSum{'PV'}            += $fc_obj->{'PvMeanPower'}->{'Amount'} if(exists($fc_obj->{'PvMeanPower'}->{'Amount'}));            # Wh
-         $tomorrowSum{'Consumption'}   += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;                                              # Wh
-         $tomorrowSum{'Total'}         += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 if ($fc_obj->{'PvMeanPower'}->{'Amount'});   # Wh
-         $tomorrowSum{'ConsumpRcmd'}   += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
+         $tomorrowSum{'PV'}          += $fc_obj->{'PvMeanPower'}->{'Amount'} if(exists($fc_obj->{'PvMeanPower'}->{'Amount'}));            # Wh
+         $tomorrowSum{'Consumption'} += $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600;                                              # Wh
+         $tomorrowSum{'Total'}       += $fc_obj->{'PvMeanPower'}->{'Amount'} - $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 if ($fc_obj->{'PvMeanPower'}->{'Amount'});   # Wh
+         $tomorrowSum{'ConsumpRcmd'} += $fc_obj->{'IsConsumptionRecommended'} ? 1 : 0;
       }
       
       # Update values in Fhem if less than 24 hours in the future
@@ -1529,12 +1529,11 @@ sub extractConsumerLiveData {
       $i = 0;
       foreach my $c (@{$clivedata->{'ParameterData'}}) {
           my $tkind            = $c->{'Parameters'}[0]{'Timestamp'}{'Kind'};                               # Zeitart: Unspecified, Utc
-          # Log3 ($name, 1, "$name - $tkind");
           my $GriSwStt         = $c->{'Parameters'}[0]{'Value'};                                           # on: 1, off: 0
           my $GriSwAuto        = $c->{'Parameters'}[1]{'Value'};                                           # automatic = 1
           my $OperationAutoEna = $c->{'Parameters'}[2]{'Value'};                                           # Automatic Betrieb erlaubt ?
           my $ltchange         = TimeAdjust($hash,$c->{'Parameters'}[0]{'Timestamp'}{'DateTime'},$tkind);  # letzter Schaltzeitpunkt der Bluetooth-Steckdose (Verbraucher)
-          my $cn  = $consumers{"${i}_ConsumerName"};                                                       # Verbrauchername
+          my $cn               = $consumers{"${i}_ConsumerName"};                                          # Verbrauchername
           next if(!$cn);
           $cn     = replaceJunkSigns($cn);                                                                 # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
           
@@ -1667,12 +1666,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 20064 2019-08-26 17:22:39Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 20064 2019-08-26 17:22:39Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1735,8 +1734,8 @@ return;
 #                 analysiere Livedaten
 ################################################################
 sub analyzeLivedata {                                                 ## no critic 'complexity'
-  my ($hash,$lc) = @_;
-  my $name       = $hash->{NAME};
+  my ($hash,$lc)      = @_;
+  my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
 
   my $livedata_content = decode_json($lc);
@@ -1885,14 +1884,15 @@ sub PortalAsHtml {                                                              
   $hash->{HELPER}{SPGROOM}   = $FW_room?$FW_room:"";                                    # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail?$FW_detail:"";                                # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
-  my $dl  = AttrVal($name, "detailLevel", 1);
-  my $pv0 = ReadingsNum($name,"L2_ThisHour_PvMeanPower", undef);
-  my $pv1 = ReadingsNum($name,"L4_NextHour01_PvMeanPower", undef);
+  my $dl  = AttrVal    ($name, "detailLevel", 1);
+  my $pv0 = ReadingsNum($name, "L2_ThisHour_PvMeanPower",   undef);
+  my $pv1 = ReadingsNum($name, "L4_NextHour01_PvMeanPower", undef);
+  
   if(!$hash || !defined($defs{$wlname}) || $dl != 4 || !defined $pv0 || !defined $pv1) {
-      $height   = AttrNum($wlname, 'beamHeight', 200);   
-      $ret     .= "<table class='roomoverview'>";
-      $ret     .= "<tr style='height:".$height."px'>";
-      $ret     .= "<td>";
+      $height = AttrNum($wlname, 'beamHeight', 200);   
+      $ret   .= "<table class='roomoverview'>";
+      $ret   .= "<tr style='height:".$height."px'>";
+      $ret   .= "<td>";
       if(!$hash) {
           $ret .= "Device \"$name\" doesn't exist !";
       } elsif (!defined($defs{$wlname})) {
@@ -1905,9 +1905,9 @@ sub PortalAsHtml {                                                              
           $ret .= "Awaiting level 4 data ...";
       }
 
-      $ret     .= "</td>";
-      $ret     .= "</tr>";
-      $ret     .= "</table>";
+      $ret .= "</td>";
+      $ret .= "</tr>";
+      $ret .= "</table>";
       return $ret;
   }
 
@@ -1982,10 +1982,9 @@ sub PortalAsHtml {                                                              
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
   $icon    = FW_makeImage($icon) if (defined($icon));
- 
-  my $co4h = ReadingsNum($name,"L2_Next04Hours_Consumption", 0);
-  my $coRe = ReadingsNum($name,"L2_RestOfDay_Consumption", 0); 
-  my $coTo = ReadingsNum($name,"L2_Tomorrow_Consumption", 0);
+  my $co4h = ReadingsNum ($name,"L2_Next04Hours_Consumption", 0);
+  my $coRe = ReadingsNum ($name,"L2_RestOfDay_Consumption", 0); 
+  my $coTo = ReadingsNum ($name,"L2_Tomorrow_Consumption", 0);
 
   my $pv4h = ReadingsNum($name,"L2_Next04Hours_PV", 0);
   my $pvRe = ReadingsNum($name,"L2_RestOfDay_PV", 0); 
@@ -2013,7 +2012,7 @@ sub PortalAsHtml {                                                              
       my $lang    = AttrVal("global","language","EN");
       my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                   # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");      # letzte Updatezeit  
+      my $lup     = $hash->{HELPER}{LASTLDSUCCTIME} // "0000-00-00 00:00:00";      # letzte erfolgreiche Updatezeit Live Daten
       
       my $lupt    = "last update:";  
       my $lblPv4h = "4h:";
@@ -2021,28 +2020,28 @@ sub PortalAsHtml {                                                              
       my $lblPvTo = "tomorrow:";
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
-        $lupt     = "Stand:"; 
-        $lblPvRe  = "heute:";
-        $lblPvTo  = "morgen:";
+          $lupt    = "Stand:"; 
+          $lblPvRe = "heute:";
+          $lblPvTo = "morgen:";
       }  
 
       $header  = "<table align=\"$hdrAlign\">"; 
       
       # Header Link + Status 
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-        my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
-        $lup     = "$3.$2.$1 $4";
-        $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
+          my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
+          $lup     = "$3.$2.$1 $4";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
       }
       
       # Header Information pv 
       if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
-        $header .= "<tr> <td><b>PV&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$pv4h</td> <td><b>$lblPvRe</b></td> <td align=right>$pvRe</td> <td><b>$lblPvTo</b></td> <td align=right>$pvTo</td> </tr>";
+          $header .= "<tr> <td><b>PV&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$pv4h</td> <td><b>$lblPvRe</b></td> <td align=right>$pvRe</td> <td><b>$lblPvTo</b></td> <td align=right>$pvTo</td> </tr>";
       }
       
       # Header Information co 
       if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
-        $header .= "<tr> <td><b>CO&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$co4h</td> <td><b>$lblPvRe</b></td> <td align=right>$coRe</td> <td><b>$lblPvTo</b></td> <td align=right>$coTo</td> </tr>"; 
+          $header .= "<tr> <td><b>CO&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$co4h</td> <td><b>$lblPvRe</b></td> <td align=right>$coRe</td> <td><b>$lblPvTo</b></td> <td align=right>$coTo</td> </tr>"; 
       }
 
       $header .= "</table>";     
@@ -2084,14 +2083,14 @@ sub PortalAsHtml {                                                              
               (undef,undef,undef,$end)   = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
 
-          $start = int($start);
-          $end   = int($end);
+          $start   = int($start);
+          $end     = int($end);
           my $flag = 0;                                                 # default kein Tagesverschieber
 
           #correct the hour for accurate display
           if ($start < $t{0}) {                                         # consumption seems to be tomorrow
               $start = 24-$t{0}+$start;
-              $flag = 1;
+              $flag  = 1;
           } else { 
               $start -= $t{0};          
           }
