@@ -296,6 +296,7 @@ FHEM/56_POKEYS.pm            axelberner           Sonstiges
 FHEM/57_Calendar.pm          neubert              Unterstützende Dienste/Kalendermodule
 FHEM/57_CALVIEW.pm           chris1284            Unterstützende Dienste/Kalendermodule
 FHEM/57_SSCal.pm             DS_Starter           Unterstützende Dienste/Kalendermodule
+FHEM/58_HVAC_DaikinAC.pm     roelb                Heizungssteuerung/Raumklima (preferably in English and a copy as PM)
 FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)

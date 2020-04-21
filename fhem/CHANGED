@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  58_HVAC_DaikinAC.pm: initial checkin for new module.
+            Forum topic #109562
  - change:  76_SMAPortal: update time in portalgraphics changed to last 
                           successful live data retrieval
  - change:  76_SMAPortal(SPG): change to package config, improve cookie 
