@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.04.22 v0.1.5
+# - CHANGE:  Mehr Loginfos bei set "NPM_login refresh" 
+#
 # 2020.04.20 v0.1.4
 # - CHANGE:  Keepalive aktiviert (cookielogin6)
 #
@@ -381,7 +384,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.4";
+my $ModulVersion     = "0.1.5";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -4712,6 +4715,7 @@ sub echodevice_NPMLoginRefresh($){
 	$NPMLoginTyp   = "NPM Login Refresh " . localtime();
 	
 	# Prüfen ob npm installiert ist
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check $npm_bin_node" ;
 	if (!(-e $npm_bin_node)) {
 		$InstallResult .= '<p>Das Bin <strong>' . $npm_bin_node . '</strong> wurde nicht gefunden. Bitte zuerst das Linux Paket NPM installieren. Folgenden Befehl koennt Ihr hier verwenden:</p>';
 		$InstallResult .= '<p><strong><font color="blue">sudo apt-get install npm</font></strong></p><br>';
@@ -4724,6 +4728,7 @@ sub echodevice_NPMLoginRefresh($){
 	}
 
 	# Prüfen ob das alexa-cookie Mdoul vorhanden ist
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check alexa-cookie.js" ;
 	if (!(-e "cache/alexa-cookie/node_modules/alexa-cookie2/alexa-cookie.js")) {
 		$InstallResult .= '<p>Das alexa-cookie Modul wurde nicht gefunden. Bitte fuehrt am Amazon Account Device einen set "<strong>NPM_install</strong>" durch </p>';
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
@@ -4734,6 +4739,7 @@ sub echodevice_NPMLoginRefresh($){
 	}
 	
 	# Prüfen ob das Refresh Cookie gültig ist!
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check Refresh Cookie String" ;
 	if (substr($RefreshCookie,0,1) ne "{") { 
 		$InstallResult .= '<p>Das angegebene Refreshtoken Cookie ist ungeueltig! Refreshtoken="<strong>' . $RefreshCookie . '</strong>"</p>';
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
@@ -4743,6 +4749,7 @@ sub echodevice_NPMLoginRefresh($){
 		return $InstallResult;
 	}
 	
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] build " . $number . "refresh-cookie.js";
 	my $SkriptContent  = "alexaCookie = require('alexa-cookie2');" . "\n";
 	$SkriptContent    .= "fs = require('fs');" . "\n";
 	$SkriptContent    .= "" . "\n";
@@ -4769,6 +4776,7 @@ sub echodevice_NPMLoginRefresh($){
 	close(FH);
 
 	# Prüfen ob das alexa-cookie Mdoul vorhanden ist
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check " . $number . "refresh-cookie.js";
 	if (!(-e $filename)) {
 		$InstallResult .= '<p>Das Skript zum Amazon Login konnte nicht gefunden werden!</p>';
 		$InstallResult .= '<br><form><input type="button" value="Zur&uuml;ck" onClick="history.go(-1);return true;"></form>';
@@ -4778,43 +4786,13 @@ sub echodevice_NPMLoginRefresh($){
 		return $InstallResult;
 	}
 
-	
 	# Skript ausführen
 	close CMD;
-	#Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] start" ;
-	#$filename = "test";
-	
-	#$filename  = "cache/alexa-cookie/66refresh-cookie.js";
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] start $npm_bin_node $filename";
 	open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &';
 	
-	while(<CMD>) {
-		if (index($_, "amazon.de") != -1) {last;}
-		Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] ERROR Start CMD=$_" ;
-	}
-	
-	close CMD;
-	
-	##open CMD,'-|',$npm_bin_node . ' ./' . $filename . ' &' or die $@;
-	
-	#system("node ./cache/alexa-cookie/refresh-cookie.js &");
-	
-	#my $line;
-	#my $Loop = "1";
-	#do {
-	#	Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] started" ;
-		$Loop = "2";
-	#} while ($Loop eq "1");
-	
-	#Log3 $name, 3, "[$name] [echodevice_NPMLoginRefresh] stop" ;
-	
-	if ($Loop eq "2") {
-		InternalTimer(gettimeofday() + 1 , "echodevice_NPMWaitForCookie" , $hash, 0);
-	}
-
-	#close CMD;
-	
-	#$InstallResult .= "</html>";
-	#$InstallResult =~ s/'/&#x0027/g;
+	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] start InternalTimer echodevice_NPMWaitForCookie";
+	InternalTimer(gettimeofday() + 1 , "echodevice_NPMWaitForCookie" , $hash, 0);
 
 	return ;#$InstallResult;
 
