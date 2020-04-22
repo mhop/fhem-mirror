@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  88_HMCCU: Fixed bug in RPC callback URL creation.
  - bugfix:  OpenWeatherMapAPI: fix Use of uninitialized value in sprintf
  - change:  58_HVAC_DaikinAC.pm: initial checkin for new module.
             Forum topic #109562

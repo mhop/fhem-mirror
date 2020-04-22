@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 4.3.024
+#  Version 4.3.025
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -52,7 +52,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.3.024';
+my $HMCCU_VERSION = '4.3.025';
 
 # Constants and default values
 my $HMCCU_MAX_IOERRORS = 100;
@@ -3780,7 +3780,7 @@ sub HMCCU_GetRPCCallbackURL ($$$$$)
 
 	return undef if (!defined ($hash));
 	
-	my $hmccu_hash = $hash->{TYPE} eq 'HMCCURPC' ? $hash->{IODev} : $hash;
+	my $hmccu_hash = $hash->{TYPE} eq 'HMCCURPCPROC' ? $hash->{IODev} : $hash;
 	
 	return undef if (!exists ($hmccu_hash->{hmccu}{interfaces}{$iface}) &&
 		!exists ($hmccu_hash->{hmccu}{ifports}{$iface}));
