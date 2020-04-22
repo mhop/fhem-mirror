@@ -865,6 +865,7 @@ sub DSBMobileUUID() {
 <a name="DSBMobile"></a>
 <div>
     <ul>
+    	######## Note: The DSBMobile API has changed and this module is currently not working!! ################
         DSBMobile reads and displays timetable change information from DSBMobile App, which is used at some schools in Germany (at least)<br><br>
         <a name="DSBMobileDefine"></a>
         <b>Define</b>
@@ -943,6 +944,7 @@ sub DSBMobileUUID() {
 <a name="DSBMobile"></a>
 <div>
     <ul>
+    	######## Achtung: Die DSBMobile API hat sich geändert und das Modul funktioniert im Augenblick nicht!! ################
         DSBMobile liest die Vertretungspläne der DSBMobile App, die (zumindest) an einigen Schulen in Deutschland verwendet wird<br><br>
         <a name="DSBMobileDefine"></a>
     </ul>
