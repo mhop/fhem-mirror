@@ -2962,11 +2962,13 @@ attr DEVICE setList\
   toggle:noArg BASE_ID/DEVNAME t\
   rgb:colorpicker,RGB BASE_ID/DEVNAME/col #$EVTPART1\
   brightness:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME\
-  speed:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api http://DEVNAME/win&SX=$EVTPART1\
-  intensity:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api http://DEVNAME/win&IX=$EVTPART1\
-  palette:selectnumbers,0,1,46,0,lin BASE_ID/DEVNAME/api http://DEVNAME/win&FP=$EVTPART1\
+  speed:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api SX=$EVTPART1\
+  intensity:colorpicker,BRI,0,1,255 BASE_ID/DEVNAME/api IX=$EVTPART1\
+  palette:selectnumbers,0,1,46,0,lin BASE_ID/DEVNAME/api FP=$EVTPART1\
   effect:selectnumbers,0,1,101,0,lin BASE_ID/DEVNAME/api FX=$EVTPART1\
-  loadPreset:selectnumbers,0,1,3,0,lin BASE_ID/DEVNAME/api http://DEVNAME/win&PL=$EVTPART1  
+  loadPreset:selectnumbers,0,1,3,0,lin BASE_ID/DEVNAME/api PL=$EVTPART1\
+  dimup:noArg BASE_ID/DEVNAME/api A=~10\
+  dimdown:noArg BASE_ID/DEVNAME/api A=~-10 
 attr DEVICE readingList \
   BASE_ID/DEVNAME/status:.* LWT\
   BASE_ID/DEVNAME/g:.* brightness\
@@ -2986,6 +2988,7 @@ attr DEVICE comment For questions about the use of different widgets for color s
 set DEVICE attrTemplate speechcontrol_type_light_255
 farewell:template has been applied successfully. <br>Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
+
 
 ###########################################
 #source post: https://forum.fhem.de/index.php/topic,109946.0.html
