@@ -39,11 +39,11 @@ my @clients = qw(
   MYSENSORS_DEVICE
 );
 
-sub MYSENSORS_Initialize($) {
+use DevIo;
 
-  my $hash = shift @_;
+sub MYSENSORS_Initialize {
 
-  require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
+  my $hash = shift;
 
   # Provider
   $hash->{Clients} = join (':',@clients);
@@ -65,7 +65,8 @@ sub MYSENSORS_Initialize($) {
     stateFormat
     OTA_firmwareConfig
   );
-  $hash->{AttrList} = $hash->{AttrList} = join(" ", @attrList)
+  $hash->{AttrList} = $hash->{AttrList} = join(" ", @attrList);
+  return;
 }
 
   
@@ -111,7 +112,7 @@ my %sensorAttr = (
   ARDUINO_REPEATER_NODE => [ 'config M' ],
 );
 
-sub Define($$) {
+sub Define {
   my ( $hash, $def ) = @_;
 
   $hash->{NOTIFYDEV} = "global";
@@ -119,16 +120,16 @@ sub Define($$) {
   if ($main::init_done) {
     return Start($hash);
   } else {
-    return undef;
+    return;
   }
 }
 
-sub Undef($) {
+sub Undef {
   Stop(shift);
-  return undef;
+  return;
 }
 
-sub Set($@) {
+sub Set {
   my ($hash, @a) = @_;
   return "Need at least one parameters" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(" ", map {@{$sets{$_}} ? $_.':'.join ',', @{$sets{$_}} : $_} sort keys %sets)
@@ -150,10 +151,11 @@ sub Set($@) {
       $hash->{'inclusion-mode'} = $value eq 'on' ? 1 : 0;
       last;
     };
-  };
+  }
+  return;
 }
 
-sub Attr($$$$) {
+sub Attr {
   my ($command,$name,$attribute,$value) = @_;
 
   my $hash = $main::defs{$name};
@@ -180,17 +182,19 @@ sub Attr($$$$) {
       last;
     };  
   }
+  return;
 }
 
-sub Notify($$) {
+sub Notify {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
     Start($hash);
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
+  return;
 }
 
-sub Start($) {
+sub Start {
   my $hash = shift;
   my ($dev) = split("[ \t]+", $hash->{DEF});
   $hash->{DeviceName} = $dev;
@@ -199,14 +203,15 @@ sub Start($) {
   return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
 }
 
-sub Stop($) {
+sub Stop {
   my $hash = shift;
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
   readingsSingleUpdate($hash,"connection","disconnected",1);
+  return;
 }
 
-sub Ready($) {
+sub Ready {
   my $hash = shift;
   return DevIo_OpenDev($hash, 1, "MYSENSORS::Init") if($hash->{STATE} eq "disconnected");
     if(defined($hash->{USBDev})) {
@@ -216,7 +221,7 @@ sub Ready($) {
     }
 }
 
-sub Init($) {
+sub Init {
   my $hash = shift;
   my $name = $hash->{NAME};
   $hash->{'inclusion-mode'} = AttrVal($name,"autocreate",0);
@@ -235,13 +240,13 @@ sub Init($) {
   }
   readingsSingleUpdate($hash,"connection","connected",1);
   sendMessage($hash, radioId => 0, childId => 0, cmd => C_INTERNAL, ack => 0, subType => I_VERSION, payload => '');
-  return undef;
+  return;
 }
 
 
 # GetConnectStatus
-sub GetConnectStatus($){
-    my ($hash) = @_;
+sub GetConnectStatus {
+    my $hash = shift;
     my $name = $hash->{NAME};
     Log3 $name, 4, "MySensors: GetConnectStatus called ...";
     
@@ -254,7 +259,7 @@ sub GetConnectStatus($){
     
 }
 
-sub Timer($) {
+sub Timer {
   my $hash = shift;
   my $now = time;
   foreach my $radioid (keys %{$hash->{messagesForRadioId}}) {
@@ -270,10 +275,11 @@ sub Timer($) {
     }
   }
   _scheduleTimer($hash);
+  return;
 }
 
 sub Read {
-  my ($hash) = @_;
+  my $hash = shift;
   my $name = $hash->{NAME};
 
   my $buf = DevIo_SimpleRead($hash);
@@ -323,10 +329,10 @@ sub Read {
     }
   }
   $hash->{PARTIAL} = $data;
-  return undef;
+  return;
 };
 
-sub onPresentationMsg($$) {
+sub onPresentationMsg {
   my ($hash,$msg) = @_;
   my $client = matchClient($hash,$msg);
   my $clientname;
@@ -346,27 +352,30 @@ sub onPresentationMsg($$) {
     }
   }
   MYSENSORS::DEVICE::onPresentationMessage($client,$msg);
+  return;
 };
 
-sub onSetMsg($$) {
+sub onSetMsg {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
     MYSENSORS::DEVICE::onSetMessage($client,$msg);
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring set-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
+  return;
 };
 
-sub onRequestMsg($$) {
+sub onRequestMsg {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
     MYSENSORS::DEVICE::onRequestMessage($client,$msg);
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring req-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
   }
+  return;
 };
 
-sub onInternalMsg($$) {
+sub onInternalMsg {
   my ($hash,$msg) = @_;
   my $address = $msg->{radioId};
   my $type = $msg->{subType};
@@ -437,9 +446,10 @@ sub onInternalMsg($$) {
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring internal-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".internalMessageTypeToStr($msg->{subType}));
   }
+  return;
 };
 
-sub onStreamMsg($$) {
+sub onStreamMsg {
   my ($hash,$msg) = @_;
   my $client;
   if ($client = matchClient($hash, $msg)) {
@@ -451,9 +461,10 @@ sub onStreamMsg($$) {
   } else {
     Log3($hash->{NAME},3,"MYSENSORS: ignoring stream-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".datastreamTypeToStr($msg->{subType}));
   }
+  return;
 }
 
-sub onAcknowledge($$) {
+sub onAcknowledge {
   my ($hash,$msg) = @_;
   my $ack;
   if (defined (my $outstanding = $hash->{messagesForRadioId}->{$msg->{radioId}}->{messages})) {
@@ -470,10 +481,11 @@ sub onAcknowledge($$) {
     $hash->{messagesForRadioId}->{$msg->{radioId}}->{numtries} = 1;
   }
   Log3 ($hash->{NAME},4,"MYSENSORS Read: unexpected ack ".dumpMsg($msg)) unless $ack;
+  return;
 }
 
-sub getFirmwareTypes($) {
-  my ($hash) = @_;
+sub getFirmwareTypes {
+  my $hash = shift;
   my $name = $hash->{NAME};
   my @fwTypes = ();
   my $filename = AttrVal($name, "OTA_firmwareConfig", undef);
@@ -496,7 +508,7 @@ sub getFirmwareTypes($) {
   return @fwTypes;
 }
 
-sub getLatestFirmware($$) {
+sub getLatestFirmware {
   my ($hash, $type) = @_;
   my $name = $hash->{NAME};
   my $cfgfilename = AttrVal($name, "OTA_firmwareConfig", undef);
@@ -528,7 +540,7 @@ sub getLatestFirmware($$) {
 }
 
 
-sub sendMessage($%) {
+sub sendMessage {
   my ($hash,%msg) = @_;
   $msg{ack} = $hash->{ack} unless defined $msg{ack};
   my $txt = createMsg(%msg);
@@ -555,10 +567,11 @@ sub sendMessage($%) {
     $messagesForRadioId->{nexttry} = gettimeofday()+$messagesForRadioId->{numtries};
     _scheduleTimer($hash);
   }
+  return;
 };
 
-sub _scheduleTimer($) {
-  my ($hash) = @_;
+sub _scheduleTimer {
+  my $hash = shift;
   $hash->{outstandingAck} = 0;
   RemoveInternalTimer($hash,"MYSENSORS::Timer");
   my $next;
@@ -568,9 +581,10 @@ sub _scheduleTimer($) {
     $next = $msgsForId->{nexttry} unless (defined $next and $next < $msgsForId->{nexttry});
   };
   InternalTimer($next, "MYSENSORS::Timer", $hash, 0) if (defined $next);
+  return;
 }
 
-sub matchClient($$) {
+sub matchClient {
   my ($hash,$msg) = @_;
   my $radioId = $msg->{radioId};
   my $found;
@@ -584,7 +598,7 @@ sub matchClient($$) {
   return $found;
 }
 
-sub matchChan76GWClient($$) {
+sub matchChan76GWClient {
   my ($hash,$msg) = @_;
   my $radioId = $msg->{radioId};
   my $found;
@@ -599,7 +613,7 @@ sub matchChan76GWClient($$) {
   }
   Log3($hash->{NAME}, 4, "$hash->{NAME}: matched firmware config request to hash $found, name: $found->{NAME}") if $found;
   return $found if $found;
-  return undef;
+  return;
 }
 
 1;

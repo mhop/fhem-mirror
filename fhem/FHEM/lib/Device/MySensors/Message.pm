@@ -10,21 +10,31 @@ use Exporter ('import');
 use strict;
 use warnings;
 
-sub parseMsg($) {
-  my $txt = shift;
-  if ($txt =~ /^(\d+);(\d+);(\d+);(\d+);(\d+);(.*)$/) {
-    return { radioId => $1,
-             childId => $2,
-             cmd     => $3,
-             ack     => $4,
-             subType => $5,
-             payload => $6 };
-  } else {
-    return undef;
-  };
+sub parseMsg {
+    my $txt = shift;
+
+    use bytes;
+
+    return if ($txt !~ m{\A
+               (?<nodeid>  [0-9]+);
+               (?<childid> [0-9]+);
+               (?<command> [0-4]);
+               (?<ack>     [01]);
+               (?<type>    [0-9]{1,2});
+               (?<payload> .*)
+               \z}xms);
+
+    return {
+        radioId => $+{nodeid}, # docs speak of "nodeId"
+        childId => $+{childid},
+        cmd     => $+{command},
+        ack     => $+{ack},
+        subType => $+{type},
+        payload => $+{payload}
+    };
 }
 
-sub createMsg(%) {
+sub createMsg {
   my %msgRef = @_;
   my @fields = ( $msgRef{'radioId'} // -1,
                  $msgRef{'childId'} // -1,
@@ -35,7 +45,7 @@ sub createMsg(%) {
   return join(';', @fields);
 }
 
-sub dumpMsg($) {
+sub dumpMsg {
 	my $msgRef = shift;
 	my $cmd = defined $msgRef->{'cmd'} ? commandToStr($msgRef->{'cmd'}) : "''";
 	my $st = (defined $msgRef->{'cmd'} and defined $msgRef->{'subType'}) ? subTypeToStr( $msgRef->{'cmd'}, $msgRef->{'subType'} ) : "''";
