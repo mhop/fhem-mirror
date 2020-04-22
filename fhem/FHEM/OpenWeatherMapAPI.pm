@@ -214,7 +214,7 @@ sub new {
     return $self;
 }
 
-sub parseApiOptions($) {
+sub parseApiOptions {
     my $apioptions = shift;
 
     my @params;
@@ -266,7 +266,7 @@ sub getWeather {
     return $self->{cached};
 }
 
-sub _RetrieveDataFromOpenWeatherMap($) {
+sub _RetrieveDataFromOpenWeatherMap {
     my $self = shift;
 
     # retrieve data from cache
@@ -326,8 +326,10 @@ sub _RetrieveDataFromOpenWeatherMap($) {
     }
 }
 
-sub _RetrieveDataFinished($$$) {
-    my ( $paramRef, $err, $response ) = @_;
+sub _RetrieveDataFinished {
+    my $paramRef    = shift;
+    my $err         = shift;
+    my $response    = shift;
     my $self = $paramRef->{self};
 
     if ( !$err ) {
@@ -342,8 +344,9 @@ sub _RetrieveDataFinished($$$) {
     }
 }
 
-sub _ProcessingRetrieveData($$) {
-    my ( $self, $response ) = @_;
+sub _ProcessingRetrieveData {
+    my $self        = shift;
+    my $response    = shift;
 
     if (    $self->{cached}->{status} eq 'ok'
         and defined($response)
@@ -401,6 +404,10 @@ sub _ProcessingRetrieveData($$) {
                             sprintf( "%.1f",
                                 ( $data->{main}->{temp_max} - 273.15 ) ) + 0.5
                         ),
+                        'tempFeelsLike_c' => int(
+                            sprintf( "%.1f",
+                                ( $data->{main}->{feels_like} - 273.15 ) ) + 0.5
+                        ),
                         'humidity' => $data->{main}->{humidity},
                         'condition' =>
                           encode_utf8( $data->{weather}->[0]->{description} ),
@@ -431,7 +438,10 @@ sub _ProcessingRetrieveData($$) {
                         ),
                         'pubDate' => strftimeWrapper(
                             "%a, %e %b %Y %H:%M",
-                            localtime( $data->{dt} )
+                            ( exists $data->{dt}
+                                ? localtime( $data->{dt} )
+                                : localtime( time )
+                            )
                         ),
                     };
                 }
@@ -444,7 +454,7 @@ sub _ProcessingRetrieveData($$) {
                         delete $self->{cached}->{forecast};
 
                         my $i = 0;
-                        foreach ( @{ $data->{list} } ) {
+                        for ( @{ $data->{list} } ) {
                             push(
                                 @{ $self->{cached}->{forecast}->{hourly} },
                                 {
@@ -580,7 +590,7 @@ sub _ProcessingRetrieveData($$) {
     _CallWeatherCallbackFn($self) if ( $self->{endpoint} eq 'none' );
 }
 
-sub _CallWeatherCallbackFn($) {
+sub _CallWeatherCallbackFn {
     my $self = shift;
 
     #     print 'Dumperausgabe: ' . Dumper $self;
@@ -588,8 +598,9 @@ sub _CallWeatherCallbackFn($) {
     main::Weather_RetrieveCallbackFn( $self->{devName} );
 }
 
-sub _ErrorHandling($$) {
-    my ( $self, $err ) = @_;
+sub _ErrorHandling {
+    my $self    = shift;
+    my $err     = shift;
 
     $self->{cached}->{current_date_time} =
       strftimeWrapper( "%a, %e %b %Y %H:%M", localtime( $self->{fetchTime} ) ),
@@ -597,7 +608,7 @@ sub _ErrorHandling($$) {
     $self->{cached}->{validity} = 'stale';
 }
 
-sub _CreateForecastRef($) {
+sub _CreateForecastRef {
     my $self = shift;
 
     my $forecastRef = (
@@ -613,7 +624,7 @@ sub _CreateForecastRef($) {
     return $forecastRef;
 }
 
-sub strftimeWrapper(@) {
+sub strftimeWrapper {
     my $string = POSIX::strftime(@_);
 
     $string =~ s/\xe4/ä/g;
@@ -649,7 +660,7 @@ sub strftimeWrapper(@) {
       "abstract": "Wetter API für OpenWeatherMap"
     }
   },
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
