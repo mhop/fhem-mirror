@@ -1,4 +1,4 @@
-REV 21735
+REV 21743
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,8 +21,8 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-04-21_07:45:02 337956 ./CHANGED
-UPD 2020-04-16_07:45:03 42122 ./MAINTAINER.txt
+UPD 2020-04-22_07:45:02 338183 ./CHANGED
+UPD 2020-04-22_07:45:02 42241 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2020-04-20_07:45:11 161529 ./fhem.pl
@@ -312,6 +312,7 @@ UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
 UPD 2020-03-29_07:45:03 168623 FHEM/57_Calendar.pm
 UPD 2020-03-25_07:45:03 227759 FHEM/57_SSCal.pm
+UPD 2020-04-22_07:45:02 52673 FHEM/58_HVAC_DaikinAC.pm
 UPD 2020-03-09_07:45:03 20495 FHEM/59_GSI.pm
 UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
 UPD 2020-03-16_07:45:03 26679 FHEM/59_LuftdatenInfo.pm
@@ -415,7 +416,7 @@ UPD 2019-03-23_07:45:03 31840 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2019-10-24_07:45:02 98948 FHEM/76_SMAInverter.pm
-UPD 2020-04-21_07:45:02 143793 FHEM/76_SMAPortal.pm
+UPD 2020-04-22_07:45:02 144268 FHEM/76_SMAPortal.pm
 UPD 2020-04-21_07:45:02 34158 FHEM/76_SMAPortalSPG.pm
 UPD 2018-06-04_07:45:02 37197 FHEM/76_msgDialog.pm
 UPD 2020-04-17_07:45:02 56471 FHEM/77_SMAEM.pm
@@ -644,7 +645,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-03-26_07:45:03 52693 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-25_07:45:03 4541 FHEM/lib/AttrTemplate/max.template
-UPD 2020-04-15_07:45:02 206915 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-04-22_07:45:02 207823 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-24_07:45:03 5068 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -743,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-04-21_07:45:06 4258942 docs/commandref.html
-UPD 2020-04-21_07:45:09 2631251 docs/commandref_DE.html
+UPD 2020-04-22_07:45:06 4276743 docs/commandref.html
+UPD 2020-04-22_07:45:08 2631520 docs/commandref_DE.html
 UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
 UPD 2020-04-20_07:45:02 89770 docs/commandref_frame_DE.html
-UPD 2020-04-21_07:45:10 230986 docs/commandref_modular.html
-UPD 2020-04-21_07:45:11 241807 docs/commandref_modular_DE.html
+UPD 2020-04-22_07:45:10 231154 docs/commandref_modular.html
+UPD 2020-04-22_07:45:11 241967 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
