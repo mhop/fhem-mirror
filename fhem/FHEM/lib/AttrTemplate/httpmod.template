@@ -74,7 +74,6 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
 defmod DEVICE HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= INTERVAL
 attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value replacement04Mode:reading,internal,text,expression,key replacement04Regex replacement04Value replacement05Mode:reading,internal,text,expression,key replacement05Regex replacement05Value
-attr DEVICE DbLogExclude .*
 attr DEVICE enableControlSet 1
 attr DEVICE group Spritpeise
 attr DEVICE reading010Name Heizoelpreis
@@ -523,8 +522,6 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 par:INTERVAL;Actual interval for updating, defaults to one day (86400s); {InternalVal("DEVICE","Interval",86400)}
 defmod DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/\DEVICE INTERVAL
 attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete showNewFWOnly:yes,no
-attr DEVICE DbLogExclude .*
-attr DEVICE alignTime 14:02
 attr DEVICE do_not_notify 1
 attr DEVICE enableControlSet 1
 attr DEVICE icon hm_ccu
