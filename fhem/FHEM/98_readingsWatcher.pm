@@ -122,7 +122,7 @@ sub Define {
     my $def  = shift;
     my ($name, $type, $noglobal) = split(m{ \s+ }xms, $def, 3);
 
-    if (exists($modules{readingsWatcher}{defptr})) {
+    if (exists($modules{readingsWatcher}{defptr}) && ($modules{readingsWatcher}{defptr}->{NAME} ne $name)) {
 	my $error = 'one readingsWatcher device is already defined !';
 	Log3 $hash, 1, $error;
 	return $error;
