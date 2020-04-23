@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_GardenaSmartBridge: change state value to Connected
  - change:  37_echodevice.pm more loginformations set "NPM_login refresh" 
  - bugfix:  88_HMCCU: Fixed bug in RPC callback URL creation.
  - bugfix:  OpenWeatherMapAPI: fix Use of uninitialized value in sprintf

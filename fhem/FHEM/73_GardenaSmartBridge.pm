@@ -63,7 +63,7 @@ use POSIX;
 use FHEM::Meta;
 
 use HttpUtils;
-our $VERSION = '1.6.8';
+our $VERSION = '1.6.9';
 
 my $missingModul = '';
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
@@ -395,7 +395,7 @@ sub Notify($$) {
     if (
         $devtype eq 'GardenaSmartBridge'
         and (
-            grep /^state:.connected.to.cloud$/,
+            grep /^state:.Connected$/,
             @{$events} or grep /^lastRequestState:.request_error$/,
             @{$events}
         )
@@ -697,7 +697,7 @@ sub ErrorHandling($$$) {
         return;
     }
 
-    readingsSingleUpdate( $hash, 'state', 'connected to cloud', 1 )
+    readingsSingleUpdate( $hash, 'state', 'Connected', 1 )
       if ( defined( $hash->{helper}{locations_id} ) );
     ResponseProcessing( $hash, $data )
       if ( ref($decode_json) eq 'HASH' );
