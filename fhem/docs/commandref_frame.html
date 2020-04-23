@@ -1528,6 +1528,20 @@ The following local attributes are used by a wider range of devices:
         dynamically.
     </li><br>
 
+    <a name="globaldisableFeatures"></a>
+    <li>disableFeatures <values><br>
+        comma separated list of values. Currently following values are
+        recognized:
+        <ul>
+          <li>attrTemplate: to avoid loading the AttrTemplates (which currently
+            consumes about 1MB of memory and needs some seconds to load on a
+            slow hardware)</li>
+          <li>securityCheck: to avoid checking if each Server port is secured
+            by password. May make sense to avoid warnings, if you know it
+            better.</li> </li><br>
+        </ul>
+        </li>
+
     <a name="dnsHostsFile"></a>
     <li>dnsHostsFile<br>
         If dnsServer is set, check the contents of the file specified as

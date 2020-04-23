@@ -331,7 +331,7 @@ my @globalAttrList = qw(
   blockingCallMax
   commandref:modular,full
   configfile
-  disableFeatures:multiple,attrTemplate
+  disableFeatures:multiple-strict,attrTemplate,securityCheck
   dnsHostsFile
   dnsServer
   dupTimeout
@@ -5983,6 +5983,7 @@ sub
 SecurityCheck()
 {
   my @fnd;
+  return if(AttrVal("global", "disableFeatures", "") =~ m/\bsecurityCheck\b/i);
   foreach my $sdev (keys %defs) {
     next if($defs{$sdev}{TEMPORARY});
     my $type = $defs{$sdev}{TYPE};
