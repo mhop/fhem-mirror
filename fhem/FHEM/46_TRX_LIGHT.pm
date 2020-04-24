@@ -34,7 +34,7 @@
 ##############################################################################
 #
 #	CHANGELOG
-#	20.12.2019	Added Westinghouse fan
+#	24.04.2020	Added Westinghouse fan (send only)
 #	20.12.2019	Fixed ASA (forum #98830)
 #				Added Kangtech (forum #105434)
 #				Minor Adjustment for DC106 Blinds (enable remote?)
