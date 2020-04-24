@@ -1,4 +1,4 @@
-REV 21756
+REV 21764
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -25,7 +25,7 @@ UPD 2020-04-23_07:45:04 338460 ./CHANGED
 UPD 2020-04-22_07:45:02 42241 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-04-20_07:45:11 161529 ./fhem.pl
+UPD 2020-04-24_07:45:11 161630 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-04-14_07:45:03 57876 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -512,7 +512,7 @@ UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2020-04-23_07:45:04 30432 FHEM/98_RandomTimer.pm
-UPD 2020-04-21_07:45:02 96690 FHEM/98_SVG.pm
+UPD 2020-04-24_07:45:02 96973 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
 UPD 2019-05-13_07:45:02 69009 FHEM/98_Text2Speech.pm
@@ -556,7 +556,7 @@ UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
 UPD 2019-11-19_07:45:03 23610 FHEM/98_serviced.pm
 UPD 2019-12-24_07:45:11 60214 FHEM/98_statistics.pm
-UPD 2020-02-07_07:45:02 33533 FHEM/98_structure.pm
+UPD 2020-04-24_07:45:02 34160 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2020-04-13_07:45:02 20644 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
@@ -642,7 +642,7 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-03-26_07:45:03 52693 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-04-24_07:45:02 54097 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-25_07:45:03 4541 FHEM/lib/AttrTemplate/max.template
 UPD 2020-04-23_07:45:04 207832 FHEM/lib/AttrTemplate/mqtt2.template
@@ -744,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-04-23_07:45:08 4279263 docs/commandref.html
-UPD 2020-04-23_07:45:10 2633041 docs/commandref_DE.html
-UPD 2020-03-14_07:45:02 80035 docs/commandref_frame.html
-UPD 2020-04-20_07:45:02 89770 docs/commandref_frame_DE.html
-UPD 2020-04-23_07:45:12 231154 docs/commandref_modular.html
-UPD 2020-04-23_07:45:13 241967 docs/commandref_modular_DE.html
+UPD 2020-04-24_07:45:06 4280112 docs/commandref.html
+UPD 2020-04-24_07:45:09 2633753 docs/commandref_DE.html
+UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
+UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
+UPD 2020-04-24_07:45:10 231768 docs/commandref_modular.html
+UPD 2020-04-24_07:45:11 242452 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
