@@ -246,6 +246,8 @@ my %fbhttp_readings = (
    summeractive    => '"summeractive:".($val ? "yes":"no")',
    holidayactive   => '"holidayactive:".($val ? "yes":"no")',
    lastpressedtimestamp => '"lastpressedtimestamp:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   lastpressedtimestamp_kurz => '"lastpressedtimestamp_kurz:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   lastpressedtimestamp_lang => '"lastpressedtimestamp_lang:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
 );
 
 sub
@@ -254,9 +256,28 @@ FBDECT_ParseHttp($$$)
   my ($iodev, $msg, $type) = @_;
   my $ioName = $iodev->{NAME};
   my %h;
+  my $omsg;
 
-  $msg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
-  $msg =~ s, ([a-z]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+  $omsg = $msg;
+  $omsg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
+  $omsg = $msg;
+  $omsg =~ s, ([a-z]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+
+  if($h{lastpressedtimestamp}) { # Dect400/#94700
+    sub dp($$$);
+    sub 
+    dp($$$)
+    {
+      my ($ln, $txt,$hptr) = (@_);
+      $txt =~ s#<([^/\s>]+?)[^/]*?>(.*?)</\g1>#
+        my ($n,$c) = ($1,$2);
+        $ln = $1 if($n eq "name" && $c =~ m/.*(kurz|lang)$/);
+        $hptr->{"${n}_$ln"} = $c if($n eq "lastpressedtimestamp" && $ln);
+        dp($ln, $c, $hptr) if($c && $c =~ m/^<.*>$/);
+      #gex;
+    }
+    dp("", $msg, \%h);
+  }
 
   my $ain = $h{identifier};
   $ain =~ s/[-: ]/_/g;
