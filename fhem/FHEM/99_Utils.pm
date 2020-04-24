@@ -17,7 +17,7 @@ time_str2num($)
   my ($str) = @_;
   my @a;
   return time() if(!$str);
-  @a = split("[ZT: -]", $str); # 31652, 110545, 
+  @a = split("[T: -]", $str); # 31652, 110545, 
   return mktime($a[5],$a[4],$a[3],$a[2],$a[1]-1,$a[0]-1900,0,0,-1);
 }
 
