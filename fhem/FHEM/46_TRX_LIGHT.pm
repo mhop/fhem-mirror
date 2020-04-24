@@ -34,6 +34,7 @@
 ##############################################################################
 #
 #	CHANGELOG
+#	20.12.2019	Added Westinghouse fan
 #	20.12.2019	Fixed ASA (forum #98830)
 #				Added Kangtech (forum #105434)
 #				Minor Adjustment for DC106 Blinds (enable remote?)
@@ -105,6 +106,7 @@ my %light_device_codes = (    # HEXSTRING => "NAME", "name of reading",
     0x1604 => [ "ENVIVO",       "chime" ],    # Envivo
                                               # 0x17: Fan
     0x1700 => [ "SIEMENS_SF01", "light" ],    # Siemens SF01
+    0x1704 => [ "WESTINGHOUSE", "light" ],    # Westinghouse 
                                               # 0x18: Curtain1
     0x1800 => [ "HARRISON",     "light" ],    # Harrison Curtain
                                               # 0x19: Blinds1
@@ -174,6 +176,8 @@ my %light_device_commands = (                 # HEXSTRING => commands
     0x1604 => ["ring"],                                                               # Envivo
                                                                                       # 0x17: Fan
     0x1700 => [ "", "timer", "-", "learn", "+", "confirm", "light", "on", "off" ],    # Siemens SF01
+    0x1704 => [ "", "Hi", "Med", "Low", "Off", "Light", "", "", "" ],                 # Westinghouse
+    
                                                                                       # 0x18: Curtain1
     0x1800 => [ "open", "close", "stop", "program" ],                                 # Harrison Curtain
                                                                                       # 0x19: Blinds1
@@ -680,6 +684,7 @@ sub TRX_LIGHT_Define($$) {
         && $type ne "CUVEO"
         && $type ne "BYRONSX"
         && $type ne "SIEMENS_SF01"
+        && $type ne "WESTINGHOUSE"
         && $type ne "HARRISON"
         && $type ne "ROLLER_TROL"
         && $type ne "HASTA_OLD"
@@ -1227,6 +1232,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  <li> <code>BYRONSX</code> (Byron SX chime devices. deviceid: 00-FF. Commands [ "tubular3_1", "solo1", "bigben1", "tubular2_1", "tubular2_2", "solo2", "tubular3_2"].)</li>
 	  <li> <code>SELECTPLUS</code> (SELECTPLUS] chime devices. deviceid: 0000-FFFF. Commands [ "ring"].)</li>
 	  <li> <code>SIEMENS_SF01</code> (Siemens SF01 devices. deviceid: 000000-007FFF. Commands [ "timer", "-", "learn", "+", "confirm", "light", "on", "off" ].)</li>
+	  <li> <code>WESTINGHOUSE</code> (Westinghouse Fans. deviceid: 000000-007FFF. Commands [ "", "Hi", "Med", "Low", "Off", "Light"].)</li>
 	  <li> <code>HARRISON</code> (Harrison curtain devices. deviceid: 00-FF. Commands [ "open", "close", "stop", "program" ].)</li>
 	  <li> <code>ROLLER_TROL</code> (Roller Trol blind devices. deviceid: 00000100-00FFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_limit" ].)</li>
 	  <li> <code>HASTA_OLD</code> (Hasta old blind devices. deviceid: 00000100-00FFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_limit" ].)</li>
