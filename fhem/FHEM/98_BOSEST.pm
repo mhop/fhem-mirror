@@ -389,7 +389,7 @@ sub BOSEST_Set($@) {
     my $list = "on:noArg off:noArg power:noArg play:noArg ".
                 "playPause:noArg ".
                 "mute:on,off,toggle recent source:".$hash->{helper}{supportedSourcesCmds}.
-                "shuffle:on,off repeat:all,one,off ".
+                " shuffle:on,off repeat:all,one,off ".
                 "nextTrack:noArg prevTrack:noArg playTrack speak speakOff ".
                 "playEverywhere:noArg stopPlayEverywhere:noArg createZone addToZone removeFromZone ".
                 "clock:enable,disable ".
