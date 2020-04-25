@@ -94,15 +94,14 @@ gassistant_Define($$)
 
   #CommandAttr(undef, "$name gassistantFHEM-filter room=GoogleAssistant") if( !AttrVal($name, 'gassistantFHEM-filter', undef ) );
 
-  if( !AttrVal($name, 'devStateIcon', undef ) ) {
-    CommandAttr(undef, "$name stateFormat gassistant-fhem");
-    CommandAttr(undef, "$name devStateIcon stopped:control_home\@red:start stopping:control_on_off\@orange running.*:control_on_off\@green:stop")
-  }
+  #if( !AttrVal($name, 'devStateIcon', undef ) ) {
+    CommandAttr(undef, "$name stateFormat gassistant-fhem-connection");
+    CommandAttr(undef, "$name devStateIcon connected:control_on_off\@green:reload disconnected:control_home\@red:start .*:control_on_off\@orange");
+  #}
 
   if( !AttrVal($name, 'room', undef ) ) {
     $attr{$hash->{NAME}}{room} = "GoogleAssistant";
   }
-
 
   $hash->{CoProcess} = {  name => 'gassistant-fhem',
                          cmdFn => 'gassistant_getCMD',
