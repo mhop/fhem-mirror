@@ -344,11 +344,11 @@ return;
 }
 
 ################################################################
-sub SSCal_Attr {
+sub SSCal_Attr {                                                  ## no critic 'complexity'
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash  = $defs{$name};
     my $model = $hash->{MODEL};
-    my ($do,$val,$cache);
+    my ($do,$val);
       
     # $cmd can be "del" or "set"
     # $name is device name
@@ -422,7 +422,7 @@ return;
 }
 
 ################################################################
-sub SSCal_Set {
+sub SSCal_Set {                                                    ## no critic 'complexity'
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -441,7 +441,7 @@ sub SSCal_Set {
   
   # alle aktuell angezeigten Event Id's  ermitteln
   my (@idarray,$evids);
-  foreach my $key (keys %{$defs{$name}{READINGS}}) {
+  for my $key (keys %{$defs{$name}{READINGS}}) {
       next if $key !~ /^.*_EventId$/;
       push (@idarray, $defs{$name}{READINGS}{$key}{VAL});   
   }
@@ -499,7 +499,7 @@ sub SSCal_Set {
       my $sub = sub { 
           my ($idx) = @_;
           my $ret;          
-          foreach my $key (reverse sort keys %{$data{SSCal}{$name}{sendqueue}{entries}{$idx}}) {
+          for my $key (reverse sort keys %{$data{SSCal}{$name}{sendqueue}{entries}{$idx}}) {
               $ret .= ", " if($ret);
               $ret .= $key."=>".$data{SSCal}{$name}{sendqueue}{entries}{$idx}{$key};
           }
@@ -510,7 +510,7 @@ sub SSCal_Set {
           return "SendQueue is empty.";
       }
       my $sq;
-      foreach my $idx (sort{$a<=>$b} keys %{$data{SSCal}{$name}{sendqueue}{entries}}) {
+      for my $idx (sort{$a<=>$b} keys %{$data{SSCal}{$name}{sendqueue}{entries}}) {
           $sq .= $idx." => ".$sub->($idx)."\n";             
       }
       return $sq;
@@ -522,7 +522,7 @@ sub SSCal_Set {
           $data{SSCal}{$name}{sendqueue}{index} = 0;
           return "All entries of SendQueue are deleted";
       } elsif($prop eq "-permError-") {
-          foreach my $idx (keys %{$data{SSCal}{$name}{sendqueue}{entries}}) { 
+          for my $idx (keys %{$data{SSCal}{$name}{sendqueue}{entries}}) { 
               delete $data{SSCal}{$name}{sendqueue}{entries}{$idx} 
                   if($data{SSCal}{$name}{sendqueue}{entries}{$idx}{forbidSend});            
           }
@@ -632,7 +632,7 @@ sub SSCal_Set {
       # Blocknummer ermitteln
       my $bnr;
       my @allrds = keys%{$defs{$name}{READINGS}};
-      foreach my $key(@allrds) {
+      for my $key(@allrds) {
           next if $key !~ /^.*_EventId$/;
           $bnr = (split("_", $key))[0] if($defs{$name}{READINGS}{$key}{VAL} == $eventid);   # Blocknummer ermittelt 
       }
@@ -678,7 +678,7 @@ return;
 }
 
 ################################################################
-sub SSCal_Get {
+sub SSCal_Get {                                                                       ## no critic 'complexity'
     my ($hash, @a) = @_;
     return "\"get X\" needs at least an argument" if ( @a < 2 );
     my $name = shift @a;
@@ -754,7 +754,7 @@ sub SSCal_Get {
             $ret .= "<tr class=\"even\">";  
             if($arg && $arg =~ /[\d]+/x) {
                 my @hints = split(",",$arg);
-                foreach (@hints) {
+                for (@hints) {
                     if(AttrVal("global","language","EN") eq "DE") {
                         $hs{$_} = $SSCal_vHintsExt_de{$_};
                     } else {
@@ -769,7 +769,7 @@ sub SSCal_Get {
                 }
             }          
             $i = 0;
-            foreach my $key (SSCal_sortVersion("desc",keys %hs)) {
+            for my $key (SSCal_sortVersion("desc",keys %hs)) {
                 $val0 = $hs{$key};
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
                 $ret .= "</tr>";
@@ -794,7 +794,7 @@ sub SSCal_Get {
             $ret .= "<tbody>";
             $ret .= "<tr class=\"even\">";
             $i = 0;
-            foreach my $key (SSCal_sortVersion("desc",keys %SSCal_vNotesExtern)) {
+            for my $key (SSCal_sortVersion("desc",keys %SSCal_vNotesExtern)) {
                 ($val0,$val1) = split(/\s/,$SSCal_vNotesExtern{$key},2);
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
                 $ret .= "</tr>";
@@ -1036,7 +1036,7 @@ sub SSCal_getapisites {
    }
    
    # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
-   foreach my $idx (sort{$a<=>$b} keys %{$data{SSCal}{$name}{sendqueue}{entries}}) {
+   for my $idx (sort{$a<=>$b} keys %{$data{SSCal}{$name}{sendqueue}{entries}}) {
        if (!$data{SSCal}{$name}{sendqueue}{entries}{$idx}{forbidSend}) {
            $hash->{OPIDX}  = $idx;
            $hash->{OPMODE} = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{opmode};
@@ -1087,7 +1087,7 @@ return;
 ####################################################################################  
 #      Auswertung Abruf apisites
 ####################################################################################
-sub SSCal_getapisites_parse {
+sub SSCal_getapisites_parse {                                                   ## no critic 'complexity'
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1338,7 +1338,7 @@ return;
 #############################################################################################
 #                                Callback from SSCal_calop
 #############################################################################################
-sub SSCal_calop_parse {  
+sub SSCal_calop_parse {                                                           ## no critic 'complexity'
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1428,7 +1428,7 @@ sub SSCal_calop_parse {
                 my @newa;
                 my $list = $modules{$hash->{TYPE}}{AttrList};
                 my @deva = split(" ", $list);
-                foreach (@deva) {
+                for (@deva) {
                      push @newa, $_ if($_ !~ /usedCalendars:/);
                 }
 
@@ -1548,7 +1548,7 @@ return;
 #############################################################################################
 #                    Extrahiert empfangene Kalendertermine (Events)
 #############################################################################################
-sub SSCal_extractEventlist { 
+sub SSCal_extractEventlist {                              ## no critic 'complexity'
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
@@ -1563,7 +1563,7 @@ sub SSCal_extractEventlist {
   my $datetimeend          = FmtDateTime($tend);
        
   my $n = 0;                                              # Zusatz f. lfd. Nr. zur Unterscheidung exakt zeitgleicher Events
-  foreach my $key (keys %{$data->{data}}) {
+  for my $key (keys %{$data->{data}}) {
       my $i = 0;
   
       while ($data->{data}{$key}[$i]) {
@@ -1631,7 +1631,7 @@ sub SSCal_extractEventlist {
               # Format: FREQ=YEARLY;COUNT=1;INTERVAL=2;BYMONTHDAY=15;BYMONTH=10;UNTIL=2020-12-31T00:00:00
               my @para  = split(";", $rr);
               
-              foreach my $par (@para) {
+              for my $par (@para) {
                   my ($p1,$p2) = split("=", $par);
                   if ($p1 eq "FREQ") {
                       $freq = $p2;
@@ -1767,7 +1767,7 @@ sub SSCal_extractEventlist {
                       my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rDayOfWeekNew,$rDaysToAddOrSub,$rNewTime);
                       my @ByDays = split(",", $byday);                          # Array der Wiederholungstage
                       
-                      foreach (@ByDays) {
+                      for (@ByDays) {
                           my $rByDay       = $_;                                # das erste Wiederholungselement
                           my $rByDayLength = length($rByDay);                   # die Länge des Strings       
   
@@ -1865,7 +1865,7 @@ sub SSCal_extractEventlist {
                       
                       while ($ci<$count) {                                                   
                           $rNewTime = $btsstart;
-                          foreach (@ByDays) {
+                          for (@ByDays) {
                               $ci++;
                               my $rByDay       = $_;                                                # das erste Wiederholungselement    
                               my @weekdays     = qw(SU MO TU WE TH FR SA);
@@ -2060,15 +2060,15 @@ return SSCal_createReadings ("$name|$rowlist");       # synchoner Mode
 #############################################################################################
 #                    Extrahiert empfangene Tasks aus ToDo-Kalender (Aufgabenliste)
 #############################################################################################
-sub SSCal_extractToDolist { 
+sub SSCal_extractToDolist {                               ## no critic 'complexity'
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $data   = delete $hash->{eventlist};
   my $am     = AttrVal($name, "asyncMode", 0);
   
   my ($val,$tz,$td,$d,$t,$uts); 
-  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$numday,$bi,$ei,$startEndDiff,$excl);
-  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets,$ydiff);
+  my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl);
+  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
   my (undef,$tstart,$tend) = SSCal_timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
@@ -2076,7 +2076,7 @@ sub SSCal_extractToDolist {
   my $datetimeend          = FmtDateTime($tend);
        
   my $n = 0;       
-  foreach my $key (keys %{$data->{data}}) {
+  for my $key (keys %{$data->{data}}) {
       my $i = 0;
   
       while ($data->{data}{$key}[$i]) {
@@ -2167,7 +2167,7 @@ sub SSCal_createReadings {
       my @row_array = split("_ESC_", $rowlist);
       
       # zentrales Datenhash füllen (erzeugt dadurch sortierbare Keys)
-      foreach my $row (@row_array) {
+      for my $row (@row_array) {
           chomp $row;
           my @r = split(" ", $row, 3);
           $data{SSCal}{$name}{eventlist}{$r[0]}{$r[1]} = $r[2];
@@ -2182,11 +2182,11 @@ sub SSCal_createReadings {
       $data{SSCal}{$name}{lstUpdtTs} = $hash->{".updateTime"};               # letzte Updatezeit speichern (Unix Format)                    
       
       my $k = 0;
-      foreach my $idx (sort keys %{$data{SSCal}{$name}{eventlist}}) {
+      for my $idx (sort keys %{$data{SSCal}{$name}{eventlist}}) {
           my $idxstr = sprintf("%0$l.0f", $k);                               # Blocknummer erstellen 
           push(@abnr, $idxstr);                                              # Array aller vorhandener Blocknummern erstellen
           
-          foreach my $r (keys %{$data{SSCal}{$name}{eventlist}{$idx}}) {
+          for my $r (keys %{$data{SSCal}{$name}{eventlist}{$idx}}) {
               if($r =~ /.*Timestamp$/x) {                                     # Readings mit Unix Timestamps versteckt erstellen
                   readingsBulkUpdate($hash, ".".$idxstr."_".$r, $data{SSCal}{$name}{eventlist}{$idx}{$r});
               } else {
@@ -2245,7 +2245,7 @@ sub SSCal_doCompositeEvents {
   }
   CommandTrigger(undef, "$name $event");
   
-  foreach my $bnr (@{$abnr}) {
+  for my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
@@ -2284,13 +2284,13 @@ sub SSCal_createATdevices {
   readingsDelete($hash,".associatedWith");                                               # Deviceassoziationen löschen
   
   @devs = devspec2array("TYPE=at:FILTER=NAME=SSCal.$name.*"); 
-  foreach (@devs) {
+  for (@devs) {
       next if(!$defs{$_});
       Log3($name, 4, "$name - delete device: $_");  
       CommandDelete(undef,$_);
   }            
   
-  foreach my $bnr (@{$abnr}) {
+  for my $bnr (@{$abnr}) {
       $summary    = ReadingsVal($name, $bnr."_01_Summary",      "");
       $desc       = ReadingsVal($name, $bnr."_03_Description",  "");
       $begin      = ReadingsVal($name, $bnr."_05_Begin",        "");
@@ -2390,7 +2390,7 @@ return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth
 #         (Index aus BeginTimestamp + lfNr) , (Blockindex_Reading) , (Wert)
 #
 #############################################################################################
-sub SSCal_writeValuesToArray {                 
+sub SSCal_writeValuesToArray {                                                   ## no critic 'complexity'
   my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref,$uid) = @_;
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
@@ -2437,7 +2437,7 @@ sub SSCal_writeValuesToArray {
   my $isRecurrence = 0;
   my $isAlldaychanded;                                                                                       # 0 -> Ganztagsevent wurde in Serienelement geändert in kein Ganztagsevent
   
-  foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                             # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
+  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                             # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
       next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_});
       $isRecurrence = 1 if($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_} eq $origdtstart);
   }
@@ -2445,7 +2445,7 @@ sub SSCal_writeValuesToArray {
   my $l   = length (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}});                        # Anzahl Stellen (Länge) des aktuellen VALM TIMEVALUE Hashes
   my $ens = 0;
   
-  foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}}) {
+  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}}) {
       my $z = $_;
       $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
       
@@ -2471,7 +2471,7 @@ sub SSCal_writeValuesToArray {
   }
 
   # restliche Keys extrahieren
-  foreach my $p (keys %{$vh}) {
+  for my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
       $vh->{$p} = SSCal_jboolmap($vh->{$p});
       next if($vh->{$p} eq "");
@@ -2484,7 +2484,7 @@ sub SSCal_writeValuesToArray {
       
       if($p eq "gps") {
           my ($address,$lng,$lat) = ("","","");
-          foreach my $r (keys %{$vh->{gps}}) {
+          for my $r (keys %{$vh->{gps}}) {
               $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
               next if($vh->{$p}{$r} eq "");
               if ($r eq "address") {
@@ -2513,7 +2513,7 @@ sub SSCal_writeValuesToArray {
       push(@row_array, $bts+$n." 90_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
-          foreach my $r (keys %{$vh->{evt_repeat_setting}}) {
+          for my $r (keys %{$vh->{evt_repeat_setting}}) {
               $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
               next if($vh->{$p}{$r} eq "");
               $val = encode("UTF-8", $vh->{$p}{$r});                 
@@ -2581,7 +2581,7 @@ sub SSCal_extractIcal {
      
       my $do = 0;
       $n     = 0;
-      foreach (@ical) {
+      for (@ical) {
           if($_ =~ m/^([-A-Z]*;).*/) {
               ($k,$v) = split(";", $_, 2);
           } else {
@@ -2621,7 +2621,7 @@ sub SSCal_extractIcal {
   
   $n = 0;
   while ($vh->{evt_notify_setting}[$n]) {
-      foreach (keys %{$vh->{evt_notify_setting}[$n]}) {
+      for (keys %{$vh->{evt_notify_setting}[$n]}) {
           if($_ eq "recurrence-id") {
               $valm{$n}{RECURRENCEID} = SSCal_icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
           }
@@ -3363,7 +3363,7 @@ sub SSCal_getclhash {
       my $outdev;
       my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
       my $i = 1;
-      foreach (@webdvs) {
+      for (@webdvs) {
           $outdev = $_;
           next if(!$defs{$outdev});
           $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
@@ -3401,7 +3401,7 @@ sub SSCal_getCalFromId {
   my $cal         = "";
   $cid            = SSCal_trim($cid);
   
-  foreach my $calname (keys %{$hash->{HELPER}{CALENDARS}}) {
+  for my $calname (keys %{$hash->{HELPER}{CALENDARS}}) {
       my $oid = $hash->{HELPER}{CALENDARS}{"$calname"}{id};
       next if(!$oid);
       $oid = SSCal_trim($oid);
@@ -3440,7 +3440,7 @@ sub SSCal_delReadings {
   $excl .= "|lastUpdate" if($respts);
   
   my @allrds = keys%{$defs{$name}{READINGS}};
-  foreach my $key(@allrds) {
+  for my $key(@allrds) {
       if($respts) {
           $lu  = $data{SSCal}{$name}{lastUpdate};
           $rts = ReadingsTimestamp($name, $key, $lu);
@@ -3497,7 +3497,7 @@ sub SSCal_explodeDateTime {
       if($dt eq $dtstart) {$checkbegin = 1} else {$checkbegin = 0};             
       if ($checkbegin) {
           # prüfen ob DTSTART verändert
-          foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
+          for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
               next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_});
               $z = $_ if($data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
           }
@@ -3509,7 +3509,7 @@ sub SSCal_explodeDateTime {
           }
       } else {
           # prüfen ob DTEND verändert
-          foreach (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
+          for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}}) {
               next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_});
               $z = $_ if($data{SSCal}{$name}{vcalendar}{"$uid"}{RECURRENCEID}{$_} eq $dtstart);
           }
@@ -3633,7 +3633,7 @@ return $bool;
 #############################################################################################
 #   Kalenderliste als HTML-Tabelle zurückgeben
 #############################################################################################
-sub SSCal_calAsHtml {      
+sub SSCal_calAsHtml {                                                                 ## no critic 'complexity'
   my ($name,$FW_wname) = @_;
   my $hash             = $defs{$name};  
   my $lang             = AttrVal("global", "language", "EN");
@@ -3721,7 +3721,7 @@ sub SSCal_calAsHtml {
   }
   
   my $maxbnr;
-  foreach my $key (keys %{$defs{$name}{READINGS}}) {
+  for my $key (keys %{$defs{$name}{READINGS}}) {
       next if $key !~ /^(\d+)_\d+_EventId$/;
       $maxbnr = $1 if(!$maxbnr || $1>$maxbnr);
   }
@@ -3910,7 +3910,7 @@ return $out;
 # $rdtype:   erwarteter Datentyp als Rückgabe (image, string)
 #
 ######################################################################################
-sub SSCal_evalTableSpecs { 
+sub SSCal_evalTableSpecs {                                                    ## no critic 'complexity'
   my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
   my $name = $hash->{NAME};
   my $check;
