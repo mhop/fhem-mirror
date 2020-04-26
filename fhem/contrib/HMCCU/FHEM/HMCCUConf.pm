@@ -38,6 +38,9 @@ use vars qw(%HMCCU_SCRIPTS);
 	'SHUTTER_CONTACT_TRANSCEIVER' => {
 		F => 3, S => 'STATE', C => '', V => ''
 	},
+	'ROTARY_HANDLE_SENSOR' => {
+		F => 3, S => 'STATE', C => '', V => ''
+	},
 	'ROTARY_HANDLE_TRANSCEIVER' => {
 		F => 3, S => 'STATE', C => '', V => ''
 	},
@@ -270,6 +273,9 @@ use vars qw(%HMCCU_SCRIPTS);
 		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'SHUTTER_CONTACT_TRANSCEIVER' => {
+		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
+	},
+	'ROTARY_HANDLE_SENSOR' => {
 		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'ROTARY_HANDLE_TRANSCEIVER' => {

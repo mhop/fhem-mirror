@@ -244,23 +244,21 @@ sub HMCCUCHN_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 
-	return "No set command specified" if (!defined ($opt));
+	return 'No set command specified' if (!defined($opt));
 	$opt = lc($opt);
 
-	# Get I/O device, check device state
-	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
-		!defined ($hash->{IODev}));
+	# Check device state
+	return undef if (!defined($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
+		!defined($hash->{IODev}));
 	return undef if ($hash->{readonly} eq 'yes' && $opt ne '?' &&
 		$opt !~ /^(clear|config|defaults)$/);
-
-	my $disable = AttrVal ($name, "disable", 0);
-	return undef if ($disable == 1);	
+	return undef if (AttrVal ($name, 'disable', 0) == 1);
 
 	my $ioHash = $hash->{IODev};
 	my $ioName = $ioHash->{NAME};
 	if (HMCCU_IsRPCStateBlocking ($ioHash)) {
 		return undef if ($opt eq '?');
-		return "HMCCUCHN: CCU busy";
+		return 'HMCCUCHN: CCU busy';
 	}
 
 	my $ccutype = $hash->{ccutype};
@@ -314,9 +312,21 @@ sub HMCCUCHN_Set ($@)
 
 	# Log commands
 	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a))
-		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand')); 
+		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand'));
+		
+	if ($opt eq 'control') {
+		return HMCCU_SetError ($hash, -14) if ($cd eq '');
+		my $value = shift @$a;
+		return HMCCU_SetError ($hash, "Usage: set $name control {value}") if (!defined($value));
 
-	if ($opt eq 'datapoint') {
+		$value =~ s/\\_/%20/g;
+
+		$rc = HMCCU_SetMultipleDatapoints ($hash,
+			{ "001.$ccuif.$ccuaddr.$cd" => HMCCU_Substitute ($value, $stateVals, 1, undef, '') }
+		);
+		return HMCCU_SetError ($hash, HMCCU_Min(0, $rc));
+	}
+	elsif ($opt eq 'datapoint') {
 		my $usage = "Usage: set $name datapoint {{datapoint} {value} | {datapoint}={value}} [...]";
 		my %dpval;
 		my $i = 0;
@@ -641,16 +651,16 @@ sub HMCCUCHN_Get ($@)
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 		return $result;
 	}
-	elsif ($opt eq 'update') {
-		my $ccuget = shift @$a;
-		$ccuget = 'Attr' if (!defined ($ccuget));
-		if ($ccuget !~ /^(Attr|State|Value)$/) {
-			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
-		}
-		$rc = HMCCU_GetUpdate ($hash, $ccuaddr, $ccuget);
-		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		return undef;
-	}
+# 	elsif ($opt eq 'update') {
+# 		my $ccuget = shift @$a;
+# 		$ccuget = 'Attr' if (!defined ($ccuget));
+# 		if ($ccuget !~ /^(Attr|State|Value)$/) {
+# 			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
+# 		}
+# 		$rc = HMCCU_GetUpdate ($hash, $ccuaddr, $ccuget);
+# 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+# 		return undef;
+# 	}
 	elsif ($opt eq 'deviceinfo') {
 		my ($a, $c) = HMCCU_SplitChnAddr ($ccuaddr);
 		$result = HMCCU_GetDeviceInfo ($hash, $a);
@@ -658,8 +668,8 @@ sub HMCCUCHN_Get ($@)
 		my $devInfo = HMCCU_FormatDeviceInfo ($result);
 		return $devInfo;
 	}
-	elsif ($opt =~ /^(config|values)$/) {
-		my %parSets = ('config' => 'MASTER,LINK', 'values' => 'VALUES');
+	elsif ($opt =~ /^(config|values|update)$/) {
+		my %parSets = ('config' => 'MASTER,LINK', 'values' => 'VALUES', 'update' => 'VALUES,MASTER,LINK');
 		my $defParamset = $parSets{$opt};
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);
@@ -678,7 +688,7 @@ sub HMCCUCHN_Get ($@)
 
 				if ($ps eq 'LINK') {
 					foreach my $rcv (HMCCU_GetReceivers ($ioHash, $ccuaddr, $ccuif)) {
-						($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $rcv, undef, undef);
+						($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $rcv, undef);
 						next if ($rc < 0);
 						foreach my $p (keys %$result) {
 							$objects{$da}{$dc}{"LINK.$rcv"}{$p} = $result->{$p};
@@ -686,7 +696,7 @@ sub HMCCUCHN_Get ($@)
 					}
 				}
 				else {
-					($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $ps, undef, undef);
+					($rc, $result) = HMCCU_RPCRequest ($hash, 'getRawParamset', $a, $ps, undef);
 					return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
 					foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
 				}
@@ -711,7 +721,7 @@ sub HMCCUCHN_Get ($@)
 			}
 		}
 		
-		return $res eq '' ? "No data found" : $res;
+		return $res eq '' ? 'No data found' : $res;
 	}
 	elsif ($opt eq 'paramsetdesc') {
 		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
@@ -793,6 +803,10 @@ sub HMCCUCHN_Get ($@)
          If <i>type</i> is not specified, it's taken from
          parameter set definition. The default <i>type</i> is STRING.
          Valid types are STRING, BOOL, INTEGER, FLOAT, DOUBLE.
+      </li><br/>
+      <li><b>set &lt;name&gt; control &lt;value&gt;</b><br/>
+      	Set value of control datapoint. This command is available for compatibility reasons.
+      	It should not be used any more.
       </li><br/>
       <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; | &lt;datapoint&gt=&lt;value&gt; [...]</b><br/>
         Set datapoint values of a CCU channel. If parameter <i>value</i> contains special
@@ -901,11 +915,17 @@ sub HMCCUCHN_Get ($@)
    <ul>
       <li><b>get &lt;name&gt; config</b><br/>
          Get configuration parameters of device and channel.
-         If ccuflag noReadings is set results are displayed in browser window. Otherwise
-         they are stored as readings beginning with "R-" for MASTER parameters and "L-" for
-         LINK parameters. 
-         Prefixes can be modified with attribute 'ccuReadingPrefix'. If option 'device' is specified parameters
-         of device are read. Without option 'device' parameters of current channel and channel 0 are read.
+         Values related to configuration ot link parameters are stored as readings beginning
+         with "R-" for MASTER parameters and "L-" for LINK parameters. 
+         Prefixes can be modified with attribute 'ccuReadingPrefix'. Whether parameters are
+         stored as readings or not, can be controlled by setting the following flags in
+         attribute ccuflags:<br/>
+         noReadings: Do not store any reading.<br/>
+         showMasterReadings: Store configuration readings of current channel.<br/>
+         showDeviceReadings: Store readings of device and channel 0.<br/>
+         showLinkReadings: Store readings of links.<br/>
+         If non of the flags is set, only readings belonging to parameter set VALUES (datapoints)
+         are stored.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
          Get value of a CCU channel datapoint.
