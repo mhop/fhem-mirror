@@ -2005,7 +2005,7 @@ attr DEVICE setList\
   pct:slider,0,1,100 shellies/DEVNAME/light/0/set {"turn": "on","brightness": $EVTPART1}\
   int(ReadingsNum($NAME,'pct',0)/10)*10-10
     dimup:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+4)/10)*10+10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
-  dimdown:noArg my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
+  dimdown:noArg { my $num=int((ReadingsNum($NAME,'pct',0)+7)/10)*10-10; return qq {shellies/DEVNAME/light/0/set {"turn": "on", "brightness": $num}}; }\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \

@@ -624,6 +624,96 @@ attr DEVICE webCmd reread
 attr DEVICE model homematic_fw_check_v2
 
 
+#Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
+name:aculfw_fw_check
+filter:TYPE=X_01d
+desc: checks a-culfw firmware updates<br />Define a HTTPMOD device like<br />define aculfw_fw_check HTTPMOD https://github.com/heliflieger/a-culfw/blob/master/CHANGELOG 86400<br /><a href="https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829">Source: Forum</a>
+order:order: XXXXX
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+par:INTERVAL;Actual interval for updating, defaults to daily (86400s); {InternalVal("DEVICE","Interval",86400)}
+defmod DEVICE HTTPMOD https://github.com/heliflieger/a-culfw/blob/master/CHANGELOG INTERVAL
+attr DEVICE userattr reading01Name reading01Regex updatableDevicesMode:onlyUpdatable,all
+attr DEVICE do_not_notify 1
+attr DEVICE enableControlSet 1
+attr DEVICE event-on-update-reading LAST_ERROR,MATCHED_READINGS
+attr DEVICE handleRedirects 1
+attr DEVICE icon cul_usb
+attr DEVICE reading01Name latestVersion
+attr DEVICE reading01Regex \#\#\# ([\d]\.[\d]{2}\.[\d]{2})
+attr DEVICE room WHICHROOM
+attr DEVICE showError 1
+attr DEVICE showMatched 1
+attr DEVICE stateFormat {	my $ret ="";;\
+	my $lastCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(ReadingsTimestamp($name,"MATCHED_READINGS","2000-01-01 00:00:00"))));;\
+	my $nextCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(InternalVal($name,"TRIGGERTIME_FMT","2000-01-01 00:00:00"))));;\
+	my $cellstyle = "padding:3pt;;border-bottom:1px dotted lightgray;;";;\
+	$ret .= '<div style="text-align:left;;">';;\
+	$ret .= 'last <a href="https://github.com/heliflieger/a-culfw" title="aculfw" rel="noopener noreferrer" target="_blank">a-culfw</a> version check => '.$lastCheck;;\
+	$ret .= '<br />';;\
+    my $check = ReadingsVal($name,"updatableDevices","error => no or wrong data from server!");;\
+    if($check eq "no updates needed!") {\
+      $ret .= '<div style="color:limegreen;;font-weight:bold;;">';;\
+      $ret .= $check;;\
+      $ret .= '</div>';;\
+    } elsif($check eq "error => no or wrong data from server!") {\
+      $ret .= '<div style="color:limegreen;;font-weight:bold;;">';;\
+      $ret .= $check;;\
+      $ret .= '</div>';;\
+    } else {\
+      my @devices = split(',',$check);;\
+	  $ret .= '<br /><div style="display:table;;width:80%;;">';;\
+		$ret .= '<div style="display:table-row;;">';;\
+		$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:60%;;font-weight:bold;;">device</div>';;\
+		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:20%;;font-weight:bold;;">current</div>';;\
+		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:20%;;font-weight:bold;;">new</div>';;\
+		$ret .= '</div>';; #header\
+      foreach my $devStr (@devices) {\
+        my ($dev,$old,$new) = $devStr =~ m/^([^\s]+)\s\(([^\s]+)\s\|\s([^\)]+)\)$/;;\
+		$ret .= '<div style="display:table-row;;">';;\
+			$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:60%;;">';;\
+				$ret .= '<a href="/fhem?detail='.$dev.'" title="'.$dev.' ('.$old.')">';;\
+				$ret .= AttrVal($dev,"alias",$dev);;\
+				$ret .= '</a></div>';;\
+			$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:20%;;font-weight:bold;;">';;\
+				$ret .= '<a href="https://github.com/heliflieger/a-culfw/releases/tag/'.$old.'" title="a-culfw '.$old.'" rel="noopener noreferrer" target="_blank" style="color:lightgray;;">';;\
+				$ret .= $old;;\
+        		$ret .= '</a></div>';;\
+			$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:20%;;font-weight:bold;;">';;\
+        		$ret .= '<a href="https://github.com/heliflieger/a-culfw/releases/tag/'.$new.'" title="a-culfw '.$new.'" rel="noopener noreferrer" target="_blank" style="color:red;;">';;\
+        		$ret .= $new;;\
+        	$ret .= '</a></div>';;\
+		$ret .= '</div>';; #row\
+      }\
+	  $ret .= '</div>';; #table\
+    }\
+	$ret .= "<br /><div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
+	$ret .= '</div>';;\
+  return $ret;;\
+}
+attr DEVICE updatableDevicesMode onlyUpdatable
+attr DEVICE userReadings updatableDevices {\
+  my $ret = "";;\
+  my $updateall = AttrVal($name,"updatableDevicesMode","");;\
+  if (ReadingsVal($name,"MATCHED_READINGS","") eq "") {\
+    $ret = "error => no or wrong data from server!";;\
+  } else {\
+    my $VERSION = ReadingsVal($name,"latestVersion","unknown");;\
+    foreach my $dev (devspec2array("TYPE=CUL")) {\
+      my $version = InternalVal($dev,"VERSION","unknown");;\
+      $version =~ m/([\d]\.[\d]{2}\.[\d]{2})/;;\
+      $version = $1;;\
+      if(($updateall eq "all") || ($version ne $VERSION)) {\
+        $ret .= "," if($ret ne "");;\
+        $ret .= $dev." (".$version." | ".$VERSION.")";;\
+      }\
+    }\
+  }\
+  return ($ret eq "")?"no updates needed!":$ret;;\
+}
+attr DEVICE webCmd reread
+attr DEVICE model aculfw_fw_check
+
+
 #Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg992348.html#msg992348
 name:tasmota_firmware_updates
 filter:TYPE=HTTPMOD
