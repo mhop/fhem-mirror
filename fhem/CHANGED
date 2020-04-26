@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 10_SOMFY: new attr autoStoreRollingCode - store rc in uniqueID
  - bugfix:  OpenWeatherMapAPI: fix no visibility is available
  - feature: 57_SSCal: set compatibility to Calendar package 2.3.4-0631, 
                       some changes according to PBP
