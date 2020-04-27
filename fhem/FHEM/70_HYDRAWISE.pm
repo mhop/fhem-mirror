@@ -798,7 +798,7 @@ sub HYDRAWISE_GetDay {
 1;
 
 =pod
-=item command
+=item device
 =item summary    controlling Hydrawise irrigation
 =item summary_DE Steuerung der Hydrawise-Bewässerung
 
