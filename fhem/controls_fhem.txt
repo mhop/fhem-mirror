@@ -1,4 +1,4 @@
-REV 21777
+REV 21783
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-04-26_07:45:02 338647 ./CHANGED
+UPD 2020-04-27_07:45:02 338722 ./CHANGED
 UPD 2020-04-22_07:45:02 42241 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -90,7 +90,7 @@ UPD 2019-11-14_07:45:03 55682 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2020-01-15_07:45:02 19430 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
-UPD 2018-01-07_07:45:03 61206 FHEM/10_SOMFY.pm
+UPD 2020-04-27_07:45:02 64385 FHEM/10_SOMFY.pm
 UPD 2019-12-21_07:45:03 18318 FHEM/10_UNIRoll.pm
 UPD 2019-12-24_07:45:11 54268 FHEM/10_WS980.pm
 UPD 2020-04-14_07:45:03 254451 FHEM/10_ZWave.pm
@@ -642,10 +642,10 @@ UPD 2019-07-01_07:45:03 421 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-04-24_07:45:02 54097 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-04-27_07:45:02 58968 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-03-25_07:45:03 4541 FHEM/lib/AttrTemplate/max.template
-UPD 2020-04-23_07:45:04 207832 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-04-27_07:45:02 207789 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-03-24_07:45:03 5068 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -744,12 +744,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-04-26_07:45:06 4280294 docs/commandref.html
+UPD 2020-04-27_07:45:06 4280555 docs/commandref.html
 UPD 2020-04-26_07:45:08 2633795 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-04-26_07:45:09 231768 docs/commandref_modular.html
-UPD 2020-04-26_07:45:10 242452 docs/commandref_modular_DE.html
+UPD 2020-04-27_07:45:10 231768 docs/commandref_modular.html
+UPD 2020-04-27_07:45:11 242452 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1383,6 +1383,7 @@ UPD 2015-07-28_14:05:32 1650 www/images/fhemSVG/fts_window_1wbb_open.svg
 UPD 2020-03-02_07:45:03 3323 www/images/fhemSVG/fuel.svg
 UPD 2017-11-14_07:45:02 5430 www/images/fhemSVG/garden_socket.svg
 UPD 2017-11-26_07:45:02 2381 www/images/fhemSVG/gasoline.svg
+UPD 2020-04-27_07:45:02 941642 www/images/fhemSVG/gefrierschrank_icon.svg
 UPD 2015-07-28_14:05:32 2898 www/images/fhemSVG/general_an.svg
 UPD 2015-07-28_14:05:32 8074 www/images/fhemSVG/general_an_fuer_zeit.svg
 UPD 2015-07-28_14:05:32 5226 www/images/fhemSVG/general_aus.svg
@@ -1467,6 +1468,8 @@ UPD 2020-03-02_07:45:03 235113 www/images/fhemSVG/it_raspberry.svg
 UPD 2020-03-02_07:45:03 69515 www/images/fhemSVG/it_raspberry_logo.svg
 UPD 2017-11-14_07:45:02 6772 www/images/fhemSVG/it_remote_folder.svg
 UPD 2017-05-05_07:45:02 5178 www/images/fhemSVG/kindle.svg
+UPD 2020-04-27_07:45:02 177096 www/images/fhemSVG/kuehlschrank_big.svg
+UPD 2020-04-27_07:45:02 270578 www/images/fhemSVG/kuehlschrank_small.svg
 UPD 2015-07-28_14:05:32 8487 www/images/fhemSVG/lan_rs485.svg
 UPD 2015-07-28_14:05:32 3820 www/images/fhemSVG/light_ceiling.svg
 UPD 2015-07-28_14:05:32 2126 www/images/fhemSVG/light_ceiling_off.svg
