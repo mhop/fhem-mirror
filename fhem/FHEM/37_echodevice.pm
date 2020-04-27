@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2020.04.27 v0.1.6
+# - FEATURE: Unterstützung A1WAR447VT003J Yamaha MusicCast 20
+# - CHANGE:  get status erweitert
+#
 # 2020.04.22 v0.1.5
 # - CHANGE:  Mehr Loginfos bei set "NPM_login refresh" 
 #
@@ -384,7 +388,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.5";
+my $ModulVersion     = "0.1.6";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -660,6 +664,7 @@ sub echodevice_Get($@) {
 		$return .= "<tr><td><strong>Beschreibung&nbsp;&nbsp;&nbsp</strong></td><td><strong>Bereich&nbsp;&nbsp;&nbsp</strong></td><td><strong>Wert</strong></td></tr>";
 		$return .= "<tr><td>STATE&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . ReadingsVal( $name, "state", "unbekannt") . "</td></tr>";
 		$return .= "<tr><td>Version&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . ReadingsVal( $name, "version", "unbekannt") . "</td></tr>";
+		$return .= "<tr><td>NPM Cookie Version&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . echodevice_NPMCheckVersion($hash,"cache/alexa-cookie/node_modules/alexa-cookie2/package.json","get status") . "</td></tr>";
 		$return .= "<tr><td>COOKIE_STATE&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . ReadingsVal( $name, "COOKIE_STATE", "unbekannt") . "</td></tr>";
 		$return .= "<tr><td>COOKIE_TYPE&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . ReadingsVal( $name, "COOKIE_TYPE", "unbekannt") . "</td></tr>";
 		$return .= "<tr><td>COOKIE_MODE&nbsp;&nbsp;&nbsp;</td><td>Reading</td><td>" . $hash->{LOGINMODE} . "</td></tr>";
@@ -4183,6 +4188,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "AKOAGQTKAS9YB"  || $ModelNumber eq "Echo Connect")			{return "Echo Connect";}
 	elsif($ModelNumber eq "A3NTO4JLV9QWRB" || $ModelNumber eq "Gigaset L800HX")			{return "Gigaset L800HX";}
 	elsif($ModelNumber eq "A1HNT9YTOBE735" || $ModelNumber eq "Telekom Smart Speaker")	{return "Telekom Smart Speaker";}
+	elsif($ModelNumber eq "A1WAR447VT003J" || $ModelNumber eq "Yamaha MusicCast 20")	{return "Yamaha MusicCast 20";}
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
@@ -4519,6 +4525,9 @@ sub echodevice_NPMLoginNew($){
 		return $InstallResult;
 	}
 	
+	# Version prüfen;
+	echodevice_NPMCheckVersion($hash,"cache/alexa-cookie/node_modules/alexa-cookie2/package.json","echodevice_NPMLoginNew");
+	
 	my $ProxyPort = AttrVal($name,"npm_proxy_port","3002");
 	my $OwnIP     = "127.0.0.1";
 
@@ -4738,6 +4747,9 @@ sub echodevice_NPMLoginRefresh($){
 		return $InstallResult;
 	}
 	
+	# Version prüfen;
+	echodevice_NPMCheckVersion($hash,"cache/alexa-cookie/node_modules/alexa-cookie2/package.json","echodevice_NPMLoginRefresh");
+	
 	# Prüfen ob das Refresh Cookie gültig ist!
 	Log3 $name, 4, "[$name] [echodevice_NPMLoginRefresh] check Refresh Cookie String" ;
 	if (substr($RefreshCookie,0,1) ne "{") { 
@@ -4848,6 +4860,27 @@ sub echodevice_NPMWaitForCookie($){
 		Log3 $name, 4, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] wait for refreshtoken exist " . $ExistSkript ;
 		InternalTimer(gettimeofday() + 1 , "echodevice_NPMWaitForCookie" , $hash, 0);
 	}
+}
+
+sub echodevice_NPMCheckVersion ($$$) {
+
+	my ($hash,$filename,$LogBereich) = @_;
+	my $name = $hash->{NAME};
+	my $Modulversion = "unknown";
+
+	if (-e $filename) {
+		open(VERSION, "<$filename");
+		while(<VERSION>){
+			if ($_ =~ m/version/) {
+				my @Result = split(/"/,$_);
+				$Modulversion  = @Result[3];
+				Log3 $name, 4, "[$name] [$LogBereich] Version alexa-cookie.js = $Modulversion";}
+		}
+		close(VERSION);
+	}
+	else {Log3 $name, 4, "[$name] [$LogBereich] Version alexa-cookie.js = unknown";}
+	
+	return $Modulversion;
 }
 
 ##########################
