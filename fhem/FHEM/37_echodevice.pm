@@ -2,8 +2,9 @@
 #
 ##############################################
 #
-# 2020.04.27 v0.1.6
+# 2020.04.27 v0.1.7
 # - FEATURE: Unterstützung A1WAR447VT003J Yamaha MusicCast 20
+# - BUG:     set "NPM_login refresh"
 # - CHANGE:  get status erweitert
 #
 # 2020.04.22 v0.1.5
@@ -388,7 +389,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.6";
+my $ModulVersion     = "0.1.7";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -4817,6 +4818,7 @@ sub echodevice_NPMWaitForCookie($){
 	my $filename    = "cache/alexa-cookie/" . $number . "result.json";
 	my $CanDelete   = 0;
 	my $ExistSkript = "false";
+	my $CookieResult;
 	
 	if ($NPMLoginTyp =~ m/Refresh/) {
 		$ExistSkript = $number . "refresh-cookie.js = true"  if (-e "cache/alexa-cookie/" . $number . "refresh-cookie.js");
@@ -4830,12 +4832,14 @@ sub echodevice_NPMWaitForCookie($){
 		open(MAILDAT, "<$filename") || die "Datei wurde nicht gefunden\n";
 		while(<MAILDAT>){
 			if (index($_, "{") != -1) {
+				$CookieResult = $_;
 				Log3 $name, 3, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] write new refreshtoken";
+				Log3 $name, 3, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] $CookieResult";
 				readingsSingleUpdate( $hash, "amazon_refreshtoken", "vorhanden",1 );
-				readingsSingleUpdate( $hash, ".COOKIE", $_,1 );
+				readingsSingleUpdate( $hash, ".COOKIE", $CookieResult,1 );
 				readingsSingleUpdate( $hash, "COOKIE_TYPE", "NPM_Login",1 );
 
-				$hash->{helper}{".COOKIE"} = $_;
+				$hash->{helper}{".COOKIE"} = $CookieResult;
 				$hash->{helper}{".COOKIE"} =~ /"localCookie":".*session-id=(.*)","?/;
 				$hash->{helper}{".COOKIE"} = "session-id=" . $1;
 				$hash->{helper}{".COOKIE"} =~ /csrf=([-\w]+)[;\s]?(.*)?$/ if(defined($hash->{helper}{".COOKIE"}));
