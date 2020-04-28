@@ -800,7 +800,7 @@ sub HYDRAWISE_GetDay {
 =pod
 =item device
 =item summary    controlling Hydrawise irrigation
-=item summary_DE Steuerung der Hydrawise-Bew√§sserung
+=item summary_DE Steuerung der Hydrawise-Bew‰sserung
 
 =begin html
 
@@ -838,7 +838,7 @@ sub HYDRAWISE_GetDay {
 
     <ul>
     <br>
-        <code>define &lt;name&gt; HYDAWISE &lt;API-KEY&gt; &lt;Interval&gt;</code><br>
+        <code>define &lt;name&gt; HYDRAWISE &lt;API-KEY&gt; &lt;Interval&gt;</code><br>
     <br>
     </ul>
   </ul>
@@ -847,7 +847,7 @@ sub HYDRAWISE_GetDay {
 
     <ul>
     <br>
-        <code>define myHydrawise HYDAWISE 1234-5678-90AB-CDEF 60</code><br>
+        <code>define myHydrawise HYDRAWISE 1234-5678-90AB-CDEF 60</code><br>
     <br>
     </ul>
 
@@ -945,7 +945,7 @@ sub HYDRAWISE_GetDay {
 
     <ul>
     <br>
-        <code>define &lt;name&gt; HYDAWISE &lt;API-KEY&gt; &lt;Intervall&gt;</code><br>
+        <code>define &lt;name&gt; HYDRAWISE &lt;API-KEY&gt; &lt;Intervall&gt;</code><br>
     <br>
     </ul>
    </ul>
@@ -954,7 +954,7 @@ sub HYDRAWISE_GetDay {
 
     <ul>
     <br>
-        <code>define myHydrawise HYDAWISE 1234-5678-90AB-CDEF 60</code><br>
+        <code>define myHydrawise HYDRAWISE 1234-5678-90AB-CDEF 60</code><br>
     <br>
     </ul>
 
