@@ -76,6 +76,10 @@
 # - new attr autoStoreRollingCode - store rc in uniqueID
 # - store rolling code in uniqueid based on addr
 # - ensure largest rollingcode (either reading or unqieid is used)
+# - FIX: hex value warning for rollcode 
+# - FIX: allow empty ioTypes for testing
+#
+#
 #
 ###############################################################################
 #
@@ -1068,7 +1072,10 @@ sub SOMFY_getRollCode($)
    if ( AttrVal( $name, "autoStoreRollingCode", 0 ) ) {
       my $storeRC = uc( SOMFY_readRollCode( $hash ) );
       $storeRC = "0000" if ( $storeRC !~ /[0-9a-f]{4}/ );
-      if ( $storeRC > $rollingcode ) {
+      my $storeDec = hex( $storeRC );
+      my $rollDec = hex( $rollingcode );
+      
+      if ( $storeDec > $rollDec ) {
         $rollingcode = $storeRC;
       }
    }
@@ -1591,6 +1598,7 @@ sub SOMFY_SendCommand($@)
 
 	my $io = $hash->{IODev};
   my $ioType = $io->{TYPE};
+  $ioType = "" if ( ! defined( $ioType ) );
 
   return $ret if(IsIgnored($name)); 
   return $ret if(IsDisabled($name));   
