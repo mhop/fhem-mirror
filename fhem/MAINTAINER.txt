@@ -620,6 +620,7 @@ contrib/PRESENCE/lepresenced PatrickR             Unterstützende Dienste
 contrib/SIP/*                Wzut                 Sonstiges
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends
+contrib/Wzut/*		     Wzut		  MAX
 contrib/YAF/*                MarcP                Frontends
 
 www/codemirror/*             rapster              Frontends
