@@ -55,18 +55,13 @@
 
 ## unserer packagename
 package FHEM::GardenaSmartDevice;
-
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-
-my $missingModul = "";
+use GPUtils qw(GP_Import GP_Export);
 
 use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
 use Time::Local;
-our $VERSION = '1.6.7';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -163,70 +158,51 @@ BEGIN {
     );
 }
 
-# _Export - Export references to main context using a different naming schema
-sub _Export {
-    no strict qw/refs/;    ## no critic
-    my $pkg  = caller(0);
-    my $main = $pkg;
-    $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-    foreach (@_) {
-        *{ $main . $_ } = *{ $pkg . '::' . $_ };
-    }
-}
-
 #-- Export to main context with different name
-_Export(
+GP_Export(
     qw(
       Initialize
       )
 );
 
-sub Initialize($) {
-
-    my ($hash) = @_;
+sub Initialize {
+    my $hash = shift;
 
     $hash->{Match} = '^{"id":".*';
 
-    $hash->{SetFn}   = "FHEM::GardenaSmartDevice::Set";
-    $hash->{DefFn}   = "FHEM::GardenaSmartDevice::Define";
-    $hash->{UndefFn} = "FHEM::GardenaSmartDevice::Undef";
-    $hash->{ParseFn} = "FHEM::GardenaSmartDevice::Parse";
+    $hash->{SetFn}   = \&Set;
+    $hash->{DefFn}   = \&Define;
+    $hash->{UndefFn} = \&Undef;
+    $hash->{ParseFn} = \&Parse;
 
-    $hash->{AttrFn} = "FHEM::GardenaSmartDevice::Attr";
+    $hash->{AttrFn} = \&Attr;
     $hash->{AttrList} =
         "readingValueLanguage:de,en "
       . "model:watering_computer,sensor,mower,ic24,power,electronic_pressure_pump "
       . "IODev "
       . $readingFnAttributes;
-
-    foreach my $d ( sort keys %{ $modules{GardenaSmartDevice}{defptr} } ) {
-
-        my $hash = $modules{GardenaSmartDevice}{defptr}{$d};
-        $hash->{VERSION} = $VERSION;
-    }
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
-sub Define($$) {
-
-    my ( $hash, $def ) = @_;
-    my @a = split( "[ \t]+", $def );
+sub Define {
+    my $hash = shift;
+    my $a    = shift;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+
     return
       "too few parameters: define <NAME> GardenaSmartDevice <device_Id> <model>"
-      if ( @a < 3 );
-    return
-"Cannot define Gardena Bridge device. Perl modul $missingModul is missing."
-      if ($missingModul);
+      if ( scalar( @{$a} ) < 3 );
 
-    my $name     = $a[0];
-    my $deviceId = $a[2];
-    my $category = $a[3];
+    my $name     = $a->[0];
+    my $deviceId = $a->[2];
+    my $category = $a->[3];
 
     $hash->{DEVICEID}                = $deviceId;
-    $hash->{VERSION}                 = $VERSION;
+    $hash->{VERSION}                 = version->parse($VERSION)->normal;
     $hash->{helper}{STARTINGPOINTID} = '';
 
     CommandAttr( undef,
@@ -251,9 +227,9 @@ sub Define($$) {
 
     return
 "GardenaSmartDevice device $name on GardenaSmartBridge $iodev already defined."
-      if (  defined($d)
-        and $d->{IODev} == $hash->{IODev}
-        and $d->{NAME} ne $name );
+      if ( defined($d)
+        && $d->{IODev} == $hash->{IODev}
+        && $d->{NAME} ne $name );
 
     CommandAttr( undef, $name . ' room GardenaSmart' )
       if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -267,100 +243,107 @@ sub Define($$) {
 
     $modules{GardenaSmartDevice}{defptr}{$deviceId} = $hash;
 
-    return undef;
+    return;
 }
 
-sub Undef($$) {
+sub Undef {
+    my $hash = shift;
+    my $arg  = shift;
 
-    my ( $hash, $arg ) = @_;
     my $name     = $hash->{NAME};
     my $deviceId = $hash->{DEVICEID};
 
     delete $modules{GardenaSmartDevice}{defptr}{$deviceId};
 
-    return undef;
+    return;
 }
 
-sub Attr(@) {
+sub Attr {
 
     my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
 
-    return undef;
+    return;
 }
 
-sub Set($@) {
+sub Set {
+    my $hash = shift;
+    my $a    = shift;
 
-    my ( $hash, $name, $cmd, @args ) = @_;
+    my $name = shift @$a;
+    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
 
     my $payload;
     my $abilities = '';
 
     ### mower
     if ( lc $cmd eq 'parkuntilfurthernotice' ) {
-
         $payload = '"name":"park_until_further_notice"';
-
     }
     elsif ( lc $cmd eq 'parkuntilnexttimer' ) {
-
         $payload = '"name":"park_until_next_timer"';
 
     }
     elsif ( lc $cmd eq 'startresumeschedule' ) {
-
         $payload = '"name":"start_resume_schedule"';
 
     }
     elsif ( lc $cmd eq 'startoverridetimer' ) {
-
-        my $duration = join( " ", @args );
         $payload = '"name":"start_override_timer","parameters":{"duration":'
-          . $duration * 60 . '}';
+          . $a->[0] * 60 . '}';
 
     }
     elsif ( lc $cmd eq 'startpoint' ) {
         my $err;
 
-        ( $err, $payload, $abilities ) =
-          SetPredefinedStartPoints( $hash, @args );
+        ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, @$a );
         return $err if ( defined($err) );
 
     }
     ### electronic_pressure_pump
     elsif ( lc $cmd eq 'pumptimer' ) {
-
-        my $duration = join( " ", @args );
-
         $payload =
           '"name":"pump_manual_watering_timer","parameters":{"duration":'
-          . $duration . '}';
+          . $a->[0] . '}';
     }
     ### watering_computer
     elsif ( lc $cmd eq 'manualoverride' ) {
-
-        my $duration = join( " ", @args );
-        $payload = '"name":"manual_override","parameters":{"duration":'
-          . $duration . '}';
-
+        $payload =
+            '"properties":{"name":"watering_timer_1'
+          . '","value":{"state":"manual","duration":'
+          . $a->[0] * 60
+          . ',"valve_id":1}}';
     }
-    elsif ( lc $cmd eq 'canceloverride' ) {
+    elsif ( $cmd =~ m{\AcancelOverride}xms ) {
 
-        $payload = '"name":"cancel_override"';
+        my $valve_id = 1;
 
+        if ( $cmd =~ m{\AcancelOverrideValve(\d)\z}xms ) {
+            $valve_id = $1;
+        }
+
+        $payload =
+            '"properties":{"name":"watering_timer_'
+          . $valve_id
+          . '","value":{"state":"idle","duration":'
+          . 0
+          . ',"valve_id":'
+          . $valve_id . '}}';
     }
-    elsif ( lc $cmd eq 'on' or lc $cmd eq 'off' or lc $cmd eq 'on-for-timer' ) {
+    elsif ( lc $cmd eq 'on' || lc $cmd eq 'off' || lc $cmd eq 'on-for-timer' ) {
+        my $val = (
+            defined($a) && ref($a) eq 'ARRAY'
+            ? $a->[0] * 60
+            : lc $cmd
+        );
 
-        my $val = ( defined( $args[0] ) ? join( " ", @args ) * 60 : lc $cmd );
         $payload = '"properties":{"value":"' . $val . '"}';
     }
     ### Watering ic24
-    elsif ( $cmd =~ /manualDurationValve/ ) {
-
+    elsif ( $cmd =~ m{\AmanualDurationValve\d\z}xms ) {
         my $valve_id;
-        my $duration = join( " ", @args );
 
-        if ( $cmd =~ m#(\d)$# ) {
+        if ( $cmd =~ m{\AmanualDurationValve(\d)\z}xms ) {
             $valve_id = $1;
         }
 
@@ -368,14 +351,14 @@ sub Set($@) {
             '"properties":{"name":"watering_timer_'
           . $valve_id
           . '","value":{"state":"manual","duration":'
-          . $duration * 60
+          . $a->[0] * 60
           . ',"valve_id":'
           . $valve_id . '}}';
     }
     ### Sensors
     elsif ( lc $cmd eq 'refresh' ) {
 
-        my $sensname = join( " ", @args );
+        my $sensname = $a->[0];
         if ( lc $sensname eq 'temperature' ) {
             $payload   = '"name":"measure_ambient_temperature"';
             $abilities = 'ambient_temperature';
@@ -395,18 +378,12 @@ sub Set($@) {
     else {
 
         my $list = '';
-        $list .=
-'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,1,60 startpoint'
-          if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
 
-        $list .= 'manualOverride:slider,0,1,59 cancelOverride:noArg'
+        $list .= 'manualOverride:slider,1,1,59 cancelOverride:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
-#         $list .= 'pumpTimer:slider,0,1,59'
-#           if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
-
         $list .=
-'manualDurationValve1:slider,1,1,59 manualDurationValve2:slider,1,1,59 manualDurationValve3:slider,1,1,59 manualDurationValve4:slider,1,1,59 manualDurationValve5:slider,1,1,59 manualDurationValve6:slider,1,1,59'
+'manualDurationValve1:slider,1,1,59 manualDurationValve2:slider,1,1,59 manualDurationValve3:slider,1,1,59 manualDurationValve4:slider,1,1,59 manualDurationValve5:slider,1,1,59 manualDurationValve6:slider,1,1,59 cancelOverrideValve1:noArg cancelOverrideValve2:noArg cancelOverrideValve3:noArg cancelOverrideValve4:noArg cancelOverrideValve5:noArg cancelOverrideValve6:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
 
         $list .= 'refresh:temperature,light,humidity'
@@ -420,11 +397,10 @@ sub Set($@) {
 
     $abilities = 'mower'
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' )
-      and $abilities ne 'mower_settings';
-    $abilities = 'outlet'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
+      && $abilities ne 'mower_settings';
     $abilities = 'watering'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24'
+        || AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
     $abilities = 'power'
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
     $abilities = 'manual_watering'
@@ -437,12 +413,12 @@ sub Set($@) {
     Log3 $name, 4,
 "GardenaSmartBridge ($name) - IOWrite: $payload $hash->{DEVICEID} $abilities IODevHash=$hash->{IODev}";
 
-    return undef;
+    return;
 }
 
-sub Parse($$) {
-
-    my ( $io_hash, $json ) = @_;
+sub Parse {
+    my $io_hash = shift;
+    my $json    = shift;
 
     my $name = $io_hash->{NAME};
 
@@ -481,11 +457,13 @@ sub Parse($$) {
               . " GardenaSmartDevice $decode_json->{id} $decode_json->{category}";
         }
     }
+
+    return;
 }
 
-sub WriteReadings($$) {
-
-    my ( $hash, $decode_json ) = @_;
+sub WriteReadings {
+    my $hash        = shift;
+    my $decode_json = shift;
 
     my $name      = $hash->{NAME};
     my $abilities = scalar( @{ $decode_json->{abilities} } );
@@ -497,11 +475,10 @@ sub WriteReadings($$) {
 
         if (
             ref( $decode_json->{abilities}[$abilities]{properties} ) eq "ARRAY"
-            and
-            scalar( @{ $decode_json->{abilities}[$abilities]{properties} } ) >
-            0 )
+            && scalar( @{ $decode_json->{abilities}[$abilities]{properties} } )
+            > 0 )
         {
-            foreach my $propertie (
+            for my $propertie (
                 @{ $decode_json->{abilities}[$abilities]{properties} } )
             {
                 readingsBulkUpdateIfChanged(
@@ -511,21 +488,21 @@ sub WriteReadings($$) {
                     RigRadingsValue( $hash, $propertie->{value} )
                   )
                   if ( defined( $propertie->{value} )
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'radio-quality'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'battery-level'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'internal_temperature-temperature'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'ambient_temperature-temperature'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'soil_temperature-temperature'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'humidity-humidity'
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} ne 'light-light'
-                    and ref( $propertie->{value} ) ne "HASH" );
+                    && ref( $propertie->{value} ) ne "HASH" );
 
                 readingsBulkUpdate(
                     $hash,
@@ -535,21 +512,21 @@ sub WriteReadings($$) {
                   )
                   if (
                     defined( $propertie->{value} )
-                    and ( $decode_json->{abilities}[$abilities]{name} . '-'
+                    && (  $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq 'radio-quality'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq 'battery-level'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq
                         'internal_temperature-temperature'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq
                         'ambient_temperature-temperature'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq 'soil_temperature-temperature'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq 'humidity-humidity'
-                        or $decode_json->{abilities}[$abilities]{name} . '-'
+                        || $decode_json->{abilities}[$abilities]{name} . '-'
                         . $propertie->{name} eq 'light-light' )
                   );
 
@@ -560,7 +537,7 @@ sub WriteReadings($$) {
                     join( ',', @{ $propertie->{value} } )
                   )
                   if ( defined( $propertie->{value} )
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} eq 'ic24-valves_connected' );
 
                 readingsBulkUpdateIfChanged(
@@ -570,7 +547,7 @@ sub WriteReadings($$) {
                     join( ',', @{ $propertie->{value} } )
                   )
                   if ( defined( $propertie->{value} )
-                    and $decode_json->{abilities}[$abilities]{name} . '-'
+                    && $decode_json->{abilities}[$abilities]{name} . '-'
                     . $propertie->{name} eq 'ic24-valves_master_config' );
 
                 if ( ref( $propertie->{value} ) eq "HASH" ) {
@@ -593,7 +570,7 @@ sub WriteReadings($$) {
     do {
 
         if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY"
-            and $decode_json->{settings}[$settings]{name} eq 'starting_points' )
+            && $decode_json->{settings}[$settings]{name} eq 'starting_points' )
         {
             #save the startingpointid needed to update the startingpoints
             if ( $hash->{helper}{STARTINGPOINTID} ne
@@ -608,7 +585,7 @@ sub WriteReadings($$) {
               . encode_json( $decode_json->{settings}[$settings]{value} ) . '}';
             my $startpoint_cnt = 0;
 
-            foreach my $startingpoint (
+            for my $startingpoint (
                 @{ $decode_json->{settings}[$settings]{value} } )
             {
                 $startpoint_cnt++;
@@ -629,9 +606,9 @@ sub WriteReadings($$) {
     readingsBulkUpdate(
         $hash, 'state',
         (
-              ReadingsVal( $name, 'outlet-valve_open', 0 ) == 1
-            ? RigRadingsValue( $hash, 'open' )
-            : RigRadingsValue( $hash, 'closed' )
+            ReadingsVal( $name, 'watering-watering_timer_1_state', 0 ) eq 'idle'
+            ? RigRadingsValue( $hash, 'closed' )
+            : RigRadingsValue( $hash, 'open' )
         )
     ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
@@ -664,17 +641,19 @@ sub WriteReadings($$) {
     readingsEndUpdate( $hash, 1 );
 
     Log3 $name, 4, "GardenaSmartDevice ($name) - readings was written}";
+
+    return;
 }
 
 ##################################
 ##################################
 #### my little helpers ###########
 
-sub ReadingLangGerman($$) {
+sub ReadingLangGerman {
+    my $hash         = shift;
+    my $readingValue = shift;
 
-    my ( $hash, $readingValue ) = @_;
-    my $name = $hash->{NAME};
-
+    my $name           = $hash->{NAME};
     my %langGermanMapp = (
         'ok_cutting'           => 'mähen',
         'paused'               => 'pausiert',
@@ -777,9 +756,9 @@ sub ReadingLangGerman($$) {
 
     if (
         defined( $langGermanMapp{$readingValue} )
-        and (  AttrVal( 'global', 'language', 'none' ) eq 'DE'
-            or AttrVal( $name, 'readingValueLanguage', 'none' ) eq 'de' )
-        and AttrVal( $name, 'readingValueLanguage', 'none' ) ne 'en'
+        && (   AttrVal( 'global', 'language', 'none' ) eq 'DE'
+            || AttrVal( $name, 'readingValueLanguage', 'none' ) eq 'de' )
+        && AttrVal( $name, 'readingValueLanguage', 'none' ) ne 'en'
       )
     {
         return $langGermanMapp{$readingValue};
@@ -787,11 +766,13 @@ sub ReadingLangGerman($$) {
     else {
         return $readingValue;
     }
+
+    return;
 }
 
-sub RigRadingsValue($$) {
-
-    my ( $hash, $readingValue ) = @_;
+sub RigRadingsValue {
+    my $hash         = shift;
+    my $readingValue = shift;
 
     my $rigReadingValue;
 
@@ -805,9 +786,9 @@ sub RigRadingsValue($$) {
     return $rigReadingValue;
 }
 
-sub Zulu2LocalString($) {
-
+sub Zulu2LocalString {
     my $t = shift;
+
     my ( $datehour, $datemin, $rest ) = split( /:/, $t, 3 );
 
     my ( $year, $month, $day, $hour, $min ) =
@@ -840,18 +821,23 @@ sub Zulu2LocalString($) {
             )
         );
     }
+
+    return;
 }
 
-sub SetPredefinedStartPoints($@) {
+sub SetPredefinedStartPoints {
+    my $hash = shift;
+    my $a    = shift;
 
-    my ( $hash, $startpoint_state, $startpoint_num, @morestartpoints ) = @_;
+    my ( $startpoint_state, $startpoint_num, @morestartpoints ) = @$a;
+
     my $name = $hash->{NAME};
     my $payload;
     my $abilities;
 
-    if ( defined($startpoint_state) and defined($startpoint_num) ) {
+    if ( defined($startpoint_state) && defined($startpoint_num) ) {
         if ( defined( $hash->{helper}{STARTINGPOINTS} )
-            and $hash->{helper}{STARTINGPOINTS} ne '' )
+            && $hash->{helper}{STARTINGPOINTS} ne '' )
         {
 # add needed parameters to saved settings config and change the value in request
             my $decode_json_settings =
@@ -869,8 +855,8 @@ sub SetPredefinedStartPoints($@) {
             #set more startpoints
             if (
                 defined scalar(@morestartpoints)
-                and (  scalar(@morestartpoints) == 2
-                    or scalar(@morestartpoints) == 4 )
+                && (   scalar(@morestartpoints) == 2
+                    || scalar(@morestartpoints) == 4 )
               )
             {
                 if ( scalar(@morestartpoints) == 2 ) {
@@ -1221,6 +1207,7 @@ sub SetPredefinedStartPoints($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
+  "version": "v2.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
