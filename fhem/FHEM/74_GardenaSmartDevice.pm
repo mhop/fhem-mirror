@@ -485,7 +485,7 @@ sub WriteReadings {
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
                       . $propertie->{name},
-                    RigRadingsValue( $hash, $propertie->{value} )
+                    RigReadingsValue( $hash, $propertie->{value} )
                   )
                   if ( defined( $propertie->{value} )
                     && $decode_json->{abilities}[$abilities]{name} . '-'
@@ -508,7 +508,7 @@ sub WriteReadings {
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
                       . $propertie->{name},
-                    RigRadingsValue( $hash, $propertie->{value} )
+                    RigReadingsValue( $hash, $propertie->{value} )
                   )
                   if (
                     defined( $propertie->{value} )
@@ -557,7 +557,7 @@ sub WriteReadings {
                             $decode_json->{abilities}[$abilities]{name} . '-'
                               . $propertie->{name} . '_'
                               . $r,
-                            RigRadingsValue( $hash, $v )
+                            RigReadingsValue( $hash, $v )
                         );
                     }
                 }
@@ -606,9 +606,9 @@ sub WriteReadings {
     readingsBulkUpdate(
         $hash, 'state',
         (
-            ReadingsVal( $name, 'watering-watering_timer_1_state', 0 ) eq 'idle'
-            ? RigRadingsValue( $hash, 'closed' )
-            : RigRadingsValue( $hash, 'open' )
+            ReadingsVal( $name, 'watering-watering_timer_1_state', 'idle' ) eq 'idle'
+            ? RigReadingsValue( $hash, 'closed' )
+            : RigReadingsValue( $hash, 'open' )
         )
     ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
@@ -770,7 +770,7 @@ sub ReadingLangGerman {
     return;
 }
 
-sub RigRadingsValue {
+sub RigReadingsValue {
     my $hash         = shift;
     my $readingValue = shift;
 
