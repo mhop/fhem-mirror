@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       60_Watches.pm
 #
-#       (c) 2018 by Heiko Maaz
+#       (c) 2018 - 2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -32,9 +32,11 @@ package main;
 
 use strict;
 use warnings;
+use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
+  "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
   "0.4.0"  => "20.11.2018  text display ",
   "0.3.0"  => "19.11.2018  digital clock added ",
   "0.2.0"  => "14.11.2018  station clock added ",
@@ -48,9 +50,10 @@ sub Watches_Initialize($) {
   my ($hash) = @_;
   
   $hash->{DefFn}              = "Watches_Define";
+  $hash->{SetFn}              = "Watches_Set";
   $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
-                                "digitalDisplayPattern:text,watch ".
+                                "digitalDisplayPattern:staticwatch,stopwatch,text,watch ".
                                 "digitalDisplayText ".
                                 "modernColorBackground:colorpicker ".
 								"modernColorHand:colorpicker ".
@@ -75,7 +78,9 @@ sub Watches_Initialize($) {
   $hash->{AttrFn}             = "Watches_Attr";
   $hash->{FW_hideDisplayName} = 1;        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
-  $hash->{FW_atPageEnd} = 1;            # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+  $hash->{FW_atPageEnd} = 1;              # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+
+return;
 }
 
 
@@ -95,7 +100,50 @@ sub Watches_Define($$) {
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
-return undef;
+return;
+}
+
+################################################################
+sub Watches_Set {                                                    ## no critic 'complexity'
+  my ($hash, @a) = @_;
+  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  my $name  = $a[0];
+  my $opt   = $a[1];
+  my $prop  = $a[2];
+  my $prop1 = $a[3];
+  my $prop2 = $a[4];
+  my $prop3 = $a[5];
+  my $model = $hash->{MODEL};
+  my $addp  = AttrVal($name,"digitalDisplayPattern","watch");
+    
+  return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch/);
+                                                           
+  my $setlist = "Unknown argument $opt, choose one of ";
+  $setlist   .= "time "                 if($addp =~ /staticwatch/);               
+  $setlist   .= "start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
+
+  if ($opt =~ /\bstart\b/) {
+      my $ms = int(time*1000);
+      readingsSingleUpdate($hash, "starttime", $ms,        0);
+      readingsSingleUpdate($hash, "state",     "started",  1);
+      
+  } elsif ($opt eq "stop") {
+      readingsSingleUpdate($hash, "state", "stopped",  1);
+      
+  } elsif ($opt eq "time") {
+      return qq{The value(s) for "time" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+  
+      readingsBeginUpdate         ($hash); 
+      readingsBulkUpdateIfChanged ($hash, "hour",   $prop);
+      readingsBulkUpdateIfChanged ($hash, "minute", $prop1);
+      readingsBulkUpdate          ($hash, "second", $prop2);                    
+      readingsEndUpdate           ($hash,0);
+      
+  } else {
+      return "$setlist"; 
+  }
+  
+return;
 }
 
 ################################################################
@@ -109,28 +157,49 @@ sub Watches_Attr($$$$) {
     # aName and aVal are Attribute name and value
 	
 	if ($cmd eq "set" && $hash->{MODEL} !~ /modern/i && $aName =~ /^modern.*/) {
-         return "\"$aName\" is only valid for Watches model \"Modern\"";
+         return qq{"$aName" is only valid for Watches model "Modern"};
 	}
 	
 	if ($cmd eq "set" && $hash->{MODEL} !~ /station/i && $aName =~ /^station.*/) {
-         return "\"$aName\" is only valid for Watches model \"Station\"";
+         return qq{"$aName" is only valid for Watches model "Station"};
 	}
 	
 	if ($cmd eq "set" && $hash->{MODEL} !~ /digital/i && $aName =~ /^digital.*/) {
-         return "\"$aName\" is only valid for Watches model \"Digital\"";
+         return qq{"$aName" is only valid for Watches model "Digital"};
 	}
     
     if ($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
-        $do = 0 if($cmd eq "del");
+        $do  = 0 if($cmd eq "del");
 		$val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
     }
+    
+    if ($aName eq "digitalDisplayPattern") {
+        if($cmd eq "set") {
+            $do = $aVal;
+        }
+        $do = 0 if($cmd eq "del");
+        
+        my @allrds = keys%{$defs{$name}{READINGS}};
+        for my $key(@allrds) {
+            # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+            next if($key =~ /\bstate\b/);
+            readingsDelete($hash,$key);
+        }  
+ 
+        readingsSingleUpdate($hash, "state", "initialized", 1); 
+        
+        if($do =~ /\bstopwatch\b/) {
+            my $ms = int(time*1000);
+            readingsSingleUpdate($hash, "starttime", $ms, 0);
+        }
+    }    
 
-return undef;
+return;
 }
 
 ################################################################
@@ -142,7 +211,7 @@ sub Watches_FwFn($$$$) {
   my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
   
   my $ret = "";
-  $ret .= "<span>$dlink </span><br>"  if(!AttrVal($d,"hideDisplayName",0));
+  $ret   .= "<span>$dlink </span><br>"  if(!AttrVal($d,"hideDisplayName",0));
   if(IsDisabled($d)) {
       if(AttrVal($d,"hideDisplayName",0)) {
           $ret .= "Watch <a href=\"/fhem?detail=$d\">$d</a> is disabled";
@@ -150,7 +219,7 @@ sub Watches_FwFn($$$$) {
           $ret .= "<html>Watch is disabled</html>";
       }  
   } else {
-      $ret .= Watches_modern($d) if($hash->{MODEL} =~ /modern/i);
+      $ret .= Watches_modern($d)  if($hash->{MODEL} =~ /modern/i);
       $ret .= Watches_station($d) if($hash->{MODEL} =~ /station/i);
 	  $ret .= Watches_digital($d) if($hash->{MODEL} =~ /digital/i);
   }
@@ -161,22 +230,43 @@ return $ret;
 ################################################################
 sub Watches_digital($) {
   my ($d) = @_;
-  my $hash   = $defs{$d};
-  my $hattr  = AttrVal($d,"htmlattr","width='150' height='50'");
-  my $bgc    = AttrVal($d,"digitalColorBackground","C4C4C4");
-  my $dcd    = AttrVal($d,"digitalColorDigits","000000"); 
-  my $ddp    = AttrVal($d,"digitalDisplayPattern","watch");  
-  my $ddt    = AttrVal($d,"digitalDisplayText","Play");
+  my $hash  = $defs{$d};
+  my $hattr = AttrVal($d,"htmlattr","width='150' height='50'");
+  my $bgc   = AttrVal($d,"digitalColorBackground","C4C4C4");
+  my $dcd   = AttrVal($d,"digitalColorDigits","000000"); 
+  my $addp  = AttrVal($d,"digitalDisplayPattern","watch");  
+  my $ddt   = AttrVal($d,"digitalDisplayText","Play");
   
-  if($ddp eq "watch") {
-      $ddp = "##:##:##";
-      $ddt = "  "."((hours < 10) ? ' ' : '') + hours
+  my $ddp = "###:##:##";                                                        # dummy
+  my $ws  = "initialized";
+  my ($h,$m,$s,$ms) = (0,0,0,0); 
+  
+  if($addp eq "watch") {
+      $ddp = "###:##:##";
+      $ddt = "((hours < 10) ? ' 0' : ' ') + hours
                     + ':' + ((minutes < 10) ? '0' : '') + minutes
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
-  } elsif($ddp eq "text") {
-      $ddp = "##########";
+  
+  } elsif($addp eq "stopwatch") {
+      $ws  = ReadingsVal($d, "state", "initialized");
+      $ddp = "###:##:##";
+      $ms  = ReadingsVal($d, "starttime", 0);
+      $ddt = "  "."((hours_$d < 10) ? ' 0' : ' ') + hours_$d
+                    + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
+                    + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
+  
+  } elsif($addp eq "staticwatch") {
+      $ddp = "###:##:##";
+      $h   = ReadingsVal($d, "hour"  , 0);
+      $m   = ReadingsVal($d, "minute", 0);
+      $s   = ReadingsVal($d, "second", 0);
+      $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
+                    + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
+                    + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
+  
+  } elsif($addp eq "text") {
 	  my $txtc = length($ddt);
-	  $ddp = "";
+	  $ddp     = "";
 	  for(my $i = 0; $i <= $txtc; $i++) {
 		  $ddp .= "#";
       }
@@ -201,7 +291,6 @@ sub Watches_digital($) {
     SegmentDisplay_$d.SymmetricCorner = 0;
     SegmentDisplay_$d.SquaredCorner   = 1;
     SegmentDisplay_$d.RoundedCorner   = 2;
-
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -748,13 +837,41 @@ sub Watches_digital($) {
     display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
 
     animate_$d();
-
+    
     function animate_$d() {
-        var time    = new Date();
-        var hours   = time.getHours();
-        var minutes = time.getMinutes();
-        var seconds = time.getSeconds();
-        var value   = $ddt;
+        var watchkind_$d = '$addp';
+        
+        if (watchkind_$d == 'watch') {
+            var time    = new Date();
+            var hours   = time.getHours();
+            var minutes = time.getMinutes();
+            var seconds = time.getSeconds();            
+        }
+        if (watchkind_$d == 'staticwatch') {
+            var hours_$d   = '$h';
+            var minutes_$d = '$m';
+            var seconds_$d = '$s';
+        }
+        if (watchkind_$d == 'stopwatch') {
+            var state_$d = '$ws';
+            
+            startDate_$d   = new Date($ms); 
+            endDate_$d     = new Date();
+            elapsesec_$d   = ((endDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
+            var hours_$d   = parseInt(elapsesec_$d / 3600);
+            elapsesec_$d  -= hours_$d * 3600;
+            var minutes_$d = parseInt(elapsesec_$d / 60);
+            var seconds_$d = elapsesec_$d - minutes_$d * 60;
+            
+            if (state_$d != 'started') {
+                hours_$d   = 0;
+                minutes_$d = 0;
+                seconds_$d = 0;
+                // if (typeof seconds_$d === 'undefined') {s_$d = 0 } else {s_$d = seconds_$d};
+            }            
+        }       
+        
+        var value = $ddt;
         display_$d.setValue(value);
         window.setTimeout('animate_$d()', 100);
     }
@@ -1407,16 +1524,53 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     
   <table>  
      <colgroup> <col width=5%> <col width=95%> </colgroup>
-     <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design  </td></tr>
+     <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design </td></tr>
      <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr oder Text) </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr, Stoppuhr, statische Zeitanzeige oder Text) </td></tr>
   </table>
   <br>
   <br>
   </ul>
 
   <a name="WatchesSet"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  
+  <ul>
+  <ul>
+  
+    <a name="start"></a>
+    <li><b>start</b><br>
+      Startet die Stoppuhr. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>  
+    
+    <a name="stop"></a>
+    <li><b>stop</b><br>
+      Stoppt die Stoppuhr. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
+    
+    <a name="time"></a>
+    <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Setzt eine statische Zeitanzeige mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = staticwatch</b> vorhanden. <br><br>
+      
+      <ul>
+      <b>Beispiel</b> <br>
+      set &lt;name&gt; time 8 15 3
+      </ul>
+      
+    </li>
+    <br>
+  
+  </ul>
+  </ul>
+  <br>
 
   <a name="WatchesGet"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -1563,31 +1717,34 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
       Farbe der Balkenanzeige in einer Digitaluhr.    
     </li>
     <br>  
-	
+  
     <a name="digitalDisplayPattern"></a>
-    <li><b>digitalDisplayPattern [text | watch]</b><br>
-      Umschaltung der Digitalanzeige zwischen Uhrenmodus (default) und Textanzeige. Der anzuzeigende Text 
-	  kann mit dem Attribut "digitalDisplayText" definiert werden. <br><br>
+    <li><b>digitalDisplayPattern [staticwatch | stopwatch | text | watch]</b><br>
+      Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
+      Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
     <ul>
 	<table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> <b>watch</b>     </td><td>: Anzeige einer Uhr </td></tr>
-       <tr><td> <b>text</b>      </td><td>: Anzeige eines definierbaren Textes </td></tr>
+       <tr><td> <b>staticwatch</b> </td><td>: statische Zeitanzeige              </td></tr>
+       <tr><td> <b>stopwatch</b>   </td><td>: Stoppuhr                           </td></tr>
+       <tr><td> <b>text</b>        </td><td>: Anzeige eines definierbaren Textes </td></tr>
+       <tr><td> <b>watch</b>       </td><td>: Uhr                                </td></tr>
     </table>
 	</ul>
+    <br>
     <br>
     </li>
 	
     <a name="digitalDisplayText"></a>
     <li><b>digitalDisplayText</b><br>
       Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
-	  anzuzeigende Text eingestellt werden. Im Default wird "Play" anzgezeigt. <br>
+	  anzuzeigende Text eingestellt werden. Per Default ist "Play" eingestellt. <br>
 	  Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
 	  A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
 	  So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
     </li>
     <br> 
-  
+	
   </ul>
   
   </ul>
@@ -1621,14 +1778,51 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design </td></tr>
      <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr oder Text) </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr, Stoppuhr, statische Zeitanzeige oder Text) </td></tr>
   </table>
   <br>
   <br>
   </ul>
 
   <a name="WatchesSet"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b> 
+  
+  <ul>
+  <ul>
+  
+    <a name="start"></a>
+    <li><b>start</b><br>
+      Startet die Stoppuhr. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>  
+    
+    <a name="stop"></a>
+    <li><b>stop</b><br>
+      Stoppt die Stoppuhr. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
+    
+    <a name="time"></a>
+    <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Setzt eine statische Zeitanzeige mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = staticwatch</b> vorhanden. <br><br>
+      
+      <ul>
+      <b>Beispiel</b> <br>
+      set &lt;name&gt; time 8 15 3
+      </ul>
+      
+    </li>
+    <br>
+  
+  </ul>
+  </ul>
+  <br>
 
   <a name="WatchesGet"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -1777,23 +1971,26 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     <br>  
   
     <a name="digitalDisplayPattern"></a>
-    <li><b>digitalDisplayPattern [text | watch]</b><br>
-      Umschaltung der Digitalanzeige zwischen Uhrenmodus (default) und Textanzeige. Der anzuzeigende Text 
-	  kann mit dem Attribut "digitalDisplayText" definiert werden. <br><br>
+    <li><b>digitalDisplayPattern [staticwatch | stopwatch | text | watch]</b><br>
+      Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
+      Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
     <ul>
 	<table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> <b>watch</b>     </td><td>: Anzeige einer Uhr </td></tr>
-       <tr><td> <b>text</b>      </td><td>: Anzeige eines definierbaren Textes </td></tr>
+       <tr><td> <b>staticwatch</b> </td><td>: statische Zeitanzeige              </td></tr>
+       <tr><td> <b>stopwatch</b>   </td><td>: Stoppuhr                           </td></tr>
+       <tr><td> <b>text</b>        </td><td>: Anzeige eines definierbaren Textes </td></tr>
+       <tr><td> <b>watch</b>       </td><td>: Uhr                                </td></tr>
     </table>
 	</ul>
+    <br>
     <br>
     </li>
 	
     <a name="digitalDisplayText"></a>
     <li><b>digitalDisplayText</b><br>
       Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
-	  anzuzeigende Text eingestellt werden. Im Default wird "Play" anzgezeigt. <br>
+	  anzuzeigende Text eingestellt werden. Per Default ist "Play" eingestellt. <br>
 	  Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
 	  A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
 	  So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
