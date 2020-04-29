@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_HYDRAWISE: Solves logging problems
  - bugfix:  93_DbLog: fix line breaks in set function, Forum: #110673
  - bugfix:  GardenaSmart: all modules change to new API and code PBP conform
  - feature: 37_echodevice.pm A1WAR447VT003J Yamaha MusicCast 20
