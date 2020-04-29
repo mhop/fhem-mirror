@@ -36,7 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
-  "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings ",
+  "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings, add csrf token support ",
   "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
   "0.4.0"  => "20.11.2018  text display ",
   "0.3.0"  => "19.11.2018  digital clock added ",
@@ -857,6 +857,12 @@ sub Watches_digital {
     display_$d.colorOn         = '#$dcd';
     display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
     
+    // CSRF-Token auslesen
+    var body = document.querySelector(\"body\");
+    if( body != null ) {
+        csrf = body.getAttribute(\"fwcsrf\");
+    }
+ 
     // get the base url
     function getBaseUrl () {
         var url = window.location.href.split(\"?\")[0];
@@ -887,11 +893,7 @@ sub Watches_digital {
             var minutes_$d = '$m';
             var seconds_$d = '$s';
         }
-        if (watchkind_$d == 'stopwatch') {
-            hours_$d   = 0;
-            minutes_$d = 0;
-            seconds_$d = 0;
-        
+        if (watchkind_$d == 'stopwatch') {        
             devName_$d = '$d';
             selVal_$d  = 'state';            
             command    = '{ReadingsVal(\"'+devName_$d+'\",\"'+selVal_$d+'\",\"\")}';
@@ -903,9 +905,9 @@ sub Watches_digital {
                 selVal_$d = 'starttime';            
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"'+selVal_$d+'\",0)}';
                 url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {ms_$d = data.replace(/\\n/g, ''); return ms_$d;} );
+                \$.get( url_$d, function (data) {ms_$d = parseInt(data); return ms_$d;} );
                 
-                startDate_$d   = new Date(parseInt(ms_$d)); 
+                startDate_$d   = new Date(ms_$d);
                 endDate_$d     = new Date();
                 elapsesec_$d   = ((endDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 hours_$d       = parseInt(elapsesec_$d / 3600);
@@ -931,10 +933,13 @@ sub Watches_digital {
                 localStorage.setItem('h_$d', hours_$d);
                 localStorage.setItem('m_$d', minutes_$d);
                 localStorage.setItem('s_$d', seconds_$d);
-            }          
-        
+            }
         }
 
+        if (typeof hours_$d   === 'undefined') { hours_$d   = 0; };
+        if (typeof minutes_$d === 'undefined') { minutes_$d = 0; };
+        if (typeof seconds_$d === 'undefined') { seconds_$d = 0; };
+        
         var value = $ddt;
         display_$d.setValue(value);
         window.setTimeout('animate_$d()', 100);
