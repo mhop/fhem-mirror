@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
+  "0.6.0"  => "29.04.2020  new set 'restet' for stopwatch ",
   "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
   "0.4.0"  => "20.11.2018  text display ",
   "0.3.0"  => "19.11.2018  digital clock added ",
@@ -46,7 +47,7 @@ our %Watches_vNotesIntern = (
 sub Watches_modern($);
 
 ################################################################
-sub Watches_Initialize($) {
+sub Watches_Initialize {
   my ($hash) = @_;
   
   $hash->{DefFn}              = "Watches_Define";
@@ -85,7 +86,7 @@ return;
 
 
 ################################################################
-sub Watches_Define($$) {
+sub Watches_Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
@@ -119,8 +120,8 @@ sub Watches_Set {                                                    ## no criti
   return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch/);
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist   .= "time "                 if($addp =~ /staticwatch/);               
-  $setlist   .= "start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
+  $setlist   .= "time "                               if($addp =~ /staticwatch/);               
+  $setlist   .= "reset:noArg start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
 
   if ($opt =~ /\bstart\b/) {
       my $ms = int(time*1000);
@@ -129,6 +130,10 @@ sub Watches_Set {                                                    ## no criti
       
   } elsif ($opt eq "stop") {
       readingsSingleUpdate($hash, "state", "stopped",  1);
+      
+  } elsif ($opt eq "reset") {
+      Watches_delread     ($name);
+      readingsSingleUpdate($hash, "state", "initialized",  1);
       
   } elsif ($opt eq "time") {
       return qq{The value(s) for "time" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
@@ -147,7 +152,7 @@ return;
 }
 
 ################################################################
-sub Watches_Attr($$$$) {
+sub Watches_Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val);
@@ -184,12 +189,7 @@ sub Watches_Attr($$$$) {
         }
         $do = 0 if($cmd eq "del");
         
-        my @allrds = keys%{$defs{$name}{READINGS}};
-        for my $key(@allrds) {
-            # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
-            next if($key =~ /\bstate\b/);
-            readingsDelete($hash,$key);
-        }  
+        Watches_delread ($name);   
  
         readingsSingleUpdate($hash, "state", "initialized", 1); 
         
@@ -203,7 +203,7 @@ return;
 }
 
 ################################################################
-sub Watches_FwFn($$$$) {
+sub Watches_FwFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   
@@ -228,7 +228,22 @@ return $ret;
 }
 
 ################################################################
-sub Watches_digital($) {
+sub Watches_delread {
+  my ($name) = @_;
+  my $hash   = $defs{$name};
+  
+  my @allrds = keys%{$hash->{READINGS}};
+  for my $key(@allrds) {
+      # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+      next if($key =~ /\bstate\b/);
+      readingsDelete($hash,$key);
+  }    
+    
+return;
+} 
+
+################################################################
+sub Watches_digital {
   my ($d) = @_;
   my $hash  = $defs{$d};
   my $hattr = AttrVal($d,"htmlattr","width='150' height='50'");
@@ -863,12 +878,24 @@ sub Watches_digital($) {
             var minutes_$d = parseInt(elapsesec_$d / 60);
             var seconds_$d = elapsesec_$d - minutes_$d * 60;
             
-            if (state_$d != 'started') {
+            if (state_$d == 'started') {
+                localStorage.setItem('h_$d', hours_$d);
+                localStorage.setItem('m_$d', minutes_$d);
+                localStorage.setItem('s_$d', seconds_$d);
+            }
+            
+            if (state_$d == 'stopped') {
+                hours_$d   = localStorage.getItem('h_$d');
+                minutes_$d = localStorage.getItem('m_$d');
+                seconds_$d = localStorage.getItem('s_$d');
+            }
+
+            if (state_$d == 'initialized') {
                 hours_$d   = 0;
                 minutes_$d = 0;
                 seconds_$d = 0;
-                // if (typeof seconds_$d === 'undefined') {s_$d = 0 } else {s_$d = seconds_$d};
-            }            
+            }
+            
         }       
         
         var value = $ddt;
@@ -883,7 +910,7 @@ sub Watches_digital($) {
 }
 
 ################################################################
-sub Watches_station($) {
+sub Watches_station {
   my ($d) = @_;
   my $hash   = $defs{$d};
   my $ssh    = AttrVal($d,"stationSecondHand","Bar")."SecondHand";
@@ -1386,7 +1413,7 @@ sub Watches_station($) {
 }
 
 ################################################################
-sub Watches_modern($) {
+sub Watches_modern {
   my ($d) = @_;
   my $hash   = $defs{$d};
   my $facec  = AttrVal($d,"modernColorFace","FFFEFA");
@@ -1537,6 +1564,14 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
   
   <ul>
   <ul>
+  
+    <a name="reset"></a>
+    <li><b>reset</b><br>
+      Stoppt die Stoppuhr (falls sie läuft) und setzt die Zeit auf 00:00:00 zurück. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
   
     <a name="start"></a>
     <li><b>start</b><br>
@@ -1790,6 +1825,14 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
   <ul>
   <ul>
   
+    <a name="reset"></a>
+    <li><b>reset</b><br>
+      Stoppt die Stoppuhr (falls sie läuft) und setzt die Zeit auf 00:00:00 zurück. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
+    
     <a name="start"></a>
     <li><b>start</b><br>
       Startet die Stoppuhr. <br>
@@ -1800,7 +1843,7 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     
     <a name="stop"></a>
     <li><b>stop</b><br>
-      Stoppt die Stoppuhr. <br>
+      Stoppt die Stoppuhr. Die erreichte Zeit bleibt erhalten. <br>
       Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
       <b>digitalDisplayPattern = stopwatch</b> vorhanden.
     </li>
