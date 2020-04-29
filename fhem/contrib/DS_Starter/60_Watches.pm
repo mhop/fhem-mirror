@@ -36,7 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
-  "0.6.0"  => "29.04.2020  new set 'restet' for stopwatch ",
+  "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings ",
   "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
   "0.4.0"  => "20.11.2018  text display ",
   "0.3.0"  => "19.11.2018  digital clock added ",
@@ -251,8 +251,7 @@ sub Watches_digital {
   my $ddt   = AttrVal($d,"digitalDisplayText","Play");
   
   my $ddp = "###:##:##";                                                        # dummy
-  my $ws  = "initialized";
-  my ($h,$m,$s,$ms) = (0,0,0,0); 
+  my ($h,$m,$s) = (0,0,0); 
   
   if($addp eq "watch") {
       $ddp = "###:##:##";
@@ -261,9 +260,7 @@ sub Watches_digital {
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
   } elsif($addp eq "stopwatch") {
-      $ws  = ReadingsVal($d, "state", "initialized");
       $ddp = "###:##:##";
-      $ms  = ReadingsVal($d, "starttime", 0);
       $ddt = "  "."((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
                     + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
@@ -304,6 +301,17 @@ sub Watches_digital {
     SegmentDisplay_$d.SymmetricCorner = 0;
     SegmentDisplay_$d.SquaredCorner   = 1;
     SegmentDisplay_$d.RoundedCorner   = 2;
+
+    // Definition variables
+    var state_$d;
+    var ms_$d;
+    var csrf;
+    var url_$d;
+    var devName_$d;
+    var selVal_$d;
+    var hours_$d;
+    var minutes_$d;
+    var seconds_$d;
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -848,12 +856,26 @@ sub Watches_digital {
     //display_$d.colorOn         = 'rgba(0, 0, 0, 0.9)';
     display_$d.colorOn         = '#$dcd';
     display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
+    
+    // get the base url
+    function getBaseUrl () {
+        var url = window.location.href.split(\"?\")[0];
+        url += \"?\";
+        if( csrf != null ) {
+            url += \"fwcsrf=\"+csrf+\"&\";
+        }
+        return url;
+    }
+
+    function makeCommand (cmd) {
+        return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+    }
 
     animate_$d();
     
     function animate_$d() {
         var watchkind_$d = '$addp';
-        
+
         if (watchkind_$d == 'watch') {
             var time    = new Date();
             var hours   = time.getHours();
@@ -866,17 +888,31 @@ sub Watches_digital {
             var seconds_$d = '$s';
         }
         if (watchkind_$d == 'stopwatch') {
-            var state_$d = '$ws';
+            hours_$d   = 0;
+            minutes_$d = 0;
+            seconds_$d = 0;
+        
+            devName_$d = '$d';
+            selVal_$d  = 'state';            
+            command    = '{ReadingsVal(\"'+devName_$d+'\",\"'+selVal_$d+'\",\"\")}';
+            url_$d     = makeCommand(command);
+            \$.get( url_$d, function (data) {state_$d = data.replace(/\\n/g, ''); return state_$d;} );
             
-            startDate_$d   = new Date($ms); 
-            endDate_$d     = new Date();
-            elapsesec_$d   = ((endDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
-            var hours_$d   = parseInt(elapsesec_$d / 3600);
-            elapsesec_$d  -= hours_$d * 3600;
-            var minutes_$d = parseInt(elapsesec_$d / 60);
-            var seconds_$d = elapsesec_$d - minutes_$d * 60;
             
-            if (state_$d == 'started') {
+            if (state_$d == 'started') {  
+                selVal_$d = 'starttime';            
+                command   = '{ReadingsNum(\"'+devName_$d+'\",\"'+selVal_$d+'\",0)}';
+                url_$d    = makeCommand(command);
+                \$.get( url_$d, function (data) {ms_$d = data.replace(/\\n/g, ''); return ms_$d;} );
+                
+                startDate_$d   = new Date(parseInt(ms_$d)); 
+                endDate_$d     = new Date();
+                elapsesec_$d   = ((endDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
+                hours_$d       = parseInt(elapsesec_$d / 3600);
+                elapsesec_$d  -= hours_$d * 3600;
+                minutes_$d     = parseInt(elapsesec_$d / 60);
+                seconds_$d     = elapsesec_$d - minutes_$d * 60;
+                
                 localStorage.setItem('h_$d', hours_$d);
                 localStorage.setItem('m_$d', minutes_$d);
                 localStorage.setItem('s_$d', seconds_$d);
@@ -892,10 +928,13 @@ sub Watches_digital {
                 hours_$d   = 0;
                 minutes_$d = 0;
                 seconds_$d = 0;
-            }
-            
-        }       
+                localStorage.setItem('h_$d', hours_$d);
+                localStorage.setItem('m_$d', minutes_$d);
+                localStorage.setItem('s_$d', seconds_$d);
+            }          
         
+        }
+
         var value = $ddt;
         display_$d.setValue(value);
         window.setTimeout('animate_$d()', 100);
