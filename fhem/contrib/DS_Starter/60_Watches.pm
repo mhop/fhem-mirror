@@ -44,8 +44,6 @@ our %Watches_vNotesIntern = (
   "0.1.0"  => "13.11.2018  initial Version with modern analog clock"
 );
 
-sub Watches_modern($);
-
 ################################################################
 sub Watches_Initialize {
   my ($hash) = @_;
