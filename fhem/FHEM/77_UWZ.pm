@@ -9,6 +9,7 @@
 #       - Marko Oldenburg (leongaultier at gmail dot com)
 #       - Hanjo (Forum) patch for sort by creation
 #       - cb1 <kontakt@it-buchinger.de> patch Replace Iconv with native perl encode()
+#       - KölnSolar (Markus) new write UWZAsHtml with smaler Code
 #
 #  Storm warnings from unwetterzentrale.de
 #  inspired by 59_PROPLANTA.pm
@@ -56,11 +57,11 @@ no
   'experimental::smartmatch';
 
 my $missingModul;
-eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
-eval "use LWP::Simple;1"    or $missingModul .= "LWP::Simple ";
-eval "use HTTP::Request;1"  or $missingModul .= "HTTP::Request ";
-eval "use HTML::Parser;1"   or $missingModul .= "HTML::Parser ";
-eval "use Encode::Guess;1"  or $missingModul .= "Encode::Guess ";
+eval 'use LWP::UserAgent;1' or $missingModul .= 'LWP::UserAgent ';
+eval 'use LWP::Simple;1'    or $missingModul .= 'LWP::Simple ';
+eval 'use HTTP::Request;1'  or $missingModul .= 'HTTP::Request ';
+eval 'use HTML::Parser;1'   or $missingModul .= 'HTML::Parser ';
+eval 'use Encode::Guess;1'  or $missingModul .= 'Encode::Guess ';
 
 require 'Blocking.pm';
 require 'HttpUtils.pm';
@@ -185,48 +186,53 @@ GP_Export(
 my @DEweekdays =
   qw(Sonntag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
 my @DEmonths = (
-    "Januar", "Februar", "März",     "April",   "Mai",      "Juni",
-    "Juli",   "August",  "September", "Oktober", "November", "Dezember"
+    'Januar', 'Februar', 'März',     'April',   'Mai',      'Juni',
+    'Juli',   'August',  'September', 'Oktober', 'November', 'Dezember'
 );
 my @NLweekdays = qw(zondag maandag dinsdag woensdag donderdag vrijdag zaterdag);
 my @NLmonths   = (
-    "januari", "februari", "maart",     "april",   "mei",      "juni",
-    "juli",    "augustus", "september", "oktober", "november", "december"
+    'januari', 'februari', 'maart',     'april',   'mei',      'juni',
+    'juli',    'augustus', 'september', 'oktober', 'november', 'december'
 );
 my @FRweekdays = qw(dimanche lundi mardi mercredi jeudi vendredi samedi);
 my @FRmonths   = (
-    "janvier", "février", "mars",      "avril",   "mai",      "juin",
-    "juillet", "août",    "september", "octobre", "novembre", "decembre"
+    'janvier', 'février', 'mars',      'avril',   'mai',      'juin',
+    'juillet', 'août',    'september', 'octobre', 'novembre', 'decembre'
 );
 my @ENweekdays = qw(sunday monday thuesday wednesday thursday friday saturday);
 my @ENmonths   = (
-    "January", "February", "March",     "April",   "Mäy",     "June",
-    "July",    "August",   "September", "October", "November", "December"
+    'January', 'February', 'March',     'April',   'Mäy',     'June',
+    'July',    'August',   'September', 'October', 'November', 'December'
 );
 
-# my $countrycode = "DE";
-# my $plz = "77777";
-# my $uwz_alert_url = "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ" . $countrycode . $plz;
+# my $countrycode = 'DE';
+# my $plz = '77777';
+# my $uwz_alert_url = 'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ' . $countrycode . $plz;
 
 ########################################
-sub Log($$$) {
+sub Log {
+    my $hash     = shift;
+    my $loglevel = shift;
+    my $text     = shift;
 
-    my ( $hash, $loglevel, $text ) = @_;
-    my $MODUL = "UWZ";
+    my $MODUL = 'UWZ';
     my $xline = ( caller(0) )[2];
 
     my $xsubroutine = ( caller(1) )[3];
     my $sub = ( split( ':', $xsubroutine ) )[2];
     $sub =~ s/UWZ_//;
 
-    my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
+    my $instName = ( ref($hash) eq 'HASH' ) ? $hash->{NAME} : $hash;
     Log3 $instName, $loglevel, "$MODUL $instName: $sub.$xline " . $text;
+
+    return;
 }
 
 ########################################
-sub Map2Movie($$) {
+sub Map2Movie {
+    my $smap = shift;
+
     my $uwz_movie_url = "http://www.meteocentrale.ch/uploads/media/";
-    my ( $hash, $smap ) = @_;
     my $lmap;
 
     $smap = lc($smap);
@@ -283,26 +289,26 @@ sub Map2Movie($$) {
 }
 
 ########################################
-sub Map2Image($$) {
+sub Map2Image {
+    my $smap = shift;
 
-    my $uwz_de_url = "http://www.unwetterzentrale.de/images/map/";
-    my $uwz_at_url = "http://unwetter.wetteralarm.at/images/map/";
-    my $uwz_ch_url = "http://alarm.meteocentrale.ch/images/map/";
-    my $uwz_en_url = "http://warnings.severe-weather-centre.co.uk/images/map/";
-    my $uwz_li_url = "http://alarm.meteocentrale.li/images/map/";
-    my $uwz_be_url = "http://alarm.meteo-info.be/images/map/";
-    my $uwz_dk_url = "http://alarm.vejrcentral.dk/images/map/";
-    my $uwz_fi_url = "http://vaaratasot.saa-varoitukset.fi/images/map/";
-    my $uwz_fr_url = "http://alerte.vigilance-meteo.fr/images/map/";
-    my $uwz_lu_url = "http://alarm.meteozentral.lu/images/map/";
-    my $uwz_nl_url = "http://alarm.noodweercentrale.nl/images/map/";
-    my $uwz_no_url = "http://advarsler.vaer-sentral.no/images/map/";
-    my $uwz_pt_url = "http://avisos.centrometeo.pt/images/map/";
-    my $uwz_se_url = "http://varningar.vader-alarm.se/images/map/";
-    my $uwz_es_url = "http://avisos.alertas-tiempo.es/images/map/";
-    my $uwz_it_url = "http://allarmi.meteo-allerta.it/images/map/";
+    my $uwz_de_url = 'http://www.unwetterzentrale.de/images/map/';
+    my $uwz_at_url = 'http://unwetter.wetteralarm.at/images/map/';
+    my $uwz_ch_url = 'http://alarm.meteocentrale.ch/images/map/';
+    my $uwz_en_url = 'http://warnings.severe-weather-centre.co.uk/images/map/';
+    my $uwz_li_url = 'http://alarm.meteocentrale.li/images/map/';
+    my $uwz_be_url = 'http://alarm.meteo-info.be/images/map/';
+    my $uwz_dk_url = 'http://alarm.vejrcentral.dk/images/map/';
+    my $uwz_fi_url = 'http://vaaratasot.saa-varoitukset.fi/images/map/';
+    my $uwz_fr_url = 'http://alerte.vigilance-meteo.fr/images/map/';
+    my $uwz_lu_url = 'http://alarm.meteozentral.lu/images/map/';
+    my $uwz_nl_url = 'http://alarm.noodweercentrale.nl/images/map/';
+    my $uwz_no_url = 'http://advarsler.vaer-sentral.no/images/map/';
+    my $uwz_pt_url = 'http://avisos.centrometeo.pt/images/map/';
+    my $uwz_se_url = 'http://varningar.vader-alarm.se/images/map/';
+    my $uwz_es_url = 'http://avisos.alertas-tiempo.es/images/map/';
+    my $uwz_it_url = 'http://allarmi.meteo-allerta.it/images/map/';
 
-    my ( $hash, $smap ) = @_;
     my $lmap;
 
     $smap = lc($smap);
@@ -483,132 +489,155 @@ sub Map2Image($$) {
 
     ## Isobaren
     $lmap->{'isobaren1'} =
-      "http://www.unwetterzentrale.de/images/icons/UWZ_ISO_00.jpg";
+      'http://www.unwetterzentrale.de/images/icons/UWZ_ISO_00.jpg';
     $lmap->{'isobaren2'} =
-      "http://www.wetteralarm.at/uploads/pics/UWZ_EURO_ISO_GER_00.jpg";
+      'http://www.wetteralarm.at/uploads/pics/UWZ_EURO_ISO_GER_00.jpg';
     $lmap->{'isobaren3'} =
-"http://www.severe-weather-centre.co.uk/uploads/pics/UWZ_EURO_ISO_ENG_00.jpg";
+'http://www.severe-weather-centre.co.uk/uploads/pics/UWZ_EURO_ISO_ENG_00.jpg';
 
     return $lmap->{$smap};
 }
 
 ###################################
-sub Initialize($) {
+sub Initialize {
+    my $hash = shift;
 
-    my ($hash) = @_;
-    $hash->{DefFn}    = "FHEM::UWZ::Define";
-    $hash->{UndefFn}  = "FHEM::UWZ::Undef";
-    $hash->{SetFn}    = "FHEM::UWZ::Set";
-    $hash->{NotifyFn} = "FHEM::UWZ::Notify";
-    $hash->{GetFn}    = "FHEM::UWZ::Get";
+    $hash->{DefFn}    = \&Define;
+    $hash->{UndefFn}  = \&Undef;
+    $hash->{SetFn}    = \&Set;
+    $hash->{NotifyFn} = \&Notify;
+    $hash->{GetFn}    = \&Get;
+    $hash->{AttrFn}   = \&Attr;
     $hash->{AttrList} =
-        "download:0,1 "
-      . "savepath " . "maps "
-      . "humanreadable:0,1 "
-      . "htmlattr "
-      . "htmltitle "
-      . "htmltitleclass "
-      . "htmlsequence:ascending,descending " . "lang "
-      . "sort_readings_by:severity,start,creation "
-      . "localiconbase "
-      . "intervalAtWarnLevel "
-      . "disable:1 "
+        'download:0,1 '
+      . 'savepath ' . 'maps '
+      . 'humanreadable:0,1 '
+      . 'htmlattr '
+      . 'htmltitle '
+      . 'htmltitleclass '
+      . 'htmlsequence:ascending,descending ' . 'lang '
+      . 'sort_readings_by:severity,start,creation '
+      . 'localiconbase '
+      . 'intervalAtWarnLevel '
+      . 'disable:1 '
+      . 'disabledForIntervals '
       . $readingFnAttributes;
+    $hash->{parseParams} = 1;
 
     return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 ###################################
-sub Define($$) {
-
-    my ( $hash, $def ) = @_;
-    my $name = $hash->{NAME};
-    my $lang = "";
-    my @a    = split( "[ \t][ \t]*", $def );
+sub Define {
+    my $hash = shift;
+    my $a    = shift;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return "Error: Perl moduls " . $missingModul . "are missing on this system"
       if ($missingModul);
+
     return
       "Wrong syntax: use define <name> UWZ <CountryCode> <PLZ> <Interval> "
-      if ( int(@a) != 5 and ( ( lc $a[2] ) ne "search" ) );
+      if ( scalar( @{$a} ) != 5
+        && lc $a->[2] ne 'search' );
 
+    my $name = $hash->{NAME};
+    my $lang = '';
     $hash->{VERSION}   = version->parse($VERSION)->normal;
     $hash->{NOTIFYDEV} = 'global,' . $name;
 
-    if ( ( lc $a[2] ) ne "search" ) {
+    if ( ( lc $a->[2] ) ne 'search' ) {
         readingsSingleUpdate( $hash, 'state', 'Initializing', 1 );
-        $hash->{CountryCode} = $a[2];
-        $hash->{PLZ}         = $a[3];
+        $hash->{CountryCode} = $a->[2];
+        $hash->{PLZ}         = $a->[3];
 
         ## URL by CountryCode
 
-        my $URL_language = "en";
+        my $URL_language = 'en';
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-            $URL_language = "de";
+            $URL_language = 'de';
         }
         if ( $hash->{CountryCode} ~~ ['NL'] ) {
-            $URL_language = "nl";
+            $URL_language = 'nl';
         }
         if ( $hash->{CountryCode} ~~ ['FR'] ) {
-            $URL_language = "fr";
+            $URL_language = 'fr';
         }
 
         $hash->{URL} =
-"http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language="
+'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
           . $URL_language
-          . "&areaID=UWZ"
-          . $a[2]
-          . $a[3];
+          . '&areaID=UWZ'
+          . $a->[2]
+          . $a->[3];
 
         $hash->{fhem}{LOCAL}  = 0;
-        $hash->{INTERVAL}     = $a[4];
+        $hash->{INTERVAL}     = $a->[4];
         $hash->{INTERVALWARN} = 0;
     }
     else {
         readingsSingleUpdate( $hash, 'state', 'Search-Mode', 1 );
-        $hash->{CountryCode} = uc $a[2];
+        $hash->{CountryCode} = uc $a->[2];
     }
 
-    return undef;
+    return;
 }
 
 #####################################
-sub Undef($$) {
-
-    my ( $hash, $arg ) = @_;
+sub Undef {
+    my $hash = shift;
+    my $arg  = shift;
 
     RemoveInternalTimer($hash);
     BlockingKill( $hash->{helper}{RUNNING_PID} )
       if ( defined( $hash->{helper}{RUNNING_PID} ) );
 
-    #     delete($modules{UWZ}{defptr}{$hash->{PLZ}});
+    return;
+}
 
-    return undef;
+sub Attr {
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my $hash = $defs{$name};
+
+    if ( $attrName eq "disabledForIntervals" ) {
+        if ( $cmd eq "set" ) {
+            return
+"check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
+              unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
+            Log3( $name, 3, "UWZ ($name) - disabledForIntervals" );
+        }
+
+        elsif ( $cmd eq "del" ) {
+            Log3( $name, 3, "UWZ ($name) - enabled" );
+            readingsSingleUpdate( $hash, "state", "active", 1 );
+        }
+    }
+
+    return;
 }
 
 #####################################
-sub Set($@) {
+sub Set {
+    my $hash = shift;
+    my $a    = shift;
 
-    my ( $hash, @a ) = @_;
-    my $name   = $hash->{NAME};
-    my $reUINT = '^([\\+]?\\d+)$';
-    my $usage  = "Unknown argument $a[1], choose one of update:noArg "
-      if ( ( lc $hash->{CountryCode} ) ne "search" );
+    my $name = shift @$a;
+    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
 
-    return $usage if ( @a < 2 );
+    my $usage = "Unknown argument $cmd, choose one of update:noArg "
+      if ( ( lc $hash->{CountryCode} ) ne 'search' );
 
-    my $cmd = lc( $a[1] );
+    return $usage if ( scalar( @{$a} ) != 0 );
 
     given ($cmd) {
         when ("?") {
             return $usage;
         }
 
-        when ("update") {
-            Log $hash, 4, "set command: " . $a[1];
+        when ('update') {
+            Log $hash, 4, 'set command: ' . $cmd;
             $hash->{fhem}{LOCAL} = 1;
             Start($hash);
             $hash->{fhem}{LOCAL} = 0;
@@ -622,11 +651,11 @@ sub Set($@) {
     return;
 }
 
-sub Notify($$) {
+sub Notify {
+    my $hash = shift;
+    my $dev  = shift;
 
-    my ( $hash, $dev ) = @_;
     my $name = $hash->{NAME};
-    return if ( IsDisabled($name) );
 
     my $devname = $dev->{NAME};
     my $devtype = $dev->{TYPE};
@@ -645,10 +674,10 @@ sub Notify($$) {
                     or grep /^ATTR.$name.disable.0$/,
                     @{$events}
                 )
-                and $devname eq 'global'
-                and $init_done
+                && $devname eq 'global'
+                && $init_done
             )
-            or (
+            || (
                 (
                     grep /^INITIALIZED$/,
                     @{$events}
@@ -657,88 +686,93 @@ sub Notify($$) {
                     or grep /^MODIFIED.$name$/,
                     @{$events}
                 )
-                and $devname eq 'global'
+                && $devname eq 'global'
             )
         )
-        and ReadingsVal( $name, 'state', 'Search-Mode' ) ne 'Search-Mode'
+        && ReadingsVal( $name, 'state', 'Search-Mode' ) ne 'Search-Mode'
       );
 
     return;
 }
 
-sub Get($@) {
+sub Get {
+    my $hash = shift;
+    my $a    = shift;
 
-    my ( $hash, @a ) = @_;
-    my $name = $hash->{NAME};
+    my $name = shift @$a;
+    my $cmd  = shift @$a // return qq{"get $name" needs at least one argument};
 
     if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
         my $usage =
-"Unknown argument $a[1], choose one of Sturm:noArg Schneefall:noArg Regen:noArg Extremfrost:noArg Waldbrand:noArg Gewitter:noArg Glaette:noArg Hitze:noArg Glatteisregen:noArg Bodenfrost:noArg Hagel:noArg ";
+"Unknown argument $cmd, choose one of Sturm:noArg Schneefall:noArg Regen:noArg Extremfrost:noArg Waldbrand:noArg Gewitter:noArg Glaette:noArg Hitze:noArg Glatteisregen:noArg Bodenfrost:noArg Hagel:noArg ";
 
-        return $usage if ( @a < 2 );
+        return $usage if ( scalar( @{$a} ) != 0 );
 
-        if    ( $a[1] =~ /^Sturm/ )         { GetCurrent( $hash, 2 ); }
-        elsif ( $a[1] =~ /^Schneefall/ )    { GetCurrent( $hash, 3 ); }
-        elsif ( $a[1] =~ /^Regen/ )         { GetCurrent( $hash, 4 ); }
-        elsif ( $a[1] =~ /^Extremfrost/ )   { GetCurrent( $hash, 5 ); }
-        elsif ( $a[1] =~ /^Waldbrand/ )     { GetCurrent( $hash, 6 ); }
-        elsif ( $a[1] =~ /^Gewitter/ )      { GetCurrent( $hash, 7 ); }
-        elsif ( $a[1] =~ /^Glaette/ )       { GetCurrent( $hash, 8 ); }
-        elsif ( $a[1] =~ /^Hitze/ )         { GetCurrent( $hash, 9 ); }
-        elsif ( $a[1] =~ /^Glatteisregen/ ) { GetCurrent( $hash, 10 ); }
-        elsif ( $a[1] =~ /^Bodenfrost/ )    { GetCurrent( $hash, 11 ); }
-        elsif ( $a[1] =~ /^Hagel/ )         { GetCurrentHail($hash); }
-        else                                { return $usage; }
+        return
+            $cmd =~ m{\ASturm}xms         ? GetCurrent( $hash, 2 )
+          : $cmd =~ m{\ASchneefall}xms    ? GetCurrent( $hash, 3 )
+          : $cmd =~ m{\ARegen}xms         ? GetCurrent( $hash, 4 )
+          : $cmd =~ m{\AExtremfrost}xms   ? GetCurrent( $hash, 5 )
+          : $cmd =~ m{\AWaldbrand}xms     ? GetCurrent( $hash, 6 )
+          : $cmd =~ m{\AGewitter}xms      ? GetCurrent( $hash, 7 )
+          : $cmd =~ m{\AGlaette}xms       ? GetCurrent( $hash, 8 )
+          : $cmd =~ m{\AHitze}xms         ? GetCurrent( $hash, 9 )
+          : $cmd =~ m{\AGlatteisregen}xms ? GetCurrent( $hash, 10 )
+          : $cmd =~ m{\ABodenfrost}xms    ? GetCurrent( $hash, 11 )
+          : $cmd =~ m{\AHagel}xms         ? GetCurrentHail($hash)
+          :                                 $usage;
     }
 
     elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
         my $usage =
-"Unknown argument $a[1], choose one of storm:noArg sneeuw:noArg regen:noArg strenge-vorst:noArg bosbrand:noArg onweer:noArg gladheid:noArg hitte:noArg ijzel:noArg grondvorst:noArg hagel:noArg ";
+"Unknown argument $cmd, choose one of storm:noArg sneeuw:noArg regen:noArg strenge-vorst:noArg bosbrand:noArg onweer:noArg gladheid:noArg hitte:noArg ijzel:noArg grondvorst:noArg hagel:noArg ";
 
-        return $usage if ( @a < 2 );
+        return $usage if ( scalar( @{$a} ) != 0 );
 
-        if    ( $a[1] =~ /^storm/ )         { GetCurrent( $hash, 2 ); }
-        elsif ( $a[1] =~ /^sneeuw/ )        { GetCurrent( $hash, 3 ); }
-        elsif ( $a[1] =~ /^regen/ )         { GetCurrent( $hash, 4 ); }
-        elsif ( $a[1] =~ /^strenge-vorst/ ) { GetCurrent( $hash, 5 ); }
-        elsif ( $a[1] =~ /^bosbrand/ )      { GetCurrent( $hash, 6 ); }
-        elsif ( $a[1] =~ /^onweer/ )        { GetCurrent( $hash, 7 ); }
-        elsif ( $a[1] =~ /^gladheid/ )      { GetCurrent( $hash, 8 ); }
-        elsif ( $a[1] =~ /^hitte/ )         { GetCurrent( $hash, 9 ); }
-        elsif ( $a[1] =~ /^ijzel/ )         { GetCurrent( $hash, 10 ); }
-        elsif ( $a[1] =~ /^grondvorst/ )    { GetCurrent( $hash, 11 ); }
-        elsif ( $a[1] =~ /^hagel/ )         { GetCurrentHail($hash); }
-        else                                { return $usage; }
+        return
+            $cmd =~ m{\Astorm}xms         ? GetCurrent( $hash, 2 )
+          : $cmd =~ m{\Asneeuw}xms        ? GetCurrent( $hash, 3 )
+          : $cmd =~ m{\Aregen}xms         ? GetCurrent( $hash, 4 )
+          : $cmd =~ m{\Astrenge-vorst}xms ? GetCurrent( $hash, 5 )
+          : $cmd =~ m{\Abosbrand}xms      ? GetCurrent( $hash, 6 )
+          : $cmd =~ m{\Aonweer}xms        ? GetCurrent( $hash, 7 )
+          : $cmd =~ m{\Agladheid}xms      ? GetCurrent( $hash, 8 )
+          : $cmd =~ m{\Ahitte}xms         ? GetCurrent( $hash, 9 )
+          : $cmd =~ m{\Aijzel}xms         ? GetCurrent( $hash, 10 )
+          : $cmd =~ m{\Agrondvorst}xms    ? GetCurrent( $hash, 11 )
+          : $cmd =~ m{\Ahagel}xms         ? GetCurrentHail($hash)
+          :                                 $usage;
     }
 
     elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
         my $usage =
-"Unknown argument $a[1], choose one of tempete:noArg neige:noArg pluie:noArg strenge-vorst:noArg incendie-de-foret:noArg orage:noArg glissange:noArg canicule:noArg verglas:noArg grondvorst:noArg grele:noArg ";
+"Unknown argument $cmd, choose one of tempete:noArg neige:noArg pluie:noArg strenge-vorst:noArg incendie-de-foret:noArg orage:noArg glissange:noArg canicule:noArg verglas:noArg grondvorst:noArg grele:noArg ";
 
-        return $usage if ( @a < 2 );
+        return $usage if ( scalar( @{$a} ) != 0 );
 
-        if    ( $a[1] =~ /^tempete/ )          { GetCurrent( $hash, 2 ); }
-        elsif ( $a[1] =~ /^neige/ )            { GetCurrent( $hash, 3 ); }
-        elsif ( $a[1] =~ /^pluie/ )            { GetCurrent( $hash, 4 ); }
-        elsif ( $a[1] =~ /^température/ )     { GetCurrent( $hash, 5 ); }
-        elsif ( $a[1] =~ /^feu-de-forêt/ )    { GetCurrent( $hash, 6 ); }
-        elsif ( $a[1] =~ /^orage/ )            { GetCurrent( $hash, 7 ); }
-        elsif ( $a[1] =~ /^route-glissante/ )  { GetCurrent( $hash, 8 ); }
-        elsif ( $a[1] =~ /^chaleur/ )          { GetCurrent( $hash, 9 ); }
-        elsif ( $a[1] =~ /^pluie-de-verglas/ ) { GetCurrent( $hash, 10 ); }
-        elsif ( $a[1] =~ /^gelée/ )           { GetCurrent( $hash, 11 ); }
-        elsif ( $a[1] =~ /^grêle/ )           { GetCurrentHail($hash); }
-        else                                   { return $usage; }
+        return
+            $cmd =~ m{\Atempete}xms          ? GetCurrent( $hash, 2 )
+          : $cmd =~ m{\Aneige}xms            ? GetCurrent( $hash, 3 )
+          : $cmd =~ m{\Apluie}xms            ? GetCurrent( $hash, 4 )
+          : $cmd =~ m{\Atempérature}xms     ? GetCurrent( $hash, 5 )
+          : $cmd =~ m{\Afeu-de-forêt}xms    ? GetCurrent( $hash, 6 )
+          : $cmd =~ m{\Aorage}xms            ? GetCurrent( $hash, 7 )
+          : $cmd =~ m{\Aoute-glissante}xms   ? GetCurrent( $hash, 8 )
+          : $cmd =~ m{\Achaleur}xms          ? GetCurrent( $hash, 9 )
+          : $cmd =~ m{\Apluie-de-verglas}xms ? GetCurrent( $hash, 10 )
+          : $cmd =~ m{\Agelée}xms           ? GetCurrent( $hash, 11 )
+          : $cmd =~ m{\Agrêle}xms           ? GetCurrentHail($hash)
+          :                                    $usage;
     }
 
     elsif ( ( lc $hash->{CountryCode} ) eq 'search' ) {
-        my $usage = "Unknown argument $a[1], choose one of SearchAreaID ";
+        my $usage = "Unknown argument $cmd, choose one of SearchAreaID ";
 
-        return $usage if ( @a < 3 );
+        return $usage if ( scalar( @{$a} ) != 1 );
 
-        if ( $a[1] =~ /^SearchAreaID/ ) { UWZSearchLatLon( $name, $a[2] ); }
-        elsif ( $a[1] =~ /^AreaID/ ) {
-            my @splitparam = split( /,/, $a[2] );
+        if ( $cmd =~ m{\ASearchAreaID}xms ) { UWZSearchLatLon( $name, $a->[0] ); }
+        elsif ( $cmd =~ m{\AAreaID}xms ) {
+            my @splitparam = split( /,/, $a->[0] );
             UWZSearchAreaID( $splitparam[0], $splitparam[1] );
         }
         else { return $usage; }
@@ -746,53 +780,54 @@ sub Get($@) {
     }
     else {
         my $usage =
-"Unknown argument $a[1], choose one of storm:noArg snow:noArg rain:noArg extremfrost:noArg forest-fire:noArg thunderstorms:noArg glaze:noArg heat:noArg glazed-rain:noArg soil-frost:noArg hail:noArg ";
+"Unknown argument $cmd, choose one of storm:noArg snow:noArg rain:noArg extremfrost:noArg forest-fire:noArg thunderstorms:noArg glaze:noArg heat:noArg glazed-rain:noArg soil-frost:noArg hail:noArg ";
 
-        return $usage if ( @a < 2 );
+        return $usage if ( scalar( @{$a} ) != 0 );
 
-        if    ( $a[1] =~ /^storm/ )         { GetCurrent( $hash, 2 ); }
-        elsif ( $a[1] =~ /^snow/ )          { GetCurrent( $hash, 3 ); }
-        elsif ( $a[1] =~ /^rain/ )          { GetCurrent( $hash, 4 ); }
-        elsif ( $a[1] =~ /^extremfrost/ )   { GetCurrent( $hash, 5 ); }
-        elsif ( $a[1] =~ /^forest-fire/ )   { GetCurrent( $hash, 6 ); }
-        elsif ( $a[1] =~ /^thunderstorms/ ) { GetCurrent( $hash, 7 ); }
-        elsif ( $a[1] =~ /^glaze/ )         { GetCurrent( $hash, 8 ); }
-        elsif ( $a[1] =~ /^heat/ )          { GetCurrent( $hash, 9 ); }
-        elsif ( $a[1] =~ /^glazed-rain/ )   { GetCurrent( $hash, 10 ); }
-        elsif ( $a[1] =~ /^soil-frost/ )    { GetCurrent( $hash, 11 ); }
-        elsif ( $a[1] =~ /^hail/ )          { GetCurrentHail($hash); }
-        else                                { return $usage; }
-
+        return
+            $cmd =~ m{\Astorm}xms         ? GetCurrent( $hash, 2 )
+          : $cmd =~ m{\Asnow}xms          ? GetCurrent( $hash, 3 )
+          : $cmd =~ m{\Arain}xms          ? GetCurrent( $hash, 4 )
+          : $cmd =~ m{\Aextremfrost}xms   ? GetCurrent( $hash, 5 )
+          : $cmd =~ m{\Aforest-fire}xms   ? GetCurrent( $hash, 6 )
+          : $cmd =~ m{\Athunderstorms}xms ? GetCurrent( $hash, 7 )
+          : $cmd =~ m{\Aglaze}xms         ? GetCurrent( $hash, 8 )
+          : $cmd =~ m{\Aheat}xms          ? GetCurrent( $hash, 9 )
+          : $cmd =~ m{\Aglazed-rain}xms   ? GetCurrent( $hash, 10 )
+          : $cmd =~ m{\Asoil-frost}xms    ? GetCurrent( $hash, 11 )
+          : $cmd =~ m{\Ahail}xms          ? GetCurrentHail($hash)
+          :                                 $usage;
     }
 }
 
 #####################################
-sub GetCurrent($@) {
+sub GetCurrent {
+    my $hash = shift;
+    my $type = shift;
 
-    my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
     my $out;
     my $curTimestamp = time();
-    if ( ReadingsVal( $name, "WarnCount", 0 ) eq 0 ) {
-        $out = "inactive";
+    if ( ReadingsVal( $name, 'WarnCount', 0 ) eq 0 ) {
+        $out = 'inactive';
     }
     else {
-        for ( my $i = 0 ; $i < ReadingsVal( $name, "WarnCount", 0 ) ; $i++ ) {
+        for ( my $i = 0 ; $i < ReadingsVal( $name, 'WarnCount', 0 ) ; $i++ ) {
             if (
                 (
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" )
+                    ReadingsVal( $name, 'Warn_' . $i . '_Start', '' )
                     le $curTimestamp
                 )
-                && ( ReadingsVal( $name, "Warn_" . $i . "_End", "" )
+                && ( ReadingsVal( $name, 'Warn_' . $i . '_End', '' )
                     ge $curTimestamp )
-                && ( ReadingsVal( $name, "Warn_" . $i . "_Type", "" ) eq $a[0] )
+                && ( ReadingsVal( $name, 'Warn_' . $i . '_Type', '' ) eq $type )
               )
             {
-                $out = "active";
+                $out = 'active';
                 last;
             }
             else {
-                $out = "inactive";
+                $out = 'inactive';
             }
         }
     }
@@ -802,32 +837,32 @@ sub GetCurrent($@) {
 
 #####################################
 sub GetCurrentHail($) {
+    my $hash = shift;
 
-    my ($hash) = @_;
     my $name = $hash->{NAME};
     my $out;
     my $curTimestamp = time();
 
     if ( ReadingsVal( $name, "WarnCount", 0 ) eq 0 ) {
-        $out = "inactive";
+        $out = 'inactive';
     }
     else {
-        for ( my $i = 0 ; $i < ReadingsVal( $name, "WarnCount", 0 ) ; $i++ ) {
+        for ( my $i = 0 ; $i < ReadingsVal( $name, 'WarnCount', 0 ) ; $i++ ) {
             if (
                 (
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" )
+                    ReadingsVal( $name, 'Warn_' . $i . '_Start', '' )
                     le $curTimestamp
                 )
-                && ( ReadingsVal( $name, "Warn_" . $i . "_End", "" )
+                && ( ReadingsVal( $name, 'Warn_' . $i . '_End', '' )
                     ge $curTimestamp )
-                && ( ReadingsVal( $name, "Warn_" . $i . "_Hail", "" ) eq 1 )
+                && ( ReadingsVal( $name, 'Warn_' . $i . '_Hail', '' ) eq 1 )
               )
             {
-                $out = "active";
+                $out = 'active';
                 last;
             }
             else {
-                $out = "inactive";
+                $out = 'inactive';
             }
         }
     }
@@ -836,111 +871,123 @@ sub GetCurrentHail($) {
 }
 
 #####################################
-sub JSONAcquire($$) {
+sub JSONAcquire {
+    my $hash = shift;
+    my $URL  = shift;
 
-    my ( $hash, $URL ) = @_;
     my $name = $hash->{NAME};
 
-    return unless ( defined( $hash->{NAME} ) );
+    return
+      if ( !defined( $hash->{NAME} ) );
 
     Log $hash, 4, "Start capturing of $URL";
 
     my $param = {
-        url     => "$URL",
+        url     => $URL,
         timeout => 5,
         hash    => $hash,
-        method  => "GET",
-        header  => "",
+        method  => 'GET',
+        header  => '',
     };
 
     my ( $err, $data ) = HttpUtils_BlockingGet($param);
 
-    if ( $err ne "" ) {
+    if ( $err ne '' ) {
         my $err_log = "Can't get $URL -- " . $err;
-        readingsSingleUpdate( $hash, "lastConnection", $err, 1 );
-        Log $hash, 1, "Error: $err_log";
-        return "Error|Error " . $err;
+        readingsSingleUpdate( $hash, 'lastConnection', $err, 1 );
+        Log $hash, 1, 'Error: ' . $err_log;
+        return main::encode_utf8( '{"Error": "' . $err . '"}' );
     }
 
-    Log $hash, 4, length($data) . " characters captured:  $data";
-    return $data;
+    Log $hash, 4,
+      length($data) . ' characters captured:  ' . main::encode_utf8($data);
+    return main::encode_utf8($data);
 }
 
 #####################################
-sub Start($) {
+sub Start {
+    my $hash = shift;
 
-    my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    return unless ( defined( $hash->{NAME} ) );
+    return
+      if ( !defined( $hash->{NAME} ) );
 
     if ( !$hash->{fhem}{LOCAL} && $hash->{INTERVAL} > 0 )
     {    # set up timer if automatically call
-
         RemoveInternalTimer($hash);
-        InternalTimer( gettimeofday() + $hash->{INTERVAL},
-            "UWZ_Start", $hash );
-        return undef if ( IsDisabled($name) );
+        InternalTimer( gettimeofday() + $hash->{INTERVAL}, 'UWZ_Start', $hash );
+
+        return readingsSingleUpdate( $hash, 'state', 'disabled', 1 )
+          if ( IsDisabled($name) );
+
         readingsSingleUpdate( $hash, 'currentIntervalMode', 'normal', 0 );
     }
 
     ## URL by CountryCode
-    my $URL_language = "en";
-    if ( AttrVal( $hash->{NAME}, "lang", undef ) ) {
-        $URL_language = AttrVal( $hash->{NAME}, "lang", "" );
+    my $URL_language = 'en';
+    if ( AttrVal( $hash->{NAME}, 'lang', undef ) ) {
+        $URL_language = AttrVal( $hash->{NAME}, 'lang', '' );
     }
     else {
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-            $URL_language = "de";
+            $URL_language = 'de';
         }
         elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-            $URL_language = "nl";
+            $URL_language = 'nl';
         }
         elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-            $URL_language = "fr";
+            $URL_language = 'fr';
         }
     }
+
     $hash->{URL} =
-"http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language="
+'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
       . $URL_language
-      . "&areaID=UWZ"
+      . '&areaID=UWZ'
       . $hash->{CountryCode}
       . $hash->{PLZ};
 
-    if ( not defined( $hash->{URL} ) ) {
+    if ( !defined( $hash->{URL} ) ) {
 
-        Log $hash, 3, "missing URL";
+        Log $hash, 3, 'missing URL';
         return;
     }
 
     $hash->{helper}{RUNNING_PID} = BlockingCall(
-        "UWZ_Run",        # callback worker task
+        'UWZ_Run',        # callback worker task
         $name,            # name of the device
-        "UWZ_Done",       # callback result method
+        'UWZ_Done',       # callback result method
         120,              # timeout seconds
-        "UWZ_Aborted",    #  callback for abortion
+        'UWZ_Aborted',    #  callback for abortion
         $hash
     );                    # parameter for abortion
+
+    return;
 }
 
 #####################################
-sub Aborted($) {
+sub Aborted {
+    my $hash = shift;
 
-    my ($hash) = @_;
     delete( $hash->{helper}{RUNNING_PID} );
+
+    return;
 }
 
 #####################################
 # asyncronous callback by blocking
-sub Done($) {
+sub Done {
+    my $string = shift;
 
-    my ($string) = @_;
-    return unless ( defined($string) );
+    return
+      if ( !defined($string) );
 
-    # all term are separated by "|" , the first is the name of the instance
-    my ( $name, %values ) = split( "\\|", $string );
+    # all term are separated by '|' , the first is the name of the instance
+    my ( $name, %values ) = split( '\\|', $string );
     my $hash = $defs{$name};
-    return unless ( defined( $hash->{NAME} ) );
+    return
+      if ( !defined( $hash->{NAME} ) );
 
     # delete the marker for RUNNING_PID process
     delete( $hash->{helper}{RUNNING_PID} );
@@ -949,9 +996,9 @@ sub Done($) {
     readingsBeginUpdate($hash);
 
     if ( defined $values{Error} ) {
-
-        readingsBulkUpdate( $hash, "lastConnection", $values{Error} );
-
+        readingsBulkUpdate( $hash, 'lastConnection', $values{Error} );
+        readingsBulkUpdate( $hash, 'state',
+            'error at last run, please check >>lastConnection<< reading' );
     }
     else {
 
@@ -972,62 +1019,66 @@ sub Done($) {
 
                 # Message by CountryCode
 
-                $newState = "Warnings: " . $values{WarnCount};
-                $newState = "Warnungen: " . $values{WarnCount}
+                $newState = 'Warnings: ' . $values{WarnCount};
+                $newState = 'Warnungen: ' . $values{WarnCount}
                   if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] );
-                $newState = "Aantal waarschuwingen: " . $values{WarnCount}
+                $newState = 'Aantal waarschuwingen: ' . $values{WarnCount}
                   if ( $hash->{CountryCode} ~~ ['NL'] );
-                $newState = "Avertissements: " . $values{WarnCount}
+                $newState = 'Avertissements: ' . $values{WarnCount}
                   if ( $hash->{CountryCode} ~~ ['FR'] );
 
                 # end Message by CountryCode
             }
             else {
                 $newState =
-"Error: Could not capture all data. Please check CountryCode and PLZ.";
+'Error: Could not capture all data. Please check CountryCode and PLZ.';
             }
 
-            readingsBulkUpdate( $hash, "state", $newState );
-            readingsBulkUpdate( $hash, "lastConnection",
+            readingsBulkUpdate( $hash, 'state', $newState );
+            readingsBulkUpdate( $hash, 'lastConnection',
                     keys(%values)
-                  . " values captured in "
+                  . ' values captured in '
                   . $values{durationFetchReadings}
-                  . " s" );
-            Log $hash, 4, keys(%values) . " values captured";
+                  . ' s' );
+            Log $hash, 4, keys(%values) . ' values captured';
 
         }
         else {
 
-            readingsBulkUpdate( $hash, "lastConnection", "no data found" );
-            Log $hash, 1, "No data found. Check city name or URL.";
+            readingsBulkUpdate( $hash, 'lastConnection', 'no data found' );
+            Log $hash, 1, 'No data found. Check city name or URL.';
 
         }
     }
 
     readingsEndUpdate( $hash, 1 );
 
-    if (    AttrVal( $name, 'intervalAtWarnLevel', '' ) ne ''
-        and ReadingsVal( $name, 'WarnUWZLevel', 0 ) > 1 )
+    if (   AttrVal( $name, 'intervalAtWarnLevel', '' ) ne ''
+        && ReadingsVal( $name, 'WarnUWZLevel', 0 ) > 1 )
     {
 
         IntervalAtWarnLevel($hash);
-        Log $hash, 5, "run Sub IntervalAtWarnLevel";
+        Log $hash, 5, 'run Sub IntervalAtWarnLevel';
     }
+
+    return;
 }
 
 #####################################
-sub Run($) {
+sub Run {
+    my $name = shift;
 
-    my ($name) = @_;
     my $ptext = $name;
     my $UWZ_download;
     my $UWZ_savepath;
     my $UWZ_humanreadable;
 
-    return unless ( defined($name) );
+    return
+      if ( !defined($name) );
 
     my $hash = $defs{$name};
-    return unless ( defined( $hash->{NAME} ) );
+    return
+      if ( !defined( $hash->{NAME} ) );
 
     my $readingStartTime = time();
     my $attrdownload     = AttrVal( $name, 'download', '' );
@@ -1039,7 +1090,7 @@ sub Run($) {
     ## end redundant Reading switch
 
     # preset download
-    if ( $attrdownload eq "" ) {
+    if ( $attrdownload eq '' ) {
 
         $UWZ_download = 0;
     }
@@ -1049,9 +1100,9 @@ sub Run($) {
     }
 
     # preset savepath
-    if ( $attrsavepath eq "" ) {
+    if ( $attrsavepath eq '' ) {
 
-        $UWZ_savepath = "/tmp/";
+        $UWZ_savepath = '/tmp/';
     }
     else {
 
@@ -1059,7 +1110,7 @@ sub Run($) {
     }
 
     # preset humanreadable
-    if ( $attrhumanreadable eq "" ) {
+    if ( $attrhumanreadable eq '' ) {
 
         $UWZ_humanreadable = 0;
     }
@@ -1069,27 +1120,27 @@ sub Run($) {
     }
 
     if ( $UWZ_download == 1 ) {
-        if ( !defined($maps2fetch) ) { $maps2fetch = "deutschland"; }
-        Log $hash, 4, "Maps2Fetch : " . $maps2fetch;
+        if ( !defined($maps2fetch) ) { $maps2fetch = 'deutschland'; }
+        Log $hash, 4, 'Maps2Fetch : ' . $maps2fetch;
         my @maps = split( ' ', $maps2fetch );
-        my $uwz_de_url = "http://www.unwetterzentrale.de/images/map/";
+        my $uwz_de_url = 'http://www.unwetterzentrale.de/images/map/';
 
         foreach my $smap (@maps) {
-            Log $hash, 4, "Download map : " . $smap;
-            my $img = Map2Image( $hash, $smap );
+            Log $hash, 4, 'Download map : ' . $smap;
+            my $img = Map2Image($smap);
 
             if ( !defined($img) ) {
                 $img = $uwz_de_url . 'deutschland_index.png';
             }
-            my $code = getstore( $img, $UWZ_savepath . $smap . ".png" );
+            my $code = getstore( $img, $UWZ_savepath . $smap . '.png' );
 
             if ( $code == 200 ) {
-                Log $hash, 4, "Successfully downloaded map " . $smap;
+                Log $hash, 4, 'Successfully downloaded map ' . $smap;
 
             }
             else {
 
-                Log $hash, 3, "Failed to download map (" . $img . ")";
+                Log $hash, 3, 'Failed to download map (' . $img . ')';
             }
         }
 
@@ -1098,664 +1149,697 @@ sub Run($) {
     # acquire the json-response
     my $response = JSONAcquire( $hash, $hash->{URL} );
 
-    Log $hash, 5, length($response) . " characters captured";
+    Log $hash, 5, length($response) . ' characters captured';
+
     my $uwz_warnings = JSON->new->ascii->decode($response);
-    my $enc          = guess_encoding($uwz_warnings);
-
-    my $uwz_warncount = scalar( @{ $uwz_warnings->{'results'} } );
-    Log $hash, 4, "There are " . $uwz_warncount . " warnings active";
-    my $sortby = AttrVal( $name, 'sort_readings_by', "" );
-    my @sorted;
-
-    if ( $sortby eq "creation" ) {
-        Log $hash, 4, "Sorting by creation";
-        @sorted = sort { $b->{payload}{creation} <=> $a->{payload}{creation} }
-          @{ $uwz_warnings->{'results'} };
-
-    }
-    elsif ( $sortby ne "severity" ) {
-        Log $hash, 4, "Sorting by dtgStart";
-        @sorted = sort { $a->{dtgStart} <=> $b->{dtgStart} }
-          @{ $uwz_warnings->{'results'} };
-
-    }
-    else {
-        Log $hash, 4, "Sorting by severity";
-        @sorted = sort { $a->{severity} <=> $b->{severity} }
-          @{ $uwz_warnings->{'results'} };
-    }
 
     my $message;
-    my $i = 0;
+    my $uwz_warncount;
 
-    my %typenames = (
-        "1"  => "unknown",           # <===== FIX HERE
-        "2"  => "sturm",
-        "3"  => "schnee",
-        "4"  => "regen",
-        "5"  => "temperatur",
-        "6"  => "waldbrand",
-        "7"  => "gewitter",
-        "8"  => "strassenglaette",
-        "9"  => "temperatur",        # 9 = hitzewarnung
-        "10" => "glatteisregen",
-        "11" => "temperatur"
-    );                               # 11 = bodenfrost
+    if ( !exists $uwz_warnings->{Error} ) {
+        my $enc = guess_encoding($uwz_warnings);
 
-    my %typenames_de_str = (
-        "1"  => "unknown",           # <===== FIX HERE
-        "2"  => "Sturm",
-        "3"  => "Schnee",
-        "4"  => "Regen",
-        "5"  => "Temperatur",
-        "6"  => "Waldbrand",
-        "7"  => "Gewitter",
-        "8"  => "Strassenglaette",
-        "9"  => "Hitze",             # 9 = hitzewarnung
-        "10" => "Glatteisregen",
-        "11" => "Bodenfrost"
-    );                               # 11 = bodenfrost
+        Log $hash, 2, 'DEBUG!!! Response: ' . $uwz_warnings;
 
-    my %typenames_nl_str = (
-        "1"  => "unknown",           # <===== FIX HERE
-        "2"  => "storm",
-        "3"  => "sneeuw",
-        "4"  => "regen",
-        "5"  => "temperatuur",
-        "6"  => "bosbrand",
-        "7"  => "onweer",
-        "8"  => "gladde wegen",
-        "9"  => "hitte",             # 9 = hitzewarnung
-        "10" => "ijzel",
-        "11" => "grondvorst"
-    );                               # 11 = bodenfrost
+        $uwz_warncount = scalar( @{ $uwz_warnings->{'results'} } );
+        Log $hash, 4, 'There are ' . $uwz_warncount . ' warnings active';
+        my $sortby = AttrVal( $name, 'sort_readings_by', '' );
+        my @sorted;
 
-    my %typenames_fr_str = (
-        "1"  => "unknown",            # <===== FIX HERE
-        "2"  => "tempete",
-        "3"  => "neige",
-        "4"  => "pluie",
-        "5"  => "températur",
-        "6"  => "feu de forêt",
-        "7"  => "orage",
-        "8"  => "route glissante",
-        "9"  => "chaleur",            # 9 = hitzewarnung
-        "10" => "pluie de verglas",
-        "11" => "gelée"
-    );                                # 11 = bodenfrost
+        if ( $sortby eq 'creation' ) {
+            Log $hash, 4, 'Sorting by creation';
+            @sorted =
+              sort { $b->{payload}{creation} <=> $a->{payload}{creation} }
+              @{ $uwz_warnings->{'results'} };
 
-    my %typenames_en_str = (
-        "1"  => "unknown",            # <===== FIX HERE
-        "2"  => "storm",
-        "3"  => "snow",
-        "4"  => "rain",
-        "5"  => "temperatur",
-        "6"  => "forest fire",
-        "7"  => "thunderstorms",
-        "8"  => "slippery road",
-        "9"  => "heat",               # 9 = hitzewarnung
-        "10" => "black ice rain",
-        "11" => "soil frost"
-    );                                # 11 = bodenfrost
+        }
+        elsif ( $sortby ne 'severity' ) {
+            Log $hash, 4, 'Sorting by dtgStart';
+            @sorted = sort { $a->{dtgStart} <=> $b->{dtgStart} }
+              @{ $uwz_warnings->{'results'} };
 
-    my %severitycolor = (
-        "0"  => "green",
-        "1"  => "unknown",            # <===== FIX HERE
-        "2"  => "unknown",            # <===== FIX HERE
-        "3"  => "unknown",            # <===== FIX HERE
-        "4"  => "orange",
-        "5"  => "unknown",            # <===== FIX HERE
-        "6"  => "unknown",            # <===== FIX HERE
-        "7"  => "orange",
-        "8"  => "gelb",
-        "9"  => "gelb",               # <===== FIX HERE
-        "10" => "orange",
-        "11" => "rot",
-        "12" => "violett"
-    );
+        }
+        else {
+            Log $hash, 4, 'Sorting by severity';
+            @sorted = sort { $a->{severity} <=> $b->{severity} }
+              @{ $uwz_warnings->{'results'} };
+        }
 
-    my @uwzmaxlevel;
-    foreach my $single_warning (@sorted) {
+        my $i = 0;
 
-        push @uwzmaxlevel,
-          GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} );
+        my %typenames = (
+            '1'  => 'unknown',           # <===== FIX HERE
+            '2'  => 'sturm',
+            '3'  => 'schnee',
+            '4'  => 'regen',
+            '5'  => 'temperatur',
+            '6'  => 'waldbrand',
+            '7'  => 'gewitter',
+            '8'  => 'strassenglaette',
+            '9'  => 'temperatur',        # 9 = hitzewarnung
+            '10' => 'glatteisregen',
+            '11' => 'temperatur'
+        );                               # 11 = bodenfrost
 
-        Log $hash, 4,
-          "Warn_" . $i . "_EventID: " . $single_warning->{'payload'}{'id'};
+        my %typenames_de_str = (
+            '1'  => 'unknown',           # <===== FIX HERE
+            '2'  => 'Sturm',
+            '3'  => 'Schnee',
+            '4'  => 'Regen',
+            '5'  => 'Temperatur',
+            '6'  => 'Waldbrand',
+            '7'  => 'Gewitter',
+            '8'  => 'Strassenglaette',
+            '9'  => 'Hitze',             # 9 = hitzewarnung
+            '10' => 'Glatteisregen',
+            '11' => 'Bodenfrost'
+        );                               # 11 = bodenfrost
+
+        my %typenames_nl_str = (
+            '1'  => 'unknown',           # <===== FIX HERE
+            '2'  => 'storm',
+            '3'  => 'sneeuw',
+            '4'  => 'regen',
+            '5'  => 'temperatuur',
+            '6'  => 'bosbrand',
+            '7'  => 'onweer',
+            '8'  => 'gladde wegen',
+            '9'  => 'hitte',             # 9 = hitzewarnung
+            '10' => 'ijzel',
+            '11' => 'grondvorst'
+        );                               # 11 = bodenfrost
+
+        my %typenames_fr_str = (
+            '1'  => 'unknown',            # <===== FIX HERE
+            '2'  => 'tempete',
+            '3'  => 'neige',
+            '4'  => 'pluie',
+            '5'  => 'températur',
+            '6'  => 'feu de forêt',
+            '7'  => 'orage',
+            '8'  => 'route glissante',
+            '9'  => 'chaleur',            # 9 = hitzewarnung
+            '10' => 'pluie de verglas',
+            '11' => 'gelée'
+        );                                # 11 = bodenfrost
+
+        my %typenames_en_str = (
+            '1'  => 'unknown',            # <===== FIX HERE
+            '2'  => 'storm',
+            '3'  => 'snow',
+            '4'  => 'rain',
+            '5'  => 'temperatur',
+            '6'  => 'forest fire',
+            '7'  => 'thunderstorms',
+            '8'  => 'slippery road',
+            '9'  => 'heat',               # 9 = hitzewarnung
+            '10' => 'black ice rain',
+            '11' => 'soil frost'
+        );                                # 11 = bodenfrost
+
+        my %severitycolor = (
+            '0'  => 'green',
+            '1'  => 'unknown',            # <===== FIX HERE
+            '2'  => 'unknown',            # <===== FIX HERE
+            '3'  => 'unknown',            # <===== FIX HERE
+            '4'  => 'orange',
+            '5'  => 'unknown',            # <===== FIX HERE
+            '6'  => 'unknown',            # <===== FIX HERE
+            '7'  => 'orange',
+            '8'  => 'gelb',
+            '9'  => 'gelb',               # <===== FIX HERE
+            '10' => 'orange',
+            '11' => 'rot',
+            '12' => 'violett'
+        );
+
+        my @uwzmaxlevel;
+        foreach my $single_warning (@sorted) {
+
+            push @uwzmaxlevel,
+              GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} );
+
+            Log $hash, 4,
+              'Warn_' . $i . '_EventID: ' . $single_warning->{'payload'}{'id'};
+            $message .=
+                'Warn_'
+              . $i
+              . '_EventID|'
+              . $single_warning->{'payload'}{'id'} . '|';
+
+            my $chopcreation =
+              substr( $single_warning->{'payload'}{'creation'}, 0, 10 );
+            $chopcreation = $chopcreation;
+
+            Log $hash, 4, 'Warn_' . $i . '_Creation: ' . $chopcreation;
+            $message .= 'Warn_' . $i . '_Creation|' . $chopcreation . '|';
+
+            Log $hash, 4, 'Warn_' . $i . '_Type: ' . $single_warning->{'type'};
+            $message .=
+              'Warn_' . $i . '_Type|' . $single_warning->{'type'} . '|';
+
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_uwzLevel: '
+              . GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} );
+            $message .= 'Warn_'
+              . $i
+              . '_uwzLevel|'
+              . GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} )
+              . '|';
+
+            Log $hash, 4,
+              'Warn_' . $i . '_Severity: ' . $single_warning->{'severity'};
+            $message .=
+              'Warn_' . $i . '_Severity|' . $single_warning->{'severity'} . '|';
+
+            Log $hash, 4,
+              'Warn_' . $i . '_Start: ' . $single_warning->{'dtgStart'};
+            $message .=
+              'Warn_' . $i . '_Start|' . $single_warning->{'dtgStart'} . '|';
+
+            Log $hash, 4, 'Warn_' . $i . '_End: ' . $single_warning->{'dtgEnd'};
+            $message .=
+              'Warn_' . $i . '_End|' . $single_warning->{'dtgEnd'} . '|';
+
+            ## Begin of redundant Reading
+            if ( $UWZ_humanreadable eq 1 ) {
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_Start_Date: '
+                  . strftime( "%d.%m.%Y",
+                    localtime( $single_warning->{'dtgStart'} ) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_Start_Date|'
+                  . strftime( "%d.%m.%Y",
+                    localtime( $single_warning->{'dtgStart'} ) )
+                  . '|';
+
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_Start_Time: '
+                  . strftime( "%H:%M",
+                    localtime( $single_warning->{'dtgStart'} ) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_Start_Time|'
+                  . strftime( "%H:%M",
+                    localtime( $single_warning->{'dtgStart'} ) )
+                  . '|';
+
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_End_Date: '
+                  . strftime( "%d.%m.%Y",
+                    localtime( $single_warning->{'dtgEnd'} ) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_End_Date|'
+                  . strftime( "%d.%m.%Y",
+                    localtime( $single_warning->{'dtgEnd'} ) )
+                  . '|';
+
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_End_Time: '
+                  . strftime( "%H:%M",
+                    localtime( $single_warning->{'dtgEnd'} ) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_End_Time|'
+                  . strftime( "%H:%M",
+                    localtime( $single_warning->{'dtgEnd'} ) )
+                  . '|';
+
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_Creation_Date: '
+                  . strftime( "%d.%m.%Y", localtime($chopcreation) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_Creation_Date|'
+                  . strftime( "%d.%m.%Y", localtime($chopcreation) ) . '|';
+
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_Creation_Time: '
+                  . strftime( "%H:%M", localtime($chopcreation) );
+                $message .= 'Warn_'
+                  . $i
+                  . '_Creation_Time|'
+                  . strftime( "%H:%M", localtime($chopcreation) ) . '|';
+
+                # Begin Language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_Type_Str: '
+                      . $typenames_de_str{ $single_warning->{'type'} };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_Type_Str|'
+                      . $typenames_de_str{ $single_warning->{'type'} } . '|';
+                    my %uwzlevelname = (
+                        '0' => 'Stufe Grün (keine Warnung)',
+                        '1' => 'Stufe Dunkelgrün (Wetterhinweise)',
+                        '2' => 'Stufe Gelb (Vorwarnung für Unwetterwarnung)',
+                        '3' => 'Warnstufe Orange (Unwetterwarnung)',
+                        '4' => 'Warnstufe Rot (Unwetterwarnung)',
+                        '5' => 'Warnstufe Violett (Unwetterwarnung)'
+                    );
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_uwzLevel_Str: '
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_uwzLevel_Str|'
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      }
+                      . '|';
+
+                }
+                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_Type_Str: '
+                      . $typenames_nl_str{ $single_warning->{'type'} };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_Type_Str|'
+                      . $typenames_nl_str{ $single_warning->{'type'} } . '|';
+                    my %uwzlevelname = (
+                        '0' => 'niveau groen (geen waarschuwingen)',
+                        '1' => 'niveau donkergroen (weermelding)',
+                        '2' => 'niveau geel (voorwaarschuwing)',
+                        '3' =>
+'waarschuwingsniveau oranje (waarschuwing voor matig noodweer)',
+                        '4' =>
+'waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)',
+                        '5' =>
+'waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)'
+                    );
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_uwzLevel_Str: '
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_uwzLevel_Str|'
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      }
+                      . '|';
+
+                }
+                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_Type_Str: '
+                      . $typenames_nl_str{ $single_warning->{'type'} };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_Type_Str|'
+                      . $typenames_nl_str{ $single_warning->{'type'} } . '|';
+                    my %uwzlevelname = (
+                        '0' => 'niveau vert (aucune alerte)',
+                        '1' => 'niveau vert foncé (indication météo)',
+                        '2' => 'niveau jaune (pré-alerte)',
+                        '3' => 'niveau d\' alerte orange (alerte météo)',
+                        '4' => 'niveau d\' alerte rouge (alerte météo)',
+                        '5' => 'niveau d\' alerte violet (alerte météo)'
+                    );
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_uwzLevel_Str: '
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_uwzLevel_Str|'
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      }
+                      . '|';
+
+                }
+                else {
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_Type_Str: '
+                      . $typenames_en_str{ $single_warning->{'type'} };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_Type_Str|'
+                      . $typenames_en_str{ $single_warning->{'type'} } . '|';
+                    my %uwzlevelname = (
+                        '0' => 'level green (no warnings)',
+                        '1' => 'level dark green (weather notice)',
+                        '2' => 'level yellow (severe weather watch)',
+                        '3' => 'Alert level Orange',
+                        '4' => 'Alert level Red',
+                        '5' => 'Alert level Violet'
+                    );
+                    Log $hash, 4,
+                        'Warn_'
+                      . $i
+                      . '_uwzLevel_Str: '
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      };
+                    $message .= 'Warn_'
+                      . $i
+                      . '_uwzLevel_Str|'
+                      . $uwzlevelname{
+                        GetUWZLevel( $hash,
+                            $single_warning->{'payload'}{'levelName'} )
+                      }
+                      . '|';
+
+                }
+
+            }
+            ## End of redundant Reading
+
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_levelName: '
+              . $single_warning->{'payload'}{'levelName'};
+            $message .= 'Warn_'
+              . $i
+              . '_levelName|'
+              . $single_warning->{'payload'}{'levelName'} . '|';
+
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_AltitudeMin: '
+              . $enc->decode( $single_warning->{'payload'}{'altMin'} );
+
+            $message .= 'Warn_'
+              . $i
+              . '_AltitudeMin|'
+              . encode( 'UTF-8',
+                decode( 'iso-8859-1', $single_warning->{'payload'}{'altMin'} ) )
+              . '|';
+
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_AltitudeMax: '
+              . $enc->decode( $single_warning->{'payload'}{'altMax'} );
+
+            $message .= 'Warn_'
+              . $i
+              . '_AltitudeMax|'
+              . encode( 'UTF-8',
+                decode( 'iso-8859-1', $single_warning->{'payload'}{'altMax'} ) )
+              . '|';
+
+            my $uclang = 'EN';
+            if ( AttrVal( $name, 'lang', undef ) ) {
+                $uclang = uc AttrVal( $name, 'lang', '' );
+            }
+            else {
+                # Begin Language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $uclang = 'DE';
+                }
+                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
+                    $uclang = 'NL';
+                }
+                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
+                    $uclang = 'FR';
+                }
+                else {
+                    $uclang = 'EN';
+                }
+            }
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_LongText: '
+              . $enc->decode(
+                $single_warning->{'payload'}{'translationsLongText'}{$uclang} );
+
+            $message .= 'Warn_'
+              . $i
+              . '_LongText|'
+              . encode(
+                'UTF-8',
+                decode(
+                    'iso-8859-1',
+                    $single_warning->{'payload'}{'translationsLongText'}
+                      {$uclang}
+                )
+              ) . '|';
+
+            Log $hash, 4,
+                'Warn_'
+              . $i
+              . '_ShortText: '
+              . $enc->decode(
+                $single_warning->{'payload'}{'translationsShortText'}{$uclang}
+              );
+
+            $message .= 'Warn_'
+              . $i
+              . '_ShortText|'
+              . encode(
+                'UTF-8',
+                decode(
+                    'iso-8859-1',
+                    $single_warning->{'payload'}{'translationsShortText'}
+                      {$uclang}
+                )
+              ) . '|';
+
+            ###
+            if ( AttrVal( $name, 'localiconbase', undef ) ) {
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_IconURL: '
+                  . AttrVal( $name, 'localiconbase', undef )
+                  . $typenames{ $single_warning->{'type'} } . '-'
+                  . $single_warning->{'severity'} . '.png';
+                $message .= 'Warn_'
+                  . $i
+                  . '_IconURL|'
+                  . AttrVal( $name, 'localiconbase', undef )
+                  . $typenames{ $single_warning->{'type'} } . '-'
+                  . GetSeverityColor(
+                    $hash,
+                    GetUWZLevel(
+                        $hash, $single_warning->{'payload'}{'levelName'}
+                    )
+                  ) . '.png|';
+
+            }
+            else {
+                Log $hash, 4,
+                    'Warn_'
+                  . $i
+                  . '_IconURL: http://www.unwetterzentrale.de/images/icons/'
+                  . $typenames{ $single_warning->{'type'} } . '-'
+                  . $single_warning->{'severity'} . '.gif';
+                $message .= 'Warn_'
+                  . $i
+                  . '_IconURL|http://www.unwetterzentrale.de/images/icons/'
+                  . $typenames{ $single_warning->{'type'} } . '-'
+                  . GetSeverityColor(
+                    $hash,
+                    GetUWZLevel(
+                        $hash, $single_warning->{'payload'}{'levelName'}
+                    )
+                  ) . '.gif|';
+            }
+            ###
+
+            ## Hagel start
+            my $hagelcount = 0;
+
+            # Begin Language by AttrVal
+
+            if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+
+                $hagelcount = my @hagelmatch =
+                  $single_warning->{'payload'}{'translationsLongText'}{'DE'} =~
+                  /Hagel/g;
+
+            }
+            elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
+
+                $hagelcount = my @hagelmatch =
+                  $single_warning->{'payload'}{'translationsLongText'}{'NL'} =~
+                  /hagel/g;
+
+            }
+            elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
+
+                $hagelcount = my @hagelmatch =
+                  $single_warning->{'payload'}{'translationsLongText'}{'FR'} =~
+                  /grêle/g;
+
+            }
+            else {
+
+                $hagelcount = my @hagelmatch =
+                  $single_warning->{'payload'}{'translationsLongText'}{'EN'} =~
+                  /Hail/g;
+            }
+
+            # end language by AttrVal
+            if ( $hagelcount ne 0 ) {
+
+                Log $hash, 4, 'Warn_' . $i . '_Hail: 1';
+                $message .= 'Warn_' . $i . '_Hail|1|';
+
+            }
+            else {
+
+                Log $hash, 4, 'Warn_' . $i . '_Hail: 0';
+                $message .= 'Warn_' . $i . '_Hail|0|';
+            }
+            ## Hagel end
+
+            $i++;
+        }
+
+        my $max = 0;
+        for (@uwzmaxlevel) {
+            $max = $_ if !$max || $_ > $max;
+        }
+
+        $message .= 'WarnUWZLevel|';
+        $message .= $max . '|';
+
+        Log $hash, 4, 'WarnUWZLevel_Color: ' . GetSeverityColor( $hash, $max );
         $message .=
-          "Warn_" . $i . "_EventID|" . $single_warning->{'payload'}{'id'} . "|";
-
-        my $chopcreation =
-          substr( $single_warning->{'payload'}{'creation'}, 0, 10 );
-        $chopcreation = $chopcreation;
-
-        Log $hash, 4, "Warn_" . $i . "_Creation: " . $chopcreation;
-        $message .= "Warn_" . $i . "_Creation|" . $chopcreation . "|";
-
-        Log $hash, 4, "Warn_" . $i . "_Type: " . $single_warning->{'type'};
-        $message .= "Warn_" . $i . "_Type|" . $single_warning->{'type'} . "|";
-
-        Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_uwzLevel: "
-          . GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} );
-        $message .= "Warn_"
-          . $i
-          . "_uwzLevel|"
-          . GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} )
-          . "|";
-
-        Log $hash, 4,
-          "Warn_" . $i . "_Severity: " . $single_warning->{'severity'};
-        $message .=
-          "Warn_" . $i . "_Severity|" . $single_warning->{'severity'} . "|";
-
-        Log $hash, 4, "Warn_" . $i . "_Start: " . $single_warning->{'dtgStart'};
-        $message .=
-          "Warn_" . $i . "_Start|" . $single_warning->{'dtgStart'} . "|";
-
-        Log $hash, 4, "Warn_" . $i . "_End: " . $single_warning->{'dtgEnd'};
-        $message .= "Warn_" . $i . "_End|" . $single_warning->{'dtgEnd'} . "|";
+          'WarnUWZLevel_Color|' . GetSeverityColor( $hash, $max ) . '|';
 
         ## Begin of redundant Reading
         if ( $UWZ_humanreadable eq 1 ) {
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_Start_Date: "
-              . strftime( "%d.%m.%Y",
-                localtime( $single_warning->{'dtgStart'} ) );
-            $message .= "Warn_"
-              . $i
-              . "_Start_Date|"
-              . strftime( "%d.%m.%Y",
-                localtime( $single_warning->{'dtgStart'} ) )
-              . "|";
-
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_Start_Time: "
-              . strftime( "%H:%M", localtime( $single_warning->{'dtgStart'} ) );
-            $message .= "Warn_"
-              . $i
-              . "_Start_Time|"
-              . strftime( "%H:%M", localtime( $single_warning->{'dtgStart'} ) )
-              . "|";
-
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_End_Date: "
-              . strftime( "%d.%m.%Y",
-                localtime( $single_warning->{'dtgEnd'} ) );
-            $message .= "Warn_"
-              . $i
-              . "_End_Date|"
-              . strftime( "%d.%m.%Y", localtime( $single_warning->{'dtgEnd'} ) )
-              . "|";
-
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_End_Time: "
-              . strftime( "%H:%M", localtime( $single_warning->{'dtgEnd'} ) );
-            $message .= "Warn_"
-              . $i
-              . "_End_Time|"
-              . strftime( "%H:%M", localtime( $single_warning->{'dtgEnd'} ) )
-              . "|";
-
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_Creation_Date: "
-              . strftime( "%d.%m.%Y", localtime($chopcreation) );
-            $message .= "Warn_"
-              . $i
-              . "_Creation_Date|"
-              . strftime( "%d.%m.%Y", localtime($chopcreation) ) . "|";
-
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_Creation_Time: "
-              . strftime( "%H:%M", localtime($chopcreation) );
-            $message .= "Warn_"
-              . $i
-              . "_Creation_Time|"
-              . strftime( "%H:%M", localtime($chopcreation) ) . "|";
-
-            # Begin Language by AttrVal
             if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_Type_Str: "
-                  . $typenames_de_str{ $single_warning->{'type'} };
-                $message .= "Warn_"
-                  . $i
-                  . "_Type_Str|"
-                  . $typenames_de_str{ $single_warning->{'type'} } . "|";
                 my %uwzlevelname = (
-                    "0" => "Stufe Grün (keine Warnung)",
-                    "1" => "Stufe Dunkelgrün (Wetterhinweise)",
-                    "2" => "Stufe Gelb (Vorwarnung für Unwetterwarnung)",
-                    "3" => "Warnstufe Orange (Unwetterwarnung)",
-                    "4" => "Warnstufe Rot (Unwetterwarnung)",
-                    "5" => "Warnstufe Violett (Unwetterwarnung)"
+                    '0' => 'Stufe Grün (keine Warnung)',
+                    '1' => 'Stufe Dunkelgrün (Wetterhinweise)',
+                    '2' => 'Stufe Gelb (Vorwarnung für Unwetterwarnung)',
+                    '3' => 'Warnstufe Orange (Unwetterwarnung)',
+                    '4' => 'Warnstufe Rot (Unwetterwarnung)',
+                    '5' => 'Warnstufe Violett (Unwetterwarnung)'
                 );
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_uwzLevel_Str: "
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  };
-                $message .= "Warn_"
-                  . $i
-                  . "_uwzLevel_Str|"
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  }
-                  . "|";
+                Log $hash, 4, 'WarnUWZLevel_Str: ' . $uwzlevelname{$max};
+                $message .= 'WarnUWZLevel_Str|' . $uwzlevelname{$max} . '|';
 
             }
             elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_Type_Str: "
-                  . $typenames_nl_str{ $single_warning->{'type'} };
-                $message .= "Warn_"
-                  . $i
-                  . "_Type_Str|"
-                  . $typenames_nl_str{ $single_warning->{'type'} } . "|";
                 my %uwzlevelname = (
-                    "0" => "niveau groen (geen waarschuwingen)",
-                    "1" => "niveau donkergroen (weermelding)",
-                    "2" => "niveau geel (voorwaarschuwing)",
-                    "3" =>
-"waarschuwingsniveau oranje (waarschuwing voor matig noodweer)",
-                    "4" =>
-"waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)",
-                    "5" =>
-"waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)"
+                    '0' => 'niveau groen (geen waarschuwingen)',
+                    '1' => 'niveau donkergroen (voorwaarschuwing)',
+                    '2' => 'niveau geel (voorwaarschuwing)',
+                    '3' =>
+'waarschuwingsniveau oranje (waarschuwing voor matig noodweer)',
+                    '4' =>
+'waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)',
+                    '5' =>
+'waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)'
                 );
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_uwzLevel_Str: "
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  };
-                $message .= "Warn_"
-                  . $i
-                  . "_uwzLevel_Str|"
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  }
-                  . "|";
+                Log $hash, 4, 'WarnUWZLevel_Str: ' . $uwzlevelname{$max};
+                $message .= 'WarnUWZLevel_Str|' . $uwzlevelname{$max} . '|';
 
             }
             elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_Type_Str: "
-                  . $typenames_nl_str{ $single_warning->{'type'} };
-                $message .= "Warn_"
-                  . $i
-                  . "_Type_Str|"
-                  . $typenames_nl_str{ $single_warning->{'type'} } . "|";
                 my %uwzlevelname = (
-                    "0" => "niveau vert (aucune alerte)",
-                    "1" => "niveau vert foncé (indication météo)",
-                    "2" => "niveau jaune (pré-alerte)",
-                    "3" => "niveau d' alerte orange (alerte météo)",
-                    "4" => "niveau d' alerte rouge (alerte météo)",
-                    "5" => "niveau d' alerte violet (alerte météo)"
+                    '0' => 'niveau vert (aucune alerte)',
+                    '1' => 'niveau vert foncé (indication météo)',
+                    '2' => 'niveau jaune (pré-alerte)',
+                    '3' => 'niveau d\' alerte orange (alerte météo)',
+                    '4' => 'niveau d\' alerte rouge (alerte météo)',
+                    '5' => 'niveau d\' alerte violet (alerte météo)'
                 );
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_uwzLevel_Str: "
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  };
-                $message .= "Warn_"
-                  . $i
-                  . "_uwzLevel_Str|"
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  }
-                  . "|";
+                Log $hash, 4, 'WarnUWZLevel_Str: ' . $uwzlevelname{$max};
+                $message .= 'WarnUWZLevel_Str|' . $uwzlevelname{$max} . '|';
 
             }
             else {
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_Type_Str: "
-                  . $typenames_en_str{ $single_warning->{'type'} };
-                $message .= "Warn_"
-                  . $i
-                  . "_Type_Str|"
-                  . $typenames_en_str{ $single_warning->{'type'} } . "|";
                 my %uwzlevelname = (
-                    "0" => "level green (no warnings)",
-                    "1" => "level dark green (weather notice)",
-                    "2" => "level yellow (severe weather watch)",
-                    "3" => "Alert level Orange",
-                    "4" => "Alert level Red",
-                    "5" => "Alert level Violet"
+                    '0' => 'level green (no warnings)',
+                    '1' => 'level dark green (weather notice)',
+                    '2' => 'level yellow (severe weather watch)',
+                    '3' => 'Alert level Orange',
+                    '4' => 'Alert level Red',
+                    '5' => 'Alert level Violet'
                 );
-                Log $hash, 4,
-                    "Warn_"
-                  . $i
-                  . "_uwzLevel_Str: "
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  };
-                $message .= "Warn_"
-                  . $i
-                  . "_uwzLevel_Str|"
-                  . $uwzlevelname{
-                    GetUWZLevel( $hash,
-                        $single_warning->{'payload'}{'levelName'} )
-                  }
-                  . "|";
-
-            }
-
-        }
-        ## End of redundant Reading
-
-        Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_levelName: "
-          . $single_warning->{'payload'}{'levelName'};
-        $message .= "Warn_"
-          . $i
-          . "_levelName|"
-          . $single_warning->{'payload'}{'levelName'} . "|";
-
-        Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_AltitudeMin: "
-          . $enc->decode( $single_warning->{'payload'}{'altMin'} );
-
-        $message .= "Warn_"
-          . $i
-          . "_AltitudeMin|"
-          . encode( "UTF-8",
-            decode( "iso-8859-1", $single_warning->{'payload'}{'altMin'} ) )
-          . "|";
-
-        Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_AltitudeMax: "
-          . $enc->decode( $single_warning->{'payload'}{'altMax'} );
-
-        $message .= "Warn_"
-          . $i
-          . "_AltitudeMax|"
-          . encode( "UTF-8",
-            decode( "iso-8859-1", $single_warning->{'payload'}{'altMax'} ) )
-          . "|";
-
-        my $uclang = "EN";
-        if ( AttrVal( $name, 'lang', undef ) ) {
-            $uclang = uc AttrVal( $name, 'lang', '' );
-        }
-        else {
-            # Begin Language by AttrVal
-            if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                $uclang = "DE";
-            }
-            elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                $uclang = "NL";
-            }
-            elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                $uclang = "FR";
-            }
-            else {
-                $uclang = "EN";
+                Log $hash, 4, 'WarnUWZLevel_Str: ' . $uwzlevelname{$max};
+                $message .= 'WarnUWZLevel_Str|' . $uwzlevelname{$max} . '|';
             }
         }
+
+        $message .= 'durationFetchReadings|';
+        $message .= sprintf "%.2f", time() - $readingStartTime;
+
+        Log $hash, 3, 'Done fetching data';
         Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_LongText: "
-          . $enc->decode(
-            $single_warning->{'payload'}{'translationsLongText'}{$uclang} );
-
-        $message .= "Warn_"
-          . $i
-          . "_LongText|"
-          . encode(
-            "UTF-8",
-            decode(
-                "iso-8859-1",
-                $single_warning->{'payload'}{'translationsLongText'}{$uclang}
-            )
-          ) . "|";
-
-        Log $hash, 4,
-            "Warn_"
-          . $i
-          . "_ShortText: "
-          . $enc->decode(
-            $single_warning->{'payload'}{'translationsShortText'}{$uclang} );
-
-        $message .= "Warn_"
-          . $i
-          . "_ShortText|"
-          . encode(
-            "UTF-8",
-            decode(
-                "iso-8859-1",
-                $single_warning->{'payload'}{'translationsShortText'}{$uclang}
-            )
-          ) . "|";
-
-###
-        if ( AttrVal( $name, 'localiconbase', undef ) ) {
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_IconURL: "
-              . AttrVal( $name, 'localiconbase', undef )
-              . $typenames{ $single_warning->{'type'} } . "-"
-              . $single_warning->{'severity'} . ".png";
-            $message .= "Warn_"
-              . $i
-              . "_IconURL|"
-              . AttrVal( $name, 'localiconbase', undef )
-              . $typenames{ $single_warning->{'type'} } . "-"
-              . GetSeverityColor(
-                $hash,
-                GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} )
-              ) . ".png|";
-
-        }
-        else {
-            Log $hash, 4,
-                "Warn_"
-              . $i
-              . "_IconURL: http://www.unwetterzentrale.de/images/icons/"
-              . $typenames{ $single_warning->{'type'} } . "-"
-              . $single_warning->{'severity'} . ".gif";
-            $message .= "Warn_"
-              . $i
-              . "_IconURL|http://www.unwetterzentrale.de/images/icons/"
-              . $typenames{ $single_warning->{'type'} } . "-"
-              . GetSeverityColor(
-                $hash,
-                GetUWZLevel( $hash, $single_warning->{'payload'}{'levelName'} )
-              ) . ".gif|";
-        }
-###
-
-        ## Hagel start
-        my $hagelcount = 0;
-
-        # Begin Language by AttrVal
-
-        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-
-            $hagelcount = my @hagelmatch =
-              $single_warning->{'payload'}{'translationsLongText'}{'DE'} =~
-              /Hagel/g;
-
-        }
-        elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-
-            $hagelcount = my @hagelmatch =
-              $single_warning->{'payload'}{'translationsLongText'}{'NL'} =~
-              /hagel/g;
-
-        }
-        elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-
-            $hagelcount = my @hagelmatch =
-              $single_warning->{'payload'}{'translationsLongText'}{'FR'} =~
-              /grêle/g;
-
-        }
-        else {
-
-            $hagelcount = my @hagelmatch =
-              $single_warning->{'payload'}{'translationsLongText'}{'EN'} =~
-              /Hail/g;
-        }
-
-        # end language by AttrVal
-        if ( $hagelcount ne 0 ) {
-
-            Log $hash, 4, "Warn_" . $i . "_Hail: 1";
-            $message .= "Warn_" . $i . "_Hail|1|";
-
-        }
-        else {
-
-            Log $hash, 4, "Warn_" . $i . "_Hail: 0";
-            $message .= "Warn_" . $i . "_Hail|0|";
-        }
-        ## Hagel end
-
-        $i++;
+          'Will return : ' . "$name|$message|WarnCount|$uwz_warncount";
     }
-
-    my $max = 0;
-    for (@uwzmaxlevel) {
-        $max = $_ if !$max || $_ > $max;
+    else {
+        $message       = 'Error|' . $uwz_warnings->{Error};
+        $uwz_warncount = -1;
     }
-
-    $message .= "WarnUWZLevel|";
-    $message .= $max . "|";
-
-    Log $hash, 4, "WarnUWZLevel_Color: " . GetSeverityColor( $hash, $max );
-    $message .= "WarnUWZLevel_Color|" . GetSeverityColor( $hash, $max ) . "|";
-
-    ## Begin of redundant Reading
-    if ( $UWZ_humanreadable eq 1 ) {
-        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-            my %uwzlevelname = (
-                "0" => "Stufe Grün (keine Warnung)",
-                "1" => "Stufe Dunkelgrün (Wetterhinweise)",
-                "2" => "Stufe Gelb (Vorwarnung für Unwetterwarnung)",
-                "3" => "Warnstufe Orange (Unwetterwarnung)",
-                "4" => "Warnstufe Rot (Unwetterwarnung)",
-                "5" => "Warnstufe Violett (Unwetterwarnung)"
-            );
-            Log $hash, 4, "WarnUWZLevel_Str: " . $uwzlevelname{$max};
-            $message .= "WarnUWZLevel_Str|" . $uwzlevelname{$max} . "|";
-
-        }
-        elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-            my %uwzlevelname = (
-                "0" => "niveau groen (geen waarschuwingen)",
-                "1" => "niveau donkergroen (voorwaarschuwing)",
-                "2" => "niveau geel (voorwaarschuwing)",
-                "3" =>
-"waarschuwingsniveau oranje (waarschuwing voor matig noodweer)",
-                "4" =>
-                  "waarschuwingsniveau rood (waarschuwing voor zwaar noodweer)",
-                "5" =>
-"waarschuwingsniveau violet (waarschuwing voor zeer zwaar noodweer)"
-            );
-            Log $hash, 4, "WarnUWZLevel_Str: " . $uwzlevelname{$max};
-            $message .= "WarnUWZLevel_Str|" . $uwzlevelname{$max} . "|";
-
-        }
-        elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-            my %uwzlevelname = (
-                "0" => "niveau vert (aucune alerte)",
-                "1" => "niveau vert foncé (indication météo)",
-                "2" => "niveau jaune (pré-alerte)",
-                "3" => "niveau d' alerte orange (alerte météo)",
-                "4" => "niveau d' alerte rouge (alerte météo)",
-                "5" => "niveau d' alerte violet (alerte météo)"
-            );
-            Log $hash, 4, "WarnUWZLevel_Str: " . $uwzlevelname{$max};
-            $message .= "WarnUWZLevel_Str|" . $uwzlevelname{$max} . "|";
-
-        }
-        else {
-            my %uwzlevelname = (
-                "0" => "level green (no warnings)",
-                "1" => "level dark green (weather notice)",
-                "2" => "level yellow (severe weather watch)",
-                "3" => "Alert level Orange",
-                "4" => "Alert level Red",
-                "5" => "Alert level Violet"
-            );
-            Log $hash, 4, "WarnUWZLevel_Str: " . $uwzlevelname{$max};
-            $message .= "WarnUWZLevel_Str|" . $uwzlevelname{$max} . "|";
-        }
-    }
-
-    $message .= "durationFetchReadings|";
-    $message .= sprintf "%.2f", time() - $readingStartTime;
-
-    Log $hash, 3, "Done fetching data";
-    Log $hash, 4, "Will return : " . "$name|$message|WarnCount|$uwz_warncount";
 
     return "$name|$message|WarnCount|$uwz_warncount";
 }
 
 #####################################
-sub UWZAsHtml($;$) {
+sub UWZAsHtml {
+    my $name = shift;
 
-    my ( $name, $items ) = @_;
     my $ret  = '';
     my $hash = $defs{$name};
 
-    my $htmlsequence   = AttrVal( $name, "htmlsequence",   "none" );
-    my $htmltitle      = AttrVal( $name, "htmltitle",      "" );
-    my $htmltitleclass = AttrVal( $name, "htmltitleclass", "" );
+    my $htmlsequence   = AttrVal( $name, 'htmlsequence',   'none' );
+    my $htmltitle      = AttrVal( $name, 'htmltitle',      '' );
+    my $htmltitleclass = AttrVal( $name, 'htmltitleclass', '' );
 
     my $attr;
-    if ( AttrVal( $name, "htmlattr", "none" ) ne "none" ) {
-        $attr = AttrVal( $name, "htmlattr", "" );
+    if ( AttrVal( $name, 'htmlattr', 'none' ) ne 'none' ) {
+        $attr = AttrVal( $name, 'htmlattr', '' );
     }
     else {
         $attr = 'width="100%"';
     }
 
-    if ( ReadingsVal( $name, "WarnCount", 0 ) != 0 ) {
+    if ( ReadingsVal( $name, 'WarnCount', 0 ) != 0 ) {
 
         $ret .= '<table><tr><td>';
         $ret .=
@@ -1767,242 +1851,24 @@ sub UWZAsHtml($;$) {
           . $htmltitle
           . '</th></tr>';
 
-        if ( $htmlsequence eq "descending" ) {
+        if ( $htmlsequence eq 'descending' ) {
             for (
-                my $i = ReadingsVal( $name, "WarnCount", -1 ) - 1 ;
+                my $i = ReadingsVal( $name, 'WarnCount', -1 ) - 1 ;
                 $i >= 0 ;
                 $i--
               )
             {
+                $ret .= UWZHtmlFrame( $hash, 'Warn_' . $i, $attr, 1 );
 
-                $ret .=
-'<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'
-                  . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
-                  . '"></td>';
-                $ret .=
-                    '<td class="uwzValue"><b>'
-                  . ReadingsVal( $name, "Warn_" . $i . "_ShortText", "" )
-                  . '</b><br><br>';
-                $ret .= ReadingsVal( $name, "Warn_" . $i . "_LongText", "" )
-                  . '<br><br>';
-
-                my (
-                    $sec,  $min,  $hour, $mday, $mon,
-                    $year, $wday, $yday, $isdst
-                  )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = undef;
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_End", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<td><b>Ende:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<td><b>Einde:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<td><b>Jusqu\'au:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<td><b>End:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-                $ret .= '</tr></table>';
-                $ret .= '</td></tr>';
             }
         }
         else {
-###
-            for ( my $i = 0 ; $i < ReadingsVal( $name, "WarnCount", 0 ) ; $i++ )
+            for ( my $i = 0 ; $i < ReadingsVal( $name, 'WarnCount', 0 ) ; $i++ )
             {
 
-                $ret .=
-'<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'
-                  . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
-                  . '"></td>';
-                $ret .=
-                    '<td class="uwzValue"><b>'
-                  . ReadingsVal( $name, "Warn_" . $i . "_ShortText", "" )
-                  . '</b><br><br>';
-                $ret .= ReadingsVal( $name, "Warn_" . $i . "_LongText", "" )
-                  . '<br><br>';
-
-                my (
-                    $sec,  $min,  $hour, $mday, $mon,
-                    $year, $wday, $yday, $isdst
-                  )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = undef;
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_End", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<td><b>Ende:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<td><b>Einde:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<td><b>Juzqu\'au:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<td><b>End:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-                $ret .= '</tr></table>';
-                $ret .= '</td></tr>';
+                $ret .= UWZHtmlFrame( $hash, 'Warn_' . $i, $attr, 1 );
             }
         }
-###
 
         $ret .= '</table>';
         $ret .= '</td></tr>';
@@ -2045,24 +1911,24 @@ sub UWZAsHtml($;$) {
 }
 
 #####################################
-sub UWZAsHtmlLite($;$) {
+sub UWZAsHtmlLite {
+    my $name = shift;
 
-    my ( $name, $items ) = @_;
     my $ret            = '';
     my $hash           = $defs{$name};
-    my $htmlsequence   = AttrVal( $name, "htmlsequence", "none" );
-    my $htmltitle      = AttrVal( $name, "htmltitle", "" );
-    my $htmltitleclass = AttrVal( $name, "htmltitleclass", "" );
+    my $htmlsequence   = AttrVal( $name, 'htmlsequence', 'none' );
+    my $htmltitle      = AttrVal( $name, 'htmltitle', '' );
+    my $htmltitleclass = AttrVal( $name, 'htmltitleclass', '' );
     my $attr;
 
-    if ( AttrVal( $name, "htmlattr", "none" ) ne "none" ) {
-        $attr = AttrVal( $name, "htmlattr", "" );
+    if ( AttrVal( $name, 'htmlattr', 'none' ) ne 'none' ) {
+        $attr = AttrVal( $name, 'htmlattr', '' );
     }
     else {
         $attr = 'width="100%"';
     }
 
-    if ( ReadingsVal( $name, "WarnCount", "" ) != 0 ) {
+    if ( ReadingsVal( $name, 'WarnCount', '' ) != 0 ) {
 
         $ret .= '<table><tr><td>';
         $ret .=
@@ -2074,233 +1940,21 @@ sub UWZAsHtmlLite($;$) {
           . $htmltitle
           . '</th></tr>';
 
-        if ( $htmlsequence eq "descending" ) {
+        if ( $htmlsequence eq 'descending' ) {
             for (
-                my $i = ReadingsVal( $name, "WarnCount", "" ) - 1 ;
+                my $i = ReadingsVal( $name, 'WarnCount', '' ) - 1 ;
                 $i >= 0 ;
                 $i--
               )
             {
-                $ret .=
-'<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'
-                  . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
-                  . '"></td>';
-                $ret .=
-                    '<td class="uwzValue"><b>'
-                  . ReadingsVal( $name, "Warn_" . $i . "_ShortText", "" )
-                  . '</b><br><br>';
-
-                my (
-                    $sec,  $min,  $hour, $mday, $mon,
-                    $year, $wday, $yday, $isdst
-                  )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = undef;
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_End", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<td><b>Ende:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<td><b>Einde:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<td><b>Jusqu\'au:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<td><b>End:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-                $ret .= '</tr></table>';
-                $ret .= '</td></tr>';
+                $ret .= UWZHtmlFrame( $hash, 'Warn_' . $i, $attr, 0 );
             }
         }
         else {
             for ( my $i = 0 ;
-                $i < ReadingsVal( $name, "WarnCount", "" ) ; $i++ )
+                $i < ReadingsVal( $name, 'WarnCount', '' ) ; $i++ )
             {
-                $ret .=
-'<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'
-                  . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
-                  . '"></td>';
-                $ret .=
-                    '<td class="uwzValue"><b>'
-                  . ReadingsVal( $name, "Warn_" . $i . "_ShortText", "" )
-                  . '</b><br><br>';
-
-                my (
-                    $sec,  $min,  $hour, $mday, $mon,
-                    $year, $wday, $yday, $isdst
-                  )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_Start", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Anfang:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Begin:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Valide à partir du:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<table '
-                      . $attr
-                      . '><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = undef;
-                ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst )
-                  = localtime(
-                    ReadingsVal( $name, "Warn_" . $i . "_End", "" ) );
-                if ( length($hour) == 1 ) { $hour = "0$hour"; }
-                if ( length($min) == 1 )  { $min  = "0$min"; }
-
-                # language by AttrVal
-                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                    $ret .=
-                        '<td><b>Ende:</b></td><td>'
-                      . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'Uhr</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
-                    $ret .=
-                        '<td><b>Einde:</b></td><td>'
-                      . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'uur</td>';
-                }
-                elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
-                    $ret .=
-                        '<td><b>Jusqu\'au:</b></td><td>'
-                      . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'heure</td>';
-                }
-                else {
-                    $ret .=
-                        '<td><b>End:</b></td><td>'
-                      . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
-                      . ( 1900 + $year )
-                      . " $hour:$min "
-                      . 'hour</td>';
-                }
-
-                # end language by AttrVal
-                $ret .= '</tr></table>';
-                $ret .= '</td></tr>';
+                $ret .= UWZHtmlFrame( $hash, 'Warn_' . $i, $attr, 0 );
             }
         }
         $ret .= '</table>';
@@ -2344,13 +1998,13 @@ sub UWZAsHtmlLite($;$) {
 }
 
 #####################################
-sub UWZAsHtmlFP($;$) {
+sub UWZAsHtmlFP {
+    my $name = shift;
 
-    my ( $name, $items ) = @_;
-    my $tablewidth = ReadingsVal( $name, "WarnCount", "" ) * 80;
-    my $htmlsequence   = AttrVal( $name, "htmlsequence",   "none" );
-    my $htmltitle      = AttrVal( $name, "htmltitle",      "" );
-    my $htmltitleclass = AttrVal( $name, "htmltitleclass", "" );
+    my $tablewidth = ReadingsVal( $name, 'WarnCount', '' ) * 80;
+    my $htmlsequence   = AttrVal( $name, 'htmlsequence',   'none' );
+    my $htmltitle      = AttrVal( $name, 'htmltitle',      '' );
+    my $htmltitleclass = AttrVal( $name, 'htmltitleclass', '' );
     my $ret            = '';
 
     $ret .=
@@ -2359,43 +2013,44 @@ sub UWZAsHtmlFP($;$) {
       . 'px"><tr><th class="'
       . $htmltitleclass
       . '" colspan="'
-      . ReadingsVal( $name, "WarnCount", "none" ) . '">'
+      . ReadingsVal( $name, 'WarnCount', 'none' ) . '">'
       . $htmltitle
       . '</th></tr>';
-    $ret .= "<tr>";
+    $ret .= '<tr>';
 
-    if ( $htmlsequence eq "descending" ) {
+    if ( $htmlsequence eq 'descending' ) {
         for (
-            my $i = ReadingsVal( $name, "WarnCount", "" ) - 1 ;
+            my $i = ReadingsVal( $name, 'WarnCount', '' ) - 1 ;
             $i >= 0 ;
             $i--
           )
         {
             $ret .=
                 '<td class="uwzIcon"><img width="80px" src="'
-              . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
+              . ReadingsVal( $name, 'Warn_' . $i . '_IconURL', '' )
               . '"></td>';
         }
     }
     else {
-        for ( my $i = 0 ; $i < ReadingsVal( $name, "WarnCount", "" ) ; $i++ ) {
+        for ( my $i = 0 ; $i < ReadingsVal( $name, 'WarnCount', '' ) ; $i++ ) {
             $ret .=
                 '<td class="uwzIcon"><img width="80px" src="'
-              . ReadingsVal( $name, "Warn_" . $i . "_IconURL", "" )
+              . ReadingsVal( $name, 'Warn_' . $i . '_IconURL', '' )
               . '"></td>';
         }
     }
-    $ret .= "</tr>";
+    $ret .= '</tr>';
     $ret .= '</table>';
 
     return $ret;
 }
 
 #####################################
-sub UWZAsHtmlMovie($$) {
+sub UWZAsHtmlMovie {
+    my $name = shift;
+    my $land = shift;
 
-    my ( $name, $land ) = @_;
-    my $url = Map2Movie( $name, $land );
+    my $url  = Map2Movie($land);
     my $hash = $defs{$name};
 
     my $ret = '<table><tr><td>';
@@ -2434,10 +2089,11 @@ sub UWZAsHtmlMovie($$) {
 }
 
 #####################################
-sub UWZAsHtmlKarteLand($$) {
+sub UWZAsHtmlKarteLand {
+    my $name = shift;
+    my $land = shift;
 
-    my ( $name, $land ) = @_;
-    my $url = Map2Image( $name, $land );
+    my $url  = Map2Image($land);
     my $hash = $defs{$name};
 
     my $ret = '<table><tr><td>';
@@ -2474,50 +2130,144 @@ sub UWZAsHtmlKarteLand($$) {
 }
 
 #####################################
-sub GetSeverityColor($$) {
-    my ( $name, $uwzlevel ) = @_;
-    my $alertcolor = "";
+sub UWZHtmlFrame {
+    my ( $hash, $readingStart, $attr, $parm ) = @_;
+
+    my $ret  = '';
+    my $name = $hash->{NAME};
+    $ret .=
+        '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'
+      . ReadingsVal( $name, $readingStart . '_IconURL', '' )
+      . '"></td>';
+    $ret .=
+        '<td class="uwzValue"><b>'
+      . ReadingsVal( $name, $readingStart . '_ShortText', '' )
+      . '</b><br><br>';
+    $ret .= ReadingsVal( $name, $readingStart . '_LongText', '' ) . '<br><br>'
+      if ($parm);
+
+    $ret .= UWZHtmlTimestamp( $hash, $readingStart . '_Start', $attr );
+    $ret .= UWZHtmlTimestamp( $hash, $readingStart . '_End',   $attr );
+    $ret .= '</tr></table>';
+    $ret .= '</td></tr>';
+
+    return $ret;
+}
+
+#####################################
+sub UWZHtmlTimestamp {
+
+    my @DEText = qw(Anfang: Ende: Uhr);
+    my @NLText = qw(Begin: Einde: uur);
+    my @FRText = ( "Valide à partir du:", "Jusqu\'au:", "heure" );
+    my @ENText = qw(Start: End: hour);
+
+    my $hash    = shift;
+    my $reading = shift;
+    my $attr    = shift;
+
+    my $ret;
+    my $StartEnd = '';
+    my $name     = $hash->{NAME};
+
+    if ( substr( $reading, 7, 1 ) eq 'S' ) {
+        $StartEnd = 0;
+        $ret .= '<table ' . $attr . '><tr><th></th><th></th></tr><tr>';
+    }
+    else { $StartEnd = 1; }
+
+    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+      localtime( ReadingsVal( $name, $reading, '' ) );
+
+    if ( length($hour) == 1 ) { $hour = "0$hour"; }
+    if ( length($min) == 1 )  { $min  = "0$min"; }
+
+    # language by AttrVal
+    if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+        $ret .=
+            "<td><b>$DEText[$StartEnd]</b></td><td>"
+          . "$DEweekdays[$wday], $mday $DEmonths[$mon] "
+          . ( 1900 + $year )
+          . " $hour:$min "
+          . "$DEText[2]</td>";
+    }
+    elsif ( $hash->{CountryCode} ~~ ['NL'] ) {
+        $ret .=
+            "<td><b>$NLText[$StartEnd]</b></td><td>"
+          . "$NLweekdays[$wday], $mday $NLmonths[$mon] "
+          . ( 1900 + $year )
+          . " $hour:$min "
+          . "$NLText[2]</td>";
+    }
+    elsif ( $hash->{CountryCode} ~~ ['FR'] ) {
+        $ret .=
+            "<td><b>$FRText[$StartEnd]</b></td><td>"
+          . "$FRweekdays[$wday], $mday $FRmonths[$mon] "
+          . ( 1900 + $year )
+          . " $hour:$min "
+          . "$FRText[2]</td>";
+    }
+    else {
+        $ret .=
+            "<td><b>$ENText[$StartEnd]</b></td><td>"
+          . "$ENweekdays[$wday], $mday $ENmonths[$mon] "
+          . ( 1900 + $year )
+          . " $hour:$min "
+          . "$ENText[2]</td>";
+    }
+
+    return $ret;
+}
+
+#####################################
+sub GetSeverityColor {
+    my $name       = shift;
+    my $uwzlevel   = shift;
+    my $alertcolor = '';
 
     my %UWZSeverity = (
-        "0" => "gruen",
-        "1" => "orange",
-        "2" => "gelb",
-        "3" => "orange",
-        "4" => "rot",
-        "5" => "violett"
+        '0' => 'gruen',
+        '1' => 'orange',
+        '2' => 'gelb',
+        '3' => 'orange',
+        '4' => 'rot',
+        '5' => 'violett'
     );
 
     return $UWZSeverity{$uwzlevel};
 }
 
 #####################################
-sub GetUWZLevel($$) {
-    my ( $name, $warnname ) = @_;
+sub GetUWZLevel {
+    my $name     = shift;
+    my $warnname = shift;
+
     my @alert = split( /_/, $warnname );
 
-    if ( $alert[0] eq "notice" ) {
-        return "1";
+    if ( $alert[0] eq 'notice' ) {
+        return '1';
     }
-    elsif ( $alert[1] eq "forewarn" ) {
-        return "2";
+    elsif ( $alert[1] eq 'forewarn' ) {
+        return '2';
     }
     else {
 
         my %UWZSeverity = (
-            "green"  => "0",
-            "yellow" => "2",
-            "orange" => "3",
-            "red"    => "4",
-            "violet" => "5"
+            'green'  => '0',
+            'yellow' => '2',
+            'orange' => '3',
+            'red'    => '4',
+            'violet' => '5'
         );
 
         return $UWZSeverity{ $alert[2] };
     }
+
+    return;
 }
 
 #####################################
-sub IntervalAtWarnLevel($) {
-
+sub IntervalAtWarnLevel {
     my $hash = shift;
 
     my $name        = $hash->{NAME};
@@ -2534,14 +2284,14 @@ sub IntervalAtWarnLevel($) {
     }
 
     if ( defined( $warnLevelInterval{$warnLevel} )
-        and $hash->{INTERVALWARN} != $warnLevelInterval{$warnLevel} )
+        && $hash->{INTERVALWARN} != $warnLevelInterval{$warnLevel} )
     {
 
         $hash->{INTERVALWARN} = $warnLevelInterval{$warnLevel};
 
         RemoveInternalTimer($hash);
         InternalTimer( gettimeofday() + $hash->{INTERVALWARN},
-            "UWZ_Start", $hash );
+            'UWZ_Start', $hash );
 
         Log $hash, 4,
           "restart internal timer with interval $hash->{INTERVALWARN}";
@@ -2556,6 +2306,8 @@ sub IntervalAtWarnLevel($) {
         Log $hash, 4,
           "restart internal timer with interval $hash->{INTERVALWARN}";
     }
+
+    return;
 }
 
 #####################################
@@ -2564,12 +2316,13 @@ sub IntervalAtWarnLevel($) {
 ##
 #####################################
 
-sub UWZSearchLatLon($$) {
-    my ( $name, $loc ) = @_;
+sub UWZSearchLatLon {
+    my $name = shift;
+    my $loc  = shift;
 
     my $err_log = '';
     my $url =
-"http://alertspro.geoservice.meteogroup.de/weatherpro/SearchFeed.php?search="
+'http://alertspro.geoservice.meteogroup.de/weatherpro/SearchFeed.php?search='
       . $loc;
     my $agent = LWP::UserAgent->new(
         env_proxy         => 1,
@@ -2580,10 +2333,10 @@ sub UWZSearchLatLon($$) {
     my $request = HTTP::Request->new( GET => $url );
     my $response = $agent->request($request);
     $err_log = 'Can\'t get ' . $url . ' -- ' . $response->status_line
-      unless ( $response->is_success );
+      if ( !$response->is_success );
 
-    if ( $err_log ne "" ) {
-        print "Error|Error " . $response->status_line;
+    if ( $err_log ne '' ) {
+        print 'Error|Error ' . $response->status_line;
     }
 
     use XML::Simple qw(:strict);
@@ -2592,7 +2345,7 @@ sub UWZSearchLatLon($$) {
     my $uwzxmlparser = XML::Simple->new();
     my $search       = $uwzxmlparser->XMLin(
         $response->content,
-        KeyAttr    => { city => 'id' },
+        KeyAttr    => { 'city' => 'id' },
         ForceArray => ['city']
     );
 
@@ -2601,10 +2354,10 @@ sub UWZSearchLatLon($$) {
     $ret .= '<table class="block wide">';
 
     $ret .= '<tr class="even">';
-    $ret .= "<td><b>city</b></td>";
-    $ret .= "<td><b>country</b></td>";
-    $ret .= "<td><b>latitude</b></td>";
-    $ret .= "<td><b>longitude</b></td>";
+    $ret .= '<td><b>city</b></td>';
+    $ret .= '<td><b>country</b></td>';
+    $ret .= '<td><b>latitude</b></td>';
+    $ret .= '<td><b>longitude</b></td>';
     $ret .= '</tr>';
 
     foreach my $locres ( $search->{cities}->{city} ) {
@@ -2616,25 +2369,22 @@ sub UWZSearchLatLon($$) {
             else {
                 $ret .= '<tr class="odd">';
             }
-            $ret .= "<td>" . encode( 'utf-8', $value->{'name'} ) . "</td>";
-            $ret .= "<td>$value->{'country-name'}</td>";
-            $ret .= "<td>$value->{'latitude'}</td>";
-            $ret .= "<td>$value->{'longitude'}</td>";
-
-            my @headerHost = grep /Host/, @FW_httpheader;
-            $headerHost[0] =~ s/Host: //g;
+            $ret .= '<td>' . encode( 'utf-8', $value->{'name'} ) . '</td>';
+            $ret .= '<td>' . $value->{'country-name'} . '</td>';
+            $ret .= '<td>' . $value->{'latitude'} . '</td>';
+            $ret .= '<td>' . $value->{'longitude'} . '</td>';
 
             my $aHref =
-                "<a href=\"http://"
-              . $headerHost[0]
-              . "/fhem?cmd=get+"
+                '<a href="/fhem?cmd=get%20'
               . $name
-              . "+AreaID+"
-              . $value->{'latitude'} . ","
+              . '%20AreaID%20'
+              . $value->{'latitude'}
+              . ','
               . $value->{'longitude'}
               . $::FW_CSRF
-              . "\">Get AreaID</a>";
-            $ret .= "<td>" . $aHref . "</td>";
+              . '">Get AreaID</a>';
+
+            $ret .= '<td>' . $aHref . '</td>';
             $ret .= '</tr>';
             $linecount++;
         }
@@ -2644,17 +2394,17 @@ sub UWZSearchLatLon($$) {
     $ret .= '</table></html>';
 
     return $ret;
-
 }
 
 #####################################
-sub UWZSearchAreaID($$) {
-    my ( $lat, $lon ) = @_;
+sub UWZSearchAreaID {
+    my $lat = shift;
+    my $lon = shift;
 
     my $err_log = '';
     my $url =
-"http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=lookupCoord&lat="
-      . $lat . "&lon="
+'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=lookupCoord&lat='
+      . $lat . '&lon='
       . $lon;
     my $agent = LWP::UserAgent->new(
         env_proxy         => 1,
@@ -2665,9 +2415,9 @@ sub UWZSearchAreaID($$) {
     my $request = HTTP::Request->new( GET => $url );
     my $response = $agent->request($request);
     $err_log = "Can't get $url -- " . $response->status_line
-      unless ( $response->is_success );
+      if ( !$response->is_success );
 
-    if ( $err_log ne "" ) {
+    if ( $err_log ne '' ) {
         print "Error|Error " . $response->status_line;
     }
     use JSON;
@@ -2677,7 +2427,7 @@ sub UWZSearchAreaID($$) {
     my $CC       = substr $perl_scalar[0]->{'AREA_ID'}, 3, 2;
     my $AreaID   = substr $perl_scalar[0]->{'AREA_ID'}, 5, 5;
 
-    if ( $AreaType eq "UWZ" ) {
+    if ( $AreaType eq 'UWZ' ) {
         my $ret =
 '<html>Please use the following statement to define Unwetterzentrale for your location:<br /><br />';
         $ret .= '<table width=100%><tr><td>';
@@ -2707,8 +2457,10 @@ sub UWZSearchAreaID($$) {
         return $ret;
     }
     else {
-        return "Sorry, nothing found or not implemented";
+        return 'Sorry, nothing found or not implemented';
     }
+
+    return;
 }
 
 #####################################
@@ -3306,7 +3058,7 @@ sub UWZSearchAreaID($$) {
       <br>
       <li><code>download</code>
          <br>
-         Download Unwetterkarten während des updates (0|1). 
+         Download Unwetterkarten während des updates (0|1).
          <br>
       </li>
       <li><code>savepath</code>
@@ -3623,7 +3375,7 @@ sub UWZSearchAreaID($$) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.2",
+  "version": "v3.0.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
