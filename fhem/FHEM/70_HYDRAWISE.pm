@@ -443,7 +443,7 @@ sub HYDRAWISE_SendCommand {
 
 ###################################
 sub HYDRAWISE_ReceiveCommand {
-    my ( $param, $err, $data ) = @_;
+    my ( $param, $err, $data, $do_trigger ) = @_;
     my $hash     = $param->{hash};
     my $name     = $hash->{NAME};
     my $service  = $param->{service};
@@ -485,13 +485,13 @@ sub HYDRAWISE_ReceiveCommand {
 
         # Set reading for presence
         #
-        #readingsSingleUpdate( $hash, "presence", $presence, 1 );
-        HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "presence", "$presence" );
+        readingsSingleUpdate( $hash, "presence", $presence, 1 );
+        #HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "presence", "$presence" );
 
         # Set reading for state
         #
-        #readingsSingleUpdate( $hash, "state", $state, 1 );
-        HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "state", "$state" );
+        readingsSingleUpdate( $hash, "state", $state, 1 );
+        #HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "state", "$state" );
 
         if ( !defined($cmd) ) {
             Log3 $name, 4, "HYDRAWISE $name: RCV $service";
@@ -537,12 +537,17 @@ sub HYDRAWISE_ReceiveCommand {
             if ( ref($return) eq "HASH" && !defined($cmd) ) {
 
                 # controllers
-                HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "customer_id",
-                    $return->{customer_id} );
-                HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash,
-                    "cur_controller_id", $return->{controller_id} );
-                HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash,
-                    "cur_controller_name", $return->{current_controller} );
+                if ($return->{customer_id}){
+                  HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "customer_id", $return->{customer_id} );
+                }
+                
+                if ($return->{controller_id}){
+                  HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "cur_controller_id", $return->{controller_id} );
+                }
+                
+                if ($return->{current_controller}){
+                  HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "cur_controller_name", $return->{current_controller} );
+                }
 
                 if ( ref( $return->{controllers} ) eq "ARRAY"
                     && scalar( @{ $return->{controllers} } ) > 0 )
@@ -589,8 +594,15 @@ sub HYDRAWISE_ReceiveCommand {
                     HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash,
                         "relay_counts", scalar( @{ $return->{relays} } ) );
                     for my $relays ( @{ $return->{relays} } ) {
-                        Log3 $name, 5,
-"HYDRAWISE $name: $relays->{relay} $relays->{relay_id}";
+                        Log3 $name, 5,"HYDRAWISE $name: $relays->{relay} $relays->{relay_id}";
+
+
+#readingsSingleUpdate( $hash, "rl" . $relays->{relay} . "_relay", $relays->{relay}, $do_trigger );
+#readingsSingleUpdate( $hash, "rl" . $relays->{relay} . "_relay_id", $relays->{relay_id}, $do_trigger );
+#readingsSingleUpdate( $hash, "rl" . $relays->{relay} . "_name", $relays->{name}, $do_trigger );
+#readingsSingleUpdate( $hash, "rl" . $relays->{relay} . "_next", $relays->{timestr}, $do_trigger );
+#readingsSingleUpdate( $hash, "rl" . $relays->{relay} . "_run_minutes", $relays->{run}, $do_trigger );
+
 
                         HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash,
                             "rl" . $relays->{relay} . "_relay",
@@ -636,6 +648,7 @@ sub HYDRAWISE_ReceiveCommand {
             if ( ref( $return->{relays} ) eq "ARRAY"
                 and scalar( @{ $return->{relays} } ) > 0 )
             {
+                readingsBeginUpdate ($hash);
                 HYDRAWISE_ReadingsBulkUpdateIfChanged( $hash, "relay_counts",
                     scalar( @{ $return->{relays} } ) );
                 for my $relays ( @{ $return->{relays} } ) {
@@ -757,13 +770,14 @@ sub HYDRAWISE_TriggerFullDataUpdate {
 }
 
 sub HYDRAWISE_ReadingsBulkUpdateIfChanged {
-    my ( $hash, $reading, $value ) = @_;
+    my ( $hash, $reading, $value, $do_trigger) = @_;
     my $name = $hash->{NAME};
-
-    $value = "" if ( !defined($value) );
-    readingsBulkUpdate( $hash, $reading, $value )
-      if ( ReadingsVal( $name, $reading, "" ) ne $value );
-
+    # print "hydrawise READING: $reading -> $value \n";
+    if($value){
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate( $hash, $reading, $value);
+      readingsEndUpdate($hash, 1);
+    }
     return;
 }
 
