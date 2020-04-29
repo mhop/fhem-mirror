@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_RandomTimer: Add disabledForIntervals attribute
+                      and active/inactive setters
  - bugfix:  70_HYDRAWISE: Solves logging problems
  - bugfix:  93_DbLog: fix line breaks in set function, Forum: #110673
  - bugfix:  GardenaSmart: all modules change to new API and code PBP conform
