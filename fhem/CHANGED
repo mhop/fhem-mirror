@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  74_GardenaSmartDevice: fix watering_computer state
  - feature: 77_UWZ: add disableForIntervals, fix searchAreaID Fn and bugfix
  - feature: 98_RandomTimer: Add disabledForIntervals attribute
                       and active/inactive setters

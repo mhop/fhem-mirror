@@ -606,9 +606,10 @@ sub WriteReadings {
     readingsBulkUpdate(
         $hash, 'state',
         (
-            ReadingsVal( $name, 'watering-watering_timer_1_state', 'idle' ) eq 'idle'
-            ? RigReadingsValue( $hash, 'closed' )
-            : RigReadingsValue( $hash, 'open' )
+            (ReadingsVal( $name, 'watering-watering_timer_1_state', 'open' ) eq 'open' 
+              || ReadingsVal( $name, 'watering-watering_timer_1_state', 'offen' ) eq 'offen')
+            ? RigReadingsValue( $hash, 'open' )
+            : RigReadingsValue( $hash, 'closed' )
         )
     ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
@@ -1207,7 +1208,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
