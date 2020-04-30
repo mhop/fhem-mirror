@@ -610,12 +610,8 @@ sub WriteReadings {
     readingsBulkUpdate(
         $hash, 'state',
         (
-            (
-                ReadingsVal( $name, 'watering-watering_timer_1_state', 'open' )
-                  eq 'open'
-                  || ReadingsVal( $name, 'watering-watering_timer_1_state',
-                    'offen' ) eq 'offen'
-            )
+                ReadingsVal( $name, 'watering-watering_timer_1_duration', 0 )
+                  =~ m{\A[1-9]([0-9]+)?\z}xms
             ? RigReadingsValue( $hash, 'open' )
             : RigReadingsValue( $hash, 'closed' )
         )
@@ -1216,7 +1212,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.1",
+  "version": "v2.0.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

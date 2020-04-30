@@ -419,12 +419,12 @@ sub Set {
     elsif ( lc $cmd eq 'gardenaaccountpassword' ) {
         return "please set Attribut gardenaAccountEmail first"
           if ( AttrVal( $name, 'gardenaAccountEmail', 'none' ) eq 'none' );
-        return "usage: $cmd <password>" if ( scalar( @{$a} ) != 0 );
+        return "usage: $cmd <password>" if ( scalar( @{$a} ) != 1 );
 
         StorePassword( $hash, $name, $a->[0] );
     }
     elsif ( lc $cmd eq 'deleteaccountpassword' ) {
-        return "usage: $cmd <password>" if ( scalar( @{$a} ) != 0 );
+        return "usage: $cmd" if ( scalar( @{$a} ) != 0 );
 
         DeletePassword($hash);
     }
@@ -1375,7 +1375,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
