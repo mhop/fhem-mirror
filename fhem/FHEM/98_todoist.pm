@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.7";
+my $version = "1.3.8";
 
 my $srandUsed;
 
@@ -1145,15 +1145,14 @@ sub todoist_GetTasksCallback($$$){
       }
     }
   }
-
+  
+  readingsEndUpdate( $hash, 1 );
+  
   ## list Text for TTS, Text-Message...
   if ($param->{completed} != 1) {
     $lText="-" if ($lText eq "");
-    readingsBulkUpdate($hash,"listText",$lText) if ($lText ne "");
+    readingsSingleUpdate($hash,"listText",$lText,1) if ($lText ne "");
   }
-  
-  
-  readingsEndUpdate( $hash, 1 );
     
   RemoveInternalTimer($hash,"todoist_GetTasks");
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "todoist_GetTasks", $hash, 0); ## loop with Interval
