@@ -379,6 +379,10 @@ sub Set {
 
         my $list = '';
 
+        $list .=
+'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,1,60 startpoint'
+          if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
+
         $list .= 'manualOverride:slider,1,1,59 cancelOverride:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
@@ -606,8 +610,12 @@ sub WriteReadings {
     readingsBulkUpdate(
         $hash, 'state',
         (
-            (ReadingsVal( $name, 'watering-watering_timer_1_state', 'open' ) eq 'open' 
-              || ReadingsVal( $name, 'watering-watering_timer_1_state', 'offen' ) eq 'offen')
+            (
+                ReadingsVal( $name, 'watering-watering_timer_1_state', 'open' )
+                  eq 'open'
+                  || ReadingsVal( $name, 'watering-watering_timer_1_state',
+                    'offen' ) eq 'offen'
+            )
             ? RigReadingsValue( $hash, 'open' )
             : RigReadingsValue( $hash, 'closed' )
         )
