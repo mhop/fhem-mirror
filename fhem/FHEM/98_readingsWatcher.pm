@@ -128,6 +128,7 @@ sub Define {
 	return $error;
     }
 
+    $hash->{svn} = (qw($Id$))[2];
     $modules{readingsWatcher}{defptr} = $hash;
 
     if (defined($noglobal) && ($noglobal  eq 'noglobal')) {
