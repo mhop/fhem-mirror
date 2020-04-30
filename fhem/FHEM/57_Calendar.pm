@@ -1847,9 +1847,6 @@ sub Calendar_Notify($$)
   Calendar_DisarmTimer($hash);
   my $delay= 10+int(rand(20));
 
-  # delay removed until further notice
-  $delay= 2;
-
   Log3 $hash, 5, "Calendar $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
   InternalTimer(time()+$delay, "Calendar_Wakeup", $hash, 0) ;
 
