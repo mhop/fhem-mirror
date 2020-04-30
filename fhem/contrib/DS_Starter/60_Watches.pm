@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       60_Watches.pm
 #
-#       (c) 2018 - 2020 by Heiko Maaz
+#       (c) 2018-2020 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
+  "0.7.0"  => "30.04.2020  new set 'restart' for stopwatch ",
   "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings, add csrf token support ",
   "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
   "0.4.0"  => "20.11.2018  text display ",
@@ -119,12 +120,20 @@ sub Watches_Set {                                                    ## no criti
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
   $setlist   .= "time "                               if($addp =~ /staticwatch/);               
-  $setlist   .= "reset:noArg start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
+  $setlist   .= "reset:noArg restart:noArg start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
 
   if ($opt =~ /\bstart\b/) {
       my $ms = int(time*1000);
       readingsSingleUpdate($hash, "starttime", $ms,        0);
       readingsSingleUpdate($hash, "state",     "started",  1);
+      
+  } elsif ($opt eq "restart") {
+      if(!ReadingsVal($name, "starttime", "")) {
+          my $ms = int(time*1000);
+          readingsSingleUpdate($hash, "starttime", $ms, 0);      
+      }
+      return if(ReadingsVal($name, "state", "") eq "started");
+      readingsSingleUpdate($hash, "state", "started",  1);
       
   } elsif ($opt eq "stop") {
       readingsSingleUpdate($hash, "state", "stopped",  1);
@@ -261,7 +270,7 @@ sub Watches_digital {
   
   } elsif($addp eq "stopwatch") {
       $ddp = "###:##:##";
-      $ddt = "  "."((hours_$d < 10) ? ' 0' : ' ') + hours_$d
+      $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
                     + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
@@ -312,6 +321,7 @@ sub Watches_digital {
     var hours_$d;
     var minutes_$d;
     var seconds_$d;
+    var startDate_$d;      
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -903,9 +913,9 @@ sub Watches_digital {
             
             if (state_$d == 'started') {  
                 selVal_$d = 'starttime';            
-                command   = '{ReadingsNum(\"'+devName_$d+'\",\"'+selVal_$d+'\",0)}';
+                command   = '{ReadingsNum(\"'+devName_$d+'\",\"'+selVal_$d+'\", 0)}';
                 url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {ms_$d = parseInt(data); return ms_$d;} );
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ms_$d = parseInt(data); return ms_$d;} );
                 
                 startDate_$d   = new Date(ms_$d);
                 endDate_$d     = new Date();
@@ -918,6 +928,7 @@ sub Watches_digital {
                 localStorage.setItem('h_$d', hours_$d);
                 localStorage.setItem('m_$d', minutes_$d);
                 localStorage.setItem('s_$d', seconds_$d);
+                
             }
             
             if (state_$d == 'stopped') {
@@ -935,12 +946,13 @@ sub Watches_digital {
                 localStorage.setItem('s_$d', seconds_$d);
             }
         }
-
-        if (typeof hours_$d   === 'undefined') { hours_$d   = 0; };
-        if (typeof minutes_$d === 'undefined') { minutes_$d = 0; };
-        if (typeof seconds_$d === 'undefined') { seconds_$d = 0; };
         
         var value = $ddt;
+        
+        if(value == ' undefined:undefined:undefined' || value == ' NaN:NaN:NaN') {
+           value = '   :  :  '; 
+        }
+        
         display_$d.setValue(value);
         window.setTimeout('animate_$d()', 100);
     }
@@ -1615,6 +1627,15 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     </li>
     <br>
   
+    <a name="restart"></a>
+    <li><b>restart</b><br>
+      Restartet eine angehaltene Stoppuhr und setzt die Zählung inklusive der seit "start" verstrichenen Zeit fort. 
+      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei 00:00:00. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
+    
     <a name="start"></a>
     <li><b>start</b><br>
       Startet die Stoppuhr. <br>
@@ -1870,6 +1891,15 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     <a name="reset"></a>
     <li><b>reset</b><br>
       Stoppt die Stoppuhr (falls sie läuft) und setzt die Zeit auf 00:00:00 zurück. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+    </li>
+    <br>
+    
+    <a name="restart"></a>
+    <li><b>restart</b><br>
+      Restartet eine angehaltene Stoppuhr und setzt die Zählung inklusive der seit "start" verstrichenen Zeit fort. 
+      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei 00:00:00. <br>
       Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
       <b>digitalDisplayPattern = stopwatch</b> vorhanden.
     </li>
