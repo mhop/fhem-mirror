@@ -23,7 +23,7 @@ use strict;
 use warnings;
 use Blocking;
 use Color;
-use vars qw($FW_CSRF);
+use vars qw($FW_CSRF $FW_room);
 
 my $hs;
 
@@ -4374,7 +4374,7 @@ sub y_h
   }
   
   my $prop=$value/($max-$min);
-  my $h=abs($prop*($height))+4.3;
+  my $h=abs($prop*($height))+4;
   my $y;
   my $null;
  
@@ -4382,7 +4382,7 @@ sub y_h
   if ($value <= 0) {
     $y=$null;
   } else {
-    $y=$null+4.3-$h;
+    $y=$null+4.9-$h;
   }
   $null=undef if ($max == 0 or $min == 0);
   return ($y,$h,$null);
@@ -5316,10 +5316,6 @@ Nur am Wochenende bzw. an Feiertagen lt. holiday-Datei (7 entspricht $we):<br>
 Zeitintervalle über Mitternacht:<br>
 <br>
 <code>define di_light DOIF ([22:00-07:00]) (set light on) DOELSE (set light off) </code><br>
-<br>
-in Verbindung mit Wochentagen (einschalten am Freitag ausschalten am Folgetag):<br>
-<br>
-<code>define di_light DOIF ([22:00-07:00|5]) (set light on) DOELSE (set light off) </code><br>
 <br>
 Zeitintervalle über mehrere Tage müssen als Zeitpunkte angegeben werden.<br>
 <br>
