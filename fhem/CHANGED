@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not insert empty lines here, update check depends on it. 
+# Do not insert empty lines here, update check depends on it.
+ - change:  70_BOTVAC: Optimze error message handling
+                       Renew accessToken if necessary
+                       PBP issues
  - change:  57_Calendar: reactivated random delay for calendar updates on start
  - bugfix   98_todoist: Forum: #1048705
  - bugfix:  74_GardenaSmartDevice: setter from mower not visible
