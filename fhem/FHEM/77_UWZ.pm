@@ -531,8 +531,8 @@ sub Initialize {
 
 ###################################
 sub Define {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
@@ -542,18 +542,18 @@ sub Define {
 
     return
       "Wrong syntax: use define <name> UWZ <CountryCode> <PLZ> <Interval> "
-      if ( scalar( @{$a} ) != 5
-        && lc $a->[2] ne 'search' );
+      if ( scalar( @{$aArg} ) != 5
+        && lc $aArg->[2] ne 'search' );
 
     my $name = $hash->{NAME};
     my $lang = '';
     $hash->{VERSION}   = version->parse($VERSION)->normal;
     $hash->{NOTIFYDEV} = 'global,' . $name;
 
-    if ( ( lc $a->[2] ) ne 'search' ) {
+    if ( ( lc $aArg->[2] ) ne 'search' ) {
         readingsSingleUpdate( $hash, 'state', 'Initializing', 1 );
-        $hash->{CountryCode} = $a->[2];
-        $hash->{PLZ}         = $a->[3];
+        $hash->{CountryCode} = $aArg->[2];
+        $hash->{PLZ}         = $aArg->[3];
 
         ## URL by CountryCode
 
@@ -572,16 +572,16 @@ sub Define {
 'http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language='
           . $URL_language
           . '&areaID=UWZ'
-          . $a->[2]
-          . $a->[3];
+          . $aArg->[2]
+          . $aArg->[3];
 
         $hash->{fhem}{LOCAL}  = 0;
-        $hash->{INTERVAL}     = $a->[4];
+        $hash->{INTERVAL}     = $aArg->[4];
         $hash->{INTERVALWARN} = 0;
     }
     else {
         readingsSingleUpdate( $hash, 'state', 'Search-Mode', 1 );
-        $hash->{CountryCode} = uc $a->[2];
+        $hash->{CountryCode} = uc $aArg->[2];
     }
 
     return;
@@ -622,16 +622,16 @@ sub Attr {
 
 #####################################
 sub Set {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
+    my $name = shift @$aArg // return;
+    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
 
     my $usage = "Unknown argument $cmd, choose one of update:noArg "
       if ( ( lc $hash->{CountryCode} ) ne 'search' );
 
-    return $usage if ( scalar( @{$a} ) != 0 );
+    return $usage if ( scalar( @{$aArg} ) != 0 );
 
     given ($cmd) {
         when ("?") {
@@ -698,17 +698,17 @@ sub Notify {
 }
 
 sub Get {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"get $name" needs at least one argument};
+    my $name = shift @$aArg // return;
+    my $cmd  = shift @$aArg // return qq{"get $name" needs at least one argument};
 
     if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
         my $usage =
 "Unknown argument $cmd, choose one of Sturm:noArg Schneefall:noArg Regen:noArg Extremfrost:noArg Waldbrand:noArg Gewitter:noArg Glaette:noArg Hitze:noArg Glatteisregen:noArg Bodenfrost:noArg Hagel:noArg ";
 
-        return $usage if ( scalar( @{$a} ) != 0 );
+        return $usage if ( scalar( @{$aArg} ) != 0 );
 
         return
             $cmd =~ m{\ASturm}xms         ? GetCurrent( $hash, 2 )
@@ -729,7 +729,7 @@ sub Get {
         my $usage =
 "Unknown argument $cmd, choose one of storm:noArg sneeuw:noArg regen:noArg strenge-vorst:noArg bosbrand:noArg onweer:noArg gladheid:noArg hitte:noArg ijzel:noArg grondvorst:noArg hagel:noArg ";
 
-        return $usage if ( scalar( @{$a} ) != 0 );
+        return $usage if ( scalar( @{$aArg} ) != 0 );
 
         return
             $cmd =~ m{\Astorm}xms         ? GetCurrent( $hash, 2 )
@@ -750,7 +750,7 @@ sub Get {
         my $usage =
 "Unknown argument $cmd, choose one of tempete:noArg neige:noArg pluie:noArg strenge-vorst:noArg incendie-de-foret:noArg orage:noArg glissange:noArg canicule:noArg verglas:noArg grondvorst:noArg grele:noArg ";
 
-        return $usage if ( scalar( @{$a} ) != 0 );
+        return $usage if ( scalar( @{$aArg} ) != 0 );
 
         return
             $cmd =~ m{\Atempete}xms          ? GetCurrent( $hash, 2 )
@@ -770,11 +770,11 @@ sub Get {
     elsif ( ( lc $hash->{CountryCode} ) eq 'search' ) {
         my $usage = "Unknown argument $cmd, choose one of SearchAreaID ";
 
-        return $usage if ( scalar( @{$a} ) != 1 );
+        return $usage if ( scalar( @{$aArg} ) != 1 );
 
-        if ( $cmd =~ m{\ASearchAreaID}xms ) { UWZSearchLatLon( $name, $a->[0] ); }
+        if ( $cmd =~ m{\ASearchAreaID}xms ) { UWZSearchLatLon( $name, $aArg->[0] ); }
         elsif ( $cmd =~ m{\AAreaID}xms ) {
-            my @splitparam = split( /,/, $a->[0] );
+            my @splitparam = split( /,/, $aArg->[0] );
             UWZSearchAreaID( $splitparam[0], $splitparam[1] );
         }
         else { return $usage; }
@@ -784,7 +784,7 @@ sub Get {
         my $usage =
 "Unknown argument $cmd, choose one of storm:noArg snow:noArg rain:noArg extremfrost:noArg forest-fire:noArg thunderstorms:noArg glaze:noArg heat:noArg glazed-rain:noArg soil-frost:noArg hail:noArg ";
 
-        return $usage if ( scalar( @{$a} ) != 0 );
+        return $usage if ( scalar( @{$aArg} ) != 0 );
 
         return
             $cmd =~ m{\Astorm}xms         ? GetCurrent( $hash, 2 )
