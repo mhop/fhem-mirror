@@ -1102,6 +1102,7 @@ sub Watches_station {
       <script>  
       
       var ct_$d;
+      var time;                                 
       
       // CSRF-Token auslesen
       var body = document.querySelector(\"body\");
@@ -1346,11 +1347,15 @@ sub Watches_station {
                   }
 
                   // aktueller Timestamp in Millisekunden 
-                  command     = '{ int(time*1000) }';
-                  url_$d      = makeCommand(command);
-                  \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
-                  var time    = new Date(ct_$d);
-                  // var time    = new Date();                       // alte Variante
+                  command = '{ int(time*1000) }';
+                  url_$d  = makeCommand(command);
+                  \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );  
+                  if (typeof ct_$d === 'undefined') {
+                      time = new Date();                                // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+                  } else {
+                      time = new Date(ct_$d);
+                  }
+                  // time = new Date();                                 // alte Variante
                   var millis  = time.getMilliseconds() / 1000.0;
                   var seconds = time.getSeconds();
                   var minutes = time.getMinutes();
@@ -1633,6 +1638,7 @@ sub Watches_modern {
       <script>
       
       var ct_$d;
+      var now_$d;
       
       // CSRF-Token auslesen
       var body = document.querySelector(\"body\");
@@ -1709,11 +1715,15 @@ sub Watches_modern {
 
       function drawTime_$d(ctx_$d, radius_$d){
           // aktueller Timestamp in Millisekunden 
-          command     = '{ int(time*1000) }';
-          url_$d      = makeCommand(command);
+          command = '{ int(time*1000) }';
+          url_$d  = makeCommand(command);
           \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
-          var now_$d  = new Date(ct_$d);
-          // var now_$d  = new Date();                    // alte Variante
+          if (typeof ct_$d === 'undefined') {
+              now_$d  = new Date();                   // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+          } else {
+              now_$d  = new Date(ct_$d);
+          }
+          // now_$d  = new Date();                    // alte Variante
           
           var hour_$d   = now_$d.getHours();
           var minute_$d = now_$d.getMinutes();
