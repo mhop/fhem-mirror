@@ -29,7 +29,7 @@ par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt_bridge_2"
 attr DEVICE icon ICON
 defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
-  (tele|cmnd)[/]([^/]+)[/].*:.* "$2"\
+  [:/](tele|stat)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
   (ESPClient_[^/]+)[/].*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
@@ -54,15 +54,24 @@ attr DEVCID model MQTT2_CLIENT_general_bridge
 ###############
 #MQTT2 IO ignoreRegexp
 #
+name:MQTT2_IO_ignoreRegexp_basic
+filter:TYPE=MQTT2_DEVICE
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: experimental first version...
+order:000002
+par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
+attr IODEVNAME irgnoreRegexp .*[:/]cmnd[/]([^/]+)[/].*:.*\
+  shellies/([^/]+)/command
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
+
 name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
 desc:experimental first version...
-order:000002
+order:000002a
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : $old =~ m,homeassistant/.*/config:.*, ? $old : $old.' \nhomeassistant/.*/config:.*'  }
-attr IODEVNAME NEWIGNOREREGEXP
+attr IODEVNAME irgnoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
-farewell:template has been applied successfully. Check further extending the brigeRegexp by yourself!
+farewell:template has been applied successfully. Check further extending the ignoreRegexp by yourself!
 
 ###########################################
 # zigbee2mqtt
@@ -2339,6 +2348,8 @@ attr DEVICE readingList BASEPATH/boiler_data { json2nameValue($EVENT,'',$JSONMAP
   BASEPATH/mixing_data:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   BASEPATH/tapwater_active:.* tapwater_active\
   BASEPATH/heating_active:.* heating_active
+attr DEVICE stateFormat { my $h=ReadingsNum($name,"heating_active",0); my $t=ReadingsNum($name,"tapwater_active",0); !$h && !$t ? "idle" : ($h && !$t ? "heating" : "tapwater")}
+attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red 
 attr DEVICE model ems-esp_boiler
 
 #ems-esp thermostat device
