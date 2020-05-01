@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 our %Watches_vNotesIntern = (
+  "0.8.0"  => "01.05.2020  new values 'countdownwatch' for attribute digitalDisplayPattern, switch all watches to server time ",
   "0.7.0"  => "30.04.2020  new set 'continue' for stopwatch ",
   "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings, add csrf token support ",
   "0.5.0"  => "28.04.2020  new values 'stopwatch', 'staticwatch' for attribute digitalDisplayPattern ",
@@ -53,7 +54,7 @@ sub Watches_Initialize {
   $hash->{SetFn}              = "Watches_Set";
   $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
-                                "digitalDisplayPattern:staticwatch,stopwatch,text,watch ".
+                                "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
                                 "digitalDisplayText ".
                                 "modernColorBackground:colorpicker ".
 								"modernColorHand:colorpicker ".
@@ -116,18 +117,43 @@ sub Watches_Set {                                                    ## no criti
   my $model = $hash->{MODEL};
   my $addp  = AttrVal($name,"digitalDisplayPattern","watch");
     
-  return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch/);
+  return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch|countdownwatch/);
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist   .= "time "                               if($addp =~ /staticwatch/);               
-  $setlist   .= "reset:noArg continue:noArg start:noArg stop:noArg"  if($addp =~ /stopwatch/);     
+  $setlist   .= "time "                                                          if($addp =~ /staticwatch/);               
+  $setlist   .= "reset:noArg continue:noArg start:noArg stop:noArg "             if($addp =~ /stopwatch/); 
+  $setlist   .= "countDownInit continue:noArg start:noArg stop:noArg "           if($addp =~ /countdownwatch/);    
 
   if ($opt =~ /\bstart\b/) {
+      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
+      
       my $ms = int(time*1000);
-      readingsSingleUpdate($hash, "starttime", $ms,        0);
-      readingsSingleUpdate($hash, "state",     "started",  1);
+      
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, "countDownDone", 0) if($addp =~ /countdownwatch/); 
+      ReadingsBulkUpdateValue ($hash, "starttime", $ms);
+      ReadingsBulkUpdateValue ($hash, "state", "started");
+      readingsEndUpdate       ($hash, 1);
+      
+  } elsif ($opt eq "countDownInit") {
+      $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
+      $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
+      $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
+      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+      
+      my $st = int(time*1000);                                             # Millisekunden ! 
+      my $ct = $prop*3600 + $prop1*60 + $prop2;                            # Sekunden !
+      
+      Watches_delread         ($name);
+      readingsBeginUpdate     ($hash);
+      ReadingsBulkUpdateValue ($hash, "countDownDone", 0);
+      ReadingsBulkUpdateValue ($hash, "countInitVal", $ct); 
+      ReadingsBulkUpdateValue ($hash, "state", "initialized");
+      readingsEndUpdate       ($hash, 1);
       
   } elsif ($opt eq "continue") {
+      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
+      
       if(!ReadingsVal($name, "starttime", "")) {
           my $ms = int(time*1000);
           readingsSingleUpdate($hash, "starttime", $ms, 0);      
@@ -143,13 +169,13 @@ sub Watches_Set {                                                    ## no criti
       readingsSingleUpdate($hash, "state", "initialized",  1);
       
   } elsif ($opt eq "time") {
-      return qq{The value(s) for "time" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
   
       readingsBeginUpdate         ($hash); 
       readingsBulkUpdateIfChanged ($hash, "hour",   $prop);
       readingsBulkUpdateIfChanged ($hash, "minute", $prop1);
       readingsBulkUpdate          ($hash, "second", $prop2);                    
-      readingsEndUpdate           ($hash,0);
+      readingsEndUpdate           ($hash, 1);
       
   } else {
       return "$setlist"; 
@@ -268,7 +294,7 @@ sub Watches_digital {
                     + ':' + ((minutes < 10) ? '0' : '') + minutes
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
-  } elsif($addp eq "stopwatch") {
+  } elsif($addp eq "stopwatch" || $addp eq "countdownwatch") {
       $ddp = "###:##:##";
       $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
@@ -313,7 +339,9 @@ sub Watches_digital {
 
     // Definition variables
     var state_$d;
-    var ms_$d;
+    var st_$d;
+    var ct_$d;
+    var ci_$d;
     var csrf;
     var url_$d;
     var devName_$d;
@@ -321,7 +349,7 @@ sub Watches_digital {
     var hours_$d;
     var minutes_$d;
     var seconds_$d;
-    var startDate_$d;      
+    var startDate_$d;    
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -886,49 +914,65 @@ sub Watches_digital {
     function makeCommand (cmd) {
         return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
     }
-
+    
+    // localStorage Set 
+    function localStoreSet (hours, minutes, seconds) {
+        localStorage.setItem('h_$d', hours);
+        localStorage.setItem('m_$d', minutes);
+        localStorage.setItem('s_$d', seconds);
+    }
+    
     animate_$d();
     
     function animate_$d() {
         var watchkind_$d = '$addp';
 
         if (watchkind_$d == 'watch') {
-            var time    = new Date();
+            // aktueller Timestamp in Millisekunden 
+            command   = '{ int(time*1000) }';
+            url_$d    = makeCommand(command);
+            \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
+            var time    = new Date(ct_$d);
             var hours   = time.getHours();
             var minutes = time.getMinutes();
             var seconds = time.getSeconds();            
         }
+        
         if (watchkind_$d == 'staticwatch') {
             var hours_$d   = '$h';
             var minutes_$d = '$m';
             var seconds_$d = '$s';
         }
+        
         if (watchkind_$d == 'stopwatch') {        
-            devName_$d = '$d';
-            selVal_$d  = 'state';            
-            command    = '{ReadingsVal(\"'+devName_$d+'\",\"'+selVal_$d+'\",\"\")}';
-            url_$d     = makeCommand(command);
+            devName_$d = '$d';   
+            
+            command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
+            url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {state_$d = data.replace(/\\n/g, ''); return state_$d;} );
             
-            
-            if (state_$d == 'started') {  
-                selVal_$d = 'starttime';            
-                command   = '{ReadingsNum(\"'+devName_$d+'\",\"'+selVal_$d+'\", 0)}';
+            if (state_$d == 'started') { 
+                // == Startzeit ==            
+                command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
                 url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ms_$d = parseInt(data); return ms_$d;} );
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); st_$d = parseInt(data); return st_$d;} );
                 
-                startDate_$d   = new Date(ms_$d);
-                endDate_$d     = new Date();
-                elapsesec_$d   = ((endDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
+                startDate_$d   = new Date(st_$d);
+                
+                // aktueller Timestamp in Millisekunden 
+                command   = '{ int(time*1000) }';
+                url_$d    = makeCommand(command);
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );                
+                
+                currDate_$d  = new Date(ct_$d);
+                
+                elapsesec_$d   = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 hours_$d       = parseInt(elapsesec_$d / 3600);
                 elapsesec_$d  -= hours_$d * 3600;
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = elapsesec_$d - minutes_$d * 60;
                 
-                localStorage.setItem('h_$d', hours_$d);
-                localStorage.setItem('m_$d', minutes_$d);
-                localStorage.setItem('s_$d', seconds_$d);
-                
+                localStoreSet (hours_$d, minutes_$d, seconds_$d);  
             }
             
             if (state_$d == 'stopped') {
@@ -941,20 +985,91 @@ sub Watches_digital {
                 hours_$d   = 0;
                 minutes_$d = 0;
                 seconds_$d = 0;
-                localStorage.setItem('h_$d', hours_$d);
-                localStorage.setItem('m_$d', minutes_$d);
-                localStorage.setItem('s_$d', seconds_$d);
+
+                localStoreSet (hours_$d, minutes_$d, seconds_$d); 
+            }
+        }
+        
+        if (watchkind_$d == 'countdownwatch') {        
+            devName_$d = '$d';           
+            
+            command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
+            url_$d  = makeCommand(command);
+            \$.get( url_$d, function (data) {state_$d = data.replace(/\\n/g, ''); return state_$d;} );
+            
+            if (state_$d == 'started') {  
+                // == Ermittlung Countdown Startwert ==         
+                command   = '{ReadingsNum(\"'+devName_$d+'\",\"countInitVal\", 0)}';
+                url_$d    = makeCommand(command);
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ci_$d = parseInt(data); return ci_$d;} );
+                countInitVal_$d = ci_$d;                        // Initialwert Countdown in Sekunden 
+                
+                // == Ermittlung vergangene Sekunden ==         
+                command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
+                url_$d    = makeCommand(command);
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); st_$d = parseInt(data); return st_$d;} );
+                startDate_$d = new Date(st_$d);
+                
+                // aktueller Timestamp in Millisekunden 
+                command   = '{ int(time*1000) }';
+                url_$d    = makeCommand(command);
+                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );
+     
+                currDate_$d  = new Date(ct_$d);
+                
+                elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden umrechnen
+                
+                // == Countdown errechnen ==
+                countcurr_$d = countInitVal_$d - elapsesec_$d;
+                if (countcurr_$d < 0) {
+                    countcurr_$d = 0;
+                }
+                //log(\"countcurr_$d: \"+countcurr_$d);
+                
+                hours_$d       = parseInt(countcurr_$d / 3600);
+                countcurr_$d  -= hours_$d * 3600;
+                minutes_$d     = parseInt(countcurr_$d / 60);
+                seconds_$d     = countcurr_$d - minutes_$d * 60;
+                
+                localStoreSet (hours_$d, minutes_$d, seconds_$d);
+                
+                if (hours_$d + minutes_$d + seconds_$d == 0) {                    
+                    Reading_$d  = 'countDownDone';
+                    command     = '{ CommandSetReading(undef, \"'+devName_$d+' countDownDone 1\") }';
+                    url_$d      = makeCommand(command);
+
+                        \$.get(url_$d, function (data) {
+                                          command = '{ CommandSetReading(undef, \"'+devName_$d+' state stopped\") }';
+                                          url_$d  = makeCommand(command);
+                                          \$.get(url_$d);
+                                       } 
+                              );
+                }
+            }
+            
+            if (state_$d == 'stopped') {
+                hours_$d   = localStorage.getItem('h_$d');
+                minutes_$d = localStorage.getItem('m_$d');
+                seconds_$d = localStorage.getItem('s_$d');
+            }
+
+            if (state_$d == 'initialized') {
+                hours_$d   = 0;
+                minutes_$d = 0;
+                seconds_$d = 0;
+                
+                localStoreSet (hours_$d, minutes_$d, seconds_$d); 
             }
         }
         
         var value = $ddt;
-        
+
         if(value == ' undefined:undefined:undefined' || value == ' NaN:NaN:NaN') {
            value = '   :  :  '; 
         }
         
         display_$d.setValue(value);
-        window.setTimeout('animate_$d()', 100);
+        window.setTimeout('animate_$d()', 200);
     }
 
     </script>
@@ -985,6 +1100,29 @@ sub Watches_station {
       </canvas>
       
       <script>  
+      
+      var ct_$d;
+      
+      // CSRF-Token auslesen
+      var body = document.querySelector(\"body\");
+      if( body != null ) {
+          csrf = body.getAttribute(\"fwcsrf\");
+      }
+ 
+      // get the base url
+      function getBaseUrl () {
+          var url = window.location.href.split(\"?\")[0];
+          url += \"?\";
+          if( csrf != null ) {
+              url += \"fwcsrf=\"+csrf+\"&\";
+          }
+          return url;
+      }
+
+      function makeCommand (cmd) {
+          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+      }
+      
       // clock body (Uhrgehäuse)
       StationClock_$d.NoBody         = 0;
       StationClock_$d.SmallWhiteBody = 1;
@@ -1040,7 +1178,7 @@ sub Watches_station {
 
       function StationClock_$d(clockId_$d) {
           this.clockId_$d = clockId_$d; 
-          this.radius  = 0;
+          this.radius     = 0;
 
           // hour offset
           this.hourOffset = 0;
@@ -1084,14 +1222,15 @@ sub Watches_station {
           // hand animation
           this.minuteHandAnimationStep = 0;
           this.secondHandAnimationStep = 0;
-          this.lastMinute = 0;
-          this.lastSecond = 0;
+          this.lastMinute              = 0;
+          this.lastSecond              = 0;
       };
 
       StationClock_$d.prototype.draw = function() {
           var clock_$d = document.getElementById(this.clockId_$d);
+          
           if (clock_$d) {
-          var context = clock_$d.getContext('2d');
+              var context = clock_$d.getContext('2d');
               if (context) {
                   this.radius = 0.75 * (Math.min(clock_$d.width, clock_$d.height) / 2);
           
@@ -1164,50 +1303,54 @@ sub Watches_station {
                       context.save();
                       context.rotate(i * Math.PI / 30);
                       switch (this.dial) {
-                        case StationClock_$d.SwissStrokeDial:
-                        if ((i % 5) == 0) {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.75, 0.07);
-                        } else {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.92, 0.026);
-                        }
-                        break;
-                        case StationClock_$d.AustriaStrokeDial:
-                        if ((i % 5) == 0) {
-                            this.fillPolygon(context, this.dialColor, -0.04, -1.0, 0.04, -1.0, 0.03, -0.78, -0.03, -0.78);
-                        } else {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.94, 0.02);
-                        }
-                        break;
-                        case StationClock_$d.GermanStrokeDial:
-                        if ((i % 15) == 0) {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.70, 0.08);
-                        } else if ((i % 5) == 0) {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.76, 0.08);
-                        } else {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.92, 0.036);
-                        }
-                        break;
-                        case StationClock_$d.GermanHourStrokeDial:
-                        if ((i % 15) == 0) {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.70, 0.10);
-                        } else if ((i % 5) == 0) {
-                            this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.74, 0.08);
-                        }
-                        break;
-                        case StationClock_$d.ViennaStrokeDial:
-                        if ((i % 15) == 0) {
-                            this.fillPolygon(context, this.dialColor, 0.7,-0.1, 0.6,0, 0.7,0.1,  1,0.03,  1,-0.03);
-                        } else if ((i % 5) == 0) {
-                            this.fillPolygon(context, this.dialColor, 0.85,-0.06, 0.78,0, 0.85,0.06,  1,0.03,  1,-0.03);
-                        }
-                        this.fillCircle(context, this.dialColor, 0.0, -1.0, 0.03);
-                        break;
-                    }
-                    context.restore();
+                          case StationClock_$d.SwissStrokeDial:
+                          if ((i % 5) == 0) {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.75, 0.07);
+                          } else {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.92, 0.026);
+                          }
+                          break;
+                          case StationClock_$d.AustriaStrokeDial:
+                          if ((i % 5) == 0) {
+                              this.fillPolygon(context, this.dialColor, -0.04, -1.0, 0.04, -1.0, 0.03, -0.78, -0.03, -0.78);
+                          } else {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.94, 0.02);
+                          }
+                          break;
+                          case StationClock_$d.GermanStrokeDial:
+                          if ((i % 15) == 0) {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.70, 0.08);
+                          } else if ((i % 5) == 0) {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.76, 0.08);
+                          } else {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.92, 0.036);
+                          }
+                          break;
+                          case StationClock_$d.GermanHourStrokeDial:
+                          if ((i % 15) == 0) {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.70, 0.10);
+                          } else if ((i % 5) == 0) {
+                              this.strokeLine(context, this.dialColor, 0.0, -1.0, 0.0, -0.74, 0.08);
+                          }
+                          break;
+                          case StationClock_$d.ViennaStrokeDial:
+                          if ((i % 15) == 0) {
+                              this.fillPolygon(context, this.dialColor, 0.7,-0.1, 0.6,0, 0.7,0.1,  1,0.03,  1,-0.03);
+                          } else if ((i % 5) == 0) {
+                              this.fillPolygon(context, this.dialColor, 0.85,-0.06, 0.78,0, 0.85,0.06,  1,0.03,  1,-0.03);
+                          }
+                          this.fillCircle(context, this.dialColor, 0.0, -1.0, 0.03);
+                          break;
+                      }
+                      context.restore();
                   }
 
-                  // get current time
-                  var time    = new Date();
+                  // aktueller Timestamp in Millisekunden 
+                  command     = '{ int(time*1000) }';
+                  url_$d      = makeCommand(command);
+                  \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
+                  var time    = new Date(ct_$d);
+                  // var time    = new Date();                       // alte Variante
                   var millis  = time.getMilliseconds() / 1000.0;
                   var seconds = time.getSeconds();
                   var minutes = time.getMinutes();
@@ -1443,19 +1586,20 @@ sub Watches_station {
           context.stroke();
       };
         
-      var clock_$d = new StationClock_$d('clock_$d');
-      clock_$d.body = StationClock_$d.$sbody;
-      clock_$d.dial = StationClock_$d.$ssd;
-      clock_$d.hourHand = StationClock_$d.$shh;
-      clock_$d.minuteHand = StationClock_$d.$smh;
-      clock_$d.secondHand = StationClock_$d.$ssh;
-      clock_$d.boss = StationClock_$d.$sb;
+      var clock_$d                = new StationClock_$d('clock_$d');
+      clock_$d.body               = StationClock_$d.$sbody;
+      clock_$d.dial               = StationClock_$d.$ssd;
+      clock_$d.hourHand           = StationClock_$d.$shh;
+      clock_$d.minuteHand         = StationClock_$d.$smh;
+      clock_$d.secondHand         = StationClock_$d.$ssh;
+      clock_$d.boss               = StationClock_$d.$sb;
       clock_$d.minuteHandBehavoir = StationClock_$d.$mhb;
       clock_$d.secondHandBehavoir = StationClock_$d.$shb;
 
       function animate(clock_$d) {
           clock_$d.draw();
-          window.setTimeout(function(){animate(clock_$d)}, 50);
+          // window.setTimeout(function(){animate(clock_$d)}, 50);     // alte Variante
+          window.setTimeout(function(){animate(clock_$d)}, 100);
       }
 
       animate(clock_$d);   
@@ -1487,17 +1631,42 @@ sub Watches_modern {
       </canvas>
 
       <script>
+      
+      var ct_$d;
+      
+      // CSRF-Token auslesen
+      var body = document.querySelector(\"body\");
+      if( body != null ) {
+          csrf = body.getAttribute(\"fwcsrf\");
+      }
+ 
+      // get the base url
+      function getBaseUrl () {
+          var url = window.location.href.split(\"?\")[0];
+          url += \"?\";
+          if( csrf != null ) {
+              url += \"fwcsrf=\"+csrf+\"&\";
+          }
+          return url;
+      }
+
+      function makeCommand (cmd) {
+          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+      }      
+      
       var canvas_$d = document.getElementById('canvas_$d');
-      var ctx_$d = canvas_$d.getContext('2d');
+      var ctx_$d    = canvas_$d.getContext('2d');
       var radius_$d = canvas_$d.height / 2;
+      
       ctx_$d.translate(radius_$d, radius_$d);
       radius_$d = radius_$d * 0.90
-      setInterval(drawClock_$d, 1000);
+      // setInterval(drawClock_$d, 1000);                // alte Variante
+      setInterval(drawClock_$d, 100);
 
       function drawClock_$d() {
-          drawFace_$d(ctx_$d, radius_$d);
-          drawnumbers_$d(ctx_$d, radius_$d);
-          drawTime_$d(ctx_$d, radius_$d);
+          drawFace_$d    (ctx_$d, radius_$d);
+          drawnumbers_$d (ctx_$d, radius_$d);
+          drawTime_$d    (ctx_$d, radius_$d);
       }
 
       function drawFace_$d(ctx_$d, radius_$d) {
@@ -1522,9 +1691,10 @@ sub Watches_modern {
       function drawnumbers_$d(ctx_$d, radius_$d) {
           var ang_$d;
           var num_$d;
-          ctx_$d.font = radius_$d*0.15 + 'px arial';
-          ctx_$d.textBaseline='middle';
-          ctx_$d.textAlign='center';
+          ctx_$d.font         = radius_$d*0.15 + 'px arial';
+          ctx_$d.textBaseline ='middle';
+          ctx_$d.textAlign    ='center';
+          
           for(num_$d = 1; num_$d < 13; num_$d++){
               ang_$d = num_$d * Math.PI / 6;
               ctx_$d.rotate(ang_$d);
@@ -1538,28 +1708,37 @@ sub Watches_modern {
       }
 
       function drawTime_$d(ctx_$d, radius_$d){
-          var now_$d = new Date();
-          var hour_$d = now_$d.getHours();
+          // aktueller Timestamp in Millisekunden 
+          command     = '{ int(time*1000) }';
+          url_$d      = makeCommand(command);
+          \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
+          var now_$d  = new Date(ct_$d);
+          // var now_$d  = new Date();                    // alte Variante
+          
+          var hour_$d   = now_$d.getHours();
           var minute_$d = now_$d.getMinutes();
           var second_$d = now_$d.getSeconds();
+          
           //hour_$d
-          hour_$d=hour_$d%12;
-          hour_$d=(hour_$d*Math.PI/6)+
-          (minute_$d*Math.PI/(6*60))+
-          (second_$d*Math.PI/(360*60));
+          hour_$d = hour_$d%12;
+          hour_$d = (hour_$d*Math.PI/6)+
+                    (minute_$d*Math.PI/(6*60))+
+                    (second_$d*Math.PI/(360*60));
           drawHand_$d(ctx_$d, hour_$d, radius_$d*0.5, radius_$d*0.07);
+          
           //minute_$d
-          minute_$d=(minute_$d*Math.PI/30)+(second_$d*Math.PI/(30*60));
+          minute_$d = (minute_$d*Math.PI/30)+(second_$d*Math.PI/(30*60));
           drawHand_$d(ctx_$d, minute_$d, radius_$d*0.8, radius_$d*0.07);
+          
           // second_$d
-          second_$d=(second_$d*Math.PI/30);
+          second_$d = (second_$d*Math.PI/30);
           drawHand_$d(ctx_$d, second_$d, radius_$d*0.9, radius_$d*0.02);
       }
 
       function drawHand_$d(ctx_$d, pos, length, width) {
           ctx_$d.beginPath();
-          ctx_$d.lineWidth = width;
-          ctx_$d.lineCap = 'round';
+          ctx_$d.lineWidth  = width;
+          ctx_$d.lineCap    = 'round';
           ctx_$d.moveTo(0,0);
           ctx_$d.rotate(pos);
           ctx_$d.lineTo(0, -length);
@@ -1876,7 +2055,7 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
      <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design </td></tr>
      <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr, Stoppuhr, statische Zeitanzeige oder Text) </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr, (CountDown)Stoppuhr, statische Zeitanzeige oder Text) </td></tr>
   </table>
   <br>
   <br>
@@ -1898,10 +2077,10 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     
     <a name="continue"></a>
     <li><b>continue</b><br>
-      Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" verstrichenen Zeit fort.
-      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei 00:00:00. <br>
+      Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" abgelaufenen Zeit fort.
+      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei "00:00:00" (stopwatch) bzw. "countInitVal" (countdownwatch). <br>
       Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden.
     </li>
     <br>
     
@@ -1909,15 +2088,14 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     <li><b>start</b><br>
       Startet die Stoppuhr. <br>
       Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden.
     </li>
     <br>  
     
     <a name="stop"></a>
     <li><b>stop</b><br>
       Stoppt die Stoppuhr. Die erreichte Zeit bleibt erhalten. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei einer | countdownwatch</b> vorhanden.
     </li>
     <br>
     
@@ -2086,16 +2264,17 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     <br>  
   
     <a name="digitalDisplayPattern"></a>
-    <li><b>digitalDisplayPattern [staticwatch | stopwatch | text | watch]</b><br>
+    <li><b>digitalDisplayPattern [countdownwatch | staticwatch | stopwatch | text | watch]</b><br>
       Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
       Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
     <ul>
 	<table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> <b>staticwatch</b> </td><td>: statische Zeitanzeige              </td></tr>
-       <tr><td> <b>stopwatch</b>   </td><td>: Stoppuhr                           </td></tr>
-       <tr><td> <b>text</b>        </td><td>: Anzeige eines definierbaren Textes </td></tr>
-       <tr><td> <b>watch</b>       </td><td>: Uhr                                </td></tr>
+       <tr><td> <b>countdownwatch </b> </td><td>: CountDown Stoppuhr                 </td></tr>
+       <tr><td> <b>staticwatch</b>     </td><td>: statische Zeitanzeige              </td></tr>
+       <tr><td> <b>stopwatch</b>       </td><td>: Stoppuhr                           </td></tr>
+       <tr><td> <b>text</b>            </td><td>: Anzeige eines definierbaren Textes </td></tr>
+       <tr><td> <b>watch</b>           </td><td>: Uhr                                </td></tr>
     </table>
 	</ul>
     <br>
