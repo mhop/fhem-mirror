@@ -63,6 +63,8 @@ use POSIX;
 use FHEM::Meta;
 use Time::Local;
 
+use Data::Dumper;    # only for debugging
+
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
 eval {
@@ -296,9 +298,8 @@ sub Set {
     elsif ( lc $cmd eq 'startpoint' ) {
         my $err;
 
-        ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, @$aArg );
+        ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, $aArg );
         return $err if ( defined($err) );
-
     }
     ### electronic_pressure_pump
     elsif ( lc $cmd eq 'pumptimer' ) {
@@ -831,10 +832,10 @@ sub Zulu2LocalString {
 }
 
 sub SetPredefinedStartPoints {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash                                                = shift;
+    my $aArg                                                = shift;
 
-    my ( $startpoint_state, $startpoint_num, @morestartpoints ) = @$a;
+    my ($startpoint_state,$startpoint_num,@morestartpoints) = @{$aArg};
 
     my $name = $hash->{NAME};
     my $payload;
