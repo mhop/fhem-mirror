@@ -187,19 +187,19 @@ sub Initialize {
 }
 
 sub Define {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return
       "too few parameters: define <NAME> GardenaSmartDevice <device_Id> <model>"
-      if ( scalar( @{$a} ) < 3 );
+      if ( scalar( @{$aArg} ) < 3 );
 
-    my $name     = $a->[0];
-    my $deviceId = $a->[2];
-    my $category = $a->[3];
+    my $name     = $aArg->[0];
+    my $deviceId = $aArg->[2];
+    my $category = $aArg->[3];
 
     $hash->{DEVICEID}                = $deviceId;
     $hash->{VERSION}                 = version->parse($VERSION)->normal;
@@ -267,11 +267,11 @@ sub Attr {
 }
 
 sub Set {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
+    my $name = shift @$aArg;
+    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
 
     my $payload;
     my $abilities = '';
@@ -290,13 +290,13 @@ sub Set {
     }
     elsif ( lc $cmd eq 'startoverridetimer' ) {
         $payload = '"name":"start_override_timer","parameters":{"duration":'
-          . $a->[0] * 60 . '}';
+          . $aArg->[0] * 60 . '}';
 
     }
     elsif ( lc $cmd eq 'startpoint' ) {
         my $err;
 
-        ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, @$a );
+        ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, @$aArg );
         return $err if ( defined($err) );
 
     }
@@ -304,14 +304,14 @@ sub Set {
     elsif ( lc $cmd eq 'pumptimer' ) {
         $payload =
           '"name":"pump_manual_watering_timer","parameters":{"duration":'
-          . $a->[0] . '}';
+          . $aArg->[0] . '}';
     }
     ### watering_computer
     elsif ( lc $cmd eq 'manualoverride' ) {
         $payload =
             '"properties":{"name":"watering_timer_1'
           . '","value":{"state":"manual","duration":'
-          . $a->[0] * 60
+          . $aArg->[0] * 60
           . ',"valve_id":1}}';
     }
     elsif ( $cmd =~ m{\AcancelOverride}xms ) {
@@ -332,8 +332,8 @@ sub Set {
     }
     elsif ( lc $cmd eq 'on' || lc $cmd eq 'off' || lc $cmd eq 'on-for-timer' ) {
         my $val = (
-            defined($a) && ref($a) eq 'ARRAY'
-            ? $a->[0] * 60
+            defined($aArg) && ref($aArg) eq 'ARRAY'
+            ? $aArg->[0] * 60
             : lc $cmd
         );
 
@@ -351,14 +351,14 @@ sub Set {
             '"properties":{"name":"watering_timer_'
           . $valve_id
           . '","value":{"state":"manual","duration":'
-          . $a->[0] * 60
+          . $aArg->[0] * 60
           . ',"valve_id":'
           . $valve_id . '}}';
     }
     ### Sensors
     elsif ( lc $cmd eq 'refresh' ) {
 
-        my $sensname = $a->[0];
+        my $sensname = $aArg->[0];
         if ( lc $sensname eq 'temperature' ) {
             $payload   = '"name":"measure_ambient_temperature"';
             $abilities = 'ambient_temperature';
@@ -1212,7 +1212,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.2",
+  "version": "v2.0.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

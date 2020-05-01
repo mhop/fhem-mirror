@@ -215,21 +215,21 @@ sub Initialize {
 }
 
 sub Define {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'too few parameters: define <NAME> GardenaSmartBridge'
-      if ( scalar( @{$a} ) != 2 );
+      if ( scalar( @{$aArg} ) != 2 );
     return
         'Cannot define Gardena Bridge device. Perl modul '
       . ${missingModul}
       . ' is missing.'
       if ($missingModul);
 
-    my $name = shift @$a;
+    my $name = shift @$aArg;
     $hash->{BRIDGE} = 1;
     $hash->{URL} =
       AttrVal( $name, 'gardenaBaseURL',
@@ -329,8 +329,8 @@ sub Attr {
 }
 
 sub Notify {
-    my $hash = shift;
-    my $dev  = shift;
+    my $hash = shift // return;
+    my $dev  = shift // return;
 
     my $name = $hash->{NAME};
     return if ( IsDisabled($name) );
@@ -396,11 +396,13 @@ sub Notify {
 }
 
 sub Set {
-    my $hash = shift;
-    my $a    = shift;
+    my $hash = shift // return;
+    my $aArg = shift // return;
 
-    my $name = shift @$a;
-    my $cmd  = shift @$a // return qq{"set $name" needs at least one argument};
+    my $name = shift @$aArg // return;
+    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
+    
+#     Das Argument für das Passwort, also das Passwort an sich darf keine = enthalten!!!
 
     if ( lc $cmd eq 'getdevicesstate' ) {
         getDevices($hash);
@@ -419,12 +421,12 @@ sub Set {
     elsif ( lc $cmd eq 'gardenaaccountpassword' ) {
         return "please set Attribut gardenaAccountEmail first"
           if ( AttrVal( $name, 'gardenaAccountEmail', 'none' ) eq 'none' );
-        return "usage: $cmd <password>" if ( scalar( @{$a} ) != 1 );
+        return "usage: $cmd <password>" if ( scalar( @{$aArg} ) != 1 );
 
-        StorePassword( $hash, $name, $a->[0] );
+        StorePassword( $hash, $name, $aArg->[0] );
     }
     elsif ( lc $cmd eq 'deleteaccountpassword' ) {
-        return "usage: $cmd" if ( scalar( @{$a} ) != 0 );
+        return "usage: $cmd" if ( scalar( @{$aArg} ) != 0 );
 
         DeletePassword($hash);
     }
@@ -1375,7 +1377,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.1",
+  "version": "v2.0.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
