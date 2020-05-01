@@ -1759,274 +1759,12 @@ sub Watches_modern {
 =item summary    create a watch in modern, station or digital style
 =item summary_DE erstellt eine Uhr: Modern, Bahnhofsuhr oder Digital
 
-
 =begin html
 
 <a name="Watches"></a>
 <h3>Watches</h3>
 
-<br>
-Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitalanzeige als Device zur Verfügung. <br>
-Die Uhren basieren auf Skripten dieser Seiten: <br>
-<a href='https://www.w3schools.com/graphics/canvas_clock_start.asp'>moderne Uhr</a>, 
-<a href='http://www.3quarks.com/de/Bahnhofsuhr/'>Bahnhofsuhr</a>, 
-<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
-<br>
-<br>
-
-<ul>
-  <a name="WatchesDefine"></a>
-  <b>Define</b>
-  
-  <ul>
-    define &lt;name&gt; Watches [Modern | Station | Digital]  
-    <br><br>
-    
-  <table>  
-     <colgroup> <col width=5%> <col width=95%> </colgroup>
-     <tr><td> <b>Modern</b>     </td><td>: erstellt eine analoge Uhr im modernen Design </td></tr>
-     <tr><td> <b>Station</b>    </td><td>: erstellt eine Bahnhofsuhr </td></tr>
-     <tr><td> <b>Digital</b>    </td><td>: erstellt eine Digitalanzeige (Uhr, Stoppuhr, statische Zeitanzeige oder Text) </td></tr>
-  </table>
-  <br>
-  <br>
-  </ul>
-
-  <a name="WatchesSet"></a>
-  <b>Set</b> 
-  
-  <ul>
-  <ul>
-  
-    <a name="reset"></a>
-    <li><b>reset</b><br>
-      Stoppt die Stoppuhr (falls sie läuft) und setzt die Zeit auf 00:00:00 zurück. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
-    </li>
-    <br>
-  
-    <a name="continue"></a>
-    <li><b>continue</b><br>
-      Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" verstrichenen Zeit fort. 
-      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei 00:00:00. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
-    </li>
-    <br>
-    
-    <a name="start"></a>
-    <li><b>start</b><br>
-      Startet die Stoppuhr. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
-    </li>
-    <br>  
-    
-    <a name="stop"></a>
-    <li><b>stop</b><br>
-      Stoppt die Stoppuhr. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch</b> vorhanden.
-    </li>
-    <br>
-    
-    <a name="time"></a>
-    <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Setzt eine statische Zeitanzeige mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = staticwatch</b> vorhanden. <br><br>
-      
-      <ul>
-      <b>Beispiel</b> <br>
-      set &lt;name&gt; time 8 15 3
-      </ul>
-      
-    </li>
-    <br>
-  
-  </ul>
-  </ul>
-  <br>
-
-  <a name="WatchesGet"></a>
-  <b>Get</b> <ul>N/A</ul><br>
-
-  <a name="WatchesAttr"></a>
-  <b>Attribute</b>
-  <br><br>
-  
-  <ul>
-  <ul>
-  
-    <a name="disable"></a>
-    <li><b>disable</b><br>
-      Aktiviert/deaktiviert das Device.
-    </li>
-    <br>
-    
-    <a name="hideDisplayName"></a>
-    <li><b>hideDisplayName</b><br>
-      Verbirgt den Device/Alias-Namen (Link zur Detailansicht).    
-    </li>
-    <br>
-    
-    <a name="htmlattr"></a>
-    <li><b>htmlattr</b><br>
-      Zusätzliche HTML Tags zur Größenänderung de Uhr. <br><br>
-      <ul>
-        <b>Beispiel: </b><br>
-        attr &lt;name&gt; htmlattr width="125" height="125" <br>
-      </ul>
-    </li>
-    <br>
-  </ul>  
-    
-  Die nachfolgenden Attribute sind spezifisch für einen Uhrentyp zu setzen. <br>
-  <br>
-   
-  <b>Model: Modern</b>  <br><br>
-  
-  <ul>
-    <a name="modernColorBackground"></a>
-    <li><b>modernColorBackground</b><br>
-      Hintergrundfarbe der Uhr.    
-    </li>
-    <br>
-    
-    <a name="modernColorFace"></a>
-    <li><b>modernColorFace</b><br>
-      Einfärbung des Ziffernblattes.    
-    </li>
-    <br>
-    
-    <a name="modernColorFigure"></a>
-    <li><b>modernColorFigure</b><br>
-      Farbe der Ziffern im Ziffernblatt und der Zeigerachsabdeckung.    
-    </li>
-    <br>
-    
-    <a name="modernColorHand"></a>
-    <li><b>modernColorHand</b><br>
-      Farbe der UhrenZeiger.    
-    </li>
-    <br>
-    
-    <a name="modernColorRing"></a>
-    <li><b>modernColorRing</b><br>
-      Farbe des Ziffernblattrahmens.    
-    </li>
-    <br>
-    
-    <a name="modernColorRingEdge"></a>
-    <li><b>modernColorRingEdge</b><br>
-      Farbe des Außenringes vom Ziffernblattrahmen.    
-    </li>
-    <br>
-  </ul>
-  <br>
-  
-  <b>Model: Station</b>  <br><br>
-  
-  <ul>
-    <a name="stationBody"></a>
-    <li><b>stationBody</b><br>
-      Art des Uhrengehäuses.    
-    </li>
-    <br>
-    
-    <a name="stationBoss"></a>
-    <li><b>stationBoss</b><br>
-      Art und Farbe der Zeigerachsabdeckung.    
-    </li>
-    <br>
-
-    <a name="stationHourHand"></a>
-    <li><b>stationHourHand</b><br>
-      Art des Stundenzeigers.    
-    </li>
-    <br>    
-    
-    <a name="stationMinuteHand"></a>
-    <li><b>stationMinuteHand</b><br>
-      Art des Minutenzeigers.    
-    </li>
-    <br> 
-
-    <a name="stationMinuteHandBehavoir"></a>
-    <li><b>stationMinuteHandBehavoir</b><br>
-      Verhalten des Minutenzeigers.    
-    </li>
-    <br>   
-
-    <a name="stationSecondHand"></a>
-    <li><b>stationSecondHand</b><br>
-      Art des Sekundenzeigers.    
-    </li>
-    <br>  
-
-    <a name="stationSecondHandBehavoir"></a>
-    <li><b>stationSecondHandBehavoir</b><br>
-      Verhalten des Sekundenzeigers.    
-    </li>
-    <br>  
-
-    <a name="stationStrokeDial"></a>
-    <li><b>stationStrokeDial</b><br>
-      Auswahl des Ziffernblattes.    
-    </li>
-    <br>      
-    
-  </ul>
-  <br>
-  
-  <b>Model: Digital</b>  <br><br>
-  
-  <ul>
-    <a name="digitalColorBackground"></a>
-    <li><b>digitalColorBackground</b><br>
-      Digitaluhr Hintergrundfarbe.    
-    </li>
-    <br>  
-
-    <a name="digitalColorDigits"></a>
-    <li><b>digitalColorDigits</b><br>
-      Farbe der Balkenanzeige in einer Digitaluhr.    
-    </li>
-    <br>  
-  
-    <a name="digitalDisplayPattern"></a>
-    <li><b>digitalDisplayPattern [staticwatch | stopwatch | text | watch]</b><br>
-      Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
-      Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
-    <ul>
-	<table>  
-       <colgroup> <col width=5%> <col width=95%> </colgroup>
-       <tr><td> <b>staticwatch</b> </td><td>: statische Zeitanzeige              </td></tr>
-       <tr><td> <b>stopwatch</b>   </td><td>: Stoppuhr                           </td></tr>
-       <tr><td> <b>text</b>        </td><td>: Anzeige eines definierbaren Textes </td></tr>
-       <tr><td> <b>watch</b>       </td><td>: Uhr                                </td></tr>
-    </table>
-	</ul>
-    <br>
-    <br>
-    </li>
-	
-    <a name="digitalDisplayText"></a>
-    <li><b>digitalDisplayText</b><br>
-      Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
-	  anzuzeigende Text eingestellt werden. Per Default ist "Play" eingestellt. <br>
-	  Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
-	  A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
-	  So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
-    </li>
-    <br> 
-	
-  </ul>
-  
-  </ul>
-  
-</ul>
+At the moment only a german commandref is available.
 
 =end html
 =begin html_DE
@@ -2084,6 +1822,20 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     </li>
     <br>
     
+    <a name="countDownInit"></a>
+    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Setzt die Sterzeit einer CountDown-Stoppuhr mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
+      <b>digitalDisplayPattern = countdownwatch</b> vorhanden. <br><br>
+      
+      <ul>
+      <b>Beispiel</b> <br>
+      set &lt;name&gt; countDownInit 0 30 10
+      </ul>
+      
+    </li>
+    <br>
+    
     <a name="start"></a>
     <li><b>start</b><br>
       Startet die Stoppuhr. <br>
@@ -2095,7 +1847,7 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
     <a name="stop"></a>
     <li><b>stop</b><br>
       Stoppt die Stoppuhr. Die erreichte Zeit bleibt erhalten. <br>
-      Dieses Set-Kommando ist nur bei einer | countdownwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei einer <b>stopwatch | countdownwatch</b> vorhanden.
     </li>
     <br>
     
