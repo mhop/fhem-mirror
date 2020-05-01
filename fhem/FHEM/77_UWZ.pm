@@ -49,7 +49,9 @@ use warnings;
 use POSIX;
 use GPUtils qw(GP_Import GP_Export);
 use FHEM::Meta;
-use Data::Dumper;    # Debug only
+use Encode qw(encode_utf8);
+
+# use Data::Dumper;    # Debug only
 
 no
   if $] >= 5.017011,
@@ -896,12 +898,12 @@ sub JSONAcquire {
         my $err_log = "Can't get $URL -- " . $err;
         readingsSingleUpdate( $hash, 'lastConnection', $err, 1 );
         Log $hash, 1, 'Error: ' . $err_log;
-        return main::encode_utf8( '{"Error": "' . $err . '"}' );
+        return encode_utf8( '{"Error": "' . $err . '"}' );
     }
 
     Log $hash, 4,
-      length($data) . ' characters captured:  ' . main::encode_utf8($data);
-    return main::encode_utf8($data);
+      length($data) . ' characters captured:  ' . encode_utf8($data);
+    return encode_utf8($data);
 }
 
 #####################################
@@ -1158,8 +1160,6 @@ sub Run {
 
     if ( !exists $uwz_warnings->{Error} ) {
         my $enc = guess_encoding($uwz_warnings);
-
-        Log $hash, 2, 'DEBUG!!! Response: ' . $uwz_warnings;
 
         $uwz_warncount = scalar( @{ $uwz_warnings->{'results'} } );
         Log $hash, 4, 'There are ' . $uwz_warncount . ' warnings active';
@@ -3375,7 +3375,7 @@ sub UWZSearchAreaID {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.0.0",
+  "version": "v3.0.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
