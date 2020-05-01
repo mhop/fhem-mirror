@@ -246,7 +246,7 @@ sub _cfgDB_readConfig() {
 		Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 		return 0;
 	}
-	my @config=<$conf>;
+	@config=<$conf>;
 	close($conf);
 
 	use vars qw(%configDB);
