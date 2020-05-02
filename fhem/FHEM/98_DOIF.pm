@@ -102,7 +102,7 @@ sub DOIF_Initialize($)
   $hash->{FW_deviceOverview} = 1;
   $hash->{FW_addDetailToSummary} = 1;
   $hash->{FW_detailFn} = "DOIF_detailFn";
-  $hash->{FW_summaryFn}  = "DOIF_summaryFn";
+  #hash->{FW_summaryFn}  = "DOIF_summaryFn";
   #$hash->{FW_atPageEnd} = 1;
 
   $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
@@ -4098,6 +4098,14 @@ sub temp_bar {
   return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,1));
 } 
 
+sub hum_bar {
+  my ($value,$header,$width,$height,$size) = @_;
+  
+  $width=60 if (!defined $width);
+  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,0));
+} 
+
+
 sub  polarToCartesian {
   my ($centerX,$centerY,$radius,$angleInDegrees)=@_;
   my $angleInRadians = ($angleInDegrees-230) * ::pi() / 180.0;
@@ -4151,6 +4159,17 @@ sub temp_hum_ring {
   $size=90 if (!defined $size);
   return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,0,100,0,0,"%",\&hum_hue,0));
 } 
+
+sub temp_temp_ring {
+  my ($value,$value2,$min,$max,$size) = @_;
+  $min=-20 if (!defined $min);
+  $max=60  if (!defined $max);
+  $size=90 if (!defined $size);
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,1));
+} 
+
+
+
 
 sub ring
 {
@@ -4374,7 +4393,7 @@ sub y_h
   }
   
   my $prop=$value/($max-$min);
-  my $h=abs($prop*($height))+4;
+  my $h=int(abs($prop*($height))+4.5);
   my $y;
   my $null;
  
@@ -4382,7 +4401,7 @@ sub y_h
   if ($value <= 0) {
     $y=$null;
   } else {
-    $y=$null+4.9-$h;
+    $y=int($null+4.5-$h);
   }
   $null=undef if ($max == 0 or $min == 0);
   return ($y,$h,$null);
@@ -4456,7 +4475,9 @@ sub cylinder
   $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',$null+6,0) if (defined $null);
   $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',8,$max);  
 
+  my $yBegin=14+($height-@values*12)/2;
   for (my $i=0;$i<@values;$i+=3){
+    my $yValue=$yBegin+12;
     my $value=$values[$i];
     my $color=$values[$i+1];
     my $text=$values[$i+2];
@@ -4465,8 +4486,11 @@ sub cylinder
     $out.= sprintf('<rect x="15" y="%d" width="%d" height="%d" rx="20" ry="2" fill="url(#grad1_%d)"/>',$y,$width,$val1,$color);
   #  $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="url(#grad2_%d)"/>',$y,$width,$color);
     $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="rgb(137, 137, 137)" stroke-width="0.5"/>',$y,$width);
-    $out.= sprintf('<text x="60" y="%d" style="fill:%s; font-size:12px">%s</text>',20+$i*12,color($color),$text.":") if ($text ne "");
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:16px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, 39+$i*12,color ($color),sprintf($format,$value),$unit);
+    if (defined $text and $text ne "") {
+      $out.= sprintf('<text x="60" y="%d" style="fill:%s; font-size:12px">%s</text>',$yBegin+$i*12,color($color),$text.":");
+      $yValue+=7;
+    }
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:16px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*12,color ($color),sprintf($format,$value),$unit);
   }  
 
   $out.= sprintf('<rect x="15" y="0"  width="%d" height="4" rx="20" ry="2" fill="none" stroke="rgb(137, 137, 137)" stroke-width="0.5"/>',$width);
