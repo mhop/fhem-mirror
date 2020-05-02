@@ -29,7 +29,6 @@ package main;
 use strict;
 use warnings;
 use AttrTemplate;
-use MIME::Base64;
 use Date::Parse;
 
 my %device_types = (
@@ -185,6 +184,28 @@ sub MAX_Define
 
   return $type." is not a valid MAX type !" if (!MAX_TypeToTypeId($type) && ($type ne 'Cube'));
 
+
+    my $old_addr = '';
+
+    # check if we have this address already in use
+    foreach my $dev ( keys %{$modules{MAX}{defptr}} ) {
+	next if (!$modules{MAX}{defptr}{$dev}->{NAME});
+	$old_addr = $dev if  ($modules{MAX}{defptr}{$dev}->{NAME} eq $name);
+	last if ($old_addr); # device found
+    }
+
+    if (($old_addr ne '') && ($old_addr ne $addr)){
+	my $msg1 = 'please dont change the address direct in DEF or RAW !';
+        my $msg2 = "If you want to change $old_addr please delete device $name first and create a new one";
+	Log3($hash, 3, "$name, $msg1 $msg2");
+	return $msg1."\n".$msg2;
+    }
+
+    if (exists($modules{MAX}{defptr}{$addr}) && $modules{MAX}{defptr}{$addr}->{type} ne $type) {
+	my $msg = "$name, type changed from $modules{MAX}{defptr}{$addr}->{type} to $type !";
+	Log3($hash, 2, $msg);
+    }
+
   Log3 $hash, 5, 'Max_define, '.$name.' '.$type.' with addr '.$addr;
   $hash->{type}                = $type;
   $hash->{devtype}             = MAX_TypeToTypeId($type);
@@ -194,6 +215,7 @@ sub MAX_Define
   $hash->{'.sendToAddr'}       = '-1'; # zu wem haben wird direkt gesendet ?
   $hash->{'.sendToName'}       = '';
   $hash->{'.timer'}            = 300;
+  $hash->{SVN}                 = (qw($Id$))[2];
   $modules{MAX}{defptr}{$addr} = $hash;
 
   #$hash->{internals}{interfaces} = $interfaces{$type}; # wozu ?
@@ -233,6 +255,8 @@ sub MAX_Timer
    InternalTimer(gettimeofday()+5,"MAX_Timer", $hash, 0);
    return;
   }
+
+  AssignIoPort($hash, AttrVal($name,'IODev','')) if (exists($hash->{IODevMissing})); # mit proposed $_
 
   InternalTimer(gettimeofday() + $hash->{'.timer'}, "MAX_Timer", $hash, 0) if ($hash->{'.timer'});
 
@@ -614,7 +638,7 @@ sub MAX_Set($@)
    my $f = $args[0];
    $args[0] =~ s/(.)/sprintf("%x",ord($1))/eg;
    return if (!$f || ($args[0] eq 'c2a0'));
-   return MAX_Restore($devname,$setting,$f);
+   return MAXX_Restore($devname,$setting,$f);
   }
   elsif($setting eq "deviceRename") 
   {
@@ -1397,7 +1421,7 @@ sub MAX_saveConfig
  return $error;
 }
 
-sub MAX_Restore
+sub MAXX_Restore
 {
  my $name   = shift;
  my $action = shift;
