@@ -1253,9 +1253,12 @@ HUEDevice_Get($@)
     $list = ' devStateIcon:noArg' if( $subtype eq 'blind' );
   }
 
-  if( $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
+  if( !$hash->{helper}->{devtype}
+      && $hash->{IODev} && $hash->{IODev}{helper}{apiversion} && $hash->{IODev}{helper}{apiversion} >= (1<<16) + (26<<8) ) {
     $list .= " startup:noArg";
   }
+
+  return "Unknown argument $cmd" if( !$list );
 
   return "Unknown argument $cmd, choose one of $list";
 }
