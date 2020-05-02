@@ -35,7 +35,8 @@ use warnings;
 use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
-our %Watches_vNotesIntern = (
+my %Watches_vNotesIntern = (
+  "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
   "0.8.0"  => "01.05.2020  new values 'countdownwatch' for attribute digitalDisplayPattern, switch all watches to server time ",
   "0.7.0"  => "30.04.2020  new set 'continue' for stopwatch ",
   "0.6.0"  => "29.04.2020  new set 'reset' for stopwatch, read 'state' and 'starttime' from readings, add csrf token support ",
@@ -56,6 +57,9 @@ sub Watches_Initialize {
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
                                 "digitalDisplayText ".
+                                "disable:1,0 ".
+                                "hideDisplayName:1,0 ".
+                                "htmlattr ".
                                 "modernColorBackground:colorpicker ".
 								"modernColorHand:colorpicker ".
 								"modernColorFigure:colorpicker ".
@@ -70,16 +74,14 @@ sub Watches_Initialize {
                                 "stationHourHand:Bar,Pointed,Swiss,Vienna ".
                                 "stationStrokeDial:GermanHour,German,Austria,Swiss,Vienna,No ".
                                 "stationBody:Round,SmallWhite,RoundGreen,Square,Vienna,No ".
-                                "disable:1,0 ".
-                                "htmlattr ".
-                                "hideDisplayName:1,0 "
-                                ;
+                                "timeSource:client,server ".
+                                "";
   $hash->{FW_summaryFn}       = "Watches_FwFn";
   $hash->{FW_detailFn}        = "Watches_FwFn";
   $hash->{AttrFn}             = "Watches_Attr";
-  $hash->{FW_hideDisplayName} = 1;        # Forum 88667
+  $hash->{FW_hideDisplayName} = 1;                        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
-  $hash->{FW_atPageEnd} = 1;              # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
+  $hash->{FW_atPageEnd}       = 1;                        # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
 return;
 }
@@ -90,7 +92,7 @@ sub Watches_Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split m{\s+}, $def;
   
   if(!$a[2]) {
       return "You need to specify more parameters.\n". "Format: define <name> Watches [Modern | Station | Digital]";
@@ -267,7 +269,6 @@ sub Watches_delread {
   
   my @allrds = keys%{$hash->{READINGS}};
   for my $key(@allrds) {
-      # delete($defs{$name}{READINGS}{$key}) if($key ne "state");
       next if($key =~ /\bstate\b/);
       readingsDelete($hash,$key);
   }    
@@ -1091,6 +1092,7 @@ sub Watches_station {
   my $ssd    = AttrVal($d,"stationStrokeDial","Swiss")."StrokeDial";
   my $sbody  = AttrVal($d,"stationBody","Round")."Body";
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
+  my $tsou   = AttrVal($d,"timeSource","server"); 
 
   # Bahnhofsuhr aus http://www.3quarks.com/de/Bahnhofsuhr/
   return "
@@ -1346,20 +1348,23 @@ sub Watches_station {
                       context.restore();
                   }
 
-                  // aktueller Timestamp in Millisekunden 
-                  command = '{ int(time*1000) }';
-                  url_$d  = makeCommand(command);
-                  \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );  
-                  if (typeof ct_$d === 'undefined') {
-                      time = new Date();                                // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
-                  } else {
-                      time = new Date(ct_$d);
+                  // Zeitsteuerung
+                  if ('$tsou' == 'server') {
+                      // aktueller Timestamp in Millisekunden 
+                      command = '{ int(time*1000) }';
+                      url_$d  = makeCommand(command);
+                      \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );  
                   }
-                  // time = new Date();                                 // alte Variante
-                  var millis  = time.getMilliseconds() / 1000.0;
-                  var seconds = time.getSeconds();
-                  var minutes = time.getMinutes();
-                  var hours   = time.getHours() + this.hourOffset;
+                  if (typeof ct_$d === 'undefined') {
+                      time_$d = new Date();                                // mit lokaler Zeit initialisieren -> Clientzeit || Serverzeit: springen Zeiger verhindern
+                  } else {
+                      time_$d = new Date(ct_$d);
+                  }
+
+                  var millis  = time_$d.getMilliseconds() / 1000.0;
+                  var seconds = time_$d.getSeconds();
+                  var minutes = time_$d.getMinutes();
+                  var hours   = time_$d.getHours() + this.hourOffset;
 
                   // draw hour hand
                   context.save();
@@ -1626,6 +1631,7 @@ sub Watches_modern {
   my $fr     = AttrVal($d,"modernColorRing","FFFFFF");
   my $fre    = AttrVal($d,"modernColorRingEdge","333");
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
+  my $tsou   = AttrVal($d,"timeSource","server"); 
 
   # moderne Uhr aus https://www.w3schools.com/graphics/canvas_clock_start.asp
   return "
@@ -1686,7 +1692,7 @@ sub Watches_modern {
           grad_$d.addColorStop(0.5, '#$fr');              // Farbe Ziffernblattring
           grad_$d.addColorStop(1, '#$fre');               // Farbe äußere Ringgrenze
           ctx_$d.strokeStyle = grad_$d;
-          ctx_$d.lineWidth = radius_$d*0.1;
+          ctx_$d.lineWidth   = radius_$d*0.1;
           ctx_$d.stroke();
           ctx_$d.beginPath();
           ctx_$d.arc(0, 0, radius_$d*0.1, 0, 2*Math.PI);
@@ -1714,20 +1720,22 @@ sub Watches_modern {
       }
 
       function drawTime_$d(ctx_$d, radius_$d){
-          // aktueller Timestamp in Millisekunden 
-          command = '{ int(time*1000) }';
-          url_$d  = makeCommand(command);
-          \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
-          if (typeof ct_$d === 'undefined') {
-              now_$d  = new Date();                   // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
-          } else {
-              now_$d  = new Date(ct_$d);
+          // Zeitsteuerung
+          if ('$tsou' == 'server') {
+              // aktueller Timestamp in Millisekunden 
+              command = '{ int(time*1000) }';
+              url_$d  = makeCommand(command);
+              \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
           }
-          // now_$d  = new Date();                    // alte Variante
+          if (typeof ct_$d === 'undefined') {
+              time_$d  = new Date();                   // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+          } else {
+              time_$d  = new Date(ct_$d);
+          }
           
-          var hour_$d   = now_$d.getHours();
-          var minute_$d = now_$d.getMinutes();
-          var second_$d = now_$d.getSeconds();
+          var hour_$d   = time_$d.getHours();
+          var minute_$d = time_$d.getMinutes();
+          var second_$d = time_$d.getSeconds();
           
           //hour_$d
           hour_$d = hour_$d%12;
@@ -1790,6 +1798,8 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
 <a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
 <br>
 <br>
+Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server eingestellt werden 
+(Attribut <a href="#timeSource">timeSource</a>). <br>
 
 <ul>
   <a name="WatchesDefine"></a>
@@ -1910,6 +1920,15 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
       </ul>
     </li>
     <br>
+    
+    <a name="timeSource"></a>
+    <li><b>timeSource</b><br>
+      Wählt die Zeitquelle aus. Es kann die lokale Clientzeit (Browser) oder die Zeit des FHEM-Servers angezeigt werden. <br>
+      Diese Einstellung ist bei (CountDown-)Stoppuhren nicht relevant. <br>
+      (default: server)
+    </li>
+    <br>
+    
   </ul>  
     
   Die nachfolgenden Attribute sind spezifisch für einen Uhrentyp zu setzen. <br>
