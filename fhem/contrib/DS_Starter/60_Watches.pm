@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 my %Watches_vNotesIntern = (
+  "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
   "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
   "0.8.0"  => "01.05.2020  new values 'countdownwatch' for attribute digitalDisplayPattern, switch all watches to server time ",
   "0.7.0"  => "30.04.2020  new set 'continue' for stopwatch ",
@@ -131,11 +132,11 @@ sub Watches_Set {                                                    ## no criti
       
       my $ms = int(time*1000);
       
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, "countDownDone", 0) if($addp =~ /countdownwatch/); 
-      ReadingsBulkUpdateValue ($hash, "starttime", $ms);
-      ReadingsBulkUpdateValue ($hash, "state", "started");
-      readingsEndUpdate       ($hash, 1);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "alarmed", 0)          if($addp =~ /countdownwatch/); 
+      readingsBulkUpdate  ($hash, "starttime", $ms);
+      readingsBulkUpdate  ($hash, "state", "started");
+      readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "countDownInit") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
@@ -146,12 +147,12 @@ sub Watches_Set {                                                    ## no criti
       my $st = int(time*1000);                                             # Millisekunden ! 
       my $ct = $prop*3600 + $prop1*60 + $prop2;                            # Sekunden !
       
-      Watches_delread         ($name);
-      readingsBeginUpdate     ($hash);
-      ReadingsBulkUpdateValue ($hash, "countDownDone", 0);
-      ReadingsBulkUpdateValue ($hash, "countInitVal", $ct); 
-      ReadingsBulkUpdateValue ($hash, "state", "initialized");
-      readingsEndUpdate       ($hash, 1);
+      Watches_delread     ($name);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "alarmed", 0);
+      readingsBulkUpdate  ($hash, "countInitVal", $ct); 
+      readingsBulkUpdate  ($hash, "state", "initialized");
+      readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "continue") {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -998,7 +999,7 @@ sub Watches_digital {
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {state_$d = data.replace(/\\n/g, ''); return state_$d;} );
             
-            if (state_$d == 'started') {  
+            if (state_$d == 'started') {            
                 // == Ermittlung Countdown Startwert ==         
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"countInitVal\", 0)}';
                 url_$d    = makeCommand(command);
@@ -1014,7 +1015,12 @@ sub Watches_digital {
                 // aktueller Timestamp in Millisekunden 
                 command   = '{ int(time*1000) }';
                 url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );
+                \$.get( url_$d, function (data) {
+                                    data = data.replace(/\\n/g, ''); 
+                                    ct_$d = parseInt(data); 
+                                    return ct_$d;
+                                } 
+                      );
      
                 currDate_$d  = new Date(ct_$d);
                 
@@ -1034,9 +1040,8 @@ sub Watches_digital {
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d);
                 
-                if (hours_$d + minutes_$d + seconds_$d == 0) {                    
-                    Reading_$d  = 'countDownDone';
-                    command     = '{ CommandSetReading(undef, \"'+devName_$d+' countDownDone 1\") }';
+                if (hours_$d + minutes_$d + seconds_$d == 0) {
+                    command     = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed 1\") }';
                     url_$d      = makeCommand(command);
 
                         \$.get(url_$d, function (data) {
