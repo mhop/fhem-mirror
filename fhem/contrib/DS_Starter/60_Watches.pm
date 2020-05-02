@@ -36,7 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 my %Watches_vNotesIntern = (
-  "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch' ",
+  "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
   "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
   "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
   "0.8.0"  => "01.05.2020  new values 'countdownwatch' for attribute digitalDisplayPattern, switch all watches to server time ",
@@ -1010,11 +1010,8 @@ sub Watches_digital {
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
                 var act = $ddt;
-                log(\"act: \"+act);
-                log(\"$alarm: \"+'$alarm');
-                log(\"afree_$d: \"+afree_$d);
                 if (act == '$alarm' && act != ' $alarmdef' && afree_$d == 1) {
-                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed 1\") }';
+                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
                     url_$d  = makeCommand(command);
 
                         \$.get(url_$d, function (data) {
@@ -1109,7 +1106,7 @@ sub Watches_digital {
                 
                 var act = $ddt;
                 if ((act == '$alarm' || act == ' $alarmdef' ) && afree_$d == 1) {
-                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed 1\") }';
+                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
                     url_$d  = makeCommand(command);
 
                         \$.get(url_$d, function (data) {
