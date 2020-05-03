@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 my %Watches_vNotesIntern = (
+  "0.13.0" => "03.05.2020  set resume for countdownwatch, set 'continue' removed ",
   "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
   "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
@@ -126,9 +127,8 @@ sub Watches_Set {                                                    ## no criti
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
   $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
-  $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg start:noArg stop:noArg "                  if($addp =~ /stopwatch|countdownwatch/); 
-  $setlist .= "resume:noArg "                                                                   if($addp =~ /stopwatch/); 
-  $setlist .= "countDownInit continue:noArg"                                                    if($addp =~ /countdownwatch/);    
+  $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
+  $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);    
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -175,16 +175,6 @@ sub Watches_Set {                                                    ## no criti
       readingsBulkUpdate  ($hash, "countInitVal", $ct); 
       readingsBulkUpdate  ($hash, "state", "initialized");
       readingsEndUpdate   ($hash, 1);
-      
-  } elsif ($opt eq "continue") {
-      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
-      
-      if(!ReadingsVal($name, "starttime", "")) {
-          my $ms = int(time*1000);
-          readingsSingleUpdate($hash, "starttime", $ms, 0);      
-      }
-      return if(ReadingsVal($name, "state", "") eq "started");
-      readingsSingleUpdate($hash, "state", "started",  1);
       
   } elsif ($opt eq "resume") {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -1079,7 +1069,7 @@ sub Watches_digital {
                             } 
                   );
             
-            if (state_$d == 'started') {                   
+            if (state_$d == 'started' || state_$d == 'resumed') {                 
                 // == Ermittlung Countdown Startwert ==         
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"countInitVal\", 0)}';
                 url_$d    = makeCommand(command);
@@ -1090,11 +1080,16 @@ sub Watches_digital {
                                 } 
                       );
                       
-                countInitVal_$d = ci_$d;                        // Initialwert Countdown in Sekunden 
+                if (state_$d == 'resumed') {
+                    countInitVal_$d = localStorage.getItem('ss_$d');
+                    afree_$d        = 0;                                          // beim 'resume' keine erneute Alarmierung
+                } else {
+                    countInitVal_$d = parseInt(ci_$d);                            // Initialwert Countdown in Sekunden 
+                }
                 
                 // == Ermittlung vergangene Sekunden ==                  
-                command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
-                url_$d    = makeCommand(command);
+                command = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
+                url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
                                     st_$d = parseInt(data); 
@@ -1116,11 +1111,10 @@ sub Watches_digital {
                       );
      
                 currDate_$d  = new Date(ct_$d);
-                
                 elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden umrechnen
                 
                 // == Countdown errechnen ==
-                countcurr_$d = countInitVal_$d - elapsesec_$d;
+                countcurr_$d = parseInt(countInitVal_$d) - parseInt(elapsesec_$d);
                 if (countcurr_$d < 0) {
                     countcurr_$d = 0;
                 }
@@ -1132,7 +1126,7 @@ sub Watches_digital {
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
                 
                 var act = $ddt;
-                if ((act == '$alarm' || act == ' $alarmdef' ) && afree_$d == 1) {
+                if (act == '$alarm' && afree_$d == 1) {
                     command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
                     url_$d  = makeCommand(command);
 
@@ -1144,7 +1138,19 @@ sub Watches_digital {
                               );
                 }
                 
-                localStoreSet (hours_$d, minutes_$d, seconds_$d);
+                if (act == ' $alarmdef') {
+                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
+                    url_$d  = makeCommand(command);
+
+                        \$.get(url_$d, function (data) {
+                                          command = '{ CommandSetReading(undef, \"'+devName_$d+' state stopped\") }';
+                                          url_$d  = makeCommand(command);
+                                          \$.get(url_$d);
+                                       } 
+                              );
+                }
+                
+                localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
                 
             }
             
@@ -1152,6 +1158,9 @@ sub Watches_digital {
                 hours_$d   = localStorage.getItem('h_$d');
                 minutes_$d = localStorage.getItem('m_$d');
                 seconds_$d = localStorage.getItem('s_$d');
+                
+                pastsumsec_$d = parseInt(hours_$d*3600) + parseInt(minutes_$d*60) + parseInt(seconds_$d);
+                localStoreSet (NaN, NaN, NaN, pastsumsec_$d);
             }
 
             if (state_$d == 'initialized') {
@@ -1952,14 +1961,6 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     </li>
     <br>
     
-    <a name="continue"></a>
-    <li><b>continue</b><br>
-      Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" abgelaufenen Zeit fort.
-      War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei "00:00:00" (stopwatch) bzw. "countInitVal" (countdownwatch). <br>
-      Dieses Set-Kommando ist nur bei einer digitalen CountDown-Stoppuhr vorhanden. <br>
-    </li>
-    <br>
-    
     <a name="countDownInit"></a>
     <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Startzeit einer CountDown-Stoppuhr mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
@@ -1984,7 +1985,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <a name="resume"></a>
     <li><b>resume</b><br>
       Setzt die Zählung einer angehaltenen Stoppuhr fort. <br>
-      Dieses Set-Kommando ist nur bei einer digitalen Stoppuhr vorhanden. <br>
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
     <br>
     
