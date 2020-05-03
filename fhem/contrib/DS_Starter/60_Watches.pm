@@ -27,15 +27,52 @@
 #       # digital clock: http://www.3quarks.com/de/Segmentanzeige/index.html
 #
 #########################################################################################################################
-
-package main;
+package FHEM::Watches;                                 ## no critic 'package'
 
 use strict;
 use warnings;
 use Time::HiRes qw(time gettimeofday tv_interval);
+use GPUtils qw(GP_Import GP_Export);                   # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+# use POSIX;
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;      ## no critic 'eval'
+
+# Run before module compilation
+BEGIN {
+  # Import from main::
+  GP_Import( 
+      qw(
+          AttrVal
+          defs
+          IsDisabled
+          Log3 
+          modules          
+          ReadingsVal
+          readingsDelete 
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsEndUpdate
+          readingsSingleUpdate   
+          sortTopicNum          
+        )
+  );
+  
+  # Export to main context with different name
+  #     my $pkg  = caller(0);
+  #     my $main = $pkg;
+  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/gx;
+  #     foreach (@_) {
+  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
+  #     }
+  GP_Export(
+      qw(
+          Initialize
+        )
+  );  
+}
 
 # Versions History intern
-my %Watches_vNotesIntern = (
+my %vNotesIntern = (
+  "0.14.0" => "03.05.2020  switch to packages, use setVersionInfo ",
   "0.13.0" => "03.05.2020  set resume for countdownwatch, set 'continue' removed ",
   "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
@@ -51,12 +88,17 @@ my %Watches_vNotesIntern = (
   "0.1.0"  => "13.11.2018  initial Version with modern analog clock"
 );
 
-################################################################
-sub Watches_Initialize {
+##############################################################################
+#         Initialize Funktion
+##############################################################################
+sub Initialize {
   my ($hash) = @_;
   
-  $hash->{DefFn}              = "Watches_Define";
-  $hash->{SetFn}              = "Watches_Set";
+  $hash->{DefFn}              = \&Define;
+  $hash->{SetFn}              = \&Set;
+  $hash->{FW_summaryFn}       = \&FWebFn;
+  $hash->{FW_detailFn}        = \&FWebFn;
+  $hash->{AttrFn}             = \&Attr;
   $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
@@ -80,38 +122,42 @@ sub Watches_Initialize {
                                 "stationBody:Round,SmallWhite,RoundGreen,Square,Vienna,No ".
                                 "timeSource:client,server ".
                                 "";
-  $hash->{FW_summaryFn}       = "Watches_FwFn";
-  $hash->{FW_detailFn}        = "Watches_FwFn";
-  $hash->{AttrFn}             = "Watches_Attr";
+
   $hash->{FW_hideDisplayName} = 1;                        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
   $hash->{FW_atPageEnd}       = 1;                        # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };        ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  
 return;
 }
 
-
-################################################################
-sub Watches_Define {
+##############################################################################
+#         Define Funktion
+##############################################################################
+sub Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
-  
-  my @a = split m{\s+}, $def;
+  my @a    = split m{\s+}, $def;
   
   if(!$a[2]) {
       return "You need to specify more parameters.\n". "Format: define <name> Watches [Modern | Station | Digital]";
   }
   
-  $hash->{MODEL}   = $a[2];
-  $hash->{VERSION} = $hash->{VERSION} = (reverse sort(keys %Watches_vNotesIntern))[0];
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);   # Modul Meta.pm nicht vorhanden
+  $hash->{MODEL}                 = $a[2];
+  
+  setVersionInfo($hash);                                   # Versionsinformationen setzen
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
 return;
 }
 
-################################################################
-sub Watches_Set {                                                    ## no critic 'complexity'
+##############################################################################
+#         Set Funktion
+##############################################################################
+sub Set {                                                    ## no critic 'complexity'
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name  = $a[0];
@@ -149,7 +195,7 @@ sub Watches_Set {                                                    ## no criti
       
       my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
       
-      Watches_delread     ($name, "alarmTime");
+      delReadings     ($name, "alarmTime");
       
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "alarmed", 0);
@@ -157,8 +203,8 @@ sub Watches_Set {                                                    ## no criti
       readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "alarmHMSdel") {      
-      Watches_delread     ($name, "alarmTime");
-      Watches_delread     ($name, "alarmed");
+      delReadings     ($name, "alarmTime");
+      delReadings     ($name, "alarmed");
       
   } elsif ($opt eq "countDownInit") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
@@ -169,7 +215,7 @@ sub Watches_Set {                                                    ## no criti
       my $st = int(time*1000);                                             # Millisekunden ! 
       my $ct = $prop*3600 + $prop1*60 + $prop2;                            # Sekunden !
       
-      Watches_delread     ($name, "countInitVal");
+      delReadings     ($name, "countInitVal");
       
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "countInitVal", $ct); 
@@ -189,7 +235,7 @@ sub Watches_Set {                                                    ## no criti
       readingsSingleUpdate($hash, "state", "stopped",  1);
       
   } elsif ($opt eq "reset") {
-      Watches_delread     ($name);
+      delReadings     ($name);
       readingsSingleUpdate($hash, "state", "initialized",  1);
       
   } elsif ($opt eq "time") {
@@ -208,8 +254,10 @@ sub Watches_Set {                                                    ## no criti
 return;
 }
 
-################################################################
-sub Watches_Attr {
+##############################################################################
+#         Attributfunktion
+##############################################################################
+sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val);
@@ -246,7 +294,7 @@ sub Watches_Attr {
         }
         $do = 0 if($cmd eq "del");
         
-        Watches_delread ($name);   
+        delReadings ($name);   
  
         readingsSingleUpdate($hash, "state", "initialized", 1); 
         
@@ -259,8 +307,10 @@ sub Watches_Attr {
 return;
 }
 
-################################################################
-sub Watches_FwFn {
+##############################################################################
+#                      Webanzeige des Devices
+##############################################################################
+sub FWebFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash   = $defs{$d};
   
@@ -276,16 +326,18 @@ sub Watches_FwFn {
           $ret .= "<html>Watch is disabled</html>";
       }  
   } else {
-      $ret .= Watches_modern($d)  if($hash->{MODEL} =~ /modern/i);
-      $ret .= Watches_station($d) if($hash->{MODEL} =~ /station/i);
-      $ret .= Watches_digital($d) if($hash->{MODEL} =~ /digital/i);
+      $ret .= modernWatch ($d) if($hash->{MODEL} =~ /modern/i);
+      $ret .= stationWatch($d) if($hash->{MODEL} =~ /station/i);
+      $ret .= digitalWatch($d) if($hash->{MODEL} =~ /digital/i);
   }
     
 return $ret;
 }
 
-################################################################
-sub Watches_delread {
+##############################################################################
+#         löscht alle oder das spezifizierte Reading (außer state)
+##############################################################################
+sub delReadings {
   my ($name,$reading) = @_;
   my $hash            = $defs{$name};
   
@@ -303,8 +355,12 @@ sub Watches_delread {
 return;
 } 
 
-################################################################
-sub Watches_digital {
+##############################################################################
+#                      Digitale Uhr / Anzeige aus:
+#            http://www.3quarks.com/de/Segmentanzeige/index.html
+#
+##############################################################################
+sub digitalWatch {
   my ($d) = @_;
   my $hash     = $defs{$d};
   my $alarmdef = "00:00:00";
@@ -347,8 +403,6 @@ sub Watches_digital {
       }
       $ddt = "' ".$ddt."'";
   }
- 
-  # Segmentanzeige aus: http://www.3quarks.com/de/Segmentanzeige/index.html
 
   return "
      <html>
@@ -1188,8 +1242,12 @@ sub Watches_digital {
   ";
 }
 
-################################################################
-sub Watches_station {
+##############################################################################
+#                            Bahnhofsuhr aus:
+#                  http://www.3quarks.com/de/Bahnhofsuhr
+#
+##############################################################################
+sub stationWatch {
   my ($d) = @_;
   my $hash   = $defs{$d};
   my $ssh    = AttrVal($d,"stationSecondHand","Bar")."SecondHand";
@@ -1203,7 +1261,6 @@ sub Watches_station {
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
   my $tsou   = AttrVal($d,"timeSource","server"); 
 
-  # Bahnhofsuhr aus http://www.3quarks.com/de/Bahnhofsuhr/
   return "
       <html>
       <body>  
@@ -1729,8 +1786,12 @@ sub Watches_station {
   ";
 }
 
-################################################################
-sub Watches_modern {
+##############################################################################
+#                            Moderne Uhr aus:
+#         https://www.w3schools.com/graphics/canvas_clock_start.asp
+#
+##############################################################################
+sub modernWatch {
   my ($d) = @_;
   my $hash   = $defs{$d};
   my $facec  = AttrVal($d,"modernColorFace","FFFEFA");
@@ -1742,7 +1803,6 @@ sub Watches_modern {
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
   my $tsou   = AttrVal($d,"timeSource","server"); 
 
-  # moderne Uhr aus https://www.w3schools.com/graphics/canvas_clock_start.asp
   return "
       <html>
       <body>
@@ -1879,12 +1939,48 @@ sub Watches_modern {
   ";
 }
 
+##############################################################################
+#               Versionierungen des Moduls setzen
+#  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#
+##############################################################################
+sub setVersionInfo {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+
+  my $v                    = (sortTopicNum("desc",keys %vNotesIntern))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
+      # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
+      } else {
+          $modules{$type}{META}{x_version} = $v; 
+      }
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          ## no critic 'VERSION'                                      
+      }
+  } else {
+      # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;
+  }
+  
+return;
+}
+
 1;
 
 =pod
 =item helper
-=item summary    create a watch in modern, station or digital style
-=item summary_DE erstellt eine Uhr: Modern, Bahnhofsuhr oder Digital
+=item summary    Clock display in different variants
+=item summary_DE Uhrenanzeige in verschiedenen Varianten
 
 =begin html
 
@@ -2210,4 +2306,50 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 60_Watches.pm
+{
+  "abstract": "Clock display in different variants",
+  "x_lang": {
+    "de": {
+      "abstract": "Uhrenanzeige in verschiedenen Varianten"
+    }
+  },
+  "keywords": [
+    "Watch",
+    "Modern clock",
+    "clock",
+    "Station clock",
+    "Digital display"
+  ],
+  "version": "v1.1.1",
+  "release_status": "testing",
+  "author": [
+    "Heiko Maaz <heiko.maaz@t-online.de>",
+    null
+  ],
+  "x_fhem_maintainer": [
+    "DS_Starter"
+  ],
+  "x_fhem_maintainer_github": [
+    "nasseeder1"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "Time::HiRes": 0,
+        "GPUtils": 0
+      },
+      "recommends": {
+        "FHEM::Meta": 0
+      },
+      "suggests": {
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
