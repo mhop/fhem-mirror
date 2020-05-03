@@ -72,6 +72,7 @@ $(document).ready(function(){
   
   f18_setWrapColumns();
   f18_setFixedInput();
+  f18_setWidePortrait();
 });
 
 function
@@ -372,6 +373,8 @@ f18_special()
     addHider("fixedInput", false, "Fixed input and menu", f18_setFixedInput);
     addHider("wrapcolumns",false,"Wrap columns<br>on small screen",
                         f18_setWrapColumns);
+    addHider("widePortrait",true,"Show all columns<br>in portrait mode",
+                        f18_setWidePortrait);
 
     $("div.f18colors").css("margin-top", "20px");
     $("tr.f18 div.fileList").each(function(e){ f18_addPinToStyleDiv(this) });
@@ -395,6 +398,12 @@ function
 f18_setWrapColumns()
 {
   $("table.block").toggleClass("wrapcolumns", f18_getAttr("wrapcolumns"));
+}
+
+function
+f18_setWidePortrait()
+{
+  $("#content").toggleClass("slim", !f18_getAttr("widePortrait"));
 }
 
 function
