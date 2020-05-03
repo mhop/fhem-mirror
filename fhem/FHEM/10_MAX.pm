@@ -41,7 +41,6 @@ my %device_types = (
   6 => "virtualShutterContact",
   7 => "virtualThermostat",
   8 => "PlugAdapter",
-  9 => "new"
 );
 
 my %msgId2Cmd = (
