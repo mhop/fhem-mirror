@@ -36,7 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 my %Watches_vNotesIntern = (
-  "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches ",
+  "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
   "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
   "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
@@ -126,7 +126,7 @@ sub Watches_Set {                                                    ## no criti
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
   $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
-  $setlist .= "alarmHMS alarmHMSdel:noArg reset:noArg start:noArg stop:noArg "                  if($addp =~ /stopwatch|countdownwatch/); 
+  $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg start:noArg stop:noArg "                  if($addp =~ /stopwatch|countdownwatch/); 
   $setlist .= "resume:noArg "                                                                   if($addp =~ /stopwatch/); 
   $setlist .= "countDownInit continue:noArg"                                                    if($addp =~ /countdownwatch/);    
 
@@ -141,7 +141,7 @@ sub Watches_Set {                                                    ## no criti
       readingsBulkUpdate  ($hash, "state", "started");
       readingsEndUpdate   ($hash, 1);
       
-  } elsif ($opt eq "alarmHMS") {
+  } elsif ($opt eq "alarmHMSset") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
       $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
       $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
@@ -1925,8 +1925,8 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   <ul>
   <ul>
   
-    <a name="alarmHMS"></a>
-    <li><b>alarmHMS &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+    <a name="alarmHMSset"></a>
+    <li><b>alarmHMSset &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Alarmzeit im Format hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
       Erreicht die Zeit den definierten Wert, wird ein Event des Readings "alarmed" erstellt. <br>
       Die Stoppuhr hält an diesem Wert an. <br>
@@ -1938,7 +1938,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
       
       <ul>
       <b>Beispiel</b> <br>
-      set &lt;name&gt; alarmHMS 0 30 10
+      set &lt;name&gt; alarmHMSset 0 30 10
       </ul>
       <br>
       
