@@ -380,13 +380,13 @@ sub digitalWatch {
                     + ':' + ((minutes < 10) ? '0' : '') + minutes
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
-  } elsif($addp eq "stopwatch" || $addp eq "countdownwatch") {
+  } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
       $ddp = "###:##:##";
       $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
                     + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
-  } elsif($addp eq "staticwatch") {
+  } elsif ($addp eq "staticwatch") {
       $ddp = "###:##:##";
       $h   = ReadingsVal($d, "hour"  , 0);
       $m   = ReadingsVal($d, "minute", 0);
@@ -395,7 +395,7 @@ sub digitalWatch {
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
                     + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
-  } elsif($addp eq "text") {
+  } elsif ($addp eq "text") {
       my $txtc = length($ddt);
       $ddp     = "";
       for(my $i = 0; $i <= $txtc; $i++) {
@@ -453,9 +453,9 @@ sub digitalWatch {
     };
 
     SegmentDisplay_$d.prototype.setValue = function(value) {
-        this.value = value;
-        this.draw();
-    };
+                                               this.value = value;
+                                               this.draw();
+                                           };
 
     SegmentDisplay_$d.prototype.draw = function() {
         var display_$d = document.getElementById(this.displayId_$d);
@@ -953,18 +953,18 @@ sub digitalWatch {
     }; 
 
     SegmentDisplay_$d.prototype.getSegmentColor_$d = function(c, charSet7, charSet14, charSet16) {
-        if (c == '#') {
-            return this.colorOn;
-        } else {
-            switch (this.segmentCount) {
-                case 7:  return (charSet7.indexOf(c) == -1) ? this.colorOff : this.colorOn;
-                case 14: return (charSet14.indexOf(c) == -1) ? this.colorOff : this.colorOn;
-                case 16: var pattern = charSet14 + (charSet16 === undefined ? '' : charSet16);
-                   return (pattern.indexOf(c) == -1) ? this.colorOff : this.colorOn;
-                default: return this.colorOff;
-            }
-        }
-    };
+                                                         if (c == '#') {
+                                                             return this.colorOn;
+                                                         } else {
+                                                             switch (this.segmentCount) {
+                                                                 case 7:  return (charSet7.indexOf(c) == -1) ? this.colorOff : this.colorOn;
+                                                                 case 14: return (charSet14.indexOf(c) == -1) ? this.colorOff : this.colorOn;
+                                                                 case 16: var pattern = charSet14 + (charSet16 === undefined ? '' : charSet16);
+                                                                 return (pattern.indexOf(c) == -1) ? this.colorOff : this.colorOn;
+                                                                 default: return this.colorOff;
+                                                             }
+                                                         }
+                                                     };
 
     var display_$d = new SegmentDisplay_$d('display_$d');
     display_$d.pattern         = '$ddp       ';
@@ -976,8 +976,7 @@ sub digitalWatch {
     display_$d.digitDistance   = 2;
     display_$d.segmentWidth    = 3;
     display_$d.segmentDistance = 0.5;
-    //display_$d.colorOn         = 'rgba(0, 0, 0, 0.9)';
-    display_$d.colorOn         = '#$dcd';
+    display_$d.colorOn         = '#$dcd';                        // original: display_$d.colorOn = 'rgba(0, 0, 0, 0.9)';
     display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
     
     // CSRF-Token auslesen
