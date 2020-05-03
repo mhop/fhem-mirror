@@ -36,6 +36,7 @@ use Time::HiRes qw(time gettimeofday tv_interval);
 
 # Versions History intern
 my %Watches_vNotesIntern = (
+  "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
   "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
   "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
@@ -124,9 +125,10 @@ sub Watches_Set {                                                    ## no criti
   return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch|countdownwatch/);
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist .= "time "                                                                        if($addp =~ /staticwatch/);               
-  $setlist .= "alarmHMS reset:noArg continue:noArg start:noArg stop:noArg "                  if($addp =~ /stopwatch/); 
-  $setlist .= "alarmHMS reset:noArg countDownInit continue:noArg start:noArg stop:noArg "    if($addp =~ /countdownwatch/);    
+  $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
+  $setlist .= "alarmHMS alarmHMSdel:noArg reset:noArg start:noArg stop:noArg "                  if($addp =~ /stopwatch|countdownwatch/); 
+  $setlist .= "resume:noArg "                                                                   if($addp =~ /stopwatch/); 
+  $setlist .= "countDownInit continue:noArg"                                                    if($addp =~ /countdownwatch/);    
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -134,7 +136,7 @@ sub Watches_Set {                                                    ## no criti
       my $ms = int(time*1000);
       
       readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "alarmed", 0)          if($addp =~ /stopwatch|countdownwatch/); 
+      readingsBulkUpdate  ($hash, "alarmed", 0)      if($addp =~ /stopwatch|countdownwatch/); 
       readingsBulkUpdate  ($hash, "starttime", $ms);
       readingsBulkUpdate  ($hash, "state", "started");
       readingsEndUpdate   ($hash, 1);
@@ -153,6 +155,10 @@ sub Watches_Set {                                                    ## no criti
       readingsBulkUpdate  ($hash, "alarmed", 0);
       readingsBulkUpdate  ($hash, "alarmTime", $at); 
       readingsEndUpdate   ($hash, 1);
+      
+  } elsif ($opt eq "alarmHMSdel") {      
+      Watches_delread     ($name, "alarmTime");
+      Watches_delread     ($name, "alarmed");
       
   } elsif ($opt eq "countDownInit") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
@@ -179,6 +185,15 @@ sub Watches_Set {                                                    ## no criti
       }
       return if(ReadingsVal($name, "state", "") eq "started");
       readingsSingleUpdate($hash, "state", "started",  1);
+      
+  } elsif ($opt eq "resume") {
+      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
+      
+      my $ms = int(time*1000);
+      readingsSingleUpdate($hash, "starttime", $ms, 0);
+      
+      return if(ReadingsVal($name, "state", "") eq "started");
+      readingsSingleUpdate($hash, "state", "resumed",  1);
       
   } elsif ($opt eq "stop") {
       readingsSingleUpdate($hash, "state", "stopped",  1);
@@ -942,10 +957,11 @@ sub Watches_digital {
     }
     
     // localStorage Set 
-    function localStoreSet (hours, minutes, seconds) {
-        localStorage.setItem('h_$d', hours);
-        localStorage.setItem('m_$d', minutes);
-        localStorage.setItem('s_$d', seconds);
+    function localStoreSet (hours, minutes, seconds, sumsecs) {
+        if (Number.isInteger(hours))   { localStorage.setItem('h_$d',  hours);   }
+        if (Number.isInteger(minutes)) { localStorage.setItem('m_$d',  minutes); }
+        if (Number.isInteger(seconds)) { localStorage.setItem('s_$d',  seconds); }
+        if (Number.isInteger(sumsecs)) { localStorage.setItem('ss_$d', sumsecs); }
     }
     
     animate_$d();
@@ -982,17 +998,17 @@ sub Watches_digital {
                             } 
                   );
             
-            if (state_$d == 'started') { 
+            if (state_$d == 'started' || state_$d == 'resumed') {  
                 // == Startzeit ==            
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); st_$d = parseInt(data); return st_$d;} );
                 
-                startDate_$d   = new Date(st_$d);
+                startDate_$d = new Date(st_$d);
                 
                 // aktueller Timestamp in Millisekunden 
-                command   = '{ int(time*1000) }';
-                url_$d    = makeCommand(command);
+                command = '{ int(time*1000) }';
+                url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data     = data.replace(/\\n/g, ''); 
                                     ct_$d    = parseInt(data); 
@@ -1001,9 +1017,17 @@ sub Watches_digital {
                                 } 
                       );                
                 
-                currDate_$d = new Date(ct_$d);
+                currDate_$d  = new Date(ct_$d);
+                elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 
-                elapsesec_$d   = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
+                if (state_$d == 'resumed') {
+                    lastsumsec_$d = localStorage.getItem('ss_$d');
+                    afree_$d      = 0;                                                       // beim 'resume' keine erneute Alarmierung
+                    elapsesec_$d  = parseInt(elapsesec_$d) + parseInt(lastsumsec_$d);
+                } else {
+                    elapsesec_$d  = parseInt(elapsesec_$d);
+                }
+                
                 hours_$d       = parseInt(elapsesec_$d / 3600);
                 elapsesec_$d  -= hours_$d * 3600;
                 minutes_$d     = parseInt(elapsesec_$d / 60);
@@ -1022,13 +1046,16 @@ sub Watches_digital {
                               );
                 }
                 
-                localStoreSet (hours_$d, minutes_$d, seconds_$d);  
+                localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
             }
             
             if (state_$d == 'stopped') {
                 hours_$d   = localStorage.getItem('h_$d');
                 minutes_$d = localStorage.getItem('m_$d');
                 seconds_$d = localStorage.getItem('s_$d');
+                
+                sumsecs_$d = parseInt(hours_$d*3600) + parseInt(minutes_$d*60) + parseInt(seconds_$d);
+                localStoreSet (NaN, NaN, NaN, sumsecs_$d);
             }
 
             if (state_$d == 'initialized') {
@@ -1907,8 +1934,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
       Zeit 00:00:00. <br>
       (default: 0 0 0) <br><br>
       
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden. <br><br>
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
@@ -1919,20 +1945,25 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     </li>
     <br>
     
+    <a name="alarmHMSdel"></a>
+    <li><b>alarmHMSdel</b><br>
+      Löscht die gesetzte Alarmzeit und deren Status. <br>
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
+    </li>
+    <br>
+    
     <a name="continue"></a>
     <li><b>continue</b><br>
       Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" abgelaufenen Zeit fort.
       War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei "00:00:00" (stopwatch) bzw. "countInitVal" (countdownwatch). <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
     <br>
     
     <a name="countDownInit"></a>
     <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Startzeit einer CountDown-Stoppuhr mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = countdownwatch</b> vorhanden. <br><br>
+      Dieses Set-Kommando ist nur bei digitalen CountDown-Stoppuhren vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
@@ -1946,31 +1977,28 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <a name="reset"></a>
     <li><b>reset</b><br>
       Stoppt die Stoppuhr (falls sie läuft) und löscht alle spezifischen Readings bzw. setzt sie auf initialized zurück. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
     <br>
     
     <a name="start"></a>
     <li><b>start</b><br>
       Startet die Stoppuhr. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = stopwatch | countdownwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
     <br>  
     
     <a name="stop"></a>
     <li><b>stop</b><br>
       Stoppt die Stoppuhr. Die erreichte Zeit bleibt erhalten. <br>
-      Dieses Set-Kommando ist nur bei einer <b>stopwatch | countdownwatch</b> vorhanden.
+      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
     <br>
     
     <a name="time"></a>
     <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt eine statische Zeitanzeige mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
-      Dieses Set-Kommando ist nur bei einer Uhr vom Modell "digital" mit gesetztem Attribut 
-      <b>digitalDisplayPattern = staticwatch</b> vorhanden. <br><br>
+      Dieses Set-Kommando ist nur bei einer Digitaluhr mit statischer Zeitanzeige vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
