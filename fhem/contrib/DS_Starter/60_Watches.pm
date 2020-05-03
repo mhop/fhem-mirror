@@ -72,7 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.14.0" => "03.05.2020  switch to packages, use setVersionInfo ",
+  "0.14.0" => "03.05.2020  switch to packages, use setVersionInfo, support of Meta.pm ",
   "0.13.0" => "03.05.2020  set resume for countdownwatch, set 'continue' removed ",
   "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
