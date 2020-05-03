@@ -1956,14 +1956,14 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>continue</b><br>
       Setzt die Zählung einer angehaltenen Stoppuhr inklusive der seit "start" abgelaufenen Zeit fort.
       War die Stoppuhr noch nicht gestartet, beginnt die Zählung bei "00:00:00" (stopwatch) bzw. "countInitVal" (countdownwatch). <br>
-      Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
+      Dieses Set-Kommando ist nur bei einer digitalen CountDown-Stoppuhr vorhanden. <br>
     </li>
     <br>
     
     <a name="countDownInit"></a>
     <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Startzeit einer CountDown-Stoppuhr mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
-      Dieses Set-Kommando ist nur bei digitalen CountDown-Stoppuhren vorhanden. <br><br>
+      Dieses Set-Kommando ist nur bei einer digitalen CountDown-Stoppuhr vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
@@ -1978,6 +1978,13 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>reset</b><br>
       Stoppt die Stoppuhr (falls sie läuft) und löscht alle spezifischen Readings bzw. setzt sie auf initialized zurück. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
+    </li>
+    <br>
+    
+    <a name="resume"></a>
+    <li><b>resume</b><br>
+      Setzt die Zählung einer angehaltenen Stoppuhr fort. <br>
+      Dieses Set-Kommando ist nur bei einer digitalen Stoppuhr vorhanden. <br>
     </li>
     <br>
     
