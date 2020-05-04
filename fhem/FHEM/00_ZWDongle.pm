@@ -389,7 +389,7 @@ ZWDongle_Set($@)
       $_ =~ s/^UNKNOWN_//;
       $_ = hex($defs{$_}{nodeIdHex})
         if($defs{$_} && $defs{$_}{nodeIdHex});
-      return "$_ is neither a device nor a decimal id" if($_ !~ m/\d+/);
+      return "$_ is neither a device nor a decimal id" if($_ !~ m/^\d+$/);
     }
   }
 
@@ -471,6 +471,7 @@ ZWDongle_Get($@)
 
     $a[0] = hex($defs{$a[0]}{nodeIdHex})
      if($defs{$a[0]} && $defs{$a[0]}{nodeIdHex});
+    return "$a[0] is neither a device nor a decimal id" if($a[0] !~ m/^\d+$/);
   }
 
   my $out = sprintf($gets{$cmd}, @a);
