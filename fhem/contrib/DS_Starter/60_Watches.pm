@@ -281,7 +281,7 @@ return;
 ##############################################################################
 sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $hash                     = $defs{$name};
     my ($do,$val);
       
     # $cmd can be "del" or "set"
@@ -334,7 +334,7 @@ return;
 ##############################################################################
 sub FWebFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-  my $hash   = $defs{$d};
+  my $hash  = $defs{$d};
   
   my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
   my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
@@ -383,7 +383,7 @@ return;
 #
 ##############################################################################
 sub digitalWatch {
-  my ($d) = @_;
+  my ($d)      = @_;
   my $hash     = $defs{$d};
   my $alarmdef = "00:00:00";
   my $hattr    = AttrVal($d, "htmlattr",               "width='150' height='50'");
@@ -1148,7 +1148,7 @@ sub digitalWatch {
                 elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 
                 if (state_$d == 'resumed') {
-                    lastsumsec_$d = localStorage.getItem('ss_$d');                                                       // beim 'resume' keine erneute Alarmierung
+                    lastsumsec_$d = localStorage.getItem('ss_$d');                                                      
                     elapsesec_$d  = parseInt(elapsesec_$d) + parseInt(lastsumsec_$d);
                 } else {
                     elapsesec_$d  = parseInt(elapsesec_$d);
@@ -1159,7 +1159,7 @@ sub digitalWatch {
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                checkAndDoAlm ($ddt);                  // Alarm auslösen wenn zutreffend
+                checkAndDoAlm ($ddt);                                                    // Alarm auslösen wenn zutreffend
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
             }
@@ -1298,7 +1298,7 @@ sub digitalWatch {
 #
 ##############################################################################
 sub stationWatch {
-  my ($d) = @_;
+  my ($d)    = @_;
   my $hash   = $defs{$d};
   my $ssh    = AttrVal($d,"stationSecondHand","Bar")."SecondHand";
   my $shb    = AttrVal($d,"stationSecondHandBehavoir","Bouncing")."SecondHand";
@@ -1842,7 +1842,7 @@ sub stationWatch {
 #
 ##############################################################################
 sub modernWatch {
-  my ($d) = @_;
+  my ($d)    = @_;
   my $hash   = $defs{$d};
   my $facec  = AttrVal($d,"modernColorFace","FFFEFA");
   my $bgc    = AttrVal($d,"modernColorBackground","333");
@@ -2046,13 +2046,17 @@ At the moment only a german commandref is available.
 <h3>Watches</h3>
 
 <br>
-Das Modul Watches stellt eine Modern-, Bahnhofs- oder Digitalanzeige als Device zur Verfügung. <br>
+Das Modul Watches stellt Uhren in unterschiedlichen Stilen als Device zur Verfügung. 
+Der Nutzer kann das Design der Uhren über Attribute beeinflussen. <br>
 Die Uhren basieren auf Skripten dieser Seiten: <br>
+
 <a href='https://www.w3schools.com/graphics/canvas_clock_start.asp'>moderne Uhr</a>, 
 <a href='http://www.3quarks.com/de/Bahnhofsuhr/'>Bahnhofsuhr</a>, 
 <a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
-<br>
-<br>
+<br><br>
+
+Eine definiertes Device vom Model <b>Digital</b> kann ebenfalls als Stoppuhr, CountDown-Timer oder
+universelle Textanzeige (im Sechzehnsegment-Modus) verwendet werden. <br>
 Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server eingestellt werden 
 (Attribut <a href="#timeSource">timeSource</a>). <br>
 
@@ -2083,12 +2087,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <a name="alarmHMSset"></a>
     <li><b>alarmHMSset &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Alarmzeit im Format hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
-      Erreicht die Zeit den definierten Wert, wird ein Event des Readings "alarmed" erstellt. <br>
-      Die Stoppuhr hält an diesem Wert an. <br>
-      Wird eine CountDown-Stoppuhr mit "coninue" fortgesetzt, erfolgt ein nochmaliger alarmed-Event beim Erreichen der 
-      Zeit 00:00:00. <br>
-      (default: 0 0 0) <br><br>
-      
+      Erreicht die Zeit den definierten Wert, wird ein Event des Readings "alarmed" ausgelöst. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br><br>
       
       <ul>
