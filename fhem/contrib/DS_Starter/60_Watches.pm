@@ -1042,23 +1042,23 @@ sub digitalWatch {
         localStorage.setItem('lastalmtime_$d', lastalmtime);
     }
     
-    // Check ob Alarma ausgelöst werden soll und ggf. Event triggern
-    function checkIfAlm (devname, acttime, almtime, almdef) {
-        lastalmtime_$d = localStorage.getItem('lastalmtime_$d');               // letzte Alarmzeit laden
-        if ( (acttime == almtime || acttime == ' '+almdef) && acttime != lastalmtime_$d ) {
+    // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
+    function checkAndDoAlm (devname, acttime, almtime, almdef) {
+        lastalmtime = localStorage.getItem('lastalmtime_$d');               // letzte Alarmzeit laden
+        if ( (acttime == almtime || acttime == ' '+almdef) && acttime != lastalmtime ) {
             command = '{ CommandSetReading(undef, \"'+devname+' alarmed '+acttime+'\") }';
-            url     = makeCommand(command);
+            url_$d  = makeCommand(command);
               
             localStoreSetLastalm (acttime);                                    // aktuelle Alarmzeit sichern 
               
             if(acttime == almtime) {
-               \$.get(url);
+               \$.get(url_$d);
             
             } else {
-                \$.get(url, function (data) {
+                \$.get(url_$d, function (data) {
                                 command = '{ CommandSetReading(undef, \"'+devname+' state stopped\") }';
-                                url  = makeCommand(command);
-                                \$.get(url);
+                                url_$d  = makeCommand(command);
+                                \$.get(url_$d);
                             }
                       );                                       
             }
@@ -1093,22 +1093,30 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'stopwatch') {        
-            devName_$d     = '$d';  
-            lastalmtime_$d = localStorage.getItem('lastalmtime_$d');             // letzte Alarmzeit laden              
+            devName_$d = '$d';             
             
             command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                                
-                                return (state_$d);
+                                return state_$d;
                             } 
                   );
             
-            if (state_$d == 'started' || state_$d == 'resumed') {  
+            if (state_$d == 'started' || state_$d == 'resumed') { 
+                if (state_$d == 'started') {
+                    localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen            
+                }
+                
                 // == Startzeit ==            
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
                 url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); st_$d = parseInt(data); return st_$d;} );
+                \$.get( url_$d, function (data) {
+                                    data  = data.replace(/\\n/g, ''); 
+                                    st_$d = parseInt(data); 
+                                    return st_$d;
+                                } 
+                      );
                 
                 startDate_$d = new Date(st_$d);
                 
@@ -1116,9 +1124,9 @@ sub digitalWatch {
                 command = '{ int(time*1000) }';
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
-                                    data     = data.replace(/\\n/g, ''); 
-                                    ct_$d    = parseInt(data);  
-                                    return (ct_$d);
+                                    data  = data.replace(/\\n/g, ''); 
+                                    ct_$d = parseInt(data);  
+                                    return ct_$d;
                                 } 
                       );                
                 
@@ -1137,7 +1145,7 @@ sub digitalWatch {
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                checkIfAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                      // Alarm auslösen wenn zutreffend
+                checkAndDoAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                  // Alarm auslösen wenn zutreffend
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
             }
@@ -1148,7 +1156,7 @@ sub digitalWatch {
                 seconds_$d = localStorage.getItem('s_$d');
                 
                 sumsecs_$d = parseInt(hours_$d*3600) + parseInt(minutes_$d*60) + parseInt(seconds_$d);
-                localStoreSet (NaN, NaN, NaN, sumsecs_$d);
+                localStoreSet        (NaN, NaN, NaN, sumsecs_$d);
             }
 
             if (state_$d == 'initialized') {
@@ -1156,22 +1164,27 @@ sub digitalWatch {
                 minutes_$d = 0;
                 seconds_$d = 0;
 
-                localStoreSet (hours_$d, minutes_$d, seconds_$d); 
+                localStoreSet (hours_$d, minutes_$d, seconds_$d);
+                localStoreSetLastalm ('NaN');                                            // letzte Alarmzeit zurücksetzen                
             }
         }
         
         if (watchkind_$d == 'countdownwatch') {        
-            devName_$d     = '$d';        
+            devName_$d = '$d';        
             
             command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                      
-                                return (state_$d, afree_$d);
+                                return state_$d;
                             } 
                   );
             
-            if (state_$d == 'started' || state_$d == 'resumed') {                 
+            if (state_$d == 'started' || state_$d == 'resumed') {
+                if (state_$d == 'started') {
+                    localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen            
+                }
+                
                 // == Ermittlung Countdown Startwert ==         
                 command   = '{ReadingsNum(\"'+devName_$d+'\",\"countInitVal\", 0)}';
                 url_$d    = makeCommand(command);
@@ -1204,9 +1217,9 @@ sub digitalWatch {
                 command   = '{ int(time*1000) }';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
-                                    data     = data.replace(/\\n/g, ''); 
-                                    ct_$d    = parseInt(data);                               
-                                    return (ct_$d);
+                                    data  = data.replace(/\\n/g, ''); 
+                                    ct_$d = parseInt(data);                               
+                                    return ct_$d;
                                 } 
                       );
      
@@ -1225,10 +1238,9 @@ sub digitalWatch {
                 minutes_$d     = parseInt(countcurr_$d / 60);
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
      
-                checkIfAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                      // Alarm auslösen wenn zutreffend
+                checkAndDoAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                 // Alarm auslösen wenn zutreffend
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
-                
             }
             
             if (state_$d == 'stopped') {
@@ -1245,7 +1257,8 @@ sub digitalWatch {
                 minutes_$d = 0;
                 seconds_$d = 0;
                 
-                localStoreSet (hours_$d, minutes_$d, seconds_$d); 
+                localStoreSet (hours_$d, minutes_$d, seconds_$d);
+                localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen
             }
         }
         
