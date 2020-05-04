@@ -72,6 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.15.1" => "04.05.2020  fix permanently events when no alarmTime is set in countdownwatch and countdown is finished ",
   "0.15.0" => "04.05.2020  new attribute 'digitalSegmentType' for different segement count, also new attributes ".
                            "'digitalDigitAngle', 'digitalDigitDistance', 'digitalDigitHeight', 'digitalDigitWidth', 'digitalSegmentDistance' ".
                            "'digitalSegmentWidth', stopwatches don't stop when alarm is triggered (use notify to do it) ",
@@ -177,14 +178,15 @@ sub Set {                                                    ## no critic 'compl
   my $prop2 = $a[4];
   my $prop3 = $a[5];
   my $model = $hash->{MODEL};
-  my $addp  = AttrVal($name,"digitalDisplayPattern","watch");
+  my $addp  = AttrVal($name, "digitalDisplayPattern", "watch");
     
-  return if(IsDisabled($name) || $addp !~ /stopwatch|staticwatch|countdownwatch/);
+  return if(IsDisabled($name) || $addp !~ /watch/);
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
   $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
   $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
-  $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);    
+  $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);
+  $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);  
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -386,7 +388,7 @@ sub digitalWatch {
   my $addd     = AttrVal($d, "digitalDigitDistance",   2);
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
-  my $alarm    = " ".ReadingsVal($d, "alarmTime",      $alarmdef);
+  my $alarm    = " ".ReadingsVal($d, "alarmTime",      "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                        # dummy
   my ($h,$m,$s) = (0,0,0); 
@@ -1044,7 +1046,7 @@ sub digitalWatch {
     
     // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
     function checkAndDoAlm (acttime) {
-        lastalmtime = localStorage.getItem('lastalmtime_$d');               // letzte Alarmzeit laden
+        lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
         if ( (acttime == '$alarm' || acttime == ' $alarmdef') && acttime != lastalmtime ) {
             command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
             url_$d  = makeCommand(command);
