@@ -1043,20 +1043,20 @@ sub digitalWatch {
     }
     
     // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
-    function checkAndDoAlm (devname, acttime, almtime, almdef) {
+    function checkAndDoAlm (acttime) {
         lastalmtime = localStorage.getItem('lastalmtime_$d');               // letzte Alarmzeit laden
-        if ( (acttime == almtime || acttime == ' '+almdef) && acttime != lastalmtime ) {
-            command = '{ CommandSetReading(undef, \"'+devname+' alarmed '+acttime+'\") }';
+        if ( (acttime == '$alarm' || acttime == ' $alarmdef') && acttime != lastalmtime ) {
+            command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
             url_$d  = makeCommand(command);
               
             localStoreSetLastalm (acttime);                                    // aktuelle Alarmzeit sichern 
               
-            if(acttime == almtime) {
+            if(acttime == '$alarm') {
                \$.get(url_$d);
             
             } else {
                 \$.get(url_$d, function (data) {
-                                command = '{ CommandSetReading(undef, \"'+devname+' state stopped\") }';
+                                command = '{ CommandSetReading(undef, \"$d state stopped\") }';
                                 url_$d  = makeCommand(command);
                                 \$.get(url_$d);
                             }
@@ -1145,7 +1145,7 @@ sub digitalWatch {
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                checkAndDoAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                  // Alarm auslösen wenn zutreffend
+                checkAndDoAlm ($ddt);                  // Alarm auslösen wenn zutreffend
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
             }
@@ -1238,7 +1238,7 @@ sub digitalWatch {
                 minutes_$d     = parseInt(countcurr_$d / 60);
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
      
-                checkAndDoAlm (devName_$d, $ddt, '$alarm', '$alarmdef');                 // Alarm auslösen wenn zutreffend
+                checkAndDoAlm ($ddt);                 // Alarm auslösen wenn zutreffend
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
             }
