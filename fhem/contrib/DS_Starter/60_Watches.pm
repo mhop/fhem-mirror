@@ -72,6 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.16.0" => "04.05.2020  delete attr 'digitalDisplayText', new setter 'displayText', 'displayTextDel' ",
   "0.15.1" => "04.05.2020  fix permanently events when no alarmTime is set in countdownwatch and countdown is finished ",
   "0.15.0" => "04.05.2020  new attribute 'digitalSegmentType' for different segement count, also new attributes ".
                            "'digitalDigitAngle', 'digitalDigitDistance', 'digitalDigitHeight', 'digitalDigitWidth', 'digitalSegmentDistance' ".
@@ -106,7 +107,6 @@ sub Initialize {
   $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
-                                "digitalDisplayText ".
                                 "digitalDigitAngle:slider,-30,0.5,30,1 ".
                                 "digitalDigitDistance:slider,0.5,0.1,10,1 ".
                                 "digitalDigitHeight:slider,5,0.1,50,1 ".
@@ -180,13 +180,14 @@ sub Set {                                                    ## no critic 'compl
   my $model = $hash->{MODEL};
   my $addp  = AttrVal($name, "digitalDisplayPattern", "watch");
     
-  return if(IsDisabled($name) || $addp !~ /watch/);
+  return if(IsDisabled($name));
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
   $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
   $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
   $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);
-  $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);  
+  # $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);
+  $setlist .= "displayTextSet displayTextDel:noArg "                                            if($addp eq "text");    
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -227,7 +228,7 @@ sub Set {                                                    ## no critic 'compl
       my $st = int(time*1000);                                             # Millisekunden ! 
       my $ct = $prop*3600 + $prop1*60 + $prop2;                            # Sekunden !
       
-      delReadings     ($name, "countInitVal");
+      delReadings         ($name, "countInitVal");
       
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "countInitVal", $ct); 
@@ -246,18 +247,27 @@ sub Set {                                                    ## no critic 'compl
   } elsif ($opt eq "stop") {
       readingsSingleUpdate($hash, "state", "stopped",  1);
       
+  } elsif ($opt eq "displayTextSet") {
+      shift @a; shift @a;
+      
+      my $txt = join (" ", @a);
+      readingsSingleUpdate($hash, "displayText", $txt, 0);
+      
+  } elsif ($opt eq "displayTextDel") {      
+      delReadings ($name, "displayText");
+      
   } elsif ($opt eq "reset") {
-      delReadings     ($name);
-      readingsSingleUpdate($hash, "state", "initialized",  1);
+      delReadings         ($name);
+      readingsSingleUpdate($hash, "state", "initialized", 1);
       
   } elsif ($opt eq "time") {
       return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
   
-      readingsBeginUpdate         ($hash); 
-      readingsBulkUpdateIfChanged ($hash, "hour",   $prop);
-      readingsBulkUpdateIfChanged ($hash, "minute", $prop1);
-      readingsBulkUpdate          ($hash, "second", $prop2);                    
-      readingsEndUpdate           ($hash, 1);
+      readingsBeginUpdate ($hash); 
+      readingsBulkUpdate  ($hash, "hour",   $prop);
+      readingsBulkUpdate  ($hash, "minute", $prop1);
+      readingsBulkUpdate  ($hash, "second", $prop2);                    
+      readingsEndUpdate   ($hash, 1);
       
   } else {
       return "$setlist"; 
@@ -380,7 +390,6 @@ sub digitalWatch {
   my $bgc      = AttrVal($d, "digitalColorBackground", "C4C4C4");
   my $dcd      = AttrVal($d, "digitalColorDigits",     "000000"); 
   my $addp     = AttrVal($d, "digitalDisplayPattern",  "watch");  
-  my $ddt      = AttrVal($d, "digitalDisplayText",     "Play");
   my $adst     = AttrVal($d, "digitalSegmentType",     7);
   my $adsw     = AttrVal($d, "digitalSegmentWidth",    1.5);
   my $addh     = AttrVal($d, "digitalDigitHeight",     20);
@@ -388,6 +397,9 @@ sub digitalWatch {
   my $addd     = AttrVal($d, "digitalDigitDistance",   2);
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
+  
+  my $ddt      =  ReadingsVal($d, "displayText",    "Play");
+  $ddt         =~ s/[\r\n]//g;
   my $alarm    = " ".ReadingsVal($d, "alarmTime",      "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                        # dummy
@@ -2109,6 +2121,28 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     </li>
     <br>
     
+    <a name="displayTextSet"></a>
+    <li><b>displayTextSet</b><br>
+      Stellt den anzuzeigenden Text ein. <br> 
+      Dieses Set-Kommando ist nur bei einer digitalen Segmentanzeige mit "digitalDisplayPattern = text" vorhanden. <br>
+      (default: PLAY) <br><br>
+      
+      <b>Hinweis:</b> <br>
+      Die darstellbaren Zeichen sind vom Attribut "digitalSegmentType" abhängig. <br>
+      Mit der (default) Siebensegmentanzeige können lediglich Ziffern, Bindestrich, Unterstrich und die Buchstaben 
+      A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
+      Damit lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. <br>
+      Für Textdarstellung wird empfohlen die Sechzehnsegmentanzeige mit dem Attribut "digitalSegmentType" einzustellen !    
+    </li>
+    <br>
+    
+    <a name="displayTextDel"></a>
+    <li><b>displayTextDel</b><br>
+      Löscht den Anzeigetext. <br>
+      Dieses Set-Kommando ist nur bei einer digitalen Segmentanzeige mit "digitalDisplayPattern = text" vorhanden. <br>
+    </li>
+    <br>
+    
     <a name="reset"></a>
     <li><b>reset</b><br>
       Stoppt die Stoppuhr (falls sie läuft) und löscht alle spezifischen Readings bzw. setzt sie auf initialized zurück. <br>
@@ -2155,7 +2189,14 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   <br>
 
   <a name="WatchesGet"></a>
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b> 
+  
+  <ul>
+  
+    N/A
+    
+  </ul>
+  <br>
 
   <a name="WatchesAttr"></a>
   <b>Attribute</b>
@@ -2340,7 +2381,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <a name="digitalDisplayPattern"></a>
     <li><b>digitalDisplayPattern [countdownwatch | staticwatch | stopwatch | text | watch]</b><br>
       Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
-      Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
+      Der anzuzeigende Text im Modus Textanzeige kann mit set <b>displayText</b> definiert werden. <br><br>
       
       <b>Hinweis:</b> Bei Textanzeige wird empfohlen das Attribut "digitalSegmentType" auf "16" zu stellen. <br><br>
       
@@ -2356,22 +2397,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     </ul>
     <br>
     <br>
-    </li>
-    
-    <a name="digitalDisplayText"></a>
-    <li><b>digitalDisplayText</b><br>
-      Ist das Attribut "digitalDisplayPattern" auf "text" gesetzt, kann mit diesem Attribut der 
-      anzuzeigende Text eingestellt werden. <br>
-      (default: PLAY) <br><br>
-      
-      <b>Hinweis:</b> <br>
-      Die darstellbaren Zeichen sind vom Attribut "digitalSegmentType" abhängig. <br>
-      Mit der (default) Siebensegmentanzeige können lediglich Ziffern, Bindestrich, Unterstrich und die Buchstaben 
-      A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
-      Damit lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. <br>
-      Für Textdarstellung wird empfohlen die Sechzehnsegmentanzeige mit dem Attribut "digitalSegmentType" einzustellen !    
-    </li>
-    <br> 
+    </li> 
     
     <a name="digitalSegmentDistance"></a>
     <li><b>digitalSegmentDistance </b><br>
