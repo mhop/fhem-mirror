@@ -72,6 +72,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.15.0" => "04.05.2020  new attribute 'digitalSegmentType' for different segement count, also new attributes ".
+                           "'digitalDigitAngle', 'digitalDigitDistance', 'digitalDigitHeight', 'digitalDigitWidth', 'digitalSegmentDistance' ".
+                           "'digitalSegmentWidth', stopwatches don't stop when alarm is triggered (use notify to do it) ",
   "0.14.0" => "03.05.2020  switch to packages, use setVersionInfo, support of Meta.pm ",
   "0.13.0" => "03.05.2020  set resume for countdownwatch, set 'continue' removed ",
   "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
@@ -103,6 +106,13 @@ sub Initialize {
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
                                 "digitalDisplayText ".
+                                "digitalDigitAngle:slider,-30,0.5,30,1 ".
+                                "digitalDigitDistance:slider,0.5,0.1,10,1 ".
+                                "digitalDigitHeight:slider,5,0.1,50,1 ".
+                                "digitalDigitWidth:slider,5,0.1,50,1 ".
+                                "digitalSegmentDistance:slider,0,0.1,5,1 ".
+                                "digitalSegmentType:7,14,16 ".
+                                "digitalSegmentWidth:slider,0.3,0.1,3.5,1 ".
                                 "disable:1,0 ".
                                 "hideDisplayName:1,0 ".
                                 "htmlattr ".
@@ -369,6 +379,13 @@ sub digitalWatch {
   my $dcd      = AttrVal($d, "digitalColorDigits",     "000000"); 
   my $addp     = AttrVal($d, "digitalDisplayPattern",  "watch");  
   my $ddt      = AttrVal($d, "digitalDisplayText",     "Play");
+  my $adst     = AttrVal($d, "digitalSegmentType",     7);
+  my $adsw     = AttrVal($d, "digitalSegmentWidth",    1.5);
+  my $addh     = AttrVal($d, "digitalDigitHeight",     20);
+  my $addw     = AttrVal($d, "digitalDigitWidth",      12);
+  my $addd     = AttrVal($d, "digitalDigitDistance",   2);
+  my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
+  my $adda     = AttrVal($d, "digitalDigitAngle",      9);
   my $alarm    = " ".ReadingsVal($d, "alarmTime",      $alarmdef);
   
   my $ddp = "###:##:##";                                                        # dummy
@@ -381,8 +398,9 @@ sub digitalWatch {
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
   } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
-      $ddp = "###:##:##";
-      $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
+      $alarmdef = "00:00:-1" if($addp eq "stopwatch");                         # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
+      $ddp      = "###:##:##";
+      $ddt      = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
                     + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
@@ -392,8 +410,8 @@ sub digitalWatch {
       $m   = ReadingsVal($d, "minute", 0);
       $s   = ReadingsVal($d, "second", 0);
       $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
-                    + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
-                    + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
+                 + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
+                 + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
   } elsif ($addp eq "text") {
       my $txtc = length($ddt);
@@ -419,7 +437,7 @@ sub digitalWatch {
     // Segment corner types
     SegmentDisplay_$d.SymmetricCorner = 0;
     SegmentDisplay_$d.SquaredCorner   = 1;
-    SegmentDisplay_$d.RoundedCorner   = 2;
+    SegmentDisplay_$d.RoundedCorner   = 3;
 
     // Definition variables
     var state_$d;
@@ -434,7 +452,7 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
-    var afree_$d = 0;    
+    var afree_$d = 0;   
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -446,11 +464,36 @@ sub digitalWatch {
         this.displayAngle    = 12;
         this.segmentWidth    = 2.5;
         this.segmentDistance = 0.2;
-        this.segmentCount    = SegmentDisplay_$d.SevenSegment;
+
+        if ($adst == '7') {
+            this.segmentCount = SegmentDisplay_$d.SevenSegment;
+        }
+        
+        if ($adst == '14') {
+            this.segmentCount = SegmentDisplay_$d.FourteenSegment;
+        }
+        
+        if ($adst == '16') {
+            this.segmentCount = SegmentDisplay_$d.SixteenSegment;
+        }
+        
         this.cornerType      = SegmentDisplay_$d.RoundedCorner;
         this.colorOn         = 'rgb(233, 93, 15)';
         this.colorOff        = 'rgb(75, 30, 5)';
     };
+    
+    var display_$d = new SegmentDisplay_$d('display_$d');
+    display_$d.pattern         = '$ddp       ';
+    display_$d.cornerType      = 2;
+    // display_$d.displayType     = 7;
+    display_$d.displayAngle    = $adda;                          // Zeichenwinkel:  -30 - 30 (9)
+    display_$d.digitHeight     = $addh;                          // Zeichenhöhe:    5   - 50 (20)
+    display_$d.digitWidth      = $addw;                          // Zeichenbreite:  5   - 50 (12)
+    display_$d.digitDistance   = $addd;                          // Zeichenabstand: 0.5 - 10 (2)
+    display_$d.segmentWidth    = $adsw;                          // Stärke des einzelnen Segments: 0.3 - 3.5 (1.5)
+    display_$d.segmentDistance = $adsd;                          // Abstand der Einzelsegmente:    0   - 5   (0.5)
+    display_$d.colorOn         = '#$dcd';                        // original: display_$d.colorOn = 'rgba(0, 0, 0, 0.9)';
+    display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
 
     SegmentDisplay_$d.prototype.setValue = function(value) {
                                                this.value = value;
@@ -965,19 +1008,6 @@ sub digitalWatch {
                                                              }
                                                          }
                                                      };
-
-    var display_$d = new SegmentDisplay_$d('display_$d');
-    display_$d.pattern         = '$ddp       ';
-    display_$d.cornerType      = 2;
-    display_$d.displayType     = 7;
-    display_$d.displayAngle    = 9;
-    display_$d.digitHeight     = 20;
-    display_$d.digitWidth      = 12;
-    display_$d.digitDistance   = 2;
-    display_$d.segmentWidth    = 3;
-    display_$d.segmentDistance = 0.5;
-    display_$d.colorOn         = '#$dcd';                        // original: display_$d.colorOn = 'rgba(0, 0, 0, 0.9)';
-    display_$d.colorOff        = 'rgba(0, 0, 0, 0.1)';
     
     // CSRF-Token auslesen
     var body = document.querySelector(\"body\");
@@ -1007,6 +1037,11 @@ sub digitalWatch {
         if (Number.isInteger(sumsecs)) { localStorage.setItem('ss_$d', sumsecs); }
     }
     
+    // localStorage speichern letzte Alarmzeit
+    function localStoreSetLastalm (lastalmtime) {
+        localStorage.setItem('lastalmtime_$d', lastalmtime);
+    }
+    
     animate_$d();
     
     function animate_$d() {
@@ -1030,7 +1065,8 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'stopwatch') {        
-            devName_$d = '$d';   
+            devName_$d     = '$d';  
+            lastalmtime_$d = localStorage.getItem('lastalmtime_$d');             // letzte Alarmzeit laden              
             
             command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
             url_$d  = makeCommand(command);
@@ -1076,17 +1112,23 @@ sub digitalWatch {
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                var act = $ddt;
-                if (act == '$alarm' && act != ' $alarmdef' && afree_$d == 1) {
-                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
-                    url_$d  = makeCommand(command);
-
+                var acttime_$d = $ddt;
+                if ( (acttime_$d == '$alarm' || acttime_$d == ' $alarmdef') && acttime_$d != lastalmtime_$d ) {
+                    command        = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+acttime_$d+'\") }';
+                    localStoreSetLastalm (acttime_$d);                                    // aktuelle Alarmzeit sichern 
+                    url_$d         = makeCommand(command);
+                      
+                    if(acttime_$d == '$alarm') {
+                       \$.get(url_$d);
+                    
+                    } else {
                         \$.get(url_$d, function (data) {
                                           command = '{ CommandSetReading(undef, \"'+devName_$d+' state stopped\") }';
                                           url_$d  = makeCommand(command);
                                           \$.get(url_$d);
-                                       } 
-                              );
+                                       }
+                              );                                       
+                    }
                 }
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
@@ -1111,13 +1153,13 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'countdownwatch') {        
-            devName_$d = '$d';           
+            devName_$d     = '$d';   
+            lastalmtime_$d = localStorage.getItem('lastalmtime_$d');             // letzte Alarmzeit laden        
             
             command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
-                                state_$d = data.replace(/\\n/g, ''); 
-                                afree_$d = 0;                            // die Alarmierung zu Beginn nicht freischalten                        
+                                state_$d = data.replace(/\\n/g, '');                      
                                 return (state_$d, afree_$d);
                             } 
                   );
@@ -1135,7 +1177,6 @@ sub digitalWatch {
                       
                 if (state_$d == 'resumed') {
                     countInitVal_$d = localStorage.getItem('ss_$d');
-                    afree_$d        = 0;                                          // beim 'resume' keine erneute Alarmierung
                 } else {
                     countInitVal_$d = parseInt(ci_$d);                            // Initialwert Countdown in Sekunden 
                 }
@@ -1157,9 +1198,8 @@ sub digitalWatch {
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data     = data.replace(/\\n/g, ''); 
-                                    ct_$d    = parseInt(data);  
-                                    afree_$d = 1;                         // die Alarmierung freischalten                              
-                                    return (ct_$d,afree_$d);
+                                    ct_$d    = parseInt(data);                               
+                                    return (ct_$d);
                                 } 
                       );
      
@@ -1178,29 +1218,23 @@ sub digitalWatch {
                 minutes_$d     = parseInt(countcurr_$d / 60);
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
                 
-                var act = $ddt;
-                if (act == '$alarm' && afree_$d == 1) {
-                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
-                    url_$d  = makeCommand(command);
-
+                var acttime_$d = $ddt;
+                if ( (acttime_$d == '$alarm' || acttime_$d == ' $alarmdef') && acttime_$d != lastalmtime_$d ) {
+                    command        = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+acttime_$d+'\") }';
+                    localStoreSetLastalm (acttime_$d);                                    // aktuelle Alarmzeit sichern 
+                    url_$d         = makeCommand(command);
+                      
+                    if(acttime_$d == '$alarm') {
+                       \$.get(url_$d);
+                    
+                    } else {
                         \$.get(url_$d, function (data) {
                                           command = '{ CommandSetReading(undef, \"'+devName_$d+' state stopped\") }';
                                           url_$d  = makeCommand(command);
                                           \$.get(url_$d);
-                                       } 
-                              );
-                }
-                
-                if (act == ' $alarmdef') {
-                    command = '{ CommandSetReading(undef, \"'+devName_$d+' alarmed '+act+'\") }';
-                    url_$d  = makeCommand(command);
-
-                        \$.get(url_$d, function (data) {
-                                          command = '{ CommandSetReading(undef, \"'+devName_$d+' state stopped\") }';
-                                          url_$d  = makeCommand(command);
-                                          \$.get(url_$d);
-                                       } 
-                              );
+                                       }
+                              );                                       
+                    }
                 }
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d, NaN);
@@ -2268,12 +2302,43 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>digitalColorDigits</b><br>
       Farbe der Balkenanzeige in einer Digitaluhr.    
     </li>
+    <br> 
+
+    <a name="digitalDigitAngle"></a>
+    <li><b>digitalDigitAngle </b><br>
+      Stellt den Neigungswinkel der dargestellten Zeichen ein. <br>
+      (default: 9)      
+    </li>
+    <br> 
+    
+    <a name="digitalDigitDistance"></a>
+    <li><b>digitalDigitDistance </b><br>
+      Stellt den Zeichenabstand ein. <br>
+      (default: 2)      
+    </li>
     <br>  
+    
+    <a name="digitalDigitHeight"></a>
+    <li><b>digitalDigitHeight </b><br>
+      Stellt die Zeichenhöhe ein. <br>
+      (default: 20)      
+    </li>
+    <br>
+
+    <a name="digitalDigitWidth"></a>
+    <li><b>digitalDigitWidth </b><br>
+      Stellt die Zeichenbreite ein. <br>
+      (default: 12)      
+    </li>
+    <br>     
   
     <a name="digitalDisplayPattern"></a>
     <li><b>digitalDisplayPattern [countdownwatch | staticwatch | stopwatch | text | watch]</b><br>
       Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
       Der anzuzeigende Text im Modus Textanzeige kann mit dem Attribut <b>digitalDisplayText</b> definiert werden. <br><br>
+      
+      <b>Hinweis:</b> Bei Textanzeige wird empfohlen das Attribut "digitalSegmentType" auf "16" zu stellen. <br><br>
+      
     <ul>
     <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
@@ -2290,16 +2355,41 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     
     <a name="digitalDisplayText"></a>
     <li><b>digitalDisplayText</b><br>
-      Ist das Attribut "digitalDisplayPattern = text" gesetzt, kann mit "digitalDisplayText" der 
-      anzuzeigende Text eingestellt werden. Per Default ist "Play" eingestellt. <br>
-      Mit der Siebensegmentanzeige können Ziffern, Bindestrich, Unterstrich und die Buchstaben 
+      Ist das Attribut "digitalDisplayPattern" auf "text" gesetzt, kann mit diesem Attribut der 
+      anzuzeigende Text eingestellt werden. <br>
+      (default: PLAY) <br><br>
+      
+      <b>Hinweis:</b> <br>
+      Die darstellbaren Zeichen sind vom Attribut "digitalSegmentType" abhängig. <br>
+      Mit der (default) Siebensegmentanzeige können lediglich Ziffern, Bindestrich, Unterstrich und die Buchstaben 
       A, b, C, d, E, F, H, L, n, o, P, r, t, U und Y angezeigt werden. 
-      So lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. 
+      Damit lassen sich außer Zahlen auch kurze Texte wie „Error“, „HELP“, „run“ oder „PLAY“ anzeigen. <br>
+      Für Textdarstellung wird empfohlen die Sechzehnsegmentanzeige mit dem Attribut "digitalSegmentType" einzustellen !    
     </li>
     <br> 
     
+    <a name="digitalSegmentDistance"></a>
+    <li><b>digitalSegmentDistance </b><br>
+      Legt den Abstand zwischen den Segmenten fest. <br>
+      (default: 0.5)      
+    </li>
+    <br> 
+    
+    <a name="digitalSegmentType"></a>
+    <li><b>digitalSegmentType </b><br>
+      Schaltet die Segmentanzahl der Digitalanzeige um. <br>
+      (default: 7)      
+    </li>
+    <br> 
+
+    <a name="digitalSegmentWidth"></a>
+    <li><b>digitalSegmentWidth </b><br>
+      Verändert die Breite der einzelnen Segmente. <br>
+      (default: 1.5)      
+    </li>
+    <br>     
+    
   </ul>
-  
   </ul>
   
 </ul>
