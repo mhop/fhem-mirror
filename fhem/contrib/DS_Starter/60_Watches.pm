@@ -398,9 +398,9 @@ sub digitalWatch {
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
   
-  my $ddt      =  ReadingsVal($d, "displayText",    "Play");
+  my $ddt      =  ReadingsVal($d, "displayText",  "----");
   $ddt         =~ s/[\r\n]//g;
-  my $alarm    = " ".ReadingsVal($d, "alarmTime",      "aa:bb:cc");
+  my $alarm    = " ".ReadingsVal($d, "alarmTime", "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                        # dummy
   my ($h,$m,$s) = (0,0,0); 
@@ -2125,7 +2125,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>displayTextSet</b><br>
       Stellt den anzuzeigenden Text ein. <br> 
       Dieses Set-Kommando ist nur bei einer digitalen Segmentanzeige mit "digitalDisplayPattern = text" vorhanden. <br>
-      (default: PLAY) <br><br>
+      (default: ----) <br><br>
       
       <b>Hinweis:</b> <br>
       Die darstellbaren Zeichen sind vom Attribut "digitalSegmentType" abhängig. <br>
