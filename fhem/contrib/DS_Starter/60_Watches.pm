@@ -72,6 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.17.0" => "05.05.2020  new attr 'digitalTextTicker', 'digitalTextDigitNumber' ",
   "0.16.0" => "04.05.2020  delete attr 'digitalDisplayText', new setter 'displayText', 'displayTextDel' ",
   "0.15.1" => "04.05.2020  fix permanently events when no alarmTime is set in countdownwatch and countdown is finished ",
   "0.15.0" => "04.05.2020  new attribute 'digitalSegmentType' for different segement count, also new attributes ".
@@ -114,6 +115,8 @@ sub Initialize {
                                 "digitalSegmentDistance:slider,0,0.1,5,1 ".
                                 "digitalSegmentType:7,14,16 ".
                                 "digitalSegmentWidth:slider,0.3,0.1,3.5,1 ".
+                                "digitalTextTicker:1,0 ".
+                                "digitalTextDigitNumber ".
                                 "disable:1,0 ".
                                 "hideDisplayName:1,0 ".
                                 "htmlattr ".
@@ -324,6 +327,12 @@ sub Attr {
             my $ms = int(time*1000);
             readingsSingleUpdate($hash, "starttime", $ms, 0);
         }
+    } 
+
+    if ($cmd eq "set") {
+        if ($aName eq "digitalTextDigitNumber" && $aVal !~ /^\d+$/x) {
+            return qq{The value of "$aName" is not valid. Only integers are allowed !};
+        }
     }    
 
 return;
@@ -397,13 +406,16 @@ sub digitalWatch {
   my $addd     = AttrVal($d, "digitalDigitDistance",   2);
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
+  my $adtt     = AttrVal($d, "digitalTextTicker",      0);
+  my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
   
   my $ddt      =  ReadingsVal($d, "displayText",  "----");
   $ddt         =~ s/[\r\n]//g;
   my $alarm    = " ".ReadingsVal($d, "alarmTime", "aa:bb:cc");
   
-  my $ddp = "###:##:##";                                                        # dummy
-  my ($h,$m,$s) = (0,0,0); 
+  my $ddp = "###:##:##";                                                       # dummy
+  my ($h,$m,$s,$txtc) = (0,0,0,0); 
+  my $forerun = "";                                                            # init Vorlauf bei Laufschrift
   
   if($addp eq "watch") {
       $ddp = "###:##:##";
@@ -412,7 +424,7 @@ sub digitalWatch {
                     + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
   } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
-      $alarmdef = "aa:bb:cc" if($addp eq "stopwatch");                         # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
+      $alarmdef = "aa:bb:cc" if($addp eq "stopwatch");                        # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
       $ddp      = "###:##:##";
       $ddt      = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
                     + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
@@ -428,11 +440,15 @@ sub digitalWatch {
                  + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
   } elsif ($addp eq "text") {
-      my $txtc = length($ddt);
-      $ddp     = "";
-      for(my $i = 0; $i <= $txtc; $i++) {
-          $ddp .= "#";
+      $txtc = length($ddt);
+      $txtc = $adtdn if($adtdn);                                              # per Attribut definierte Anzahl der TextDigits im Display
+      $ddp  = "";
+      
+      for(my $i = 0; $i <= $txtc; $i++) {                                     # die Anzahl der TextDigits im Display berechnen
+          $ddp     .= "#";
+          $forerun .= " ";                                                    # Vorlauf bei Laufschrift = Länge des Schriftzuges (default)
       }
+      
       $ddt = "' ".$ddt."'";
   }
 
@@ -1272,11 +1288,23 @@ sub digitalWatch {
                 seconds_$d = 0;
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen
+                localStoreSetLastalm ('NaN');                             // letzte Alarmzeit zurücksetzen
             }
         }
         
         var value = $ddt;
+        
+        if (watchkind_$d == 'text' && $adtt == 1) {                      // Laufschrift anzeigen 
+            var rttime    = new Date();
+            var rthours   = rttime.getHours();
+            var rtminutes = rttime.getMinutes();
+            var rtseconds = rttime.getSeconds();
+            var rtmillis  = rttime.getMilliseconds();
+            // var text  = '     abcdefghijklmnopqrstuvwxyz     0123456789      ';
+            var text     = '$forerun'+value+'      ';
+            var index    = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
+            value        = text.substr(index, $txtc+parseInt(1));
+        }
 
         if(value == ' undefined:undefined:undefined' || value == ' NaN:NaN:NaN') {
            value = '   :  :  '; 
@@ -2218,7 +2246,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     
     <a name="htmlattr"></a>
     <li><b>htmlattr</b><br>
-      Zusätzliche HTML Tags zur Größenänderung de Uhr. <br><br>
+      Zusätzliche HTML Tags zur Größenänderung der Uhr / Anzeige. <br><br>
       <ul>
         <b>Beispiel: </b><br>
         attr &lt;name&gt; htmlattr width="125" height="125" <br>
@@ -2417,7 +2445,23 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
       Verändert die Breite der einzelnen Segmente. <br>
       (default: 1.5)      
     </li>
-    <br>     
+    <br> 
+
+    <a name="digitalTextDigitNumber"></a>
+    <li><b>digitalTextDigitNumber &lt;Anzahl&gt; </b><br>
+      Wenn &lt;Anzahl&gt > 0 wird die Anzahl der Stellen einer Textanzeige (digitalDisplayPattern = text) fest eingestellt. 
+      Wenn &lt;Anzahl&gt = 0 oder nicht gesetzt erfolgt die Festlegung automatisch. In diesem Fall erfolgt eine Adaption
+      der Zeichengröße an die Anzahl abhängig von der eingestellten Displaygröße (siehe htmlattr). <br>
+      (default: 0)      
+    </li>
+    <br>
+
+    <a name="digitalTextTicker"></a>
+    <li><b>digitalTextTicker </b><br>
+      Schaltet den Laufschriftmodus einer Textanzeige (digitalDisplayPattern = text) ein bzw. aus. <br>
+      (default: 0)      
+    </li>
+    <br>      
     
   </ul>
   </ul>
