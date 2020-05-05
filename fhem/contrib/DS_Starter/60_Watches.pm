@@ -254,6 +254,7 @@ sub Set {                                                    ## no critic 'compl
       shift @a; shift @a;
       
       my $txt = join (" ", @a);
+      $txt    =~ s/[\r\n]//g;
       readingsSingleUpdate($hash, "displayText", $txt, 0);
       
   } elsif ($opt eq "displayTextDel") {      
@@ -409,8 +410,8 @@ sub digitalWatch {
   my $adtt     = AttrVal($d, "digitalTextTicker",      0);
   my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
   
-  my $ddt      =  ReadingsVal($d, "displayText",  "----");
-  $ddt         =~ s/[\r\n]//g;
+  my $deftxt   =  "    ";
+  my $ddt      =  ReadingsVal($d, "displayText",  $deftxt);
   my $alarm    = " ".ReadingsVal($d, "alarmTime", "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                       # dummy
@@ -482,7 +483,8 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
-    var afree_$d = 0;   
+    var value_$d   = ' $deftxt';                     // default Digitaltext initialisieren
+    var tlength_$d = '$txtc';                        // Textlänge Digitaltext initialisieren
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -513,7 +515,7 @@ sub digitalWatch {
     };
     
     var display_$d = new SegmentDisplay_$d('display_$d');
-    display_$d.pattern         = '$ddp       ';
+    display_$d.pattern         = '$ddp       ';                  // Textschablone initialisieren
     display_$d.cornerType      = 2;
     // display_$d.displayType     = 7;
     display_$d.displayAngle    = $adda;                          // Zeichenwinkel:  -30 - 30 (9)
@@ -1288,30 +1290,54 @@ sub digitalWatch {
                 seconds_$d = 0;
                 
                 localStoreSet (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm ('NaN');                             // letzte Alarmzeit zurücksetzen
+                localStoreSetLastalm ('NaN');                                 // letzte Alarmzeit zurücksetzen
             }
         }
         
-        var value = $ddt;
+        if (watchkind_$d == 'text') {         
+            tlength_$d = value_$d.length-1;                                   // Länge des Textes abzgl. 1 für ' '
+            if($adtdn) {
+                tlength_$d = $adtdn;
+            }
+            
+            display_$d.pattern = '';                                           // Textschablone erstellen
+            for (var i = 0; i <= tlength_$d; i++) {
+                display_$d.pattern += '#';
+            }
+            display_$d.pattern += '       ';                                  // Abstand Text zum rechten Rand            
         
-        if (watchkind_$d == 'text' && $adtt == 1) {                      // Laufschrift anzeigen 
-            var rttime    = new Date();
-            var rthours   = rttime.getHours();
-            var rtminutes = rttime.getMinutes();
-            var rtseconds = rttime.getSeconds();
-            var rtmillis  = rttime.getMilliseconds();
-            // var text  = '     abcdefghijklmnopqrstuvwxyz     0123456789      ';
-            var text     = '$forerun'+value+'      ';
-            var index    = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
-            value        = text.substr(index, $txtc+parseInt(1));
-        }
-
-        if(value == ' undefined:undefined:undefined' || value == ' NaN:NaN:NaN') {
-           value = '   :  :  '; 
+            if ($adtt == 1) {                                                 // Text als Laufband
+                var rttime    = new Date();
+                var rthours   = rttime.getHours();
+                var rtminutes = rttime.getMinutes();
+                var rtseconds = rttime.getSeconds();
+                var rtmillis  = rttime.getMilliseconds();      
+           
+                var text  = '$forerun'+value_$d+'      ';
+                var index = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
+                value_$d  = text.substr(index, $txtc+parseInt(1));
+            
+            }
+            
+            command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';   // Text dynamisch aus Reading lesen
+            url_$d  = makeCommand(command);
+            \$.get( url_$d, function (data) {
+                                value_$d = data.replace(/\\n/g, '');
+                                value_$d = ' '+value_$d;                           
+                                return value_$d;
+                            } 
+                  );
+        
+        } else {
+            value_$d = $ddt;
+            
+            if(value_$d == ' undefined:undefined:undefined' || value_$d == ' NaN:NaN:NaN') {
+               value_$d = '   :  :  '; 
+            }
         }
         
-        display_$d.setValue(value);
-        window.setTimeout('animate_$d()', 200);
+        display_$d.setValue(value_$d);
+        window.setTimeout('animate_$d()', 200); 
     }
 
     </script>
