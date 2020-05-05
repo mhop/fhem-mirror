@@ -1,8 +1,8 @@
-﻿##############################################
+##############################################
 # 00_THZ
 # $Id$
-# by immi 10/2019
-my $thzversion = "0.182";  #   
+# by immi 05/2020
+my $thzversion = "0.184";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -32,6 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use feature ":5.10";
 use SetExtensions;
 use Blocking;
+use DevIo;
 
 sub THZ_Read($);
 sub THZ_ReadAnswer($);
@@ -423,7 +424,8 @@ my %sets439539common = (
   "p24Hyst4"			    	=> {cmd2=>"0A05C3", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
   "p25Hyst5"			    	=> {cmd2=>"0A05C4", argMin =>   "0", argMax =>    "5", 	type =>"5temp",  unit =>" K"},
   "p29HystAsymmetry"			=> {cmd2=>"0A05C5", argMin =>   "1", argMax =>    "5",	type =>"1clean",  unit =>""}, 
-  "p30integralComponent"		=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"}, 
+  "p30integralComponent"		=> {cmd2=>"0A0162", argMin =>  "10", argMax =>  "999",	type =>"1clean",  unit =>" Kmin"},
+  "p31MaxBoosterStgHtg"         => {cmd2=>"0A059F", argMin =>   "0", argMax =>   "3", 	type =>"1clean",  unit =>""},
   "p32HystDHW"			    	=> {cmd2=>"0A0140", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
   "p79BoosterTimeoutHC"			=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
@@ -707,8 +709,8 @@ my %sets206 = (
   "progHC2Friday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progHC2Saturday"             => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progHC2Sunday"               => {parent=>"pHeatProg",    argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
-  "progFAN1StartTime"           => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ptime",  unit =>""}, 
-  "progFAN1EndTime"             => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ütime",  unit =>""},
+  "progFAN1StartTime"           => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ptime",  unit =>""},
+  "progFAN1EndTime"             => {parent=>"pFanProg",     argMin => "00:00",	argMax => "23:59",  type =>"ptime",  unit =>""},
   "progFAN1Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN1Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN1Tuesday"             => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
@@ -717,7 +719,7 @@ my %sets206 = (
   "progFAN1Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN1Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN1Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
-  "progFAN2StartTime"           => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", type =>"ptime",  unit =>""}, 
+  "progFAN2StartTime"           => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", type =>"ptime",  unit =>""},
   "progFAN2EndTime"             => {parent=>"pFanProg",     argMin => "00:00", 	argMax =>  "23:59", type =>"ptime",  unit =>""},
   "progFAN2Enable"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN2Monday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
@@ -726,11 +728,11 @@ my %sets206 = (
   "progFAN2Thursday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN2Friday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
   "progFAN2Saturday"            => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""},
-  "progFAN2Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""}  
+  "progFAN2Sunday"              => {parent=>"pFanProg",     argMin => "0", 		argMax =>    "1", 	type =>"pclean", unit =>""} 
  );
 
 my %setsonly214 = (
-  "ResetErrors"			        => {cmd2=>"F8",             argMin =>   "0",    argMax =>    "0",	type =>"0clean", unit =>""}
+  "ResetErrors"					=> {cmd2=>"F8",             argMin =>   "0",    argMax =>    "0",	type =>"0clean", unit =>""}
 );
 
 
@@ -742,13 +744,13 @@ my %setsonly214 = (
 
 my %getsonly439 = (
 #"debug_read_raw_register_slow"	=> { },
-  "sSol"			    => {cmd2=>"16", type =>"16sol", unit =>""},
+  "sSol"				=> {cmd2=>"16", type =>"16sol", unit =>""},
   "sHistory"			=> {cmd2=>"09", type =>"09his", unit =>""},
   "sLast10errors"		=> {cmd2=>"D1", type =>"D1last", unit =>""},
   "sFan"  				=> {cmd2=>"E8", type =>"E8fan", unit =>""},
-  "sDHW"			    => {cmd2=>"F3", type =>"F3dhw", unit =>""},
-  "sHC1"			    => {cmd2=>"F4", type =>"F4hc1", unit =>""},
-  "sHC2"			    => {cmd2=>"F5", type =>"F5hc2", unit =>""},
+  "sDHW"				=> {cmd2=>"F3", type =>"F3dhw", unit =>""},
+  "sHC1"				=> {cmd2=>"F4", type =>"F4hc1", unit =>""},
+  "sHC2"				=> {cmd2=>"F5", type =>"F5hc2", unit =>""},
   "sControl"  			=> {cmd2=>"F2", type =>"F2ctrl", unit =>""},
   "sGlobal"	     		=> {cmd2=>"FB", type =>"FBglob", unit =>""},  #allFB
   "sTimedate" 			=> {cmd2=>"FC", type =>"FCtime", unit =>""},
@@ -860,7 +862,6 @@ my $internalHash;
 ########################################################################################
 sub THZ_Initialize($) {
   my ($hash) = @_;
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "THZ_Read";
@@ -950,10 +951,10 @@ sub THZ_Refresh_all_gets($) {
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
   my $timedelay= 65; 						#5 seconds were ok but considering winter 2017/2018 I prefer to increase
   foreach  my $cmdhash  (keys %gets) {
-    my %par = (  hash => $hash, command => $cmdhash );
-    #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
-    InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
-    $timedelay += 1.6;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
+        my %par = (  hash => $hash, command => $cmdhash );
+        #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
+        InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
+        $timedelay += 1.6;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
   }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
 }
 
@@ -1015,12 +1016,11 @@ sub THZ_GetRefresh($) {
 #
 ########################################################################################
 sub THZ_Write($$) {
-  my ($hash,$bstring) = @_;
-  my $name = $hash->{NAME};
-  Log3 $hash->{NAME}, 5, "$hash->{NAME} sending $bstring"; 
-  DevIo_SimpleWrite($hash, $bstring, 1);
+    my ($hash,$bstring) = @_;
+    my $name = $hash->{NAME};
+    Log3 $hash->{NAME}, 5, "$hash->{NAME} sending $bstring"; 
+    DevIo_SimpleWrite($hash, $bstring, 1);
 }
-
 
 #####################################
 # sub THZ_Read($)
@@ -1028,16 +1028,16 @@ sub THZ_Write($$) {
 # used just for testing the interface
 ########################################################################################
 sub THZ_Read($) {
-  my ($hash) = @_;
-  my $buf = DevIo_SimpleRead($hash);
-  return "" if(!defined($buf));
-  my $name = $hash->{NAME};
-  $hash->{helper}{PARTIAL} .= uc(unpack('H*', $buf));
-  my $msg=$hash->{helper}{PARTIAL};
-  my $err;
-  if ( !defined($hash->{helper}{step}) or (length($msg) == 1)  or (($msg =~ m/^01/) and ($msg !~ m/1003$/m ))) {} 
-  else {
-    if    ($hash->{helper}{step} eq "step0") { #Expectedanswer0    is  "10"  DLE data link escape
+    my ($hash) = @_;
+    my $buf = DevIo_SimpleRead($hash);
+    return "" if(!defined($buf));
+    my $name = $hash->{NAME};
+    $hash->{helper}{PARTIAL} .= uc(unpack('H*', $buf));
+    my $msg=$hash->{helper}{PARTIAL};
+    my $err;
+    if ( !defined($hash->{helper}{step}) or (length($msg) == 1)  or (($msg =~ m/^01/) and ($msg !~ m/1003$/m ))) {} 
+    else {
+        if    ($hash->{helper}{step} eq "step0") { #Expectedanswer0    is  "10"  DLE data link escape
             if ($msg ne "10")   {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15");  THZ_Resethelper($hash);}
             else                { THZ_Write($hash, $hash->{helper}{cmdHex}); 		$hash->{helper}{step}="step1";       $hash->{helper}{PARTIAL}="";  }
         }    
@@ -1053,14 +1053,13 @@ sub THZ_Read($) {
             #THZ_Resethelper($hash);
         }    
     }   
-Log3 $name, 3, "$name/RAW: $msg - $err - $hash->{helper}{step}";
+    Log3 $name, 3, "$name/RAW: $msg - $err - $hash->{helper}{step}";
 }
-
 
 
 #####################################
 #
-# THZ_Resethelper() 
+# THZ_Resethelper()
 #
 # Parameter hash
 #
@@ -1074,7 +1073,6 @@ sub THZ_Resethelper($) {
 }
 
 
-
 sub THZ_Testloopapproach($) {
     my ($hash) = @_;
     my $cmd="sGlobal";
@@ -1083,22 +1081,20 @@ sub THZ_Testloopapproach($) {
     THZ_Write($hash,  "02");
     $hash->{helper}{step}="step0";
     $hash->{helper}{cmdHex}=THZ_encodecommand($cmdhash->{cmd2},"get");
-    $hash->{helper}{PARTIAL}="";     
+    $hash->{helper}{PARTIAL}="";
 }
-  
+
 sub THZ_testtimer($) {
     my ($hash) = @_;
- my $counter=1;
- my $stringa = ("starttest \n");
- foreach my $a (keys %intAt) 
- {
- if ($intAt{$a}{FN} eq "THZ_GetRefresh")	
- 	{
-		$stringa = $stringa . ("timer ". $counter ." ARG". $intAt{$a}{ARG} ."fn " . $intAt{$a}{FN} ."\n") ;
-		$counter+=1;
-	}
- }
- Log3 $hash->{NAME}, 5, $stringa;
+    my $counter=1;
+    my $stringa = ("starttest \n");
+    foreach my $a (keys %intAt) {
+        if ($intAt{$a}{FN} eq "THZ_GetRefresh")	{
+            $stringa = $stringa . ("timer ". $counter ." ARG". $intAt{$a}{ARG} ."fn " . $intAt{$a}{FN} ."\n") ;
+            $counter+=1;
+        }
+    }
+    Log3 $hash->{NAME}, 5, $stringa;
 }
 
      
@@ -1110,26 +1106,20 @@ sub THZ_testtimer($) {
 #
 ########################################################################################
 sub THZ_Ready($) {
-  my ($hash) = @_;
-  if($hash->{STATE} eq "disconnected")
-  { #RemoveInternalTimer(0, "THZ_GetRefresh"); #non necessario in THZ_getrefresh non vengono piu' rinnoovati
-   #THZ_testtimer($hash);
-  select(undef, undef, undef, 0.010); #equivalent to sleep 10ms
-  #Log3 $hash->{NAME}, 3, "THZ_Ready: readyevent";
-  return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
-  }	
+    my ($hash) = @_;
+    if($hash->{STATE} eq "disconnected") { #RemoveInternalTimer(0, "THZ_GetRefresh"); #non necessario in THZ_getrefresh non vengono piu' rinnoovati
+        #THZ_testtimer($hash);
+        select(undef, undef, undef, 0.010); #equivalent to sleep 10ms
+        #Log3 $hash->{NAME}, 3, "THZ_Ready: readyevent";
+        return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
+    }	
     # This is relevant for windows/USB only
-  my $po = $hash->{USBDev};
-  if($po) {
-    my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-    return ($InBytes>0);
-  }
-  
+    my $po = $hash->{USBDev};
+    if($po) {
+        my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+        return ($InBytes>0);
+    }
 }
-
-
-
-
 
 #####################################
 #
@@ -1139,183 +1129,153 @@ sub THZ_Ready($) {
 #
 ########################################################################################
 sub THZ_Set($@){
-  my ($hash,  @a) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME}; 
-  return "\"set $name\" needs at least two parameters: <device-parameter> and <value-to-be-modified>" if(@a < 2);
-  my $cmd = $a[1];
-  my $arg = $a[2];
-  my $arg1 = "00:00";
-  my ($err, $msg) =("", " ");
-  my $cmdhash = $sets{$cmd};
-  #return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
-  if(!defined($cmdhash)) {
-    my $setList;
-    foreach my $key (sort keys %sets) {
-      my $value = $sets{$key};
-      $setList .= $key;
-      #if (($value->{type} eq "0clean" or $value->{type} eq "1clean") and $value->{unit} eq "") {
-      if ($value->{type} =~ /clean/ ) {
-        #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
-        if (($value->{argMax} - $value->{argMin})<5 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
-        else  					 {$setList .= ":textField ";}
-        #else						 {$setList .= ":slider,$value->{argMin},1,$value->{argMax} ";}
-        #else						 {$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:1 " ;}
-	  }
-      elsif ($value->{type} eq "2opmode"){
-        $setList .= ":" . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
-        #$setList .= ":uzsuSelectRadio," . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
-        #attr Mythz widgetOverride pOpMode:uzsuDropDown,automatic,standby
-	  }
-      #elsif ($value->{type} eq "9holy"){
-        #$setList .= ":time ";
-        # $setList .= ":textField ";
-	  # }
-      #elsif ($value->{type} eq "5temp") {
-        #   $setList .= ":slider,$value->{argMin},0.1,$value->{argMax},1 "  ;
-      	#$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1 "  ;
-	    #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.1,angleOffset:-125,angleArc:250 "
-	    #attr Mythz widgetOverride p01RoomTempDayHC1:knob,min:22,max:26,step:0.1,angleOffset:-125,angleArc:250
-	    #attr Mythz widgetOverride p01RoomTempDayHC1:slider,$value->{argMin},0.1,$value->{argMax}
-	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuDropDown,21,29
-	    #attr Mythz widgetOverride p01RoomTempDayHC1:uzsuSelectRadio,44,234,21
-	 # }
-      #elsif ($value->{type} eq "6gradient") {
-        #   $setList .= ":slider,$value->{argMin},0.01,$value->{argMax},1 " ;
-        #$setList .= ":knob,min:$value->{argMin},max:$value->{argMax},step:0.01 "  ;
-	  #   }
-      else {
-        #$setList .= ":textField ";
-      $setList .= " ";
-      }
+    my ($hash,  @a) = @_;
+    my $dev = $hash->{DeviceName};
+    my $name = $hash->{NAME}; 
+    return "\"set $name\" needs at least two parameters: <device-parameter> and <value-to-be-modified>" if(@a < 2);
+    my $cmd = $a[1];
+    my $arg = $a[2];
+    my $arg1 = "00:00";
+    my ($err, $msg) =("", " ");
+    my $cmdhash = $sets{$cmd};
+    #return "Unknown argument $cmd, choose one of " . join(" ", sort keys %sets) if(!defined($cmdhash));
+    if(!defined($cmdhash)) {
+        my $setList;
+        foreach my $key (sort keys %sets) {
+            my $value = $sets{$key};
+            $setList .= $key;
+            #if (($value->{type} eq "0clean" or $value->{type} eq "1clean") and $value->{unit} eq "") {
+            if ($value->{type} =~ /clean/ ) {
+                #if (($value->{argMax} - $value->{argMin})<2 ) {$setList .= ":uzsuToggle," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+                if (($value->{argMax} - $value->{argMin})<5 ) {$setList .= ":uzsuSelectRadio," . join (",", ($value->{argMin} .. $value->{argMax})) . " ";}
+                else  					 {$setList .= ":textField ";}
+            }
+            elsif ($value->{type} eq "2opmode"){
+                $setList .= ":" . join (",", (sort {lc $a cmp lc $b} values %OpMode)) . " ";
+            }
+            else {
+                #$setList .= ":textField ";
+                $setList .= " ";
+            }
+        }
+        return "Unknown argument $cmd, choose one of  $setList";
     }
-    return "Unknown argument $cmd, choose one of  $setList";
-  }
-  
-  return "\"set $name $cmd\" needs at least one further argument: <value-to-be-modified>" if(!defined($arg));
- 
-  
-  
-  my $cmdHex2 = $cmdhash->{cmd2};
-  my $argMax = $cmdhash->{argMax};
-  my $argMin = $cmdhash->{argMin};
-  
-  #-- check the parameter range
-  if ($cmdhash->{type} =~ /ptime/) {          
-    $arg1=undef;
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.")  and ($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ;
+    return "\"set $name $cmd\" needs at least one further argument: <value-to-be-modified>" if(!defined($arg));
+    my $cmdHex2 = $cmdhash->{cmd2};
+    my $argMax = $cmdhash->{argMax};
+    my $argMin = $cmdhash->{argMin};
+    #-- check the parameter range
+    if ($cmdhash->{type} =~ /ptime/) {          
+        $arg1=undef;
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.")  and ($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ;
     }
-  elsif ($cmdhash->{type} =~ /7prog|8party/) {          
-    ($arg, $arg1)=split('--', $arg);
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )  or ($arg1 !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ) ;
+    elsif ($cmdhash->{type} =~ /7prog|8party/) {          
+        ($arg, $arg1)=split('--', $arg);
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )  or ($arg1 !~ /^(?:\d|[01]\d|2[0-3]):[0-5]\d$/ )) ) ;
     }
-  elsif ($cmdhash->{type} eq "2opmode") {
-    $arg1=undef;
-    $arg=$Rev_OpMode{$arg};
-    return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
-    }
-  else {
-    $arg1=undef;
-    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
-    }
-  #--
-  my $i=0;  my $parsingrule;
-  THZ_AvoidCollisions($hash);
-  my $parent = $cmdhash->{parent};
-  #if I have a father read from it: important for older firmwares
-  if(defined($parent) ) {
-      my $parenthash=$gets{$parent};
-      $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
-	  Log3 $hash->{NAME}, 5, "searching for parent; parenthash= $parenthash, parent = $parent, cmdHex2 = $cmdHex2  ";
-      $cmdHex2=THZ_encodecommand($cmdHex2, "get");  #read before write the register
-      ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-      if (defined($err))     {
-		 Log3 $hash->{NAME}, 3, "THZ_Set: error reading register: '$err'";
-		 return ($msg ."\n msg " . $err);
-      }
-      substr($msg, 0, 2, ""); 		#remove the checksum from the head of the payload
-      Log3 $hash->{NAME}, 5, "read before write from THZ: $msg";
-      #--
-      $parsingrule = $parsinghash{$parenthash->{type}};
-      for (@$parsingrule) {
-	      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
-	      $i++;
-      }
-      select(undef, undef, undef, 0.25);
-  }
-  else {
-    $msg =  $cmdHex2 . "0000";
-    my $msgtype =$cmdhash->{type};
-    $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
-  }
-  my $pos = @$parsingrule[$i]->[1] -2; #I removed the checksum
-  my $len = @$parsingrule[$i]->[2];
-  my $parsingtype = @$parsingrule[$i]->[3];
-  my $dec = @$parsingrule[$i]->[4];
-  Log3 $hash->{NAME}, 5, "write command (parsed element/pos/len/dec/parsingtype): $i / $pos / $len / $dec / $parsingtype";
-  
-  $arg *= $dec                                                  if ($dec != 1);
-  $arg  = time2quaters($arg)                                    if ($parsingtype eq "quater");
-  $arg= join('', (split(':', $arg)))                            if ($parsingtype eq "hex2time"); # only in firmware 2.x
-  #$arg= eval(join('*100+', (split(':', $arg))))                 if ($parsingtype eq "hex2time"); #just in case the above does not work
-  $arg=(hex(substr($msg, $pos, 1)) & (15-2**$1)) | (2**$1*$arg) if ($parsingtype =~ /bit(\d)/);
-  $arg  = substr((sprintf(("%0".$len."X"), $arg)), (-1*$len)); #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
-  substr($msg, $pos, $len, $arg);
- 
-  if (defined($arg1))  {		#only in case of "8party" or "7prog" 
-    $arg1  = time2quaters($arg1);
-    $arg1  = substr((sprintf(("%02X"), $arg1)), -2);
-    $pos = @$parsingrule[($i+1)]->[1] -2;
-    substr($msg, $pos, $len, $arg1);
-  }
-  Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg $msg' ... Check if port is open. State = '($hash->{STATE})'";
-  $cmdHex2=THZ_encodecommand($msg,"set");
-  ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-  #$err=undef;
-  if (defined($err))  {
-    Log3 $hash->{NAME}, 3, "THZ_Set: Error msg:  $err -- $cmdHex2 -> $msg";
-    return($cmdHex2 . "-". $msg ."--" . $err);
-    }
-  else {
-	select(undef, undef, undef, 0.25);
-    if (defined($gets{$cmd})) {
-        $msg=THZ_Get($hash, $name, $cmd);
+    elsif ($cmdhash->{type} eq "2opmode") {
+        $arg1=undef;
+        $arg=$Rev_OpMode{$arg};
+        return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
     }
     else {
-          $msg=$cmd.": OK";
+        $arg1=undef;
+        return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
     }
-    #because of F8 reset introduced by andre topic=33211 msg695420
-    #take care of program of the week
-	if ($a[1] =~ /Mo-So/){
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/Mo-So/Mo-Fr/;	$msg.= "\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/Mo-Fr/Sa-So/;	$msg.="\n" . THZ_Set($hash, @a);
-	  }
-	elsif ($a[1] =~ /Mo-Fr/)  	{
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Mo_/_Tu_/ ;	$msg.="\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Tu_/_We_/ ;	$msg.="\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_We_/_Th_/ ;	$msg.="\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Th_/_Fr_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
-	  }
-	 elsif ($a[1] =~ /Sa-So/){
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Sa-So_/_Sa_/; 	$msg.="\n" . THZ_Set($hash, @a);
-	    select(undef, undef, undef, 0.05);
-	    $a[1] =~ s/_Sa_/_So_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
-	  }
-	#split _ mo-fr when [3] undefined do nothing, when mo-fr  chiama gli altri
+    #--
+    my $i=0;  my $parsingrule;
+    THZ_AvoidCollisions($hash);
+    my $parent = $cmdhash->{parent};
+    #if I have a father read from it: important for older firmwares
+    if(defined($parent) ) {
+        my $parenthash=$gets{$parent};
+        $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
+        Log3 $hash->{NAME}, 5, "searching for parent; parenthash= $parenthash, parent = $parent, cmdHex2 = $cmdHex2  ";
+        $cmdHex2=THZ_encodecommand($cmdHex2, "get");  #read before write the register
+        ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+        if (defined($err))     {
+            $err="THZ_Set: error reading register: '$err'";
+            Log3 $hash->{NAME}, 3, $err;
+            eadingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
+            return ($msg ."\n msg " . $err);
+        }
+        substr($msg, 0, 2, ""); 		#remove the checksum from the head of the payload
+        Log3 $hash->{NAME}, 5, "read before write from THZ: $msg";
+        #--
+        $parsingrule = $parsinghash{$parenthash->{type}};
+        for (@$parsingrule) {
+            last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
+            $i++;
+        }
+        select(undef, undef, undef, 0.25);
+    }
+    else {
+        $msg =  $cmdHex2 . "0000";
+        my $msgtype =$cmdhash->{type};
+        $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
+    }
+    my $pos = @$parsingrule[$i]->[1] -2; #I removed the checksum
+    my $len = @$parsingrule[$i]->[2];
+    my $parsingtype = @$parsingrule[$i]->[3];
+    my $dec = @$parsingrule[$i]->[4];
+    Log3 $hash->{NAME}, 5, "write command (parsed element/pos/len/dec/parsingtype): $i / $pos / $len / $dec / $parsingtype";
+    $arg *= $dec                                                  if ($dec != 1);
+    $arg  = time2quaters($arg)                                    if ($parsingtype eq "quater");
+    $arg= join('', (split(':', $arg)))                            if ($parsingtype eq "hex2time"); # only in firmware 2.x
+    #$arg= eval(join('*100+', (split(':', $arg))))                 if ($parsingtype eq "hex2time"); #just in case the above does not work
+    $arg=(hex(substr($msg, $pos, 1)) & (15-2**$1)) | (2**$1*$arg) if ($parsingtype =~ /bit(\d)/);
+    $arg  = substr((sprintf(("%0".$len."X"), $arg)), (-1*$len)); #04X converts to hex and fills up 0s; for negative, it must be trunckated. 
+    substr($msg, $pos, $len, $arg);
+    if (defined($arg1))  {		#only in case of "8party" or "7prog" 
+        $arg1  = time2quaters($arg1);
+        $arg1  = substr((sprintf(("%02X"), $arg1)), -2);
+        $pos = @$parsingrule[($i+1)]->[1] -2;
+        substr($msg, $pos, $len, $arg1);
+    }
+    Log3 $hash->{NAME}, 5, "THZ_Set: '$cmd $arg $msg' ... Check if port is open. State = '($hash->{STATE})'";
+    $cmdHex2=THZ_encodecommand($msg,"set");
+    ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+    #$err=undef;
+    if (defined($err))  {
+        $err="THZ_Set: Error msg:  $err -- $cmdHex2 -> $msg";
+        Log3 $hash->{NAME}, 3, $err;
+        readingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
+        return($cmdHex2 . "-". $msg ."--" . $err);
+    }
+    else {
+        select(undef, undef, undef, 0.25);
+        if (defined($gets{$cmd}))   {$msg=THZ_Get($hash, $name, $cmd);}
+        else                        {$msg=$cmd.": OK";}   
+        #because of F8 reset introduced by andre topic=33211 msg695420
+        #take care of program of the week
+        if ($a[1] =~ /Mo-So/){
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/Mo-So/Mo-Fr/;	$msg.= "\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/Mo-Fr/Sa-So/;	$msg.="\n" . THZ_Set($hash, @a);
+        }
+        elsif ($a[1] =~ /Mo-Fr/)  	{
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Mo_/_Tu_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Tu_/_We_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_We_/_Th_/ ;	$msg.="\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Th_/_Fr_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
+        }
+        elsif ($a[1] =~ /Sa-So/){
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Sa-So_/_Sa_/; 	$msg.="\n" . THZ_Set($hash, @a);
+            select(undef, undef, undef, 0.05);
+            $a[1] =~ s/_Sa_/_So_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
+        }
+        #split _ mo-fr when [3] undefined do nothing, when mo-fr  chiama gli altri
         return ($msg);
-  }
+    }
 }
-
-
 
 ########################################################################################
 #
@@ -1325,31 +1285,30 @@ sub THZ_Set($@){
 #
 ########################################################################################
 sub THZ_GetNB($){
-  my ($string) = @_;
-  my ($name, $cmd) = split("\\|", $string);
-  my $hash = $defs{$name};
-  my $dev = $hash->{DeviceName};
-  my $ret = DevIo_OpenDev($hash, 0, undef);         #open device in child process
-  #($hash->{STATE}, $hash->{USBDev} , $hash->{TCPDev} , $hash->{conn} , $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});  
-  #($hash->{STATE},  $hash->{TCPDev} ,  $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});
-  #$selectlist{"$name.$dev"} = $hash;
-  #open (MYFILE, '>>data.txt');
-  #print MYFILE ($hash->{connection} . "\n");
-  #close (MYFILE);
-  if (defined($ret)) {
-    Log3 $hash, 3, "[$name] THZ_GetNB: open device $hash->{DeviceName} error:$ret";
-    return ("$name|$cmd|$ret");
-  }
-  my $msg = THZ_Get($hash, $name, $cmd);
-  DevIo_CloseDev($hash);                            #close device in child process
-  if ($msg =~ m/\n/m) {                             #error message from get contains \n
-    return ("$name|$cmd|[ERROR]");
-  }
-  else {
-    return ("$name|$cmd|$msg");
-  }
+    my ($string) = @_;
+    my ($name, $cmd) = split("\\|", $string);
+    my $hash = $defs{$name};
+    my $dev = $hash->{DeviceName};
+    my $ret = DevIo_OpenDev($hash, 0, undef);         #open device in child process
+    #($hash->{STATE}, $hash->{USBDev} , $hash->{TCPDev} , $hash->{conn} , $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});  
+    #($hash->{STATE},  $hash->{TCPDev} ,  $hash->{FD} , $selectlist{"$name.$dev"}) =  split("\\|", $hash->{connection});
+    #$selectlist{"$name.$dev"} = $hash;
+    #open (MYFILE, '>>data.txt');
+    #print MYFILE ($hash->{connection} . "\n");
+    #close (MYFILE);
+    if (defined($ret)) {
+        Log3 $hash, 3, "[$name] THZ_GetNB: open device $hash->{DeviceName} error:$ret";
+        return ("$name|$cmd|$ret");
+    }
+    my $msg = THZ_Get($hash, $name, $cmd);
+    DevIo_CloseDev($hash);                            #close device in child process
+    if ($msg =~ m/\n/m) {                             #error message from get contains \n
+        return ("$name|$cmd|[ERROR]");
+    }
+    else {
+        return ("$name|$cmd|$msg");
+    }
 }
-
 
 ########################################################################################
 #
@@ -1359,17 +1318,16 @@ sub THZ_GetNB($){
 #
 ########################################################################################
 sub THZ_GetNBDone($){
-  my ($string) = @_;
-  my ($name, $cmd, $msg) = split("\\|", $string);
-  my $hash = $defs{$name};
-  Log3 $hash, 4, "[$name] THZ_GetNBDone: $cmd - $msg";
-  readingsSingleUpdate($hash, $cmd, $msg, 1) if ($msg ne "[ERROR]");
-  delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
-  DevIo_OpenDev($hash, 1, undef); #  if($hash->{STATE} ne "opened");         #reopen device for parent process
-  return;
- }
+    my ($string) = @_;
+    my ($name, $cmd, $msg) = split("\\|", $string);
+    my $hash = $defs{$name};
+    Log3 $hash, 4, "[$name] THZ_GetNBDone: $cmd - $msg";
+    readingsSingleUpdate($hash, $cmd, $msg, 1) if ($msg ne "[ERROR]");
+    delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
+    DevIo_OpenDev($hash, 1, undef); #  if($hash->{STATE} ne "opened");         #reopen device for parent process
+    return;
+}
 
- 
 ########################################################################################
 #
 # THZ_GetNBAbort - Abort Function
@@ -1378,13 +1336,12 @@ sub THZ_GetNBDone($){
 #
 ########################################################################################
 sub THZ_GetNBAbort($){
-  my ($hash) = @_;
-  delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
-  DevIo_OpenDev($hash, 1, undef);#   if($hash->{STATE} ne "opened");         #reopen device for parent process
-  Log3 $hash->{NAME}, 3, "BlockingCall for ".$hash->{NAME}." was aborted";
-  return;
+    my ($hash) = @_;
+    delete($hash->{helper}{RUNNING_PID}) if (defined($hash->{helper}{RUNNING_PID}));
+    DevIo_OpenDev($hash, 1, undef);#   if($hash->{STATE} ne "opened");         #reopen device for parent process
+    Log3 $hash->{NAME}, 3, "BlockingCall for ".$hash->{NAME}." was aborted";
+    return;
 }
-
 
 ########################################################################################
 #
@@ -1398,24 +1355,20 @@ sub THZ_AvoidCollisions($) {
     # if child found, wait 0,25 second, and kill it
     # maybe after 1 second child would have finished, but its THZ_GetNBDone is blocked
     if (defined($hash->{helper}{RUNNING_PID})){
-    select(undef, undef, undef, 0.25);     
-    BlockingKill($hash->{helper}{RUNNING_PID});
-    delete($hash->{helper}{RUNNING_PID});
-    DevIo_OpenDev($hash, 1, undef); #if($hash->{STATE} ne "opened");
-    #reset heatpump
-    THZ_Write($hash,  "10"); 		    	
-    select(undef, undef, undef, 0.1);
-    THZ_ReadAnswer($hash);	
-    THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.1);
-    Log3 $hash->{NAME}, 3, "Possible collision in ".$hash->{NAME}." was aborted";
+        select(undef, undef, undef, 0.25);     
+        BlockingKill($hash->{helper}{RUNNING_PID});
+        delete($hash->{helper}{RUNNING_PID});
+        DevIo_OpenDev($hash, 1, undef); #if($hash->{STATE} ne "opened");
+        #reset heatpump
+        THZ_Write($hash,  "10"); 		    	
+        select(undef, undef, undef, 0.1);
+        THZ_ReadAnswer($hash);	
+        THZ_Write($hash,  "10");
+        select(undef, undef, undef, 0.1);
+        Log3 $hash->{NAME}, 3, "Possible collision in ".$hash->{NAME}." was aborted";
     }
     return;
 }
-
-
-
-
 
 #####################################
 #
@@ -1425,85 +1378,77 @@ sub THZ_AvoidCollisions($) {
 #
 ########################################################################################
 sub THZ_Get($@) {
-  my ($hash, @a) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-
-  return "\"get $name\" needs one parameter" if(@a != 2);
-  my $cmd = $a[1];
-  my ($err, $msg2) =("", " ");
-  
-  if ($cmd eq "debug_read_raw_register_slow") {
-    THZ_debugread($hash);
-    return ("all raw registers read and saved");
-  }
-  if ($cmd eq "zBackupParameters") {
-    $err=THZ_backup_readings($hash);
-    return $err;
-  }
-  
-  
-  my $cmdhash = $gets{$cmd};
-  #return "Unknown argument $cmd, choose one of " .   join(" ", sort keys %gets) if(!defined($cmdhash));
-  if(!defined($cmdhash)) {
-    my $getList;
-    foreach my $key (sort keys %gets) {$getList .= "$key:noArg ";}
-    $getList .= "zBackupParameters:noArg";
-    return "Unknown argument $cmd, choose one of  $getList";
-  }
-  
-  Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
-  THZ_AvoidCollisions($hash);
-  my $parent = $cmdhash->{parent};	#if I have a father read from it
-  if(defined($parent) ) {
-      my ($seconds, $microseconds) = gettimeofday();
-      $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
-      my $risultato=ReadingsVal($name, $parent, 0);
-      $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 20 );	#update of the parent: if under 20sec use the current value
-      #$risultato=THZ_Parse1($hash,"B81700C800BE00A001C20190006402010000E601D602");
-      my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
-      my $i=0; 
-      for  (@$parsingrule) {
-      last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
-	$i++;}
-      $msg2=(split ' ', $risultato)[$i*2+1];
-      Log3 $hash->{NAME}, 5, "THZ_split: $msg2 --- $risultato";
-  }
-  else { 
-      my $cmdHex2 = $cmdhash->{cmd2};
-      if(defined($cmdHex2) ) {
-          #empty
-          ($err, $msg2) = THZ_Get_Comunication($hash, THZ_encodecommand($cmdHex2,"get") );
-          if (defined($err))     {
-             Log3 $hash->{NAME}, 3, "THZ_Get: Error msg2:  $err -- $cmdHex2 -> $msg2";
-             return ($msg2 ."\n msg2 " . $err);
-          }
-          $msg2 = THZ_Parse1($hash,$msg2);
-      }
-  
-      my $cmdHex3 = $cmdhash->{cmd3};
-      if(defined($cmdHex3)) {
-          my $msg3= " ";
-          #empty 
-          ($err, $msg3) = THZ_Get_Comunication($hash,  THZ_encodecommand($cmdHex3,"get"));
-           if (defined($err))     {
-                Log3 $hash->{NAME}, 3, "THZ_Get: Error msg3:  $err -- $cmdHex3 -> $msg3";
-                 return ($msg3 ."\n msg3 " . $err);
-          }
-          $msg2 = THZ_Parse1($hash,$msg3) * 1000 + $msg2  ;
-      }	            		
-  } 
-  my $unit = $cmdhash->{unit};
-  $msg2 = $msg2 .  $unit  if(defined($unit)) ;
-    
-    
-  my $activatetrigger =1;
-  readingsSingleUpdate($hash, $cmd, $msg2, $activatetrigger);
-  return ($msg2);	       
+    my ($hash, @a) = @_;
+    my $dev = $hash->{DeviceName};
+    my $name = $hash->{NAME};
+    return "\"get $name\" needs one parameter" if(@a != 2);
+    my $cmd = $a[1];
+    my ($err, $msg2) =("", " ");
+    if ($cmd eq "debug_read_raw_register_slow") {
+        THZ_debugread($hash);
+        return ("all raw registers read and saved");
+    }
+    if ($cmd eq "zBackupParameters") {
+        $err=THZ_backup_readings($hash);
+        return $err;
+    }
+    my $cmdhash = $gets{$cmd};
+    #return "Unknown argument $cmd, choose one of " .   join(" ", sort keys %gets) if(!defined($cmdhash));
+    if(!defined($cmdhash)) {
+        my $getList;
+        foreach my $key (sort keys %gets) {$getList .= "$key:noArg ";}
+        $getList .= "zBackupParameters:noArg";
+        return "Unknown argument $cmd, choose one of  $getList";
+    }
+    Log3 $hash->{NAME}, 5, "THZ_Get: Try to get '$cmd'";
+    THZ_AvoidCollisions($hash);
+    my $parent = $cmdhash->{parent};	#if I have a father read from it
+    if(defined($parent) ) {
+        my ($seconds, $microseconds) = gettimeofday();
+        $seconds= abs($seconds - time_str2num(ReadingsTimestamp($name, $parent, "1970-01-01 01:00:00")));
+        my $risultato=ReadingsVal($name, $parent, 0);
+        $risultato=THZ_Get($hash, $name, $parent) if ($seconds > 20 );	#update of the parent: if under 20sec use the current value
+        #$risultato=THZ_Parse1($hash,"B81700C800BE00A001C20190006402010000E601D602");
+        my $parenthash=$gets{$parent}; my $parsingrule = $parsinghash{$parenthash->{type}};
+        my $i=0; 
+        for  (@$parsingrule) {
+            last if ((@$parsingrule[$i]->[0]) =~ m/$cmd/);
+            $i++;
+            }
+        $msg2=(split ' ', $risultato)[$i*2+1];
+        Log3 $hash->{NAME}, 5, "THZ_split: $msg2 --- $risultato";
+    }
+    else { 
+        my $cmdHex2 = $cmdhash->{cmd2};
+        if(defined($cmdHex2) ) {#empty
+            ($err, $msg2) = THZ_Get_Comunication($hash, THZ_encodecommand($cmdHex2,"get") );
+            if (defined($err))     {
+                $err="THZ_Get: Error msg2:  $err -- $cmdHex2 -> $msg2";
+                Log3 $hash->{NAME}, 3, $err;
+                readingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
+                return ($msg2 ."\n msg2 " . $err);
+            }
+            $msg2 = THZ_Parse1($hash,$msg2);
+        }
+        my $cmdHex3 = $cmdhash->{cmd3};
+        if(defined($cmdHex3)) {
+            my $msg3= " ";      #empty 
+            ($err, $msg3) = THZ_Get_Comunication($hash,  THZ_encodecommand($cmdHex3,"get"));
+            if (defined($err))     {
+                $err="THZ_Get: Error msg3:  $err -- $cmdHex3 -> $msg3";
+                Log3 $hash->{NAME}, 3, $err;
+                readingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
+                return ($msg3 ."\n msg3 " . $err);
+            }
+            $msg2 = THZ_Parse1($hash,$msg3) * 1000 + $msg2  ;
+        }	            		
+    } 
+    my $unit = $cmdhash->{unit};
+    $msg2 = $msg2 .  $unit  if(defined($unit)) ;  
+    my $activatetrigger =1;
+    readingsSingleUpdate($hash, $cmd, $msg2, $activatetrigger);
+    return ($msg2);	       
 }
-
-
-
 
 #####################################
 #
@@ -1513,48 +1458,32 @@ sub THZ_Get($@) {
 #
 ########################################################################################
 sub THZ_Get_Comunication($$) {
-  my ($hash, $cmdHex) = @_;
-  my ($err, $msg) =("", " ");
-  Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
-  if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
-  
-  select(undef, undef, undef, 0.001);
-  THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
-  ($err, $msg) = THZ_ReadAnswer($hash);
-
-#Expectedanswer0    is  "10"  DLE data link escape
-
-  if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
-  else  {
-     THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-     ($err, $msg) = THZ_ReadAnswer($hash);
-  }
-  
-  if ((defined($err)))  { $err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
-
-# Expectedanswer1     is "1002",		DLE data link escape -- STX start of text    
-
-  if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
-  elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
-  if ($msg eq "1002" || $msg eq "02") {
-    THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape  
-    ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer2 // read from the heatpump
-    THZ_Write($hash,  "10");  
-  }
-  
-  if ((defined($err)))  { $err .= " THZ_Get_Com: error found at step2"; select(undef, undef, undef, 0.1);} 
-  else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
-  return($err, $msg) ;
+    my ($hash, $cmdHex) = @_;
+    my ($err, $msg) =("", " ");
+    Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
+    if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
+    select(undef, undef, undef, 0.001);
+    THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
+    ($err, $msg) = THZ_ReadAnswer($hash);
+    #Expectedanswer0    is  "10"  DLE data link escape
+    if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    else  {
+        THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+        ($err, $msg) = THZ_ReadAnswer($hash);
+    }
+    if ((defined($err)))  { $err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    # Expectedanswer1     is "1002",		DLE data link escape -- STX start of text    
+    if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
+    elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    if ($msg eq "1002" || $msg eq "02") {
+        THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape  
+        ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer2 // read from the heatpump
+        THZ_Write($hash,  "10");  
+    }
+    if ((defined($err)))  { $err .= " THZ_Get_Com: error found at step2"; select(undef, undef, undef, 0.1);} 
+    else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
+    return($err, $msg) ;
 }
-
-
-
-
-
-
-
-
-
 
 #####################################
 #
@@ -1577,17 +1506,17 @@ sub THZ_ReadAnswer($) {
 	my $count =1;
 	my $countmax = 60;
 	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
-	  select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	  my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
-	  Log3($hash->{NAME}, 5, "double read $count activated $data");
-	  if(defined($buf1)) {
-	    $buf .=  $buf1 ;
-	    $data =  uc(unpack('H*', $buf));
-	    Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
-	    $count ++;
+        select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
+        my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
+        Log3($hash->{NAME}, 5, "double read $count activated $data");
+        if(defined($buf1)) {
+            $buf .=  $buf1 ;
+            $data =  uc(unpack('H*', $buf));
+            Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
+            $count ++;
 	    }
-	  else{ $count += 5; }
-	}
+        else{ $count += 5; }
+    }
 	return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
 	return (undef, $data);
@@ -1602,13 +1531,13 @@ sub THZ_ReadAnswer($) {
 #
 ########################################################################################
 sub THZ_checksum($) {
-  my ($stringa) = @_;
-  my $ml = length($stringa) - 4;
-  my $checksum = 0;
-  for(my $i = 0; $i < $ml; $i += 2) {
-    ($checksum= $checksum + hex(substr($stringa, $i, 2))) if ($i != 4);
-  }
-  return (sprintf("%02X", ($checksum %256)));
+    my ($stringa) = @_;
+    my $ml = length($stringa) - 4;
+    my $checksum = 0;
+    for(my $i = 0; $i < $ml; $i += 2) {
+        ($checksum= $checksum + hex(substr($stringa, $i, 2))) if ($i != 4);
+    }
+    return (sprintf("%02X", ($checksum %256)));
 }
 
 #####################################
@@ -1617,9 +1546,9 @@ sub THZ_checksum($) {
 #
 ########################################################################################
 sub hex2int($) {
-  my ($num) = @_;
- $num = unpack('s', pack('S', hex($num)));
-  return $num;
+    my ($num) = @_;
+    $num = unpack('s', pack('S', hex($num)));
+    return $num;
 }
 
 ####################################
@@ -1632,16 +1561,13 @@ sub hex2int($) {
 # example: value 1E is converted to decimal 30 and then to a time  7:30 
 ########################################################################################
 sub quaters2time($) {
-  my ($num) = @_;
-  return("n.a.") if($num eq "80"); 
-  my $quarters= hex($num) %4;
-  my $hour= (hex($num) - $quarters)/4 ;
-  my $time = sprintf("%02u", ($hour)) . ":" . sprintf("%02u", ($quarters*15));
-  return $time;
+    my ($num) = @_;
+    return("n.a.") if($num eq "80"); 
+    my $quarters= hex($num) %4;
+    my $hour= (hex($num) - $quarters)/4 ;
+    my $time = sprintf("%02u", ($hour)) . ":" . sprintf("%02u", ($quarters*15));
+    return $time;
 }
-
-
-
 
 ####################################
 #
@@ -1653,17 +1579,15 @@ sub quaters2time($) {
 # example: a time  7:30  is converted to decimal 30 
 ########################################################################################
 sub time2quaters($) {
-   my ($stringa) = @_;
-   return("128") if($stringa eq "n.a."); 
- my ($h,$m) = split(":", $stringa);
-  $m = 0 if(!$m);
-  $h = 0 if(!$h);
-  my $num = $h*4 +  int($m/15);
-  return ($num);
+    my ($stringa) = @_;
+    return("128") if($stringa eq "n.a."); 
+    my ($h,$m) = split(":", $stringa);
+    $m = 0 if(!$m);
+    $h = 0 if(!$h);
+    my $num = $h*4 +  int($m/15);
+    return ($num);
 }
 
-
- 
 ####################################
 #
 # bitmap2string - convert from bitmap to concatenated string
@@ -1673,17 +1597,15 @@ sub time2quaters($) {
 #
 ########################################################################################
 sub bitmap2string($$) {
-  my($bitmap, $href) = @_;
-  my $idx = 1;
-  my $res = "";
-  foreach my $bit (split //, $bitmap) {
-    $res .= $href->{$idx} if ($bit);
-    $idx++;
-  }
-  return $res;
+    my($bitmap, $href) = @_;
+    my $idx = 1;
+    my $res = "";
+    foreach my $bit (split //, $bitmap) {
+        $res .= $href->{$idx} if ($bit);
+        $idx++;
+    }
+    return $res;
 }
-
-
 
 ####################################
 #
@@ -1694,28 +1616,30 @@ sub bitmap2string($$) {
 #
 ########################################################################################
 sub THZ_replacebytes($$$) {
-  my ($stringa, $find, $replace) = @_; 
-  my $leng_str = length($stringa);
-  my $leng_find = length($find);
-  my $new_stringa ="";
-  for(my $i = 0; $i < $leng_str; $i += 2) {
-    if (substr($stringa, $i, $leng_find) eq $find){
-      $new_stringa=$new_stringa . $replace;
-      if ($leng_find == 4) {$i += 2;}
-      }
-    else {$new_stringa=$new_stringa . substr($stringa, $i, 2);};
-  }
-  return ($new_stringa);
+    my ($stringa, $find, $replace) = @_; 
+    my $leng_str = length($stringa);
+    my $leng_find = length($find);
+    my $new_stringa ="";
+    for(my $i = 0; $i < $leng_str; $i += 2) {
+        if (substr($stringa, $i, $leng_find) eq $find){
+            $new_stringa=$new_stringa . $replace;
+            if ($leng_find == 4) {$i += 2;}
+        }
+        else {$new_stringa=$new_stringa . substr($stringa, $i, 2);};
+    }
+    return ($new_stringa);
 }
 
-
+####################################
+#
 ## usage THZ_overwritechecksum("0100XX". $cmd."1003"); not needed anymore
+#
+########################################################################################
 sub THZ_overwritechecksum($) {
-  my ($stringa) = @_;
-  my $checksumadded=substr($stringa,0,4) . THZ_checksum($stringa) . substr($stringa,6);
-  return($checksumadded);
+    my ($stringa) = @_;
+    my $checksumadded=substr($stringa,0,4) . THZ_checksum($stringa) . substr($stringa,6);
+    return($checksumadded);
 }
-
 
 ####################################
 #
@@ -1727,27 +1651,23 @@ sub THZ_overwritechecksum($) {
 #
 ########################################################################################
 sub THZ_encodecommand($$) {
-  my ($cmd,$getorset) = @_;
-  my $header = "0100";
-  $header = "0180" if ($getorset eq "set");	# "set" and "get" have differnt header
-  my $footer ="1003";
-  my $checksumadded=THZ_checksum($header . "XX" . $cmd . $footer) . $cmd;
-  # each 2B byte must be completed by byte 18
-  # each 10 byte must be repeated (duplicated)
-  my $find = "10";
-  my $replace = "1010";
-  #$checksumadded =~ s/$find/$replace/g; #problems in 1% of the cases, in middle of a byte
-  $checksumadded=THZ_replacebytes($checksumadded, $find, $replace);
-  $find = "2B";
-  $replace = "2B18";
-  #$checksumadded =~ s/$find/$replace/g;
-  $checksumadded=THZ_replacebytes($checksumadded, $find, $replace);
-  return($header. $checksumadded .$footer);
+    my ($cmd,$getorset) = @_;
+    my $header = "0100";
+    $header = "0180" if ($getorset eq "set");	# "set" and "get" have differnt header
+    my $footer ="1003";
+    my $checksumadded=THZ_checksum($header . "XX" . $cmd . $footer) . $cmd;
+    # each 2B byte must be completed by byte 18
+    # each 10 byte must be repeated (duplicated)
+    my $find = "10";
+    my $replace = "1010";
+    #$checksumadded =~ s/$find/$replace/g; #problems in 1% of the cases, in middle of a byte
+    $checksumadded=THZ_replacebytes($checksumadded, $find, $replace);
+    $find = "2B";
+    $replace = "2B18";
+    #$checksumadded =~ s/$find/$replace/g;
+    $checksumadded=THZ_replacebytes($checksumadded, $find, $replace);
+    return($header. $checksumadded .$footer);
 }
-
-
-
-
 
 ####################################
 #
@@ -1763,39 +1683,35 @@ sub THZ_encodecommand($$) {
 #
 ########################################################################################
 sub THZ_decode($) {
-  my ($message_orig) = @_;
-  #  raw data received from device have to be de-escaped before header evaluation and data use:
-  my $find = "1010";    # - each sequece 10 10 must be replaced with single byte 10
-  my $replace = "10";
-  $message_orig=THZ_replacebytes($message_orig, $find, $replace);
-  $find = "2B18";       # - each sequece 2B 18 must be replaced with single byte 2B
-  $replace = "2B";
-  $message_orig=THZ_replacebytes($message_orig, $find, $replace);
-  
-  #Check if answer is NAK
-  if (length($message_orig) == 2 && $message_orig eq "15") {
-    return("decode: NAK received from device",$message_orig);
-  }
-  
-  #check header and if ok 0100, check checksum and return the decoded msg
-  my $header = substr($message_orig,0,4);
-  if ($header eq "0100")  {
-    if (THZ_checksum($message_orig) eq substr($message_orig,4,2)) {
-      $message_orig =~ /0100(.*)1003/; 
-      my $message = $1;
-      return (undef, $message);
+    my ($message_orig) = @_;
+    #  raw data received from device have to be de-escaped before header evaluation and data use:
+    my $find = "1010";    # - each sequece 10 10 must be replaced with single byte 10
+    my $replace = "10";
+    $message_orig=THZ_replacebytes($message_orig, $find, $replace);
+    $find = "2B18";       # - each sequece 2B 18 must be replaced with single byte 2B
+    $replace = "2B";
+    $message_orig=THZ_replacebytes($message_orig, $find, $replace);
+    #Check if answer is NAK
+    if (length($message_orig) == 2 && $message_orig eq "15") {
+        return("decode: NAK received from device",$message_orig);
     }
-    else {return(THZ_checksum($message_orig) . "decode: crc_error in answer", $message_orig)};
-  }
-  if ($header eq "0101")  { return ("decode: timing issue", $message_orig);}
-  if ($header eq "0103")  { return ("decode: command not known", $message_orig);}
-  if ($header eq "0102")  { return("decode: CRC error in request", $message_orig);}
-  if ($header eq "0104")  { return("decode: UNKNOWN Register REQUEST", $message_orig);}
-  if ($header eq "0180")  { return(undef, $message_orig);}
-  
-  return("decode: new unknown answer " , $message_orig);
+    #check header and if ok 0100, check checksum and return the decoded msg
+    my $header = substr($message_orig,0,4);
+    if ($header eq "0100")  {
+        if (THZ_checksum($message_orig) eq substr($message_orig,4,2)) {
+            $message_orig =~ /0100(.*)1003/; 
+            my $message = $1;
+            return (undef, $message);
+        }
+        else {return(THZ_checksum($message_orig) . "decode: crc_error in answer", $message_orig)};
+    }
+    if ($header eq "0101")  { return ("decode: timing issue", $message_orig);}
+    if ($header eq "0103")  { return ("decode: command not known", $message_orig);}
+    if ($header eq "0102")  { return("decode: CRC error in request", $message_orig);}
+    if ($header eq "0104")  { return("decode: UNKNOWN Register REQUEST", $message_orig);}
+    if ($header eq "0180")  { return(undef, $message_orig);}
+    return("decode: new unknown answer " , $message_orig);
 }
-
 
 ###############################
 #added by jakob do not know if needed
@@ -1815,233 +1731,213 @@ local $SIG{__WARN__} = sub {
 };
 
 
-
 #######################################
 #THZ_Parse1($) could be used in order to test an external config file; I do not know if I want it
 #e.g. {THZ_Parse1(undef,"F70B000500E6")}
 #######################################
 sub THZ_Parse1($$) {
-  my ($hash,$message) = @_;  
-  Log3 $hash->{NAME}, 5, "Parse message: $message";	  
-  my $length = length($message);
-  Log3 $hash->{NAME}, 5, "Message length: $length";
-  my $parsingcmd = substr($message,2,2);
-  $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39")  !~ /^2/) );
-  my $msgtype;
-  my $parsingrule;
-  my $parsingelement;
-  # search for the type in %gets
-     foreach  my $cmdhash  (values %gets) {
-    if (defined ($cmdhash->{cmd2}) and ($cmdhash->{cmd2} eq $parsingcmd))
-	{$msgtype = $cmdhash->{type} ;
-	 last
-	 }
-    elsif (defined ($cmdhash->{cmd3}))
-	{ if ($cmdhash->{cmd3} eq $parsingcmd)
-	   {$msgtype = $cmdhash->{type} ;
-	  last
-	  }
-	 }
-  }
-  $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
-  
-  my $ParsedMsg = $message;
-  if(defined($parsingrule)) {
-    $ParsedMsg = "";
-    for  $parsingelement  (@$parsingrule) {
-      my $parsingtitle = $parsingelement->[0];
-      my $positionInMsg = $parsingelement->[1];
-      my $lengthInMsg = $parsingelement->[2];
-      my $Type = $parsingelement->[3];
-      my $divisor = $parsingelement->[4];
-      #check if parsing out of message, and fill with zeros; the other possibility is to skip the step.
-      if (length($message) < ($positionInMsg + $lengthInMsg))    {
-      	Log3 $hash->{NAME}, 5, "THZ_Parsing: offset($positionInMsg) + length($lengthInMsg) is longer then message : '$message'"; 
-      	#$message.= '0' x ($positionInMsg + $lengthInMsg - length($message)); # fill up with 0s to the end if needed
-      	#line above redundant because of  else below added 9.2018; 
-        #Log3 $hash->{NAME},3, "after: '$message'"; 
-      }
-      else {
-          my $value = substr($message, $positionInMsg, $lengthInMsg);
-          if    ($Type eq "hex")		{$value= hex($value);}
-          elsif ($Type eq "year")		{$value= hex($value)+2000;}
-          elsif ($Type eq "hex2int")	{$value= hex2int($value);}
-          elsif ($Type eq "turnhexdate")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100); }
-          elsif ($Type eq "hexdate")	{$value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100) ;}
-          #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
-          #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
-          elsif ($Type eq "turnhex2time")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100); }
-          elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
-          elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
-          elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
-          elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
-          elsif ($Type eq "opmode2")	{$value= $opMode2{hex($value)};}
-          elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
-          elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
-          elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}
-          #elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
-          elsif ($Type eq "hex2error")	{$value= bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap);}
-          elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
-          elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
-          elsif ($Type eq "quater")		{$value= quaters2time($value);}
-          elsif ($Type eq "bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
-          elsif ($Type eq "bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
-          elsif ($Type eq "bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
-          elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
-          elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
-          elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
-          elsif ($Type eq "raw")		{;}
-          elsif ($Type eq "n.a.")		{$value= "n.a.";}
-          $value = $value/$divisor if ($divisor != 1); 
-          $ParsedMsg .= $parsingtitle . $value; 
+    my ($hash,$message) = @_;  
+    Log3 $hash->{NAME}, 5, "Parse message: $message";	  
+    my $length = length($message);
+    Log3 $hash->{NAME}, 5, "Message length: $length";
+    my $parsingcmd = substr($message,2,2);
+    $parsingcmd = substr($message,2,6) if (($parsingcmd =~ m/(0A|0B|0C)/) and (AttrVal($hash->{NAME}, "firmware" , "4.39")  !~ /^2/) );
+    my $msgtype;
+    my $parsingrule;
+    my $parsingelement;
+    # search for the type in %gets
+    foreach  my $cmdhash  (values %gets) {
+        if (defined ($cmdhash->{cmd2}) and ($cmdhash->{cmd2} eq $parsingcmd)) {
+        $msgtype = $cmdhash->{type} ;
+        last
+        }
+        elsif (defined ($cmdhash->{cmd3})){
+            if ($cmdhash->{cmd3} eq $parsingcmd) {
+                $msgtype = $cmdhash->{type} ;
+                last
+            }
         }
     }
-  }
-  return (undef, $ParsedMsg);
+    $parsingrule = $parsinghash{$msgtype} if(defined($msgtype));
+    my $ParsedMsg = $message;
+    if(defined($parsingrule)) {
+        $ParsedMsg = "";
+        for  $parsingelement  (@$parsingrule) {
+            my $parsingtitle = $parsingelement->[0];
+            my $positionInMsg = $parsingelement->[1];
+            my $lengthInMsg = $parsingelement->[2];
+            my $Type = $parsingelement->[3];
+            my $divisor = $parsingelement->[4];
+            #check if parsing out of message, and fill with zeros; the other possibility is to skip the step.
+            if (length($message) < ($positionInMsg + $lengthInMsg))    {
+                Log3 $hash->{NAME}, 5, "THZ_Parsing: offset($positionInMsg) + length($lengthInMsg) is longer then message : '$message'"; 
+                #$message.= '0' x ($positionInMsg + $lengthInMsg - length($message)); # fill up with 0s to the end if needed
+                #line above redundant because of  else below added 9.2018; 
+                #Log3 $hash->{NAME},3, "after: '$message'"; 
+            }
+            else {
+                my $value = substr($message, $positionInMsg, $lengthInMsg);
+                if    ($Type eq "hex")		{$value= hex($value);}
+                elsif ($Type eq "year")		{$value= hex($value)+2000;}
+                elsif ($Type eq "hex2int")	{$value= hex2int($value);}
+                elsif ($Type eq "turnhexdate")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100); }
+                elsif ($Type eq "hexdate")	{$value= sprintf("%02u.%02u", hex($value)/100, hex($value)%100) ;}
+                #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
+                #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
+                elsif ($Type eq "turnhex2time")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100); }
+                elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
+                elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
+                elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
+                elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
+                elsif ($Type eq "opmode2")	{$value= $opMode2{hex($value)};}
+                elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
+                elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
+                elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}
+                #elsif ($Type eq "hex2wday")	{$value= bitmap2string(unpack('b7', pack('H*',$value)), \%weekdaymap);}
+                elsif ($Type eq "hex2error")	{$value= bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap);}
+                elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
+                elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
+                elsif ($Type eq "quater")		{$value= quaters2time($value);}
+                elsif ($Type eq "bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
+                elsif ($Type eq "bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
+                elsif ($Type eq "bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
+                elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
+                elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
+                elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
+                elsif ($Type eq "raw")		{;}
+                elsif ($Type eq "n.a.")		{$value= "n.a.";}
+                $value = $value/$divisor if ($divisor != 1); 
+                $ParsedMsg .= $parsingtitle . $value; 
+            }
+        }
+    }
+    return (undef, $ParsedMsg);
 }
-
-
-
-
 
 ########################################################################################
 # only for debug
 #
 ########################################################################################
 sub THZ_debugread($){
-  my ($hash) = @_;
-  my ($err, $msg) =("", " ");
-  my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'F8', 'FB', 'FC', 'FD', 'FE', 'FF');
-  #my @numbers=('FB',  '0A0BA3', '0A057C', '0A057D', '0A057E', '0A057F' );
-  #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
-  #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
- # my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
-  #my @numbers = (1..256);
-  #my @numbers = (1..65535);
- # my @numbers = (1..3179);
-  my $indice= "FF";
-  unlink("data.txt"); #delete  debuglog
-  #my $i=0;
-  foreach $indice(@numbers) {
-   # $i=$i+1;
-   #my $cmd = sprintf("%02X", $indice);
-  #  my $cmd = sprintf("%04X", $indice);
-    #my $cmd = "0A" . sprintf("%04X",  $indice);
-    my $cmd = $indice;
-    my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
-    #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
-    #STX start of text
-    THZ_Write($hash,  "02");
-    ($err, $msg) = THZ_ReadAnswer($hash);
-    #select(undef, undef, undef, (0.05*$i));
-    #if you wait here more than 600ms connection dropped
-    # send request
-    THZ_Write($hash,  $cmdHex2);
-    #select(undef, undef, undef, (0.05*$i));
-    ($err, $msg) = THZ_ReadAnswer($hash);
-    #expected 1002; if not following if takes care
-    if ($msg eq "10") {
-      select(undef, undef, undef, 0.01);
-      ($err, $msg) = THZ_ReadAnswer($hash);
-     }  
-    # ack datatranfer and read from the heatpump        
-    select(undef, undef, undef, 0.015);
-    THZ_Write($hash,  "10");
-    select(undef, undef, undef, 0.001);
-    ($err, $msg) = THZ_ReadAnswer($hash);
-    THZ_Write($hash,  "10");
-
-    if (defined($err))  {return ($msg ."\n" . $err);}
-    else {   #clean up and remove footer and header
-	($err, $msg) = THZ_decode($msg);
-	if (defined($err)) {
-		  $msg = THZ_Parse1($hash,$msg);
-		  $msg=$cmdHex2 ."-". $msg ."-". $err;} 
-		  my $activatetrigger =1;
-		 # readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
-		  open (MYFILE, '>>data.txt');
-		  print MYFILE ($cmdHex2 ."-". $cmd . "-" . $msg . "\n");
-		  close (MYFILE);
-		  #Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
-    }    
-    select(undef, undef, undef, 0.2); 
-  }
+    my ($hash) = @_;
+    my ($err, $msg) =("", " ");
+    my @numbers=('01', '09', '16', 'D1', 'D2', 'E8', 'E9', 'F2', 'F3', 'F4', 'F5', 'F6', 'F8', 'FB', 'FC', 'FD', 'FE', 'FF');
+    #my @numbers=('FB',  '0A0BA3', '0A057C', '0A057D', '0A057E', '0A057F' );
+    #my @numbers=(1, 3, 4, 5, 8, 12, 13, 14, 15, 17, 18, 19, 20, 22, 26, 39, 40, 82, 83, 86, 87, 96, 117, 128, 239, 265, 268, 269, 270, 271, 274, 275, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 297, 299, 317, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 603, 607, 612, 613, 634, 647, 650, 961, 1385, 1386, 1387, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 830, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 1555, 272, 1489, 1490, 1491, 1492, 1631, 933, 934, 1634, 928, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, 2029, 2030, 2031, 2032, 2033);
+    #my @numbers=(1, 3, 12, 13, 14, 15, 19, 20, 22, 26, 39,  82, 83, 86, 87, 96, 239, 265, 268, 274, 278, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 320, 354, 384, 410, 428, 440, 442, 443, 444, 445, 446, 613, 634, 961, 1388, 1389, 1391, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409,  1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 2970, 2971, 2975, 2976, 2977, 2978, 2979, 474, 1499, 757, 758, 952, 955, 1501, 1502, 374, 1553, 1554, 272, 1489, 1491, 1492, 1631, 718, 64990, 64991, 64992, 64993, 2372, 2016, 936, 937, 938, 939, 1632, 2350, 2351, 2352, 2353, 2346, 2347, 2348, 2349, 2334, 2335, 2336, 2337, 2330, 2331, 2332, 2333, 2344, 2345, 2340, 2341, 942, 943, 944, 945, 328, );
+    #my @numbers=(239, 410, 603, 607, 634, 830, 1424, 1425, 1426, 1427, 1428, 1429, 1430, 1431, 1432, 1433, 1434, 1435, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1467, 1468, 1469, 1478, 1479, 1480, 1481, 2970, 2971, 2974, 2975, 2976, 2977, 2978, 2979, 1413, 1426, 1427, 474, 1501, 1502, 374, 1631, 718, 2372, 328);
+    #my @numbers = (1..256);
+    #my @numbers = (1..65535);
+    #my @numbers = (1..3179);
+    my $indice= "FF";
+    unlink("data.txt"); #delete  debuglog
+    #my $i=0;
+    foreach $indice(@numbers) {
+        # $i=$i+1;
+        #my $cmd = sprintf("%02X", $indice);
+        #my $cmd = sprintf("%04X", $indice);
+        #my $cmd = "0A" . sprintf("%04X",  $indice);
+        my $cmd = $indice;
+        my $cmdHex2 = THZ_encodecommand($cmd,"get"); 
+        #($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
+        #STX start of text
+        THZ_Write($hash,  "02");
+        ($err, $msg) = THZ_ReadAnswer($hash);
+        #select(undef, undef, undef, (0.05*$i));
+        #if you wait here more than 600ms connection dropped
+        # send request
+        THZ_Write($hash,  $cmdHex2);
+        #select(undef, undef, undef, (0.05*$i));
+        ($err, $msg) = THZ_ReadAnswer($hash);
+        #expected 1002; if not following if takes care
+        if ($msg eq "10") {
+            select(undef, undef, undef, 0.01);
+            ($err, $msg) = THZ_ReadAnswer($hash);
+        }  
+        # ack datatranfer and read from the heatpump        
+        select(undef, undef, undef, 0.015);
+        THZ_Write($hash,  "10");
+        select(undef, undef, undef, 0.001);
+        ($err, $msg) = THZ_ReadAnswer($hash);
+        THZ_Write($hash,  "10");
+        if (defined($err))  {return ($msg ."\n" . $err);}
+        else {   #clean up and remove footer and header
+            ($err, $msg) = THZ_decode($msg);
+            if (defined($err)) {
+                $msg = THZ_Parse1($hash,$msg);
+                $msg=$cmdHex2 ."-". $msg ."-". $err;
+                } 
+            my $activatetrigger =1;
+            # readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
+            open (MYFILE, '>>data.txt');
+            print MYFILE ($cmdHex2 ."-". $cmd . "-" . $msg . "\n");
+            close (MYFILE);
+            #Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
+        }
+        select(undef, undef, undef, 0.2); 
+    }
 }
 
 #######################################
+#
 #THZ_Attr($) 
 #in case of change of attribute starting with interval_ refresh all
+#
 ########################################################################################
 sub THZ_Attr(@) {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
-  my $hash = $defs{$name};
-  
-  $attrVal = "4.39" if (($cmd eq "del") and ($attrName eq "firmware"));
-  
-  if ( $attrName eq "firmware" )  {  
-      if ($attrVal eq "2.06") {
-         %sets = %sets206;
-         %gets = (%getsonly2xx, %getsonly206, %sets);
-         THZ_Refresh_all_gets($hash);
-      }
-      elsif ($attrVal eq "2.14") {
-        %sets = (%sets206, %setsonly214);
-        %gets = (%getsonly2xx, %getsonly214, %sets206);
+    my ($cmd, $name, $attrName, $attrVal) = @_;
+    my $hash = $defs{$name};
+    $attrVal = "4.39" if (($cmd eq "del") and ($attrName eq "firmware"));
+    if ( $attrName eq "firmware" )  {  
+        if ($attrVal eq "2.06") {
+            %sets = %sets206;
+            %gets = (%getsonly2xx, %getsonly206, %sets);
+            THZ_Refresh_all_gets($hash);
+        }
+        elsif ($attrVal eq "2.14") {
+            %sets = (%sets206, %setsonly214);
+            %gets = (%getsonly2xx, %getsonly214, %sets206);
+            THZ_Refresh_all_gets($hash);
+        }
+        elsif ($attrVal eq "5.39") {
+            %sets=(%sets439539common, %sets539only);
+            %gets=(%getsonly539, %sets);
+            THZ_Refresh_all_gets($hash);
+        }
+        elsif ($attrVal eq "4.39technician") {
+            %sets=(%sets439539common, %sets439only, %sets439technician);
+            %gets=(%getsonly439, %sets);
+            THZ_Refresh_all_gets($hash);
+        }
+        else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
+            %sets=(%sets439539common, %sets439only);
+            %gets=(%getsonly439, %sets);
+            THZ_Refresh_all_gets($hash);
+        }
+    }
+    if( $attrName =~ /^interval_/ ) {
         THZ_Refresh_all_gets($hash);
-      }
-      elsif ($attrVal eq "5.39") {
-        %sets=(%sets439539common, %sets539only);
-        %gets=(%getsonly539, %sets);
-        THZ_Refresh_all_gets($hash);
-      }
-      elsif ($attrVal eq "4.39technician") {
-        %sets=(%sets439539common, %sets439only, %sets439technician);
-        %gets=(%getsonly439, %sets);
-        THZ_Refresh_all_gets($hash);
-      }
-      else { #in all other cases I assume $attrVal eq "4.39" cambiato nella v0140
-        %sets=(%sets439539common, %sets439only);
-        %gets=(%getsonly439, %sets);
-        THZ_Refresh_all_gets($hash);
-      }
-  }
-  
-  
-  if( $attrName =~ /^interval_/ ) {
-  #DevIo_CloseDev($hash);
-  #sleep 1;
-  #DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets");
-  THZ_Refresh_all_gets($hash);
-  }
-  return undef;
+    }
+    return undef;
 }
-
 
 
 #####################################
 sub THZ_Undef($$) {
-  my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
-  RemoveInternalTimer(0, "THZ_GetRefresh");
-  #THZ_RemoveInternalTimer("THZ_GetRefresh");
-  foreach my $d (sort keys %defs) {
-    if(defined($defs{$d}) &&
-       defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      {
-        my $lev = ($reread_active ? 4 : 2);
-        Log3 $hash->{NAME}, $lev, "deleting port for $d";
-        delete $defs{$d}{IODev};
-      }
-  }
-  
-  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
-  DevIo_CloseDev($hash); 
-  return undef;
+    my ($hash, $arg) = @_;
+    my $name = $hash->{NAME};
+    RemoveInternalTimer(0, "THZ_GetRefresh");
+    foreach my $d (sort keys %defs) {
+        if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash) {
+            my $lev = ($reread_active ? 4 : 2);
+            Log3 $hash->{NAME}, $lev, "deleting port for $d";
+            delete $defs{$d}{IODev};
+        }
+    }
+    BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+    DevIo_CloseDev($hash); 
+    return undef;
 }
-
-
-
 
 ##########################################
 # nearest rounds to the nearrest value multiple of the first argumen
@@ -2054,23 +1950,15 @@ sub nearest_ceil($$) {
     my $targ = abs(shift);
     my $Math1 = 0.5000000000003;
     my @res  = map { $targ * POSIX::floor(($_ + $Math1 * $targ) / $targ) } @_;
-
     return wantarray ? @res : $res[0];
 }
-
 
 sub nearest_floor($$) {
     my $targ = abs(shift);
     my $Math1 = 0.5000000000003;
     my @res  = map { $targ * POSIX::ceil(($_ - $Math1 * $targ) / $targ) } @_;
-
     return wantarray ? @res : $res[0];
 }
-
-
-
-
-
 
 ##########################################
 # THZ_RemoveInternalTimer($) 
@@ -2082,53 +1970,47 @@ sub nearest_floor($$) {
 #    delete($intAt{$a}) if($intAt{$a}{FN} eq $callingfun);
 #  }
 #}
-
 ################################
 #
-
 sub function_heatSetTemp($$) {
-  my ($start, $stop) = @_;
-  my ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1);
-  my $pOpMode = " ";
-
-  my $devname; #normally Mythz but could be defined differently
-  foreach   (keys %defs) { 
-  $devname=$_;
-  last if(($defs{$_}{TYPE}) =~ "THZ");
-  }
-
-  if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ )  {
-    ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,3,5];
-  }  
-  else {
-  $pOpMode = ReadingsVal($devname,"pOpMode"," ");
-  $p13GradientHC1 	  = ReadingsVal($devname,"p13GradientHC1",0.4);
-  $p15RoomInfluenceHC1 = (split ' ',ReadingsVal($devname,"p15RoomInfluenceHC1",0))[0];
-  $p14LowEndHC1 	  = (split ' ',ReadingsVal($devname,"p14LowEndHC1",0))[0];
-  }
-  my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal($devname,"sHC1",0))[11,21,27];
-  my $outside_tempFiltered =(split ' ',ReadingsVal($devname,"sGlobal",0))[65];
-  if (!$roomSetTemp) {
-  $insideTemp=23.8 ; $roomSetTemp = 19.5; $p13GradientHC1 = 0.31; $heatSetTemp = 15; $p15RoomInfluenceHC1 = 80;
-  $pOpMode ="DEMO: no data";
-  $outside_tempFiltered = 0; $p14LowEndHC1 =0.5; 
-  }
-
-  my $a= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
-  my $a1= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
-  my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
-  my $c= -1 * $p13GradientHC1 /75;
-  
-  my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
-  foreach ($start..$stop) {
-   my $tmp =$_ * $_ * $c + $_ * $b;
-   $Simul_heatSetTemp 		 = sprintf("%.1f", maxNum(5,( $tmp + $a)));
-   #$Simul_heatSetTemp 		 =  8 if ($pOpMode eq "DHWmode"); # DHWmode is always at 8 grad C 
-   $Simul_heatSetTemp_simplified = sprintf("%.1f", maxNum(5,($tmp + $a1)));
-   push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
-  }
-  my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C';
-  return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode);
+    my ($start, $stop) = @_;
+    my ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1);
+    my $pOpMode = " ";
+    my $devname; #normally Mythz but could be defined differently
+    foreach (keys %defs) { 
+        $devname=$_;
+        last if(($defs{$_}{TYPE}) =~ "THZ");
+    }
+    if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ )  {
+        ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,3,5];
+    }  
+    else {
+        $pOpMode = ReadingsVal($devname,"pOpMode"," ");
+        $p13GradientHC1 	  = ReadingsVal($devname,"p13GradientHC1",0.4);
+        $p15RoomInfluenceHC1 = (split ' ',ReadingsVal($devname,"p15RoomInfluenceHC1",0))[0];
+        $p14LowEndHC1 	  = (split ' ',ReadingsVal($devname,"p14LowEndHC1",0))[0];
+    }
+    my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal($devname,"sHC1",0))[11,21,27];
+    my $outside_tempFiltered =(split ' ',ReadingsVal($devname,"sGlobal",0))[65];
+    if (!$roomSetTemp) {
+        $insideTemp=23.8 ; $roomSetTemp = 19.5; $p13GradientHC1 = 0.31; $heatSetTemp = 15; $p15RoomInfluenceHC1 = 80;
+        $pOpMode ="DEMO: no data";
+        $outside_tempFiltered = 0; $p14LowEndHC1 =0.5; 
+    }
+    my $a= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
+    my $a1= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
+    my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
+    my $c= -1 * $p13GradientHC1 /75;
+    my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
+    foreach ($start..$stop) {
+        my $tmp =$_ * $_ * $c + $_ * $b;
+        $Simul_heatSetTemp 		 = sprintf("%.1f", maxNum(5,( $tmp + $a)));
+        #$Simul_heatSetTemp 		 =  8 if ($pOpMode eq "DHWmode"); # DHWmode is always at 8 grad C 
+        $Simul_heatSetTemp_simplified = sprintf("%.1f", maxNum(5,($tmp + $a1)));
+        push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
+    }
+    my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C';
+    return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode);
 }
 
 #####################################
@@ -2140,13 +2022,13 @@ sub function_heatSetTemp($$) {
 #####################################
 
 sub THZ_PrintcurveSVG {
-my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode) = function_heatSetTemp(-15,20);
-my $v0min = minNum(15, ($ycurvevalues->[33][1]), ($ycurvevalues->[33][2]), $heatSetTemp);	#lower offset than 15, if out of scale
-$v0min = maxNum(5, nearest_ceil(5, $v0min));					#start only from a multiple of 5, but do not go below 5
-my $vstep= 5;
-$vstep= 10 if ((($ycurvevalues->[0][1])>($v0min+4*$vstep)) or (($ycurvevalues->[0][2])>($v0min+4*$vstep))); #increase step, if out of scale
-my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
-my $ret =  <<'END';
+    my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode) = function_heatSetTemp(-15,20);
+    my $v0min = minNum(15, ($ycurvevalues->[33][1]), ($ycurvevalues->[33][2]), $heatSetTemp);	#lower offset than 15, if out of scale
+    $v0min = maxNum(5, nearest_ceil(5, $v0min));					#start only from a multiple of 5, but do not go below 5
+    my $vstep= 5;
+    $vstep= 10 if ((($ycurvevalues->[0][1])>($v0min+4*$vstep)) or (($ycurvevalues->[0][2])>($v0min+4*$vstep))); #increase step, if out of scale
+    my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
+    my $ret =  <<'END';
 <?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="164" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
@@ -2201,111 +2083,89 @@ polyline { stroke:black; fill:none; }
 <text x="751" y="155" class="ylabel" text-anchor="middle">20</text>  	<polyline points="751,19 751,140" class="hgrid"/>
 <g>
 END
-
-$ret .= '<polyline points="44,140 49,140"/> <text x="39" y="144" class="ylabel" text-anchor="end">' . $v0min . '</text>';
-$ret .= '<polyline points="44,110 49,110"/> <text x="39" y="114" class="ylabel" text-anchor="end">' . $v1    . '</text>';
-$ret .= '<polyline points="44,80 49,80"/>   <text x="39" y="84" class="ylabel" text-anchor="end">'  . $v2    . '</text>';
-$ret .= '<polyline points="44,49 49,49"/>   <text x="39" y="53" class="ylabel" text-anchor="end">'  . $v3    . '</text>';
-$ret .= '<polyline points="44,19 49,19"/>   <text x="39" y="23" class="ylabel" text-anchor="end">'  . $v4    . '</text>';
-$ret .= '</g> <g>';
-$ret .= '<polyline points="751,140 756,140"/> <text x="760" y="144" class="ylabel">'. $v0min .'</text>';
-$ret .= '<polyline points="751,110 756,110"/> <text x="760" y="114" class="ylabel">'. $v1    .'</text>';
-$ret .= '<polyline points="751,80 756,80"/>   <text x="760" y="84" class="ylabel">' . $v2    .'</text>';
-$ret .= '<polyline points="751,49 756,49"/>   <text x="760" y="53" class="ylabel">' . $v3    .'</text>';
-$ret .= '<polyline points="751,19 756,19"/>   <text x="760" y="23" class="ylabel">' . $v4    .'</text>';
-$ret .= '</g>' ."\n";
-
-
-#labels ######################
-$ret .= '<text line_id="line_1" x="70" y="100" class="l1"> --- heat curve with insideTemp correction</text>' ;
-$ret .= '<text line_id="line_3" x="70" y="115" class="l3"> --- heat curve simplified</text>' ;
-$ret .= '<text  line_id="line_0" x="70" y="130"  class="l0"> --- working point: '; 
-$ret .= 'outside_tempFiltered=' . $outside_tempFiltered . '°C heatSetTemp=' . $heatSetTemp . '°C </text>';
-$ret .= '<text line_id="line_3" x="650" y="50" class="title"> -'. $pOpMode . '- </text>' ." \n" ;
-
-#title ######################
-$ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
-$ret .=  $titlestring .' </text>' . "\n";
-
-#point ######################
-$ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
-my ($px,$py) = (sprintf("%.1f", (($outside_tempFiltered+15)*(750-49)/(15+20)+49)),sprintf("%.1f", (($heatSetTemp-$v4)*(140-19)/($v0min-$v4)+19))); 
-$ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
-
-#curve with inside temperature correction ######################
-$ret .='<polyline id="line_1"  title="Heat Curve with insideTemp correction" style="stroke-width:1" class="l1" points="';
-foreach (@{$ycurvevalues}) {
-$ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+20)+49) ). "," . sprintf("%.1f", (($_->[1]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
+    $ret .= '<polyline points="44,140 49,140"/>   <text x="39"  y="144" class="ylabel" text-anchor="end">'  . $v0min . '</text>'
+         .  '<polyline points="44,110 49,110"/>   <text x="39"  y="114" class="ylabel" text-anchor="end">'  . $v1    . '</text>'
+         .  '<polyline points="44,80 49,80"/>     <text x="39"  y="84"  class="ylabel" text-anchor="end">'  . $v2    . '</text>'
+         .  '<polyline points="44,49 49,49"/>     <text x="39"  y="53"  class="ylabel" text-anchor="end">'  . $v3    . '</text>'
+         .  '<polyline points="44,19 49,19"/>     <text x="39"  y="23"  class="ylabel" text-anchor="end">'  . $v4    . '</text> </g> <g>'
+         .  '<polyline points="751,140 756,140"/> <text x="760" y="144" class="ylabel">'                    . $v0min . '</text>'
+         .  '<polyline points="751,110 756,110"/> <text x="760" y="114" class="ylabel">'                    . $v1    . '</text>'
+         .  '<polyline points="751,80 756,80"/>   <text x="760" y="84"  class="ylabel">'                    . $v2    . '</text>'
+         .  '<polyline points="751,49 756,49"/>   <text x="760" y="53"  class="ylabel">'                    . $v3    . '</text>'
+         .  '<polyline points="751,19 756,19"/>   <text x="760" y="23"  class="ylabel">'                    . $v4    . '</text></g>' ."\n";
+    #labels ######################
+    $ret .= '<text line_id="line_1"  x="70"  y="100" class="l1"> --- heat curve with insideTemp correction</text>' 
+         .  '<text line_id="line_3"  x="70"  y="115" class="l3"> --- heat curve simplified</text>' 
+         .  '<text  line_id="line_0" x="70"  y="130" class="l0"> --- working point: outside_tempFiltered='
+         . $outside_tempFiltered . '°C heatSetTemp=' . $heatSetTemp . '°C </text>'
+         .  '<text line_id="line_3"  x="650" y="50"  class="title"> -'. $pOpMode . '- </text>' ." \n"; 
+    #title ######################
+    $ret .= '<text id="svg_title" x="400" y="14.4"  class="title" text-anchor="middle">'. $titlestring .' </text>' . "\n";
+    #point ######################
+    $ret .='<polyline id="line_0"   style="stroke-width:2" class="l0" points="';
+    my ($px,$py) = (sprintf("%.1f", (($outside_tempFiltered+15)*(750-49)/(15+20)+49)),sprintf("%.1f", (($heatSetTemp-$v4)*(140-19)/($v0min-$v4)+19))); 
+    $ret.= ($px-3) . "," . ($py)   ." " . ($px)  . "," . ($py-3) ." " . ($px+3) . "," . ($py) ." " . ($px)   . "," . ($py+3)  ." " . ($px-3)   . "," . ($py)  ." " . '"/>' . "\n";
+    #curve with inside temperature correction ######################
+    $ret .='<polyline id="line_1"  title="Heat Curve with insideTemp correction" style="stroke-width:1" class="l1" points="';
+    foreach (@{$ycurvevalues}) {
+        $ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+20)+49) ). "," . sprintf("%.1f", (($_->[1]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
+    }
+    $ret .= '"/> ' . "\n";
+    #curve without inside temperature correction ######################
+    $ret .='<polyline id="line_3"  title="Heat Curve simplified" style="stroke-width:1" class="l3" points="';
+    foreach (@{$ycurvevalues}) {
+        $ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+20)+49) ). "," . sprintf("%.1f", (($_->[2]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
+    }
+    $ret .= '"/> ' . "\n";
+    $ret .= '</svg>';
+    my $FW_RETTYPE = "image/svg+xml";
+    return ($FW_RETTYPE, $ret);
 }
-$ret .= '"/> ' . "\n";
-
-#curve without inside temperature correction ######################
-$ret .='<polyline id="line_3"  title="Heat Curve simplified" style="stroke-width:1" class="l3" points="';
-foreach (@{$ycurvevalues}) {
-$ret.= (sprintf("%.1f", ($_->[0]+15)*(750-49)/(15+20)+49) ). "," . sprintf("%.1f", (($_->[2]-$v4)*(140-19)/($v0min-$v4)+19)) ." ";
-}
-$ret .= '"/> ' . "\n";
-$ret .= '</svg>';
-
-my $FW_RETTYPE = "image/svg+xml";
-return ($FW_RETTYPE, $ret);
-}
-
-
-
-
-
 
 sub THZ_detailFn(@){
-  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
-  my $hash = $defs{$d}; #$d is the name of the defined device 
-  return '<div class="SVGplot"><embed src="/fhem/THZ_PrintcurveSVG/" type="image/svg+xml"  name="wl_hr22"/></div> <br>';
+    my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+    my $hash = $defs{$d}; #$d is the name of the defined device 
+    return '<div class="SVGplot"><embed src="/fhem/THZ_PrintcurveSVG/" type="image/svg+xml"  name="wl_hr22"/></div> <br>';
 }
 
 #####################################
 sub THZ_backup_readings($){
-  my ($hash) = @_;
-  return "No statefile specified" if(!$attr{global}{statefile});
-  my $backupfile=$attr{global}{statefile};
-  my $t = localtime;
-  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-  $month++;
-  $year+=1900;
-  #$year+=1900 - 2000;
-  my $replacestr= "$hash->{NAME}-$year-$month-$mday.backup"; 
-  $backupfile=~ s/fhem.save/$replacestr/g;  #saving to statefile path
-  if(!open(BAFH, ">$backupfile")) {
-    my $msg = "WriteStateFile: Cannot open $backupfile: $!";
-    Log3 $hash->{NAME},3, $msg;
-    return $msg;
-  }
-  print BAFH "#$t\n";
-  my $r = $hash->{READINGS};
-  foreach my $c (sort keys %{$r}) {
-    my $rd = $r->{$c};
-    if(($c =~ /^p[HOr0-9]/) and (defined($rd->{VAL}))) {
-	my $val = $rd->{VAL};
-	$val =~ s/;/;;/g;
-	$val =~ s/\n/\\\n/g;
-	print BAFH "set $hash->{NAME}  $c $val\n";
+    my ($hash) = @_;
+    return "No statefile specified" if(!$attr{global}{statefile});
+    my $backupfile=$attr{global}{statefile};
+    my $t = localtime;
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    $month++;
+    $year+=1900;
+    #$year+=1900 - 2000;
+    my $replacestr= "$hash->{NAME}-$year-$month-$mday.backup"; 
+    $backupfile=~ s/fhem.save/$replacestr/g;  #saving to statefile path
+    if(!open(BAFH, ">$backupfile")) {
+        my $msg = "WriteStateFile: Cannot open $backupfile: $!";
+        Log3 $hash->{NAME},3, $msg;
+        return $msg;
     }
-  }
-  return "$backupfile: $!" if(!close(BAFH));
-  return "saved Readings in $backupfile";
+    print BAFH "#$t\n";
+    my $r = $hash->{READINGS};
+    foreach my $c (sort keys %{$r}) {
+        my $rd = $r->{$c};
+            if(($c =~ /^p[HOr0-9]/) and (defined($rd->{VAL}))) {
+            my $val = $rd->{VAL};
+            $val =~ s/;/;;/g;
+            $val =~ s/\n/\\\n/g;
+            print BAFH "set $hash->{NAME}  $c $val\n";
+        }
+    }
+    return "$backupfile: $!" if(!close(BAFH));
+    return "saved Readings in $backupfile";
 }
 
-
-
-
-
-
 1;
-
 
 =pod
 =item device
 =item summary Monitors and controls Tecalor/StiebelEltron heatpumps via RS232 or ser2net
-=item summary_DE Kommuniziert mittels RS232 oder ser2net mit einer Tecalor/SE W&auml;rmepumpe
+=item summary_DE Kommuniziert mittels RS232 oder ser2net mit einer Tecalor/SE Wärmepumpe
 =item cloudfree
 =item openapi
 =begin html
@@ -2388,19 +2248,15 @@ sub THZ_backup_readings($){
 <a name="THZ"></a>
 <h3>THZ</h3>
 <ul>
-  THZ Modul: Kommuniziert mittels einem seriellen Interface RS232/USB (z.B. /dev/ttyxx), oder mittels ser2net (z.B. 10.0.x.x:5555) mit einer Tecalor / Stiebel  
-  Eltron W&auml;rmepumpe. <br>
-  Getestet mit einer Tecalor THZ303/Sol (Serielle Geschwindigkeit 57600/115200@USB) und einer THZ403 (Serielle Geschwindigkeit 115200) mit identischer 
-  Firmware 4.39. <br>
+  THZ Modul: Kommuniziert mittels einem seriellen Interface RS232/USB (z.B. /dev/ttyxx), oder mittels ser2net (z.B. 10.0.x.x:5555) mit einer Tecalor / Stiebel  Eltron Wärmepumpe. <br>
+  Getestet mit einer Tecalor THZ303/Sol (Serielle Geschwindigkeit 57600/115200@USB) und einer THZ403 (Serielle Geschwindigkeit 115200) mit identischer Firmware 4.39. <br>
   Getestet mit einer Stiebel LWZ404 (Serielle Geschwindigkeit 115200@USB) mit Firmware 5.39. <br>
   Getestet auf FritzBox, nas-qnap, Raspberry Pi and MacOS.<br>
-  Dieses Modul funktioniert nicht mit &aumlterer Firmware; Gleichwohl, das "parsing" k&ouml;nnte leicht angepasst werden da die Register gut 
-  beschrieben wurden.
+  Dieses Modul funktioniert nicht mit älterer Firmware; Gleichwohl, das "parsing" könnte leicht angepasst werden da die Register gut beschrieben wurden.
   https://answers.launchpad.net/heatpumpmonitor/+question/100347  <br>
   Implementiert: Lesen der Statusinformation sowie Lesen und Schreiben einzelner Einstellungen.
   Genauere Beschreinung des Modules --> 00_THZ wiki http://www.fhemwiki.de/wiki/Tecalor_THZ_W%C3%A4rmepumpe
   <br><br>
-
   <a name="THZdefine"></a>
   <b>Define</b>
   <ul>
@@ -2471,6 +2327,4 @@ sub THZ_backup_readings($){
 
 
 =cut
-
-
 
