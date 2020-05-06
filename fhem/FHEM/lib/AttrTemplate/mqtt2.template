@@ -31,6 +31,7 @@ defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
   (tele|stat)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
+  (zigbee2mqtt)[/].*:.* "$1"\
   (ESPClient_[^/]+)[/].*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
   [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
@@ -60,7 +61,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: experimental first version...
 order:000002
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-attr IODEVNAME irgnoreRegexp [:/]cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
+attr IODEVNAME irgnoreRegexp cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
 
 name:MQTT2_IO_ignoreRegexp_homeassistant
