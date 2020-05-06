@@ -97,7 +97,7 @@ sub Define {
 
   RemoveInternalTimer($hash);
   my ($name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch, $variation) =
-    split m{\s+}, $def;
+    split m{\s+}xms, $def;
 
   return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch> [<variations>]"
     if(!defined $timeToSwitch);
