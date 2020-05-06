@@ -1,4 +1,4 @@
-REV 21868
+REV 21874
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-05-05_07:45:02 339898 ./CHANGED
+UPD 2020-05-06_07:45:02 339961 ./CHANGED
 UPD 2020-04-29_07:45:02 42274 ./MAINTAINER.txt
 UPD 2020-04-02_07:45:03 39553 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -53,7 +53,7 @@ UPD 2020-04-14_07:45:03 226629 FHEM/00_SIGNALduino.pm
 UPD 2018-04-26_07:45:02 488957 FHEM/00_SONOS.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2019-06-14_07:45:02 63360 FHEM/00_TCM.pm
-UPD 2019-10-29_07:45:02 143655 FHEM/00_THZ.pm
+UPD 2020-05-06_07:45:02 145097 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2020-05-05_07:45:02 45328 FHEM/00_ZWDongle.pm
@@ -484,7 +484,6 @@ UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
 UPD 2020-05-03_07:45:02 299446 FHEM/98_DOIF.pm
 UPD 2020-03-06_07:45:03 112474 FHEM/98_DOIFtools.pm
-UPD 2020-04-23_07:45:04 37550 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
 UPD 2020-02-17_07:45:03 42906 FHEM/98_GAEBUS.pm
@@ -744,12 +743,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-05-05_07:45:06 4284753 docs/commandref.html
-UPD 2020-05-05_07:45:08 2638719 docs/commandref_DE.html
+UPD 2020-05-06_07:45:06 4280225 docs/commandref.html
+UPD 2020-05-06_07:45:08 2633949 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-05-05_07:45:10 231873 docs/commandref_modular.html
-UPD 2020-05-05_07:45:11 242556 docs/commandref_modular_DE.html
+UPD 2020-05-06_07:45:09 231566 docs/commandref_modular.html
+UPD 2020-05-06_07:45:11 242249 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
