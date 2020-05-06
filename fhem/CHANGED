@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_XiaomiDevice: supporting EvpHumidifier and AirPurifier3H
  - remove:  98_DSBMobile: removed due to unavailability of API
  - feature: 73_DoorBird: ftui image history as links
  - change:  74_GardenaSmart: code change
