@@ -72,6 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.18.0" => "06.05.2020  attr 'digitalTextTicker' deleted and switched to setter 'textTicker', default text switched to blank ",
   "0.17.0" => "05.05.2020  new attr 'digitalTextTicker', 'digitalTextDigitNumber' ",
   "0.16.0" => "04.05.2020  delete attr 'digitalDisplayText', new setter 'displayText', 'displayTextDel' ",
   "0.15.1" => "04.05.2020  fix permanently events when no alarmTime is set in countdownwatch and countdown is finished ",
@@ -115,7 +116,6 @@ sub Initialize {
                                 "digitalSegmentDistance:slider,0,0.1,5,1 ".
                                 "digitalSegmentType:7,14,16 ".
                                 "digitalSegmentWidth:slider,0.3,0.1,3.5,1 ".
-                                "digitalTextTicker:1,0 ".
                                 "digitalTextDigitNumber ".
                                 "disable:1,0 ".
                                 "hideDisplayName:1,0 ".
@@ -158,10 +158,10 @@ sub Define {
       return "You need to specify more parameters.\n". "Format: define <name> Watches [Modern | Station | Digital]";
   }
   
-  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);   # Modul Meta.pm nicht vorhanden
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);      # Modul Meta.pm nicht vorhanden
   $hash->{MODEL}                 = $a[2];
   
-  setVersionInfo($hash);                                   # Versionsinformationen setzen
+  setVersionInfo($hash);                                      # Versionsinformationen setzen
   
   readingsSingleUpdate($hash,"state", "initialized", 1);      # Init für "state" 
   
@@ -190,7 +190,7 @@ sub Set {                                                    ## no critic 'compl
   $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
   $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);
   # $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);
-  $setlist .= "displayTextSet displayTextDel:noArg "                                            if($addp eq "text");    
+  $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                          if($addp eq "text");    
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -255,10 +255,17 @@ sub Set {                                                    ## no critic 'compl
       
       my $txt = join (" ", @a);
       $txt    =~ s/[\r\n]//g;
-      readingsSingleUpdate($hash, "displayText", $txt, 0);
+      readingsSingleUpdate($hash, "displayText", $txt, 1);
       
   } elsif ($opt eq "displayTextDel") {      
       delReadings ($name, "displayText");
+      
+  } elsif ($opt eq "textTicker") {
+      if($prop eq "on") {
+          readingsSingleUpdate($hash, "displayTextTicker", "on", 1); 
+      } else {
+          readingsSingleUpdate($hash, "displayTextTicker", "off", 1); 
+      }
       
   } elsif ($opt eq "reset") {
       delReadings         ($name);
@@ -320,7 +327,11 @@ sub Attr {
         }
         $do = 0 if($cmd eq "del");
         
-        delReadings ($name);   
+        if($do ne "text") {
+            delReadings ($name); 
+        } else {
+            delReadings ($name,undef,"^display.*"); 
+        }        
  
         readingsSingleUpdate($hash, "state", "initialized", 1); 
         
@@ -368,19 +379,24 @@ return $ret;
 
 ##############################################################################
 #         löscht alle oder das spezifizierte Reading (außer state)
+#         $todel   = nur dieses Reading löschen
+#         $supress = Reading (Regex) nicht löschen
 ##############################################################################
 sub delReadings {
-  my ($name,$reading) = @_;
-  my $hash            = $defs{$name};
+  my ($name,$todel,$supress) = @_;
+  my $hash = $defs{$name};
   
-  if($reading) {
-      readingsDelete($hash,$reading);
+  my $addp = AttrVal($name, "digitalDisplayPattern", "watch");
+  
+  if($todel) {
+      readingsDelete($hash,$todel);
       return;
   }
   
   my @allrds = keys%{$hash->{READINGS}};
   for my $key(@allrds) {
-      next if($key =~ /\bstate\b/);
+      next if($key =~ /\bstate\b/x);     
+      next if(defined $supress && $key =~ /$supress/x);        
       readingsDelete($hash,$key);
   }    
     
@@ -407,12 +423,12 @@ sub digitalWatch {
   my $addd     = AttrVal($d, "digitalDigitDistance",   2);
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
-  my $adtt     = AttrVal($d, "digitalTextTicker",      0);
   my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
   
   my $deftxt   =  "    ";
-  my $ddt      =  ReadingsVal($d, "displayText",  $deftxt);
-  my $alarm    = " ".ReadingsVal($d, "alarmTime", "aa:bb:cc");
+  my $rdtt     =  ReadingsVal   ($d, "displayTextTicker", "off");
+  my $ddt      =  ReadingsVal   ($d, "displayText",       $deftxt);
+  my $alarm    = " ".ReadingsVal($d, "alarmTime",         "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                       # dummy
   my ($h,$m,$s,$txtc) = (0,0,0,0); 
@@ -485,6 +501,7 @@ sub digitalWatch {
     var startDate_$d;
     var value_$d   = ' $deftxt';                     // default Digitaltext initialisieren
     var tlength_$d = '$txtc';                        // Textlänge Digitaltext initialisieren
+    var tticker_$d = '$rdtt';                        // Tickereinstellung initialisieren
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1300,13 +1317,13 @@ sub digitalWatch {
                 tlength_$d = $adtdn;
             }
             
-            display_$d.pattern = '';                                           // Textschablone erstellen
+            display_$d.pattern = '';                                          // Textschablone erstellen
             for (var i = 0; i <= tlength_$d; i++) {
                 display_$d.pattern += '#';
             }
             display_$d.pattern += '       ';                                  // Abstand Text zum rechten Rand            
         
-            if ($adtt == 1) {                                                 // Text als Laufband
+            if (tticker_$d == 'on') {                                         // Text als Laufband ?
                 var rttime    = new Date();
                 var rthours   = rttime.getHours();
                 var rtminutes = rttime.getMinutes();
@@ -1319,12 +1336,20 @@ sub digitalWatch {
             
             }
             
-            command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';   // Text dynamisch aus Reading lesen
+            command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';     // Text dynamisch aus Reading lesen
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 value_$d = data.replace(/\\n/g, '');
                                 value_$d = ' '+value_$d;                           
                                 return value_$d;
+                            } 
+                  );
+                  
+            command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';   // Textticker Einstellung aus Reading lesen
+            url_$d  = makeCommand(command);
+            \$.get( url_$d, function (data) {
+                                tticker_$d = data.replace(/\\n/g, '');                     
+                                return tticker_$d;
                             } 
                   );
         
@@ -1337,7 +1362,7 @@ sub digitalWatch {
         }
         
         display_$d.setValue(value_$d);
-        window.setTimeout('animate_$d()', 200); 
+        window.setTimeout('animate_$d()', 200);
     }
 
     </script>
@@ -2178,7 +2203,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>displayTextSet</b><br>
       Stellt den anzuzeigenden Text ein. <br> 
       Dieses Set-Kommando ist nur bei einer digitalen Segmentanzeige mit "digitalDisplayPattern = text" vorhanden. <br>
-      (default: ----) <br><br>
+      (default: leere Anzeige) <br><br>
       
       <b>Hinweis:</b> <br>
       Die darstellbaren Zeichen sind vom Attribut "digitalSegmentType" abhängig. <br>
@@ -2221,6 +2246,13 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>stop</b><br>
       Stoppt die Stoppuhr. Die erreichte Zeit bleibt erhalten. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
+    </li>
+    <br>
+    
+    <a name="textTicker"></a>
+    <li><b>textTicker on | off </b><br>
+      Schaltet den Laufschriftmodus einer Textanzeige (siehe Attribut digitalDisplayPattern) ein bzw. aus. <br>
+      (default: off)      
     </li>
     <br>
     
@@ -2478,13 +2510,6 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
       Wenn &lt;Anzahl&gt > 0 wird die Anzahl der Stellen einer Textanzeige (digitalDisplayPattern = text) fest eingestellt. 
       Wenn &lt;Anzahl&gt = 0 oder nicht gesetzt erfolgt die Festlegung automatisch. In diesem Fall erfolgt eine Adaption
       der Zeichengröße an die Anzahl abhängig von der eingestellten Displaygröße (siehe htmlattr). <br>
-      (default: 0)      
-    </li>
-    <br>
-
-    <a name="digitalTextTicker"></a>
-    <li><b>digitalTextTicker </b><br>
-      Schaltet den Laufschriftmodus einer Textanzeige (digitalDisplayPattern = text) ein bzw. aus. <br>
       (default: 0)      
     </li>
     <br>      
