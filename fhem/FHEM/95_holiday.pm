@@ -47,6 +47,7 @@ holiday_refresh($;$$)
   my ($name, $fordate, $showAvailable) = (@_);
   my $hash = $defs{$name};
   my $fromTimer=0;
+  my $foryeardate;
 
   return if(!$hash);           # Just deleted
 
@@ -56,12 +57,14 @@ holiday_refresh($;$$)
   if(!$fordate) {
     $fromTimer = 1;
     $fordate = sprintf("%02d-%02d", $lt[4]+1, $lt[3]);
+    $foryeardate = sprintf("%4d-%02d-%02d",$lt[5]+1900, $lt[4]+1, $lt[3]);
     @fd = @lt;
   } else {
     $fordate =~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/; # fmt is already checked
-    my ($m,$d) = ($3,$4);
+    my ($y,$m,$d) = ($2, $3,$4);
     $fordate = "$m-$d";
     $lt[5] = $2-1900 if($2);
+    $foryeardate = $a ? "$y-$m-$d" : sprintf("%4d-%02d-%02d",$lt[5]+1900,$m,$d);
     @fd = localtime(mktime(1,1,1,$d,$m-1,$lt[5],0,0,-1));
   }
 
@@ -105,9 +108,9 @@ holiday_refresh($;$$)
     next if($l =~ m/^\s*$/);
     my $found;
 
-    if($l =~ m/^1/) {               # Exact date: 1 MM-DD Holiday
+    if($l =~ m/^1/) {   # Exact date: 1 MM-DD Holiday (MM-DD-YYYY, Forum #93277)
       my @args = split(" ", $l, 3);
-      if($args[1] eq $fordate) {
+      if(@args == 3 && ($args[1] eq $fordate || $args[1] eq $foryeardate)) {
         $found = $args[2];
       }
 
@@ -287,7 +290,7 @@ holiday_Get($@)
 {
   my ($hash, @a) = @_;
 
-  shift(@a) if($a[1] && $a[1] eq "MM-DD" || $a[1] eq "YYYY-MM-DD");
+  shift(@a) if($a[1] && ($a[1] eq "MM-DD" || $a[1] eq "YYYY-MM-DD"));
   return "argument is missing" if(int(@a) < 2);
   my $arg;
 
@@ -405,7 +408,8 @@ holiday_FW_detailFn($$$$)
     <ul>
       <li>1<br>
           Exact date. Arguments: &lt;MM-DD&gt; &lt;holiday-name&gt;<br>
-          Exampe: 1 12-24 Christmas
+          Exampe: 1 12-24 Christmas<br>
+          You can alternatively specify the year as YYYY-MM-DD.
           </li>
       <li>2<br>
           Easter-dependent date. Arguments: &lt;day-offset&gt;
@@ -559,7 +563,8 @@ holiday_FW_detailFn($$$$)
     <ul>
       <li>1<br>
           Genaues Datum. Argument: &lt;MM-TT&gt; &lt;Feiertag-Name&gt;<br>
-          Beispiel: 1 12-24 Weihnachten
+          Beispiel: 1 12-24 Weihnachten<br>
+          Statt MM-TT kann auch YYYY-MM-TT geschrieben werden
           </li>
       <li>2<br>
           Oster-abh&auml;ngiges Datum. Argument: &lt;Tag-Offset&gt;
