@@ -92,11 +92,12 @@ sub Initialize {
 
 # regular Functions ##################################################################
 sub Define {
-  my ($hash, $def) = @_;
+  my $hash = shift;
+  my $def  = shift // return;
 
   RemoveInternalTimer($hash);
   my ($name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch, $variation) =
-    split("[ \t][ \t]*", $def);
+    split m{\s+}, $def;
 
   return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch> [<variations>]"
     if(!defined $timeToSwitch);
@@ -238,7 +239,8 @@ sub Set {
 
 # module Fn ###################################################################
 sub addDays {
-   my ($now, $days) = @_;
+   my $now = shift;
+   my $days = shift // return;
 
    my @jetzt_arr = localtime($now);
    $jetzt_arr[3] += $days;
@@ -429,7 +431,8 @@ sub isDisabled {
 }
 
 sub schaltZeitenErmitteln {
-  my ($hash,$now) = @_;
+  my $hash = shift;
+  my $now = shift // return;
 
   startZeitErmitteln($hash, $now);
   stopZeitErmitteln ($hash, $now);
@@ -444,7 +447,8 @@ sub schaltZeitenErmitteln {
 }
 
 sub setActive {
-   my ($hash, $value) = @_;
+   my $hash = shift;
+   my $value = shift // return;
    $hash->{helper}{active} = $value;
    my $trigger = (isDisabled($hash)) ? 0 : 1;
    readingsSingleUpdate ($hash,  "active", $value, $trigger);
@@ -468,7 +472,8 @@ sub setState {
 
 sub setSwitchmode {
 
-   my ($hash, $attrVal) = @_;
+   my $hash = shift;
+   my $attrVal = shift // return;
    my $mod = "[".$hash->{NAME} ."] ";
 
 
@@ -516,7 +521,8 @@ sub SetTimer {
 }
 
 sub startZeitErmitteln {
-   my ($hash,$now) = @_;
+   my $hash = shift;
+   my $now  = shift // return;
 
    my $timespec_start = $hash->{helper}{TIMESPEC_START};
 
@@ -552,7 +558,8 @@ sub stopTimeReached {
 }
 
 sub stopZeitErmitteln {
-   my ($hash,$now) = @_;
+   my $hash = shift;
+   my $now  = shift // return;
 
    my $timespec_stop = $hash->{helper}{TIMESPEC_STOP};
 
@@ -585,7 +592,7 @@ sub stopZeitErmitteln {
    return;
 }
 
-sub Wakeup() {
+sub Wakeup {
 
   for my $hc ( sort keys %{$modules{RandomTimer}{defptr}} ) {
      my $hash = $modules{RandomTimer}{defptr}{$hc};
@@ -627,7 +634,8 @@ sub MkInternalTimer {
 }
 ################################################################################
 sub RmInternalTimer {
-   my ($modifier, $hash) = @_;
+   my $modifier = shift;
+   my $hash = shift // return;
 
    my $timerName = "$hash->{NAME}_$modifier";
    my $myHash = $hash->{TIMER}{$timerName};
@@ -640,7 +648,8 @@ sub RmInternalTimer {
 }
 
 sub GetHashIndirekt {
-  my ($myHash, $function) = @_;
+  my $myHash = shift;
+  my $function = shift // return;
 
   if (!defined($myHash->{HASH})) {
     Log3 $myHash, 3, "[$function] myHash not valid";
