@@ -567,7 +567,7 @@ holiday_FW_detailFn($$$$)
       <li>1<br>
           Genaues Datum. Argument: &lt;MM-TT&gt; &lt;Feiertag-Name&gt;<br>
           Beispiel: 1 12-24 Weihnachten<br>
-          MM-TT kann auch als YYYY-MM-TT geschrieben werden.
+          MM-TT kann auch als JJJJ-MM-TT geschrieben werden.
           </li>
       <li>2<br>
           Oster-abh&auml;ngiges Datum. Argument: &lt;Tag-Offset&gt;
@@ -601,7 +601,7 @@ holiday_FW_detailFn($$$$)
             4 12-20 12-31 Winterferien<br>
             4 01-01 01-10 Winterferien<br>
           </ul>
-          MM-TT kann auch als YYYY-MM-TT geschrieben werden.
+          MM-TT kann auch als JJJJ-MM-TT geschrieben werden.
           </li>
       <li>5<br>
           Datum relativ, Wochentags ein fester Urlaubstag/Feiertag. Argument:
