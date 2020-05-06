@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.05.06 v0.1.8
+# - BUG:     Zu viele Loginfos bei set "NPM_login refresh" 
+#
 # 2020.04.27 v0.1.7
 # - FEATURE: Unterstützung A1WAR447VT003J Yamaha MusicCast 20
 # - BUG:     set "NPM_login refresh"
@@ -389,7 +392,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.7";
+my $ModulVersion     = "0.1.8";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -4834,7 +4837,7 @@ sub echodevice_NPMWaitForCookie($){
 			if (index($_, "{") != -1) {
 				$CookieResult = $_;
 				Log3 $name, 3, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] write new refreshtoken";
-				Log3 $name, 3, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] $CookieResult";
+				# Log3 $name, 3, "[$name] [echodevice_NPMWaitForCookie] [$NPMLoginTyp] $CookieResult";
 				readingsSingleUpdate( $hash, "amazon_refreshtoken", "vorhanden",1 );
 				readingsSingleUpdate( $hash, ".COOKIE", $CookieResult,1 );
 				readingsSingleUpdate( $hash, "COOKIE_TYPE", "NPM_Login",1 );
