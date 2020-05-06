@@ -164,7 +164,9 @@ holiday_refresh($;$$)
 
     } elsif($l =~ m/^4/) {          # Interval: 4 MM-DD MM-DD Holiday
       my @args = split(" ", $l, 4);
-      if($args[1] le $fordate && $args[2] ge $fordate) {
+      if(@args == 4 && 
+         (($args[1] le $fordate     && $args[2] ge $fordate) ||
+          ($args[1] le $foryeardate && $args[2] ge $foryeardate))) {
         $found = $args[3];
       }
 
@@ -409,7 +411,7 @@ holiday_FW_detailFn($$$$)
       <li>1<br>
           Exact date. Arguments: &lt;MM-DD&gt; &lt;holiday-name&gt;<br>
           Exampe: 1 12-24 Christmas<br>
-          You can alternatively specify the year as YYYY-MM-DD.
+          MM-DD can also be written as YYYY-MM-DD.
           </li>
       <li>2<br>
           Easter-dependent date. Arguments: &lt;day-offset&gt;
@@ -443,6 +445,7 @@ holiday_FW_detailFn($$$$)
             4 12-20 12-31 Winter holiday<br>
             4 01-01 01-10 Winter holiday<br>
           </ul>
+          MM-DD can also be written as YYYY-MM-DD.
           </li>
       <li>5<br>
           Date relative, weekday fixed holiday. Arguments: &lt;nth&gt;
@@ -564,7 +567,7 @@ holiday_FW_detailFn($$$$)
       <li>1<br>
           Genaues Datum. Argument: &lt;MM-TT&gt; &lt;Feiertag-Name&gt;<br>
           Beispiel: 1 12-24 Weihnachten<br>
-          Statt MM-TT kann auch YYYY-MM-TT geschrieben werden
+          MM-TT kann auch als YYYY-MM-TT geschrieben werden.
           </li>
       <li>2<br>
           Oster-abh&auml;ngiges Datum. Argument: &lt;Tag-Offset&gt;
@@ -598,6 +601,7 @@ holiday_FW_detailFn($$$$)
             4 12-20 12-31 Winterferien<br>
             4 01-01 01-10 Winterferien<br>
           </ul>
+          MM-TT kann auch als YYYY-MM-TT geschrieben werden.
           </li>
       <li>5<br>
           Datum relativ, Wochentags ein fester Urlaubstag/Feiertag. Argument:
