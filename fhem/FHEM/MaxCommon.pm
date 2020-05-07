@@ -25,17 +25,18 @@
 package MaxCommon;
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile MAX_ParseTemperature validTemperature);
+@EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile validTemperature);
 
 %device_types = (
-  0 => "Cube",
+
   1 => "HeatingThermostat",
   2 => "HeatingThermostatPlus",
   3 => "WallMountedThermostat",
   4 => "ShutterContact",
   5 => "PushButton",
   6 => "virtualShutterContact",
-  7 => "virtualThermostat"
+  7 => "virtualThermostat",
+  8 => "PlugAdapter"
 );
 
 %msgId2Cmd = (
@@ -76,15 +77,15 @@ require Exporter;
 
 %msgCmd2Id = reverse %msgId2Cmd;
 
-$defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
+my $defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
 
 
 sub validTemperature { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] =~ /^\d+(\.[05])?$/ && $_[0] >= 4.5 && $_[0] <= 30.5); }
 
 # Identify for numeric values and maps "on" and "off" to their temperatures
-sub MAX_ParseTemperature($)
-{
-  return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
-}
+#sub MAX_ParseTemperature
+#{
+  #return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
+#}
 
 1;
