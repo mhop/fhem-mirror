@@ -536,7 +536,7 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  " on:noArg off:noArg mode:auto,idle,silent,favorite favorite:slider,0,1,16 preset:noArg save:noArg restore:noArg buzzer:on,off led:bright,dim,off turbo:on,off child_lock:on,off sleep_time sleep_auto:close,single";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H"){
-    $list  .=  " on:noArg off:noArg mode:auto,fan,favorite,silent favorite_level:slider,0,1,14 fan_level:1,2,3 buzzer:on,off led:on,off led_brightness:bright,dim,off child_lock:on,off";
+    $list  .=  " on:noArg off:noArg mode:auto,fan,silent,favorite favorite:slider,0,1,14 fan_level:1,2,3 buzzer:on,off led:bright,dim,off child_lock:on,off";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier"){
     $list  .=  " on:noArg off:noArg mode:idle,silent,medium,high buzzer:on,off led:bright,dim,off child_lock:on,off limit_hum:slider,30,1,80";
