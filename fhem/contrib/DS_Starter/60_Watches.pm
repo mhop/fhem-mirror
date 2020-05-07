@@ -33,7 +33,6 @@ use strict;
 use warnings;
 use Time::HiRes qw(time gettimeofday tv_interval);
 use GPUtils qw(GP_Import GP_Export);                   # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-# use POSIX;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;      ## no critic 'eval'
 
 # Run before module compilation
@@ -72,6 +71,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.20.0" => "07.05.2020  asynchron read alarmTime reading, some fixes ",
+  "0.19.0" => "06.05.2020  alarm event creation for watch models 'Station' and 'Station' ",
   "0.18.0" => "06.05.2020  attr 'digitalTextTicker' deleted and switched to setter 'textTicker', default text switched to blank ",
   "0.17.0" => "05.05.2020  new attr 'digitalTextTicker', 'digitalTextDigitNumber' ",
   "0.16.0" => "04.05.2020  delete attr 'digitalDisplayText', new setter 'displayText', 'displayTextDel' ",
@@ -189,7 +190,7 @@ sub Set {                                                    ## no critic 'compl
   $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
   $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
   $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);
-  # $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);
+  $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);
   $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                          if($addp eq "text");    
 
   if ($opt =~ /\bstart\b/) {
@@ -210,8 +211,6 @@ sub Set {                                                    ## no critic 'compl
       return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
       
       my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
-      
-      delReadings     ($name, "alarmTime");
       
       readingsBeginUpdate ($hash);
       readingsBulkUpdate  ($hash, "alarmed", 0);
@@ -299,15 +298,15 @@ sub Attr {
     # $name is device name
     # aName and aVal are Attribute name and value
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /modern/i && $aName =~ /^modern.*/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /modern/i && $aName =~ /^modern/) {
          return qq{"$aName" is only valid for Watches model "Modern"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /station/i && $aName =~ /^station.*/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /station/i && $aName =~ /^station/) {
          return qq{"$aName" is only valid for Watches model "Station"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /digital/i && $aName =~ /^digital.*/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /digital/i && $aName =~ /^digital/) {
          return qq{"$aName" is only valid for Watches model "Digital"};
     }
     
@@ -342,7 +341,7 @@ sub Attr {
     } 
 
     if ($cmd eq "set") {
-        if ($aName eq "digitalTextDigitNumber" && $aVal !~ /^\d+$/x) {
+        if ($aName eq "digitalTextDigitNumber" && $aVal !~ /^[0-9]+$/x) {
             return qq{The value of "$aName" is not valid. Only integers are allowed !};
         }
     }    
@@ -424,37 +423,35 @@ sub digitalWatch {
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
   my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
+  my $tsou     = AttrVal($d, "timeSource",             "server");
   
   my $deftxt   =  "    ";
-  my $rdtt     =  ReadingsVal   ($d, "displayTextTicker", "off");
-  my $ddt      =  ReadingsVal   ($d, "displayText",       $deftxt);
-  my $alarm    = " ".ReadingsVal($d, "alarmTime",         "aa:bb:cc");
+  my $rdtt     =  ReadingsVal ($d, "displayTextTicker", "off");
+  my $ddt      =  ReadingsVal ($d, "displayText",       $deftxt);
+  my $alarm    =  ReadingsVal ($d, "alarmTime",         "aa:bb:cc");
   
   my $ddp = "###:##:##";                                                       # dummy
   my ($h,$m,$s,$txtc) = (0,0,0,0); 
   my $forerun = "";                                                            # init Vorlauf bei Laufschrift
   
+  if($addp !~ /text/) {
+      $ddt = "((hours_$d   < 10) ? '0' : '')   + hours_$d   + ':' + 
+              ((minutes_$d < 10) ? '0'  : '')  + minutes_$d + ':' + 
+              ((seconds_$d < 10) ? '0'  : '')  + seconds_$d"; 
+  }
+  
   if($addp eq "watch") {
       $ddp = "###:##:##";
-      $ddt = "((hours < 10) ? ' 0' : ' ') + hours
-                    + ':' + ((minutes < 10) ? '0' : '') + minutes
-                    + ':' + ((seconds < 10) ? '0' : '') + seconds";
   
   } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
       $alarmdef = "aa:bb:cc" if($addp eq "stopwatch");                        # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
       $ddp      = "###:##:##";
-      $ddt      = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
-                    + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
-                    + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
   } elsif ($addp eq "staticwatch") {
       $ddp = "###:##:##";
       $h   = ReadingsVal($d, "hour"  , 0);
       $m   = ReadingsVal($d, "minute", 0);
       $s   = ReadingsVal($d, "second", 0);
-      $ddt = "((hours_$d < 10) ? ' 0' : ' ') + hours_$d
-                 + ':' + ((minutes_$d < 10) ? '0' : '') + minutes_$d
-                 + ':' + ((seconds_$d < 10) ? '0' : '') + seconds_$d";
   
   } elsif ($addp eq "text") {
       $txtc = length($ddt);
@@ -499,9 +496,10 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
-    var value_$d   = ' $deftxt';                     // default Digitaltext initialisieren
-    var tlength_$d = '$txtc';                        // Textlänge Digitaltext initialisieren
-    var tticker_$d = '$rdtt';                        // Tickereinstellung initialisieren
+    var armtime0_$d = '$alarm';                       // Alarmzeit initialisieren
+    var value_$d    = ' $deftxt';                     // default Digitaltext initialisieren
+    var tlength_$d  = '$txtc';                        // Textlänge Digitaltext initialisieren
+    var tticker_$d  = '$rdtt';                        // Tickereinstellung initialisieren
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -534,7 +532,6 @@ sub digitalWatch {
     var display_$d = new SegmentDisplay_$d('display_$d');
     display_$d.pattern         = '$ddp       ';                  // Textschablone initialisieren
     display_$d.cornerType      = 2;
-    // display_$d.displayType     = 7;
     display_$d.displayAngle    = $adda;                          // Zeichenwinkel:  -30 - 30 (9)
     display_$d.digitHeight     = $addh;                          // Zeichenhöhe:    5   - 50 (20)
     display_$d.digitWidth      = $addw;                          // Zeichenbreite:  5   - 50 (12)
@@ -1094,13 +1091,13 @@ sub digitalWatch {
     // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
     function checkAndDoAlm (acttime) {
         lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
-        if ( (acttime == '$alarm' || acttime == ' $alarmdef') && acttime != lastalmtime ) {
+        if ( (acttime == armtime0_$d || acttime == '$alarmdef') && acttime != lastalmtime ) {
             command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
             url_$d  = makeCommand(command);
               
             localStoreSetLastalm (acttime);                                    // aktuelle Alarmzeit sichern 
               
-            if(acttime == '$alarm') {
+            if(acttime == armtime0_$d) {
                \$.get(url_$d);
             
             } else {
@@ -1119,20 +1116,33 @@ sub digitalWatch {
     function animate_$d() {
         var watchkind_$d = '$addp';
 
-        if (watchkind_$d == 'watch') {
-            // aktueller Timestamp in Millisekunden 
-            command   = '{ int(time*1000) }';
-            url_$d    = makeCommand(command);
-            \$.get( url_$d, function (data) {
-                                data = data.replace(/\\n/g, ''); 
-                                ct_$d = parseInt(data); return ct_$d;
-                            } 
-                  ); 
-            
-            var time    = new Date(ct_$d);
-            var hours   = time.getHours();
-            var minutes = time.getMinutes();
-            var seconds = time.getSeconds();            
+        if (watchkind_$d == 'watch') {                  
+            // Zeitsteuerung - aktueller Timestamp in Millisekunden
+            if ('$tsou' == 'server') {                   // Serverzeit
+                command = '{ int(time*1000) }';
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    data = data.replace(/\\n/g, ''); 
+                                    ct_$d = parseInt(data); 
+                                    return ct_$d;
+                                } 
+                      ); 
+              
+                time_$d  = new Date(ct_$d);
+              
+            } else {
+                time_$d  = new Date();                   // Clientzeit
+            }
+          
+            if (typeof ct_$d === 'undefined') {          // wenn Zeit noch undef mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+                time_$d  = new Date();                   
+            } else {
+                time_$d  = new Date(ct_$d);
+            }                  
+                  
+            var hours_$d   = time_$d.getHours();
+            var minutes_$d = time_$d.getMinutes();
+            var seconds_$d = time_$d.getSeconds();            
         }
         
         if (watchkind_$d == 'staticwatch') {
@@ -1141,10 +1151,8 @@ sub digitalWatch {
             var seconds_$d = '$s';
         }
         
-        if (watchkind_$d == 'stopwatch') {        
-            devName_$d = '$d';             
-            
-            command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
+        if (watchkind_$d == 'stopwatch') {           
+            command = '{ReadingsVal(\"$d\",\"state\",\"\")}';                          // state Reading lesen
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                                
@@ -1154,11 +1162,19 @@ sub digitalWatch {
             
             if (state_$d == 'started' || state_$d == 'resumed') { 
                 if (state_$d == 'started') {
-                    localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen            
+                    localStoreSetLastalm ('NaN');                                      // letzte Alarmzeit zurücksetzen            
                 }
                 
+                command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+armtime0_$d+\")}';     // alarmTime Reading lesen
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    armtime0_$d = data.replace(/\\n/g, '');
+                                    return armtime0_$d;
+                                } 
+                      );
+                
                 // == Startzeit ==            
-                command   = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
+                command   = '{ReadingsNum(\"$d\",\"starttime\", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
@@ -1169,17 +1185,8 @@ sub digitalWatch {
                 
                 startDate_$d = new Date(st_$d);
                 
-                // aktueller Timestamp in Millisekunden 
-                command = '{ int(time*1000) }';
-                url_$d  = makeCommand(command);
-                \$.get( url_$d, function (data) {
-                                    data  = data.replace(/\\n/g, ''); 
-                                    ct_$d = parseInt(data);  
-                                    return ct_$d;
-                                } 
-                      );                
-                
-                currDate_$d  = new Date(ct_$d);
+                // aktueller Timestamp in Millisekunden      
+                currDate_$d  = new Date();
                 elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 
                 if (state_$d == 'resumed') {
@@ -1218,10 +1225,9 @@ sub digitalWatch {
             }
         }
         
-        if (watchkind_$d == 'countdownwatch') {        
-            devName_$d = '$d';        
+        if (watchkind_$d == 'countdownwatch') {                 
             
-            command = '{ReadingsVal(\"'+devName_$d+'\",\"state\",\"\")}';
+            command = '{ReadingsVal(\"$d\",\"state\",\"\")}';                           // state Reading lesen
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                      
@@ -1231,11 +1237,19 @@ sub digitalWatch {
             
             if (state_$d == 'started' || state_$d == 'resumed') {
                 if (state_$d == 'started') {
-                    localStoreSetLastalm ('NaN');                        // letzte Alarmzeit zurücksetzen            
+                    localStoreSetLastalm ('NaN');                                      // letzte Alarmzeit zurücksetzen            
                 }
                 
+                command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+armtime0_$d+\")}';     // alarmTime Reading lesen
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    armtime0_$d = data.replace(/\\n/g, '');
+                                    return armtime0_$d;
+                                } 
+                      );
+                
                 // == Ermittlung Countdown Startwert ==         
-                command   = '{ReadingsNum(\"'+devName_$d+'\",\"countInitVal\", 0)}';
+                command   = '{ReadingsNum(\"$d\",\"countInitVal\", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
@@ -1251,7 +1265,7 @@ sub digitalWatch {
                 }
                 
                 // == Ermittlung vergangene Sekunden ==                  
-                command = '{ReadingsNum(\"'+devName_$d+'\",\"starttime\", 0)}';
+                command = '{ReadingsNum(\"$d\",\"starttime\", 0)}';
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
@@ -1262,17 +1276,8 @@ sub digitalWatch {
                       
                 startDate_$d = new Date(st_$d);
                 
-                // aktueller Timestamp in Millisekunden 
-                command   = '{ int(time*1000) }';
-                url_$d    = makeCommand(command);
-                \$.get( url_$d, function (data) {
-                                    data  = data.replace(/\\n/g, ''); 
-                                    ct_$d = parseInt(data);                               
-                                    return ct_$d;
-                                } 
-                      );
-     
-                currDate_$d  = new Date(ct_$d);
+                // aktueller Timestamp in Millisekunden      
+                currDate_$d  = new Date();
                 elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden umrechnen
                 
                 // == Countdown errechnen ==
@@ -1354,7 +1359,7 @@ sub digitalWatch {
                   );
         
         } else {
-            value_$d = $ddt;
+            value_$d = ' '+$ddt;
             
             if(value_$d == ' undefined:undefined:undefined' || value_$d == ' NaN:NaN:NaN') {
                value_$d = '   :  :  '; 
@@ -1389,6 +1394,8 @@ sub stationWatch {
   my $sbody  = AttrVal($d,"stationBody","Round")."Body";
   my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
   my $tsou   = AttrVal($d,"timeSource","server"); 
+  
+  my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");
 
   return "
       <html>
@@ -1399,27 +1406,8 @@ sub stationWatch {
       <script>  
       
       var ct_$d;
-      var time;                                 
-      
-      // CSRF-Token auslesen
-      var body = document.querySelector(\"body\");
-      if( body != null ) {
-          csrf = body.getAttribute(\"fwcsrf\");
-      }
- 
-      // get the base url
-      function getBaseUrl () {
-          var url = window.location.href.split(\"?\")[0];
-          url += \"?\";
-          if( csrf != null ) {
-              url += \"fwcsrf=\"+csrf+\"&\";
-          }
-          return url;
-      }
-
-      function makeCommand (cmd) {
-          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
-      }
+      var armtime0_$d = '$alarm';
+      var time_$d;                                 
       
       // clock body (Uhrgehäuse)
       StationClock_$d.NoBody         = 0;
@@ -1472,7 +1460,44 @@ sub stationWatch {
       StationClock_$d.BouncingSecondHand        = 1;
       StationClock_$d.ElasticBouncingSecondHand = 2;
       StationClock_$d.OverhastySecondHand       = 3;
+      
+      // CSRF-Token auslesen
+      var body = document.querySelector(\"body\");
+      if( body != null ) {
+          csrf = body.getAttribute(\"fwcsrf\");
+      }
+ 
+      // get the base url
+      function getBaseUrl () {
+          var url = window.location.href.split(\"?\")[0];
+          url += \"?\";
+          if( csrf != null ) {
+              url += \"fwcsrf=\"+csrf+\"&\";
+          }
+          return url;
+      }
 
+      function makeCommand (cmd) {
+          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+      }
+      
+      // localStorage speichern letzte Alarmzeit
+      function localStoreSetLastalm (lastalmtime) {
+          localStorage.setItem('lastalmtime_$d', lastalmtime);
+      }
+    
+      // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
+      function checkAndDoAlm (acttime) {
+          lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
+          if ( (acttime == armtime0_$d) && acttime != lastalmtime ) {
+              command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
+              url_$d  = makeCommand(command);
+              
+              localStoreSetLastalm (acttime);                                    // aktuelle Alarmzeit sichern 
+              
+              \$.get(url_$d);
+          }
+      }
 
       function StationClock_$d(clockId_$d) {
           this.clockId_$d = clockId_$d; 
@@ -1644,26 +1669,43 @@ sub stationWatch {
                   }
 
                   // Zeitsteuerung
-                  if ('$tsou' == 'server') {
+                  if ('$tsou' == 'server') {                   // Serverzeit
                       // aktueller Timestamp in Millisekunden 
                       command = '{ int(time*1000) }';
                       url_$d  = makeCommand(command);
-                      \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} );  
-                  }
-                  if (typeof ct_$d === 'undefined') {
-                      time_$d = new Date();                                // mit lokaler Zeit initialisieren -> Clientzeit || Serverzeit: springen Zeiger verhindern
+                      \$.get( url_$d, function (data) {
+                                          data = data.replace(/\\n/g, ''); 
+                                          ct_$d = parseInt(data); 
+                                          return ct_$d;
+                                      } 
+                            ); 
+                      
+                      time_$d  = new Date(ct_$d);
+                      
                   } else {
-                      time_$d = new Date(ct_$d);
+                      time_$d  = new Date();                   // Clientzeit
+                  }
+                  
+                  if (typeof ct_$d === 'undefined') {          // wenn Zeit noch undef mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+                      time_$d  = new Date();                   
+                  } else {
+                      time_$d  = new Date(ct_$d);
                   }
 
-                  var millis  = time_$d.getMilliseconds() / 1000.0;
-                  var seconds = time_$d.getSeconds();
-                  var minutes = time_$d.getMinutes();
-                  var hours   = time_$d.getHours() + this.hourOffset;
+                  var millis_$d  = time_$d.getMilliseconds() / 1000.0;
+                  var seconds_$d = time_$d.getSeconds();
+                  var minutes_$d = time_$d.getMinutes();
+                  var hours_$d   = time_$d.getHours() + this.hourOffset;
+                  
+                  acttime_$d = ((hours_$d   < 10) ? '0' : '') + hours_$d   + ':' + 
+                               ((minutes_$d < 10) ? '0' : '') + minutes_$d + ':' + 
+                               ((seconds_$d < 10) ? '0' : '') + seconds_$d;
+
+                  checkAndDoAlm (acttime_$d);                 
 
                   // draw hour hand
                   context.save();
-                  context.rotate(hours * Math.PI / 6 + minutes * Math.PI / 360);
+                  context.rotate(hours_$d * Math.PI / 6 + minutes_$d * Math.PI / 360);
                   this.setShadow(context, this.handShadowColor, this.handShadowOffsetX, this.handShadowOffsetY, this.handShadowBlur);
                   switch (this.hourHand) {
                     case StationClock_$d.BarHourHand:
@@ -1684,17 +1726,17 @@ sub stationWatch {
                   context.save();
                   switch (this.minuteHandBehavoir) {
                     case StationClock_$d.CreepingMinuteHand:
-                      context.rotate((minutes + seconds / 60) * Math.PI / 30);
+                      context.rotate((minutes_$d + seconds_$d / 60) * Math.PI / 30);
                       break;
                     case StationClock_$d.BouncingMinuteHand:
-                      context.rotate(minutes * Math.PI / 30);
+                      context.rotate(minutes_$d * Math.PI / 30);
                       break;
                     case StationClock_$d.ElasticBouncingMinuteHand:
-                      if (this.lastMinute != minutes) {
+                      if (this.lastMinute != minutes_$d) {
                           this.minuteHandAnimationStep = 3;
-                          this.lastMinute = minutes;
+                          this.lastMinute = minutes_$d;
                       }
-                      context.rotate((minutes + this.getAnimationOffset(this.minuteHandAnimationStep)) * Math.PI / 30);
+                      context.rotate((minutes_$d + this.getAnimationOffset(this.minuteHandAnimationStep)) * Math.PI / 30);
                       this.minuteHandAnimationStep--;
                       break;
                   }
@@ -1718,20 +1760,20 @@ sub stationWatch {
                   context.save();
                   switch (this.secondHandBehavoir) {
                     case StationClock_$d.OverhastySecondHand:
-                      context.rotate(Math.min((seconds + millis) * (60.0 / 58.5), 60.0) * Math.PI / 30);
+                      context.rotate(Math.min((seconds_$d + millis_$d) * (60.0 / 58.5), 60.0) * Math.PI / 30);
                       break;
                     case StationClock_$d.CreepingSecondHand:
-                      context.rotate((seconds + millis) * Math.PI / 30);
+                      context.rotate((seconds_$d + millis_$d) * Math.PI / 30);
                       break;
                     case StationClock_$d.BouncingSecondHand:
-                      context.rotate(seconds * Math.PI / 30);
+                      context.rotate(seconds_$d * Math.PI / 30);
                       break;
                     case StationClock_$d.ElasticBouncingSecondHand:
-                      if (this.lastSecond != seconds) {
+                      if (this.lastSecond != seconds_$d) {
                           this.secondHandAnimationStep = 3;
-                          this.lastSecond = seconds;
+                          this.lastSecond = seconds_$d;
                       }
-                      context.rotate((seconds + this.getAnimationOffset(this.secondHandAnimationStep)) * Math.PI / 30);
+                      context.rotate((seconds_$d + this.getAnimationOffset(this.secondHandAnimationStep)) * Math.PI / 30);
                       this.secondHandAnimationStep--;
                       break;
                   }
@@ -1923,14 +1965,16 @@ sub stationWatch {
 sub modernWatch {
   my ($d)    = @_;
   my $hash   = $defs{$d};
-  my $facec  = AttrVal($d,"modernColorFace","FFFEFA");
-  my $bgc    = AttrVal($d,"modernColorBackground","333");
-  my $fc     = AttrVal($d,"modernColorFigure","333");
-  my $hc     = AttrVal($d,"modernColorHand","333");
-  my $fr     = AttrVal($d,"modernColorRing","FFFFFF");
-  my $fre    = AttrVal($d,"modernColorRingEdge","333");
-  my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
-  my $tsou   = AttrVal($d,"timeSource","server"); 
+  my $facec  = AttrVal($d, "modernColorFace",       "FFFEFA");
+  my $bgc    = AttrVal($d, "modernColorBackground", "333");
+  my $fc     = AttrVal($d, "modernColorFigure",     "333");
+  my $hc     = AttrVal($d, "modernColorHand",       "333");
+  my $fr     = AttrVal($d, "modernColorRing",       "FFFFFF");
+  my $fre    = AttrVal($d, "modernColorRingEdge",   "333");
+  my $hattr  = AttrVal($d, "htmlattr",              "width='150' height='150'");
+  my $tsou   = AttrVal($d, "timeSource",            "server");
+
+  my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");  
 
   return "
       <html>
@@ -1943,6 +1987,7 @@ sub modernWatch {
       
       var ct_$d;
       var now_$d;
+      var armtime0_$d = '$alarm';
       
       // CSRF-Token auslesen
       var body = document.querySelector(\"body\");
@@ -1962,7 +2007,25 @@ sub modernWatch {
 
       function makeCommand (cmd) {
           return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
-      }      
+      }
+      
+      // localStorage speichern letzte Alarmzeit
+      function localStoreSetLastalm (lastalmtime) {
+          localStorage.setItem('lastalmtime_$d', lastalmtime);
+      }
+    
+      // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
+      function checkAndDoAlm (acttime) {
+          lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
+          if ( (acttime == armtime0_$d) && acttime != lastalmtime ) {
+              command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
+              url_$d  = makeCommand(command);
+              
+              localStoreSetLastalm (acttime);                                    // aktuelle Alarmzeit sichern 
+              
+              \$.get(url_$d);
+          }
+      }     
       
       var canvas_$d = document.getElementById('canvas_$d');
       var ctx_$d    = canvas_$d.getContext('2d');
@@ -2019,14 +2082,25 @@ sub modernWatch {
 
       function drawTime_$d(ctx_$d, radius_$d){
           // Zeitsteuerung
-          if ('$tsou' == 'server') {
+          if ('$tsou' == 'server') {                   // Serverzeit
               // aktueller Timestamp in Millisekunden 
               command = '{ int(time*1000) }';
               url_$d  = makeCommand(command);
-              \$.get( url_$d, function (data) {data = data.replace(/\\n/g, ''); ct_$d = parseInt(data); return ct_$d;} ); 
+              \$.get( url_$d, function (data) {
+                                  data = data.replace(/\\n/g, ''); 
+                                  ct_$d = parseInt(data); 
+                                  return ct_$d;
+                              } 
+                    ); 
+              
+              time_$d  = new Date(ct_$d);
+              
+          } else {
+              time_$d  = new Date();                   // Clientzeit
           }
-          if (typeof ct_$d === 'undefined') {
-              time_$d  = new Date();                   // mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+          
+          if (typeof ct_$d === 'undefined') {          // wenn Zeit noch undef mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+              time_$d  = new Date();                   
           } else {
               time_$d  = new Date(ct_$d);
           }
@@ -2034,6 +2108,12 @@ sub modernWatch {
           var hour_$d   = time_$d.getHours();
           var minute_$d = time_$d.getMinutes();
           var second_$d = time_$d.getSeconds();
+          
+          acttime_$d = ((hour_$d   < 10) ? '0' : '') + hour_$d   + ':' + 
+                       ((minute_$d < 10) ? '0' : '') + minute_$d + ':' + 
+                       ((second_$d < 10) ? '0' : '') + second_$d;
+
+          checkAndDoAlm (acttime_$d);
           
           //hour_$d
           hour_$d = hour_$d%12;
@@ -2084,17 +2164,17 @@ sub setVersionInfo {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      $modules{$type}{META}{version} = "v".$v;                                         # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+      if($modules{$type}{META}{x_version}) {                                                                             
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          ## no critic 'VERSION'                                      
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );        ## no critic 'VERSION'                                      
       }
   } else {
       # herkömmliche Modulstruktur
