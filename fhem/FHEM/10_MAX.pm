@@ -32,7 +32,7 @@ use AttrTemplate;
 use Date::Parse;
 
 my %device_types = (
-  0 => "Cube",
+
   1 => "HeatingThermostat",
   2 => "HeatingThermostatPlus",
   3 => "WallMountedThermostat",
@@ -40,7 +40,8 @@ my %device_types = (
   5 => "PushButton",
   6 => "virtualShutterContact",
   7 => "virtualThermostat",
-  8 => "PlugAdapter",
+  8 => "PlugAdapter"
+
 );
 
 my %msgId2Cmd = (
@@ -161,29 +162,29 @@ sub MAX_Initialize
 }
 
 #############################
-sub MAX_Define
-{
-  my $hash = shift;
-  my $def  = shift;
-  my @arg  = split("[ \t][ \t]*", $def);
-  my $name = $hash->{NAME};
-  return 'name '.$name.' is reserved for internal use' if($name eq 'fakeWallThermostat' or $name eq 'fakeShutterContact');
-  return 'wrong syntax: define <name> MAX type address'   if(int(@arg)!=4 || $arg[3] !~ m/^[a-fA-F0-9]{6}$/i);
-  return 'incorrect address 000000' if ($arg[3] eq '000000');
+sub MAX_Define {
 
-  my $type = $arg[2];
-  my $addr = lc($arg[3]); #all addr should be lowercase
+    my $hash = shift;
+    my $def  = shift;
 
-  if(exists($modules{MAX}{defptr}{$addr}) && $modules{MAX}{defptr}{$addr}->{NAME} ne $name)
-  {
-    my $msg = 'MAX_Define, a Device with addr '.$addr.' is already defined ('.$modules{MAX}{defptr}{$addr}->{NAME}.')';
-    Log3 $hash, 2, $msg;
-    return $msg;
-  }
+    my ($name, undef, $type, $addr) = split(m{ \s+ }xms, $def, 4);
 
-  return $type." is not a valid MAX type !" if (!MAX_TypeToTypeId($type) && ($type ne 'Cube'));
+    return "name $name is reserved for internal use" if (($name eq 'fakeWallThermostat') || ($name eq 'fakeShutterContact'));
 
+    my $devtype = MAX_TypeToTypeId($type);
 
+    return "$name, invalid MAX type $type !" if (!$devtype);
+    return "$name, invalid address $addr !"  if (($addr !~ m/^[a-fA-F0-9]{6}$/ix) || ($addr eq '000000'));
+
+    $addr = lc($addr); # all addr should be lowercase
+
+ 
+    if (exists($modules{MAX}{defptr}{$addr}) && $modules{MAX}{defptr}{$addr}->{NAME} ne $name) {
+	my $msg = "MAX_Define, a MAX device with address $addr is already defined as ".$modules{MAX}{defptr}{$addr}->{NAME};
+	Log3($name, 2, $msg);
+	return $msg;
+    }
+ 
     my $old_addr = '';
 
     # check if we have this address already in use
@@ -196,51 +197,50 @@ sub MAX_Define
     if (($old_addr ne '') && ($old_addr ne $addr)){
 	my $msg1 = 'please dont change the address direct in DEF or RAW !';
         my $msg2 = "If you want to change $old_addr please delete device $name first and create a new one";
-	Log3($hash, 3, "$name, $msg1 $msg2");
+	Log3($name, 3, "$name, $msg1 $msg2");
 	return $msg1."\n".$msg2;
     }
 
     if (exists($modules{MAX}{defptr}{$addr}) && $modules{MAX}{defptr}{$addr}->{type} ne $type) {
 	my $msg = "$name, type changed from $modules{MAX}{defptr}{$addr}->{type} to $type !";
-	Log3($hash, 2, $msg);
+	Log3($name, 2, $msg);
     }
 
-  Log3 $hash, 5, 'Max_define, '.$name.' '.$type.' with addr '.$addr;
-  $hash->{type}                = $type;
-  $hash->{devtype}             = MAX_TypeToTypeId($type);
-  $hash->{addr}                = $addr;
-  $hash->{TimeSlot}            = -1 if ($type =~ /.*Thermostat.*/); # wird durch CUL_MAX neu gesetzt 
-  $hash->{'.count'}            = 0; # ToDo Kommentar
-  $hash->{'.sendToAddr'}       = '-1'; # zu wem haben wird direkt gesendet ?
-  $hash->{'.sendToName'}       = '';
-  $hash->{'.timer'}            = 300;
-  $hash->{SVN}                 = (qw($Id$))[2];
-  $modules{MAX}{defptr}{$addr} = $hash;
+    Log3 $hash, 5, 'Max_define, '.$name.' '.$type.' with addr '.$addr;
 
-  #$hash->{internals}{interfaces} = $interfaces{$type}; # wozu ?
+    $hash->{type}                = $type;
+    $hash->{devtype}             = $devtype;
+    $hash->{addr}                = $addr;
+    $hash->{TimeSlot}            = -1 if ($type =~ /.*Thermostat.*/); # wird durch CUL_MAX neu gesetzt 
+    $hash->{'.count'}            = 0; # ToDo Kommentar
+    $hash->{'.sendToAddr'}       = '-1'; # zu wem haben wird direkt gesendet ?
+    $hash->{'.sendToName'}       = '';
+    $hash->{'.timer'}            = 300;
+    $hash->{SVN}                 = (qw($Id$))[2];
+    $modules{MAX}{defptr}{$addr} = $hash;
 
-  AssignIoPort($hash);
+    #$hash->{internals}{interfaces} = $interfaces{$type}; # wozu ?
 
-  CommandAttr(undef,$name.' model '.$type); # Forum Stats werten nur attr model aus
+    AssignIoPort($hash);
 
-  if ($init_done == 1)
-  {
+    CommandAttr(undef,$name.' model '.$type); # Forum Stats werten nur attr model aus
+
+    if ($init_done == 1) {
     #nur beim ersten define setzen:
-    if ((($hash->{devtype} > 0) && ($hash->{devtype} < 4)) || ($hash->{devtype} == 7))
-    {
-     $attr{$name}{room} = "MAX" if( not defined( $attr{$name}{room} ) );
-     MAX_ReadingsVal($hash,'groupid');
-     MAX_ReadingsVal($hash,'windowOpenTemperature') if ($hash->{devtype} == 7);
-     readingsBeginUpdate($hash);
-     MAX_ParseWeekProfile($hash);
-     readingsEndUpdate($hash,0);
+	if (($hash->{devtype} < 4) || ($hash->{devtype} == 7)) {
+    	    $attr{$name}{room} = 'MAX' if( not defined( $attr{$name}{room} ) );
+    	    MAX_ReadingsVal($hash,'groupid');
+    	    MAX_ReadingsVal($hash,'windowOpenTemperature') if ($hash->{devtype} == 7);
+    	    readingsBeginUpdate($hash);
+    	    MAX_ParseWeekProfile($hash);
+    	    readingsEndUpdate($hash,0);
+	}
     }
-  }
 
-  RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+5, "MAX_Timer", $hash, 0) if ($hash->{devtype} != 5);
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+5, 'MAX_Timer', $hash, 0) if ($hash->{devtype} != 5);
 
-  return;
+    return;
 }
 
 
@@ -371,10 +371,10 @@ sub MAX_Undef
 
 sub MAX_TypeToTypeId
 {
-  my $id = shift;
-  foreach (keys %device_types) 
+  my $type = shift;
+  foreach my $id (keys %device_types)
   {
-    return $_ if($id eq $device_types{$_});
+    return $id if ($type eq $device_types{$id});
   }
   return 0;
 }
@@ -1167,6 +1167,7 @@ sub MAX_Set($@)
      foreach (keys %{$modules{MAX}{defptr}}) 
      {
       next if (!$modules{MAX}{defptr}{$_}->{NAME});
+      next if (!defined($modules{MAX}{defptr}{$_}->{devtype}));
       if ( ($modules{MAX}{defptr}{$_}->{devtype} > 0) # 1 - 4
         && ($modules{MAX}{defptr}{$_}->{devtype} != 5) 
         && !IsDummy  ($modules{MAX}{defptr}{$_}->{NAME}) 
@@ -1186,6 +1187,7 @@ sub MAX_Set($@)
      foreach (keys %{$modules{MAX}{defptr}})
      {
       next if (!$modules{MAX}{defptr}{$_}->{NAME});
+      next if (!defined($modules{MAX}{defptr}{$_}->{devtype}));
       if ( ($modules{MAX}{defptr}{$_}->{devtype} >  0) # 1,2,4
         && ($modules{MAX}{defptr}{$_}->{devtype} != 5)
         && ($modules{MAX}{defptr}{$_}->{devtype} != 3)
@@ -1202,6 +1204,7 @@ sub MAX_Set($@)
      foreach ( keys %{$modules{MAX}{defptr}} ) 
      {
       next if (!$modules{MAX}{defptr}{$_}->{NAME});
+      next if (!defined($modules{MAX}{defptr}{$_}->{devtype}));
       if ( ($modules{MAX}{defptr}{$_}->{devtype} > 0) # 1 - 3
         && ($modules{MAX}{defptr}{$_}->{devtype} < 4)
         && !IsDummy  ($modules{MAX}{defptr}{$_}->{NAME}) 
@@ -1770,7 +1773,7 @@ sub MAX_Parse
     readingsBulkUpdate($shash, "maximumTemperature", MAX_SerializeTemperature($args[2]));
     readingsBulkUpdate($shash, "minimumTemperature", MAX_SerializeTemperature($args[3]));
     readingsBulkUpdate($shash, ".weekProfile", $args[4]);
-    Log3 $shash,1,$msgtype.' : '.$args[4];
+    #Log3 $shash,1,$msgtype.' : '.$args[4];
     readingsBulkUpdate($shash, 'lastcmd', $msgtype);
 
     if(@args > 5) 
@@ -2259,10 +2262,10 @@ sub MAX_today
   <a name="MAXset"></a>
   <b>Set</b>
   <ul>
-  <li>deviceRename &lt;value&gt; <br>
+  <a name=""></a><li>deviceRename &lt;value&gt; <br>
    rename of the device and its logfile
   </li>
-    <li>desiredTemperature auto [&lt;temperature&gt;]<br>
+    <a name=""></a><li>desiredTemperature auto [&lt;temperature&gt;]<br>
         For devices of type HeatingThermostat only. If &lt;temperature&gt; is omitted,
         the current temperature according to the week profile is used. If &lt;temperature&gt; is provided,
         it is used until the next switch point of the week porfile. It maybe one of
@@ -2271,7 +2274,7 @@ sub MAX_today
           <li>"on" or "off" set the thermostat to full or no heating, respectively</li>
           <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
         </ul></li>
-    <li>desiredTemperature [manual] &lt;value&gt; [until &lt;date&gt;]<br>
+    <a name=""></a><li>desiredTemperature [manual] &lt;value&gt; [until &lt;date&gt;]<br>
         For devices of type HeatingThermostat only. &lt;value&gt; maybe one of
         <ul>
           <li>degree celcius between 4.5 and 30.5 in 0.5 degree steps</li>
@@ -2283,49 +2286,49 @@ sub MAX_today
         If the keepAuto attribute is 1 and the device is currently in auto mode, 'desiredTemperature &lt;value&gt;'
         behaves as 'desiredTemperature auto &lt;value&gt;'. If the 'manual' keyword is used, the keepAuto attribute is ignored
         and the device goes into manual mode.</li>
-    <li>desiredTemperature boost<br>
+    <a name=""></a><li>desiredTemperature boost<br>
       For devices of type HeatingThermostat only.
       Activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
-    <li>groupid &lt;id&gt;<br>
+    <a name=""></a><li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
       Writes the given group id the device's memory. To sync all devices in one room, set them to the same groupid greater than zero.</li>
-    <li>ecoTemperature &lt;value&gt;<br>
+    <a name=""></a><li>ecoTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given eco temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
-    <li>comfortTemperature &lt;value&gt;<br>
+    <a name=""></a><li>comfortTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given comfort temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
-    <li>measurementOffset &lt;value&gt;<br>
+    <a name=""></a><li>measurementOffset &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. If the internal temperature sensor is not well calibrated, it may produce a systematic error. Using measurementOffset, this error can be compensated. The reading temperature is equal to the measured temperature at sensor + measurementOffset. Usually, the internally measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree celsius.</li>
-    <li>minimumTemperature &lt;value&gt;<br>
+    <a name=""></a><li>minimumTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given minimum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
-    <li>maximumTemperature &lt;value&gt;<br>
+    <a name=""></a><li>maximumTemperature &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given maximum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
-    <li>windowOpenTemperature &lt;value&gt;<br>
+    <a name=""></a><li>windowOpenTemperature &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open temperature to the device's memory. That is the temperature the heater will temporarily set if an open window is detected. Setting it to 4.5 degree or "off" will turn off reacting on open windows.</li>
-    <li>windowOpenDuration &lt;value&gt;<br>
+    <a name=""></a><li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
-    <li>decalcification &lt;value&gt;<br>
+    <a name=""></a><li>decalcification &lt;value&gt;<br>
         For devices of type HeatingThermostat only. Writes the given decalcification time to the device's memory. Value must be of format "Sat 12:00" with minutes being "00". Once per week during that time, the HeatingThermostat will open the valves shortly for decalcification.</li>
-    <li>boostDuration &lt;value&gt;<br>
+    <a name=""></a><li>boostDuration &lt;value&gt;<br>
         For devices of type HeatingThermostat only. Writes the given boost duration to the device's memory. Value must be one of 5, 10, 15, 20, 25, 30, 60. It is the duration of the boost function in minutes.</li>
-    <li>boostValveposition &lt;value&gt;<br>
+    <a name=""></a><li>boostValveposition &lt;value&gt;<br>
         For devices of type HeatingThermostat only. Writes the given boost valveposition to the device's memory. It is the valve position in percent during the boost function.</li>
-    <li>maxValveSetting &lt;value&gt;<br>
+    <a name=""></a><li>maxValveSetting &lt;value&gt;<br>
         For devices of type HeatingThermostat only. Writes the given maximum valveposition to the device's memory. The heating thermostat will not open the valve more than this value (in percent).</li>
-    <li>valveOffset &lt;value&gt;<br>
+    <a name=""></a><li>valveOffset &lt;value&gt;<br>
         For devices of type HeatingThermostat only. Writes the given valve offset to the device's memory. The heating thermostat will add this to all computed valvepositions during control.</li>
-    <li>factoryReset<br>
+    <a name=""></a><li>factoryReset<br>
         Resets the device to factory values. It has to be paired again afterwards.<br>
         ATTENTION: When using this on a ShutterContact using the MAXLAN backend, the ShutterContact has to be triggered once manually to complete
         the factoryReset.</li>
-    <li>associate &lt;value&gt;<br>
+    <a name=""></a><li>associate &lt;value&gt;<br>
         Associated one device to another. &lt;value&gt; can be the name of MAX device or its 6-digit hex address.<br>
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened. The thermostat must be associated to the ShutterContact, too, to accept those messages.
         <b>!Attention: After sending this associate command to the ShutterContact, you have to press the button on the ShutterContact to wake it up and accept the command. See the log for a message regarding this!</b>
         Associating HeatingThermostat and WallMountedThermostat makes them sync their desiredTemperature and uses the measured temperature of the
  WallMountedThermostat for control.</li>
-    <li>deassociate &lt;value&gt;<br>
+    <a name=""></a><li>deassociate &lt;value&gt;<br>
         Removes the association set by associate.</li>
-    <li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
+    <a name=""></a><li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
       Allows setting the week profile. For devices of type HeatingThermostat or WallMountedThermostat only. Example:<br>
       <code>set MAX_12345 weekProfile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
       sets the profile <br>
@@ -2333,19 +2336,19 @@ sub MAX_today
       Saturday: 7 &deg;C for 0:00 - 4:30, 19 &deg;C for 4:30 - 12:55, 6 &deg;C for 12:55 - 0:00</code><br>
       while keeping the old profile for all other days.
     </li>
-    <li>saveConfig &lt;name&gt;<br>
+    <a name=""></a><li>saveConfig &lt;name&gt;<br>
 
     </li>
 
-    <li>restoreReadings &lt;name of saved config&gt;<br>
+    <a name=""></a><li>restoreReadings &lt;name of saved config&gt;<br>
 
     </li>
 
-    <li>restoreDevice &lt;name of saved config&gt;<br>
+    <a name=""></a><li>restoreDevice &lt;name of saved config&gt;<br>
 
     </li>
 
-    <li>exportWeekprofile &lt;name od weekprofile device&gt;<br>
+    <a name=""></a><li>exportWeekprofile &lt;name od weekprofile device&gt;<br>
 
     </li>
 
@@ -2433,39 +2436,65 @@ sub MAX_today
   <a name="MAXset"></a>
   <b>Set</b>
   <ul>
-  <li>deviceRename &lt;value&gt; <br>
-  Benennt das Device um, inklusive durch autocreate erzeugtem Logfile
-  </li>
-    <li>desiredTemperature &lt;value&gt; [until &lt;date&gt;]<br>
-        Nur f&uuml;r Heizk&ouml;rperthermostate. &lt;value&gt; kann einer aus folgenden Werten sein
+    <a name="associate"></a><li>associate &lt;value&gt;<br>
+      Verbindet ein Ger&auml;t mit einem anderen. &lt;value&gt; kann entweder der Name eines MAX Ger&auml;tes oder
+      seine 6-stellige hexadezimale Adresse sein.<br>
+      Wenn ein Fensterkontakt mit einem HT/WT verbunden wird, sendet der Fensterkontakt automatisch die <code>windowOpen</code> Information wenn der Kontakt
+      ge&ouml;ffnet ist. Das Thermostat muss ebenfalls mit dem Fensterkontakt verbunden werden, um diese Nachricht zu verarbeiten.
+      <b>Achtung: Nach dem Senden der Botschaft zum Verbinden an den Fensterkontakt muss der Knopf am Fensterkontakt gedr&uuml;ckt werden um den Fensterkonakt aufzuwecken
+      und den Befehl zu verarbeiten. Details &uuml;ber das erfolgreiche Verbinden finden sich in der Logdatei!</b>
+      Das Verbinden eines Heizk&ouml;rperthermostates und eines Wandthermostates synchronisiert deren
+      <code>desiredTemperature</code> und verwendet die am Wandthermostat gemessene Temperatur f&uuml;r die Regelung.</li>
+
+    <a name="comfortTemperature"></a><li>comfortTemperature &lt;value&gt;<br>
+      Nur f&uuml;r HT/WT. Schreibt die angegebene <code>comfort</code> Temperatur in den Speicher des Ger&auml;tes.<br>
+      Diese kann durch dr&uuml;cken der Taste Halbmond/Stern am Ger&auml;t aktiviert werden.</li>
+
+    <a name="deassociate"></a><li>deassociate &lt;value&gt;<br>
+      L&ouml;st die Verbindung, die mit <code>associate</code> gemacht wurde, wieder auf.</li>
+
+    <a name="desiredTemperature"></a><li>desiredTemperature &lt;value&gt; [until &lt;date&gt;]<br>
+        Nur f&uuml;r HT/WT &lt;value&gt; kann einer aus folgenden Werten sein
         <ul>
-          <li>Grad Celsius zwischen 3,5 und 30,5 Grad in 0,5 Kelvin Schritten</li>
-          <li>"on" oder "off" versetzt den Thermostat in volle bzw. keine Heizleistung</li>
+          <li>Grad Celsius zwischen 4,5 und 30,5 Grad Celisus in 0,5 Grad Schritten</li>
+          <li>"on" (30.5) oder "off" (4.5) versetzt den Thermostat in volle Heizleistung bzw. schaltet ihn ab</li>
           <li>"eco" oder "comfort" mit der eco/comfort Temperatur, die direkt am Ger&auml;t
-              eingestellt wurde (&auml;nhlich wie die rechte Taste am Ger&auml;t selbst)</li>
+              eingestellt wurde (&auml;nhlich wie die Halbmond/Stern Taste am Ger&auml;t selbst)</li>
           <li>"auto &lt;temperature&gt;". Damit wird das am Thermostat eingestellte Wochenprogramm
               abgearbeitet. Wenn optional die Temperatur &lt;temperature&gt; angegeben wird, wird diese
-              bis zum n&auml;sten Schaltzeitpunkt des Wochenprogramms als
-              <code>desiredTemperature</code> gesetzt.</li>
+              bis zum n&auml;sten Schaltzeitpunkt des Wochenprogramms als <code>desiredTemperature</code> gesetzt.</li>
           <li>"boost" aktiviert den Boost Modus, wobei f&uuml;r <code>boostDuration</code> Minuten
               das Ventil <code>boostValveposition</code> Prozent ge&ouml;ffnet wird.</li>
         </ul>
         Alle Werte au&szlig;er "auto" k&ouml;nnen zus&auml;zlich den Wert "until" erhalten,
-        wobei &lt;date&gt; in folgendem Format sein mu&szlig;: "dd.mm.yyyy HH:MM"
-        (Minuten nur "30" bzw. "00"!), um kurzzeitige eine andere Temperatur bis zu diesem Datum/dieser
-        Zeit einzustellen. Bitte sicherstellen, dass der Cube bzw. das Ger&auml;t die korrekte Systemzeit hat.</li>
-    <li>groupid &lt;id&gt;<br>
+        wobei &lt;date&gt; in folgendem Format sein mu&szlig;: "TT.MM.JJJJ SS:MM"
+        (Minuten nur 30 bzw. 00 !), um kurzzeitige eine andere Temperatur bis zu diesem Datum und dieser
+        Zeit einzustellen. Wichtig : der Zeitpunkt muß in der Zukunft liegen !<br>
+	Wenn dd.mm.yyyy dem heutigen Tag entspricht kann statdessen auch das Schl&uml;sselwort today verwendet werden.
+	Bitte sicherstellen, dass der Cube bzw. das Ger&auml;t die korrekte Systemzeit hat</li>
+
+      <a name="deviceRename"></a><li>deviceRename &lt;value&gt; <br>
+	Benennt das Device um, inklusive dem durch autocreate erzeugtem Logfile</li>
+
+     <a name="ecoTemperature"></a><li>ecoTemperature &lt;value&gt;<br>
+      Nur f&uuml;r HT/WT. Schreibt die angegebene <code>eco</code> Temperatur in den Speicher
+      des Ger&auml;tes. Diese kann durch Dr&uuml;cken der Halbmond/Stern Taste am Ger&auml;t aktiviert werden.</li>
+
+    <a name="export_Weekprofile"></a><li>export_Weekprofile [device weekprofile name]</li>
+
+    <a name="factoryReset"></a><li>factoryReset<br>
+      Setzt das Ger&auml;t auf die Werkseinstellungen zur&uuml;ck. Das Ger&auml;t muss anschlie&szlig;end neu angelernt werden.<br>
+      ACHTUNG: Wenn dies in Kombination mit einem Fensterkontakt und dem MAXLAN Modul
+      verwendet wird, muss der Fensterkontakt einmal manuell ausgel&ouml;st werden, damit das Zur&uuml;cksetzen auf Werkseinstellungen beendet werden kann.</li>
+
+
+    <a name="groupid"></a><li>groupid &lt;id&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate.
       Schreibt die angegebene Gruppen ID in den Speicher des Ger&auml;tes.
       Um alle Ger&auml;te in einem Raum zu synchronisieren, k&ouml;nnen diese derselben Gruppen ID
       zugeordnet werden, diese mu&szlig; gr&ouml;&szlig;er Null sein.</li>
-    <li>ecoTemperature &lt;value&gt;<br>
-      Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene <code>eco</code> Temperatur in den Speicher
-      des Ger&auml;tes. Diese kann durch Dr&uuml;cken der rechten Taste am Ger&auml;t aktiviert werden.</li>
-    <li>comfortTemperature &lt;value&gt;<br>
-      Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene <code>comfort</code> Temperatur in den Speicher
-      des Ger&auml;tes. Diese kann durch Dr&uuml;cken der rechten Taste am Ger&auml;t aktiviert werden.</li>
-    <li>measurementOffset &lt;value&gt;<br>
+
+    <a name="measurementOffset"></a><li>measurementOffset &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene <code>offset</code> Temperatur in den Speicher
       des Ger&auml;tes. Wenn der interne Temperatursensor nicht korrekt kalibriert ist, kann dieses einen
       systematischen Fehler erzeugen. Mit dem Wert <code>measurementOffset</code>, kann dieser Fehler
@@ -2473,65 +2502,46 @@ sub MAX_today
       Temperatur + <code>measurementOffset</code>. Normalerweise ist die intern gemessene Temperatur h&ouml;her
       als die Raumtemperatur, da der Sensor n&auml;her am Heizk&ouml;rper ist und man verwendet einen
       kleinen negativen Offset, der zwischen -3,5 und 3,5 Kelvin sein mu&szlig;.</li>
-    <li>minimumTemperature &lt;value&gt;<br>
+    <a name="minimumTemperature"></a><li>minimumTemperature &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegemene <code>minimum</code> Temperatur in der Speicher
       des Ger&auml;tes. Diese begrenzt die Temperatur, die am Ger&auml;t manuell eingestellt werden kann.</li>
-    <li>maximumTemperature &lt;value&gt;<br>
+    <a name="maximumTemperature"></a><li>maximumTemperature &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegemene <code>maximum</code> Temperatur in der Speicher
       des Ger&auml;tes. Diese begrenzt die Temperatur, die am Ger&auml;t manuell eingestellt werden kann.</li>
-    <li>windowOpenTemperature &lt;value&gt;<br>
+    <a name="windowOpenTemperature"></a><li>windowOpenTemperature &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegemene <code>window open</code> Temperatur in den Speicher
       des Ger&auml;tes. Das ist die Tempereratur, die an der Heizung kurzfristig eingestellt wird, wenn ein
       ge&ouml;ffnetes Fenster erkannt wird. Der Wert 4,5 Grad bzw. "off" schaltet die Reaktion auf
       ein offenes Fenster aus.</li>
-    <li>windowOpenDuration &lt;value&gt;<br>
+    <a name="windowOpenDuration"></a><li>windowOpenDuration &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene <code>window</code> open Dauer in den Speicher
       des Ger&auml;tes. Dies ist die Dauer, w&auml;hrend der die Heizung kurzfristig die window open Temperatur
       einstellt, wenn ein offenes Fenster durch einen schnellen Temperatursturz erkannt wird.
       (Wird nicht verwendet, wenn das offene Fenster von <code>ShutterControl</code> erkannt wird.)
       Parameter muss zwischen Null und 60 Minuten sein als Vielfaches von 5.</li>
-    <li>decalcification &lt;value&gt;<br>
+    <a name="decalcification"></a><li>decalcification &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene Zeit f&uuml;r <code>decalcification</code>
       in den Speicher des Ger&auml;tes. Parameter muss im Format "Sat 12:00" sein, wobei die Minuten
       "00" sein m&uuml;ssen. Zu dieser angegebenen Zeit wird das Heizk&ouml;rperthermostat das Ventil
       kurz ganz &ouml;ffnen, um vor Schwerg&auml;ngigkeit durch Kalk zu sch&uuml;tzen.</li>
-    <li>boostDuration &lt;value&gt;<br>
+    <a name="boostDuration"></a><li>boostDuration &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene Boost Dauer in den Speicher
       des Ger&auml;tes. Der gew&auml;hlte Parameter muss einer aus 5, 10, 15, 20, 25, 30 oder 60 sein
       und gibt die Dauer der Boost-Funktion in Minuten an.</li>
-    <li>boostValveposition &lt;value&gt;<br>
+    <a name="boostValveposition"></a><li>boostValveposition &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene Boost Ventilstellung in den Speicher
       des Ger&auml;tes. Dies ist die Ventilstellung (in Prozent) die bei der Boost-Fumktion eingestellt wird.</li>
-    <li>maxValveSetting &lt;value&gt;<br>
+    <a name="maxValveSetting"></a><li>maxValveSetting &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt die angegebene maximale Ventilposition in den Speicher
       des Ger&auml;tes. Der Heizk&ouml;rperthermostat wird das Ventil nicht weiter &ouml;ffnen als diesen Wert
       (Angabe in Prozent).</li>
-    <li>valveOffset &lt;value&gt;<br>
+    <a name="valveOffset"></a><li>valveOffset &lt;value&gt;<br>
       Nur f&uuml;r Heizk&ouml;rperthermostate. Schreibt den angegebenen <code>offset</code> Wert der Ventilstellung
       in den Speicher des Ger&auml;tes Der Heizk&ouml;rperthermostat wird diesen Wert w&auml;hrend der Regelung
       zu den berechneten Ventilstellungen hinzuaddieren.</li>
-    <li>factoryReset<br>
-      Setzt das Ger&auml;t auf die Werkseinstellungen zur&uuml;ck. Das Ger&auml;t muss anschlie&szlig;end neu
-      angelernt werden.<br>
-      ACHTUNG: Wenn dies in Kombination mit einem Fensterkontakt und dem MAXLAN Modul
-      verwendet wird, muss der Fensterkontakt einmal manuell ausgel&ouml;st werden, damit das
-      Zur&uuml;cksetzen auf Werkseinstellungen beendet werden kann.</li>
-    <li>associate &lt;value&gt;<br>
-      Verbindet ein Ger&auml;t mit einem anderen. &lt;value&gt; kann entweder der Name eines MAX Ger&auml;tes oder
-      seine 6-stellige hexadezimale Adresse sein.<br>
-      Wenn ein Fensterkontakt mit einem {Heizk&ouml;rper-/Wand-}Thermostat verbunden wird, sendet der
-      Fensterkontakt automatisch die <code>windowOpenTemperature</code> Temperatur wenn der Kontakt
-      ge&ouml;ffnet ist. Das Thermostat muss ebenfalls mit dem Fensterkontakt verbunden werden, um diese
-      Botschaften zu verarbeiten.
-      <b>Achtung: Nach dem Senden der Botschaft zum Verbinden an den Fensterkontakt muss der Knopf am
-      Fensterkontakt gedr&uuml;ckt werden um den Fensterkonakt einzuschalten und den Befehl zu verarbeiten.
-      Details &uuml;ber das erfolgreiche Verbinden finden sich in der fhem Logdatei!</b>
-      Das Verbinden eines Heizk&ouml;rperthermostates und eines Wandthermostates synchronisiert deren
-      <code>desiredTemperature</code> und verwendet die am Wandthermostat gemessene Temperatur f&uuml;r
-      die Regelung.</li>
-    <li>deassociate &lt;value&gt;<br>
-      L&ouml;st die Verbindung, die mit <code>associate</code> gemacht wurde, wieder auf.</li>
-    <li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;]
+
+
+    <a name="weekProfile"></a><li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;]
       [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
       Erlaubt das Setzen eines Wochenprofils. Nur f&uuml;r Heizk&ouml;rperthermostate bzw. Wandthermostate.<br>
       Beispiel:<br>
@@ -2541,17 +2551,16 @@ sub MAX_today
       Samstag: 7 &deg;C von 0:00 - 4:30, 19 &deg;C von 4:30 - 12:55, 6 &deg;C von 12:55 - 0:00</code><br>
       und beh&auml;lt die Profile f&uuml;r die anderen Wochentage bei.
     </li>
-    <li>exportWeekprofile [device weekprofile name]</li>
-    <li>saveConfig [name]</li>
-    <li>restoreRedings [name]</li>
-    <li>restoreDevice [name] (default </li>
+    <a name="saveConfig">saveConfig</a><li>saveConfig [name]</li>
+    <a name="restoreRedings"></a><li>restoreRedings [name]</li>
+    <a name="restoreDevice"></a><li>restoreDevice [name]</li>
   </ul>
   <br>
 
   <a name="MAXget"></a>
   <b>Get</b>
    <ul>
-   <li>show_savedConfig <device><br>
+   <a name=""></a><li>show_savedConfig <device><br>
    zeigt gespeicherte Konfigurationen an die mittels set restoreReadings / restoreDevice verwendet werden k&ouml;nnen<br>
    steht erst zur Verf&uuml;gung wenn für dieses Ger&auml;t eine gespeichrte Konfiguration gefunden wurde.
    </li>
