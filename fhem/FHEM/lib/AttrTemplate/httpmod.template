@@ -310,13 +310,13 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 attr DEVICE userattr reading01Name reading01XPath-Strict reading02Name reading02XPath-Strict reading03Name reading03XPath-Strict reading04Name reading04XPath-Strict reading05Name reading05XPath-Strict reading06Name reading06XPath-Strict$
 attr DEVICE httpVersion 1.1
 attr DEVICE reading01Name Cyan
-attr DEVICE reading01XPath-Strict //ccdyn:ConsumableInfo[2]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading01XPath-Strict //ccdyn:ConsumableInfo[3]/dd:ConsumablePercentageLevelRemaining/text()
 attr DEVICE reading02Name Magenta
-attr DEVICE reading02XPath-Strict //ccdyn:ConsumableInfo[3]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading02XPath-Strict //ccdyn:ConsumableInfo[2]/dd:ConsumablePercentageLevelRemaining/text()
 attr DEVICE reading03Name Yellow
 attr DEVICE reading03XPath-Strict //ccdyn:ConsumableInfo[4]/dd:ConsumablePercentageLevelRemaining/text()
 attr DEVICE reading04Name Black
-attr DEVICE reading04XPath-Strict //ccdyn:ConsumableInfo[1]/dd:ConsumablePercentageLevelRemaining/text()
+attr DEVICE reading04XPath-Strict //ccdyn:ConsumableInfo[5]/dd:ConsumablePercentageLevelRemaining/text()
 attr DEVICE reading05Name CyanCatridgeModel
 attr DEVICE reading05XPath-Strict //ccdyn:ConsumableInfo[3]/dd:ConsumableSelectibilityNumber/text()
 attr DEVICE reading06Name MagentaCatridgeModel
