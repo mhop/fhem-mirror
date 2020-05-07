@@ -1187,7 +1187,7 @@ sub _cfgDB_Fileexport {
 	my $sth      = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename = '$filename'" );  
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
-    $blobContent = decode_base64($blobContent);
+    $blobContent = decode_base64($blobContent) if($blobContent);
 	my $counter = length($blobContent);
 	$sth->finish();
 	$fhem_dbh->disconnect();
