@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.20.1" => "07.05.2020  asynchron read digital text fixes ",
   "0.20.0" => "07.05.2020  asynchron read alarmTime reading, some fixes ",
   "0.19.0" => "06.05.2020  alarm event creation for watch models 'Station' and 'Station' ",
   "0.18.0" => "06.05.2020  attr 'digitalTextTicker' deleted and switched to setter 'textTicker', default text switched to blank ",
@@ -218,8 +219,8 @@ sub Set {                                                    ## no critic 'compl
       readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "alarmHMSdel") {      
-      delReadings     ($name, "alarmTime");
-      delReadings     ($name, "alarmed");
+      delReadings ($name, "alarmTime");
+      delReadings ($name, "alarmed");
       
   } elsif ($opt eq "countDownInit") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
@@ -497,9 +498,10 @@ sub digitalWatch {
     var seconds_$d;
     var startDate_$d;
     var armtime0_$d = '$alarm';                       // Alarmzeit initialisieren
-    var value_$d    = ' $deftxt';                     // default Digitaltext initialisieren
+    var digitxt_$d  = ' $deftxt';                     // default Digitaltext initialisieren
     var tlength_$d  = '$txtc';                        // Textlänge Digitaltext initialisieren
     var tticker_$d  = '$rdtt';                        // Tickereinstellung initialisieren
+    var zmodulo_$d  = 0;                              // Hilfszähler
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1317,7 +1319,7 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'text') {         
-            tlength_$d = value_$d.length-1;                                   // Länge des Textes abzgl. 1 für ' '
+            tlength_$d = digitxt_$d.length-1;                                   // Länge des Textes abzgl. 1 für ' '
             if($adtdn) {
                 tlength_$d = $adtdn;
             }
@@ -1328,35 +1330,44 @@ sub digitalWatch {
             }
             display_$d.pattern += '       ';                                  // Abstand Text zum rechten Rand            
         
-            if (tticker_$d == 'on') {                                         // Text als Laufband ?
-                var rttime    = new Date();
-                var rthours   = rttime.getHours();
-                var rtminutes = rttime.getMinutes();
-                var rtseconds = rttime.getSeconds();
-                var rtmillis  = rttime.getMilliseconds();      
-           
-                var text  = '$forerun'+value_$d+'      ';
-                var index = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
-                value_$d  = text.substr(index, $txtc+parseInt(1));
+            var rttime    = new Date();
+            var rthours   = rttime.getHours();
+            var rtminutes = rttime.getMinutes();
+            var rtseconds = rttime.getSeconds();
+            var rtmillis  = rttime.getMilliseconds(); 
             
+            modulo_$d     = rtseconds % 2;                                    // Taktung für Readingabruf (Serverauslastung reduzieren)
+            
+            if (tticker_$d == 'on') {                                         // Text als Laufband ?                   
+                var text  = '$forerun'+digitxt_$d+'      ';
+                var index = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
+                value_$d  = text.substr(index, tlength_$d+parseInt(1));
+            
+            } else {
+                value_$d = digitxt_$d;
             }
             
-            command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';     // Text dynamisch aus Reading lesen
-            url_$d  = makeCommand(command);
-            \$.get( url_$d, function (data) {
-                                value_$d = data.replace(/\\n/g, '');
-                                value_$d = ' '+value_$d;                           
-                                return value_$d;
-                            } 
-                  );
+            if (modulo_$d != zmodulo_$d) {
+                command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';     // Text dynamisch aus Reading lesen
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    digitxt_$d = data.replace(/\\n/g, '');
+                                    digitxt_$d = ' '+digitxt_$d; 
+                                    return digitxt_$d;                                     
+                                } 
+                      );
+            }
                   
-            command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';   // Textticker Einstellung aus Reading lesen
-            url_$d  = makeCommand(command);
-            \$.get( url_$d, function (data) {
-                                tticker_$d = data.replace(/\\n/g, '');                     
-                                return tticker_$d;
-                            } 
-                  );
+            if (modulo_$d != zmodulo_$d) {
+                command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';   // Textticker Einstellung aus Reading lesen
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    tticker_$d = data.replace(/\\n/g, '');
+                                    zmodulo_$d = modulo_$d;  
+                                    return tticker_$d;                                    
+                                } 
+                      );
+            }
         
         } else {
             value_$d = ' '+$ddt;
