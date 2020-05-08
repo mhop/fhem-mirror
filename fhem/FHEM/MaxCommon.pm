@@ -28,7 +28,7 @@ require Exporter;
 @EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile validTemperature);
 
 %device_types = (
-
+  0 => "Cube",
   1 => "HeatingThermostat",
   2 => "HeatingThermostatPlus",
   3 => "WallMountedThermostat",
