@@ -71,7 +71,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.20.1" => "08.05.2020  asynchron read digital text and much more fixes ",
+  "0.21.0" => "08.05.2020  support of alarm time of model digital 'watch' ",
+  "0.20.1" => "08.05.2020  asynchron read digital text and much more fixes, set client as default timeSource ",
   "0.20.0" => "07.05.2020  asynchron read alarmTime reading, some fixes ",
   "0.19.0" => "06.05.2020  alarm event creation for watch models 'Station' and 'Station' ",
   "0.18.0" => "06.05.2020  attr 'digitalTextTicker' deleted and switched to setter 'textTicker', default text switched to blank ",
@@ -136,7 +137,7 @@ sub Initialize {
                                 "stationHourHand:Bar,Pointed,Swiss,Vienna ".
                                 "stationStrokeDial:GermanHour,German,Austria,Swiss,Vienna,No ".
                                 "stationBody:Round,SmallWhite,RoundGreen,Square,Vienna,No ".
-                                "timeSource:client,server ".
+                                "timeSource:server,client ".
                                 "";
 
   $hash->{FW_hideDisplayName} = 1;                        # Forum 88667
@@ -424,7 +425,7 @@ sub digitalWatch {
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
   my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
-  my $tsou     = AttrVal($d, "timeSource",             "server");
+  my $tsou     = AttrVal($d, "timeSource",             "client");
   
   my $deftxt   =  "    ";
   my $rdtt     =  ReadingsVal ($d, "displayTextTicker", "off");
@@ -1086,18 +1087,18 @@ sub digitalWatch {
     }
     
     // localStorage speichern letzte Alarmzeit
-    function localStoreSetLastalm_$d (lastalmtime) {
-        localStorage.setItem('lastalmtime_$d', lastalmtime);
+    function localStoreSetLastalm_$d (dev, lastalmtime) {
+        localStorage.setItem('lastalmtime_'+dev, lastalmtime);
     }
     
     // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
-    function checkAndDoAlm_$d (acttime, almtime) {
-        lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
-        if ( (acttime == almtime || acttime == '$alarmdef') && acttime != lastalmtime ) {
+    function checkAndDoAlm_$d (dev, acttime, almtime) {
+        lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                              // letzte Alarmzeit laden        
+        if ( (acttime == almtime || acttime == '$alarmdef') && acttime != lastalmtime_$d ) {
             command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
             url_$d  = makeCommand(command);
               
-            localStoreSetLastalm_$d (acttime);                                    // aktuelle Alarmzeit sichern 
+            localStoreSetLastalm_$d (dev, acttime);                                           // aktuelle Alarmzeit sichern 
               
             if(acttime == almtime) {
                \$.get(url_$d);
@@ -1119,9 +1120,20 @@ sub digitalWatch {
         var watchkind_$d = '$addp';
         var cycletime    = new Date();
         var cycleseconds = cycletime.getSeconds();
-        modulo_$d        = cycleseconds % 2;                                    // Taktung für Readingabruf (Serverauslastung reduzieren)
+        modulo_$d        = cycleseconds % 2;                                           // Taktung für Readingabruf (Serverauslastung reduzieren)
 
         if (watchkind_$d == 'watch') {                  
+            if (modulo_$d != zmodulo_$d) {
+                command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                url_$d  = makeCommand(command);
+                \$.get( url_$d, function (data) {
+                                    almtime0_$d = data.replace(/\\n/g, '');
+                                    zmodulo_$d = modulo_$d;
+                                    return (almtime0_$d, zmodulo_$d);
+                                } 
+                      );
+            }            
+            
             // Zeitsteuerung - aktueller Timestamp in Millisekunden
             if ('$tsou' == 'server') {                   // Serverzeit
                 command = '{ int(time*1000) }';
@@ -1147,7 +1159,17 @@ sub digitalWatch {
                   
             var hours_$d   = time_$d.getHours();
             var minutes_$d = time_$d.getMinutes();
-            var seconds_$d = time_$d.getSeconds();            
+            var seconds_$d = time_$d.getSeconds();
+            
+            acttime_$d = ((hours_$d   < 10) ? '0' : '') + hours_$d   + ':' + 
+                         ((minutes_$d < 10) ? '0' : '') + minutes_$d + ':' + 
+                         ((seconds_$d < 10) ? '0' : '') + seconds_$d;
+                         
+            if (acttime_$d == '00:00:00') {
+                localStoreSetLastalm_$d ('$d', 'NaN');               // letzte Alarmzeit zurücksetzen zum Tageswechsel            
+            }
+
+            checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);
         }
         
         if (watchkind_$d == 'staticwatch') {
@@ -1165,20 +1187,19 @@ sub digitalWatch {
                             } 
                   );
             
-            if (state_$d == 'started' || state_$d == 'resumed') { 
-                if (state_$d == 'started') {
-                    localStoreSetLastalm_$d ('NaN');                                      // letzte Alarmzeit zurücksetzen            
+            if (state_$d == 'started' || state_$d == 'resumed') {                 
+                if (modulo_$d != zmodulo_$d) {
+                    command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                    url_$d  = makeCommand(command);
+                    \$.get( url_$d, function (data) {
+                                        almtime0_$d = data.replace(/\\n/g, '');
+                                        zmodulo_$d = modulo_$d;
+                                        return (almtime0_$d, zmodulo_$d);
+                                    } 
+                          );
                 }
                 
-                command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
-                url_$d  = makeCommand(command);
-                \$.get( url_$d, function (data) {
-                                    almtime0_$d = data.replace(/\\n/g, '');
-                                    return almtime0_$d;
-                                } 
-                      );
-                
-                // == Startzeit ==            
+                // == Startzeit für CountDown ==            
                 command   = '{ReadingsNum(\"$d\",\"starttime\", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
@@ -1191,7 +1212,7 @@ sub digitalWatch {
                 startDate_$d = new Date(st_$d);
                 
                 // aktueller Timestamp in Millisekunden      
-                currDate_$d  = new Date();
+                currDate_$d  = new Date();            
                 elapsesec_$d = ((currDate_$d.getTime() - startDate_$d.getTime()))/1000;    // vergangene Millisekunden in Sekunden
                 
                 if (state_$d == 'resumed') {
@@ -1201,12 +1222,16 @@ sub digitalWatch {
                     elapsesec_$d  = parseInt(elapsesec_$d);
                 }
                 
+                if (state_$d == 'started' && elapsesec_$d <= 5) {
+                    localStoreSetLastalm_$d ('$d', 'NaN');                               // letzte Alarmzeit zurücksetzen bis 2 s nach Start            
+                }
+                
                 hours_$d       = parseInt(elapsesec_$d / 3600);
                 elapsesec_$d  -= hours_$d * 3600;
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                checkAndDoAlm_$d ($ddt, almtime0_$d);                                      // Alarm auslösen wenn zutreffend
+                checkAndDoAlm_$d ('$d', $ddt, almtime0_$d);                                      // Alarm auslösen wenn zutreffend
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
             }
@@ -1226,7 +1251,7 @@ sub digitalWatch {
                 seconds_$d = 0;
 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm_$d ('NaN');                                  // letzte Alarmzeit zurücksetzen                
+                localStoreSetLastalm_$d ('$d', 'NaN');                                  // letzte Alarmzeit zurücksetzen                
             }
         }
         
@@ -1239,11 +1264,7 @@ sub digitalWatch {
                             } 
                   );
             
-            if (state_$d == 'started' || state_$d == 'resumed') {
-                if (state_$d == 'started') {
-                    localStoreSetLastalm_$d ('NaN');                                       // letzte Alarmzeit zurücksetzen            
-                }
-                
+            if (state_$d == 'started' || state_$d == 'resumed') {                
                 if (modulo_$d != zmodulo_$d) {
                     command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
@@ -1298,11 +1319,12 @@ sub digitalWatch {
                 currDate_$d  = new Date(ct_$d);
                 elapsesec_$d = (currDate_$d.getTime() - startDate_$d.getTime())/1000;    // vergangene Millisekunden in Sekunden umrechnen
                 
+                if (state_$d == 'started' && elapsesec_$d <= 5) {
+                    localStoreSetLastalm_$d ('$d', 'NaN');                               // letzte Alarmzeit zurücksetzen bis 2 s nach Start            
+                }                
+                
                 // == Countdown errechnen ==
                 countcurr_$d = parseInt(countInitVal_$d) - parseInt(elapsesec_$d);
-                //if (countcurr_$d < 0) {                                                  // Fehlerkorrektur bei resumed
-                //    countcurr_$d = 1;
-                //}
                 //log(\"countcurr_$d: \"+countcurr_$d);
                 
                 hours_$d       = parseInt(countcurr_$d / 3600);
@@ -1311,7 +1333,7 @@ sub digitalWatch {
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
      
                 if (countcurr_$d >= 0) {
-                    checkAndDoAlm_$d ($ddt, almtime0_$d);                                   // Alarm auslösen wenn zutreffend
+                    checkAndDoAlm_$d ('$d', $ddt, almtime0_$d);                                   // Alarm auslösen wenn zutreffend
                     localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
                 }
             }
@@ -1331,17 +1353,12 @@ sub digitalWatch {
                 seconds_$d = 0;
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm_$d ('NaN');                                 // letzte Alarmzeit zurücksetzen
+                localStoreSetLastalm_$d ('$d', 'NaN');                                 // letzte Alarmzeit zurücksetzen
             }
         }
         
-        if (watchkind_$d == 'text') {         
-            tlength_$d = digitxt_$d.length-1;                                   // Länge des Textes abzgl. 1 für ' '
-            if($adtdn) {
-                tlength_$d = $adtdn;
-            }
-            
-            display_$d.pattern = '';                                          // Textschablone erstellen
+        if (watchkind_$d == 'text') {            
+            display_$d.pattern = '';                                          // Template erstellen
             for (var i = 0; i <= tlength_$d; i++) {
                 display_$d.pattern += '#';
             }
@@ -1354,9 +1371,9 @@ sub digitalWatch {
             var rtmillis  = rttime.getMilliseconds(); 
                         
             if (tticker_$d == 'on') {                                         // Text als Laufband ?                   
-                var text  = '$forerun'+digitxt_$d+'      ';
-                var index = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text.length - 6);
-                value_$d  = text.substr(index, tlength_$d+parseInt(1));
+                var text_$d  = '$forerun'+digitxt_$d+'      ';
+                var index_$d = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text_$d.length - 6);
+                value_$d     = text_$d.substr(index_$d, tlength_$d+parseInt(1));
             
             } else {
                 value_$d = digitxt_$d;
@@ -1368,7 +1385,11 @@ sub digitalWatch {
                 \$.get( url_$d, function (data) {
                                     digitxt_$d = data.replace(/\\n/g, '');
                                     digitxt_$d = ' '+digitxt_$d; 
-                                    return digitxt_$d;                                     
+                                    tlength_$d = digitxt_$d.length-1;               // Länge des Textes abzgl. 1 für ' '
+                                    if($adtdn > 0) {
+                                        tlength_$d = $adtdn;
+                                    }
+                                    return (digitxt_$d, tlength_$d);                                     
                                 } 
                       );
             }
@@ -1410,16 +1431,16 @@ sub digitalWatch {
 sub stationWatch {
   my ($d)    = @_;
   my $hash   = $defs{$d};
-  my $ssh    = AttrVal($d,"stationSecondHand","Bar")."SecondHand";
-  my $shb    = AttrVal($d,"stationSecondHandBehavoir","Bouncing")."SecondHand";
-  my $smh    = AttrVal($d,"stationMinuteHand","Pointed")."MinuteHand";
-  my $mhb    = AttrVal($d,"stationMinuteHandBehavoir","Bouncing")."MinuteHand";
-  my $shh    = AttrVal($d,"stationHourHand","Pointed")."HourHand";
-  my $sb     = AttrVal($d,"stationBoss","Red")."Boss"; 
-  my $ssd    = AttrVal($d,"stationStrokeDial","Swiss")."StrokeDial";
-  my $sbody  = AttrVal($d,"stationBody","Round")."Body";
-  my $hattr  = AttrVal($d,"htmlattr","width='150' height='150'");
-  my $tsou   = AttrVal($d,"timeSource","server"); 
+  my $ssh    = AttrVal ($d, "stationSecondHand",         "Bar").      "SecondHand";
+  my $shb    = AttrVal ($d, "stationSecondHandBehavoir", "Bouncing"). "SecondHand";
+  my $smh    = AttrVal ($d, "stationMinuteHand",         "Pointed").  "MinuteHand";
+  my $mhb    = AttrVal ($d, "stationMinuteHandBehavoir", "Bouncing"). "MinuteHand";
+  my $shh    = AttrVal ($d, "stationHourHand",           "Pointed").  "HourHand";
+  my $sb     = AttrVal ($d, "stationBoss",               "Red").      "Boss"; 
+  my $ssd    = AttrVal ($d, "stationStrokeDial",         "Swiss").    "StrokeDial";
+  my $sbody  = AttrVal ($d, "stationBody",               "Round").    "Body";
+  my $hattr  = AttrVal ($d, "htmlattr",                  "width='150' height='150'");
+  my $tsou   = AttrVal ($d, "timeSource",                "client"); 
   
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");
 
@@ -1509,20 +1530,30 @@ sub stationWatch {
       }
       
       // localStorage speichern letzte Alarmzeit
-      function localStoreSetLastalm_$d (lastalmtime) {
-          localStorage.setItem('lastalmtime_$d', lastalmtime);
+      function localStoreSetLastalm_$d (dev, lastalmtime) {
+          localStorage.setItem('lastalmtime_'+dev, lastalmtime);
       }
     
       // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
-      function checkAndDoAlm_$d (acttime, almtime) {
-          lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
-          if ( (acttime == almtime) && acttime != lastalmtime ) {
+      function checkAndDoAlm_$d (dev, acttime, almtime) {
+          lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                             // letzte Alarmzeit laden   
+          if ( acttime == almtime && acttime != lastalmtime_$d ) {
               command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
               url_$d  = makeCommand(command);
               
-              localStoreSetLastalm_$d (acttime);                                    // aktuelle Alarmzeit sichern 
+              localStoreSetLastalm_$d (dev, acttime);                                        // aktuelle Alarmzeit sichern 
               
-              \$.get(url_$d);
+              if(acttime == almtime) {
+                 \$.get(url_$d);
+            
+              } else {
+                  \$.get(url_$d, function (data) {
+                                     command = '{ CommandSetReading(undef, \"$d state stopped\") }';
+                                     url_$d  = makeCommand(command);
+                                     \$.get(url_$d);
+                                }
+                        );                                       
+              }
           }
       }
 
@@ -1742,8 +1773,12 @@ sub stationWatch {
                   acttime_$d = ((hours_$d   < 10) ? '0' : '') + hours_$d   + ':' + 
                                ((minutes_$d < 10) ? '0' : '') + minutes_$d + ':' + 
                                ((seconds_$d < 10) ? '0' : '') + seconds_$d;
+                               
+                  if (acttime_$d == '00:00:00') {
+                      localStoreSetLastalm_$d ('$d', 'NaN');               // letzte Alarmzeit zurücksetzen zum Tageswechsel            
+                  }
 
-                  checkAndDoAlm_$d (acttime_$d, almtime0_$d);                 
+                  checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);                 
 
                   // draw hour hand
                   context.save();
@@ -2014,7 +2049,7 @@ sub modernWatch {
   my $fr     = AttrVal($d, "modernColorRing",       "FFFFFF");
   my $fre    = AttrVal($d, "modernColorRingEdge",   "333");
   my $hattr  = AttrVal($d, "htmlattr",              "width='150' height='150'");
-  my $tsou   = AttrVal($d, "timeSource",            "server");
+  my $tsou   = AttrVal($d, "timeSource",            "client");
 
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");  
 
@@ -2052,20 +2087,30 @@ sub modernWatch {
       }
       
       // localStorage speichern letzte Alarmzeit
-      function localStoreSetLastalm_$d (lastalmtime) {
-          localStorage.setItem('lastalmtime_$d', lastalmtime);
+      function localStoreSetLastalm_$d (dev, lastalmtime) {
+          localStorage.setItem('lastalmtime_'+dev, lastalmtime);
       }
     
       // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
-      function checkAndDoAlm_$d (acttime, almtime) {
-          lastalmtime = localStorage.getItem('lastalmtime_$d');                  // letzte Alarmzeit laden
-          if ( (acttime == almtime) && acttime != lastalmtime ) {
+      function checkAndDoAlm_$d (dev, acttime, almtime) {
+          lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                             // letzte Alarmzeit laden   
+          if ( acttime == almtime && acttime != lastalmtime_$d ) {
               command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
               url_$d  = makeCommand(command);
               
-              localStoreSetLastalm_$d (acttime);                                    // aktuelle Alarmzeit sichern 
+              localStoreSetLastalm_$d (dev, acttime);                                        // aktuelle Alarmzeit sichern 
               
-              \$.get(url_$d);
+              if(acttime == almtime) {
+                 \$.get(url_$d);
+            
+              } else {
+                  \$.get(url_$d, function (data) {
+                                     command = '{ CommandSetReading(undef, \"$d state stopped\") }';
+                                     url_$d  = makeCommand(command);
+                                     \$.get(url_$d);
+                                }
+                        );                                       
+              }
           }
       }     
       
@@ -2168,8 +2213,12 @@ sub modernWatch {
           acttime_$d = ((hour_$d   < 10) ? '0' : '') + hour_$d   + ':' + 
                        ((minute_$d < 10) ? '0' : '') + minute_$d + ':' + 
                        ((second_$d < 10) ? '0' : '') + second_$d;
+                       
+          if (acttime_$d == '00:00:00') {
+              localStoreSetLastalm_$d ('$d', 'NaN');               // letzte Alarmzeit zurücksetzen zum Tageswechsel            
+          }
 
-          checkAndDoAlm_$d (acttime_$d, almtime0_$d);
+          checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);
           
           //hour_$d
           hour_$d = hour_$d%12;
@@ -2452,7 +2501,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <li><b>timeSource</b><br>
       Wählt die Zeitquelle aus. Es kann die lokale Clientzeit (Browser) oder die Zeit des FHEM-Servers angezeigt werden. <br>
       Diese Einstellung ist bei (CountDown-)Stoppuhren nicht relevant. <br>
-      (default: server)
+      (default: client)
     </li>
     <br>
     
