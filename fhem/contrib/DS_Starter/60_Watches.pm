@@ -84,7 +84,7 @@ my %vNotesIntern = (
                            "'digitalSegmentWidth', stopwatches don't stop when alarm is triggered (use notify to do it) ",
   "0.14.0" => "03.05.2020  switch to packages, use setVersionInfo, support of Meta.pm ",
   "0.13.0" => "03.05.2020  set resume for countdownwatch, set 'continue' removed ",
-  "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmHMSdel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
+  "0.12.0" => "03.05.2020  set resume for stopwatch, new 'alarmDel' command for stop watches, alarmHMS renamed to 'alarmHMSdelset' ",
   "0.11.0" => "02.05.2020  alarm event stabilized, reset command for 'countdownwatch', event alarmed contains alarm time ",
   "0.10.0" => "02.05.2020  renamed 'countDownDone' to 'alarmed', bug fix ",
   "0.9.0"  => "02.05.2020  new attribute 'timeSource' for selection of client/server time ",
@@ -189,11 +189,11 @@ sub Set {                                                    ## no critic 'compl
   return if(IsDisabled($name));
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist .= "time "                                                                           if($addp =~ /staticwatch/);               
-  $setlist .= "alarmHMSset alarmHMSdel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
-  $setlist .= "countDownInit "                                                                  if($addp =~ /countdownwatch/);
-  $setlist .= "alarmHMSset alarmHMSdel:noArg "                                                  if($addp =~ /\bwatch\b/);
-  $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                          if($addp eq "text");    
+  $setlist .= "time "                                                                     if($addp =~ /staticwatch/);               
+  $setlist .= "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
+  $setlist .= "countDownInit "                                                            if($addp =~ /countdownwatch/);
+  $setlist .= "alarmSet alarmDel:noArg "                                                  if($addp =~ /\bwatch\b/);
+  $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                    if($addp eq "text");    
 
   if ($opt =~ /\bstart\b/) {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
@@ -206,7 +206,7 @@ sub Set {                                                    ## no critic 'compl
       readingsBulkUpdate  ($hash, "state", "started");
       readingsEndUpdate   ($hash, 1);
       
-  } elsif ($opt eq "alarmHMSset") {
+  } elsif ($opt eq "alarmSet") {
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
       $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
       $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
@@ -217,7 +217,7 @@ sub Set {                                                    ## no critic 'compl
       readingsSingleUpdate($hash, "alarmed",     0, 0);
       readingsSingleUpdate($hash, "alarmTime", $at, 1);
       
-  } elsif ($opt eq "alarmHMSdel") {      
+  } elsif ($opt eq "alarmDel") {      
       delReadings ($name, "alarmTime");
       delReadings ($name, "alarmed");
       
@@ -1118,15 +1118,15 @@ sub digitalWatch {
         var watchkind_$d = '$addp';
         var cycletime    = new Date();
         var cycleseconds = cycletime.getSeconds();
-        modulo_$d        = cycleseconds % 2;                                           // Taktung für Readingabruf (Serverauslastung reduzieren)
+        modulo2_$d       = cycleseconds % 2;                                           // Taktung für Readingabruf (Serverauslastung reduzieren)
 
         if (watchkind_$d == 'watch') {                  
-            if (modulo_$d != zmodulo_$d) {
+            if (modulo2_$d != zmodulo_$d) {
                 command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     almtime0_$d = data.replace(/\\n/g, '');
-                                    zmodulo_$d = modulo_$d;
+                                    zmodulo_$d = modulo2_$d;
                                     return (almtime0_$d, zmodulo_$d);
                                 } 
                       );
@@ -1186,12 +1186,12 @@ sub digitalWatch {
                   );
             
             if (state_$d == 'started' || state_$d == 'resumed') {                 
-                if (modulo_$d != zmodulo_$d) {
+                if (modulo2_$d != zmodulo_$d) {
                     command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         almtime0_$d = data.replace(/\\n/g, '');
-                                        zmodulo_$d = modulo_$d;
+                                        zmodulo_$d = modulo2_$d;
                                         return (almtime0_$d, zmodulo_$d);
                                     } 
                           );
@@ -1263,19 +1263,19 @@ sub digitalWatch {
                   );
             
             if (state_$d == 'started' || state_$d == 'resumed') {                
-                if (modulo_$d != zmodulo_$d) {
+                if (modulo2_$d != zmodulo_$d) {
                     command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         almtime0_$d = data.replace(/\\n/g, '');
-                                        zmodulo_$d = modulo_$d;  
+                                        zmodulo_$d = modulo2_$d;  
                                         return (almtime0_$d, zmodulo_$d);
                                     } 
                           );
                 }
                 
                 // == Ermittlung Countdown Startwert ==
-                if (modulo_$d != zmodulo_$d) {                
+                if (modulo2_$d != zmodulo_$d) {                
                     command   = '{ReadingsNum(\"$d\",\"countInitVal\", 0)}';
                     url_$d    = makeCommand(command);
                     \$.get( url_$d, function (data) {
@@ -1377,7 +1377,7 @@ sub digitalWatch {
                 value_$d = digitxt_$d;
             }
             
-            if (modulo_$d != zmodulo_$d) {
+            if (modulo2_$d != zmodulo_$d) {
                 command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';     // Text dynamisch aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
@@ -1392,12 +1392,12 @@ sub digitalWatch {
                       );
             }
                   
-            if (modulo_$d != zmodulo_$d) {
+            if (modulo2_$d != zmodulo_$d) {
                 command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';   // Textticker Einstellung aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     tticker_$d = data.replace(/\\n/g, '');
-                                    zmodulo_$d = modulo_$d;  
+                                    zmodulo_$d = modulo2_$d;  
                                     return (tticker_$d, zmodulo_$d);                                    
                                 } 
                       );
@@ -1726,14 +1726,14 @@ sub stationWatch {
                   
                   var cycletime    = new Date();
                   var cycleseconds = cycletime.getSeconds();
-                  modulo_$d        = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
+                  modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
 
-                  if (modulo_$d != zmodulo_$d) {
+                  if (modulo2_$d != zmodulo_$d) {
                       command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
                       url_$d  = makeCommand(command);
                       \$.get( url_$d, function (data) {
                                           almtime0_$d = data.replace(/\\n/g, '');
-                                          zmodulo_$d = modulo_$d;  
+                                          zmodulo_$d = modulo2_$d;  
                                           return (almtime0_$d, zmodulo_$d);
                                       } 
                             );
@@ -2168,14 +2168,14 @@ sub modernWatch {
       function drawTime_$d(ctx_$d, radius_$d){
           var cycletime    = new Date();
           var cycleseconds = cycletime.getSeconds();
-          modulo_$d        = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
+          modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
 
-          if (modulo_$d != zmodulo_$d) {
+          if (modulo2_$d != zmodulo_$d) {
               command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
               url_$d  = makeCommand(command);
               \$.get( url_$d, function (data) {
                                   almtime0_$d = data.replace(/\\n/g, '');
-                                  zmodulo_$d = modulo_$d;  
+                                  zmodulo_$d = modulo2_$d;  
                                   return (almtime0_$d, zmodulo_$d);
                               } 
                     );
@@ -2347,23 +2347,23 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   <ul>
   <ul>
   
-    <a name="alarmHMSset"></a>
-    <li><b>alarmHMSset &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+    <a name="alarmSet"></a>
+    <li><b>alarmSet &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
       Setzt die Alarmzeit im Format hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
       Erreicht die Zeit den definierten Wert, wird ein Event des Readings "alarmed" ausgelöst. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
-      set &lt;name&gt; alarmHMSset 0 30 10
+      set &lt;name&gt; alarmSet 0 30 10
       </ul>
       <br>
       
     </li>
     <br>
     
-    <a name="alarmHMSdel"></a>
-    <li><b>alarmHMSdel</b><br>
+    <a name="alarmDel"></a>
+    <li><b>alarmDel</b><br>
       Löscht die gesetzte Alarmzeit und deren Status. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br>
     </li>
