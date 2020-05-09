@@ -213,11 +213,9 @@ sub Set {                                                    ## no critic 'compl
       return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
       
       my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
-      
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "alarmed", 0);
-      readingsBulkUpdate  ($hash, "alarmTime", $at); 
-      readingsEndUpdate   ($hash, 1);
+            
+      readingsSingleUpdate($hash, "alarmed",     0, 0);
+      readingsSingleUpdate($hash, "alarmTime", $at, 1);
       
   } elsif ($opt eq "alarmHMSdel") {      
       delReadings ($name, "alarmTime");
@@ -2319,8 +2317,9 @@ Die Uhren basieren auf Skripten dieser Seiten: <br>
 <a href='http://www.3quarks.com/de/Segmentanzeige/'>Digitalanzeige</a> 
 <br><br>
 
-Eine definiertes Device vom Model <b>Digital</b> kann ebenfalls als Stoppuhr, CountDown-Timer oder
-universelle Textanzeige (im Sechzehnsegment-Modus) verwendet werden. <br>
+Ein Device vom Model <b>Digital</b> kann ebenfalls als Stoppuhr, CountDown-Timer oder
+universelle Textanzeige (für Sechzehnsegment-Modus siehe Attribut <a href="#digitalSegmentType">digitalSegmentType</a>) 
+verwendet werden. <br>
 Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server eingestellt werden 
 (Attribut <a href="#timeSource">timeSource</a>). <br>
 
