@@ -71,6 +71,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.22.0" => "09.05.2020  new attr 'digitalBorderDistance' for left and rigtht border distance of digital text ", 
+  "0.21.1" => "09.05.2020  fix calculate forerun of 'text' dynamically if digitalTextDigitNumber=0 ",
   "0.21.0" => "08.05.2020  support of alarm time of model digital 'watch' ",
   "0.20.1" => "08.05.2020  asynchron read digital text and much more fixes, set client as default timeSource ",
   "0.20.0" => "07.05.2020  asynchron read alarmTime reading, some fixes ",
@@ -109,7 +111,8 @@ sub Initialize {
   $hash->{FW_summaryFn}       = \&FWebFn;
   $hash->{FW_detailFn}        = \&FWebFn;
   $hash->{AttrFn}             = \&Attr;
-  $hash->{AttrList}           = "digitalColorBackground:colorpicker ".
+  $hash->{AttrList}           = "digitalBorderDistance:slider,0,1,40 ".
+                                "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
                                 "digitalDigitAngle:slider,-30,0.5,30,1 ".
@@ -341,7 +344,7 @@ sub Attr {
     } 
 
     if ($cmd eq "set") {
-        if ($aName eq "digitalTextDigitNumber" && $aVal !~ /^[0-9]+$/x) {
+        if ($aName =~ /digitalTextDigitNumber|digitalBorderDistance/ && $aVal !~ /^[0-9]+$/x) {
             return qq{The value of "$aName" is not valid. Only integers are allowed !};
         }
     }    
@@ -411,7 +414,6 @@ sub digitalWatch {
   my ($d)      = @_;
   my $hash     = $defs{$d};
   my $alarmdef = "00:00:00";
-  my $hattr    = AttrVal($d, "htmlattr",               "width='150' height='50'");
   my $bgc      = AttrVal($d, "digitalColorBackground", "C4C4C4");
   my $dcd      = AttrVal($d, "digitalColorDigits",     "000000"); 
   my $addp     = AttrVal($d, "digitalDisplayPattern",  "watch");  
@@ -423,6 +425,8 @@ sub digitalWatch {
   my $adsd     = AttrVal($d, "digitalSegmentDistance", 0.5);
   my $adda     = AttrVal($d, "digitalDigitAngle",      9);
   my $adtdn    = AttrVal($d, "digitalTextDigitNumber", 0);
+  my $abdist   = AttrVal($d, "digitalBorderDistance",  8);
+  my $hattr    = AttrVal($d, "htmlattr",               "width='150' height='50'");
   my $tsou     = AttrVal($d, "timeSource",             "client");
   
   my $deftxt   =  "    ";
@@ -430,40 +434,34 @@ sub digitalWatch {
   my $ddt      =  ReadingsVal ($d, "displayText",       $deftxt);
   my $alarm    =  ReadingsVal ($d, "alarmTime",         "aa:bb:cc");
   
-  my $ddp = "###:##:##";                                                       # dummy
-  my ($h,$m,$s,$txtc) = (0,0,0,0); 
-  my $forerun = "";                                                            # init Vorlauf bei Laufschrift
+  my $ddp = "###:##:##";                                                      # dummy
+  my ($h,$m,$s,$txtc) = (0,0,0,0);
   
-  if($addp !~ /text/) {
-      $ddt = "((hours_$d   < 10) ? '0' : '')   + hours_$d   + ':' + 
-              ((minutes_$d < 10) ? '0'  : '')  + minutes_$d + ':' + 
-              ((seconds_$d < 10) ? '0'  : '')  + seconds_$d"; 
+  my $bdist = "";                                                             # Abstand zum linken und rechten Rand
+  for (my $i=0; $i<=$abdist; $i++ ) {
+      $bdist .= " ";
   }
   
-  if($addp eq "watch") {
+  if($addp !~ /text/) {
+      $ddt = "((hours_$d   < 10) ? '0' : '') + hours_$d   + ':' + 
+              ((minutes_$d < 10) ? '0' : '') + minutes_$d + ':' + 
+              ((seconds_$d < 10) ? '0' : '') + seconds_$d"; 
+  } else {
+      $ddt = "'".$ddt."'";
+  }
+  
+  if($addp eq "watch") {                                                      # Digitaluhr
       $ddp = "###:##:##";
   
   } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
       $alarmdef = "aa:bb:cc" if($addp eq "stopwatch");                        # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
       $ddp      = "###:##:##";
   
-  } elsif ($addp eq "staticwatch") {
+  } else {                                                                    # statische Uhrzeitanzeige
       $ddp = "###:##:##";
       $h   = ReadingsVal($d, "hour"  , 0);
       $m   = ReadingsVal($d, "minute", 0);
       $s   = ReadingsVal($d, "second", 0);
-  
-  } elsif ($addp eq "text") {
-      $txtc = length($ddt);
-      $txtc = $adtdn if($adtdn);                                              # per Attribut definierte Anzahl der TextDigits im Display
-      $ddp  = "";
-      
-      for(my $i = 0; $i <= $txtc; $i++) {                                     # die Anzahl der TextDigits im Display berechnen
-          $ddp     .= "#";
-          $forerun .= " ";                                                    # Vorlauf bei Laufschrift = Länge des Schriftzuges (default)
-      }
-      
-      $ddt = "' ".$ddt."'";
   }
 
   return "
@@ -496,11 +494,12 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
-    var almtime0_$d = '$alarm';                       // Alarmzeit initialisieren
-    var digitxt_$d  = ' $deftxt';                     // default Digitaltext initialisieren
-    var tlength_$d  = '$txtc';                        // Textlänge Digitaltext initialisieren
-    var tticker_$d  = '$rdtt';                        // Tickereinstellung initialisieren
-    var zmodulo_$d  = 0;                              // Hilfszähler
+    var almtime0_$d        = '$alarm';                // Alarmzeit initialisieren
+    var digitxt_$d         = '$deftxt';               // default Digitaltext initialisieren
+    var tticker_$d         = '$rdtt';                 // Tickereinstellung initialisieren
+    var zmodulo_$d         = 0;                       // Hilfszähler
+    var distBorderright_$d = '$bdist';              // Abstand zum rechten Rand
+    var distBorderleft_$d  = '$bdist';              // Abstand zum linken Rand
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1355,26 +1354,34 @@ sub digitalWatch {
             }
         }
         
-        if (watchkind_$d == 'text') {            
+        if (watchkind_$d == 'text') {  
+            tlength_$d = digitxt_$d.length;                                   // Länge des Textes
+            if($adtdn > 0) {
+                tlength_$d = $adtdn;
+            }  
+            
             display_$d.pattern = '';                                          // Template erstellen
+            forerun_$d         = '';                                          // Vorlauf Textticker initialisieren
             for (var i = 0; i <= tlength_$d; i++) {
                 display_$d.pattern += '#';
+                forerun_$d         += ' ';
             }
-            display_$d.pattern += '       ';                                  // Abstand Text zum rechten Rand            
-        
-            var rttime    = new Date();
-            var rthours   = rttime.getHours();
-            var rtminutes = rttime.getMinutes();
-            var rtseconds = rttime.getSeconds();
-            var rtmillis  = rttime.getMilliseconds(); 
+            display_$d.pattern += distBorderright_$d;                         // Abstand Text zum rechten Rand  
+            display_$d.pattern  = distBorderleft_$d + display_$d.pattern      //
                         
-            if (tticker_$d == 'on') {                                         // Text als Laufband ?                   
-                var text_$d  = '$forerun'+digitxt_$d+'      ';
+            if (tticker_$d == 'on') {                                         // Text als Laufband ?                         
+                var rttime    = new Date();
+                var rthours   = rttime.getHours();
+                var rtminutes = rttime.getMinutes();
+                var rtseconds = rttime.getSeconds();
+                var rtmillis  = rttime.getMilliseconds();
+                
+                var text_$d  = forerun_$d+digitxt_$d+'      ';
                 var index_$d = ( 2 * (rtseconds + 60*rtminutes + 24*60*rthours) + Math.floor(rtmillis / 500) ) % (text_$d.length - 6);
-                value_$d     = text_$d.substr(index_$d, tlength_$d+parseInt(1));
+                value_$d     = distBorderleft_$d + text_$d.substr(index_$d, tlength_$d+1);
             
             } else {
-                value_$d = digitxt_$d;
+                value_$d = distBorderleft_$d + digitxt_$d;
             }
             
             if (modulo2_$d != zmodulo_$d) {
@@ -1382,12 +1389,7 @@ sub digitalWatch {
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     digitxt_$d = data.replace(/\\n/g, '');
-                                    digitxt_$d = ' '+digitxt_$d; 
-                                    tlength_$d = digitxt_$d.length-1;               // Länge des Textes abzgl. 1 für ' '
-                                    if($adtdn > 0) {
-                                        tlength_$d = $adtdn;
-                                    }
-                                    return (digitxt_$d, tlength_$d);                                     
+                                    return (digitxt_$d);                                     
                                 } 
                       );
             }
@@ -2607,6 +2609,13 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   <b>Model: Digital</b>  <br><br>
   
   <ul>
+    <a name="digitalBorderDistance"></a>
+    <li><b>digitalBorderDistance</b><br>
+      Linker und rechter Abstand der digitalen Textanzeige vom Hintergrundrand. <br>
+      (default: 8)      
+    </li>
+    <br>  
+  
     <a name="digitalColorBackground"></a>
     <li><b>digitalColorBackground</b><br>
       Digitaluhr Hintergrundfarbe.    
