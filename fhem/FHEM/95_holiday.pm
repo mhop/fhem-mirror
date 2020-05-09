@@ -63,12 +63,13 @@ holiday_refresh($;$$)
     $fordate =~ m/^((\d{4})-)?([01]\d)-([0-3]\d)$/; # fmt is already checked
     my ($y,$m,$d) = ($2, $3,$4);
     $fordate = "$m-$d";
-    $lt[5] = $2-1900 if($2);
-    $foryeardate = $a ? "$y-$m-$d" : sprintf("%4d-%02d-%02d",$lt[5]+1900,$m,$d);
+    $lt[5] = $y-1900 if($y);
+    $foryeardate = $y ? "$y-$m-$d" : sprintf("%4d-%02d-%02d",$lt[5]+1900,$m,$d);
     @fd = localtime(mktime(1,1,1,$d,$m-1,$lt[5],0,0,-1));
   }
 
-  Log3 $name, 5, "holiday_refresh $name called for $fordate ($fromTimer)";
+  Log3 $name, 5,
+        "holiday_refresh $name called for $fordate/$foryeardate ($fromTimer)";
 
   my $dir = $attr{global}{modpath} . "/FHEM";
   my ($err, @holidayfile) = FileRead("$dir/$name.holiday");
@@ -125,14 +126,19 @@ holiday_refresh($;$$)
       # get month & day for E-sunday
       my ($Om,$Od) = western_easter(($lt[5]+1900));
       my $timex = mktime(0,0,12,$Od,$Om-1, $lt[5],0,0,-1); # gen timevalue
+      if(!defined $timex) {
+        my $dt = sprintf("%04d-%02d-%02d", $lt[5]+1900, $Om, $Od);
+        Log 1, "holiday/$name: mktime failed for $dt";
+        return "Cannot process $dt";
+      }
       $timex = $timex + $a[1]*86400; # add offset days
 
       my ($msecond, $mminute, $mhour,
           $mday, $mmonth, $myear, $mrest) = localtime($timex);
       $myear = $myear+1900;
       $mmonth = $mmonth+1;
-      #Log 1, "$name: Ostern:".sprintf("%04d-%02d-%02d", $lt[5]+1900, $Om, $Od).
-      #             " Target:".sprintf("%04d-%02d-%02d", $myear, $mmonth, $mday);
+      #Log 1,"$name:Eastern:".sprintf("%04d-%02d-%02d", $lt[5]+1900, $Om, $Od).
+      #            " Target:".sprintf("%04d-%02d-%02d", $myear, $mmonth, $mday);
 
       next if($mday != $fd[3] || $mmonth != $fd[4]+1);
       $found = $a[2];
