@@ -8319,7 +8319,9 @@ sub CUL_HMTmplSetCmd($){
   my $name = shift;
   return "" if(not scalar devspec2array("TYPE=HMinfo"));
   my %a;
-  foreach my $peer(split(",",InternalVal($name,"peerList","")),"0"){
+
+  foreach my $peerId(split(",",AttrVal($name,"peerIDs","")),"0"){ 
+    my $peer = CUL_HM_id2Name($peerId);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
     foreach my $t(keys %HMConfig::culHmTpl){
