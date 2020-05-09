@@ -1,4 +1,4 @@
-REV 21893
+REV 21897
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -582,7 +582,7 @@ UPD 2019-09-09_07:45:04 62889 FHEM/HMCCUConf.pm
 UPD 2020-01-06_07:45:06 200869 FHEM/HMConfig.pm
 UPD 2019-05-17_07:45:03 46853 FHEM/HOMESTATEtk.pm
 UPD 2020-03-29_07:45:03 30399 FHEM/HttpUtils.pm
-UPD 2020-05-08_07:45:03 3445 FHEM/MaxCommon.pm
+UPD 2020-05-09_07:45:02 3459 FHEM/MaxCommon.pm
 UPD 2020-01-19_07:45:03 119701 FHEM/Meta.pm
 UPD 2017-04-18_07:45:02 272672 FHEM/ONKYOdb.pm
 UPD 2015-07-28_14:05:31 12165 FHEM/OWX_DS2480.pm
@@ -747,8 +747,8 @@ UPD 2020-05-08_07:45:07 4281613 docs/commandref.html
 UPD 2020-05-08_07:45:09 2634847 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-05-08_07:45:10 231920 docs/commandref_modular.html
-UPD 2020-05-08_07:45:11 242603 docs/commandref_modular_DE.html
+UPD 2020-05-09_07:45:10 231920 docs/commandref_modular.html
+UPD 2020-05-09_07:45:11 242603 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
