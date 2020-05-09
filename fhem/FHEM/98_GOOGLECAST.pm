@@ -1,15 +1,18 @@
 #############################################################
 #
-# GOOGLECAST.pm (c) by Dominik Karall, 2016-2018
+# GOOGLECAST.pm (c) by Dominik Karall, 2016-2020
 # dominik karall at gmail dot com
 # $Id$
 #
 # FHEM module to communicate with Google Cast devices
 # e.g. Chromecast Video, Chromecast Audio, Google Home
 #
-# Version: 2.1.4
+# Version: 2.1.5
 #
 #############################################################
+#
+# v2.1.5 - 20200509
+# - BUGFIX:   support pychromecast 5.1
 #
 # v2.1.4 - 20190403
 # - BUGFIX:   support pychromecast 3.x
@@ -222,6 +225,7 @@ sub GOOGLECAST_findChromecastsResult {
             };
             if($@) {
               $hash->{helper}{ccdevice} = "";
+              Log3 $hash, 1, "GOOGLECAST Error ($hash->{NAME}): $@";
             }
             Log3 $hash, 4, "GOOGLECAST ($hash->{NAME}): device initialized";
         }
@@ -712,7 +716,10 @@ def GOOGLECAST_PyFindChromecasts():
 
 def GOOGLECAST_PyCreateChromecast(ip, port, uuid, model_name, friendly_name):
     logging.basicConfig(level=logging.CRITICAL)
-    cast = pychromecast._get_chromecast_from_host((ip.decode("utf-8"), int(port), uuid.decode("utf-8"), model_name.decode("utf-8"), friendly_name.decode("utf-8")), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    try:
+      cast = pychromecast._get_chromecast_from_host((ip.decode("utf-8"), int(port), uuid.decode("utf-8"), model_name.decode("utf-8"), friendly_name.decode("utf-8")), blocking=False, timeout=0.1, tries=1, retry_wait=0.1)
+    except:
+      cast = pychromecast._get_chromecast_from_host((ip.decode("utf-8"), int(port), uuid.decode("utf-8"), model_name.decode("utf-8"), friendly_name.decode("utf-8")), timeout=0.1, tries=1, retry_wait=0.1)
     try:
       cast.connect()
     except:
