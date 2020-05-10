@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.23.1" => "10.05.2020  some more changes for PBP severity 3 ",
   "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches, some changes for PBP ", 
   "0.22.0" => "09.05.2020  new attr 'digitalBorderDistance' for left and rigtht border distance of digital text ", 
   "0.21.1" => "09.05.2020  fix calculate forerun of 'text' dynamically if digitalTextDigitNumber=0 ",
@@ -178,7 +179,7 @@ return;
 ##############################################################################
 #         Set Funktion
 ##############################################################################
-sub Set {                                                    ## no critic 'complexity'
+sub Set {                                                    ## no critic 'complexity'   
   my ($hash, @a) = @_;
   return qq{"set X" needs at least an argument} if ( @a < 2 );
   my $name  = $a[0];
@@ -199,7 +200,7 @@ sub Set {                                                    ## no critic 'compl
   $setlist .= "alarmSet alarmDel:noArg "                                                  if($addp =~ /\bwatch\b/x);
   $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                    if($addp eq "text");    
 
-  if ($opt =~ /\bstart\b/x) {
+  if ($opt eq "start") {                                    ## no critic 'Cascading'
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
       
       my $ms = int(time*1000);
@@ -293,7 +294,7 @@ return;
 ##############################################################################
 #         Attributfunktion
 ##############################################################################
-sub Attr {
+sub Attr {                                                         ## no critic 'complexity'
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash                     = $defs{$name};
     my ($do,$val);
@@ -442,14 +443,6 @@ sub digitalWatch {
       $bdist .= " ";
   }
   
-  if($addp !~ /text/) {
-      $ddt = "((hours_$d   < 10) ? '0' : '') + hours_$d   + ':' + 
-              ((minutes_$d < 10) ? '0' : '') + minutes_$d + ':' + 
-              ((seconds_$d < 10) ? '0' : '') + seconds_$d"; 
-  } else {
-      $ddt = "'".$ddt."'";
-  }
-  
   if ($addp eq "stopwatch") {
       $alarmdef = "aa:bb:cc";                                                 # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
   }
@@ -460,7 +453,7 @@ sub digitalWatch {
       $s   = ReadingsVal($d, "second", 0);
   }
 
-  return qq{
+  my $back = << "END_JS";
      <html>
      <body>
      
@@ -490,12 +483,13 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
+    var  ddt_$d;
     var almtime0_$d        = '$alarm';                // Alarmzeit initialisieren
     var digitxt_$d         = '$deftxt';               // default Digitaltext initialisieren
     var tticker_$d         = '$rdtt';                 // Tickereinstellung initialisieren
     var zmodulo_$d         = 0;                       // Hilfszähler
-    var distBorderright_$d = '$bdist';              // Abstand zum rechten Rand
-    var distBorderleft_$d  = '$bdist';              // Abstand zum linken Rand
+    var distBorderright_$d = '$bdist';                // Abstand zum rechten Rand
+    var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand    
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1070,6 +1064,15 @@ sub digitalWatch {
         return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
     }
     
+    // Template digital time display
+    function buildtime (hours, minutes, seconds) {
+        var ddt = ((hours   < 10) ? '0' : '') + hours   + ':' + 
+                  ((minutes < 10) ? '0' : '') + minutes + ':' + 
+                  ((seconds < 10) ? '0' : '') + seconds
+                  ;   
+        return ddt;
+    }
+    
     // localStorage Set 
     function localStoreSet_$d (hours, minutes, seconds, sumsecs) {
         if (Number.isInteger(hours))   { localStorage.setItem('h_$d',  hours);   }
@@ -1223,7 +1226,9 @@ sub digitalWatch {
                 minutes_$d     = parseInt(elapsesec_$d / 60);
                 seconds_$d     = parseInt(elapsesec_$d - minutes_$d * 60);
                 
-                checkAndDoAlm_$d ('$d', $ddt, almtime0_$d);                                      // Alarm auslösen wenn zutreffend
+                ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
+                
+                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                           // Alarm auslösen wenn zutreffend
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
             }
@@ -1325,7 +1330,8 @@ sub digitalWatch {
                 seconds_$d     = parseInt(countcurr_$d - minutes_$d * 60);
      
                 if (countcurr_$d >= 0) {
-                    checkAndDoAlm_$d ('$d', $ddt, almtime0_$d);                                   // Alarm auslösen wenn zutreffend
+                    ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
+                    checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                       // Alarm auslösen wenn zutreffend
                     localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
                 }
             }
@@ -1402,8 +1408,8 @@ sub digitalWatch {
         
         } else { 
             display_$d.pattern = distBorderleft_$d + '##:##:##' + distBorderright_$d;    // Textschablone initialisieren        
-            
-            value_$d = distBorderleft_$d + $ddt;
+            ddt_$d   = buildtime (hours_$d, minutes_$d, seconds_$d);            
+            value_$d = distBorderleft_$d + ddt_$d;
             
             if(value_$d == distBorderleft_$d + 'undefined:undefined:undefined' || value_$d == distBorderleft_$d + 'NaN:NaN:NaN') {
                value_$d = distBorderleft_$d + '  :  :  '; 
@@ -1417,7 +1423,10 @@ sub digitalWatch {
     </script>
     </body>
     </html>      
-  };
+  
+END_JS
+
+return qq{$back};
 }
 
 ##############################################################################
@@ -1441,7 +1450,7 @@ sub stationWatch {
   
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");
 
-  return qq{
+  my $back = << "END_JS";
       <html>
       <body>  
       <canvas id='clock_$d' $hattr> 
@@ -2028,7 +2037,10 @@ sub stationWatch {
       
       </body>
       </html>      
-  };
+
+END_JS
+
+return qq{$back};
 }
 
 ##############################################################################
@@ -2050,7 +2062,7 @@ sub modernWatch {
 
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");  
 
-  return qq{
+  my $back = << "END_JS";
       <html>
       <body>
 
@@ -2247,7 +2259,10 @@ sub modernWatch {
 
       </body>
       </html>
-  };
+      
+END_JS
+
+return qq{$back};
 }
 
 ##############################################################################
