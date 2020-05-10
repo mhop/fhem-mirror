@@ -71,7 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches ", 
+  "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches, some changes for PBP ", 
   "0.22.0" => "09.05.2020  new attr 'digitalBorderDistance' for left and rigtht border distance of digital text ", 
   "0.21.1" => "09.05.2020  fix calculate forerun of 'text' dynamically if digitalTextDigitNumber=0 ",
   "0.21.0" => "08.05.2020  support of alarm time of model digital 'watch' ",
@@ -159,7 +159,7 @@ return;
 sub Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
-  my @a    = split m{\s+}, $def;
+  my @a    = split m{\s+}x, $def;
   
   if(!$a[2]) {
       return "You need to specify more parameters.\n". "Format: define <name> Watches [Modern | Station | Digital]";
@@ -180,7 +180,7 @@ return;
 ##############################################################################
 sub Set {                                                    ## no critic 'complexity'
   my ($hash, @a) = @_;
-  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  return qq{"set X" needs at least an argument} if ( @a < 2 );
   my $name  = $a[0];
   my $opt   = $a[1];
   my $prop  = $a[2];
@@ -193,19 +193,19 @@ sub Set {                                                    ## no critic 'compl
   return if(IsDisabled($name));
                                                            
   my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist .= "time "                                                                     if($addp =~ /staticwatch/);               
-  $setlist .= "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/); 
-  $setlist .= "countDownInit "                                                            if($addp =~ /countdownwatch/);
-  $setlist .= "alarmSet alarmDel:noArg "                                                  if($addp =~ /\bwatch\b/);
+  $setlist .= "time "                                                                     if($addp =~ /staticwatch/x);               
+  $setlist .= "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/x); 
+  $setlist .= "countDownInit "                                                            if($addp =~ /countdownwatch/x);
+  $setlist .= "alarmSet alarmDel:noArg "                                                  if($addp =~ /\bwatch\b/x);
   $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                    if($addp eq "text");    
 
-  if ($opt =~ /\bstart\b/) {
-      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
+  if ($opt =~ /\bstart\b/x) {
+      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
       
       my $ms = int(time*1000);
       
       readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "alarmed", 0)      if($addp =~ /stopwatch|countdownwatch/); 
+      readingsBulkUpdate  ($hash, "alarmed", 0)      if($addp =~ /stopwatch|countdownwatch/x); 
       readingsBulkUpdate  ($hash, "starttime", $ms);
       readingsBulkUpdate  ($hash, "state", "started");
       readingsEndUpdate   ($hash, 1);
@@ -242,7 +242,7 @@ sub Set {                                                    ## no critic 'compl
       readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "resume") {
-      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/ && !ReadingsVal($name, "countInitVal", ""));
+      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
       
       my $ms = int(time*1000);
       readingsSingleUpdate($hash, "starttime", $ms, 0);
@@ -257,7 +257,7 @@ sub Set {                                                    ## no critic 'compl
       shift @a; shift @a;
       
       my $txt = join (" ", @a);
-      $txt    =~ s/[\r\n]//g;
+      $txt    =~ s/[\r\n]//gx;
       readingsSingleUpdate($hash, "displayText", $txt, 1);
       
   } elsif ($opt eq "displayTextDel") {      
@@ -302,15 +302,15 @@ sub Attr {
     # $name is device name
     # aName and aVal are Attribute name and value
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /modern/i && $aName =~ /^modern/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /modern/ix && $aName =~ /^modern/x) {
          return qq{"$aName" is only valid for Watches model "Modern"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /station/i && $aName =~ /^station/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /station/ix && $aName =~ /^station/x) {
          return qq{"$aName" is only valid for Watches model "Station"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} !~ /digital/i && $aName =~ /^digital/) {
+    if ($cmd eq "set" && $hash->{MODEL} !~ /digital/ix && $aName =~ /^digital/x) {
          return qq{"$aName" is only valid for Watches model "Digital"};
     }
     
@@ -338,14 +338,14 @@ sub Attr {
  
         readingsSingleUpdate($hash, "state", "initialized", 1); 
         
-        if($do =~ /\bstopwatch\b/) {
+        if($do =~ /\bstopwatch\b/x) {
             my $ms = int(time*1000);
             readingsSingleUpdate($hash, "starttime", $ms, 0);
         }
     } 
 
     if ($cmd eq "set") {
-        if ($aName =~ /digitalTextDigitNumber|digitalBorderDistance/ && $aVal !~ /^[0-9]+$/x) {
+        if ($aName =~ /digitalTextDigitNumber|digitalBorderDistance/x && $aVal !~ /^[0-9]+$/x) {
             return qq{The value of "$aName" is not valid. Only integers are allowed !};
         }
     }    
@@ -361,20 +361,20 @@ sub FWebFn {
   my $hash  = $defs{$d};
   
   my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
+  my $dlink = qq{<a href="/fhem?detail=$d">$alias</a>}; 
   
   my $ret = "";
   $ret   .= "<span>$dlink </span><br>"  if(!AttrVal($d,"hideDisplayName",0));
   if(IsDisabled($d)) {
       if(AttrVal($d,"hideDisplayName",0)) {
-          $ret .= "Watch <a href=\"/fhem?detail=$d\">$d</a> is disabled";
+          $ret .= qq{Watch <a href="/fhem?detail=$d">$d</a> is disabled};
       } else {
           $ret .= "<html>Watch is disabled</html>";
       }  
   } else {
-      $ret .= modernWatch ($d) if($hash->{MODEL} =~ /modern/i);
-      $ret .= stationWatch($d) if($hash->{MODEL} =~ /station/i);
-      $ret .= digitalWatch($d) if($hash->{MODEL} =~ /digital/i);
+      $ret .= modernWatch ($d) if($hash->{MODEL} =~ /modern/ix);
+      $ret .= stationWatch($d) if($hash->{MODEL} =~ /station/ix);
+      $ret .= digitalWatch($d) if($hash->{MODEL} =~ /digital/ix);
   }
     
 return $ret;
@@ -460,7 +460,7 @@ sub digitalWatch {
       $s   = ReadingsVal($d, "second", 0);
   }
 
-  return "
+  return qq{
      <html>
      <body>
      
@@ -1051,23 +1051,23 @@ sub digitalWatch {
                                                      };
     
     // CSRF-Token auslesen
-    var body = document.querySelector(\"body\");
+    var body = document.querySelector("body");
     if( body != null ) {
-        csrf = body.getAttribute(\"fwcsrf\");
+        csrf = body.getAttribute("fwcsrf");
     }
  
     // get the base url
     function getBaseUrl () {
-        var url = window.location.href.split(\"?\")[0];
-        url += \"?\";
+        var url = window.location.href.split("?")[0];
+        url += "?";
         if( csrf != null ) {
-            url += \"fwcsrf=\"+csrf+\"&\";
+            url += "fwcsrf="+csrf+"&";
         }
         return url;
     }
 
     function makeCommand (cmd) {
-        return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+        return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
     }
     
     // localStorage Set 
@@ -1087,7 +1087,7 @@ sub digitalWatch {
     function checkAndDoAlm_$d (dev, acttime, almtime) {
         lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                              // letzte Alarmzeit laden        
         if ( (acttime == almtime || acttime == '$alarmdef') && acttime != lastalmtime_$d ) {
-            command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
+            command = '{ CommandSetReading(undef, "$d alarmed '+acttime+'") }';
             url_$d  = makeCommand(command);
               
             localStoreSetLastalm_$d (dev, acttime);                                           // aktuelle Alarmzeit sichern 
@@ -1097,7 +1097,7 @@ sub digitalWatch {
             
             } else {
                 \$.get(url_$d, function (data) {
-                                command = '{ CommandSetReading(undef, \"$d state stopped\") }';
+                                command = '{ CommandSetReading(undef, "$d state stopped") }';
                                 url_$d  = makeCommand(command);
                                 \$.get(url_$d);
                             }
@@ -1116,7 +1116,7 @@ sub digitalWatch {
 
         if (watchkind_$d == 'watch') {                  
             if (modulo2_$d != zmodulo_$d) {
-                command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     almtime0_$d = data.replace(/\\n/g, '');
@@ -1171,7 +1171,7 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'stopwatch') {           
-            command = '{ReadingsVal(\"$d\",\"state\",\"\")}';                          // state Reading lesen
+            command = '{ReadingsVal("$d","state","")}';                          // state Reading lesen
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                                
@@ -1181,7 +1181,7 @@ sub digitalWatch {
             
             if (state_$d == 'started' || state_$d == 'resumed') {                 
                 if (modulo2_$d != zmodulo_$d) {
-                    command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                    command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         almtime0_$d = data.replace(/\\n/g, '');
@@ -1192,7 +1192,7 @@ sub digitalWatch {
                 }
                 
                 // == Startzeit für CountDown ==            
-                command   = '{ReadingsNum(\"$d\",\"starttime\", 0)}';
+                command   = '{ReadingsNum("$d","starttime", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
@@ -1248,7 +1248,7 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'countdownwatch') {                                    
-            command = '{ReadingsVal(\"$d\",\"state\",\"\")}';
+            command = '{ReadingsVal("$d","state","")}';
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                      
@@ -1258,7 +1258,7 @@ sub digitalWatch {
             
             if (state_$d == 'started' || state_$d == 'resumed') {                
                 if (modulo2_$d != zmodulo_$d) {
-                    command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                    command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         almtime0_$d = data.replace(/\\n/g, '');
@@ -1270,7 +1270,7 @@ sub digitalWatch {
                 
                 // == Ermittlung Countdown Startwert ==
                 if (modulo2_$d != zmodulo_$d) {                
-                    command   = '{ReadingsNum(\"$d\",\"countInitVal\", 0)}';
+                    command   = '{ReadingsNum("$d","countInitVal", 0)}';
                     url_$d    = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         data  = data.replace(/\\n/g, ''); 
@@ -1287,7 +1287,7 @@ sub digitalWatch {
                 }
                 
                 // == Ermittlung vergangene Sekunden ==                  
-                command = '{ReadingsNum(\"$d\",\"starttime\", 0)}';
+                command = '{ReadingsNum("$d","starttime", 0)}';
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     data  = data.replace(/\\n/g, ''); 
@@ -1317,7 +1317,7 @@ sub digitalWatch {
                 
                 // == Countdown errechnen ==
                 countcurr_$d = parseInt(countInitVal_$d) - parseInt(elapsesec_$d);
-                //log(\"countcurr_$d: \"+countcurr_$d);
+                //log("countcurr_$d: "+countcurr_$d);
                 
                 hours_$d       = parseInt(countcurr_$d / 3600);
                 countcurr_$d  -= hours_$d * 3600;
@@ -1380,7 +1380,7 @@ sub digitalWatch {
             }
             
             if (modulo2_$d != zmodulo_$d) {
-                command = '{ReadingsVal(\"$d\",\"displayText\", \"$deftxt\")}';     // Text dynamisch aus Reading lesen
+                command = '{ReadingsVal("$d","displayText", "$deftxt")}';     // Text dynamisch aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     digitxt_$d = data.replace(/\\n/g, '');
@@ -1390,7 +1390,7 @@ sub digitalWatch {
             }
                   
             if (modulo2_$d != zmodulo_$d) {
-                command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';         // Textticker Einstellung aus Reading lesen
+                command = '{ReadingsVal("$d","displayTextTicker", "off")}';         // Textticker Einstellung aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     tticker_$d = data.replace(/\\n/g, '');
@@ -1417,7 +1417,7 @@ sub digitalWatch {
     </script>
     </body>
     </html>      
-  ";
+  };
 }
 
 ##############################################################################
@@ -1441,7 +1441,7 @@ sub stationWatch {
   
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");
 
-  return "
+  return qq{
       <html>
       <body>  
       <canvas id='clock_$d' $hattr> 
@@ -1507,23 +1507,23 @@ sub stationWatch {
       StationClock_$d.OverhastySecondHand       = 3;
       
       // CSRF-Token auslesen
-      var body = document.querySelector(\"body\");
+      var body = document.querySelector("body");
       if( body != null ) {
-          csrf = body.getAttribute(\"fwcsrf\");
+          csrf = body.getAttribute("fwcsrf");
       }
  
       // get the base url
       function getBaseUrl () {
-          var url = window.location.href.split(\"?\")[0];
-          url += \"?\";
+          var url = window.location.href.split("?")[0];
+          url += "?";
           if( csrf != null ) {
-              url += \"fwcsrf=\"+csrf+\"&\";
+              url += "fwcsrf="+csrf+"&";
           }
           return url;
       }
 
       function makeCommand (cmd) {
-          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+          return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
       }
       
       // localStorage speichern letzte Alarmzeit
@@ -1535,7 +1535,7 @@ sub stationWatch {
       function checkAndDoAlm_$d (dev, acttime, almtime) {
           lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                             // letzte Alarmzeit laden   
           if ( acttime == almtime && acttime != lastalmtime_$d ) {
-              command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
+              command = '{ CommandSetReading(undef, "$d alarmed '+acttime+'") }';
               url_$d  = makeCommand(command);
               
               localStoreSetLastalm_$d (dev, acttime);                                        // aktuelle Alarmzeit sichern 
@@ -1545,7 +1545,7 @@ sub stationWatch {
             
               } else {
                   \$.get(url_$d, function (data) {
-                                     command = '{ CommandSetReading(undef, \"$d state stopped\") }';
+                                     command = '{ CommandSetReading(undef, "$d state stopped") }';
                                      url_$d  = makeCommand(command);
                                      \$.get(url_$d);
                                 }
@@ -1728,7 +1728,7 @@ sub stationWatch {
                   modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
 
                   if (modulo2_$d != zmodulo_$d) {
-                      command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+                      command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
                       url_$d  = makeCommand(command);
                       \$.get( url_$d, function (data) {
                                           almtime0_$d = data.replace(/\\n/g, '');
@@ -2028,7 +2028,7 @@ sub stationWatch {
       
       </body>
       </html>      
-  ";
+  };
 }
 
 ##############################################################################
@@ -2050,7 +2050,7 @@ sub modernWatch {
 
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");  
 
-  return "
+  return qq{
       <html>
       <body>
 
@@ -2064,23 +2064,23 @@ sub modernWatch {
       var zmodulo_$d  = 0;                              // Hilfszähler 
       
       // CSRF-Token auslesen
-      var body = document.querySelector(\"body\");
+      var body = document.querySelector("body");
       if( body != null ) {
-          csrf = body.getAttribute(\"fwcsrf\");
+          csrf = body.getAttribute("fwcsrf");
       }
  
       // get the base url
       function getBaseUrl () {
-          var url = window.location.href.split(\"?\")[0];
-          url += \"?\";
+          var url = window.location.href.split("?")[0];
+          url += "?";
           if( csrf != null ) {
-              url += \"fwcsrf=\"+csrf+\"&\";
+              url += "fwcsrf="+csrf+"&";
           }
           return url;
       }
 
       function makeCommand (cmd) {
-          return getBaseUrl()+\"cmd=\"+encodeURIComponent(cmd)+\"&XHR=1\";
+          return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
       }
       
       // localStorage speichern letzte Alarmzeit
@@ -2092,7 +2092,7 @@ sub modernWatch {
       function checkAndDoAlm_$d (dev, acttime, almtime) {
           lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                             // letzte Alarmzeit laden   
           if ( acttime == almtime && acttime != lastalmtime_$d ) {
-              command = '{ CommandSetReading(undef, \"$d alarmed '+acttime+'\") }';
+              command = '{ CommandSetReading(undef, "$d alarmed '+acttime+'") }';
               url_$d  = makeCommand(command);
               
               localStoreSetLastalm_$d (dev, acttime);                                        // aktuelle Alarmzeit sichern 
@@ -2102,7 +2102,7 @@ sub modernWatch {
             
               } else {
                   \$.get(url_$d, function (data) {
-                                     command = '{ CommandSetReading(undef, \"$d state stopped\") }';
+                                     command = '{ CommandSetReading(undef, "$d state stopped") }';
                                      url_$d  = makeCommand(command);
                                      \$.get(url_$d);
                                 }
@@ -2170,7 +2170,7 @@ sub modernWatch {
           modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
 
           if (modulo2_$d != zmodulo_$d) {
-              command = '{ReadingsVal(\"$d\",\"alarmTime\",\"+almtime0_$d+\")}';     // alarmTime Reading lesen
+              command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
               url_$d  = makeCommand(command);
               \$.get( url_$d, function (data) {
                                   almtime0_$d = data.replace(/\\n/g, '');
@@ -2247,7 +2247,7 @@ sub modernWatch {
 
       </body>
       </html>
-  ";
+  };
 }
 
 ##############################################################################
