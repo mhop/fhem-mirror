@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches ", 
   "0.22.0" => "09.05.2020  new attr 'digitalBorderDistance' for left and rigtht border distance of digital text ", 
   "0.21.1" => "09.05.2020  fix calculate forerun of 'text' dynamically if digitalTextDigitNumber=0 ",
   "0.21.0" => "08.05.2020  support of alarm time of model digital 'watch' ",
@@ -434,7 +435,6 @@ sub digitalWatch {
   my $ddt      =  ReadingsVal ($d, "displayText",       $deftxt);
   my $alarm    =  ReadingsVal ($d, "alarmTime",         "aa:bb:cc");
   
-  my $ddp = "###:##:##";                                                      # dummy
   my ($h,$m,$s,$txtc) = (0,0,0,0);
   
   my $bdist = "";                                                             # Abstand zum linken und rechten Rand
@@ -450,15 +450,11 @@ sub digitalWatch {
       $ddt = "'".$ddt."'";
   }
   
-  if($addp eq "watch") {                                                      # Digitaluhr
-      $ddp = "###:##:##";
+  if ($addp eq "stopwatch") {
+      $alarmdef = "aa:bb:cc";                                                 # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
+  }
   
-  } elsif ($addp eq "stopwatch" || $addp eq "countdownwatch") {
-      $alarmdef = "aa:bb:cc" if($addp eq "stopwatch");                        # Stoppuhr bei Start 00:00:00 nicht Alerm auslösen
-      $ddp      = "###:##:##";
-  
-  } else {                                                                    # statische Uhrzeitanzeige
-      $ddp = "###:##:##";
+  if ($addp eq "staticwatch") {                                               # statische Uhrzeitanzeige
       $h   = ReadingsVal($d, "hour"  , 0);
       $m   = ReadingsVal($d, "minute", 0);
       $s   = ReadingsVal($d, "second", 0);
@@ -530,7 +526,6 @@ sub digitalWatch {
     };
     
     var display_$d = new SegmentDisplay_$d('display_$d');
-    display_$d.pattern         = '$ddp       ';                  // Textschablone initialisieren
     display_$d.cornerType      = 2;
     display_$d.displayAngle    = $adda;                          // Zeichenwinkel:  -30 - 30 (9)
     display_$d.digitHeight     = $addh;                          // Zeichenhöhe:    5   - 50 (20)
@@ -1367,7 +1362,7 @@ sub digitalWatch {
                 forerun_$d         += ' ';
             }
             display_$d.pattern += distBorderright_$d;                         // Abstand Text zum rechten Rand  
-            display_$d.pattern  = distBorderleft_$d + display_$d.pattern      //
+            display_$d.pattern  = distBorderleft_$d + display_$d.pattern      
                         
             if (tticker_$d == 'on') {                                         // Text als Laufband ?                         
                 var rttime    = new Date();
@@ -1395,7 +1390,7 @@ sub digitalWatch {
             }
                   
             if (modulo2_$d != zmodulo_$d) {
-                command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';   // Textticker Einstellung aus Reading lesen
+                command = '{ReadingsVal(\"$d\",\"displayTextTicker\", \"off\")}';         // Textticker Einstellung aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     tticker_$d = data.replace(/\\n/g, '');
@@ -1405,11 +1400,13 @@ sub digitalWatch {
                       );
             }
         
-        } else {
-            value_$d = ' '+$ddt;
+        } else { 
+            display_$d.pattern = distBorderleft_$d + '##:##:##' + distBorderright_$d;    // Textschablone initialisieren        
             
-            if(value_$d == ' undefined:undefined:undefined' || value_$d == ' NaN:NaN:NaN') {
-               value_$d = '   :  :  '; 
+            value_$d = distBorderleft_$d + $ddt;
+            
+            if(value_$d == distBorderleft_$d + 'undefined:undefined:undefined' || value_$d == distBorderleft_$d + 'NaN:NaN:NaN') {
+               value_$d = distBorderleft_$d + '  :  :  '; 
             }
         }
         
