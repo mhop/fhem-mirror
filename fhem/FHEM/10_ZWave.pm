@@ -3333,7 +3333,7 @@ ZWave_battery($) # Forum #87575
 
   push @ret, "battery:".       ($val eq "ff" ? "low" : hex($val)." %");
   push @ret, "batteryState:" .(($val eq "ff" || $val eq "00") ? "low":"ok");
-  push @ret, "batteryPercent:".($val eq "ff" ? 0 : hex($val)); #110964
+  push @ret, "batteryPercent:".hex($val) if($val ne "ff"); #110964
   return @ret;
 }
 
