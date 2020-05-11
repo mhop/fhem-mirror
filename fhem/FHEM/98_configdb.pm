@@ -51,18 +51,13 @@ sub CommandConfigdb {
 			# delete attribute
 				delete $configDB{attr}{$param1};
 				$ret = " attribute $param1 deleted";
-                shift @structChangeHist
-                      if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
-                push @structChangeHist, "configdb attr $param1 (deleted)";
-				addStructChange('configDB attr','configDB',"$param1 (deleted)");
+				addStructChange('configdb attr',undef,"$param1 (deleted)");
 
 			} else {
 			# set attribute
 				$configDB{attr}{$param1} = $param2;
 				$ret = " attribute $param1 set to value $param2";
-                shift @structChangeHist
-                      if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
-                push @structChangeHist, "configdb attr $param1 $param2 (set)";
+                addStructChange('configdb attr',undef,"$param1 $param2 (set)";
 			}
 		}
 
