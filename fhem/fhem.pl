@@ -5557,14 +5557,13 @@ setKeyValue($$)
 sub
 addStructChange($$$)
 {
-  return if(!$init_done);
-
   my ($cmd, $dev, $param) = @_;
-  return if(!$defs{$dev} || $defs{$dev}{TEMPORARY});
+
+  return if(!$init_done);
+  return if(defined($dev) &&
+            (!$defs{$dev} || $defs{$dev}{TEMPORARY} || $defs{$dev}{VOLATILE}));
 
   $lastDefChange++;
-  return if($defs{$dev}{VOLATILE});
-
   shift @structChangeHist
           if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
   $param = substr($param, 0, 40)."..." if(length($param) > 40);
