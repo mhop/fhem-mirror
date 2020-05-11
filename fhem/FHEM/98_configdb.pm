@@ -57,7 +57,7 @@ sub CommandConfigdb {
 			# set attribute
 				$configDB{attr}{$param1} = $param2;
 				$ret = " attribute $param1 set to value $param2";
-                addStructChange('configdb attr',undef,"$param1 $param2 (set)";
+                addStructChange('configdb attr',undef,"$param1 $param2 (set)");
 			}
 		}
 
