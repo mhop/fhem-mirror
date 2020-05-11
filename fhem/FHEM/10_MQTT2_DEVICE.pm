@@ -191,7 +191,7 @@ MQTT2_DEVICE_Parse($$)
   #################################################
   # IODevs autocreate and/or expand readingList
   if($autocreate ne "no" && !%fnd) {
-    return "" if($cid && $cid =~ m/mosqpub.*/);
+    return "" if($cid && $cid =~ m/^(mosqpub|mosq_)/); # mosquitto_pub default
 
     ################## bridge stuff
     my $newCid = $cid;
