@@ -51,10 +51,18 @@ sub CommandConfigdb {
 			# delete attribute
 				delete $configDB{attr}{$param1};
 				$ret = " attribute $param1 deleted";
+                shift @structChangeHist
+                      if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
+                push @structChangeHist, "configdb attr $param1 (deleted)";
+				addStructChange('configDB attr','configDB',"$param1 (deleted)");
+
 			} else {
 			# set attribute
 				$configDB{attr}{$param1} = $param2;
 				$ret = " attribute $param1 set to value $param2";
+                shift @structChangeHist
+                      if(@structChangeHist > AttrVal('global', 'maxChangeLog', 10) - 1);
+                push @structChangeHist, "configdb attr $param1 $param2 (set)";
 			}
 		}
 
@@ -442,6 +450,7 @@ sub _cfgDB_readConfig() {
 			<ul><b>maxversions</b> set the maximum number of configurations stored in database. <br/>
 			    The oldest version will be dropped in a "save config" if it would exceed this number.</ul><br/>
 			<ul><b>private</b> if set to 0 the database user and password info will be shown in 'configdb info' output.</ul><br/>
+			<ul><b>dumpPath</b> define a path for database dumps<br/></ul><br/>
 			<br/>
 
 		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
