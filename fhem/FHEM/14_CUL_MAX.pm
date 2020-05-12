@@ -79,7 +79,7 @@ my %msgId2Cmd = (
 my %msgCmd2Id = reverse %msgId2Cmd;
 
 my $defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
-
+sub CUL_MAX_ParseTemperature  { return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]); }
 
 my $ackTimeout      = 3; # seconds
 my $maxRetryCnt     = 3;
@@ -495,7 +495,7 @@ sub CUL_MAX_Set
       #Encode into binary form
       my $arg2 = int(10*$args[2]);
       #First bit is 9th bit of temperature, rest is desiredTemperature
-      my $arg1 = (($arg2&0x100)>>1) | (int(2*MAX_ParseTemperature($args[1]))&0x7F);
+      my $arg1 = (($arg2&0x100)>>1) | (int(2*CUL_MAX_ParseTemperature($args[1]))&0x7F);
       $arg2 &= 0xFF; #only take the lower 8 bits
       my $groupid = ReadingsNum($destname,'groupid',0);
 
