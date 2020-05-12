@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_Log2Syslog: add device in check message by attr 'exclErrCond'
  - feature: 57_Calendar: new attribute delay
  - feature: 72_XiaomiDevice: supporting EvpHumidifier and AirPurifier3H
  - remove:  98_DSBMobile: removed due to unavailability of API

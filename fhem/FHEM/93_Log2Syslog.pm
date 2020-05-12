@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.1" => "12.05.2020  add dev to check regex of 'exclErrCond' ",
   "5.12.0" => "16.04.2020  improve IETF octet count again, internal code changes for PBP ",
   "5.11.0" => "14.04.2020  switch to packages, improve IETF octet count ",
   "5.10.3" => "11.04.2020  new reading 'Parse_Err_LastData', change octet count read ",
@@ -1747,7 +1748,7 @@ sub eventLog {
       if($n =~ m/^$rex$/x || "$n:$txt" =~ m/^$rex$/x || "$tim:$n:$txt" =~ m/^$rex$/x) {
           my $otp             = "$n $txt";
           $otp                = "$tim $otp" if AttrVal($name,'addTimestamp',0);
-          ($prival,$sevAstxt) = setPrival($hash,$txt);
+          ($prival,$sevAstxt) = setPrival($hash,$otp);
           if($sendsev && $sendsev !~ m/$sevAstxt/x) {                                 # nicht senden wenn Severity nicht in "respectSeverity" enthalten
               Log3slog ($name, 5, "Log2Syslog $name - Warning - Payload NOT sent due to Message Severity not in attribute \"respectSeverity\"\n");
               next;        
@@ -2140,7 +2141,7 @@ sub setPrival {
               # Negativliste abarbeiten
               $e =~ s/_ESC_/,/g;
               trim($e);
-              $do = 0 if($txt =~ m/^$e$/x);        
+              $do = 0 if($txt =~ m/$e/);        
           }
       }
       $sv = 3 if($do); 
