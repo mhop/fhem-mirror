@@ -250,8 +250,6 @@ sub CUL_MAX_Define
     return $ret;
   }
 
-  $modules{CUL_MAX}{defptr} = $hash;
-
   $hash->{addr}         = $MAXid;
   $hash->{STATE}        = "Defined";
   $hash->{cnt}          = 0;
@@ -261,6 +259,9 @@ sub CUL_MAX_Define
   $hash->{sq}           = 0;
   $hash->{LASTInputDev} = '';
   $hash->{'.culids'}    = '';
+  $hash->{SVN}          = (qw($Id$))[2];
+
+  $modules{CUL_MAX}{defptr} = $hash;
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+5, 'CUL_MAX_updateConfig', $hash, 0);
