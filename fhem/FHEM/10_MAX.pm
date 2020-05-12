@@ -602,7 +602,7 @@ sub MAX_Get
   return 'unknown argument '.$cmd.' , choose one of show_savedConfig:'.$backuped_devs;
 }
 
-sub MAX_Set($@)
+sub MAX_Set
 {
   my ($hash, $devname, @ar) = @_;
   my ($setting, @args) = @ar;
@@ -645,8 +645,12 @@ sub MAX_Set($@)
     return CommandRename(undef,$devname.' '.$newName);
   }
 
-  return $devname.', invalid IODev' if(MAX_CheckIODev($hash));
-  return $devname.', can not set without IODev' if(!exists($hash->{IODev}));
+  $ret = 'invalid_IODev' if (MAX_CheckIODev($hash));
+  return "$ret:noArg"  if ($ret);
+  $ret = 'can_not_set_without_IODev' if (!exists($hash->{IODev}));
+  return "$ret:noArg"  if ($ret);
+  $ret = 'can_not_send_with_IODev'   if (!exists($hash->{IODev}{Send}));
+  return "$ret:noArg"  if ($ret);
 
   if($setting eq 'desiredTemperature' and $hash->{type} =~ /.*Thermostat.*/) 
   {
