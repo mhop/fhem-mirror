@@ -27,7 +27,7 @@ FhemTestUtils_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Wrong syntax: use define <name> dummy" if(int(@a) != 2);
+  return "Wrong syntax: use define <name> FhemTestUtils" if(int(@a) != 2);
   $logInform{$a[0]} = sub() { push @logs, $_[1] };
   return undef;
 }
