@@ -1,8 +1,8 @@
 Execute all the tests from the directory above with:
-  prove t/*/*.t
+  prove `find . -name \*.t`
 
 Building a single test is easier with
-  perl fhem.pl -t t/00_MQTT2_SERVER/01_autocreate.t
+  perl fhem.pl -t t/FHEM/00_MQTT2_SERVER/01_autocreate.t
 as you'll see the Log
 
 Each test needs a config file, with is either fhem.cfg or testname.cfg
