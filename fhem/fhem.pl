@@ -127,6 +127,7 @@ sub devspec2array($;$$);
 sub doGlobalDef($);
 sub escapeLogLine($);
 sub evalStateFormat($);
+sub execFhemTestFile();
 sub fhem($@);
 sub fhemTimeGm($$$$$$);
 sub fhemTimeLocal($$$$$$);
@@ -143,6 +144,8 @@ sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
 sub parseParams($;$$$);
+sub prepareFhemTestFile();
+sub execFhemTestFile();
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -241,6 +244,7 @@ use vars qw($cvsid);            # used in 98_version.pm
 use vars qw($devcount);         # Maximum device number, used for storing
 use vars qw($featurelevel); 
 use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
+use vars qw($fhemTestFile);     # file to include if -t is specified
 use vars qw($fhem_started);     # used for uptime calculation
 use vars qw($haveInet6);        # Using INET6
 use vars qw($init_done);        #
@@ -478,14 +482,16 @@ my %ra = (
 # Start the program
 my $fhemdebug;
 $fhemdebug = shift @ARGV if($ARGV[0] eq "-d");
+prepareFhemTestFile();
 
 if(int(@ARGV) < 1) {
   print "Usage:\n";
-  print "as server: fhem configfile\n";
-  print "as client: fhem [host:]port cmd cmd cmd...\n";
+  print "as server: perl fhem.pl [-d] {<configfile>|configDb}\n";
+  print "as client: perl fhem.pl [host:]port cmd cmd cmd...\n";
+  print "testing:   perl fhem.pl -t <testfile>.t\n";
   if($^O =~ m/Win/) {
-    print "install as windows service: fhem.pl configfile -i\n";
-    print "uninstall the windows service: fhem.pl -u\n";
+    print "install as windows service: perl fhem.pl configfile -i\n";
+    print "uninstall the windows service: perl fhem.pl -u\n";
   }
   exit(1);
 }
@@ -569,8 +575,9 @@ if(configDBUsed()) {
 
 
 # As newer Linux versions reset serial parameters after fork, we parse the
-# config file after the fork. But we need some global attr parameters before, so we
-# read them here.
+# config file after the fork. But we need some global attr parameters before,
+# so we read them here. FHEM_GLOBALATTR is for docker, as it needs to overwrite
+# fhem.cfg
 my (undef, $globalAttrFromEnv) = parseParams($ENV{FHEM_GLOBALATTR});
 setGlobalAttrBeforeFork($attr{global}{configfile});
 applyGlobalAttrFromEnv();
@@ -661,6 +668,7 @@ my $osuser = "os:$^O user:".(getlogin || getpwuid($<) || "unknown");
 Log 0, "Featurelevel: $featurelevel";
 Log 0, "Server started with ".int(keys %defs).
         " defined entities ($attr{global}{version} perl:$] $osuser pid:$$)";
+execFhemTestFile();
 
 ################################################
 # Main Loop
@@ -990,7 +998,7 @@ Log3($$$)
 
   no strict "refs";
   foreach my $li (keys %logInform) {
-    if($defs{$li}) {
+    if($defs{$li}) {    # Function wont be called for WARNING, don't know why
       &{$logInform{$li}}($li, "$tim $loglevel : $text");
     } else {
       delete $logInform{$li};
@@ -4378,6 +4386,7 @@ setGlobalAttrBeforeFork($)
     next if($l !~ m/^attr\s+global\s+([^\s]+)\s+(.*)$/);
     AnalyzeCommand(undef, $l);
   }
+  CommandAttr(undef, "global modpath .") if(!AttrVal("global","modpath",""));
 }
 
 sub
@@ -6068,6 +6077,31 @@ applyGlobalAttrFromEnv()
     Log 3, "From the FHEM_GLOBALATTR environment: attr global $k $v";
     CommandAttr(undef, "global $k $v");
   }
+}
+
+# set the test config file: either the corresponding X.cfg, or fhem.cfg
+sub
+prepareFhemTestFile()
+{
+  return if($ARGV[0] ne "-t" || @ARGV < 2);
+  shift @ARGV;
+
+  return if($ARGV[0] !~ m,^(.*?)([^/]+)\.t$,);
+  my ($dir, $fileBase) = ($1, $2);
+
+  $fhemTestFile = $ARGV[0];
+  $ARGV[0] = "${dir}fhem.cfg"    if(-r "${dir}fhem.cfg");
+  $ARGV[0] = "$dir$fileBase.cfg" if(-r "$dir$fileBase.cfg");
+}
+
+sub
+execFhemTestFile()
+{
+  return if(!$fhemTestFile);
+  $attr{global}{autosave} = 0;
+  AnalyzeCommand(undef, "define .ftu FhemTestUtils")
+    if(!grep { $defs{$_}{TYPE} eq "FhemTestUtils" } keys %defs);
+  InternalTimer(1, sub { require $fhemTestFile }, 0 ) if($fhemTestFile);
 }
 
 1;

@@ -480,6 +480,7 @@ FHEM/98_DSBMobile 			 KernSani 			  https://forum.fhem.de/index.php/topic,107104
 FHEM/98_expandJSON.pm        dev0                 Unterstützende Dienste
 FHEM/98_feels_like.pm        hotbso               Wettermodule
 FHEM/98_fhemdebug.pm         rudolfkoenig         Sonstiges
+FHEM/98_FhemTestUtils.pm     rudolfkoenig         Development
 FHEM/98_fheminfo.pm          betateilchen         Sonstiges
 FHEM/98_freezemon            KernSani             Unterstützende Dienste
 FHEM/98_FReplacer.pm         StefanStrobel        Sonstiges

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: module test framework (fhem.pl -t / FhemTestUtils)
  - change:  00_MYSENSORS: apply some PBP recommendations,
                   integrate libs from fib/Device/MySensors
  - feature: 10_MYSENSORS_DEVICE: PBP, see 00_MYSENSORS;

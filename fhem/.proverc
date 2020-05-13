@@ -1,0 +1,1 @@
+--exec 'perl fhem.pl -t'
