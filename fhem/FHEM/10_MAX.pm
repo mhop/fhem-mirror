@@ -379,23 +379,18 @@ sub MAX_TypeToTypeId
   return 0;
 }
 
-
 sub MAX_CheckIODev
 {
   my $hash = shift;
-  return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
+    return 'device has no valid IODev' if (!exists($hash->{IODev}));
+    return 'device IODev has no TYPE' if (!exists($hash->{IODev}{TYPE}));
+    return 'device IODev TYPE must be CUL_MAX or MAXLAN' if ($hash->{IODev}{TYPE} ne 'MAXLAN' && $hash->{IODev}{TYPE} ne 'CUL_MAX');
+    return 'can not send a command with this IODev (missing IODev->Send)'  if (!exists($hash->{IODev}{Send}));
+    return 'ok';
 }
 
 # Print number in format "0.0", pass "on" and "off" verbatim, convert 30.5 and 4.5 to "on" and "off"
 # Used for "desiredTemperature", "ecoTemperature" etc. but not "temperature"
-
-#sub MAX_SerializeTemperature($)
-#{
-  #if (($_[0] eq  "on") || ($_[0] eq "off"))  { return $_[0]; } 
-  #elsif($_[0] == 4.5)                        { return "off"; } 
-  #elsif($_[0] == 30.5)                       { return "on"; } 
-  #return sprintf("%2.1f",$_[0]);
-#}
 
 sub MAX_SerializeTemperature
 {
@@ -403,7 +398,7 @@ sub MAX_SerializeTemperature
  return $t    if ( $t =~ /^(on|off)$/ );
  return 'off' if ( $t ==  4.5 );
  return 'on'  if ( $t == 30.5 );
- return sprintf("%2.1f", $t);
+ return sprintf('%2.1f', $t);
 }
 
 sub MAX_Validate # Todo : kann das weg ?
@@ -645,12 +640,13 @@ sub MAX_Set
     return CommandRename(undef,$devname.' '.$newName);
   }
 
-  $ret = 'invalid_IODev' if (MAX_CheckIODev($hash));
-  return "$ret:noArg"  if ($ret);
-  $ret = 'can_not_set_without_IODev' if (!exists($hash->{IODev}));
-  return "$ret:noArg"  if ($ret);
-  $ret = 'can_not_send_with_IODev'   if (!exists($hash->{IODev}{Send}));
-  return "$ret:noArg"  if ($ret);
+    if ($setting ne '?') {
+	my $error =  MAX_CheckIODev($hash);
+	if ($error ne 'ok') {
+	    Log3($hash, 2, "$devname, $error");
+	    return $error;
+	}
+    }
 
   if($setting eq 'desiredTemperature' and $hash->{type} =~ /.*Thermostat.*/) 
   {
