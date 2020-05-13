@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  00_MYSENSORS: apply some PBP recommendations,
+                  integrate libs from fib/Device/MySensors
+ - feature: 10_MYSENSORS_DEVICE: PBP, see 00_MYSENSORS;
+                  expand getter feedback, shorten list info (no static info)
  - change:  93_Log2Syslog: add device in check message by attr 'exclErrCond'
  - feature: 57_Calendar: new attribute delay
  - feature: 72_XiaomiDevice: supporting EvpHumidifier and AirPurifier3H
