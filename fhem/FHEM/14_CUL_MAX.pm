@@ -78,8 +78,11 @@ my %msgId2Cmd = (
 
 my %msgCmd2Id = reverse %msgId2Cmd;
 
-my $defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
+my $defaultWeekProfile = '444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520';
+
 sub CUL_MAX_ParseTemperature  { return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]); }
+
+sub CUL_MAX_validTemperature  { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] =~ /^\d+(\.[05])?$/ && $_[0] >= 4.5 && $_[0] <= 30.5); }
 
 my $ackTimeout      = 3; # seconds
 my $maxRetryCnt     = 3;
@@ -215,7 +218,7 @@ sub CUL_MAX_updateConfig
   }# use IOdev
 
   #This interface is shared with 00_MAXLAN.pm
-  $hash->{Send} = \&CUL_MAX_Send;
+  #$hash->{Send} = \&CUL_MAX_Send;
 
   #Start broadcasting time after 30 seconds, so there is enough time to parse the config
   InternalTimer(gettimeofday()+30, "CUL_MAX_BroadcastTime", $hash, 0);
@@ -260,6 +263,7 @@ sub CUL_MAX_Define
   $hash->{LASTInputDev} = '';
   $hash->{'.culids'}    = '';
   $hash->{SVN}          = (qw($Id$))[2];
+  $hash->{Send} 	= \&CUL_MAX_Send;
 
   $modules{CUL_MAX}{defptr} = $hash;
 
@@ -487,7 +491,7 @@ sub CUL_MAX_Set
     elsif ($cmd eq 'fakeWT') 
     {
       return $name.', invalid number of arguments for '.$cmd if (@args != 3);
-      return $name.', desiredTemperature is invalid' if (!validTemperature($args[1]));
+      return $name.', desiredTemperature is invalid' if (!CUL_MAX_validTemperature($args[1]));
       return $name.',invalid fakeWTaddr attribute set (must not be 000000)' if (AttrVal($name,'fakeWTaddr','') eq '000000');
 
       #Valid range for measured temperature is 0 - 51.1 degree
