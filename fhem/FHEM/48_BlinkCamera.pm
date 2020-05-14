@@ -39,9 +39,10 @@
 #   ensure networks retrieved in docmd before other cmds
 #   parse networks
 # 2.0 2020-05-13 CheckIn to SVN for regular FHEM update
+#
 #   use DevIo according to commit hook
-# 
-# 
+#   fix videodelete according to msg1053993
+#   fix videodelete filename (change path to _)
 # 
 # 
 ##############################################################################
@@ -55,7 +56,6 @@
 #   might need to check for transaction id on command post
 #   store poll failures / digest?
 #   allow thumbnailreset
-#   remove video file
 #   
 ##############################################################################
 # Ideas
@@ -810,6 +810,11 @@ my $uid_key = join "", map { unpack "H*", chr(rand(256)) } 1..8;
         my $filename = BlinkCamera_ReplacePattern( $BlinkCamera_videofile, $vid, $name );
         my $proxyDir = AttrVal($name,"proxyDir","/tmp/");
 
+        # normalize URL separator / into _
+        $filename =~ s/\//_/g;
+
+        Log3 $name, 4, "BlinkCamera_DoCmd $name: deleting $filename in $proxyDir "; 
+
         eval { unlink $proxyDir."/".$filename; } if ( -e $proxyDir."/".$filename );
         Log3 $name, 2, "BlinkCamera_DoCmd $name: video file $filename could not be deleted :$@: " if $@; 
       }
@@ -817,7 +822,7 @@ my $uid_key = join "", map { unpack "H*", chr(rand(256)) } 1..8;
       if ( defined( $vid ) ) {
         $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v2/videos/delete";
+        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v3/videos/delete";
         $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_deleteVideojson;
         $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$vid/g;
 
