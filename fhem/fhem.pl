@@ -6086,7 +6086,10 @@ prepareFhemTestFile()
   return if($ARGV[0] ne "-t" || @ARGV < 2);
   shift @ARGV;
 
-  return if($ARGV[0] !~ m,^(.*?)([^/]+)\.t$,);
+  if($ARGV[0] !~ m,^(.*?)([^/]+)\.t$, || !-r $ARGV[0]) {
+    print STDERR "Need a .t file as argument for -t\n";
+    exit(1);
+  }
   my ($dir, $fileBase) = ($1, $2);
 
   $fhemTestFile = $ARGV[0];
