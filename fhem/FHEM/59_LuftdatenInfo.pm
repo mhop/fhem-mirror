@@ -721,7 +721,7 @@ sub LuftdatenInfo_statusRequest($) {
       <li>
         <code>interval &lt;seconds&gt;</code><br>
         Interval in seconds in which queries are performed.<br>
-        The default and minimum value is 300 seconds.
+        The default and minimum value is 300 seconds for remote request and 30 seconds for local requests.
       </li>
       <li>
         <code>timeout &lt;seconds&gt;</code><br>
@@ -904,7 +904,7 @@ sub LuftdatenInfo_statusRequest($) {
       <li>
         <code>interval &lt;seconds&gt;</code><br>
         Intervall in Sekunden in dem Abfragen durchgef&uuml;hrt werden.<br>
-        Der Vorgabe- und Mindestwert betr&auml;gt 300 Sekunden.
+        Der Vorgabe- und Mindestwert betr&auml;gt 300 Sekunden für remote Abfragen und 30 Sekunden für local Abfragen.
       </li>
       <li>
         <code>timeout &lt;seconds&gt;</code><br>
