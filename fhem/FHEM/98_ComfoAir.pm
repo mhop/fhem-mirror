@@ -40,6 +40,8 @@
 #   2016-11-13  korrektur bei set / get / readanswer. Set liefert bei Erfolg undef statt Text
 #   2017-02-12  Doku ergänzt
 #   2017-05-09  Text-Kodierung für summary korrigiert
+#   2020-05-07  fixed log level of debug massages in get function
+#   2020-05-15  fix uppercase hex strings in %parseInfo, use DevIo
 #
 #
 # Todo / Ideas:
@@ -48,6 +50,9 @@
 package main;
 
 use strict;
+
+use DevIo;
+
 use warnings;
 use Time::HiRes qw( time );
 
@@ -67,7 +72,7 @@ sub ComfoAir_HandleSendQueue($);
 sub ComfoAir_SendAck($);
 sub ComfoAir_TimeoutSend($);
 
-my $ComfoAir_Version = '1.51 - 9.5.2017';
+my $ComfoAir_Version = '1.52 - 15.5.2020';
 
 # %parseInfo:
 # replyCode => msgHashRef
@@ -85,12 +90,12 @@ my %parseInfo = (
                   request => "0001", 
                 },                              
                                
-    "001A"  =>  { unpack   => "C",
+    "001a"  =>  { unpack   => "C",
                   name     => "Test-Modus-Aus",
                   request => "0019", 
                 },  
                  
-    "FF09"  =>  { unpack   => "C",   
+    "ff09"  =>  { unpack   => "C",   
                   name     => "Klappen setzen",     
                   readings => [ { name => "Bypass",
                                   map => "1:offen, 0:geschlossen, 3:stop",
@@ -250,8 +255,6 @@ ComfoAir_Initialize($)
 {
     my ($hash) = @_;
 
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
     $hash->{ReadFn}  = "ComfoAir_Read";
     $hash->{ReadyFn} = "ComfoAir_Ready";
     $hash->{DefFn}   = "ComfoAir_Define";
@@ -391,7 +394,7 @@ ComfoAir_Get($@)
     if (defined($getHash{$getName})) {
         # get Option für Reading aus parseInfo -> generische Verarbeitung
         my $msgHash = $getHash{$getName}{msgHash};  # Hash für die Nachricht aus parseInfo
-        Log3 $name, 3, "$name: Request found in getHash created from parseInfo data";
+        Log3 $name, 5, "$name: Request found in getHash created from parseInfo data";
         if ($msgHash->{request}) {
             ComfoAir_Send($hash, $msgHash->{request}, "", $msgHash->{replyCode}, 1);
             my ($err, $result) = ComfoAir_ReadAnswer($hash, $getName, $msgHash->{replyCode});
