@@ -570,7 +570,7 @@ sub Read {                                                  ## no critic 'comple
   
   if($data) {                                                           # parse Payload 
       my (@load,$ocount,$msg,$tail);
-      if($data =~ /^(?<ocount>(\d+))\s(?<tail>(.*))/sx) {               # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      if($data =~ /^(?<ocount>(\d+?))\s(?<tail>(.*))/sx) {              # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
           use bytes;
           my $i   = 0;
@@ -589,7 +589,7 @@ sub Read {                                                  ## no critic 'comple
           Log3slog ($hash, 5, "Log2Syslog $name -> LENGTH_MSG$i: ".length($msg)); 
           Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i      : $tail");
           
-          while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>(.*))/sx) {
+          while($tail && $tail =~ /^(?<ocount>(\d+?))\s(?<tail>(.*))/sx) {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
