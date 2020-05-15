@@ -40,9 +40,9 @@ use POSIX;
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use Encode qw(encode_utf8 decode_utf8);
-eval "use IO::Socket::INET;1"                                         or my $MissModulSocket = "IO::Socket::INET";   ## no critic 
-eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom   = "Net::Domain";        ## no critic 
-eval "use FHEM::Meta;1"                                               or my $modMetaAbsent   = 1;                    ## no critic 
+eval "use IO::Socket::INET;1"                                         or my $MissModulSocket = "IO::Socket::INET";   ## no critic 'eval'
+eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $MissModulNDom   = "Net::Domain";        ## no critic 'eval'
+eval "use FHEM::Meta;1"                                               or my $modMetaAbsent   = 1;                    ## no critic 'eval'
 use GPUtils qw(GP_Import GP_Export);
 
 # Run before module compilation
@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.2" => "15.05.2020  permit content of 'exclErrCond' to fhemLog strings ",
   "5.12.1" => "12.05.2020  add dev to check regex of 'exclErrCond' ",
   "5.12.0" => "16.04.2020  improve IETF octet count again, internal code changes for PBP ",
   "5.11.0" => "14.04.2020  switch to packages, improve IETF octet count ",
@@ -526,7 +527,7 @@ return;
 #
 ########################################################################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub Read {
+sub Read {                                                  ## no critic 'complexity'
   my ($hash,$reread) = @_;
   my $socket         = $hash->{SERVERSOCKET};
   
@@ -569,7 +570,7 @@ sub Read {
   
   if($data) {                                                           # parse Payload 
       my (@load,$ocount,$msg,$tail);
-      if($data =~ /^(?<ocount>(\d+))\s(?<tail>.*)/sx) {                  # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
+      if($data =~ /^(?<ocount>(\d+?))\s(?<tail>(.*))/sx) {              # Syslog Sätze mit Octet Count -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
           Log3slog ($hash, 4, "Log2Syslog $name - Datagramm with Octet Count detected - prepare message for Parsing ... \n");          
           use bytes;
           my $i   = 0;
@@ -588,7 +589,7 @@ sub Read {
           Log3slog ($hash, 5, "Log2Syslog $name -> LENGTH_MSG$i: ".length($msg)); 
           Log3slog ($hash, 5, "Log2Syslog $name -> TAIL$i      : $tail");
           
-          while($tail && $tail =~ /^(?<ocount>(\d+))\s(?<tail>.*)/sx) {
+          while($tail && $tail =~ /^(?<ocount>(\d+?))\s(?<tail>(.*))/sx) {
               $i++;
               $ocount = $+{ocount};
               $tail   = $+{tail};
@@ -662,7 +663,7 @@ return;
 #   (sSiehe auch "list TYPE=FHEMWEB", bzw. "man -s2 accept")
 # 
 ###############################################################################
-sub getIfData {
+sub getIfData {                                                     ## no critic 'complexity'
   my ($hash,$len,$mlen,$reread) = @_;
   my $name                      = $hash->{NAME};
   my $socket                    = $hash->{SERVERSOCKET};
@@ -796,7 +797,7 @@ return ($st,undef,$hash);
 #                Parsen Payload für Syslog-Server
 #                (im Collector Model)
 ###############################################################################
-sub parsePayload { 
+sub parsePayload {                                           ## no critic 'complexity'
   my ($hash,$data) = @_;
   my $name         = $hash->{NAME};
   my $pp           = AttrVal($name, "parseProfile", $hash->{PROFILE});
@@ -1154,7 +1155,7 @@ sub parsePayload {
           my $SDFIELD = "";
           my $IGNORE  = 0;
 
-          eval $parseFn;                                        ##no critic
+          eval $parseFn;                                        ## no critic 'eval'
           if($@) {
               Log3slog ($hash, 2, "Log2Syslog $name -> error parseFn: $@"); 
               $err = 1;
@@ -1419,7 +1420,7 @@ return;
 ###############################################################################
 #                                    Get
 ###############################################################################
-sub Get {
+sub Get {                                             ## no critic 'complexity'
   my ($hash, @a) = @_;
   return "\"get X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -1533,7 +1534,9 @@ return;
 }
 
 ###############################################################################
-sub Attr {
+#      Attr
+###############################################################################
+sub Attr {                                            ## no critic 'complexity'
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$st);
@@ -1709,7 +1712,7 @@ return ($reading, $value, $unit);
 #################################################################################
 #                               Eventlogging
 #################################################################################
-sub eventLog {
+sub eventLog {                                          ## no critic 'complexity'
   # $hash is my entry, $dev is the entry of the changed device
   my ($hash,$dev) = @_;
   my $name    = $hash->{NAME};
@@ -1923,7 +1926,7 @@ return($txt);
 ###############################################################################
 #                        erstelle Socket 
 ###############################################################################
-sub openSocket { 
+sub openSocket {                                      ## no critic 'complexity'
   my ($hash,$supresslog)   = @_;
   my $name     = $hash->{NAME};
   my $protocol = lc(AttrVal($name, "protocol", "udp"));
@@ -1955,7 +1958,7 @@ sub openSocket {
       $attr{$name}{protocol} = "TCP" if(AttrVal($name, "protocol", "UDP") ne "TCP");
       $sslver  = "n.a.";
       $sslalgo = "n.a.";
-      eval "use IO::Socket::SSL";                                ##no critic
+      eval "use IO::Socket::SSL";                                ## no critic 'eval'
       if($@) {
           $st = "$@";
       } else {
@@ -2106,7 +2109,7 @@ sub setPrival {
   # https://tools.ietf.org/pdf/rfc5424.pdf
   
   # determine facility
-  my $fac = 5;                                     # facility by syslogd
+  my $fac = 5;                                                                # facility by syslogd
   
   # calculate severity
   # mapping verbose level to severity
@@ -2117,9 +2120,9 @@ sub setPrival {
   # 4: Informational   -> 6
   # 5: Debug           -> 7
   
-  my $sv = 5;                                      # notice (default)
+  my $sv = 5;                                                                 # notice (default)
   
-  if ($vbose) {
+  if (defined $vbose) {
       # map verbose to severity 
       $sv = 2 if ($vbose == 0);
       $sv = 3 if ($vbose == 1);
@@ -2129,7 +2132,7 @@ sub setPrival {
       $sv = 7 if ($vbose == 5);
   }
   
-  if (lc($txt) =~ m/error/) {                      # error condition und exludes anwenden
+  if ( lc($txt) =~ m/error/ || (defined $vbose && $vbose =~ /[01]/) ) {       # error condition und exludes anwenden
       $do = 1;
       my $ees = AttrVal($name, "exclErrCond", "");
       if($ees) {
@@ -2144,10 +2147,11 @@ sub setPrival {
               $do = 0 if($txt =~ m/$e/);        
           }
       }
-      $sv = 3 if($do); 
+      $sv = 3 if(!defined $vbose && $do);
+      $sv = 5 if(defined  $vbose && !$do);                                    # Severity bei fhemLog Einträgen verbose 1 zu 'Notice' ändern
   }  
                
-  $sv = 4 if (lc($txt) =~ m/warning/);            # warning conditions
+  $sv = 4 if (lc($txt) =~ m/warning/);                                        # warning conditions
   
   $prival   = ($fac*8)+$sv;
   $sevAstxt = $Log2Syslog_Severity{$sv};
@@ -2180,7 +2184,7 @@ sub setPayload {
       $month  = $Log2Syslog_BSDMonth{$month};                # Monatsmapping, z.B. 01 -> Jan
       $day    =~ s/0/ / if($day =~ m/^0.*$/x);               # in Tagen < 10 muss 0 durch Space ersetzt werden
       my $tag = substr($ident,0, $RFC3164len{TAG});          # Länge TAG Feld begrenzen
-      no warnings 'uninitialized';                           ##no critic
+      no warnings 'uninitialized';                           ## no critic 'warnings'
       $tag  = $tag."[$pid]: ".$cdl;                          # TAG-Feld um PID und Content-Delimiter ergänzen
       $data = "<$prival>$month $day $time $myhost $tag$otp";
       use warnings;
@@ -2202,7 +2206,7 @@ sub setPayload {
       $mid    = substr($mid,0,    ($RFC5425len{MID}-1));
       $myfqdn = substr($myfqdn,0, ($RFC5425len{HST}-1));
       
-      no warnings 'uninitialized';                          ##no critic
+      no warnings 'uninitialized';                          ## no critic 'warnings'
       if ($IETFver == 1) {
           $data = "<$prival>$IETFver $tim $myfqdn $ident $pid $mid $sdfield $cdl$otp";
       }
@@ -2211,7 +2215,7 @@ sub setPayload {
   
   if($data =~ /\s$/x) {$data =~ s/\s$//x;}
   $data = $data."\n";
-  my $dl = length($data);                               # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
+  my $dl = length($data);                                   # Länge muss ! für TLS stimmen, sonst keine Ausgabe !
   
   # wenn Transport Layer Security (TLS) -> Transport Mapping for Syslog https://tools.ietf.org/pdf/rfc5425.pdf
   # oder Octet counting -> Transmission of Syslog Messages over TCP https://tools.ietf.org/html/rfc6587
@@ -2346,7 +2350,7 @@ sub evalPeer {
   } 
   my ($phost,$paddr,$pport, $pipaddr);
   
-  no warnings 'uninitialized';                 ##no critic
+  no warnings 'uninitialized';                 ## no critic 'warnings'
   if($protocol =~ /tcp/) {
       $pipaddr = $hash->{HELPER}{TCPPADDR};    # gespeicherte IP-Adresse 
       $phost = $hash->{HIPCACHE}{$pipaddr};    # zuerst IP/Host-Kombination aus Cache nehmen falls vorhanden     
@@ -2444,7 +2448,7 @@ sub setVersionInfo {
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');         ## no critic                                        
+          use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');         ## no critic 'VERSION'                                      
       }
   } else {                                                                            # herkömmliche Modulstruktur
       $hash->{VERSION} = $v;
@@ -2852,9 +2856,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 attr &lt;name&gt; exclErrCond Error: none, 
                         Errorcode: none,
                         Dum.Energy PV: 2853.0,, Error: none,
-                        .*Seek_Error_Rate_.*,
-                        .*Raw_Read_Error_Rate_.*,
-                        .*sabotageError:.*,
+                        Seek_Error_Rate_,
+                        Raw_Read_Error_Rate_,
+                        sabotageError:,
         </pre>
     </li>
     </ul>
@@ -3626,9 +3630,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 attr &lt;name&gt; exclErrCond Error: none, 
                         Errorcode: none,
                         Dum.Energy PV: 2853.0,, Error: none,
-                        .*Seek_Error_Rate_.*,
-                        .*Raw_Read_Error_Rate_.*,
-                        .*sabotageError:.*,
+                        Seek_Error_Rate_,
+                        Raw_Read_Error_Rate_,
+                        sabotageError:,
         </pre>
     </li>
     </ul>
