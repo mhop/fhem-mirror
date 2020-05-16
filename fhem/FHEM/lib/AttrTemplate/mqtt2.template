@@ -1902,6 +1902,29 @@ deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shellyflood
 
+# shellydw using original firmware
+# contributed by majestro84, https://forum.fhem.de/index.php/topic,94060.msg1054466.html#msg1054466
+name:shellydw
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shellydw using original firmware
+order:A_16b
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal("DEVICE","icon","fts_window_1w_open") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon open:fts_window_1w_open@red tilted:fts_window_1w_tilt@yellow closed:fts_window_1w@green
+attr DEVICE readingList shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/sensor/state:.* doorWindow\
+  shellies/DEVNAME/sensor/tilt:.* tilt\
+  shellies/DEVNAME/sensor/vibration:.* vibration\
+  shellies/DEVNAME/sensor/lux:.* lux\
+  shellies/DEVNAME/sensor/battery:.* batteryPercent\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
+attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt","") ? 'tilted' :'open' }
+attr DEVICE model shellydw
+
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
 # shellyrgbw2 color mode
