@@ -145,7 +145,6 @@ sub myrename($$$);
 sub notifyRegexpChanged($$);
 sub parseParams($;$$$);
 sub prepareFhemTestFile();
-sub execFhemTestFile();
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
