@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.12";
+my $version = "2.13";
 
 #-- these we may get on request
 my %gets = (
@@ -726,7 +726,7 @@ sub Shelly_Set ($@) {
       my $red=hex(substr($value,0,2));
       my $green=hex(substr($value,2,2));
       my $blue=hex(substr($value,4,2));
-      my $white=hex(substr($value,4,2));
+      my $white=hex(substr($value,6,2));
       $cmd=sprintf("red=%d&green=%d&blue=%d&white=%d",$red,$green,$blue,$white);
       Shelly_dim($hash,"color/0","?".$cmd);
     }elsif( $cmd eq "white" ){
