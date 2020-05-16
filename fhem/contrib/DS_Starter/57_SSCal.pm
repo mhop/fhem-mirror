@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 57_SSCal.pm 21499 2020-03-24 10:08:20Z DS_Starter $
+# $Id: 57_SSCal.pm 21776 2020-04-25 19:53:14Z DS_Starter $
 #########################################################################################################################
 #       57_SSCal.pm
 #
@@ -29,15 +29,16 @@
 # 
 # Example: define SynCal SSCal 192.168.2.20 [5000] [HTTP(S)]
 #
-
-package main;
+package FHEM::SSCal;                                              ## no critic 'package'
 
 use strict;                           
 use warnings;
 eval "use JSON;1;" or my $SSCalMM = "JSON";                       ## no critic 'eval' # Debian: apt-get install libjson-perl
 use Data::Dumper;                                                 # Perl Core module
+use GPUtils qw(GP_Import GP_Export);                              # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use MIME::Base64;
-use Time::HiRes;
+use POSIX qw(strftime);
+use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
 use Encode;
 use Blocking;
@@ -46,8 +47,71 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                 ## no critic '
                                                     
 # no if $] >= 5.017011, warnings => 'experimental';
 
+# Run before module compilation
+BEGIN {
+  # Import from main::
+  GP_Import( 
+      qw(
+          AnalyzePerlCommand
+          asyncOutput
+          AttrVal
+          BlockingCall
+          BlockingKill
+          CancelDelayedShutdown
+          CommandSet
+          CommandAttr
+          CommandDelete
+          CommandDefine
+          CommandGet
+          CommandSetReading
+          CommandTrigger
+          data
+          defs
+          devspec2array
+          fhemTimeLocal
+          FmtDateTime
+          FmtTime
+          FW_makeImage
+          getKeyValue
+          HttpUtils_NonblockingGet
+          init_done
+          InternalTimer
+          IsDisabled
+          Log3 
+          modules
+          readingFnAttributes          
+          ReadingsVal
+          RemoveInternalTimer
+          readingsDelete 
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged 
+          readingsEndUpdate
+          readingsSingleUpdate
+          ReadingsTimestamp           
+          sortTopicNum
+          setKeyValue
+          TimeNow          
+        )
+  );
+  
+  # Export to main context with different name
+  #     my $pkg  = caller(0);
+  #     my $main = $pkg;
+  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/gx;
+  #     foreach (@_) {
+  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
+  #     }
+  GP_Export(
+      qw(
+          Initialize
+        )
+  );  
+}
+
 # Versions History intern
-my %SSCal_vNotesIntern = (
+my %vNotesIntern = (
+  "2.4.0"  => "16.05.2020  more changes according to PBP, switch to packages, fix cannot delete (and display in table) EventId of block 0 ",
   "2.3.0"  => "25.04.2020  set compatibility to Calendar package 2.3.4-0631, some changes according to PBP ",
   "2.2.3"  => "24.03.2020  minor code change ",
   "2.2.2"  => "08.03.2020  review commandref ",
@@ -59,20 +123,20 @@ my %SSCal_vNotesIntern = (
   "1.14.0" => "23.02.2020  new setter \"calUpdate\" consistent for both models, calEventList and calToDoList are obsolete ",
   "1.13.0" => "22.02.2020  manage recurring entries if one/more of a series entry is deleted or changed and their reminder times ",
   "1.12.0" => "15.02.2020  create At-devices from calendar entries if FHEM-commands or Perl-routines detected in \"Summary\", minor fixes ", 
-  "1.11.0" => "14.02.2020  new function SSCal_doCompositeEvents to create Composite Events for special notify use in FHEM ",
+  "1.11.0" => "14.02.2020  new function doCompositeEvents to create Composite Events for special notify use in FHEM ",
   "1.10.0" => "13.02.2020  new key cellStyle for attribute tableSpecs, avoid FHEM crash when are design failures in tableSpecs ",
   "1.9.0"  => "11.02.2020  new reading Weekday with localization, more field selection for overview table ",
-  "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub SSCal_evalTableSpecs , fix no table is shown after FHEM restart ",
+  "1.8.0"  => "09.02.2020  evaluate icons for DaysLeft, Map and State in sub evalTableSpecs , fix no table is shown after FHEM restart ",
   "1.7.0"  => "09.02.2020  respect global language setting for some presentation, new attributes tableSpecs & tableColumnMap, days left in overview ".
                            "formatting overview table, feature smallScreen for tableSpecs, rename attributes to tableFields, ".
-                           "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API, function SSCal_boolean ".
+                           "tableInDetail, tableInRoom, correct enddate/time if is_all_day incl. bugfix API, function boolean ".
                            "to avoid fhem crash if an older JSON module is installed ",
   "1.6.1"  => "03.02.2020  rename attributes to \"calOverviewInDetail\",\"calOverviewInRoom\", bugfix of gps extraction ",
   "1.6.0"  => "03.02.2020  new attribute \"tableFields\" to show specified fields in calendar overview in detail/room view, ".
                            "Model Diary/Tasks defined, periodic call of ToDo-Liists now possible ",
   "1.5.0"  => "02.02.2020  new attribute \"calOverviewInDetail\",\"calOverviewInRoom\" to control calendar overview in room or detail view ",
-  "1.4.0"  => "02.02.2020  get calAsHtml command or use sub SSCal_calAsHtml(\$name) ",
-  "1.3.1"  => "01.02.2020  add SSCal_errauthlist hash for login/logout API error codes ",
+  "1.4.0"  => "02.02.2020  get calAsHtml command or use sub calAsHtml(\$name) ",
+  "1.3.1"  => "01.02.2020  add errauthlist hash for login/logout API error codes ",
   "1.3.0"  => "01.02.2020  new command \"cleanCompleteTasks\" to delete completed tasks, \"deleteEventId\" to delete an event id, ".
                            "new get command \"apiInfo\" - detect and show API info, avoid empty readings ",
   "1.2.0"  => "29.01.2020  get tasks from calendar with set command 'calToDoList' ",
@@ -95,28 +159,28 @@ my %SSCal_vNotesIntern = (
 );
 
 # Versions History extern
-my %SSCal_vNotesExtern = (
+my %vNotesExtern = (
   "2.3.0"  => "25.04.2020  The module compatibility is set to Synology Calendar package 2.3.4-0631. ",
   "1.0.0"  => "18.12.2019  initial "
 );
 
 # Hints EN
-my %SSCal_vHintsExt_en = (
+my %vHintsExt_en = (
   "1" => "The module implements the Internet Calendaring and Scheduling Core Object Specification (iCalendar) ".
          "according to <a href=\"https://tools.ietf.org/html/rfc5545\">RFC5545</a>. "
 );
 
 # Hints DE
-my %SSCal_vHintsExt_de = (
+my %vHintsExt_de = (
   "1" => "Das Modul implementiert die Internet Calendaring and Scheduling Core Object Specification (iCalendar) ".
          "gemäß <a href=\"https://tools.ietf.org/html/rfc5545\">RFC5545</a>. "
 );
 
 # Hash der API-Seiten
-use vars qw(%SSCal_api);
+use vars qw(%api);
 
 # Aufbau Errorcode-Hashes
-my %SSCal_errauthlist = (
+my %errauthlist = (
   400 => "No such account or the password is incorrect",
   401 => "Account disabled",
   402 => "Permission denied",
@@ -124,7 +188,7 @@ my %SSCal_errauthlist = (
   404 => "Failed to authenticate 2-step verification code",
 );
 
-my %SSCal_errlist = (
+my %errlist = (
   100 => "Unknown error",
   101 => "No parameter of API, method or version",
   102 => "The requested API does not exist - may be the Synology Calendar package is stopped",
@@ -170,20 +234,20 @@ my %SSCal_errlist = (
 );
 
 ################################################################
-sub SSCal_Initialize {
+sub Initialize {
  my ($hash) = @_;
- $hash->{DefFn}                 = "SSCal_Define";
- $hash->{UndefFn}               = "SSCal_Undef";
- $hash->{DeleteFn}              = "SSCal_Delete"; 
- $hash->{SetFn}                 = "SSCal_Set";
- $hash->{GetFn}                 = "SSCal_Get";
- $hash->{AttrFn}                = "SSCal_Attr";
- $hash->{DelayedShutdownFn}     = "SSCal_DelayedShutdown";
+ $hash->{DefFn}                 = \&Define;
+ $hash->{UndefFn}               = \&Undef;
+ $hash->{DeleteFn}              = \&Delete; 
+ $hash->{SetFn}                 = \&Set;
+ $hash->{GetFn}                 = \&Get;
+ $hash->{AttrFn}                = \&Attr;
+ $hash->{DelayedShutdownFn}     = \&DelayedShutdown;
  
  # Darstellung FHEMWEB
- # $hash->{FW_summaryFn}        = "SSCal_FWsummaryFn";
+ # $hash->{FW_summaryFn}        = \&FWsummaryFn;
  $hash->{FW_addDetailToSummary} = 1 ;                       # zusaetzlich zu der Device-Summary auch eine Neue mit dem Inhalt von DetailFn angezeigt             
- $hash->{FW_detailFn}           = "SSCal_FWdetailFn";
+ $hash->{FW_detailFn}           = \&FWdetailFn;
  $hash->{FW_deviceOverview}     = 1;
  
  $hash->{AttrList} = "asyncMode:1,0 ".  
@@ -206,7 +270,7 @@ sub SSCal_Initialize {
                      "usedCalendars:--wait#for#Calendar#list-- ".
                      $readingFnAttributes;   
          
- eval { FHEM::Meta::InitMod( __FILE__, $hash ) };           # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+ FHEM::Meta::InitMod( __FILE__, $hash ) if(!$modMetaAbsent);  # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;   
 }
@@ -216,7 +280,7 @@ return;
 #                   [1]      [2]        [3]      [4]  
 #
 ################################################################
-sub SSCal_Define {
+sub Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
   
@@ -250,7 +314,7 @@ sub SSCal_Define {
   CommandAttr(undef,"$name room SSCal");
   CommandAttr(undef,"$name event-on-update-reading .*Summary,state");
   
-  %SSCal_api = (
+  %api = (
                "APIINFO"   => { "NAME" => "SYNO.API.Info"    },     # Info-Seite für alle API's, einzige statische Seite !                                                    
                "APIAUTH"   => { "NAME" => "SYNO.API.Auth"    },     # API used to perform session login and logout  
                "CALCAL"    => { "NAME" => "SYNO.Cal.Cal"     },     # API to manipulate calendar
@@ -260,10 +324,10 @@ sub SSCal_Define {
                );
 
   # Versionsinformationen setzen
-  SSCal_setVersionInfo($hash);
+  setVersionInfo($hash);
   
   # Credentials lesen
-  SSCal_getcredentials($hash,1,"credentials");
+  getcredentials($hash,1,"credentials");
   
   # Index der Sendequeue initialisieren
   $data{SSCal}{$name}{sendqueue}{index} = 0;
@@ -277,7 +341,7 @@ sub SSCal_Define {
   readingsEndUpdate           ($hash,1);              
 
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
-  SSCal_initonboot($name);
+  initOnBoot($name);
 
 return;
 }
@@ -292,7 +356,7 @@ return;
 # internen Timern, sofern diese im Modul zum Pollen verwendet 
 # wurden.
 ################################################################
-sub SSCal_Undef {
+sub Undef {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   
@@ -310,12 +374,12 @@ return;
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
-sub SSCal_DelayedShutdown {
+sub DelayedShutdown {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
   if($hash->{HELPER}{SID}) {
-      SSCal_logout($hash);                      # Session alter User beenden falls vorhanden  
+      logout($hash);                      # Session alter User beenden falls vorhanden  
       return 1;
   }
   
@@ -332,7 +396,7 @@ return 0;
 # FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 #################################################################
-sub SSCal_Delete {
+sub Delete {
   my ($hash, $arg) = @_;
   my $name  = $hash->{NAME};
   my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
@@ -344,7 +408,7 @@ return;
 }
 
 ################################################################
-sub SSCal_Attr {                                                  ## no critic 'complexity'
+sub Attr {                                                  ## no critic 'complexity'
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash  = $defs{$name};
     my $model = $hash->{MODEL};
@@ -357,15 +421,15 @@ sub SSCal_Attr {                                                  ## no critic '
     if ($cmd eq "set") {
         
         if ($aName =~ /filterCompleteTask|filterDueTask/x && $model ne "Tasks") {            
-            return " The attribute \"$aName\" is only valid for devices of MODEL \"Tasks\"! Please set this attribute in a device of this model.";
+            return qq{The attribute "$aName" is only valid for devices of MODEL "Tasks" ! Please set this attribute in a device of this MODEL.};
         }
         
         if ($aName =~ /showRepeatEvent/x && $model ne "Diary") {            
-            return " The attribute \"$aName\" is only valid for devices of MODEL \"Diary\"! Please set this attribute in a device of this model.";
+            return qq{The attribute "$aName" is only valid for devices of MODEL "Diary" ! Please set this attribute in a device of this MODEL.};
         }
         
         if ($aName =~ /tableSpecs/x) {            
-            return " The attribute \"$aName\" has wrong syntax. The value must be set into \"{ }\". " if($aVal !~ m/^\s*\{.*\}\s*$/s);
+            return qq{The attribute "$aName" has wrong syntax. The value must be set into "{ }".} if($aVal !~ m/^\s*\{.*\}\s*$/s);
         }
         
         my $attrVal = $aVal;
@@ -398,7 +462,7 @@ sub SSCal_Attr {                                                  ## no critic '
         if ($do == 1) {
             RemoveInternalTimer($name);
         } else {
-            InternalTimer(gettimeofday()+2, "SSCal_initonboot", $name, 0) if($init_done); 
+            InternalTimer(gettimeofday()+2, "FHEM::SSCal::initOnBoot", $name, 0) if($init_done); 
         }
     
         readingsBeginUpdate($hash); 
@@ -408,12 +472,12 @@ sub SSCal_Attr {                                                  ## no critic '
     
     if ($cmd eq "set") {
         if ($aName =~ m/timeout|cutLaterDays|cutOlderDays|interval/x) {
-            unless ($aVal =~ /^\d+$/x) { return "The Value for $aName is not valid. Use only figures 1-9 !";}
+            unless ($aVal =~ /^\d+$/x) { return qq{The value of $aName is not valid. Use only integers 1-9 !}; }
         }     
         if($aName =~ m/interval/x) {
-            RemoveInternalTimer($name,"SSCal_periodicCall");
+            RemoveInternalTimer($name,"FHEM::SSCal::periodicCall");
             if($aVal > 0) {
-                InternalTimer(gettimeofday()+1.0, "SSCal_periodicCall", $name, 0);
+                InternalTimer(gettimeofday()+1.0, "FHEM::SSCal::periodicCall", $name, 0);
             }
         }      
     }
@@ -422,7 +486,7 @@ return;
 }
 
 ################################################################
-sub SSCal_Set {                                                    ## no critic 'complexity'
+sub Set {                                                    ## no critic 'complexity'
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -442,7 +506,7 @@ sub SSCal_Set {                                                    ## no critic 
   # alle aktuell angezeigten Event Id's  ermitteln
   my (@idarray,$evids);
   for my $key (keys %{$defs{$name}{READINGS}}) {
-      next if $key !~ /^.*_EventId$/;
+      next if $key !~ /_EventId$/x;
       push (@idarray, $defs{$name}{READINGS}{$key}{VAL});   
   }
   
@@ -482,14 +546,14 @@ sub SSCal_Set {                                                    ## no critic 
                  ;
   }
  
-  if ($opt eq "credentials") {
+  if ($opt eq "credentials") {                                           ## no critic 'Cascading'
       return "The command \"$opt\" needs an argument." if (!$prop); 
-      SSCal_logout($hash) if($hash->{HELPER}{SID});                      # Session alter User beenden falls vorhanden      
-      ($success) = SSCal_setcredentials($hash,$prop,$prop1);
+      logout($hash) if($hash->{HELPER}{SID});                      # Session alter User beenden falls vorhanden      
+      ($success) = setcredentials($hash,$prop,$prop1);
       
       if($success) {
-          SSCal_addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
-          SSCal_getapisites($name);
+          addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
+          getApiSites($name);
           return "credentials saved successfully";
       } else {
           return "Error while saving credentials - see logfile for details";
@@ -562,7 +626,7 @@ sub SSCal_Set {                                                    ## no critic 
       Log3($name, 5, "$name - Calendar selection for add queue: ".join(',', @cas));
 
       if($model eq "Diary") {                                                 # Modell Terminkalender
-          my ($err,$tstart,$tend) = SSCal_timeEdge ($name);
+          my ($err,$tstart,$tend) = timeEdge ($name);
           if($err) {
               Log3($name, 2, "$name - ERROR in timestamp: $err");
             
@@ -578,8 +642,8 @@ sub SSCal_Set {                                                    ## no critic 
           }   
 
           my $lr = AttrVal($name,"showRepeatEvent", "true");
-          SSCal_addQueue($name,"eventlist","CALEVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
-          SSCal_getapisites($name);      
+          addQueue($name,"eventlist","CALEVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
+          getApiSites($name);      
       
       } else {                                                                # Modell Aufgabenliste
           my $limit          = "";                                            # Limit of matched tasks
@@ -587,8 +651,8 @@ sub SSCal_Set {                                                    ## no critic 
           my $filterdue      = AttrVal($name,"filterDueTask", 3);             # show tasks with and without due time
           my $filtercomplete = AttrVal($name,"filterCompleteTask", 3);        # show completed and not completed tasks
           
-          SSCal_addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
-          SSCal_getapisites($name);      
+          addQueue($name,"todolist","CALTODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
+          getApiSites($name);      
       }
   
   } elsif ($opt eq "cleanCompleteTasks") {                                                          # erledigte Aufgaben einer Cal_id (Liste) löschen     
@@ -620,9 +684,9 @@ sub SSCal_Set {                                                    ## no critic 
       
       Log3($name, 5, "$name - Calendar selection for add queue: $cals");
       
-      # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
-      SSCal_addQueue($name,"cleanCompleteTasks","CALTODO","clean_complete","&cal_id_list=[$oids]"); 
-      SSCal_getapisites($name);
+      # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+      addQueue($name,"cleanCompleteTasks","CALTODO","clean_complete","&cal_id_list=[$oids]"); 
+      getApiSites($name);
   
   } elsif ($opt eq "deleteEventId") {
       return "You must specify an event id (Reading EventId) what is to be deleted." if(!$prop);
@@ -633,11 +697,11 @@ sub SSCal_Set {                                                    ## no critic 
       my $bnr;
       my @allrds = keys%{$defs{$name}{READINGS}};
       for my $key(@allrds) {
-          next if $key !~ /^.*_EventId$/;
+          next if $key !~ /_EventId$/x;
           $bnr = (split("_", $key))[0] if($defs{$name}{READINGS}{$key}{VAL} == $eventid);   # Blocknummer ermittelt 
       }
       
-      return "The blocknumber of specified event id could not be identified. Make sure you have specified a valid event id." if(!$bnr);
+      return "The blocknumber of specified event id could not be identified. Make sure you have specified a valid event id." if(!defined $bnr);
 
       # die Summary zur Event Id ermitteln
       my $sum = ReadingsVal($name, $bnr."_01_Summary", "");
@@ -652,12 +716,12 @@ sub SSCal_Set {                                                    ## no critic 
       
       Log3($name, 3, "$name - The event \"$sum\" with id \"$eventid\" will be deleted in calendar \"$calname\".");
       
-      # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
-      SSCal_addQueue($name,"deleteEventId",$api,"delete","&evt_id=$eventid"); 
-      SSCal_getapisites($name);      
+      # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+      addQueue($name,"deleteEventId",$api,"delete","&evt_id=$eventid"); 
+      getApiSites($name);      
   
   } elsif ($opt eq "restartSendqueue") {
-      my $ret = SSCal_getapisites($name);
+      my $ret = getApiSites($name);
       if($ret) {
           return $ret;
       } else {
@@ -665,10 +729,10 @@ sub SSCal_Set {                                                    ## no critic 
       }
       
   } elsif ($opt eq 'eraseReadings') {       
-        SSCal_delReadings($name,0);                                                    # Readings löschen
+        delReadings($name,0);                                                    # Readings löschen
     
   } elsif ($opt eq 'logout') {      
-        SSCal_logout($hash);                                     
+        logout($hash);                                     
     
   } else {
       return "$setlist"; 
@@ -678,7 +742,7 @@ return;
 }
 
 ################################################################
-sub SSCal_Get {                                                                       ## no critic 'complexity'
+sub Get {                                                                       ## no critic 'complexity'
     my ($hash, @a) = @_;
     return "\"get X\" needs at least an argument" if ( @a < 2 );
     my $name = shift @a;
@@ -704,10 +768,10 @@ sub SSCal_Get {                                                                 
           
     return if(IsDisabled($name));             
               
-    if ($opt eq "storedCredentials") {
+    if ($opt eq "storedCredentials") {                                                ## no critic 'Cascading'
         if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials <CREDENTIALS>\"";}
         # Credentials abrufen
-        my ($success, $username, $passwd) = SSCal_getcredentials($hash,0,"credentials");
+        my ($success, $username, $passwd) = getcredentials($hash,0,"credentials");
         unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
         
         return "Stored Credentials:\n".
@@ -717,22 +781,22 @@ sub SSCal_Get {                                                                 
     
     } elsif ($opt eq "apiInfo") {                                                         # Liste aller Kalender abrufen
         # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        SSCal_getclhash($hash,1);
+        getclhash($hash,1);
         $hash->{HELPER}{APIPARSET} = 0;                                                   # Abruf API Infos erzwingen
 
-        # <Name, operation mode, API (siehe %SSCal_api), auszuführende API-Methode, spezifische API-Parameter>
-        SSCal_addQueue($name,"apiInfo","","","");            
-        SSCal_getapisites($name);
+        # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+        addQueue($name,"apiInfo","","","");            
+        getApiSites($name);
   
     } elsif ($opt eq "getCalendars") {                                                    # Liste aller Kalender abrufen
         # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        SSCal_getclhash($hash,1);
+        getclhash($hash,1);
         
-        SSCal_addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
-        SSCal_getapisites($name);
+        addQueue($name,"listcal","CALCAL","list","&is_todo=true&is_evt=true");            
+        getApiSites($name);
   
     } elsif ($opt eq "calAsHtml") {                                                    
-        my $out = SSCal_calAsHtml($name);
+        my $out = calAsHtml($name);
         return $out;
   
     } elsif ($opt =~ /versionNotes/x) {
@@ -741,7 +805,7 @@ sub SSCal_Get {                                                                 
         my %hs;
       
         # Ausgabetabelle erstellen
-        my ($ret,$val0,$val1);
+        my ($val0,$val1);
         my $i = 0;
       
         $ret  = "<html>";
@@ -756,20 +820,20 @@ sub SSCal_Get {                                                                 
                 my @hints = split(",",$arg);
                 for (@hints) {
                     if(AttrVal("global","language","EN") eq "DE") {
-                        $hs{$_} = $SSCal_vHintsExt_de{$_};
+                        $hs{$_} = $vHintsExt_de{$_};
                     } else {
-                        $hs{$_} = $SSCal_vHintsExt_en{$_};
+                        $hs{$_} = $vHintsExt_en{$_};
                     }
                 }                      
             } else {
                 if(AttrVal("global","language","EN") eq "DE") {
-                    %hs = %SSCal_vHintsExt_de;
+                    %hs = %vHintsExt_de;
                 } else {
-                    %hs = %SSCal_vHintsExt_en; 
+                    %hs = %vHintsExt_en; 
                 }
             }          
             $i = 0;
-            for my $key (SSCal_sortVersion("desc",keys %hs)) {
+            for my $key (sortVersion("desc",keys %hs)) {
                 $val0 = $hs{$key};
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
                 $ret .= "</tr>";
@@ -794,8 +858,8 @@ sub SSCal_Get {                                                                 
             $ret .= "<tbody>";
             $ret .= "<tr class=\"even\">";
             $i = 0;
-            for my $key (SSCal_sortVersion("desc",keys %SSCal_vNotesExtern)) {
-                ($val0,$val1) = split(/\s/,$SSCal_vNotesExtern{$key},2);
+            for my $key (sortVersion("desc",keys %vNotesExtern)) {
+                ($val0,$val1) = split(/\s/x,$vNotesExtern{$key},2);
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
                 $ret .= "</tr>";
                 $i++;
@@ -826,12 +890,12 @@ return $ret;                                                        # not genera
 ######################################################################################
 #                 Kalenderübersicht in Detailanzeige darstellen 
 ######################################################################################
-sub SSCal_FWdetailFn {
+sub FWdetailFn {
   my ($FW_wname, $d, $room, $pageHash) = @_;           
   my $hash = $defs{$d};
   my $ret  = "";
   
-  $hash->{".calhtml"} = SSCal_calAsHtml($d,$FW_wname);
+  $hash->{".calhtml"} = FHEM::SSCal::calAsHtml($d,$FW_wname);
 
   if($hash->{".calhtml"} ne "" && !$room && AttrVal($d,"tableInDetail",1)) {    # Anzeige Übersicht in Detailansicht
       $ret .= $hash->{".calhtml"};
@@ -849,17 +913,17 @@ return;
 ######################################################################################
 #                   initiale Startroutinen nach Restart FHEM
 ######################################################################################
-sub SSCal_initonboot {
+sub initOnBoot {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my ($ret);
   
-  RemoveInternalTimer($name, "SSCal_initonboot");
+  RemoveInternalTimer($name, "FHEM::SSCal::initOnBoot");
   
   if ($init_done) {
       CommandGet(undef, "$name getCalendars");                      # Kalender Liste initial abrufen     
   } else {
-      InternalTimer(gettimeofday()+3, "SSCal_initonboot", $name, 0);
+      InternalTimer(gettimeofday()+3, "FHEM::SSCal::initOnBoot", $name, 0);
   }
   
 return;
@@ -868,7 +932,7 @@ return;
 #############################################################################################
 #      regelmäßiger Intervallabruf
 #############################################################################################
-sub SSCal_periodicCall {
+sub periodicCall {
   my ($name)   = @_;
   my $hash     = $defs{$name};
   my $interval = AttrVal($name, "interval", 0);
@@ -884,14 +948,14 @@ sub SSCal_periodicCall {
       readingsEndUpdate   ($hash,1);
   }
   
-  RemoveInternalTimer($name,"SSCal_periodicCall");
+  RemoveInternalTimer($name,"FHEM::SSCal::periodicCall");
   return if(!$interval);
   
   if($hash->{CREDENTIALS} && !IsDisabled($name)) {
       CommandSet(undef, "$name calUpdate");                                                       # Einträge aller gewählter Kalender oder Aufgabenlisten abrufen (in Queue stellen)
   }
   
-  InternalTimer($new, "SSCal_periodicCall", $name, 0);
+  InternalTimer($new, "FHEM::SSCal::periodicCall", $name, 0);
     
 return;  
 }
@@ -900,12 +964,12 @@ return;
 #                            Eintrag zur SendQueue hinzufügen
 #    $name   = Name Kalenderdevice
 #    $opmode = operation mode
-#    $api    = API (siehe %SSCal_api)
+#    $api    = API (siehe %api)
 #    $method = auszuführende API-Methode 
 #    $params = spezifische API-Parameter 
 #
 ######################################################################################
-sub SSCal_addQueue {
+sub addQueue {
    my ($name,$opmode,$api,$method,$params) = @_;
    my $hash                = $defs{$name};
    
@@ -923,7 +987,7 @@ sub SSCal_addQueue {
                       
    $data{SSCal}{$name}{sendqueue}{entries}{$index} = $pars;  
 
-   SSCal_updQLength ($hash);                        # updaten Länge der Sendequeue     
+   updQLength ($hash);                        # updaten Länge der Sendequeue     
    
 return;
 }
@@ -937,7 +1001,7 @@ return;
 #                       1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
 #                            eventuell verzögert wiederholen)
 #############################################################################################
-sub SSCal_checkretry {  
+sub checkRetry {  
   my ($name,$retry) = @_;
   my $hash          = $defs{$name};  
   my $idx           = $hash->{OPIDX};
@@ -945,7 +1009,7 @@ sub SSCal_checkretry {
   
   if(!keys %{$data{SSCal}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
-      SSCal_updQLength ($hash);
+      updQLength ($hash);
       return;  
   } 
   
@@ -953,8 +1017,8 @@ sub SSCal_checkretry {
       delete $hash->{OPIDX};
       delete $data{SSCal}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
-      SSCal_updQLength ($hash);
-      return SSCal_getapisites($name);                              # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      updQLength ($hash);
+      return getApiSites($name);                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
   } else {                                                          # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
       $data{SSCal}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
@@ -964,8 +1028,8 @@ sub SSCal_checkretry {
       if($errorcode =~ /119/x) {
           delete $hash->{HELPER}{SID};
       }
-      if($errorcode =~ /100|101|103|117|120|407|409|800|900x/) {        # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
-          $forbidSend = SSCal_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
+      if($errorcode =~ /100|101|103|117|120|407|409|800|900/x) {        # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = experror($hash,$errorcode);                     # Fehlertext zum Errorcode ermitteln
           $data{SSCal}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
@@ -973,9 +1037,9 @@ sub SSCal_checkretry {
           delete $hash->{OPIDX};
           delete $hash->{OPMODE};
           
-          SSCal_updQLength ($hash);                                 # updaten Länge der Sendequeue
+          updQLength ($hash);                                 # updaten Länge der Sendequeue
           
-          return SSCal_getapisites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
+          return getApiSites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
       if(!$forbidSend) {
@@ -997,10 +1061,10 @@ sub SSCal_checkretry {
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
           
           my $rst = gettimeofday()+$rs;                            # resend Timer 
-          SSCal_updQLength ($hash,$rst);                           # updaten Länge der Sendequeue mit resend Timer
+          updQLength ($hash,$rst);                           # updaten Länge der Sendequeue mit resend Timer
           
-          RemoveInternalTimer($name, "SSCal_getapisites");
-          InternalTimer($rst, "SSCal_getapisites", "$name", 0);
+          RemoveInternalTimer($name, "FHEM::SSCal::getApiSites");
+          InternalTimer($rst, "FHEM::SSCal::getApiSites", "$name", 0);
       }
   }
 
@@ -1010,7 +1074,7 @@ return;
 #############################################################################################################################
 #######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
 #############################################################################################################################
-sub SSCal_getapisites {
+sub getApiSites {
    my ($name)     = @_;
    my $hash       = $defs{$name};
    my $addr       = $hash->{ADDR};
@@ -1020,7 +1084,7 @@ sub SSCal_getapisites {
    
    $hash->{HELPER}{LOGINRETRIES} = 0;
    
-   my ($err,$tstart,$tend) = SSCal_timeEdge($name);
+   my ($err,$tstart,$tend) = timeEdge($name);
    $tstart = FmtDateTime($tstart);
    $tend   = FmtDateTime($tend);   
   
@@ -1060,14 +1124,14 @@ sub SSCal_getapisites {
    
    if ($hash->{HELPER}{APIPARSET}) {                                 # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hash values already set - ignore get apisites");
-       return SSCal_checkSID($name);
+       return checkSID($name);
    }
 
    my $timeout = AttrVal($name,"timeout",20);
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$prot://$addr:$port/webapi/query.cgi?api=$SSCal_api{APIINFO}{NAME}&method=Query&version=1&query=$SSCal_api{APIAUTH}{NAME},$SSCal_api{CALCAL}{NAME},$SSCal_api{CALEVENT}{NAME},$SSCal_api{CALSHARE}{NAME},$SSCal_api{CALTODO}{NAME},$SSCal_api{APIINFO}{NAME}";
+   $url = "$prot://$addr:$port/webapi/query.cgi?api=$api{APIINFO}{NAME}&method=Query&version=1&query=$api{APIAUTH}{NAME},$api{CALCAL}{NAME},$api{CALEVENT}{NAME},$api{CALSHARE}{NAME},$api{CALTODO}{NAME},$api{APIINFO}{NAME}";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
@@ -1077,7 +1141,7 @@ sub SSCal_getapisites {
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
-               callback => \&SSCal_getapisites_parse
+               callback => \&FHEM::SSCal::getApiSites_parse
             };
    HttpUtils_NonblockingGet ($param);  
 
@@ -1087,7 +1151,7 @@ return;
 ####################################################################################  
 #      Auswertung Abruf apisites
 ####################################################################################
-sub SSCal_getapisites_parse {                                                   ## no critic 'complexity'
+sub getApiSites_parse {                                                   ## no critic 'complexity'
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1107,15 +1171,15 @@ sub SSCal_getapisites_parse {                                                   
         readingsBulkUpdate          ($hash, "state",    "Error");                    
         readingsEndUpdate           ($hash,1); 
         
-        SSCal_checkretry($name,1);
+        checkRetry($name,1);
         return;
         
     } elsif ($myjson ne "") {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash,$success,$myjson) = SSCal_evaljson($hash,$myjson);
+        ($hash,$success,$myjson) = evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-            SSCal_checkretry($name,1);       
+            checkRetry($name,1);       
             return;
         }
         
@@ -1130,63 +1194,63 @@ sub SSCal_getapisites_parse {                                                   
             my $logstr;
                         
           # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
-            my $apiauthpath   = $data->{data}->{$SSCal_api{APIAUTH}{NAME}}->{path};
+            my $apiauthpath   = $data->{data}->{$api{APIAUTH}{NAME}}->{path};
             $apiauthpath      =~ tr/_//d if (defined($apiauthpath));
-            my $apiauthmaxver = $data->{data}->{$SSCal_api{APIAUTH}{NAME}}->{maxVersion}; 
+            my $apiauthmaxver = $data->{data}->{$api{APIAUTH}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apiauthpath) ? "Path of $SSCal_api{APIAUTH}{NAME} selected: $apiauthpath" : "Path of $SSCal_api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiauthpath) ? "Path of $api{APIAUTH}{NAME} selected: $apiauthpath" : "Path of $api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiauthmaxver) ? "MaxVersion of $SSCal_api{APIAUTH}{NAME} selected: $apiauthmaxver" : "MaxVersion of $SSCal_api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiauthmaxver) ? "MaxVersion of $api{APIAUTH}{NAME} selected: $apiauthmaxver" : "MaxVersion of $api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
                    
           # Pfad und Maxversion von "SYNO.Cal.Cal" ermitteln
-            my $apicalpath   = $data->{data}->{$SSCal_api{CALCAL}{NAME}}->{path};
+            my $apicalpath   = $data->{data}->{$api{CALCAL}{NAME}}->{path};
             $apicalpath      =~ tr/_//d if (defined($apicalpath));
-            my $apicalmaxver = $data->{data}->{$SSCal_api{CALCAL}{NAME}}->{maxVersion}; 
+            my $apicalmaxver = $data->{data}->{$api{CALCAL}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apicalpath) ? "Path of $SSCal_api{CALCAL}{NAME} selected: $apicalpath" : "Path of $SSCal_api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apicalpath) ? "Path of $api{CALCAL}{NAME} selected: $apicalpath" : "Path of $api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apicalmaxver) ? "MaxVersion of $SSCal_api{CALCAL}{NAME} selected: $apicalmaxver" : "MaxVersion of $SSCal_api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apicalmaxver) ? "MaxVersion of $api{CALCAL}{NAME} selected: $apicalmaxver" : "MaxVersion of $api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");            
             
           # Pfad und Maxversion von "SYNO.Cal.Event" ermitteln
-            my $apievtpath   = $data->{data}->{$SSCal_api{CALEVENT}{NAME}}->{path};
+            my $apievtpath   = $data->{data}->{$api{CALEVENT}{NAME}}->{path};
             $apievtpath      =~ tr/_//d if (defined($apievtpath));
-            my $apievtmaxver = $data->{data}->{$SSCal_api{CALEVENT}{NAME}}->{maxVersion}; 
+            my $apievtmaxver = $data->{data}->{$api{CALEVENT}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apievtpath) ? "Path of $SSCal_api{CALEVENT}{NAME} selected: $apievtpath" : "Path of $SSCal_api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apievtpath) ? "Path of $api{CALEVENT}{NAME} selected: $apievtpath" : "Path of $api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apievtmaxver) ? "MaxVersion of $SSCal_api{CALEVENT}{NAME} selected: $apievtmaxver" : "MaxVersion of $SSCal_api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apievtmaxver) ? "MaxVersion of $api{CALEVENT}{NAME} selected: $apievtmaxver" : "MaxVersion of $api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr"); 
 
           # Pfad und Maxversion von "SYNO.Cal.Sharing" ermitteln
-            my $apisharepath   = $data->{data}->{$SSCal_api{CALSHARE}{NAME}}->{path};
+            my $apisharepath   = $data->{data}->{$api{CALSHARE}{NAME}}->{path};
             $apisharepath      =~ tr/_//d if (defined($apisharepath));
-            my $apisharemaxver = $data->{data}->{$SSCal_api{CALSHARE}{NAME}}->{maxVersion}; 
+            my $apisharemaxver = $data->{data}->{$api{CALSHARE}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apisharepath) ? "Path of $SSCal_api{CALSHARE}{NAME} selected: $apisharepath" : "Path of $SSCal_api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apisharepath) ? "Path of $api{CALSHARE}{NAME} selected: $apisharepath" : "Path of $api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apisharemaxver) ? "MaxVersion of $SSCal_api{CALSHARE}{NAME} selected: $apisharemaxver" : "MaxVersion of $SSCal_api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apisharemaxver) ? "MaxVersion of $api{CALSHARE}{NAME} selected: $apisharemaxver" : "MaxVersion of $api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr"); 
 
           # Pfad und Maxversion von "SYNO.Cal.Todo" ermitteln
-            my $apitodopath   = $data->{data}->{$SSCal_api{CALTODO}{NAME}}->{path};
+            my $apitodopath   = $data->{data}->{$api{CALTODO}{NAME}}->{path};
             $apitodopath      =~ tr/_//d if (defined($apitodopath));
-            my $apitodomaxver = $data->{data}->{$SSCal_api{CALTODO}{NAME}}->{maxVersion}; 
+            my $apitodomaxver = $data->{data}->{$api{CALTODO}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apitodopath) ? "Path of $SSCal_api{CALTODO}{NAME} selected: $apitodopath" : "Path of $SSCal_api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apitodopath) ? "Path of $api{CALTODO}{NAME} selected: $apitodopath" : "Path of $api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apitodomaxver) ? "MaxVersion of $SSCal_api{CALTODO}{NAME} selected: $apitodomaxver" : "MaxVersion of $SSCal_api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apitodomaxver) ? "MaxVersion of $api{CALTODO}{NAME} selected: $apitodomaxver" : "MaxVersion of $api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
 
           # Pfad und Maxversion von "SYNO.API.Info" ermitteln
-            my $apiinfopath   = $data->{data}->{$SSCal_api{APIINFO}{NAME}}->{path};
+            my $apiinfopath   = $data->{data}->{$api{APIINFO}{NAME}}->{path};
             $apiinfopath      =~ tr/_//d if (defined($apiinfopath));
-            my $apiinfomaxver = $data->{data}->{$SSCal_api{APIINFO}{NAME}}->{maxVersion}; 
+            my $apiinfomaxver = $data->{data}->{$api{APIINFO}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apiinfopath) ? "Path of $SSCal_api{APIINFO}{NAME} selected: $apiinfopath" : "Path of $SSCal_api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiinfopath) ? "Path of $api{APIINFO}{NAME} selected: $apiinfopath" : "Path of $api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiinfomaxver) ? "MaxVersion of $SSCal_api{APIINFO}{NAME} selected: $apiinfomaxver" : "MaxVersion of $SSCal_api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiinfomaxver) ? "MaxVersion of $api{APIINFO}{NAME} selected: $apiinfomaxver" : "MaxVersion of $api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");             
             
             
@@ -1197,29 +1261,29 @@ sub SSCal_getapisites_parse {                                                   
             
             $apievtmaxver = 3;
             $evtmod       = "yes";
-            Log3($name, 4, "$name - MaxVersion of $SSCal_api{CALEVENT}{NAME} adapted to: $apievtmaxver");
+            Log3($name, 4, "$name - MaxVersion of $api{CALEVENT}{NAME} adapted to: $apievtmaxver");
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
             
             # ermittelte Werte in $hash einfügen
-            $SSCal_api{APIINFO}{PATH}   = $apiinfopath;
-            $SSCal_api{APIINFO}{MAX}    = $apiinfomaxver;
-            $SSCal_api{APIINFO}{MOD}    = $infomod // "no";
-            $SSCal_api{APIAUTH}{PATH}   = $apiauthpath;
-            $SSCal_api{APIAUTH}{MAX}    = $apiauthmaxver;  
-            $SSCal_api{APIAUTH}{MOD}    = $authmod // "no";            
-            $SSCal_api{CALCAL}{PATH}    = $apicalpath;
-            $SSCal_api{CALCAL}{MAX}     = $apicalmaxver;
-            $SSCal_api{CALCAL}{MOD}     = $calmod // "no";     
-            $SSCal_api{CALEVENT}{PATH}  = $apievtpath;
-            $SSCal_api{CALEVENT}{MAX}   = $apievtmaxver;
-            $SSCal_api{CALEVENT}{MOD}   = $evtmod // "no";
-            $SSCal_api{CALSHARE}{PATH}  = $apisharepath;
-            $SSCal_api{CALSHARE}{MAX}   = $apisharemaxver;
-            $SSCal_api{CALSHARE}{MOD}   = $sharemod // "no";   
-            $SSCal_api{CALTODO}{PATH}   = $apitodopath;
-            $SSCal_api{CALTODO}{MAX}    = $apitodomaxver;
-            $SSCal_api{CALTODO}{MOD}    = $todomod // "no";  
+            $api{APIINFO}{PATH}   = $apiinfopath;
+            $api{APIINFO}{MAX}    = $apiinfomaxver;
+            $api{APIINFO}{MOD}    = $infomod // "no";
+            $api{APIAUTH}{PATH}   = $apiauthpath;
+            $api{APIAUTH}{MAX}    = $apiauthmaxver;  
+            $api{APIAUTH}{MOD}    = $authmod // "no";            
+            $api{CALCAL}{PATH}    = $apicalpath;
+            $api{CALCAL}{MAX}     = $apicalmaxver;
+            $api{CALCAL}{MOD}     = $calmod // "no";     
+            $api{CALEVENT}{PATH}  = $apievtpath;
+            $api{CALEVENT}{MAX}   = $apievtmaxver;
+            $api{CALEVENT}{MOD}   = $evtmod // "no";
+            $api{CALSHARE}{PATH}  = $apisharepath;
+            $api{CALSHARE}{MAX}   = $apisharemaxver;
+            $api{CALSHARE}{MOD}   = $sharemod // "no";   
+            $api{CALTODO}{PATH}   = $apitodopath;
+            $api{CALTODO}{MAX}    = $apitodomaxver;
+            $api{CALTODO}{MOD}    = $todomod // "no";  
         
             # API values sind gesetzt in Hash
             $hash->{HELPER}{APIPARSET} = 1;
@@ -1231,11 +1295,11 @@ sub SSCal_getapisites_parse {                                                   
                 $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Downgraded</b> </td></tr>";
                 $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td> </td></tr>";
         
-                for my $key (keys %SSCal_api) {
-                    my $apiname = $SSCal_api{$key}{NAME};
-                    my $apipath = $SSCal_api{$key}{PATH};
-                    my $apiver  = $SSCal_api{$key}{MAX};
-                    my $apimod  = $SSCal_api{$key}{MOD};
+                for my $key (keys %api) {
+                    my $apiname = $api{$key}{NAME};
+                    my $apipath = $api{$key}{PATH};
+                    my $apiver  = $api{$key}{MAX};
+                    my $apimod  = $api{$key}{MOD};
 
                     $out .= "<tr>";
                     $out .= "<td> $apiname </td>";
@@ -1259,13 +1323,13 @@ sub SSCal_getapisites_parse {                                                   
                 asyncOutput($hash->{HELPER}{CL}{1},"$out");
                 delete($hash->{HELPER}{CL});
               
-                SSCal_checkretry($name,0);
+                checkRetry($name,0);
                 return;
             }
                         
         } else {
             $errorcode = "806";
-            $error     = SSCal_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
+            $error     = experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
             
             readingsBeginUpdate         ($hash);
             readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
@@ -1275,18 +1339,18 @@ sub SSCal_getapisites_parse {                                                   
 
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
             
-            SSCal_checkretry($name,1);    
+            checkRetry($name,1);    
             return;
         }
     }
     
-return SSCal_checkSID($name);
+return checkSID($name);
 }
 
 #############################################################################################
 #                                     Ausführung Operation
 #############################################################################################
-sub SSCal_calop {  
+sub calOp {  
    my ($name) = @_;
    my $hash   = $defs{$name};
    my $prot   = $hash->{PROT};
@@ -1307,10 +1371,10 @@ sub SSCal_calop {
    
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
         
-   $url = "$prot://$addr:$port/webapi/".$SSCal_api{$api}{PATH}."?api=".$SSCal_api{$api}{NAME}."&version=".$SSCal_api{$api}{MAX}."&method=$method".$params."&_sid=$sid";
+   $url = "$prot://$addr:$port/webapi/".$api{$api}{PATH}."?api=".$api{$api}{NAME}."&version=".$api{$api}{MAX}."&method=$method".$params."&_sid=$sid";
    
    if($opmode eq "deleteEventId" && $api eq "CALEVENT") {               # Workaround !!! Methode delete funktioniert nicht mit SYNO.Cal.Event version > 1
-       $url = "$prot://$addr:$port/webapi/".$SSCal_api{$api}{PATH}."?api=".$SSCal_api{$api}{NAME}."&version=1&method=$method".$params."&_sid=$sid";
+       $url = "$prot://$addr:$port/webapi/".$api{$api}{PATH}."?api=".$api{$api}{NAME}."&version=1&method=$method".$params."&_sid=$sid";
    }
 
    my $part = $url;
@@ -1327,7 +1391,7 @@ sub SSCal_calop {
             hash     => $hash,
             method   => "GET",
             header   => "Accept: application/json",
-            callback => \&SSCal_calop_parse
+            callback => \&FHEM::SSCal::calOp_parse
             };
    
    HttpUtils_NonblockingGet ($param);
@@ -1336,9 +1400,9 @@ return;
 } 
   
 #############################################################################################
-#                                Callback from SSCal_calop
+#                                Callback from calOp
 #############################################################################################
-sub SSCal_calop_parse {                                                           ## no critic 'complexity'
+sub calOp_parse {                                                           ## no critic 'complexity'
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1362,16 +1426,16 @@ sub SSCal_calop_parse {                                                         
         readingsBulkUpdate          ($hash, "state",        "Error");                    
         readingsEndUpdate           ($hash,1);         
 
-        SSCal_checkretry($name,1);        
+        checkRetry($name,1);        
         return;
    
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        ($hash,$success,$myjson) = SSCal_evaljson($hash,$myjson);        
+        ($hash,$success,$myjson) = evaljson($hash,$myjson);        
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-            SSCal_checkretry($name,1);       
+            checkRetry($name,1);       
             return;
         }
         
@@ -1384,7 +1448,7 @@ sub SSCal_calop_parse {                                                         
 
         if ($success) {       
 
-            if ($opmode eq "listcal") {                                     # alle Kalender abrufen
+            if ($opmode eq "listcal") {                                     ## no critic 'Cascading' # alle Kalender abrufen  
                 my %calendars = ();   
                 my ($cals,$dnm,$typ,$oid,$des,$prv,$psi);                   
                 my $i    = 0;
@@ -1429,10 +1493,10 @@ sub SSCal_calop_parse {                                                         
                 my $list = $modules{$hash->{TYPE}}{AttrList};
                 my @deva = split(" ", $list);
                 for (@deva) {
-                     push @newa, $_ if($_ !~ /usedCalendars:/);
+                     push @newa, $_ if($_ !~ /usedCalendars:/x);
                 }
 
-                $cals =~ s/ /#/g if($cals);
+                $cals =~ s/\s/#/gx if($cals);
     
                 push @newa, ($cals?"usedCalendars:multiple-strict,$cals ":"usedCalendars:--no#Calendar#selectable--");
                 
@@ -1443,7 +1507,7 @@ sub SSCal_calop_parse {                                                         
                 asyncOutput($hash->{HELPER}{CL}{1},"$out");
                 delete($hash->{HELPER}{CL});  
                 
-                SSCal_checkretry($name,0);
+                checkRetry($name,0);
 
                 readingsBeginUpdate         ($hash); 
                 readingsBulkUpdateIfChanged ($hash, "Errorcode",  "none");
@@ -1460,12 +1524,12 @@ sub SSCal_calop_parse {                                                         
                     Log3($name, 4, "$name - Event parse mode: asynchronous");
                     my $timeout = AttrVal($name, "timeout", 20)+180;
                     
-                    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("SSCal_extractEventlist", $name, "SSCal_createReadings", $timeout, "SSCal_blockingTimeout", $hash);
+                    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSCal::extractEventlist", $name, "FHEM::SSCal::createReadings", $timeout, "FHEM::SSCal::blockingTimeout", $hash);
                     $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057                    
                 
                 } else {                                                # Extrahieren der Events synchron (blockierend)
                     Log3($name, 4, "$name - Event parse mode: synchronous");
-                    SSCal_extractEventlist ($name);                         
+                    extractEventlist ($name);                         
                 }    
             
             } elsif ($opmode eq "todolist") {                           # ToDo's der ausgewählten Tasks-Kalender aufbereiten
@@ -1476,12 +1540,12 @@ sub SSCal_calop_parse {                                                         
                     Log3($name, 4, "$name - Task parse mode: asynchronous");
                     my $timeout = AttrVal($name, "timeout", 20)+180;
                     
-                    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("SSCal_extractToDolist", $name, "SSCal_createReadings", $timeout, "SSCal_blockingTimeout", $hash);
+                    $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSCal::extractToDolist", $name, "FHEM::SSCal::createReadings", $timeout, "FHEM::SSCal::blockingTimeout", $hash);
                     $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057                    
                 
                 } else {                                                # Extrahieren der ToDos synchron (blockierend)
                     Log3($name, 4, "$name - Task parse mode: synchronous");
-                    SSCal_extractToDolist ($name);                         
+                    extractToDolist ($name);                         
                 }
                 
             } elsif ($opmode eq "cleanCompleteTasks") {                  # abgeschlossene ToDos wurden gelöscht                
@@ -1494,7 +1558,7 @@ sub SSCal_calop_parse {                                                         
                 
                 Log3($name, 3, "$name - All completed tasks were deleted from selected ToDo lists");
                 
-                SSCal_checkretry($name,0);
+                checkRetry($name,0);
             
             } elsif ($opmode eq "deleteEventId") {                      # ein Kalendereintrag mit Event Id wurde gelöscht                
 
@@ -1510,7 +1574,7 @@ sub SSCal_calop_parse {                                                         
                 my $idx = $hash->{OPIDX};
                 my $api = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{api};
                 
-                SSCal_checkretry($name,0);
+                checkRetry($name,0);
                 
                 # Kalendereinträge neu einlesen nach dem löschen Event Id
                 CommandSet(undef, "$name calUpdate");
@@ -1522,9 +1586,9 @@ sub SSCal_calop_parse {                                                         
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{error}->{code};
             $cherror   = $data->{error}->{errors};                       # vom cal gelieferter Fehler
-            $error     = SSCal_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
+            $error     = experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
             if ($error =~ /not found/) {
-                $error .= " New error: ".($cherror?$cherror:"");
+                $error .= " New error: ".($cherror // "'  '");
             }
             
             readingsBeginUpdate         ($hash);
@@ -1535,7 +1599,7 @@ sub SSCal_calop_parse {                                                         
        
             Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
-            SSCal_checkretry($name,1);
+            checkRetry($name,1);
         }
                 
        undef $data;
@@ -1548,17 +1612,17 @@ return;
 #############################################################################################
 #                    Extrahiert empfangene Kalendertermine (Events)
 #############################################################################################
-sub SSCal_extractEventlist {                              ## no critic 'complexity'
+sub extractEventlist {                              ## no critic 'complexity'
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
   my $am     = AttrVal($name, "asyncMode", 0);
   
   my ($tz,$bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl,$es,$em,$eh);
-  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
+  my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = SSCal_timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my (undef,$tstart,$tend) = timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
@@ -1572,23 +1636,17 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
           ($nbdate,$nedate) = ("","");  
 
           my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events    
-          SSCal_extractIcal ($name,$data->{data}{$key}[$i]);                    # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
+          extractIcal ($name,$data->{data}{$key}[$i]);                    # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
           
           my $isallday                         = $data->{data}{$key}[$i]{is_all_day};
-          ($bi,$tz,$bdate,$btime,$bts,$excl)   = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{dtstart}, 0, 0, 0);         # Beginn des Events
-          ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{dtend}, $isallday, 0, 0);   # Ende des Events
+          ($bi,$tz,$bdate,$btime,$bts,$excl)   = explodeDateTime ($hash, $data->{data}{$key}[$i]{dtstart}, 0, 0, 0);         # Beginn des Events
+          ($ei,undef,$edate,$etime,$ets,undef) = explodeDateTime ($hash, $data->{data}{$key}[$i]{dtend}, $isallday, 0, 0);   # Ende des Events
             
-          $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/x;
-          $bmday  = $3;
-          $bmonth = $2;
-          $byear  = $1;
-          $nbtime = $btime;                
+          my ($byear, $bmonth, $bmday) = $bdate =~ /(\d{4})-(\d{2})-(\d{2})/x;
+          $nbtime                      = $btime;                
           
-          $edate  =~ /(\d{4})-(\d{2})-(\d{2})/x;
-          $emday  = $3;
-          $emonth = $2;
-          $eyear  = $1;
-          $netime = $etime;
+          my ($eyear, $emonth, $emday) = $edate =~ /(\d{4})-(\d{2})-(\d{2})/x;
+          $netime                      = $etime;
           
           # Bugfix API - wenn is_all_day und an erster Stelle im 'data' Ergebnis des API-Calls ist Endedate/time nicht korrekt !
           if($isallday && ($bdate ne $edate) && $netime =~ /^00:59:59$/x) {
@@ -1599,8 +1657,8 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
               $netime = $eh.$em.$es;
               $nbtime =~ s/://gx;
 
-              ($bi,undef,$bdate,$btime,$bts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, 0, 0);  
-              ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, 0, 0);         
+              ($bi,undef,$bdate,$btime,$bts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, 0, 0);  
+              ($ei,undef,$edate,$etime,$ets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, 0, 0);         
           }
           
           $startEndDiff = $ets - $bts;                                          # Differenz Event Ende / Start in Sekunden
@@ -1617,7 +1675,7 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                   $ignore = 1;
                   $done   = 0;               
               } else {
-                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -1642,7 +1700,7 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                   } elsif ($p1 eq "UNTIL") {                                    # festes Intervallende angegeben        
                       $until = $p2;
                       $until =~ s/[-:]//gx;
-                      (undef,undef,undef,undef,$uets,undef) = SSCal_explodeDateTime ($hash, $until, 0, 0, 0);
+                      (undef,undef,undef,undef,$uets,undef) = explodeDateTime ($hash, $until, 0, 0, 0);
                       if ($uets < $tstart) {
                           Log3($name, 4, "$name - Ignore recurring event -> $data->{data}{$key}[$i]{summary} , interval end \"$nedate $netime\" is less than selection start \"$datetimestart\"");
                           $ignore = 1;
@@ -1654,11 +1712,11 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                   } 
               }
               
-              $count      = $count?$count:9999999;                              # $count "unendlich" wenn kein COUNT angegeben
-              $interval   = $interval?$interval:1;
-              $bymonthday = $bymonthday?$bymonthday:"";
-              $byday      = $byday?$byday:"";
-              $until      = $until?$until:"";
+              $count      = $count      ? $count      : 9999999;                # $count "unendlich" wenn kein COUNT angegeben
+              $interval   = $interval   ? $interval   : 1;
+              $bymonthday = $bymonthday ? $bymonthday : "";
+              $byday      = $byday      ? $byday      : "";
+              $until      = $until      ? $until      : "";
               
               Log3($name, 4, "$name - Recurring params - FREQ: $freq, COUNT: $count, INTERVAL: $interval, BYMONTHDAY: $bymonthday, BYDAY: $byday, UNTIL: $until");
                  
@@ -1673,8 +1731,8 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                       $netime =~ s/://gx;
                      
                       my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                      ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                      ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                       Log3($name, 5, "$name - YEARLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -1691,15 +1749,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                           $ignore = 1;
                           $done   = 0;                      
                       } else {
-                          $bdate = $nbdate?$nbdate:$bdate;
-                          $btime = $nbtime?$nbtime:$btime;
-                          $bts   = $nbts?$nbts:$bts;
+                          $bdate = $nbdate ? $nbdate : $bdate;
+                          $btime = $nbtime ? $nbtime : $btime;
+                          $bts   = $nbts   ? $nbts   : $bts;
                           
-                          $edate = $nedate?$nedate:$edate;
-                          $etime = $netime?$netime:$etime;
-                          $ets   = $nets?$nets:$ets;                  
+                          $edate = $nedate ? $nedate : $edate;
+                          $etime = $netime ? $netime : $etime;
+                          $ets   = $nets   ? $nets   : $ets;                  
                           
-                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                          @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                           $ignore = 0;
                           $done   = 1;
@@ -1727,8 +1785,8 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                           $netime =~ s/://gx;
   
                           my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                          ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                          ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                           Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -1745,15 +1803,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                               $ignore = 1;
                               $done   = 0;                      
                           } else {
-                              $bdate = $nbdate?$nbdate:$bdate;
-                              $btime = $nbtime?$nbtime:$btime;
-                              $bts   = $nbts?$nbts:$bts;
+                              $bdate = $nbdate ? $nbdate : $bdate;
+                              $btime = $nbtime ? $nbtime : $btime;
+                              $bts   = $nbts   ? $nbts   : $bts;
                               
-                              $edate = $nedate?$nedate:$edate;
-                              $etime = $netime?$netime:$etime;
-                              $ets   = $nets?$nets:$ets;                  
+                              $edate = $nedate ? $nedate : $edate;
+                              $etime = $netime ? $netime : $etime;
+                              $ets   = $nets   ? $nets   : $ets;                  
                               
-                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                               $ignore = 0;
                               $done   = 1;
@@ -1802,8 +1860,8 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                                   }
                                   $rDaysToAddOrSub += (7 * ($rDayInterval - 1));                     # addiere Tagesintervall, z.B. 4th Freitag ...
   
-                                  $rNewTime = SSCal_plusNSeconds($firstOfNextMonth, 86400*$rDaysToAddOrSub, 1);                                                                                                
-                                  ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($rNewTime,$startEndDiff);
+                                  $rNewTime = plusNSeconds($firstOfNextMonth, 86400*$rDaysToAddOrSub, 1);                                                                                                
+                                  ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = DTfromStartandDiff ($rNewTime,$startEndDiff);
                               
                               } else {
                                   Log3($name, 2, "$name - WARNING - negative values for BYDAY are currently not implemented and will be ignored");
@@ -1817,8 +1875,8 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                               $netime = $nehh.$nemm.$ness;
   
                               my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                              ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                              ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                               Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
@@ -1835,15 +1893,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                                   $ignore = 1;
                                   $done   = 0;                      
                               } else {
-                                  $bdate = $nbdate?$nbdate:$bdate;
-                                  $btime = $nbtime?$nbtime:$btime;
-                                  $bts   = $nbts?$nbts:$bts;
+                                  $bdate = $nbdate ? $nbdate : $bdate;
+                                  $btime = $nbtime ? $nbtime : $btime;
+                                  $bts   = $nbts   ? $nbts   : $bts;
                                   
-                                  $edate = $nedate?$nedate:$edate;
-                                  $etime = $netime?$netime:$etime;
-                                  $ets   = $nets?$nets:$ets;                  
+                                  $edate = $nedate ? $nedate : $edate;
+                                  $etime = $netime ? $netime : $etime;
+                                  $ets   = $nets   ? $nets   : $ets;                  
                                   
-                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                                   $ignore = 0;
                                   $done   = 1;
@@ -1881,15 +1939,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                                   $rDaysToAddOrSub = 7 - $rDayOfWeekNew + $rDayOfWeek + (7 * ($interval-1));          
                               }                                            
 
-                              $rNewTime = SSCal_plusNSeconds($rNewTime, 86400 * $rDaysToAddOrSub, 1);                             
-                              ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($rNewTime,$startEndDiff);
+                              $rNewTime = plusNSeconds($rNewTime, 86400 * $rDaysToAddOrSub, 1);                             
+                              ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = DTfromStartandDiff ($rNewTime,$startEndDiff);
                
                               $nbtime = $nbhh.$nbmm.$nbss;
                               $netime = $nehh.$nemm.$ness;
 
                               my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                              ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                              ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                              ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
 
                               Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
@@ -1906,15 +1964,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                                   $ignore = 1;
                                   $done   = 0;                      
                               } else {
-                                  $bdate = $nbdate?$nbdate:$bdate;
-                                  $btime = $nbtime?$nbtime:$btime;
-                                  $bts   = $nbts?$nbts:$bts;
+                                  $bdate = $nbdate ? $nbdate : $bdate;
+                                  $btime = $nbtime ? $nbtime : $btime;
+                                  $bts   = $nbts   ? $nbts   : $bts;
                                   
-                                  $edate = $nedate?$nedate:$edate;
-                                  $etime = $netime?$netime:$etime;
-                                  $ets   = $nets?$nets:$ets;                  
+                                  $edate = $nedate ? $nedate : $edate;
+                                  $etime = $netime ? $netime : $etime;
+                                  $ets   = $nets   ? $nets   : $ets;                  
                                   
-                                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
 
                                   $ignore = 0;
                                   $done   = 1;
@@ -1933,13 +1991,13 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                       for ($ci=-1; $ci<($count*$interval); $ci+=$interval) {
                           $rNewTime += $interval*604800 if($ci>=0);                          # Wochenintervall addieren
                           
-                          ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($rNewTime,$startEndDiff);                      
+                          ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = DTfromStartandDiff ($rNewTime,$startEndDiff);                      
                           $nbtime = $nbhh.$nbmm.$nbss;
                           $netime = $nehh.$nemm.$ness;                
   
                           my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                          ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                          ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                          ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                           Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                            
@@ -1956,15 +2014,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                               $ignore = 1;
                               $done   = 0;                      
                           } else {
-                              $bdate = $nbdate?$nbdate:$bdate;
-                              $btime = $nbtime?$nbtime:$btime;
-                              $bts   = $nbts?$nbts:$bts;
+                              $bdate = $nbdate ? $nbdate : $bdate;
+                              $btime = $nbtime ? $nbtime : $btime;
+                              $bts   = $nbts   ? $nbts   : $bts;
                               
-                              $edate = $nedate?$nedate:$edate;
-                              $etime = $netime?$netime:$etime;
-                              $ets   = $nets?$nets:$ets; 
+                              $edate = $nedate ? $nedate : $edate;
+                              $etime = $netime ? $netime : $etime;
+                              $ets   = $nets   ? $nets   : $ets; 
                                   
-                              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                               
                               $ignore = 0;
                               $done   = 1;
@@ -1982,14 +2040,14 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                       
                       $bts += 86400*$interval if($ci>=0);
   
-                      ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = SSCal_DTfromStartandDiff ($bts,$startEndDiff);                                    
+                      ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear) = DTfromStartandDiff ($bts,$startEndDiff);                                    
   
                       $nbtime = $nbhh.$nbmm.$nbss;
                       $netime = $nehh.$nemm.$ness;                                    
                       
                       my $dtstart = $byear.$bmonth.$bmday."T".$nbtime;
-                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = SSCal_explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
-                      ($ei,undef,$nedate,$netime,$nets,undef) = SSCal_explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
+                      ($bi,undef,$nbdate,$nbtime,$nbts,$excl) = explodeDateTime ($hash, $byear.$bmonth.$bmday."T".$nbtime, 0, $uid, $dtstart);  # Beginn des Wiederholungsevents
+                      ($ei,undef,$nedate,$netime,$nets,undef) = explodeDateTime ($hash, $eyear.$emonth.$emday."T".$netime, 0, $uid, $dtstart);  # Ende des Wiederholungsevents
   
                       Log3($name, 5, "$name - DAILY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
@@ -2006,15 +2064,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                           $ignore = 1;
                           $done   = 0;                      
                       } else {
-                          $bdate = $nbdate?$nbdate:$bdate;
-                          $btime = $nbtime?$nbtime:$btime;
-                          $bts   = $nbts?$nbts:$bts;
+                          $bdate = $nbdate ? $nbdate : $bdate;
+                          $btime = $nbtime ? $nbtime : $btime;
+                          $bts   = $nbts   ? $nbts   : $bts;
                           
-                          $edate = $nedate?$nedate:$edate;
-                          $etime = $netime?$netime:$etime;
-                          $ets   = $nets?$nets:$ets;                  
+                          $edate = $nedate ? $nedate : $edate;
+                          $etime = $netime ? $netime : $etime;
+                          $ets   = $nets   ? $nets   : $ets;                  
                           
-                          @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                          @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
   
                           $ignore = 0;
                           $done   = 1;
@@ -2032,15 +2090,15 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
           }
           
           if(!$done) {                                      # für Testzwecke mit $ignore = 0 und $done = 0
-              $bdate = $nbdate?$nbdate:$bdate;
-              $btime = $nbtime?$nbtime:$btime;
-              $bts   = $nbts?$nbts:$bts;
+              $bdate = $nbdate ? $nbdate : $bdate;
+              $btime = $nbtime ? $nbtime : $btime;
+              $bts   = $nbts   ? $nbts   : $bts;
               
-              $edate = $nedate?$nedate:$edate;
-              $etime = $netime?$netime:$etime;
-              $ets   = $nets?$nets:$ets;                  
+              $edate = $nedate ? $nedate : $edate;
+              $etime = $netime ? $netime : $etime;
+              $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
           }
           $i++;
           $n++;
@@ -2054,13 +2112,13 @@ sub SSCal_extractEventlist {                              ## no critic 'complexi
                                       
   return "$name|$rowlist" if($am);                    # asynchroner Mode mit BlockingCall                                                    
       
-return SSCal_createReadings ("$name|$rowlist");       # synchoner Mode
+return createReadings ("$name|$rowlist");       # synchoner Mode
 }
 
 #############################################################################################
 #                    Extrahiert empfangene Tasks aus ToDo-Kalender (Aufgabenliste)
 #############################################################################################
-sub SSCal_extractToDolist {                               ## no critic 'complexity'
+sub extractToDolist {                               ## no critic 'complexity'
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $data   = delete $hash->{eventlist};
@@ -2068,10 +2126,10 @@ sub SSCal_extractToDolist {                               ## no critic 'complexi
   
   my ($val,$tz,$td,$d,$t,$uts); 
   my ($bdate,$btime,$bts,$edate,$etime,$ets,$ci,$bi,$ei,$startEndDiff,$excl);
-  my ($bmday,$bmonth,$emday,$emonth,$byear,$eyear,$nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
+  my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = SSCal_timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my (undef,$tstart,$tend) = timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
@@ -2086,21 +2144,15 @@ sub SSCal_extractToDolist {                               ## no critic 'complexi
 
           my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events          
           
-          ($bi,$tz,$bdate,$btime,$bts,$excl)   = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Fälligkeit des Tasks (falls gesetzt)
-          ($ei,undef,$edate,$etime,$ets,undef) = SSCal_explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Ende = Fälligkeit des Tasks (falls gesetzt)
+          ($bi,$tz,$bdate,$btime,$bts,$excl)   = explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Fälligkeit des Tasks (falls gesetzt)
+          ($ei,undef,$edate,$etime,$ets,undef) = explodeDateTime ($hash, $data->{data}{$key}[$i]{due}, 0, 0, 0);    # Ende = Fälligkeit des Tasks (falls gesetzt)
   
           if ($bdate && $edate) {                                               # nicht jede Aufgabe hat Date / Time gesetzt
-              $bdate  =~ /(\d{4})-(\d{2})-(\d{2})/x;
-              $bmday  = $3;
-              $bmonth = $2;
-              $byear  = $1;
-              $nbtime = $btime;                
+              my ($byear, $bmonth, $bmday) = $bdate =~ /(\d{4})-(\d{2})-(\d{2})/x;
+              $nbtime                      = $btime;                
               
-              $edate  =~ /(\d{4})-(\d{2})-(\d{2})/x;
-              $emday  = $3;
-              $emonth = $2;
-              $eyear  = $1;
-              $netime = $etime;
+              my ($eyear, $emonth, $emday) = $edate =~ /(\d{4})-(\d{2})-(\d{2})/x;
+              $netime                      = $etime;
           }
                                               
           if(!$data->{data}{$key}[$i]{is_repeat_evt}) {                         # einmaliger Task (momentan gibt es keine Wiederholungstasks)
@@ -2111,7 +2163,7 @@ sub SSCal_extractToDolist {                               ## no critic 'complexi
                   $ignore = 1;
                   $done   = 0; 
               } else {
-                  @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -2124,15 +2176,15 @@ sub SSCal_extractToDolist {                               ## no critic 'complexi
           }
           
           if(!$done) {                                      # für Testzwecke mit $ignore = 0 und $done = 0
-              $bdate = $nbdate?$nbdate:$bdate;
-              $btime = $nbtime?$nbtime:$btime;
-              $bts   = $nbts?$nbts:$bts;
+              $bdate = $nbdate ? $nbdate : $bdate;
+              $btime = $nbtime ? $nbtime : $btime;
+              $bts   = $nbts   ? $nbts   : $bts;
               
-              $edate = $nedate?$nedate:$edate;
-              $etime = $netime?$netime:$etime;
-              $ets   = $nets?$nets:$ets;                  
+              $edate = $nedate ? $nedate : $edate;
+              $etime = $netime ? $netime : $etime;
+              $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = SSCal_writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
           }
           $i++;
           $n++;
@@ -2146,7 +2198,7 @@ sub SSCal_extractToDolist {                               ## no critic 'complexi
                                          
   return "$name|$rowlist" if($am);                      # asynchroner Mode mit BlockingCall          
                                       
-return SSCal_createReadings ("$name|$rowlist");         # synchoner Mode
+return createReadings ("$name|$rowlist");         # synchoner Mode
 }
 
 #############################################################################################
@@ -2154,7 +2206,7 @@ return SSCal_createReadings ("$name|$rowlist");         # synchoner Mode
 #   - erstellt Readings aus $data{SSCal}{$name}{eventlist}
 #   - ruft Routine auf um zusätzliche Steuerungsevents zu erstellen
 #############################################################################################
-sub SSCal_createReadings { 
+sub createReadings { 
   my ($string) = @_;
   my @a        = split("\\|",$string);
   my $name     = $a[0];
@@ -2198,12 +2250,12 @@ sub SSCal_createReadings {
       readingsEndUpdate($hash, 1);
         
   } else {
-      SSCal_delReadings($name,0);                                            # alle Kalender-Readings löschen
+      delReadings($name,0);                                            # alle Kalender-Readings löschen
   }
   
-  SSCal_doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
+  doCompositeEvents ($name,\@abnr,$data{SSCal}{$name}{eventlist}); # spezifische Controlevents erstellen
   
-  SSCal_checkretry($name,0);
+  checkRetry($name,0);
 
   $data{SSCal}{$name}{lastUpdate} = FmtDateTime($data{SSCal}{$name}{lstUpdtTs}) if($data{SSCal}{$name}{lstUpdtTs});  
 
@@ -2214,10 +2266,10 @@ sub SSCal_createReadings {
   readingsBulkUpdate          ($hash, "state",      "done");                    
   readingsEndUpdate           ($hash,1); 
 
-  SSCal_delReadings($name,1) if($data{SSCal}{$name}{lstUpdtTs});                  # Readings löschen wenn Timestamp nicht "lastUpdate"
+  delReadings($name,1) if($data{SSCal}{$name}{lstUpdtTs});                  # Readings löschen wenn Timestamp nicht "lastUpdate"
       
   if(AttrVal($name, "createATDevs", 0)) {
-      SSCal_createATdevices   ($name,\@abnr,$data{SSCal}{$name}{eventlist});      # automatisch at-Devics mit FHEM/Perl-Kommandos erstellen
+      createAtDevices   ($name,\@abnr,$data{SSCal}{$name}{eventlist});      # automatisch at-Devics mit FHEM/Perl-Kommandos erstellen
   }
 
 return;
@@ -2231,7 +2283,7 @@ return;
 #      $evref - Referenz zum zentralen Valuehash ($data{SSCal}{$name}{eventlist}) 
 #    
 #############################################################################################
-sub SSCal_doCompositeEvents { 
+sub doCompositeEvents { 
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
   
@@ -2273,7 +2325,7 @@ return;
 #      $evref - Referenz zum zentralen Valuehash ($data{SSCal}{$name}{eventlist}) 
 #    
 #############################################################################################
-sub SSCal_createATdevices { 
+sub createAtDevices { 
   my ($name,$abnr,$evref) = @_;
   my $hash                = $defs{$name}; 
     
@@ -2326,14 +2378,14 @@ return;
 ####################################################################################################
 #                               Abbruchroutine BlockingCall
 ####################################################################################################
-sub SSCal_blockingTimeout {
+sub blockingTimeout {
   my ($hash,$cause) = @_;
   my $name          = $hash->{NAME}; 
   
   $cause = $cause?$cause:"Timeout: process terminated";
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");    
   
-  SSCal_checkretry($name,0);
+  checkRetry($name,0);
 
   readingsBeginUpdate         ($hash); 
   readingsBulkUpdateIfChanged ($hash, "Error",     $cause);
@@ -2352,7 +2404,7 @@ return;
 #   Beginn: SS,MM,HH,Tag(01-31),Monat(01-12),Jahr(YYYY)
 #   Ende:   SS,MM,HH,Tag(01-31),Monat(01-12),Jahr(YYYY)
 #############################################################################################
-sub SSCal_DTfromStartandDiff {
+sub DTfromStartandDiff {
   my ($bts,$diff) = @_;
               
   my ($nbss, $nbmm, $nbhh, $bmday, $bmonth, $byear, $bWday, $bYday, $bisdst);
@@ -2390,7 +2442,7 @@ return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth
 #         (Index aus BeginTimestamp + lfNr) , (Blockindex_Reading) , (Wert)
 #
 #############################################################################################
-sub SSCal_writeValuesToArray {                                                   ## no critic 'complexity'
+sub writeValuesToArray {                                                   ## no critic 'complexity'
   my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref,$uid) = @_;
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
@@ -2402,9 +2454,9 @@ sub SSCal_writeValuesToArray {                                                  
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
  
-  $upcoming = SSCal_isUpcoming ($ts,0,$bts);                                     # initiales upcoming
-  $started  = SSCal_isStarted  ($ts,$bts,$ets);
-  $ended    = SSCal_isEnded    ($ts,$ets);
+  $upcoming = isUpcoming ($ts,0,$bts);                                     # initiales upcoming
+  $started  = isStarted  ($ts,$bts,$ets);
+  $ended    = isEnded    ($ts,$ets);
   
   if($bdate && $btime) {
       push(@row_array, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
@@ -2437,7 +2489,7 @@ sub SSCal_writeValuesToArray {                                                  
   my $isRecurrence = 0;
   my $isAlldaychanded;                                                                                       # 0 -> Ganztagsevent wurde in Serienelement geändert in kein Ganztagsevent
   
-  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                             # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
+  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                                 # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
       next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_});
       $isRecurrence = 1 if($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_} eq $origdtstart);
   }
@@ -2450,19 +2502,27 @@ sub SSCal_writeValuesToArray {                                                  
       $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
       
       if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} && !$isRecurrence) {                # wenn keine Veränderung vorhanden ist ({RECURRENCEID}{index}=undef) gelten die Erinnerungszeiten Standarderinnerungszeiten
-          ($uts,$td) = SSCal_evtNotTime ($name,$val,$bts);   
+          ($uts,$td) = evtNotTime ($name,$val,$bts);   
           push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
           
-          $alarmed = SSCal_isAlarmed ($ts,$uts,$bts) if(!$alarmed);
+          $alarmed = isAlarmed ($ts,$uts,$bts) if(!$alarmed);
       
       } elsif ($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} &&
                $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} eq $origdtstart) {
-          "$bdate $btime" =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;                             # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
-          eval { $chts = timelocal($6, $5, $4, $3, $2-1, $1-1900); };                                        # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
-          ($uts,$td) = SSCal_evtNotTime ($name,$val,$chts);   
+          my ($y, $m, $d)  = $bdate =~ /^(\d{4})-(\d{2})-(\d{2})/x;                                  # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
+          my ($h, $mi, $s) = $btime =~ /^(\d{2}):(\d{2}):(\d{2})/x;
+          
+          eval { $chts = timelocal($s, $mi, $h, $d, $m-1, $y-1900);                                  # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
+                 1;
+          } or do {
+              my $err = (split(" at", $@))[0];
+              Log3($name, 3, "$name - ERROR - invalid date/time format in 'writeValuesToArray' detected: $err ");
+          };                                       
+          
+          ($uts,$td) = evtNotTime ($name,$val,$chts);   
           push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
           
-          $alarmed = SSCal_isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
+          $alarmed = isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
           
           $isAlldaychanded = 0;          
       }
@@ -2473,7 +2533,7 @@ sub SSCal_writeValuesToArray {                                                  
   # restliche Keys extrahieren
   for my $p (keys %{$vh}) {
       $vh->{$p} = "" if(!defined $vh->{$p});
-      $vh->{$p} = SSCal_jboolmap($vh->{$p});
+      $vh->{$p} = jboolmap($vh->{$p});
       next if($vh->{$p} eq "");
         
       $val = encode("UTF-8", $vh->{$p}); 
@@ -2504,13 +2564,13 @@ sub SSCal_writeValuesToArray {                                                  
       push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")                                                  if($p eq "is_repeat_evt");
       
       if($p eq "due") {                                                        
-          my (undef,undef,$duedate,$duetime,$duets,undef) = SSCal_explodeDateTime ($hash, $val, 0, 0, 0);
+          my (undef,undef,$duedate,$duetime,$duets,undef) = explodeDateTime ($hash, $val, 0, 0, 0);
           push(@row_array, $bts+$n." 60_dueDateTime "  .$duedate." ".$duetime."\n"); 
           push(@row_array, $bts+$n." 65_dueTimestamp " .$duets."\n");
       }
       
       push(@row_array, $bts+$n." 85_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
-      push(@row_array, $bts+$n." 90_calName "         .SSCal_getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
+      push(@row_array, $bts+$n." 90_calName "         .getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
 
       if($p eq "evt_repeat_setting") {
           for my $r (keys %{$vh->{evt_repeat_setting}}) {
@@ -2567,7 +2627,7 @@ return @row_array;
 #  Auswertung mit  $data{SSCal}{$name}{vcalendar}{"$uid"}
 #
 #############################################################################################
-sub SSCal_extractIcal {                 
+sub extractIcal {                                      ## no critic 'complexity' 
   my ($name,$vh) = @_;
   my $hash       = $defs{$name};
   
@@ -2577,12 +2637,12 @@ sub SSCal_extractIcal {
   my ($uid,$k,$v,$n);
 
   if($vh->{evt_ical}) {
-      my @ical = split(/\015\012/, $vh->{evt_ical});
+      my @ical = split(/\015\012/x, $vh->{evt_ical});
      
       my $do = 0;
       $n     = 0;
       for (@ical) {
-          if($_ =~ m/^([-A-Z]*;).*/) {
+          if($_ =~ m/^([-A-Z]*;)/x) {
               ($k,$v) = split(";", $_, 2);
           } else {
               ($k,$v) = split(":", $_, 2);
@@ -2597,22 +2657,22 @@ sub SSCal_extractIcal {
               $vcal{$n}{SEQUENCE}    = $v     if($k eq "SEQUENCE");
               
               if($k eq "DTSTART") {
-                  $v                 = SSCal_icalTimecheck ($name,$v);
+                  $v                 = icalTimecheck ($name,$v);
                   $vcal{$n}{DTSTART} = $v;
               }
               
               if($k eq "DTEND") {
-                  $v                 = SSCal_icalTimecheck ($name,$v);
+                  $v                 = icalTimecheck ($name,$v);
                   $vcal{$n}{DTEND} = $v;
               }
               
               if($k eq "RECURRENCE-ID") {
-                  $v                      = SSCal_icalTimecheck ($name,$v);
+                  $v                      = icalTimecheck ($name,$v);
                   $vcal{$n}{RECURRENCEID} = $v;
               }
               
               if($k eq "EXDATE") {
-                  $v                  = SSCal_icalTimecheck ($name,$v);
+                  $v                  = icalTimecheck ($name,$v);
                   $vcal{$n}{EXDATES} .= $v." ";
               }
           }
@@ -2623,7 +2683,7 @@ sub SSCal_extractIcal {
   while ($vh->{evt_notify_setting}[$n]) {
       for (keys %{$vh->{evt_notify_setting}[$n]}) {
           if($_ eq "recurrence-id") {
-              $valm{$n}{RECURRENCEID} = SSCal_icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
+              $valm{$n}{RECURRENCEID} = icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
           }
 
           if($_ eq "time_value") {
@@ -2640,7 +2700,7 @@ sub SSCal_extractIcal {
       $icals{$uid}{SEQUENCE}{$n}     = $vcal{$n}{SEQUENCE};
       $icals{$uid}{DTSTART}{$n}      = $vcal{$n}{DTSTART};
       $icals{$uid}{DTEND}{$n}        = $vcal{$n}{DTEND};
-      $icals{$uid}{EXDATES}{$n}      = SSCal_trim($vcal{$n}{EXDATES});
+      $icals{$uid}{EXDATES}{$n}      = trim($vcal{$n}{EXDATES});
       $icals{$uid}{RECURRENCEID}{$n} = $vcal{$n}{RECURRENCEID};
       $n++;
   }
@@ -2662,10 +2722,10 @@ return;
 }
 
 #############################################################################################
-#  Checked und korrigiert Zeitformate aus VCALENDAR um sie mit API-Werten zu vergleichbar
+#  Checked und korrigiert Zeitformate aus VCALENDAR um sie mit API-Werten vergleichbar
 #  zu machen
 #############################################################################################
-sub SSCal_icalTimecheck {
+sub icalTimecheck {
   my $name = shift;
   my $v    = shift;
   
@@ -2693,7 +2753,12 @@ sub SSCal_icalTimecheck {
       $sec  = "00";
   }
   
-  eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
+  eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); 
+         1;
+  } or do {
+      my $err = (split(" at", $@))[0];
+      Log3($name, 3, "$name - ERROR - invalid date/time format in 'icalTimecheck' detected: $err ");
+  };
   $isdst   = (localtime($tstamp))[8];
   $zulu    = 7200 if($isdst && $zulu);                                  # wenn Sommerzeit und Zulu-Zeit -> +1 Stunde
   $tstamp += $zulu; 
@@ -2707,7 +2772,7 @@ return $v;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts vor Alarmzeit $ats und vor Startzeit $bts,
 #  sonst 0
 #############################################################################################
-sub SSCal_isUpcoming {
+sub isUpcoming {
   my ($ts,$ats,$bts) = @_;
 
   if($ats) {
@@ -2722,7 +2787,7 @@ sub SSCal_isUpcoming {
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts zwischen Alarmzeit $ats und Startzeit $bts,
 #  sonst 0
 #############################################################################################
-sub SSCal_isAlarmed {
+sub isAlarmed {
   my ($ts,$ats,$bts) = @_;
   
 return $ats ? (($ats <= $ts && $ts < $bts) ? 1 : 0) : 0;
@@ -2733,7 +2798,7 @@ return $ats ? (($ats <= $ts && $ts < $bts) ? 1 : 0) : 0;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts zwischen Startzeit $bts und Endezeit $ets,
 #  sonst 0
 #############################################################################################
-sub SSCal_isStarted {
+sub isStarted {
   my ($ts,$bts,$ets) = @_;
   
   return 0 unless($bts);
@@ -2751,7 +2816,7 @@ return 1;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts größer Endezeit $ets,
 #  sonst 0
 #############################################################################################
-sub SSCal_isEnded {
+sub isEnded {
   my ($ts,$ets) = @_;
 
   return 0 unless($ets && $ts);
@@ -2762,33 +2827,33 @@ return $ets <= $ts ? 1 : 0;
 #############################################################################################
 #                                     check SID
 #############################################################################################
-sub SSCal_checkSID { 
+sub checkSID { 
   my ($name) = @_;
   my $hash   = $defs{$name};
   
   # SID holen bzw. login
-  my $subref = "SSCal_calop";
+  my $subref = "calOp";
   if(!$hash->{HELPER}{SID}) {
       Log3($name, 3, "$name - no session ID found - get new one");
-      SSCal_login($hash,$subref);
+      login($hash,$subref);
       return;
   }
    
-return SSCal_calop($name);
+return calOp($name);
 }
 
 ####################################################################################  
 #                                 Login for SID
 ####################################################################################
-sub SSCal_login {
+sub login {
   my ($hash,$fret)  = @_;
   my $name          = $hash->{NAME};
   my $serveraddr    = $hash->{ADDR};
   my $serverport    = $hash->{PORT};
   my $proto         = $hash->{PROT};
-  my $apiauth       = $SSCal_api{APIAUTH}{NAME};
-  my $apiauthpath   = $SSCal_api{APIAUTH}{PATH};
-  my $apiauthmaxver = $SSCal_api{APIAUTH}{MAX};
+  my $apiauth       = $api{APIAUTH}{NAME};
+  my $apiauthpath   = $api{APIAUTH}{PATH};
+  my $apiauthmaxver = $api{APIAUTH}{MAX};
 
   my $lrt = AttrVal($name,"loginRetries",3);
   my ($url,$param);
@@ -2799,7 +2864,7 @@ sub SSCal_login {
   Log3($name, 4, "$name - --- Start Synology Calendar login ---");
   
   # Credentials abrufen
-  my ($success, $username, $password) = SSCal_getcredentials($hash,0,"credentials");
+  my ($success, $username, $password) = getcredentials($hash,0,"credentials");
   
   unless ($success) {
       Log3($name, 2, "$name - Credentials couldn't be obtained successfully - make sure you've set it with \"set $name credentials <username> <password>\"");     
@@ -2832,14 +2897,14 @@ sub SSCal_login {
                funcret  => $fret,
                method   => "GET",
                header   => "Accept: application/json",
-               callback => \&SSCal_login_return
+               callback => \&FHEM::SSCal::login_return
            };
   HttpUtils_NonblockingGet ($param);
   
 return;
 }
 
-sub SSCal_login_return {
+sub login_return {
   my ($param, $err, $myjson) = @_;
   my $hash     = $param->{hash};
   my $name     = $hash->{NAME};
@@ -2855,11 +2920,11 @@ sub SSCal_login_return {
         
       readingsSingleUpdate($hash, "Error", $err, 1);                               
         
-      return SSCal_login($hash,$fret);
+      return login($hash,$fret);
    
    } elsif ($myjson ne "") {        
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = SSCal_evaljson($hash,$myjson);
+        ($hash, $success) = evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - no JSON-Data returned while login: ".$myjson);
             return;
@@ -2893,7 +2958,7 @@ sub SSCal_login_return {
             my $errorcode = $data->{error}{code};
        
             # Fehlertext zum Errorcode ermitteln
-            my $error = SSCal_experrorauth($hash,$errorcode);
+            my $error = experrorauth($hash,$errorcode);
 
             readingsBeginUpdate ($hash);
             readingsBulkUpdate  ($hash,"Errorcode", $errorcode);
@@ -2903,25 +2968,25 @@ sub SSCal_login_return {
        
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
-            return SSCal_login($hash,$fret);
+            return login($hash,$fret);
        }
    }
    
-return SSCal_login($hash,$fret);
+return login($hash,$fret);
 }
 
 ###################################################################################  
 #                                Funktion logout
 ###################################################################################
-sub SSCal_logout {
+sub logout {
    my ($hash)        = @_;
    my $name          = $hash->{NAME};
    my $serveraddr    = $hash->{ADDR};
    my $serverport    = $hash->{PORT};
    my $proto         = $hash->{PROT};
-   my $apiauth       = $SSCal_api{APIAUTH}{NAME};
-   my $apiauthpath   = $SSCal_api{APIAUTH}{PATH};
-   my $apiauthmaxver = $SSCal_api{APIAUTH}{MAX};
+   my $apiauth       = $api{APIAUTH}{NAME};
+   my $apiauthpath   = $api{APIAUTH}{PATH};
+   my $apiauthmaxver = $api{APIAUTH}{MAX};
    my $sid           = $hash->{HELPER}{SID};
    my ($url,$param);
     
@@ -2939,7 +3004,7 @@ sub SSCal_logout {
             hash     => $hash,
             method   => "GET",
             header   => "Accept: application/json",
-            callback => \&SSCal_logout_return
+            callback => \&FHEM::SSCal::logout_return
             };
    
    HttpUtils_NonblockingGet ($param);
@@ -2947,13 +3012,13 @@ sub SSCal_logout {
 return;  
 }
 
-sub SSCal_logout_return {  
+sub logout_return {  
    my ($param, $err, $myjson) = @_;
    my $hash                   = $param->{hash};
    my $name                   = $hash->{NAME};
    my $sid                    = $hash->{HELPER}{SID};
    my $OpMode                 = $hash->{OPMODE};
-   my ($success, $username, $password) = SSCal_getcredentials($hash,0,"credentials");
+   my ($success, $username, $password) = getcredentials($hash,0,"credentials");
    my ($data,$error,$errorcode);
   
    if ($err ne "") {
@@ -2968,7 +3033,7 @@ sub SSCal_logout_return {
    
    } elsif ($myjson ne "") {       
        # Evaluiere ob Daten im JSON-Format empfangen wurden
-       ($hash,$success,$myjson) = SSCal_evaljson($hash,$myjson);
+       ($hash,$success,$myjson) = evaljson($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);       
             return;
@@ -2990,7 +3055,7 @@ sub SSCal_logout_return {
            $errorcode = $data->{error}->{code};
 
            # Fehlertext zum Errorcode ermitteln
-           $error = SSCal_experrorauth($hash,$errorcode); 
+           $error = experrorauth($hash,$errorcode); 
 
            Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
        }
@@ -3007,7 +3072,7 @@ return;
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
 ###############################################################################
-sub SSCal_evaljson { 
+sub evaljson { 
   my ($hash,$myjson) = @_;
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
@@ -3020,7 +3085,7 @@ sub SSCal_evaljson {
           $errorcode = "900";
 
           # Fehlertext zum Errorcode ermitteln
-          $error = SSCal_experror($hash,$errorcode);
+          $error = experror($hash,$errorcode);
             
           readingsBeginUpdate         ($hash);
           readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
@@ -3036,17 +3101,17 @@ return ($hash,$success,$myjson);
 #  Auflösung Errorcodes Calendar AUTH API
 #  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
-sub SSCal_experrorauth {
+sub experrorauth {
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
   
-  unless (exists($SSCal_errauthlist{"$errorcode"})) {
+  unless (exists($errauthlist{"$errorcode"})) {
       $error = "Value of errorcode \"$errorcode\" not found."; 
       return ($error);
   }
 
-  $error = $SSCal_errauthlist{"$errorcode"};
+  $error = $errauthlist{"$errorcode"};
   
 return ($error);
 }
@@ -3055,17 +3120,17 @@ return ($error);
 #  Auflösung Errorcodes Calendar API
 #  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
-sub SSCal_experror {
+sub experror {
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
   
-  unless (exists($SSCal_errlist{"$errorcode"})) {
+  unless (exists($errlist{"$errorcode"})) {
       $error = "Value of errorcode \"$errorcode\" not found."; 
       return ($error);
   }
 
-  $error = $SSCal_errlist{"$errorcode"};
+  $error = $errlist{"$errorcode"};
   
 return ($error);
 }
@@ -3075,18 +3140,18 @@ return ($error);
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
 ################################################################
-sub SSCal_sortVersion {
+sub sortVersion {
   my ($sseq,@versions) = @_;
 
   return "" if(!@versions);
   
   my @sorted = map {$_->[0]}
                sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./]} @versions;
+               map {[$_, pack "C*", split /\./x]} @versions;
              
   @sorted = map {join ".", unpack "C*", $_}
             sort
-            map {pack "C*", split /\./} @versions;
+            map {pack "C*", split /\./x} @versions;
   
   if($sseq eq "desc") {
       @sorted = reverse @sorted;
@@ -3098,7 +3163,7 @@ return @sorted;
 ######################################################################################
 #                            credentials speichern
 ######################################################################################
-sub SSCal_setcredentials {
+sub setcredentials {
     my ($hash, @credentials) = @_;
     my $name                 = $hash->{NAME};
     my ($success, $credstr, $username, $passwd, $index, $retcode);
@@ -3123,7 +3188,7 @@ sub SSCal_setcredentials {
         Log3($name, 2, "$name - Error while saving Credentials - $retcode");
         $success = 0;
     } else {
-        ($success, $username, $passwd) = SSCal_getcredentials($hash,1,$ao);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
+        ($success, $username, $passwd) = getcredentials($hash,1,$ao);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
     }
 
 return ($success);
@@ -3132,7 +3197,7 @@ return ($success);
 ######################################################################################
 #                             credentials lesen
 ######################################################################################
-sub SSCal_getcredentials {
+sub getcredentials {
     my ($hash,$boot, $ao) = @_;
     my $name              = $hash->{NAME};
     my ($success, $username, $passwd, $index, $retcode, $credstr);
@@ -3191,7 +3256,7 @@ return ($success, $username, $passwd);
 #############################################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 #############################################################################################
-sub SSCal_trim {
+sub trim {
   my $str = shift;
   
   return if(!$str);
@@ -3203,7 +3268,7 @@ return ($str);
 #############################################################################################
 #                        Länge Senedequeue updaten          
 #############################################################################################
-sub SSCal_updQLength {
+sub updQLength {
   my ($hash,$rst) = @_;
   my $name        = $hash->{NAME};
  
@@ -3226,7 +3291,7 @@ return;
 #############################################################################################
 #              Start- und Endezeit ermitteln
 #############################################################################################
-sub SSCal_timeEdge {
+sub timeEdge {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my ($error,$t1,$t2) = ("","","");
@@ -3239,7 +3304,7 @@ sub SSCal_timeEdge {
   my $cutLaterDays = AttrVal($name, "cutLaterDays", 5)."d";
 
   # start of time window
-  ($error,$t1) = SSCal_GetSecondsFromTimeSpec($cutOlderDays);
+  ($error,$t1) = GetSecondsFromTimeSpec($cutOlderDays);
   if($error) {
       Log3 $hash, 2, "$name: attribute cutOlderDays: $error";
       return ($error,"","");
@@ -3250,7 +3315,7 @@ sub SSCal_timeEdge {
   }
 
   # end of time window
-  ($error,$t2) = SSCal_GetSecondsFromTimeSpec($cutLaterDays);
+  ($error,$t2) = GetSecondsFromTimeSpec($cutLaterDays);
   if($error) {
       Log3 $hash, 2, "$name: attribute cutLaterDays: $error";
       return ($error,"","");
@@ -3276,7 +3341,7 @@ return ("",$t1,$t2);
 #                           $ts:  Timstamp als YYYY-MM-DD HH:MM:SS
 #                 
 #############################################################################################
-sub SSCal_evtNotTime {
+sub evtNotTime {
   my ($name,$tv,$bts) = @_;
   my $hash            = $defs{$name};
   my ($uts,$ts)       = ("","");
@@ -3311,7 +3376,7 @@ return ($uts,$ts);
 #############################################################################################
 #              Unix timestamp aus Zeitdifferenz berechnen
 #############################################################################################
-sub SSCal_GetSecondsFromTimeSpec {
+sub GetSecondsFromTimeSpec {
   my ($tspec) = @_;
 
   # days
@@ -3346,7 +3411,7 @@ return ("Wrong time specification $tspec", undef);
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 #############################################################################################
-sub SSCal_getclhash {      
+sub getclhash {      
   my ($hash,$nobgd) = @_;
   my $name          = $hash->{NAME};
   my $ret;
@@ -3396,15 +3461,15 @@ return ($ret);
 ################################################################
 #         Kalendername aus Kalender-Id liefern
 ################################################################
-sub SSCal_getCalFromId {      
+sub getCalFromId {      
   my ($hash,$cid) = @_;
   my $cal         = "";
-  $cid            = SSCal_trim($cid);
+  $cid            = trim($cid);
   
   for my $calname (keys %{$hash->{HELPER}{CALENDARS}}) {
       my $oid = $hash->{HELPER}{CALENDARS}{"$calname"}{id};
       next if(!$oid);
-      $oid = SSCal_trim($oid);
+      $oid = trim($oid);
       if($oid eq $cid) {
           $cal = $calname;
           last;          
@@ -3417,7 +3482,7 @@ return $cal;
 ################################################################
 #   addiert Anzahl ($n) Sekunden ($s) zu $t1 
 ################################################################
-sub SSCal_plusNSeconds {
+sub plusNSeconds {
   my ($t1, $s, $n) = @_;
   
   $n     = 1 unless defined($n);
@@ -3432,7 +3497,7 @@ return $t2;
 #               wenn gesetzt, wird Reading nicht gelöscht
 #               wenn Updatezeit identisch zu "lastUpdate"
 ################################################################
-sub SSCal_delReadings {      
+sub delReadings {      
   my ($name,$respts) = @_;
   my ($lu,$rts,$excl);
   
@@ -3446,7 +3511,7 @@ sub SSCal_delReadings {
           $rts = ReadingsTimestamp($name, $key, $lu);
           next if($rts eq $lu);
       }
-      delete($defs{$name}{READINGS}{$key}) if($key !~ m/^($excl)$/);
+      delete($defs{$name}{READINGS}{$key}) if($key !~ m/^$excl$/x);
   }
   
 return;
@@ -3461,7 +3526,7 @@ return;
 #                                zu ignorieren und auch nicht zu zählen !)
 #    $dtstart:       man benötigt originales DTSTART für den Vergleich bei Recurring Terminen
 #############################################################################################
-sub SSCal_explodeDateTime {      
+sub explodeDateTime {                              ## no critic 'complexity'
   my ($hash,$dt,$isallday,$uid,$dtstart) = @_;
   my $name                 = $hash->{NAME};
   my ($tz,$t)              = ("","");
@@ -3503,9 +3568,9 @@ sub SSCal_explodeDateTime {
           }
           if($z) {
               $changedt = $data{SSCal}{$name}{vcalendar}{"$uid"}{DTSTART}{$z};
-              $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
-              $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
-              $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
+              my ($y, $m, $dd, $h, $mi, $s) = $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/x;
+              $changed  = $y."-".$m."-".$dd;                                    # einmalig geändertes Datum
+              $changet  = $h.":".$mi.":".$s;                                    # einmalig geänderte Zeit
           }
       } else {
           # prüfen ob DTEND verändert
@@ -3515,9 +3580,9 @@ sub SSCal_explodeDateTime {
           }
           if($z) {
               $changedt = $data{SSCal}{$name}{vcalendar}{"$uid"}{DTEND}{$z};
-              $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/;
-              $changed  = $1."-".$2."-".$3;                                     # einmalig geändertes Datum
-              $changet  = $4.":".$5.":".$6;                                     # einmalig geänderte Zeit
+              my ($y, $m, $dd, $h, $mi, $s) = $changedt =~ /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/x;
+              $changed  = $y."-".$m."-".$dd;                                    # einmalig geändertes Datum
+              $changet  = $h.":".$mi.":".$s;                                    # einmalig geänderte Zeit
           }      
       }
   }
@@ -3541,31 +3606,35 @@ sub SSCal_explodeDateTime {
       $t     = "00:00:00";
   }
   
-  unless ( ($d." ".$t) =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/) {
+  unless ( ($d." ".$t) =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})/x) {
       Log3($name, 2, "$name - ERROR - invalid DateTime format for explodeDateTime: $d $t");
   }
   
   if ($corrsec) {                              # Termin um 1 Sekunde verkürzen damit Termin am selben Tag 23:59:59 endet (sonst Folgetag 00:00:00)         
-      eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
-      $tstamp -= $corrsec;
-      my $nt   = FmtDateTime($tstamp);
-      $nt      =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
-      $year    = $1;     
-      $month   = $2;    
-      $mday    = $3;
-      $hour    = $4;
-      $min     = $5;
-      $sec     = $6;
-      $d       = $year."-".$month."-".$mday;
-      $t       = $hour.":".$min.":".$sec;
+      eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); 
+             1;
+      } or do {
+          my $err = (split(" at", $@))[0];
+          Log3($name, 3, "$name - WARNING - invalid date/time format detected: $err. It will be ignored.");
+          $invalid = 1;
+      };
+      
+      if(!$invalid) {
+          $tstamp -= $corrsec;
+          my $nt   = FmtDateTime($tstamp);
+          ($year, $month, $mday, $hour, $min, $sec) = $nt =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})/x;
+          $d                                        = $year."-".$month."-".$mday;
+          $t                                        = $hour.":".$min.":".$sec;
+      }
   }
   
-  eval { $tstamp = timelocal($sec, $min, $hour, $mday, $month-1, $year-1900); };
-  if ($@) {
+  eval { $tstamp = fhemTimeLocal($sec, $min, $hour, $mday, $month-1, $year-1900); 
+         1;
+  } or do {
       my $err = (split(" at", $@))[0];
       Log3($name, 3, "$name - WARNING - invalid format of recurring event: $err. It will be ignored due to RFC 5545 standard.");
       $invalid = 1;
-  }
+  };
 
   $d = $changed // $d;                               # mit einmalig geänderten Datum ersetzen
   $t = $changet // $t;                               # mit einmalig geänderter Zeit ersetzen
@@ -3577,11 +3646,11 @@ return ($invalid,$tz,$d,$t,$tstamp,$excl);
 #                          Versionierungen des Moduls setzen
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
-sub SSCal_setVersionInfo {
+sub setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
-  my $v                    = (SSCal_sortVersion("desc",keys %SSCal_vNotesIntern))[0];
+  my $v                    = (sortVersion("desc",keys %vNotesIntern))[0];
   my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
@@ -3589,16 +3658,16 @@ sub SSCal_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCal}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21499 2020-03-24 10:08:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 57_SSCal.pm 21776 2020-04-25 19:53:14Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21499 2020-03-24 10:08:20Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 57_SSCal.pm 21776 2020-04-25 19:53:14Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );       ## no critic 'VERSION'                                      
       }
   } else {
       # herkömmliche Modulstruktur
@@ -3611,29 +3680,20 @@ return;
 ###############################################################################
 #                       JSON Boolean Test und Mapping
 ###############################################################################
-sub SSCal_jboolmap {
-  my ($bool)= @_;
+sub jboolmap {
+  my ($bool) = @_;
   
   if(JSON::is_bool($bool)) {
-      my $b = SSCal_boolean($bool);
-      $bool = 1 if($b == $JSON::true);
-      $bool = 0 if($b == $JSON::false);
+      $bool = $bool ? 1 : 0;
   }
   
-return $bool;
-}
-
-sub SSCal_boolean {
-    my $bool = shift;
-    $bool    = $bool ? $JSON::true : $JSON::false;
-
 return $bool;
 }
 
 #############################################################################################
 #   Kalenderliste als HTML-Tabelle zurückgeben
 #############################################################################################
-sub SSCal_calAsHtml {                                                                 ## no critic 'complexity'
+sub calAsHtml {                                                                 ## no critic 'complexity'
   my ($name,$FW_wname) = @_;
   my $hash             = $defs{$name};  
   my $lang             = AttrVal("global", "language", "EN");
@@ -3666,13 +3726,21 @@ sub SSCal_calAsHtml {                                                           
   grep { !$seen{$_}++ } @cof; 
 
   # Gestaltung Headerzeile
-  my $nohead        = 0;                                                             # Unterdrückung Anzeige Headerzeile: 0 - nein, 1 - Ja  
-  eval { $nohead    = SSCal_evalTableSpecs ($hash,$nohead,$hash->{HELPER}{tableSpecs}{cellStyle}{noHeader},"",\@allrds,"string"); };
-  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);
-  my $headalign     = "center";                                                      # Ausrichtung der Headerzeile, default: center
-  eval { $headalign = SSCal_evalTableSpecs ($hash,$headalign,$hash->{HELPER}{tableSpecs}{cellStyle}{headerAlign},"",\@allrds,"string"); };
-  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@); 
-  $headalign        = "cal".$headalign;
+  my $nohead  = 0;                                                             # Unterdrückung Anzeige Headerzeile: 0 - nein, 1 - Ja  
+  eval { $nohead = evalTableSpecs ($hash,$nohead,$hash->{HELPER}{tableSpecs}{cellStyle}{noHeader},"",\@allrds,"string"); 
+         1;
+  } or do {
+      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@");
+  };
+    
+  my $headalign = "center";                                                      # Ausrichtung der Headerzeile, default: center
+  eval { $headalign = evalTableSpecs ($hash,$headalign,$hash->{HELPER}{tableSpecs}{cellStyle}{headerAlign},"",\@allrds,"string"); 
+         1;
+  } or do {
+      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@");
+  };
+   
+  $headalign = "cal".$headalign;
 
   # Tabelle erstellen
   my $out  = "<html>";  
@@ -3722,8 +3790,9 @@ sub SSCal_calAsHtml {                                                           
   
   my $maxbnr;
   for my $key (keys %{$defs{$name}{READINGS}}) {
-      next if $key !~ /^(\d+)_\d+_EventId$/;
-      $maxbnr = $1 if(!$maxbnr || $1>$maxbnr);
+      my ($bno) = $key =~ /^(\d+)_\d+_EventId$/x;
+      next if(!defined $bno);
+      $maxbnr = $bno if(!$maxbnr || $bno > $maxbnr);
   }
 
   return "" if(!defined $maxbnr);
@@ -3760,15 +3829,24 @@ sub SSCal_calAsHtml {                                                           
           if ($mi eq "icon") {
               # Karten-Icon auswählen
               $di           = "it_i-net";
-              eval { $micon = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image"); };
-              Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapIcon\": $@") if($@);           
+              eval { $micon = evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image"); 
+                     1;
+              } or do {
+                  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapIcon\": $@")
+              };
+                         
           } elsif ($mi eq "data") {
               $micon = join(" ", split(",", $gpsc));
+              
           } elsif ($mi eq "text") {
               # Karten-Text auswählen
               my $dt        = "link";
-              eval { $micon = SSCal_evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string"); };
-              Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapText\": $@") if($@);
+              eval { $micon = evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string"); 
+                     1;
+              } or do {
+                  Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapText\": $@");
+              };
+              
           } else {
               $micon = "";
           }
@@ -3779,8 +3857,12 @@ sub SSCal_calAsHtml {                                                           
                                              
           # Kartenanbieter auswählen
           my $up     = "GoogleMaps";
-          eval { $up = SSCal_evalTableSpecs ($hash,$up,$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string"); };
-          Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapProvider\": $@") if($@);
+          eval { $up = evalTableSpecs ($hash,$up,$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string"); 
+                 1;
+          } or do {
+              Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapProvider\": $@");
+          };
+          
           if ($up eq "GoogleMaps") {                                                                                       # Kartenprovider: Google Maps
               $gps = "<a href='https://www.google.de/maps/place/$gpsa/\@$lat,$lng' target='_blank'> $micon </a>";          
           } elsif ($up eq "OpenStreetMap") {
@@ -3789,9 +3871,9 @@ sub SSCal_calAsHtml {                                                           
       }
       
       if($begin ne "") {                                             # Datum sprachabhängig konvertieren bzw. heute/morgen setzen
-          my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());         # Jetzt
-          my ($by,$bm,$bd,$bt)   = split(/[ -]/, $begin);
-          my ($ey,$em,$ed,$et)   = split(/[ -]/, $end);
+          my ($ny,$nm,$nd,undef) = split(/[\s-]/x, TimeNow());         # Jetzt
+          my ($by,$bm,$bd,$bt)   = split(/[\s-]/x, $begin);
+          my ($ey,$em,$ed,$et)   = split(/[\s-]/x, $end);
           my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
           my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
           my $etimes             = fhemTimeLocal(00, 00, 00, $ed, $em-1, $ey-1900);
@@ -3828,39 +3910,51 @@ sub SSCal_calAsHtml {                                                           
       }
 
       # Icon für Spalte Resttage spezifizieren
-      eval { $dleft = SSCal_evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image"); };
-      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnDaysLeftIcon\": $@") if($@);
-      
+      eval { $dleft = evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image"); 
+             1;
+      } or do {
+          Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnDaysLeftIcon\": $@");
+      };
+            
       # Icon für Spalte Status spezifizieren
-      eval { $status = SSCal_evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image"); };
-      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnStateIcon\": $@") if($@);
+      eval { $status = evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image"); 
+             1;
+      } or do {
+          Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnStateIcon\": $@");
+      };
       
       # Icon für Spalte "Symbol" bestimmen
       $di            = ($hash->{MODEL} eq "Diary") ? "time_calendar" : "time_note";
-      eval { $symbol = SSCal_evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image"); };
-      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnSymbolIcon\": $@") if($@);
+      eval { $symbol = evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image"); 
+             1;
+      } or do {
+          Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnSymbolIcon\": $@");
+      };
       
       # Gestaltung Spaltentext
       my $coldefalign     = "center";                               # Ausrichtung der Spalte, default: center
       eval { 
-           $coldefalign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign}             ,"",\@allrds,"string"); 
-           $colSymbolAlign  = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSymbolAlign}       ,"",\@allrds,"string");
-           $colBeginAlign   = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnBeginAlign}        ,"",\@allrds,"string");
-           $colEndAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEndAlign}          ,"",\@allrds,"string");
-           $colDayAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftAlign}     ,"",\@allrds,"string");
-           $colDLongAlign   = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftLongAlign} ,"",\@allrds,"string");
-           $colWeekdayAlign = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnWeekdayAlign}      ,"",\@allrds,"string");
-           $colTzAlign      = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnTimezoneAlign}     ,"",\@allrds,"string");
-           $colSummaryAlign = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSummaryAlign}      ,"",\@allrds,"string");
-           $colDescAlign    = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDescriptionAlign}  ,"",\@allrds,"string");  
-           $colStatusAlign  = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnStatusAlign}       ,"",\@allrds,"string");  
-           $colCompAlign    = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCompletionAlign}   ,"",\@allrds,"string");  
-           $colLocAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnLocationAlign}     ,"",\@allrds,"string");  
-           $colMapAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnMapAlign}          ,"",\@allrds,"string");  
-           $colCalAlign     = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCalendarAlign}     ,"",\@allrds,"string");  
-           $colIdAlign      = "cal".SSCal_evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEventIdAlign}      ,"",\@allrds,"string");  
+           $coldefalign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign}             ,"",\@allrds,"string"); 
+           $colSymbolAlign  = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSymbolAlign}       ,"",\@allrds,"string");
+           $colBeginAlign   = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnBeginAlign}        ,"",\@allrds,"string");
+           $colEndAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEndAlign}          ,"",\@allrds,"string");
+           $colDayAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftAlign}     ,"",\@allrds,"string");
+           $colDLongAlign   = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftLongAlign} ,"",\@allrds,"string");
+           $colWeekdayAlign = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnWeekdayAlign}      ,"",\@allrds,"string");
+           $colTzAlign      = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnTimezoneAlign}     ,"",\@allrds,"string");
+           $colSummaryAlign = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSummaryAlign}      ,"",\@allrds,"string");
+           $colDescAlign    = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDescriptionAlign}  ,"",\@allrds,"string");  
+           $colStatusAlign  = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnStatusAlign}       ,"",\@allrds,"string");  
+           $colCompAlign    = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCompletionAlign}   ,"",\@allrds,"string");  
+           $colLocAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnLocationAlign}     ,"",\@allrds,"string");  
+           $colMapAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnMapAlign}          ,"",\@allrds,"string");  
+           $colCalAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCalendarAlign}     ,"",\@allrds,"string");  
+           $colIdAlign      = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEventIdAlign}      ,"",\@allrds,"string");  
+           1;
+      } or do {
+          Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@")
       };
-      Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@") if($@);
+
       my $colalign  = $coldefalign;
       
       # TabellenBody 
@@ -3910,7 +4004,7 @@ return $out;
 # $rdtype:   erwarteter Datentyp als Rückgabe (image, string)
 #
 ######################################################################################
-sub SSCal_evalTableSpecs {                                                    ## no critic 'complexity'
+sub evalTableSpecs {                                                    ## no critic 'complexity'
   my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
   my $name = $hash->{NAME};
   my $check;
@@ -3919,12 +4013,12 @@ sub SSCal_evalTableSpecs {                                                    ##
   
   # anonymous sub für Abarbeitung Perl-Kommandos
   $check = sub {
-      my ($specs) = @_;
-      my $ret     = AnalyzePerlCommand(undef, $specs);
+      my ($cmd) = @_;
+      my $ret   = AnalyzePerlCommand(undef, $cmd);
   return $ret;
   };
                           
-  no warnings;
+  no warnings;                                                                ## no critic 'warnings'
   
   if ($specs) {                                                               # Eigenschaft muß Wert haben
       my ($rn,$reading,$uval,$ui,$rval);
@@ -4044,7 +4138,7 @@ return $default;
     <a href="https://forum.fhem.de/index.php/topic,106963.0.html">57_SSCal - Modul für den Synology Kalender</a>.<br><br>
 
     Further information about the module you can find in the (german) FHEM Wiki:<br>
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
     <br><br><br>
     
     
@@ -4257,7 +4351,7 @@ return $default;
   overview can be used as follows: <br><br>
   
     <ul>
-      { SSCal_calAsHtml ("&lt;SSCal-Device&gt;") }
+      { FHEM::SSCal::calAsHtml ("&lt;SSCal-Device&gt;") }
     </ul>  
   
   </li><br>
@@ -4318,7 +4412,7 @@ return $default;
     A FHEM command to be executed has to be included into <b>{ }</b> in the field <b>Description</b> of Synology Calendar 
     application WebUI, Perl routines has to be included into double <b>{{ }}</b>. <br>    
     For further detailed information please read the Wiki (germnan) section:
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
     <br>
     (default: 0)
     
@@ -4459,7 +4553,7 @@ return $default;
     To make further adjustments, there are some more possibilities to specify properties in the attribute tableSpecs.
     For detailed informations about the possibilities to configure the overview table please consult the (german) Wiki
     chapter 
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
     <br>    
     
   </li><br>
@@ -4500,7 +4594,7 @@ return $default;
   
     By several key-value pair combinations the presentation of informations in the overview table can be adjusted. 
     The (german) Wiki chapter 
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
     provides more detailed help for it.
      
   </li><br>
@@ -4604,7 +4698,7 @@ return $default;
     <a href="https://forum.fhem.de/index.php/topic,106963.0.html">57_SSCal - Modul für den Synology Kalender</a>.<br><br>
 
     Weitere Infomationen zum Modul sind im FHEM-Wiki zu finden:<br>
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers">SSCal - Integration des Synology Calendar Servers</a>.
     <br><br><br>
     
     
@@ -4820,7 +4914,7 @@ return $default;
   diese Übersicht aufgerufen werden mit: <br><br>
   
     <ul>
-      { SSCal_calAsHtml ("&lt;SSCal-Device&gt;") }
+      { FHEM::SSCal::calAsHtml ("&lt;SSCal-Device&gt;") }
     </ul>  
   
   </li><br>
@@ -4881,7 +4975,7 @@ return $default;
     Auszuführende FHEM-Kommandos werden in <b>{ }</b> eingeschlossen im Feld <b>Beschreibung</b> im Synology Kalender WebUI
     hinterlegt, Perl Routinen werden in doppelte <b>{{ }}</b> eingeschlossen. <br>    
     Lesen sie bitte dazu die detailliierte Beschreibung im Wiki Abschnitt
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#at-Devices_f.C3.BCr_Steuerungen_automatisch_erstellen_und_verwalten_lassen">at-Devices für Steuerungen automatisch erstellen und verwalten lassen</a>.
     <br>
     (default: 0)
     
@@ -5022,7 +5116,7 @@ return $default;
     <br>
     Der Nutzer kann weitere Anpassungen des verwendeten Icons oder Textes in den Eigenschaften des Attributs tableSpecs 
     vornehmen. Für detailliierte Informationen dazu siehe Wiki-Kapitel 
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>.
     <br>    
     
   </li><br>
@@ -5064,7 +5158,7 @@ return $default;
   
     Über verschiedene Schlüssel-Wertpaar Kombinationen kann die Darstellung der Informationen in der Übersichtstabelle 
     angepasst werden. Das Wiki-Kapitel
-    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
+    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
     liefert detailiierte Informationen dazu.
      
   </li><br>
