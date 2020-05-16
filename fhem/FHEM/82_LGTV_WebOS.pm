@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2018 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -228,7 +228,8 @@ my %openApps = (
     'Notificationcenter' => 'com.webos.app.notificationcenter',
     'Plex'               => 'cdp-30',
     'SkyOnline'          => 'de.sky.skyonline',
-    'Smart-IPTV'         => 'com.1827622.109556'
+    'Smart-IPTV'         => 'com.1827622.109556',
+    'Spotify'            => 'spotify-beehive',
 );
 
 my %openAppsPackageName = reverse %openApps;
@@ -2006,7 +2007,7 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.1",
+  "version": "v3.2.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
