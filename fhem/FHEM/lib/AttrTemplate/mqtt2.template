@@ -1866,6 +1866,42 @@ set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellybulb
 
+# contributed by KurtK https://forum.fhem.de/index.php/topic,94495.msg1055093.html#msg1055093
+# shellyduo using original firmware
+name:shellyduo
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:Shelly Duo using original firmware <br>Tested with firmware 20200320-123338/v1.6.2@514044b4 <br> based on shellybulb and shelliergbw2 template
+order:A_15a
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+attr DEVICE icon ICON
+attr DEVICE setList\
+  off:noArg shellies/DEVNAME/light/0/command off\
+  on:noArg shellies/DEVNAME/light/0/command on\
+  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"gain":"$EVTPART1","brightness":"$EVTPART1"}\
+  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/light/0/set {"turn":"on","gain":"$EVTPART1","brightness":"$EVTPART1"}\
+  ct:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/light/0/set {\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  ct_on:colorpicker,CT,3000,10,6500 {$EVTPART1=3000 if ($EVTPART1<3000);"shellies/DEVNAME/light/0/set {\"turn\":\"on\",\"mode\":\"white\",\"temp\":\"$EVTPART1\"}"}\
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+deletereading -q DEVICE status_.*
+attr DEVICE readingList\
+  shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
+  shellies/DEVNAME/light/0/power:.* power\
+  shellies/DEVNAME/light/0/energy:.* energy\
+  shellies/DEVNAME/light/0:.* state\
+  shellies/DEVNAME/online:.* online\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
+attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}
+attr DEVICE webCmd on:off:pct:ct
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
+#attr DEVICE genericDeviceType light
+attr DEVICE jsonMap brightness:pct
+set DEVICE x_mqttcom announce
+set DEVICE attrTemplate speechcontrol_type_light
+attr DEVICE model shellyduo
+
+
 # shellyht using original firmware
 name:shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -1906,7 +1942,7 @@ attr DEVICE model shellyflood
 # contributed by majestro84, https://forum.fhem.de/index.php/topic,94060.msg1054466.html#msg1054466
 name:shellydw
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
-desc:shellydw using original firmware
+desc:shellydw using original firmware. <br>Note: can be configered als two- or three-state sensor.
 order:A_16b
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal("DEVICE","icon","fts_window_1w_open") }
