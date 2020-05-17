@@ -176,9 +176,6 @@ my %vHintsExt_de = (
          "gemäß <a href=\"https://tools.ietf.org/html/rfc5545\">RFC5545</a>. "
 );
 
-# Hash der API-Seiten
-use vars qw(%api);
-
 # Aufbau Errorcode-Hashes
 my %errauthlist = (
   400 => "No such account or the password is incorrect",
@@ -314,14 +311,14 @@ sub Define {
   CommandAttr(undef,"$name room SSCal");
   CommandAttr(undef,"$name event-on-update-reading .*Summary,state");
   
-  %api = (
-               "APIINFO"   => { "NAME" => "SYNO.API.Info"    },     # Info-Seite für alle API's, einzige statische Seite !                                                    
-               "APIAUTH"   => { "NAME" => "SYNO.API.Auth"    },     # API used to perform session login and logout  
-               "CALCAL"    => { "NAME" => "SYNO.Cal.Cal"     },     # API to manipulate calendar
-               "CALEVENT"  => { "NAME" => "SYNO.Cal.Event"   },     # Provide methods to manipulate events in the specific calendar
-               "CALSHARE"  => { "NAME" => "SYNO.Cal.Sharing" },     # Get/set sharing setting of calendar
-               "CALTODO"   => { "NAME" => "SYNO.Cal.Todo"    },     # Provide methods to manipulate events in the specific calendar
-               );
+  $data{SSCal}{$name}{calapi} = {                                                     # in Define um unterschiedliche DSM mit div. Versionen zu ermöglichen
+                                 "APIINFO"   => { "NAME" => "SYNO.API.Info"    },     # Info-Seite für alle API's, einzige statische Seite !                                                    
+                                 "APIAUTH"   => { "NAME" => "SYNO.API.Auth"    },     # API used to perform session login and logout  
+                                 "CALCAL"    => { "NAME" => "SYNO.Cal.Cal"     },     # API to manipulate calendar
+                                 "CALEVENT"  => { "NAME" => "SYNO.Cal.Event"   },     # Provide methods to manipulate events in the specific calendar
+                                 "CALSHARE"  => { "NAME" => "SYNO.Cal.Sharing" },     # Get/set sharing setting of calendar
+                                 "CALTODO"   => { "NAME" => "SYNO.Cal.Todo"    },     # Provide methods to manipulate events in the specific calendar
+                                };
 
   # Versionsinformationen setzen
   setVersionInfo($hash);
@@ -429,12 +426,12 @@ sub Attr {                                                  ## no critic 'comple
         }
         
         if ($aName =~ /tableSpecs/x) {            
-            return qq{The attribute "$aName" has wrong syntax. The value must be set into "{ }".} if($aVal !~ m/^\s*\{.*\}\s*$/s);
+            return qq{The attribute "$aName" has wrong syntax. The value must be set into "{ }".} if($aVal !~ m/^\s*?\{.*\}\s*?$/xs);
         }
         
         my $attrVal = $aVal;
         
-        if ($attrVal =~ m/^\{.*\}$/s && $attrVal =~ m/=>/x) {
+        if ($attrVal =~ m/^\{.*\}$/xs && $attrVal =~ m/=>/x) {
             $attrVal =~ s/\@/\\\@/gx;
             $attrVal =~ s/\$/\\\$/gx;
             
@@ -684,7 +681,7 @@ sub Set {                                                    ## no critic 'compl
       
       Log3($name, 5, "$name - Calendar selection for add queue: $cals");
       
-      # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+      # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
       addQueue($name,"cleanCompleteTasks","CALTODO","clean_complete","&cal_id_list=[$oids]"); 
       getApiSites($name);
   
@@ -716,7 +713,7 @@ sub Set {                                                    ## no critic 'compl
       
       Log3($name, 3, "$name - The event \"$sum\" with id \"$eventid\" will be deleted in calendar \"$calname\".");
       
-      # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+      # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
       addQueue($name,"deleteEventId",$api,"delete","&evt_id=$eventid"); 
       getApiSites($name);      
   
@@ -784,7 +781,7 @@ sub Get {                                                                       
         getclhash($hash,1);
         $hash->{HELPER}{APIPARSET} = 0;                                                   # Abruf API Infos erzwingen
 
-        # <Name, operation mode, API (siehe %api), auszuführende API-Methode, spezifische API-Parameter>
+        # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
         addQueue($name,"apiInfo","","","");            
         getApiSites($name);
   
@@ -964,7 +961,7 @@ return;
 #                            Eintrag zur SendQueue hinzufügen
 #    $name   = Name Kalenderdevice
 #    $opmode = operation mode
-#    $api    = API (siehe %api)
+#    $api    = API (siehe $data{SSCal}{$name}{calapi})
 #    $method = auszuführende API-Methode 
 #    $params = spezifische API-Parameter 
 #
@@ -1131,7 +1128,14 @@ sub getApiSites {
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$prot://$addr:$port/webapi/query.cgi?api=$api{APIINFO}{NAME}&method=Query&version=1&query=$api{APIAUTH}{NAME},$api{CALCAL}{NAME},$api{CALEVENT}{NAME},$api{CALSHARE}{NAME},$api{CALTODO}{NAME},$api{APIINFO}{NAME}";
+   my $calapi = $data{SSCal}{$name}{calapi};
+   $url       = "$prot://$addr:$port/webapi/query.cgi?api=".$calapi->{APIINFO}{NAME}."&method=Query&version=1&query=".
+                                                            $calapi->{APIAUTH}{NAME}.",".
+                                                            $calapi->{CALCAL}{NAME}.",".
+                                                            $calapi->{CALEVENT}{NAME}.",".
+                                                            $calapi->{CALSHARE}{NAME}.",".
+                                                            $calapi->{CALTODO}{NAME}.",".
+                                                            $calapi->{APIINFO}{NAME};
 
    Log3($name, 4, "$name - Call-Out: $url");
    
@@ -1192,65 +1196,66 @@ sub getApiSites_parse {                                                   ## no 
     
         if ($success) {
             my $logstr;
+            my $calapi = $data{SSCal}{$name}{calapi};
                         
           # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
-            my $apiauthpath   = $data->{data}->{$api{APIAUTH}{NAME}}->{path};
+            my $apiauthpath   = $data->{data}->{$calapi->{APIAUTH}{NAME}}->{path};
             $apiauthpath      =~ tr/_//d if (defined($apiauthpath));
-            my $apiauthmaxver = $data->{data}->{$api{APIAUTH}{NAME}}->{maxVersion}; 
+            my $apiauthmaxver = $data->{data}->{$calapi->{APIAUTH}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apiauthpath) ? "Path of $api{APIAUTH}{NAME} selected: $apiauthpath" : "Path of $api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiauthpath) ? "Path of $calapi->{APIAUTH}{NAME} selected: $apiauthpath" : "Path of $calapi->{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiauthmaxver) ? "MaxVersion of $api{APIAUTH}{NAME} selected: $apiauthmaxver" : "MaxVersion of $api{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiauthmaxver) ? "MaxVersion of $calapi->{APIAUTH}{NAME} selected: $apiauthmaxver" : "MaxVersion of $calapi->{APIAUTH}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
                    
           # Pfad und Maxversion von "SYNO.Cal.Cal" ermitteln
-            my $apicalpath   = $data->{data}->{$api{CALCAL}{NAME}}->{path};
+            my $apicalpath   = $data->{data}->{$calapi->{CALCAL}{NAME}}->{path};
             $apicalpath      =~ tr/_//d if (defined($apicalpath));
-            my $apicalmaxver = $data->{data}->{$api{CALCAL}{NAME}}->{maxVersion}; 
+            my $apicalmaxver = $data->{data}->{$calapi->{CALCAL}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apicalpath) ? "Path of $api{CALCAL}{NAME} selected: $apicalpath" : "Path of $api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apicalpath) ? "Path of $calapi->{CALCAL}{NAME} selected: $apicalpath" : "Path of $calapi->{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apicalmaxver) ? "MaxVersion of $api{CALCAL}{NAME} selected: $apicalmaxver" : "MaxVersion of $api{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apicalmaxver) ? "MaxVersion of $calapi->{CALCAL}{NAME} selected: $apicalmaxver" : "MaxVersion of $calapi->{CALCAL}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");            
             
           # Pfad und Maxversion von "SYNO.Cal.Event" ermitteln
-            my $apievtpath   = $data->{data}->{$api{CALEVENT}{NAME}}->{path};
+            my $apievtpath   = $data->{data}->{$calapi->{CALEVENT}{NAME}}->{path};
             $apievtpath      =~ tr/_//d if (defined($apievtpath));
-            my $apievtmaxver = $data->{data}->{$api{CALEVENT}{NAME}}->{maxVersion}; 
+            my $apievtmaxver = $data->{data}->{$calapi->{CALEVENT}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apievtpath) ? "Path of $api{CALEVENT}{NAME} selected: $apievtpath" : "Path of $api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apievtpath) ? "Path of $calapi->{CALEVENT}{NAME} selected: $apievtpath" : "Path of $calapi->{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apievtmaxver) ? "MaxVersion of $api{CALEVENT}{NAME} selected: $apievtmaxver" : "MaxVersion of $api{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apievtmaxver) ? "MaxVersion of $calapi->{CALEVENT}{NAME} selected: $apievtmaxver" : "MaxVersion of $calapi->{CALEVENT}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr"); 
 
           # Pfad und Maxversion von "SYNO.Cal.Sharing" ermitteln
-            my $apisharepath   = $data->{data}->{$api{CALSHARE}{NAME}}->{path};
+            my $apisharepath   = $data->{data}->{$calapi->{CALSHARE}{NAME}}->{path};
             $apisharepath      =~ tr/_//d if (defined($apisharepath));
-            my $apisharemaxver = $data->{data}->{$api{CALSHARE}{NAME}}->{maxVersion}; 
+            my $apisharemaxver = $data->{data}->{$calapi->{CALSHARE}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apisharepath) ? "Path of $api{CALSHARE}{NAME} selected: $apisharepath" : "Path of $api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apisharepath) ? "Path of $calapi->{CALSHARE}{NAME} selected: $apisharepath" : "Path of $calapi->{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apisharemaxver) ? "MaxVersion of $api{CALSHARE}{NAME} selected: $apisharemaxver" : "MaxVersion of $api{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apisharemaxver) ? "MaxVersion of $calapi->{CALSHARE}{NAME} selected: $apisharemaxver" : "MaxVersion of $calapi->{CALSHARE}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr"); 
 
           # Pfad und Maxversion von "SYNO.Cal.Todo" ermitteln
-            my $apitodopath   = $data->{data}->{$api{CALTODO}{NAME}}->{path};
+            my $apitodopath   = $data->{data}->{$calapi->{CALTODO}{NAME}}->{path};
             $apitodopath      =~ tr/_//d if (defined($apitodopath));
-            my $apitodomaxver = $data->{data}->{$api{CALTODO}{NAME}}->{maxVersion}; 
+            my $apitodomaxver = $data->{data}->{$calapi->{CALTODO}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apitodopath) ? "Path of $api{CALTODO}{NAME} selected: $apitodopath" : "Path of $api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apitodopath) ? "Path of $calapi->{CALTODO}{NAME} selected: $apitodopath" : "Path of $calapi->{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apitodomaxver) ? "MaxVersion of $api{CALTODO}{NAME} selected: $apitodomaxver" : "MaxVersion of $api{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apitodomaxver) ? "MaxVersion of $calapi->{CALTODO}{NAME} selected: $apitodomaxver" : "MaxVersion of $calapi->{CALTODO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
 
           # Pfad und Maxversion von "SYNO.API.Info" ermitteln
-            my $apiinfopath   = $data->{data}->{$api{APIINFO}{NAME}}->{path};
+            my $apiinfopath   = $data->{data}->{$calapi->{APIINFO}{NAME}}->{path};
             $apiinfopath      =~ tr/_//d if (defined($apiinfopath));
-            my $apiinfomaxver = $data->{data}->{$api{APIINFO}{NAME}}->{maxVersion}; 
+            my $apiinfomaxver = $data->{data}->{$calapi->{APIINFO}{NAME}}->{maxVersion}; 
        
-            $logstr = defined($apiinfopath) ? "Path of $api{APIINFO}{NAME} selected: $apiinfopath" : "Path of $api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiinfopath) ? "Path of $calapi->{APIINFO}{NAME} selected: $apiinfopath" : "Path of $calapi->{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiinfomaxver) ? "MaxVersion of $api{APIINFO}{NAME} selected: $apiinfomaxver" : "MaxVersion of $api{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
+            $logstr = defined($apiinfomaxver) ? "MaxVersion of $calapi->{APIINFO}{NAME} selected: $apiinfomaxver" : "MaxVersion of $calapi->{APIINFO}{NAME} undefined - Synology cal Server may be stopped";
             Log3($name, 4, "$name - $logstr");             
             
             
@@ -1261,29 +1266,29 @@ sub getApiSites_parse {                                                   ## no 
             
             $apievtmaxver = 3;
             $evtmod       = "yes";
-            Log3($name, 4, "$name - MaxVersion of $api{CALEVENT}{NAME} adapted to: $apievtmaxver");
+            Log3($name, 4, "$name - MaxVersion of $calapi->{CALEVENT}{NAME} adapted to: $apievtmaxver");
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
             
             # ermittelte Werte in $hash einfügen
-            $api{APIINFO}{PATH}   = $apiinfopath;
-            $api{APIINFO}{MAX}    = $apiinfomaxver;
-            $api{APIINFO}{MOD}    = $infomod // "no";
-            $api{APIAUTH}{PATH}   = $apiauthpath;
-            $api{APIAUTH}{MAX}    = $apiauthmaxver;  
-            $api{APIAUTH}{MOD}    = $authmod // "no";            
-            $api{CALCAL}{PATH}    = $apicalpath;
-            $api{CALCAL}{MAX}     = $apicalmaxver;
-            $api{CALCAL}{MOD}     = $calmod // "no";     
-            $api{CALEVENT}{PATH}  = $apievtpath;
-            $api{CALEVENT}{MAX}   = $apievtmaxver;
-            $api{CALEVENT}{MOD}   = $evtmod // "no";
-            $api{CALSHARE}{PATH}  = $apisharepath;
-            $api{CALSHARE}{MAX}   = $apisharemaxver;
-            $api{CALSHARE}{MOD}   = $sharemod // "no";   
-            $api{CALTODO}{PATH}   = $apitodopath;
-            $api{CALTODO}{MAX}    = $apitodomaxver;
-            $api{CALTODO}{MOD}    = $todomod // "no";  
+            $calapi->{APIINFO}{PATH}   = $apiinfopath;
+            $calapi->{APIINFO}{MAX}    = $apiinfomaxver;
+            $calapi->{APIINFO}{MOD}    = $infomod // "no";
+            $calapi->{APIAUTH}{PATH}   = $apiauthpath;
+            $calapi->{APIAUTH}{MAX}    = $apiauthmaxver;  
+            $calapi->{APIAUTH}{MOD}    = $authmod // "no";            
+            $calapi->{CALCAL}{PATH}    = $apicalpath;
+            $calapi->{CALCAL}{MAX}     = $apicalmaxver;
+            $calapi->{CALCAL}{MOD}     = $calmod // "no";     
+            $calapi->{CALEVENT}{PATH}  = $apievtpath;
+            $calapi->{CALEVENT}{MAX}   = $apievtmaxver;
+            $calapi->{CALEVENT}{MOD}   = $evtmod // "no";
+            $calapi->{CALSHARE}{PATH}  = $apisharepath;
+            $calapi->{CALSHARE}{MAX}   = $apisharemaxver;
+            $calapi->{CALSHARE}{MOD}   = $sharemod // "no";   
+            $calapi->{CALTODO}{PATH}   = $apitodopath;
+            $calapi->{CALTODO}{MAX}    = $apitodomaxver;
+            $calapi->{CALTODO}{MOD}    = $todomod // "no";  
         
             # API values sind gesetzt in Hash
             $hash->{HELPER}{APIPARSET} = 1;
@@ -1295,11 +1300,11 @@ sub getApiSites_parse {                                                   ## no 
                 $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Downgraded</b> </td></tr>";
                 $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td> </td></tr>";
         
-                for my $key (keys %api) {
-                    my $apiname = $api{$key}{NAME};
-                    my $apipath = $api{$key}{PATH};
-                    my $apiver  = $api{$key}{MAX};
-                    my $apimod  = $api{$key}{MOD};
+                for my $key (keys %{$calapi}) {
+                    my $apiname = $calapi->{$key}{NAME};
+                    my $apipath = $calapi->{$key}{PATH};
+                    my $apiver  = $calapi->{$key}{MAX};
+                    my $apimod  = $calapi->{$key}{MOD};
 
                     $out .= "<tr>";
                     $out .= "<td> $apiname </td>";
@@ -1364,6 +1369,7 @@ sub calOp {
    my $method = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{method};
    my $api    = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{api};
    my $params = $data{SSCal}{$name}{sendqueue}{entries}{$idx}{params};
+   my $calapi = $data{SSCal}{$name}{calapi};
 
    Log3($name, 4, "$name - start SendQueue entry index \"$idx\" ($hash->{OPMODE}) for operation."); 
 
@@ -1371,10 +1377,10 @@ sub calOp {
    
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
         
-   $url = "$prot://$addr:$port/webapi/".$api{$api}{PATH}."?api=".$api{$api}{NAME}."&version=".$api{$api}{MAX}."&method=$method".$params."&_sid=$sid";
+   $url = "$prot://$addr:$port/webapi/".$calapi->{$api}{PATH}."?api=".$calapi->{$api}{NAME}."&version=".$calapi->{$api}{MAX}."&method=$method".$params."&_sid=$sid";
    
    if($opmode eq "deleteEventId" && $api eq "CALEVENT") {               # Workaround !!! Methode delete funktioniert nicht mit SYNO.Cal.Event version > 1
-       $url = "$prot://$addr:$port/webapi/".$api{$api}{PATH}."?api=".$api{$api}{NAME}."&version=1&method=$method".$params."&_sid=$sid";
+       $url = "$prot://$addr:$port/webapi/".$calapi->{$api}{PATH}."?api=".$calapi->{$api}{NAME}."&version=1&method=$method".$params."&_sid=$sid";
    }
 
    my $part = $url;
@@ -1418,7 +1424,7 @@ sub calOp_parse {                                                           ## n
         Log3($name, 2, "$name - ERROR message: $err");
         
         $errorcode = "none";
-        $errorcode = "800" if($err =~ /: malformed or unsupported URL$/s);
+        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
         readingsBeginUpdate         ($hash); 
         readingsBulkUpdateIfChanged ($hash, "Error",           $err);
@@ -1612,7 +1618,7 @@ return;
 #############################################################################################
 #                    Extrahiert empfangene Kalendertermine (Events)
 #############################################################################################
-sub extractEventlist {                              ## no critic 'complexity'
+sub extractEventlist {                                    ## no critic 'complexity'
   my ($name) = @_;
   my $hash   = $defs{$name};
   my $data   = delete $hash->{eventlist};                 # zentrales Eventhash löschen !
@@ -1622,7 +1628,7 @@ sub extractEventlist {                              ## no critic 'complexity'
   my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my (undef,$tstart,$tend) = timeEdge($name);             # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
@@ -1635,7 +1641,7 @@ sub extractEventlist {                              ## no critic 'complexity'
           my $done   = 0;
           ($nbdate,$nedate) = ("","");  
 
-          my $uid = $data->{data}{$key}[$i]{ical_uid};                          # UID des Events    
+          my $uid = $data->{data}{$key}[$i]{ical_uid};                    # UID des Events    
           extractIcal ($name,$data->{data}{$key}[$i]);                    # VCALENDAR Extrakt in {HELPER}{VCALENDAR} importieren          
           
           my $isallday                         = $data->{data}{$key}[$i]{is_all_day};
@@ -1675,7 +1681,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                   $ignore = 1;
                   $done   = 0;               
               } else {
-                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                  @row_array = writeValuesToArray ({ name        => $name,
+                                                     eventno     => $n,
+                                                     calref      => $data->{data}{$key}[$i],
+                                                     timezone    => $tz,
+                                                     begindate   => $bdate,
+                                                     begintime   => $btime,
+                                                     begints     => $bts,
+                                                     enddate     => $edate,
+                                                     endtime     => $etime,
+                                                     endts       => $ets,
+                                                     sumarrayref => \@row_array,
+                                                     uid         => $uid
+                                                   });
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -1757,8 +1775,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                           $etime = $netime ? $netime : $etime;
                           $ets   = $nets   ? $nets   : $ets;                  
                           
-                          @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-  
+                          @row_array = writeValuesToArray ({ name        => $name,
+                                                             eventno     => $n,
+                                                             calref      => $data->{data}{$key}[$i],
+                                                             timezone    => $tz,
+                                                             begindate   => $bdate,
+                                                             begintime   => $btime,
+                                                             begints     => $bts,
+                                                             enddate     => $edate,
+                                                             endtime     => $etime,
+                                                             endts       => $ets,
+                                                             sumarrayref => \@row_array,
+                                                             uid         => $uid
+                                                           });  
                           $ignore = 0;
                           $done   = 1;
                           $n++;
@@ -1811,8 +1840,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                               $etime = $netime ? $netime : $etime;
                               $ets   = $nets   ? $nets   : $ets;                  
                               
-                              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-  
+                              @row_array = writeValuesToArray ({ name        => $name,
+                                                                 eventno     => $n,
+                                                                 calref      => $data->{data}{$key}[$i],
+                                                                 timezone    => $tz,
+                                                                 begindate   => $bdate,
+                                                                 begintime   => $btime,
+                                                                 begints     => $bts,
+                                                                 enddate     => $edate,
+                                                                 endtime     => $etime,
+                                                                 endts       => $ets,
+                                                                 sumarrayref => \@row_array,
+                                                                 uid         => $uid
+                                                               });  
                               $ignore = 0;
                               $done   = 1;
                               $n++;
@@ -1901,8 +1941,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                                   $etime = $netime ? $netime : $etime;
                                   $ets   = $nets   ? $nets   : $ets;                  
                                   
-                                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-  
+                                  @row_array = writeValuesToArray ({ name        => $name,
+                                                                     eventno     => $n,
+                                                                     calref      => $data->{data}{$key}[$i],
+                                                                     timezone    => $tz,
+                                                                     begindate   => $bdate,
+                                                                     begintime   => $btime,
+                                                                     begints     => $bts,
+                                                                     enddate     => $edate,
+                                                                     endtime     => $etime,
+                                                                     endts       => $ets,
+                                                                     sumarrayref => \@row_array,
+                                                                     uid         => $uid
+                                                                   });  
                                   $ignore = 0;
                                   $done   = 1;
                                   $n++;
@@ -1972,8 +2023,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                                   $etime = $netime ? $netime : $etime;
                                   $ets   = $nets   ? $nets   : $ets;                  
                                   
-                                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-
+                                  @row_array = writeValuesToArray ({ name        => $name,
+                                                                     eventno     => $n,
+                                                                     calref      => $data->{data}{$key}[$i],
+                                                                     timezone    => $tz,
+                                                                     begindate   => $bdate,
+                                                                     begintime   => $btime,
+                                                                     begints     => $bts,
+                                                                     enddate     => $edate,
+                                                                     endtime     => $etime,
+                                                                     endts       => $ets,
+                                                                     sumarrayref => \@row_array,
+                                                                     uid         => $uid
+                                                                   });
                                   $ignore = 0;
                                   $done   = 1;
                                   $n++;
@@ -2022,8 +2084,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                               $etime = $netime ? $netime : $etime;
                               $ets   = $nets   ? $nets   : $ets; 
                                   
-                              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-                              
+                              @row_array = writeValuesToArray ({ name        => $name,
+                                                                 eventno     => $n,
+                                                                 calref      => $data->{data}{$key}[$i],
+                                                                 timezone    => $tz,
+                                                                 begindate   => $bdate,
+                                                                 begintime   => $btime,
+                                                                 begints     => $bts,
+                                                                 enddate     => $edate,
+                                                                 endtime     => $etime,
+                                                                 endts       => $ets,
+                                                                 sumarrayref => \@row_array,
+                                                                 uid         => $uid
+                                                               });                              
                               $ignore = 0;
                               $done   = 1;
                               $n++;
@@ -2072,8 +2145,19 @@ sub extractEventlist {                              ## no critic 'complexity'
                           $etime = $netime ? $netime : $etime;
                           $ets   = $nets   ? $nets   : $ets;                  
                           
-                          @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
-  
+                          @row_array = writeValuesToArray ({ name        => $name,
+                                                             eventno     => $n,
+                                                             calref      => $data->{data}{$key}[$i],
+                                                             timezone    => $tz,
+                                                             begindate   => $bdate,
+                                                             begintime   => $btime,
+                                                             begints     => $bts,
+                                                             enddate     => $edate,
+                                                             endtime     => $etime,
+                                                             endts       => $ets,
+                                                             sumarrayref => \@row_array,
+                                                             uid         => $uid
+                                                           });  
                           $ignore = 0;
                           $done   = 1;
                           $n++;
@@ -2098,8 +2182,21 @@ sub extractEventlist {                              ## no critic 'complexity'
               $etime = $netime ? $netime : $etime;
               $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+              @row_array = writeValuesToArray ({ name        => $name,
+                                                 eventno     => $n,
+                                                 calref      => $data->{data}{$key}[$i],
+                                                 timezone    => $tz,
+                                                 begindate   => $bdate,
+                                                 begintime   => $btime,
+                                                 begints     => $bts,
+                                                 enddate     => $edate,
+                                                 endtime     => $etime,
+                                                 endts       => $ets,
+                                                 sumarrayref => \@row_array,
+                                                 uid         => $uid
+                                               });          
           }
+          
           $i++;
           $n++;
       }
@@ -2162,8 +2259,21 @@ sub extractToDolist {                               ## no critic 'complexity'
                   Log3($name, 4, "$name - Ignore single task -> $data->{data}{$key}[$i]{summary} start: $bdate $btime, end: $edate $etime");
                   $ignore = 1;
                   $done   = 0; 
+              
               } else {
-                  @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+                  @row_array = writeValuesToArray ({ name        => $name,
+                                                     eventno     => $n,
+                                                     calref      => $data->{data}{$key}[$i],
+                                                     timezone    => $tz,
+                                                     begindate   => $bdate,
+                                                     begintime   => $btime,
+                                                     begints     => $bts,
+                                                     enddate     => $edate,
+                                                     endtime     => $etime,
+                                                     endts       => $ets,
+                                                     sumarrayref => \@row_array,
+                                                     uid         => $uid
+                                                   });
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -2184,7 +2294,19 @@ sub extractToDolist {                               ## no critic 'complexity'
               $etime = $netime ? $netime : $etime;
               $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = writeValuesToArray ($name,$n,$data->{data}{$key}[$i],$tz,$bdate,$btime,$bts,$edate,$etime,$ets,\@row_array,$uid);
+              @row_array = writeValuesToArray ({ name        => $name,
+                                                 eventno     => $n,
+                                                 calref      => $data->{data}{$key}[$i],
+                                                 timezone    => $tz,
+                                                 begindate   => $bdate,
+                                                 begintime   => $btime,
+                                                 begints     => $bts,
+                                                 enddate     => $edate,
+                                                 endtime     => $etime,
+                                                 endts       => $ets,
+                                                 sumarrayref => \@row_array,
+                                                 uid         => $uid
+                                               });
           }
           $i++;
           $n++;
@@ -2443,12 +2565,25 @@ return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth
 #
 #############################################################################################
 sub writeValuesToArray {                                                   ## no critic 'complexity'
-  my ($name,$n,$vh,$tz,$bdate,$btime,$bts,$edate,$etime,$ets,$aref,$uid) = @_;
+  my ($argref)  = @_;
+  my $name      = $argref->{name};
+  my $n         = $argref->{eventno};
+  my $vh        = $argref->{calref};
+  my $tz        = $argref->{timezone};
+  my $bdate     = $argref->{begindate};
+  my $btime     = $argref->{begintime};
+  my $bts       = $argref->{begints};
+  my $edate     = $argref->{enddate};
+  my $etime     = $argref->{endtime};
+  my $ets       = $argref->{endts};
+  my $aref      = $argref->{sumarrayref};
+  my $uid       = $argref->{uid};
+  
   my @row_array = @{$aref};
   my $hash      = $defs{$name};
   my $lang      = AttrVal("global", "language", "EN");
-  my $ts        = time();                                                        # Istzeit Timestamp
-  my $om        = $hash->{OPMODE};                                               # aktuelle Operation Mode
+  my $ts        = time();                                                  # Istzeit Timestamp
+  my $om        = $hash->{OPMODE};                                         # aktuelle Operation Mode
   my $status    = "initialized";
   my ($val,$uts,$td,$dleft,$bWday,$chts);
   
@@ -2460,8 +2595,8 @@ sub writeValuesToArray {                                                   ## no
   
   if($bdate && $btime) {
       push(@row_array, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
-      my ($ny,$nm,$nd,undef) = split(/[ -]/, TimeNow());                         # Datum Jetzt
-      my ($by,$bm,$bd)       = split("-", $bdate);                               # Beginn Datum
+      my ($ny,$nm,$nd,undef) = split(/[\s-]/x, TimeNow());                         # Datum Jetzt
+      my ($by,$bm,$bd)       = split("-", $bdate);                                 # Beginn Datum
       my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
       my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
       if($btimes >= $ntimes) {
@@ -2851,9 +2986,9 @@ sub login {
   my $serveraddr    = $hash->{ADDR};
   my $serverport    = $hash->{PORT};
   my $proto         = $hash->{PROT};
-  my $apiauth       = $api{APIAUTH}{NAME};
-  my $apiauthpath   = $api{APIAUTH}{PATH};
-  my $apiauthmaxver = $api{APIAUTH}{MAX};
+  my $apiauth       = $data{SSCal}{$name}{calapi}{APIAUTH}{NAME};
+  my $apiauthpath   = $data{SSCal}{$name}{calapi}{APIAUTH}{PATH};
+  my $apiauthmaxver = $data{SSCal}{$name}{calapi}{APIAUTH}{MAX};
 
   my $lrt = AttrVal($name,"loginRetries",3);
   my ($url,$param);
@@ -2984,9 +3119,9 @@ sub logout {
    my $serveraddr    = $hash->{ADDR};
    my $serverport    = $hash->{PORT};
    my $proto         = $hash->{PROT};
-   my $apiauth       = $api{APIAUTH}{NAME};
-   my $apiauthpath   = $api{APIAUTH}{PATH};
-   my $apiauthmaxver = $api{APIAUTH}{MAX};
+   my $apiauth       = $data{SSCal}{$name}{calapi}{APIAUTH}{NAME};
+   my $apiauthpath   = $data{SSCal}{$name}{calapi}{APIAUTH}{PATH};
+   my $apiauthmaxver = $data{SSCal}{$name}{calapi}{APIAUTH}{MAX};
    my $sid           = $hash->{HELPER}{SID};
    my ($url,$param);
     
@@ -4004,7 +4139,7 @@ return $out;
 # $rdtype:   erwarteter Datentyp als Rückgabe (image, string)
 #
 ######################################################################################
-sub evalTableSpecs {                                                    ## no critic 'complexity'
+sub evalTableSpecs {                                                          ## no critic 'complexity'
   my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
   my $name = $hash->{NAME};
   my $check;
@@ -4093,9 +4228,9 @@ sub evalTableSpecs {                                                    ## no cr
           }
       
       } else {                                                                # ref Wert der Eigenschaft ist nicht HASH oder ARRAY
-          if($specs =~ m/^\{.*\}$/s) {                                        # den Wert als Perl-Funktion ausführen wenn in {}
-              $specs   =~ s/\$NAME/$name/g;                                   # Platzhalter $NAME, $BNR ersetzen
-              $specs   =~ s/\$BNR/$bnr/g;
+          if($specs =~ m/\{.*\}/xs) {                                       # den Wert als Perl-Funktion ausführen wenn in {}
+              $specs   =~ s/\$NAME/$name/xg;                                  # Platzhalter $NAME, $BNR ersetzen
+              $specs   =~ s/\$BNR/$bnr/xg;
               $default = $check->($specs);
           } else {                                                            # einfache key-value Zuweisung
               eval ($default = $specs);                                       ## no critic 'eval' 
