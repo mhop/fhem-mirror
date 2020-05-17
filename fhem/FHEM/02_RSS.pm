@@ -11,6 +11,7 @@ package main;
 use strict;
 use warnings;
 use GD;
+use Image::LibRSVG;
 use feature qw/switch/;
 use vars qw(%data);
 use HttpUtils;
@@ -449,28 +450,8 @@ sub RSS_itemImg {
     return unless ( defined($arg) );
     return if ( $arg eq "" );
     my $I;
-    if ( $srctype eq "url" || $srctype eq "urlq" ) {
-        my $data;
-        if ( $srctype eq "url" ) {
-            $data = GetFileFromURL( $arg, 3, undef, 1 );
-        }
-        else {
-            $data = GetFileFromURLQuiet( $arg, 3, undef, 1 );
-        }
-        if ( $imgtype eq "gif" ) {
-            $I = GD::Image->newFromGifData($data);
-        }
-        elsif ( $imgtype eq "png" ) {
-            $I = GD::Image->newFromPngData($data);
-        }
-        elsif ( $imgtype eq "jpeg" ) {
-            $I = GD::Image->newFromJpegData($data);
-        }
-        else {
-            return;
-        }
-    }
-    elsif ( $srctype eq "file" ) {
+
+    if ( $srctype eq "file" ) {
         if ( $imgtype eq "gif" ) {
             $I = GD::Image->newFromGif($arg);
         }
@@ -480,11 +461,28 @@ sub RSS_itemImg {
         elsif ( $imgtype eq "jpeg" ) {
             $I = GD::Image->newFromJpeg($arg);
         }
+        elsif ( $imgtype eq "svg" ) { # SVG: replace $arg with PNG data and act as if "png data" were given.
+            my $rsvg = new Image::LibRSVG();
+            $rsvg->loadImage($arg);
+            $arg = $rsvg->getImageBitmap();
+            $imgtype = "png";
+            $srctype = "data";
+        }
         else {
             return;
         }
     }
-    elsif ( $srctype eq "data" ) {
+    elsif ( $srctype eq "url" || $srctype eq "urlq" ) { # URL: replace $arg with data and act as if "data" were given
+        if ( $srctype eq "url" ) {
+            $arg = GetFileFromURL( $arg, 3, undef, 1 );
+        }
+        else {
+            $arg = GetFileFromURLQuiet( $arg, 3, undef, 1 );
+        }
+        $srctype = "data";
+    }
+
+    if ( $srctype eq "data" ) { # No elsif here, run this also if we saved data in $arg above.
         if ( $imgtype eq "gif" ) {
             $I = GD::Image->newFromGifData($arg);
         }
@@ -494,13 +492,19 @@ sub RSS_itemImg {
         elsif ( $imgtype eq "jpeg" ) {
             $I = GD::Image->newFromJpegData($arg);
         }
+        elsif ( $imgtype eq "svg" ) {
+            my $rsvg = new Image::LibRSVG();
+            $rsvg->loadImageFromString($arg);
+            $I = GD::Image->newFromPngData($rsvg->getImageBitmap());
+        }
         else {
             return;
         }
     }
-    else {
-        return;
-    }
+
+    # If any of the cases above was true, we should have an image now. Otherwise return.
+    return if(!defined($I));
+
     eval {
         my ( $width, $height ) = $I->getBounds();
         if ( $scale =~ s/([wh])([\d]*)/$2/ )
@@ -1395,7 +1399,7 @@ sub plotFromUrl(@) {
     <li>rect &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt; [&lt;filled&gt;]<br>Draws a rectangle with corners at positions (&lt;x1&gt;, &lt;y1&gt;) and (&lt;x2&gt;, &lt;y2&gt;), which is filled if the &lt;filled&gt; parameter is set and not zero.<br>If x2 or y2 is preceeded with a + (plus sign) then the coordinate is relative to x1 or y1, or in other words, it is the width-1 or height-1 of the rectangle, respectively.</li><br>
 
     <li>img &lt;x&gt; &lt;y&gt; &lt;['w' or 'h']s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
-    position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
+    position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>, <code>svg</code>.
     The picture is scaled by the factor &lt;s&gt; (a decimal value). If 'w' or 'h' is in front of scale-value the value is used to set width or height to the value in pixel. If &lt;srctype&gt; is <code>file</code>, the picture
     is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code> or <code>urlq</code>, the picture
     is loaded from the URL &lt;arg&gt; (with or without logging the URL), if &lt;srctype&gt; is <code>data</code>, the picture
@@ -1422,7 +1426,7 @@ sub plotFromUrl(@) {
     moveby 0 -25<br>
     text x y "Another text"<br>
     img 20 530 0.5 png file { "/usr/share/fhem/www/images/weather/" . ReadingsVal("MyWeather","icon","") . ".png" }<br>
-    embed 0 0 2 absolute plot1 { plotFromUrl('mySVG') }
+    embed 0 0 2 absolute plot1 { plotFromUrl('mySVG') }<br>
     embed 10 200 2 absolute iframe1 "&lt;iframe width=\"420\" height=\"315\" src=\"//www.youtube.com/embed/9HShl_ufOFI\" frameborder=\"0\" allowfullscreen&gt;&lt;/iframe&gt;"
     </code>
     <p>
@@ -1436,6 +1440,11 @@ sub plotFromUrl(@) {
     </code>
     <p>
     This requires the perl module Image::LibRSVG and librsvg. Debian-based systems can install these with <code>apt-get install libimage-librsvg-perl</code>.<p>
+
+    You can display colorful icons with using the function <code>FW_makeImage</code> from the <a href="http://wiki.fhem.de/wiki/DevelopmentFHEMWEB-API#FW_makeImage">FHEMWEB API</a>:
+    <code>
+    img 40 200 h40 svg data {FW_makeImage('clock@blue')}
+    </code>
 
     For HTML output, you can use <code>plotFromURL(&lt;name&gt;[,&lt;zoom&gt;[,&lt;offset&gt;]])</code> instead.
   </ul>
