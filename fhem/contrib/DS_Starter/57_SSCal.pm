@@ -2647,7 +2647,7 @@ sub writeValuesToArray {                                                   ## no
           my ($y, $m, $d)  = $bdate =~ /^(\d{4})-(\d{2})-(\d{2})/x;                                  # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
           my ($h, $mi, $s) = $btime =~ /^(\d{2}):(\d{2}):(\d{2})/x;
           
-          eval { $chts = timelocal($s, $mi, $h, $d, $m-1, $y-1900);                                  # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
+          eval { $chts = fhemTimeLocal($s, $mi, $h, $d, $m-1, $y-1900);                              # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
                  1;
           } or do {
               my $err = (split(" at", $@))[0];
@@ -3311,9 +3311,7 @@ sub setcredentials {
     @key = qw(1 3 4 5 6 3 2 1 9);
     $len = scalar @key;  
     $i = 0;  
-    $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
     # End Scramble-Routine    
        
     $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
@@ -3367,9 +3365,7 @@ sub getcredentials {
             $len = scalar @key;  
             $i = 0;  
             $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) - $key[$i] + 256) % 256) }  
-            split //, $credstr;   
+            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;   
             # Ende Descramble-Routine
             
             ($username, $passwd) = split("!_ESC_!",decode_base64($credstr));
@@ -3661,7 +3657,7 @@ return;
 #                                zu ignorieren und auch nicht zu zählen !)
 #    $dtstart:       man benötigt originales DTSTART für den Vergleich bei Recurring Terminen
 #############################################################################################
-sub explodeDateTime {                              ## no critic 'complexity'
+sub explodeDateTime {                                    ## no critic 'complexity'
   my ($hash,$dt,$isallday,$uid,$dtstart) = @_;
   my $name                 = $hash->{NAME};
   my ($tz,$t)              = ("","");
@@ -3689,7 +3685,8 @@ sub explodeDateTime {                              ## no critic 'complexity'
       my %seen;
       if($exdates) {
           my @exd = split(" ", $exdates);  
-          grep { !$seen{$_}++ } @exd;
+          # grep { !$seen{$_}++ } @exd;
+          for (@exd) { !$seen{$_}++ };
       }
       $excl = 1 if($seen{$dtstart});                                            # check erfolgreich -> exclude recurring date weil (Serienelement gelöscht)
   
@@ -3851,8 +3848,9 @@ sub calAsHtml {                                                                 
       my %specs;
       my $FW_style = AttrVal($FW_wname, "stylesheetPrefix", "default");
       my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreenStyles});     # Eigenschaft smallScreen in Array lesen
-      grep { !$specs{$_}++ } @scspecs;
-      $small       = 1 if($specs{$FW_style});                                        # Tabelle für small-Style anpassen                                   
+      # grep { !$specs{$_}++ } @scspecs; 
+      for (@scspecs) { !$specs{$_}++ };
+      $small = 1 if($specs{$FW_style});                                              # Tabelle für small-Style anpassen                                   
   }
   
   # Auswahl der darzustellenden Tabellenfelder
@@ -3862,15 +3860,29 @@ sub calAsHtml {                                                                 
 
   # Gestaltung Headerzeile
   my $nohead  = 0;                                                             # Unterdrückung Anzeige Headerzeile: 0 - nein, 1 - Ja  
-  eval { $nohead = evalTableSpecs ($hash,$nohead,$hash->{HELPER}{tableSpecs}{cellStyle}{noHeader},"",\@allrds,"string"); 
-         1;
+  eval { $nohead = evalTableSpecs ( {
+                                      href    => $hash,
+                                      def     => $nohead,
+                                      base    => $hash->{HELPER}{tableSpecs}{cellStyle}{noHeader},
+                                      bnr     => "",
+                                      readref => \@allrds,
+                                      rdtype  => "string" 
+                                    } 
+                                  ); 1;
   } or do {
       Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@");
   };
     
   my $headalign = "center";                                                      # Ausrichtung der Headerzeile, default: center
-  eval { $headalign = evalTableSpecs ($hash,$headalign,$hash->{HELPER}{tableSpecs}{cellStyle}{headerAlign},"",\@allrds,"string"); 
-         1;
+  eval { $headalign = evalTableSpecs ( {
+                                         href    => $hash,
+                                         def     => $headalign,
+                                         base    => $hash->{HELPER}{tableSpecs}{cellStyle}{headerAlign},
+                                         bnr     => "",
+                                         readref => \@allrds,
+                                         rdtype  => "string"
+                                       }
+                                     ); 1;
   } or do {
       Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@");
   };
@@ -3964,8 +3976,15 @@ sub calAsHtml {                                                                 
           if ($mi eq "icon") {
               # Karten-Icon auswählen
               $di           = "it_i-net";
-              eval { $micon = evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnMapIcon},$bnr,\@allrds,"image"); 
-                     1;
+              eval { $micon = evalTableSpecs ( {
+                                                 href    => $hash,
+                                                 def     => $di,
+                                                 base    => $hash->{HELPER}{tableSpecs}{columnMapIcon},
+                                                 bnr     => $bnr,
+                                                 readref => \@allrds,
+                                                 rdtype  => "image" 
+                                               }
+                                             ); 1;
               } or do {
                   Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapIcon\": $@")
               };
@@ -3976,8 +3995,15 @@ sub calAsHtml {                                                                 
           } elsif ($mi eq "text") {
               # Karten-Text auswählen
               my $dt        = "link";
-              eval { $micon = evalTableSpecs ($hash,$dt,$hash->{HELPER}{tableSpecs}{columnMapText},$bnr,\@allrds,"string"); 
-                     1;
+              eval { $micon = evalTableSpecs ( {
+                                                 href    => $hash,
+                                                 def     => $dt,
+                                                 base    => $hash->{HELPER}{tableSpecs}{columnMapText},
+                                                 bnr     => $bnr,
+                                                 readref => \@allrds,
+                                                 rdtype  => "string" 
+                                               }
+                                             ); 1;
               } or do {
                   Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapText\": $@");
               };
@@ -3992,8 +4018,15 @@ sub calAsHtml {                                                                 
                                              
           # Kartenanbieter auswählen
           my $up     = "GoogleMaps";
-          eval { $up = evalTableSpecs ($hash,$up,$hash->{HELPER}{tableSpecs}{columnMapProvider},$bnr,\@allrds,"string"); 
-                 1;
+          eval { $up = evalTableSpecs ( {
+                                          href    => $hash,
+                                          def     => $up,
+                                          base    => $hash->{HELPER}{tableSpecs}{columnMapProvider},
+                                          bnr     => $bnr,
+                                          readref => \@allrds,
+                                          rdtype  => "string"
+                                        }
+                                      ); 1;
           } or do {
               Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnMapProvider\": $@");
           };
@@ -4045,23 +4078,44 @@ sub calAsHtml {                                                                 
       }
 
       # Icon für Spalte Resttage spezifizieren
-      eval { $dleft = evalTableSpecs ($hash,$dleft,$hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},$bnr,\@allrds,"image"); 
-             1;
+      eval { $dleft = evalTableSpecs ( {
+                                         href    => $hash,
+                                         def     => $dleft,
+                                         base    => $hash->{HELPER}{tableSpecs}{columnDaysLeftIcon},
+                                         bnr     => $bnr,
+                                         readref => \@allrds,
+                                         rdtype  => "image"
+                                       }
+                                     ); 1;
       } or do {
           Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnDaysLeftIcon\": $@");
       };
             
       # Icon für Spalte Status spezifizieren
-      eval { $status = evalTableSpecs ($hash,$status,$hash->{HELPER}{tableSpecs}{columnStateIcon},$bnr,\@allrds,"image"); 
-             1;
+      eval { $status = evalTableSpecs ( {
+                                          href    => $hash,
+                                          def     => $status,
+                                          base    => $hash->{HELPER}{tableSpecs}{columnStateIcon},
+                                          bnr     => $bnr,
+                                          readref => \@allrds,
+                                          rdtype  => "image"
+                                        }
+                                      ); 1;
       } or do {
           Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnStateIcon\": $@");
       };
       
       # Icon für Spalte "Symbol" bestimmen
       $di            = ($hash->{MODEL} eq "Diary") ? "time_calendar" : "time_note";
-      eval { $symbol = evalTableSpecs ($hash,$di,$hash->{HELPER}{tableSpecs}{columnSymbolIcon},$bnr,\@allrds,"image"); 
-             1;
+      eval { $symbol = evalTableSpecs ( {
+                                          href    => $hash,
+                                          def     => $di,
+                                          base    => $hash->{HELPER}{tableSpecs}{columnSymbolIcon},
+                                          bnr     => $bnr,
+                                          readref => \@allrds,
+                                          rdtype  => "image"
+                                        }
+                                      ); 1;
       } or do {
           Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"columnSymbolIcon\": $@");
       };
@@ -4069,22 +4123,22 @@ sub calAsHtml {                                                                 
       # Gestaltung Spaltentext
       my $coldefalign     = "center";                               # Ausrichtung der Spalte, default: center
       eval { 
-           $coldefalign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign}             ,"",\@allrds,"string"); 
-           $colSymbolAlign  = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSymbolAlign}       ,"",\@allrds,"string");
-           $colBeginAlign   = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnBeginAlign}        ,"",\@allrds,"string");
-           $colEndAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEndAlign}          ,"",\@allrds,"string");
-           $colDayAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftAlign}     ,"",\@allrds,"string");
-           $colDLongAlign   = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftLongAlign} ,"",\@allrds,"string");
-           $colWeekdayAlign = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnWeekdayAlign}      ,"",\@allrds,"string");
-           $colTzAlign      = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnTimezoneAlign}     ,"",\@allrds,"string");
-           $colSummaryAlign = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnSummaryAlign}      ,"",\@allrds,"string");
-           $colDescAlign    = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnDescriptionAlign}  ,"",\@allrds,"string");  
-           $colStatusAlign  = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnStatusAlign}       ,"",\@allrds,"string");  
-           $colCompAlign    = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCompletionAlign}   ,"",\@allrds,"string");  
-           $colLocAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnLocationAlign}     ,"",\@allrds,"string");  
-           $colMapAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnMapAlign}          ,"",\@allrds,"string");  
-           $colCalAlign     = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnCalendarAlign}     ,"",\@allrds,"string");  
-           $colIdAlign      = "cal".evalTableSpecs ($hash,$coldefalign,$hash->{HELPER}{tableSpecs}{cellStyle}{columnEventIdAlign}      ,"",\@allrds,"string");  
+           $coldefalign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnAlign}             ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colSymbolAlign  = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnSymbolAlign}       ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colBeginAlign   = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnBeginAlign}        ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colEndAlign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnEndAlign}          ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colDayAlign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftAlign}     ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colDLongAlign   = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnDaysLeftLongAlign} ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colWeekdayAlign = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnWeekdayAlign}      ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colTzAlign      = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnTimezoneAlign}     ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colSummaryAlign = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnSummaryAlign}      ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colDescAlign    = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnDescriptionAlign}  ,bnr => "",readref => \@allrds,rdtype => "string"} );  
+           $colStatusAlign  = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnStatusAlign}       ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colCompAlign    = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnCompletionAlign}   ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
+           $colLocAlign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnLocationAlign}     ,bnr => "",readref => \@allrds,rdtype => "string"} );  
+           $colMapAlign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnMapAlign}          ,bnr => "",readref => \@allrds,rdtype => "string"} );  
+           $colCalAlign     = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnCalendarAlign}     ,bnr => "",readref => \@allrds,rdtype => "string"} );   
+           $colIdAlign      = "cal".evalTableSpecs ( {href => $hash,def => $coldefalign,base => $hash->{HELPER}{tableSpecs}{cellStyle}{columnEventIdAlign}      ,bnr => "",readref => \@allrds,rdtype => "string"} ); 
            1;
       } or do {
           Log3($name, 1, "$name - Syntax error in attribute \"tableSpecs\" near \"cellStyle\": $@")
@@ -4140,8 +4194,16 @@ return $out;
 #
 ######################################################################################
 sub evalTableSpecs {                                                          ## no critic 'complexity'
-  my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
-  my $name = $hash->{NAME};
+  # my ($hash,$default,$specs,$bnr,$allrds,$rdtype) = @_;
+  my ($argref) = @_;
+  my $hash     = $argref->{href};
+  my $default  = $argref->{def};
+  my $specs    = $argref->{base};
+  my $bnr      = $argref->{bnr};
+  my $allrds   = $argref->{readref};
+  my $rdtype   = $argref->{rdtype};
+  
+  my $name     = $hash->{NAME};
   my $check;
   
   $rdtype = $rdtype // "string";                                              # "string" als default Rückgabe Datentyp
@@ -4228,7 +4290,7 @@ sub evalTableSpecs {                                                          ##
           }
       
       } else {                                                                # ref Wert der Eigenschaft ist nicht HASH oder ARRAY
-          if($specs =~ m/\{.*\}/xs) {                                       # den Wert als Perl-Funktion ausführen wenn in {}
+          if($specs =~ m/\{.*\}/xs) {                                         # den Wert als Perl-Funktion ausführen wenn in {}
               $specs   =~ s/\$NAME/$name/xg;                                  # Platzhalter $NAME, $BNR ersetzen
               $specs   =~ s/\$BNR/$bnr/xg;
               $default = $check->($specs);
@@ -5293,7 +5355,7 @@ return $default;
   
     Über verschiedene Schlüssel-Wertpaar Kombinationen kann die Darstellung der Informationen in der Übersichtstabelle 
     angepasst werden. Das Wiki-Kapitel
-    <a href="https://wiki.fhem.de/wiki/-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
+    <a href="https://wiki.fhem.de/wiki/SSCal_-_Integration_des_Synology_Calendar_Servers#Darstellung_der_.C3.9Cbersichtstabelle_in_Raum-_und_Detailansicht_beeinflussen">Darstellung der Übersichtstabelle in Raum- und Detailansicht beeinflussen</a>
     liefert detailiierte Informationen dazu.
      
   </li><br>
