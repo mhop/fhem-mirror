@@ -43,10 +43,14 @@
 #   use DevIo according to commit hook
 #   fix videodelete according to msg1053993
 #   fix videodelete filename (change path to _)
-
-
 #   new attribute homeScreenV3 set to 1 to use new v3 api
 #   support blink cameras on homescreen - with new homeScreenV3
+
+#   added documentation for homeScreenV3 and BLinkMini - readonly mode
+#   added - for host name instaed of . after rest
+#   new camtype dependant camEnable / camDisable 
+#   ...Cam...active state corrected (was always disabled)
+#   getThumbnail also for Blink Mini
 # 
 # 
 # 
@@ -56,6 +60,13 @@
 ##############################################################################
 ##############################################################################
 # TASKS 
+#
+#   unique id generator
+#   change headers: user-agent (Blink/8280 CFNetwork/1125.2 Darwin/19.4.0)/ app-build (IOS_8280)
+#   post on login with all information? --> https://rest-prod.immedia-semi.com/api/v4/account/login
+#   
+#
+#
 #   FIX: getThumbnail url failing sometimes
 #   FIX: imgOriginalFile not fully working
 #   might need to check for transaction id on command post
@@ -117,6 +128,7 @@ sub BlinkCamera_CheckSetGet( $$$ );
 sub BlinkCamera_ReplacePattern( $$;$ );
 sub BlinkCamera_ParseStartAlerts($;$$$);
 sub BlinkCamera_AnalyzeAlertPage( $$$ );
+sub BlinkCamera_GetCamType( $$ );
 
 #########################
 # Globals
@@ -133,6 +145,8 @@ my $BlinkCamera_header = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0"
 my $BlinkCamera_loginjson = "{ \"password\" : \"q_password_q\", \"client_specifier\" : \"FHEM blinkCameraModule 1 - q_name_q\", \"email\" : \"q_email_q\" }";
 
 my $BlinkCamera_configCamAlertjson = "{ \"camera\" : \"q_id_q\", \"id\" : \"q_id_q\", \"network\" : \"q_network_q\", \"motion_alert\" : \"q_alert_q\" }";
+
+my $BlinkCamera_configOwljson = "{ \"enabled\" : q_value_q }";
 
 my $BlinkCamera_deleteVideojson = "{ \"video_list\" : [ q_id_q ] }";
 
@@ -601,11 +615,12 @@ my $uid_key = join "", map { unpack "H*", chr(rand(256)) } 1..8;
     
     if ($cmd eq "login") {
       $dynhost =~ s/##region##/prod/;
-      $dynhost =~ s/##sep##/-/;
+#      $dynhost =~ s/##sep##/-/;
     } else {
       $dynhost =~ s/##region##/$region/;
-      $dynhost =~ s/##sep##/./;
+#      $dynhost =~ s/##sep##/./;
     }
+    $dynhost =~ s/##sep##/-/;
     $hash->{URL} = "https://".$dynhost;
   
     $hash->{HU_DO_PARAMS}->{header} = $BlinkCamera_header.
@@ -644,23 +659,38 @@ my $uid_key = join "", map { unpack "H*", chr(rand(256)) } 1..8;
     
       $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
-      $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_configCamAlertjson;
       
       my $net =  BlinkCamera_GetNetwork( $hash );
-      if ( defined( $net ) ) {
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/network/".$net."/camera/".$par1."/update";
-      } else {
+      my $ctype = "invalid";
+      
+      if ( ! defined( $net ) ) {
         $ret = "BlinkCamera_DoCmd $name: no network identifier found for $cmd - set attribute";
+      } else {
+        $ctype =  BlinkCamera_GetCamType( $hash, $par1 );
       }
 
       if ( ! $ret ) {
+
         my $alert = ($cmd eq "camEnable")?"true":"false";
       
-        $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$par1/g;
-        $hash->{HU_DO_PARAMS}->{data} =~ s/q_network_q/$net/g;
-        $hash->{HU_DO_PARAMS}->{data} =~ s/q_alert_q/$alert/g;
-
-        Log3 $name, 4, "BlinkCamera_DoCmd $name:   data :".$hash->{HU_DO_PARAMS}->{data}.":";
+        if ( $ctype eq "camera" ) {
+          $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/network/".$net."/camera/".$par1."/update";
+        
+          $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_configCamAlertjson;
+          $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$par1/g;
+          $hash->{HU_DO_PARAMS}->{data} =~ s/q_network_q/$net/g;
+          $hash->{HU_DO_PARAMS}->{data} =~ s/q_alert_q/$alert/g;
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:   cam type: ".$ctype.":  - data :".$hash->{HU_DO_PARAMS}->{data}.":";
+        } elsif ( $ctype eq "owl" ) {
+        
+          $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/owls/".$par1."/config";
+          
+          $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_configOwljson;
+          $hash->{HU_DO_PARAMS}->{data} =~ s/q_value_q/$alert/g;
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:   cam type: ".$ctype.":  - data :".$hash->{HU_DO_PARAMS}->{data}.":";
+        } else {
+          $ret = "BlinkCamera_DoCmd $name: camera type (".$ctype."( unknown !!";
+        }
 
       }
 
@@ -766,14 +796,27 @@ my $uid_key = join "", map { unpack "H*", chr(rand(256)) } 1..8;
       $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "POST";
+      $hash->{HU_DO_PARAMS}->{data} = "";
 
       my $net =  BlinkCamera_GetNetwork( $hash );
       if ( defined( $net ) ) {
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/network/".$net."/camera/".$par1."/thumbnail";
+      
+        my $ctype =  BlinkCamera_GetCamType( $hash, $par1 );
+        if ( $ctype eq "camera" ) {
+          $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/network/".$net."/camera/".$par1."/thumbnail";
 
-        $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_cameraThumbnailjson;
-        $hash->{HU_DO_PARAMS}->{data} =~ s/q_network_q/$net/g;
-        $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$par1/g;
+#          $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_cameraThumbnailjson;
+#          $hash->{HU_DO_PARAMS}->{data} =~ s/q_network_q/$net/g;
+#          $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$par1/g;
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:  $cmd cam type: ".$ctype.":  ";
+        } elsif ( $ctype eq "owl" ) {
+          # https://rest-prde.immedia-semi.com/api/v1/accounts/<accid>/networks/<netid>/owls/<camid>/thumbnail
+          $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/networks/".$net."/owls/".$par1."/thumbnail";
+          Log3 $name, 4, "BlinkCamera_DoCmd $name:  $cmd cam type: ".$ctype.":  ";
+        } else {
+          $ret = "BlinkCamera_DoCmd $name: $cmd camera type (".$ctype."( unknown !!";
+        }
+      
       } else {
         $ret = "BlinkCamera_DoCmd $name: no network identifier found for $cmd - set attribute";
       }
@@ -1252,18 +1295,6 @@ sub BlinkCamera_ParseHomescreen($$$)
   # sync module information
   my $syncList = $result->{sync_modules};
   
-       # "id": 22192,
-      # "created_at": "2017-10-03T11:40:18+00:00",
-      # "updated_at": "2020-05-14T00:01:42+00:00",
-      # "onboarded": true,
-      # "status": "online",
-      # "name": "My Blink Sync Module",
-      # "serial": "271000866",
-      # "fw_version": "2.12.28",
-      # "last_hb": "2020-05-14T18:59:34+00:00",
-      # "wifi_strength": 5,
-      # "network_id": 1018,
-      # "enable_temp_alerts": true
   
   # loop through msync modules and get the requested module information 
   $readUpdates->{networkSyncModule} = "";
@@ -1300,33 +1331,11 @@ sub BlinkCamera_ParseHomescreen($$$)
   # loop through cameras and get the requested camera information 
   if ( defined( $camList ) ) {
   
-    # {
-      # "id": 12214,
-      # "created_at": "2017-03-20T14:38:39+00:00",
-      # "updated_at": "2020-05-14T18:59:12+00:00",
-      # "name": "test",
-      # "serial": "161023557",
-      # "fw_version": "2.151",
-      # "type": "white",
-      # "enabled": true,
-      # "thumbnail": "/media/production/account/935/network/1018/camera/12214/clip_Q1BlC1P0_2020_03_26__19_17PM",
-      # "status": "done",
-      # "battery": "ok",
-      # "usage_rate": false,
-      # "network_id": 1018,
-      # "issues": [],
-      # "signals": {
-        # "lfr": 3,
-        # "wifi": 3,
-        # "temp": 76,
-        # "battery": 3
-      # }
-    # }
-
     foreach my $device ( @$camList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-        $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled} eq "true" );
+        $active = "armed" if ( $device->{enabled} );
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
@@ -1369,25 +1378,11 @@ sub BlinkCamera_ParseHomescreen($$$)
   # loop through owls and get the requested camera information 
   if ( defined( $owlList ) ) {
   
-    # {
-      # "id": 2437,
-      # "created_at": "2020-05-14T18:34:28+00:00",
-      # "updated_at": "2020-05-14T18:36:07+00:00",
-      # "name": "G8T1-9400-0135-1GR0",
-      # "type": "owl",
-      # "onboarded": true,
-      # "serial": "G8T1940001351GR0",
-      # "fw_version": "9.62",
-      # "enabled": true,
-      # "thumbnail": null,
-      # "status": "online",
-      # "network_id": 1018
-    # }
-
     foreach my $device ( @$owlList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-        $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled} eq "true" );
+        $active = "armed" if ( $device->{enabled}  );
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
@@ -2224,6 +2219,17 @@ sub BlinkCamera_GetNetwork( $ ) {
   
   return $net;
 }
+
+#####################################
+#  INTERNAL: Either read attribute, if not set use Reading networks first line
+sub BlinkCamera_GetCamType( $$ ) {
+  my ( $hash, $camid ) = @_;
+  
+  return ReadingsVal($hash->{NAME},"networkCamera".$camid."Type","INVALID");
+}
+
+
+
   
 ######################################
 #  write binary file for (hest hash, filename and the data
@@ -2557,6 +2563,12 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
 
     <li><code>imgTemplate &lt;HTML template for reading&gt;</code><br>Give an HTML template for the image reading that shows the thumbnail of a camera. Default is a template which shows the image a link to the image and also the url as text. In the template the string #URL# will be replaced with the actual URL
     </li> 
+
+
+    <li><code>homeScreenV3 &lt;1 or 0&gt;</code><br>If set to 1 the new version 3 of the blink API will be used. Unfortunately this includes different readings and settings <br>
+    NOTE: This is necessary to show at least the status of Blink Mini cameras - changes are not yet possible 
+    </li> 
+
 
     <li><code>imgOriginalFile &lt;1 or 0&gt;</code><br>If set to 1 it will keep the original filename of the thumbnail when storing ti. With setting this new thumbnails will not overwrite existing ones. <br>
     NOTE: No cleanup of thumbnails is done, so over time more and more thumbnails will be stored in the proxydir. 
