@@ -230,6 +230,7 @@ my %openApps = (
     'SkyOnline'          => 'de.sky.skyonline',
     'Smart-IPTV'         => 'com.1827622.109556',
     'Spotify'            => 'spotify-beehive',
+    'DuplexIPTV'         => 'com.duplexiptv.app',
 );
 
 my %openAppsPackageName = reverse %openApps;
@@ -2007,7 +2008,7 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.2",
+  "version": "v3.2.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

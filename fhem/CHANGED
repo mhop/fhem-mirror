@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 82_LGTV_WebOS: add DuplexIPTV App support
  - feature: 00_RSS: new img type SVG (forum #111271)
  - bugfix:  73_AutoShuttersControl: fix bug after privacyDown and open window
  - feature: 48_BlinkCamera: first step to support BlinkMini (no change possible)
