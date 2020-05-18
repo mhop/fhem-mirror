@@ -58,6 +58,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.1"  => "18.05.2020  improve 'restore' setlist, revised comRef, fix compare timesettings for delEntries,reduceLog ",
   "8.40.0"  => "30.03.2020  new attribute 'autoForward' ",
   "8.39.0"  => "28.03.2020  option 'writeToDBInTime' for function 'sumValue' and 'averageValue' ",
   "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
@@ -541,12 +542,12 @@ sub DbRep_Set($@) {
   opendir(DIR,$dir);
   if ($dbmodel =~ /MYSQL/) {
       $dbname = $hash->{DATABASE};
-      $sd = $dbname.".*(csv|sql)"; 
+      $sd     = $dbname."_.*?(csv|sql)"; 
   } elsif ($dbmodel =~ /SQLITE/) {
       $dbname = $hash->{DATABASE};
       $dbname = (split /[\/]/, $dbname)[-1];
       $dbname = (split /\./, $dbname)[0];
-      $sd = $dbname."_.*.sqlitebkp";
+      $sd = $dbname."_.*?.sqlitebkp";
   }               
   while (my $file = readdir(DIR)) {
       next unless (-f "$dir/$file");
@@ -807,7 +808,9 @@ sub DbRep_Set($@) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
 	  delete $hash->{HELPER}{DELENTRIES};
-	  $hash->{HELPER}{DELENTRIES} = \@a;
+      shift @a;
+      shift @a;
+	  $hash->{HELPER}{DELENTRIES} = \@a if(@a);
       DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
       
@@ -1838,12 +1841,14 @@ sub DbRep_dbConnect($$) {
       }
   }
   
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
-                                                                    RaiseError => 1, 
-                                                                    AutoCommit => 1, 
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
+                                                                    RaiseError          => 1, 
+                                                                    AutoCommit          => 1, 
                                                                     AutoInactiveDestroy => 1,
-                                                                    mysql_enable_utf8 => $utf8
-                                                                  } ); };
+                                                                    mysql_enable_utf8   => $utf8
+                                                                  } 
+                            ); 
+  };
   
   if ($@) {
       $err = $@;
@@ -2037,10 +2042,10 @@ sub DbRep_Main($$;$) {
          
  } elsif ($opt eq "delEntries") {
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
      my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-     if($nthants >= $othants) {
+     if($nthants > $othants) {
 	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
          return;
 	 }  
@@ -2139,7 +2144,7 @@ sub DbRep_Main($$;$) {
      my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
      my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-     if($nthants >= $othants) {
+     if($nthants > $othants) {
 	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
          return;
 	 } 
@@ -4347,23 +4352,25 @@ sub del_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
- 
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''|''|''";
- }
- 
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
+ BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","DELENTRIES"], 1);
  
  # SQL zusammenstellen für DB-Operation
  if ($IsTimeSet || $IsAggrSet) {
      $sql = DbRep_createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,''); 
  } else {
      $sql = DbRep_createDeleteSql($hash,$table,$device,$reading,undef,undef,''); 
+ }
+ 
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err|''|''|''";
  }
 
  $sth = $dbh->prepare($sql); 
@@ -8263,7 +8270,7 @@ sub mysql_RestoreClientSide($) {
  my $bst = [gettimeofday];
  
  # Verbindung mit DB
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 1 });};
  if ($@) {
      $e = $@;
 	 $err = encode_base64($e,"");
@@ -8498,7 +8505,7 @@ sub DbRep_syncStandby($) {
  my $bst = [gettimeofday];
  
  # Verbindung zur Quell-DB
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
@@ -12567,12 +12574,12 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: the local mounted directory dumpDirRemote </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
+                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation                   </td></tr>
+                                      <tr><td> dumpDirLocal             </td><td>: Target directory of the dumpfiles                       </td></tr>
+	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep                            </td></tr>
 	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump  </td></tr>
+	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump                          </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 
@@ -13020,16 +13027,16 @@ return;
 								 <b>Usage of serverSide-Dumps </b> <br>
 								 The content of history-table will be restored from a serverSide-Dump.
                                  Therefore the remote directory "dumpDirRemote" of the MySQL-Server has to be mounted on the 
-								 Client and make it usable to the DbRep-device by setting <a href="#DbRepattr">attribute</a> 
-								 "dumpDirLocal" to the appropriate value. <br>
+								 Client and make it usable to the DbRep device by setting attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
+								 to the appropriate value. <br>
 								 All files with extension "csv[.gzip]" and if the filename is beginning with the name of the connected database 
 								 (see Internal DATABASE) are listed. 
 								 <br><br>
 								 
 								 <b>Usage of clientSide-Dumps </b> <br>
 								 All tables and views (if present) are restored.
-								 The directory which contains the dump files has to be set by <a href="#DbRepattr">attribute</a> 
-								 "dumpDirLocal" to make it usable by the DbRep device. <br>
+								 The directory which contains the dump files has to be set by attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
+								 to make it usable by the DbRep device. <br>
 								 All files with extension "sql[.gzip]" and if the filename is beginning with the name of the connected database 
 								 (see Internal DATABASE) are listed. <br> 
 								 The restore speed depends of the server variable "<b>max_allowed_packet</b>". You can change  
@@ -13620,11 +13627,11 @@ return $ret;
   <li><b>dumpCompress </b>    - if set, the dump files are compressed after operation of "dumpMySQL" bzw. "dumpSQLite" </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide"
+  <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide" or "dumpSQLite"
                                 (default: "{global}{modpath}/log/" on the FHEM-Server). <br>
 								In this directory also the internal version administration searches for old backup-files 
 								and deletes them if the number exceeds attribute "dumpFilesKeep". 
-								The attribute is also relevant to publish a local mounted directory "dumpDirRemote" to
+								The attribute is also relevant to publish a local mounted directory "dumpDirRemote" (dumpMySQL serverSide) to
 								DbRep. </li> <br>
 
   <a name="dumpDirRemote"></a>								
@@ -15136,12 +15143,12 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung           </td></tr>
+                                      <tr><td> dumpDirLocal             </td><td>: Zielverzeichnis der Dumpfiles                             </td></tr>
+	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles                      </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump  </td></tr>
                                       <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
+	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen                  </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 
@@ -15610,14 +15617,14 @@ sub bdump {
 								 <b>Verwendung eines serverSide-Dumps </b> <br>
 								 Es wird der Inhalt der history-Tabelle aus einem serverSide-Dump wiederhergestellt.
                                  Dazu ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
-								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br>
+								 und im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
 								 Es werden alle Files mit der Endung "csv[.gzip]" und deren Name mit der 
 								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet. 
 								 <br><br>
 								 
 								 <b>Verwendung eines clientSide-Dumps </b> <br>
 								 Es werden alle Tabellen und eventuell vorhandenen Views wiederhergestellt.
-								 Das Verzeichnis, in dem sich die Dump-Files befinden, ist im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem 
+								 Das Verzeichnis, in dem sich die Dump-Files befinden, ist im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem 
 								 DbRep-Device bekannt zu machen. <br>
 						         Es werden alle Files mit der Endung "sql[.gzip]" und deren Name mit der 
 								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet. <br> 
@@ -16224,11 +16231,11 @@ return $ret;
   <li><b>dumpCompress </b>    - wenn gesetzt, werden die Dumpfiles nach "dumpMySQL" bzw. "dumpSQLite" komprimiert </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide". 
+  <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide" oder "dumpSQLite". 
                                 default: "{global}{modpath}/log/" auf dem FHEM-Server. <br>
-								Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung von 
-								"dumpMySQL" gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
-								überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote"
+								Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung 
+								gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
+								überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote" (bei dumpMySQL serverSide)
 								DbRep bekannt zu machen. </li> <br>
 
   <a name="dumpDirRemote"></a>								
