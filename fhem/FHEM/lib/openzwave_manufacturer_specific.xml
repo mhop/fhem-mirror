@@ -1523,6 +1523,7 @@
     <Product config="steinel/rs-led-d2.xml" id="1a74" name="RS LED D2" type="0001"/>
     <Product config="steinel/xled-home-2.xml" id="1a73" name="XLED HOME 2" type="0001"/>
     <Product config="steinel/l810-led-ihf.xml" id="1a75" name="L810 LED iHF" type="0001"/>
+    <Product config="steinel/MotionSwitch.xml" id="19fb" name="MotionSwitch LED" type="0002" forumNr="111295"/>
   </Manufacturer>
   <Manufacturer id="0239" name="Stelpro">
     <Product config="stelpro/stzw402.xml" id="0001" name="STZW402+ Electronic Thermostat" type="0001"/>
