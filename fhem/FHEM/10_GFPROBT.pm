@@ -48,7 +48,7 @@ sub GFPROBT_Define($$$) {
     
     $hash->{NAME} = $name;
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.0.0";
+    $hash->{VERSION} = "2.1.0";
     $hash->{loglevel} = 4;
     Log3 $hash, 3, "GFPROBT: G.F.Pro Eco Watering Bluetooth ".$hash->{VERSION};
     
