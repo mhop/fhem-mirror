@@ -1958,7 +1958,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
-attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt","") ? 'tilted' :'open' }
+attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt",1) > 0 ? 'tilted' :'open' }
 attr DEVICE model shellydw
 
 #shelly2rgbw
