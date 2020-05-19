@@ -1,4 +1,4 @@
-REV 21961
+REV 21966
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-05-18_07:45:03 340947 ./CHANGED
+UPD 2020-05-19_07:45:03 341140 ./CHANGED
 UPD 2020-05-14_07:45:02 42336 ./MAINTAINER.txt
 UPD 2020-05-08_07:45:03 39570 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -272,7 +272,7 @@ UPD 2019-12-23_07:45:02 25474 FHEM/46_TRX_SECURITY.pm
 UPD 2018-12-31_07:45:03 58001 FHEM/46_TRX_WEATHER.pm
 UPD 2018-01-24_07:45:02 18229 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
-UPD 2020-05-17_07:45:03 91027 FHEM/48_BlinkCamera.pm
+UPD 2020-05-19_07:45:03 92337 FHEM/48_BlinkCamera.pm
 UPD 2020-02-18_07:45:02 66733 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
 UPD 2020-04-15_07:45:02 766188 FHEM/49_SSCam.pm
@@ -427,7 +427,7 @@ UPD 2016-12-14_11:01:16 51480 FHEM/79_BDKM.pm
 UPD 2018-03-11_07:45:03 9772 FHEM/80_M232.pm
 UPD 2018-03-11_07:45:03 8527 FHEM/81_M232Counter.pm
 UPD 2017-09-27_07:45:02 34699 FHEM/82_LGTV_IP12.pm
-UPD 2020-05-17_07:45:03 68349 FHEM/82_LGTV_WebOS.pm
+UPD 2020-05-19_07:45:03 68399 FHEM/82_LGTV_WebOS.pm
 UPD 2018-03-11_07:45:03 3753 FHEM/82_M232Voltage.pm
 UPD 2018-07-17_07:45:04 37500 FHEM/83_IOhomecontrol.pm
 UPD 2018-07-17_07:45:04 6465 FHEM/84_IOhomecontrolDevice.pm
@@ -457,7 +457,7 @@ UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-04-30_07:45:03 437557 FHEM/93_DbLog.pm
-UPD 2020-03-31_07:45:02 886625 FHEM/93_DbRep.pm
+UPD 2020-05-19_07:45:03 887201 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2020-05-16_07:45:03 175783 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
@@ -717,9 +717,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2020-04-18_07:45:02 6742 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-05-19_07:45:03 7363 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-04-18_07:45:02 148569 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-05-19_07:45:03 148681 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -743,12 +743,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-05-18_07:45:07 4292841 docs/commandref.html
-UPD 2020-05-16_07:45:09 2635883 docs/commandref_DE.html
+UPD 2020-05-19_07:45:07 4293269 docs/commandref.html
+UPD 2020-05-19_07:45:10 2635959 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-05-18_07:45:11 232418 docs/commandref_modular.html
-UPD 2020-05-18_07:45:12 243093 docs/commandref_modular_DE.html
+UPD 2020-05-19_07:45:11 232418 docs/commandref_modular.html
+UPD 2020-05-19_07:45:12 243093 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
