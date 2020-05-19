@@ -1,6 +1,6 @@
 ##################################################################
 #
-# GFPROBT.pm (c) by Dominik Karall, 2019
+# GFPROBT.pm (c) by Dominik Karall, 2019-2020
 # dominik karall at gmail dot com
 # $Id$
 #
@@ -19,6 +19,8 @@ use Expect;
 use JSON;
 use Blocking;
 use Time::Piece;
+
+use POSIX qw(strftime);
 
 sub GFPROBT_Initialize($) {
     my ($hash) = @_;
@@ -121,7 +123,7 @@ sub GFPROBT_Set($$$) {
     my ($hash, $a, $h) = @_;
     my $name = shift @$a;
     my $workType = shift @$a;
-    my $list = "on off devicename addTimer deleteTimer editTimer eco adjust";
+    my $list = "on off:noArg devicename addTimer deleteTimer editTimer eco:on,off adjust update:noArg";
 
     # check parameters for set function
     if($workType eq "?") {
@@ -146,6 +148,10 @@ sub GFPROBT_Set($$$) {
         GFPROBT_editTimer($hash, $h);
     } elsif($workType eq "adjust") {
         GFPROBT_setAdjust($hash, $a);
+    } elsif($workType eq "eco") {
+        GFPROBT_setEco($hash, $a);
+    } elsif($workType eq "update") {
+        GFPROBT_updateStatusOnce($hash, $a);
     } else {
         return SetExtensions($hash, $list, $name, $workType, $a);
     }
@@ -163,6 +169,19 @@ sub GFPROBT_setResetErrorCounters {
         }
     }
 
+    return undef;
+}
+
+### updateStatusOnce
+sub GFPROBT_updateStatusOnce {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    readingsSingleUpdate($hash, "state", "sending", 1);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("GFPROBT_execGatttool", $name."|".$hash->{MAC}."|updateStatusOnce", "GFPROBT_processGatttoolResult", 300, "GFPROBT_killGatttool", $hash);
+}
+
+sub GFPROBT_updateStatusOnceSuccessful {
+    my ($hash) = @_;
     return undef;
 }
 
@@ -258,6 +277,16 @@ sub GFPROBT_deleteOnTimer {
     return undef;
 }
 
+### setEco ###
+sub GFPROBT_setEco {
+    my ($hash, $opt) = @_;
+    my $name = $hash->{NAME};
+    my $onoff = shift(@$opt);
+    readingsSingleUpdate($hash, "state", "sending", 1);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("GFPROBT_execGatttool", $name."|".$hash->{MAC}."|setEco|".$onoff, "GFPROBT_processGatttoolResult", 300, "GFPROBT_killGatttool", $hash);
+    return undef;
+}
+
 ### setAdjust ###
 sub GFPROBT_setAdjust {
     my ($hash, $opt) = @_;
@@ -342,7 +371,7 @@ sub GFPROBT_execGatttool($) {
     
         $hash->{gattProc} = Expect->spawn('gatttool -b '.$hash->{MAC}.' -i '.$hciDevice. ' -I');
         $hash->{gattProc}->raw_pty(1);
-        #$hash->{gattProc}->log_stdout(0);
+        $hash->{gattProc}->log_stdout(0);
         
         while (!$ret and $retries < 10) {
             $hash->{gattProc}->send("connect\r");
@@ -373,9 +402,14 @@ sub GFPROBT_execGatttool($) {
           if ($ret) {
             $json{'batteryVoltage'} = GFPROBT_convertHexToIntReverse($hash, $hash->{gattProc}->exp_after());
             if ($json{'batteryVoltage'} > 3575) {
-              $json{'battery'} = 100
+              $json{'batteryPercent'} = 100
             } else {
-              $json{'battery'} = int(($json{'batteryVoltage'} - 2900) / 6.75);
+              $json{'batteryPercent'} = int(($json{'batteryVoltage'} - 2900) / 6.75);
+            }
+            if ($json{'batteryPercent'} > 20) {
+              $json{'battery'} = "ok";
+            } else {
+              $json{'battery'} = "low";
             }
           }
           
@@ -422,26 +456,32 @@ sub GFPROBT_execGatttool($) {
           #}
           
           #read ECO1
-          #$hash->{gattProc}->send("char-read-hnd 0x0033\r");
-          #$ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
-          #if ($ret) {
-          #  $json{'eco'} = GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
-          #}
-          
-          #read ECO2
-          #$hash->{gattProc}->send("char-read-hnd 0x0045\r");
-          #$ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
-          #if ($ret) {
-          #  $json{'eco'} .= " ".GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
-          #}
-          
-          #read time offset
-          $hash->{gattProc}->send("char-read-hnd 0x0035\r");
+          my $ecoValuesHex = '';
+          $hash->{gattProc}->send("char-read-hnd 0x0033\r");
           $ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
           if ($ret) {
-            my @hexarr = GFPROBT_getHexOutput($hash, $hash->{gattProc}->exp_after());
-            $json{'deviceTime'} = GFPROBT_convertHexArrToSeconds($hash, \@hexarr);
+            $ecoValuesHex = GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
           }
+          
+          #read ECO2
+          $hash->{gattProc}->send("char-read-hnd 0x0045\r");
+          $ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
+          if ($ret) {
+            $ecoValuesHex .= " ".GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
+          }
+          if ($ecoValuesHex ne "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00") {
+            $json{'ecoMode'} = 1;
+          } else {
+            $json{'ecoMode'} = 0;
+          }
+          
+          #read time offset
+          #$hash->{gattProc}->send("char-read-hnd 0x0035\r");
+          #$ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
+          #if ($ret) {
+          #  my @hexarr = GFPROBT_getHexOutput($hash, $hash->{gattProc}->exp_after());
+          #  $json{'deviceTime'} = GFPROBT_convertHexArrToSeconds($hash, \@hexarr);
+          #}
           
           #read MAC
           $hash->{gattProc}->send("char-read-hnd 0x004a\r");
@@ -587,10 +627,51 @@ sub GFPROBT_execGatttool($) {
             
             GFPROBT_saveTimers($hash, \%timers);
           } elsif ($workType eq "setEco") {
-            #localtime->week
+            if ($params[0] eq "on") {
+              my $defaultEcoValues = "0000000000280E0D0B14110E0D0B1914111D16120F0B07040302020000FEFEFDFCF9F6F3F1EEEAF2EFECF6F5F3F2EFF6F5F3E300";
+              $defaultEcoValues .= "0000000000280E0D0B14110E0D0B1914111D16120F0B07040302020000FEFEFDFCF9F6F3F1EEEAF2EFECF6F5F3F2EFF6F5F3E300";
+              my $currWeek = int(strftime "%V", localtime);
+              #write based on week
+              my $eco = substr($defaultEcoValues, $currWeek*2-2, 40);
+              $hash->{gattProc}->send("char-write-req 0x0033 $eco\r");
+              $hash->{gattProc}->expect(2, "Characteristic value was written successfully");
+              $eco = substr($defaultEcoValues, $currWeek*2-2+40, 40);
+              $hash->{gattProc}->send("char-write-req 0x0045 $eco\r");
+              $hash->{gattProc}->expect(2, "Characteristic value was written successfully");
+            } else {
+              #write 0000...
+              $hash->{gattProc}->send("char-write-req 0x0033 0000000000000000000000000000000000000000\r");
+              $hash->{gattProc}->expect(2, "Characteristic value was written successfully");
+              $hash->{gattProc}->send("char-write-req 0x0045 0000000000000000000000000000000000000000\r");
+              $hash->{gattProc}->expect(2, "Characteristic value was written successfully");
+            }
+            #writeOffset
+            GFPROBT_writeOffset($hash);
+            #commitCode
+            GFPROBT_commitCode($hash);
+
+            #reread ECO1
+            my $ecoValuesHex = '';
+            $hash->{gattProc}->send("char-read-hnd 0x0033\r");
+            $ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
+            if ($ret) {
+              $ecoValuesHex = GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
+            }
+            
+            #reread ECO2
+            $hash->{gattProc}->send("char-read-hnd 0x0045\r");
+            $ret = $hash->{gattProc}->expect(2, "Characteristic value/descriptor: ");
+            if ($ret) {
+              $ecoValuesHex .= " ".GFPROBT_getHexString($hash, $hash->{gattProc}->exp_after());
+            }
+            if ($ecoValuesHex ne "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00") {
+              $json{'ecoMode'} = 1;
+            } else {
+              $json{'ecoMode'} = 0;
+            }
             
           } elsif ($workType eq "setAdjust") {
-            my $percHex = GFPROBT_convertIntToHexReverse($hash, $params[0]);
+            my $percHex = GFPROBT_convertIntToHexReverse($hash, int($params[0]));
             my $daysHex = GFPROBT_convertIntToHexReverse($hash, $params[1]*86400);
             $percHex = substr($percHex, 0, 4);
             my $hex = $daysHex.$percHex;
@@ -598,6 +679,9 @@ sub GFPROBT_execGatttool($) {
             $hash->{gattProc}->send("char-write-req 0x0043 $hex\r");
             $hash->{gattProc}->expect(2, "Characteristic value was written successfully");
 
+            #writeOffset
+            GFPROBT_writeOffset($hash);
+            #commitCode
             GFPROBT_commitCode($hash);
             
           } elsif ($workType eq "setOnSeconds") {
@@ -690,6 +774,68 @@ sub GFPROBT_execGatttool($) {
                 $json{'timer'.$timercnt."-Start"} = sprintf("%02d:%02d", $hour, $minute);
                 $json{'timer'.$timercnt."-Duration"} = int($duration);
                 $json{'timer'.$timercnt."-Weekdays"} = join(",", @{$timers{$hour}{$minute}{$duration}});
+                if ($ecoValuesHex ne "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00") {
+                  #get week of eco activation based on known eco sequence
+                  my $defaultEcoValues = "0000000000280e0e0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
+                  $defaultEcoValues .= "0000000000280e0e0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
+                  my $ecoVals = join("", split(" ", $ecoValuesHex));
+                  #search ecoVals in defaultEcoValues to get activation week
+                  my $weekPos = index($defaultEcoValues, $ecoVals);
+                  $json{'ecoActivationWeek'} = $weekPos / 2 + 1;
+                  my $ecoDuration = int($duration);
+                  my $week = $json{'ecoActivationWeek'};
+                  my $currWeek = int(strftime "%V", localtime);
+                  my @ecoArr = split(" ", $ecoValuesHex);
+                  $json{'ecoConfig'} = '';
+                  for my $ev (@ecoArr) {
+                    my $mult = hex($ev);
+                    if ($mult > 128) {
+                      $mult = $mult - 256;
+                    }
+                    $json{'ecoConfig'} .= $mult . " ";
+                  }
+                  my $removeFirst = shift @ecoArr;
+                  if ($currWeek > $week) {
+                    for my $ev (@ecoArr) {
+                      my $mult = hex($ev);
+                      if ($mult > 128) {
+                        $mult = $mult - 256;
+                      }
+                      $ecoDuration = $ecoDuration * ($mult/100 + 1);
+                      $week++;
+                      if ($week == $currWeek) {
+                        last;
+                      }
+                    }
+                  }
+                  $json{'timer'.$timercnt."-EcoDuration"} = int($ecoDuration);
+                  my $currEcoDuration = int($ecoDuration);
+                  #next weeks
+                  $json{'timer'.$timercnt."-NextWeeksDuration"} = '';
+                  $week = $json{'ecoActivationWeek'};
+                  $ecoDuration = $currEcoDuration;
+                  my $fixCurrWeek = $currWeek;
+                  for my $ev (@ecoArr) {
+                    if ($week < $fixCurrWeek) {
+                      $week++;
+                      next;
+                    }
+                    my $mult = hex($ev);
+                    if ($mult > 128) {
+                      $mult = $mult - 256;
+                    }
+                    $ecoDuration = $ecoDuration * ($mult/100 + 1);
+                    $json{'timer'.$timercnt."-NextWeeksDuration"} .= int($ecoDuration)." ";
+                    $currWeek++;
+                    if ($currWeek > 51) {
+                      last;
+                    }
+                  }
+                  #TODO MaxEcoDuration / MinEcoDuration
+                } else {
+                  readingsDelete($hash, "timer".$timercnt."-EcoDuration");
+                  readingsDelete($hash, "timer".$timercnt."-NextWeeksDuration");
+                }
                 $timercnt += 1;
               }
             }
@@ -710,7 +856,11 @@ sub GFPROBT_execGatttool($) {
             if ($json{'adjustPercentage'} !=0 ) {
               my $seconds = GFPROBT_convertHexArrToSeconds($hash, \@hextime);
               my $till = time() + $seconds;
-              $json{'adjustTill'} = sprintf("%s", scalar localtime($till));
+              if ($seconds < 60) {
+                $json{'adjustTill'} = '-';
+              } else {
+                $json{'adjustTill'} = sprintf("%s", scalar localtime($till));
+              }
             } else {
               $json{'adjustTill'} = "-";
             }
@@ -1036,6 +1186,8 @@ sub GFPROBT_processJson {
       readingsDelete($hash, "timer".$i."-Start");
       readingsDelete($hash, "timer".$i."-Duration");
       readingsDelete($hash, "timer".$i."-Weekdays");
+      readingsDelete($hash, "timer".$i."-EcoDuration");
+      readingsDelete($hash, "timer".$i."-NextWeeksDuration");
     }
     foreach my $reading (keys %data) {
       if ($reading ne "DATA") {
