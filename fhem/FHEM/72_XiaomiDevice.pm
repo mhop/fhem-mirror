@@ -100,6 +100,14 @@ my %vacuum_errors = ( '0' => "None",
                     '255' => "Internal error" , );
 
 
+my %vacuum_waterbox = ( '200' => 'off',
+                        '201' => 'low',
+                        '202' => 'medium',
+                        '203' => 'high',
+                        '204' => 'auto',
+                      );
+
+
 my %cooker_menus = ( '0000' => "None",
                      '0001' => "Cooking",
                      '0002' => "Quick cooking",
@@ -131,7 +139,7 @@ sub XiaomiDevice_Initialize($) {
   $hash->{WriteFn}      = "XiaomiDevice_Write";
   $hash->{DbLog_splitFn}= "XiaomiDevice_DbLog_splitFn";
   $hash->{AttrFn}       = "XiaomiDevice_Attr";
-  $hash->{AttrList}     = "subType:AirPurifier,AirPurifier3H,Humidifier,EvpHumidifier,VacuumCleaner,SmartFan,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names map_names ".
+  $hash->{AttrList}     = "subType:AirPurifier,AirPurifier3H,Humidifier,EvpHumidifier,HumidifierMJJSQ,VacuumCleaner,SmartFan,SmartFan1X,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names map_names ".
                           $readingFnAttributes;
 
 }
@@ -290,9 +298,11 @@ sub XiaomiDevice_Define($$$) {
   $attr{$name}{stateFormat} = "pm25 µg/m³ / speed rpm / mode" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "pm25 µg/m³ / speed rpm / mode" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "state" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner" && !defined($attr{$name}{stateFormat}));
-  $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "state" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier" && !defined($attr{$name}{stateFormat}));
+  $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier" && !defined($attr{$name}{stateFormat}));
+  $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "mode level%" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan" && !defined($attr{$name}{stateFormat}));
+  $attr{$name}{stateFormat} = "mode level%" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "state" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EyeCare" && !defined($attr{$name}{stateFormat}));
   $attr{$name}{stateFormat} = "power" if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "WaterPurifier" && !defined($attr{$name}{stateFormat}));
@@ -544,8 +554,14 @@ sub XiaomiDevice_Set($$@) {
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier"){
     $list  .=  " on:noArg off:noArg mode:silent,medium,high,auto buzzer:on,off dry:on,off led:bright,dim,off child_lock:on,off limit_hum:slider,30,1,80";
   }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ"){
+    $list  .=  " on:noArg off:noArg mode:silent,medium,high,auto buzzer:on,off led:on,off limit_hum:slider,30,1,80";
+  }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan"){
     $list  .=  " on:noArg off:noArg timed_off mode:straight,natural level:slider,0,1,100 angle:30,60,90,120 angle_enable:on,off move:left,right buzzer:on,off led:bright,dim,off child_lock:on,off";
+  }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X"){
+    $list  .=  " on:noArg off:noArg timed_off mode:straight,natural level:slider,0,1,100 angle:30,60,90,120,140 angle_enable:on,off move:left,right buzzer:on,off led:on,off child_lock:on,off";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp"){
     $list .= " on:noArg off:noArg toggle:noArg brightness:slider,0,1,100 timed_off save:noArg";
@@ -605,21 +621,24 @@ sub XiaomiDevice_Set($$@) {
       $list  .=  ' goto';
     }
     }
-    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.s5" || $hash->{model} ne "test") {
+    if(!defined($hash->{model}) || ($hash->{model} ne "rockrobo.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.s5
       if(defined($hash->{helper}{map_names})) {
         $list  .=  ' save_map:reset,'.$hash->{helper}{map_names}.' start_edit_map:noArg end_edit_map:noArg reset_map:noArg use_new_map:noArg use_old_map:noArg get_persist_map:noArg get_fresh_map:noArg';
       } else {
         $list  .=  ' save_map start_edit_map:noArg end_edit_map:noArg reset_map:noArg use_new_map:noArg use_old_map:noArg get_persist_map:noArg get_fresh_map:noArg';
       }
-    }
-    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.s5" || $hash->{model} ne "test") {
       if(defined(ReadingsVal($name,"lab_status",undef))) {
         $list  .=  ' lab_status:yes,no';
       }
     }
-    if(!defined($hash->{model}) || $hash->{model} eq "roborock.vacuum.m1s" || $hash->{model} ne "test") {
-      $list  .=  ' clean_segment';
+    if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.m1s roborock.vacuum.s5e roborock.vacuum.s6 roborock.vacuum.t6
+      $list  .=  ' clean_segment clean_segment_stop:noArg clean_segment_resume:noArg';
     }
+    if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.s5e")) {
+      $list  .=  ' water_box_mode:off,low,medium,high,auto';
+    }
+
+
 
     if (defined($hash->{helper}{timers})&&($hash->{helper}{timers}>0))
     {
@@ -736,6 +755,15 @@ sub XiaomiDevice_Set($$@) {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_move","params":["'.$arg[0].'"]}' );
       return undef;
     }
+    if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      return "Usage: move [left/right]" if(!defined($arg[0]));
+      my $packetid = $hash->{helper}{packetid};
+      $hash->{helper}{packetid} = $packetid+1;
+      $hash->{helper}{packet}{$packetid} = "move";
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"m_roll","params":["'.$arg[0].'"]}' );
+      return undef;
+    }
     return "Usage: move [direction -100..100] [velocity 0..100] [time ms]" if(!defined($arg[0]) || !defined($arg[1]));
     if($hash->{helper}{rc_seq} == 0) {
       my $packetid = $hash->{helper}{packetid};
@@ -846,7 +874,7 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "set_custom_mode";
     if($hash->{model} ne "rockrobo.vacuum.v1") {
-      $arg[0] = ($arg[0] eq "quiet") ? "101" : ($arg[0] eq "balanced") ? "102" : ($arg[0] eq "turbo") ? "103" : ($arg[0] eq "max") ? "104" : ($arg[0] eq "mop") ? "105" : "102";
+      $arg[0] = ($arg[0] eq "quiet") ? "101" : ($arg[0] eq "balanced") ? "102" : ($arg[0] eq "turbo") ? "103" : ($arg[0] eq "max") ? "104" : ($arg[0] eq "mop") ? "105" : ($arg[0] eq "auto") ? "106" : "102";
     } else {
       $arg[0] = ($arg[0] eq "quiet") ? "38" : ($arg[0] eq "balanced") ? "60" : ($arg[0] eq "turbo") ? "77" : ($arg[0] eq "max") ? "90" : ($arg[0] eq "mop") ? "1" : "60";
     }
@@ -858,6 +886,14 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "set_custom_mode";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_custom_mode","params":['.$arg[0].']}' );
+  }
+  elsif ($cmd eq 'water_box_mode')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "set_water_box_custom_mode";
+    my $waterboxmode = ($arg[0] eq 'off') ? '200' : ($arg[0] eq 'low') ? '201' : ($arg[0] eq 'medium') ? '202' : ($arg[0] eq 'high') ? '203' : '204';
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_water_box_custom_mode","params":['.$waterboxmode.']}' );
   }
   elsif ($cmd eq 'dnd_enabled')
   {
@@ -1033,6 +1069,20 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "clean_segment";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_segment_clean","params":['.$arg[0].']}' );
+  }
+  elsif ($cmd eq 'clean_segment_stop')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "clean_segment_stop";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"stop_segment_clean","params":[]}' );
+  }
+  elsif ($cmd eq 'clean_segment_resume')
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "clean_segment_resume";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"resume_segment_clean","params":[]}' );
   }
   elsif ($cmd eq 'timezone')
   {
@@ -1235,10 +1285,19 @@ sub XiaomiDevice_Set($$@) {
     }
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
     {
-      my $cmd_boolean = $cmd eq 'on' ? 'true' : 'false';
-      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "power", "siid": 2, "piid": 2, "value": '.$cmd_boolean.'}]}' );
-      InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash);
-      InternalTimer( gettimeofday() + 20, "XiaomiDevice_GetSpeed", $hash);
+      my $cmd_set = $cmd eq 'on' ? 'true' : 'false';
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "power", "siid": 2, "piid": 2, "value": '.$cmd_set.'}]}' );
+      InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetSpeed", $hash);
+      return undef;
+    }
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"Set_OnOff","params":['.($cmd eq "on" ? '1' : '0').']}' );
+      return undef;
+    }
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_power","params":['.($cmd eq "on" ? 'true' : 'false').']}' );
       return undef;
     }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_power","params":["'.$cmd.'"]}' );
@@ -1370,6 +1429,13 @@ sub XiaomiDevice_Set($$@) {
 
     my $limit_hum = $arg[0];
     $limit_hum = 50 if(!defined($limit_hum) || int($limit_hum < 30) || int($limit_hum > 80));
+
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"Set_HumiValue","params":['.$limit_hum.']}' );
+      return undef;
+    }
+
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_limit_hum","params":['.$limit_hum.']}' );
   }
   elsif ($cmd eq 'mode')
@@ -1388,16 +1454,24 @@ sub XiaomiDevice_Set($$@) {
       InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetSpeed", $hash);
       return undef;
     }
-
-    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
+    if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
     {
-      my $cmd_boolean = $arg[0] eq 'auto' ? '0' : $arg[0] eq 'silent' ? '1' : $arg[0] eq 'favorite' ? '2' : '3';
-      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "mode", "siid": 2, "piid": 5, "value": '.$cmd_boolean.'}]}' );
-      InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash);
+      my $mode = ($arg[0] eq "natural")?"natural":"speed";
+      $hash->{helper}{packet}{$packetid} = 'mode_'.$mode;
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_mode","params":["'.(($arg[0] eq "natural")?'nature':'normal').'"]}' );
+      InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetSpeed", $hash);
       return undef;
     }
 
+
     $hash->{helper}{packet}{$packetid} = ($arg[0] eq 'idle') ? 'mode_idle' : ($arg[0] eq 'auto') ? 'mode_auto' : ($arg[0] eq 'silent') ? 'mode_silent' : ($arg[0] eq 'medium') ? 'mode_medium' : ($arg[0] eq 'high') ? 'mode_high' : 'mode_favorite';
+
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
+    {
+      my $cmd_set = $arg[0] eq 'auto' ? '0' : $arg[0] eq 'silent' ? '1' : $arg[0] eq 'favorite' ? '2' : '3';
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "mode", "siid": 2, "piid": 5, "value": '.$cmd_set.'}]}' );
+      return undef;
+    }
 
     if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier")
     {
@@ -1406,6 +1480,13 @@ sub XiaomiDevice_Set($$@) {
         InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetSpeed", $hash);
         return undef;
       }
+    }
+
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+    {
+      my $cmd_set = $arg[0] eq 'silent' ? '1' : $arg[0] eq 'medium' ? '2' : $arg[0] eq 'high' ? '3' : '4';
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"Set_HumidifierGears","params":['.$cmd_set.']}' );
+      return undef;
     }
 
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_mode","params":["'.$arg[0].'"]}' );
@@ -1452,6 +1533,11 @@ sub XiaomiDevice_Set($$@) {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "set_angle";
+    if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_angle","params":['.$arg[0].']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_angle","params":['.$arg[0].']}' );
   }
   elsif ($cmd eq 'angle_enable')
@@ -1459,6 +1545,11 @@ sub XiaomiDevice_Set($$@) {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "set_angle_enable";
+    if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_roll","params":['.($arg[0] eq "on" ? "true" : "false").']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_angle_enable","params":["'.$arg[0].'"]}' );
   }
   elsif ($cmd eq 'level')
@@ -1468,10 +1559,22 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packet}{$packetid} = "set_level";
     if(int($arg[0])<1)
     {
+      if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+      {
+        XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_power","params":[false]}' );
+      }
+      else
+      {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_power","params":["off"]}' );
+      }
     } else {
-      my $mode = (ReadingsVal($name, "mode", "natural") eq "natural")?"natural":"speed";
-      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_'.$mode.'_level","params":['.$arg[0].']}' );
+      if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+      {
+        XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_speed","params":['.$arg[0].']}' );
+      } else {
+        my $mode = (ReadingsVal($name, "mode", "natural") eq "natural")?"natural":"speed";
+        XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_'.$mode.'_level","params":['.$arg[0].']}' );
+      }
     }
     InternalTimer( gettimeofday() + 10, "XiaomiDevice_GetSpeed", $hash);
   }
@@ -1491,30 +1594,42 @@ sub XiaomiDevice_Set($$@) {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"delay_off","params":['.$arg[0].']}' );
       return undef;
     }
-
+    if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_t_off","params":['.$arg[0].']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_poweroff_time","params":['.$arg[0].']}' );
   }
   elsif ($cmd eq 'buzzer')
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on") ? 'buzzer_on' : 'buzzer_off';
 
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
     {
       my $cmd_boolean = $arg[0] eq 'on' ? 'true' : 'false';
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "buzzer", "siid": 5, "piid": 1, "value": '.$cmd_boolean.'}]}' );
-      InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSettings", $hash);
       return undef;
     }
-
-    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on") ? 'buzzer_on' : 'buzzer_off';
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"SetTipSound_Status","params":['.($arg[0] eq "off" ? '0' : '1' ).']}' );
+      return undef;
+    }
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_sound","params":['.($arg[0] eq "off" ? 'false' : 'true' ).']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_buzzer","params":["'.$arg[0].'"]}' );
   }
   elsif ($cmd eq 'led')
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
-    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on" || $arg[0] eq "bright") ? 'led_bright' : ($arg[0] eq "dim") ? 'led_dim' : 'led_off';
+    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on") ? 'led_on' : ($arg[0] eq "bright") ? 'led_bright' : ($arg[0] eq "dim") ? 'led_dim' : 'led_off';
 
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
     {
@@ -1526,6 +1641,16 @@ sub XiaomiDevice_Set($$@) {
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier")
     {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_led_b","params":["'.($arg[0] eq "bright" ? '0' : $arg[0] eq "dim" ? '1' : '2' ).'"]}' );
+      return undef;
+    }
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"SetLedState","params":['.($arg[0] eq "off" ? '0' : '1' ).']}' );
+      return undef;
+    }
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_light","params":['.($arg[0] eq "off" ? 'false' : 'true' ).']}' );
       return undef;
     }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_led_b","params":['.($arg[0] eq "bright" ? '0' : $arg[0] eq "dim" ? '1' : '2' ).']}' );
@@ -1556,16 +1681,19 @@ sub XiaomiDevice_Set($$@) {
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on") ? 'child_lock_on' : 'child_lock_off';
 
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "AirPurifier3H")
     {
       my $cmd_boolean = $arg[0] eq 'on' ? 'true' : 'false';
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "child_lock", "siid": 7, "piid": 1, "value": '.$cmd_boolean.'}]}' );
-      InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSettings", $hash);
       return undef;
     }
-
-    $hash->{helper}{packet}{$packetid} = ($arg[0] eq "on") ? 'child_lock_on' : 'child_lock_off';
+    if (defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_lock","params":['.($arg[0] eq "off" ? 'false' : 'true' ).']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_child_lock","params":["'.$arg[0].'"]}' );
   }
   elsif ($cmd eq 'kid_mode')
@@ -1801,20 +1929,30 @@ sub XiaomiDevice_GetUpdate($)
     $hash->{helper}{packet}{$packetid} = "air_data_3H";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 2}, {"did": "fan_level", "siid": 2, "piid": 4}, {"did": "mode", "siid": 2, "piid": 5}, {"did": "humidity", "siid": 3, "piid": 7}, {"did": "temperature", "siid": 3, "piid": 8}, {"did": "aqi", "siid": 3, "piid": 6}, {"did": "filter_life_remaining", "siid": 4, "piid": 3}, {"did": "purify_volume", "siid": 13, "piid": 1}, {"did": "filter_hours_used", "siid": 4, "piid": 5},  {"did": "favorite_level", "siid": 10, "piid": 10}, {"did": "favorite_rpm", "siid": 10, "piid": 7},{"did": "motor_speed", "siid": 10, "piid": 8}, {"did": "use_time", "siid": 12, "piid": 1},{"did": "average_aqi", "siid": 13, "piid": 2}]}');
   }
-  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier")
-  {
-    $hash->{helper}{packet}{$packetid} = "evphum_data";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","humidity","speed","depth","temperature","use_time"]}' );
-  }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier")
   {
     $hash->{helper}{packet}{$packetid} = "hum_data";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","temp_dec","humidity","trans_level","speed","depth","temperature","use_time","button_pressed"]}' );
   }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier")
+  {
+    $hash->{helper}{packet}{$packetid} = "hum_data_evp";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","humidity","speed","depth","temperature","use_time"]}' );
+  }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+  {
+    $hash->{helper}{packet}{$packetid} = "hum_data_mjjsq";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["Humidifier_Gear","Humidity_Value","HumiSet_Value","Led_State","OnOff_State","TemperatureValue","TipSound_State","waterstatus","watertankstatus"]}' );
+  }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
   {
     $hash->{helper}{packet}{$packetid} = "fan_data";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed","button_pressed"]}' );
+  }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+  {
+    $hash->{helper}{packet}{$packetid} = "fan_data_1x";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","speed","roll_enable","roll_angle","time_off","light","beep_sound","child_lock"]}' );
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp")
   {
@@ -1880,14 +2018,6 @@ sub XiaomiDevice_GetSettings($)
     return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "led", "siid": 6, "piid": 6},{"did": "buzzer", "siid": 5, "piid": 1}, {"did": "buzzer_volume", "siid": 5, "piid": 2},{"did": "led_brightness", "siid": 6, "piid": 1},{"did": "child_lock", "siid": 7, "piid": 1}, {"did": "app_extra", "siid": 15, "piid": 1}, {"did": "filter_rfid_product_id", "siid": 14, "piid": 3}, {"did": "filter_rfid_tag", "siid": 14, "piid": 1}]}');
   }
 
-  if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier")
-  {
-    my $packetid = $hash->{helper}{packetid};
-    $hash->{helper}{packetid} = $packetid+1;
-    $hash->{helper}{packet}{$packetid} = "evphum_settings";
-    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["buzzer","led","child_lock","limit_hum","dry"]}' );
-  }
-
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier")
   {
     my $packetid = $hash->{helper}{packetid};
@@ -1896,12 +2026,35 @@ sub XiaomiDevice_GetSettings($)
     return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["buzzer","led_b","child_lock","limit_hum","dry"]}' );
   }
 
+  if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "EvpHumidifier")
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "hum_settings_evp";
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["buzzer","led","child_lock","limit_hum","dry"]}' );
+  }
+
+  if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "hum_settings_mjjsq";
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["HumiSet_Value","Led_State","TipSound_State"]}' );
+  }
+
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "fan_data";
     return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["angle","angle_enable","power","bat_charge","battery","speed_level","natural_level","buzzer","led_b","poweroff_time","ac_power","child_lock","temp_dec","humidity","speed","button_pressed"]}' );
+  }
+  if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+  {
+    my $packetid = $hash->{helper}{packetid};
+    $hash->{helper}{packetid} = $packetid+1;
+    $hash->{helper}{packet}{$packetid} = "fan_data_1x";
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","speed","roll_enable","roll_angle","time_off","light","beep_sound","child_lock"]}' );
   }
 
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp")
@@ -2058,10 +2211,20 @@ sub XiaomiDevice_GetSpeed($)
     $hash->{helper}{packet}{$packetid} = "hum_status";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","limit_hum"]}' );
   }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "HumidifierMJJSQ")
+  {
+    $hash->{helper}{packet}{$packetid} = "hum_status_mjjsq";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["OnOff_State","Humidifier_Gear","HumiSet_Value"]}' );
+  }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan")
   {
     $hash->{helper}{packet}{$packetid} = "fan_status";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","speed_level","natural_level","speed"]}' );
+  }
+  elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
+  {
+    $hash->{helper}{packet}{$packetid} = "fan_status_1x";
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_prop","params":["power","mode","speed"]}' );
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartLamp")
   {
@@ -2203,6 +2366,16 @@ sub XiaomiDevice_ParseJSON($$)
   return undef if($msgtype eq "app_sleep");
   return undef if($msgtype eq "save_map");
   return undef if($msgtype eq "start_edit_map");
+  return undef if($msgtype eq "end_edit_map");
+  return undef if($msgtype eq "reset_map");
+  return undef if($msgtype eq "use_new_map");
+  return undef if($msgtype eq "use_old_map");
+  return undef if($msgtype eq "get_persist_map");
+  return undef if($msgtype eq "get_fresh_map");
+  return undef if($msgtype eq "lab_status");
+  return undef if($msgtype eq "clean_segment");
+  return undef if($msgtype eq "clean_segment_stop");
+  return undef if($msgtype eq "clean_segment_resume");
 
   if($msgtype eq "air_data")
   {
@@ -2331,7 +2504,7 @@ sub XiaomiDevice_ParseJSON($$)
     readingsEndUpdate($hash,1);
     return undef;
   }
-  if($msgtype eq "evphum_data")
+  if($msgtype eq "hum_data_evp")
   {
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
@@ -2347,16 +2520,21 @@ sub XiaomiDevice_ParseJSON($$)
     readingsEndUpdate($hash,1);
     return undef;
   }
-  if($msgtype eq "evphum_settings")
+  if($msgtype eq "hum_data_mjjsq")
   {
+    # "Humidifier_Gear","Humidity_Value","HumiSet_Value","Led_State","OnOff_State","TemperatureValue","TipSound_State","waterstatus","watertankstatus"
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "buzzer", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
-    readingsBulkUpdate( $hash, "led", ($json->{result}[1] == 0 ? 'bright' : $json->{result}[1] == 1 ? 'dim' : 'off' ), 1 ) if(defined($json->{result}[1]));
-    readingsBulkUpdate( $hash, "child_lock", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
-    readingsBulkUpdate( $hash, "limit_hum", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
-    readingsBulkUpdate( $hash, "dry", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "mode", ($json->{result}[0] == 1 ? 'silent' : ($json->{result}[0] == 2) ? 'medium' : ($json->{result}[0] == 2) ? 'high' : 'auto' ), 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "humidity", $json->{result}[1], 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "limit_hum", ($json->{result}[2]), 1 ) if(defined($json->{result}[2]));
+    readingsBulkUpdate( $hash, "led", ($json->{result}[3] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[3]));
+    readingsBulkUpdate( $hash, "power", ($json->{result}[4] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "temperature", $json->{result}[5], 1 ) if(defined($json->{result}[5]));
+    readingsBulkUpdate( $hash, "buzzer", ($json->{result}[6] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[6]));
+    readingsBulkUpdate( $hash, "water", ($json->{result}[7] == 1 ? 'ok' : 'low' ), 1 ) if(defined($json->{result}[7]));
+    readingsBulkUpdate( $hash, "tank", ($json->{result}[8] == 1 ? 'installed' : 'detached' ), 1 ) if(defined($json->{result}[8]));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2373,6 +2551,31 @@ sub XiaomiDevice_ParseJSON($$)
     readingsEndUpdate($hash,1);
     return undef;
   }
+  if($msgtype eq "hum_settings_evp")
+  {
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "buzzer", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "led", ($json->{result}[1] == 0 ? 'bright' : $json->{result}[1] == 1 ? 'dim' : 'off' ), 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "child_lock", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
+    readingsBulkUpdate( $hash, "limit_hum", $json->{result}[3], 1 ) if(defined($json->{result}[3]));
+    readingsBulkUpdate( $hash, "dry", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+    readingsEndUpdate($hash,1);
+    return undef;
+  }
+  if($msgtype eq "hum_settings_mjjsq")
+  {
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "limit_hum", ($json->{result}[0]), 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "led", ($json->{result}[1] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "buzzer", ($json->{result}[2] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[2]));
+    readingsEndUpdate($hash,1);
+    return undef;
+  }
+
   if($msgtype eq "hum_status")
   {
     return undef if(!defined($json->{result}));
@@ -2380,6 +2583,18 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "power", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
     readingsBulkUpdate( $hash, "mode", ($json->{result}[0] eq "off") ? "idle" : $json->{result}[1], 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "limit_hum", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
+    readingsEndUpdate($hash,1);
+    return undef;
+  }
+
+  if($msgtype eq "hum_status_mjjsq")
+  {
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "power", ($json->{result}[0] == 1 ? 'on' : 'off' ), 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "mode", ($json->{result}[1] == 1 ? 'silent' : ($json->{result}[1] == 2) ? 'medium' : ($json->{result}[1] == 2) ? 'high' : 'auto' ), 1 ) if(defined($json->{result}[1]));
     readingsBulkUpdate( $hash, "limit_hum", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
     readingsEndUpdate($hash,1);
     return undef;
@@ -2497,6 +2712,24 @@ sub XiaomiDevice_ParseJSON($$)
     readingsEndUpdate($hash,1);
     return undef;
   }
+  if($msgtype eq "fan_data_1x")
+  {
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    #"power","mode","speed","roll_enable","roll_angle","time_off","light","beep_sound","child_lock"
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "power", ((lc $json->{result}[0] eq "false" || $json->{result}[0] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "mode", ($json->{result}[1] eq "normal" ? 'straight' : 'natural'), 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "level", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
+    readingsBulkUpdate( $hash, "angle_enable", ((lc $json->{result}[3] eq "false" || $json->{result}[3] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[3]));
+    readingsBulkUpdate( $hash, "angle", $json->{result}[4], 1 ) if(defined($json->{result}[4]));
+    readingsBulkUpdate( $hash, "poweroff_time", $json->{result}[5], 1 ) if(defined($json->{result}[5]));
+    readingsBulkUpdate( $hash, "led", ((lc $json->{result}[6] eq "false" || $json->{result}[6] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[6]));
+    readingsBulkUpdate( $hash, "buzzer", ((lc $json->{result}[7] eq "false" || $json->{result}[7] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[7]));
+    readingsBulkUpdate( $hash, "child_lock", ((lc $json->{result}[8] eq "false" || $json->{result}[8] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[8]));
+    readingsEndUpdate($hash,1);
+    return undef;
+  }
   if($msgtype eq "fan_status")
   {
     return undef if(!defined($json->{result}));
@@ -2511,6 +2744,17 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "level", $fanspeed, 1 ) if(defined($json->{result}[2]));
     readingsBulkUpdate( $hash, "mode", (int($json->{result}[2])>0)?"natural":"straight", 1 ) if(defined($json->{result}[2]));
     readingsBulkUpdate( $hash, "speed", (($json->{result}[0] eq "off")?"0":$json->{result}[3]), 1 ) if(defined($json->{result}[3]));
+    readingsEndUpdate($hash,1);
+    return undef;
+  }
+  if($msgtype eq "fan_status_1x")
+  {
+    return undef if(!defined($json->{result}));
+    return undef if(ref($json->{result}) ne "ARRAY");
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate( $hash, "power", (($json->{result}[0] eq "false" || $json->{result}[0] eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[0]));
+    readingsBulkUpdate( $hash, "mode", ($json->{result}[1] eq "normal" ? 'straight' : 'natural'), 1 ) if(defined($json->{result}[1]));
+    readingsBulkUpdate( $hash, "level", $json->{result}[2], 1 ) if(defined($json->{result}[2]));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2671,13 +2915,17 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "dnd", (($json->{result}[0]{dnd_enabled} ne "0")?"on":"off"), 1 ) if(defined($json->{result}[0]{dnd_enabled}));
     if(defined($json->{result}[0]{fan_power}) && int($json->{result}[0]{fan_power}) > 100) {
       my $cleaning_int = int($json->{result}[0]{fan_power});
-      my $cleaningmode = ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : "unknown";
+      my $cleaningmode = ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : ($cleaning_int == 106) ? "auto" : "unknown";
       readingsBulkUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     } elsif(defined($json->{result}[0]{fan_power})) {
       my $cleaning_int = int($json->{result}[0]{fan_power});
       my $cleaningmode = ($cleaning_int > 89) ? "max" : ($cleaning_int > 74) ? "turbo" : ($cleaning_int > 40) ? "balanced" : ($cleaning_int > 10) ? "quiet" : "mop";
       readingsBulkUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     }
+    readingsBulkUpdate( $hash, "water_box_carriage_status", (($json->{result}[0]{water_box_carriage_status} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{water_box_carriage_status}));
+    readingsBulkUpdate( $hash, "water_box_status", (($json->{result}[0]{water_box_status} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{water_box_status}));
+    readingsBulkUpdate( $hash, "water_box_mode", $vacuum_waterbox{$json->{result}[0]{water_box_mode}}, 1) if(defined($json->{result}[0]{water_box_mode}));
+    readingsBulkUpdate( $hash, "mop_forbidden_enable", (($json->{result}[0]{mop_forbidden_enable} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{mop_forbidden_enable}));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -3014,7 +3262,7 @@ sub XiaomiDevice_ParseJSON($$)
   return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_angle");
   return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_angle_enable");
 
-  return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSpeed", $hash) if($msgtype eq "set_limit_hum");
+  return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "set_limit_hum");
 
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "nowarn" || $msgtype eq "ack");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "power_mode" || $msgtype eq "power_price" || $msgtype eq "wifi_led" || $msgtype eq "usb_power" || $msgtype eq "rt_power");
@@ -3034,6 +3282,7 @@ sub XiaomiDevice_ParseJSON($$)
   return InternalTimer( gettimeofday() + 2, "XiaomiDevice_GetSpeed", $hash) if($msgtype eq "set_level_favorite" || $msgtype eq "set_custom_mode");
   return readingsSingleUpdate( $hash, "buzzer", "off", 1 ) if($msgtype eq "buzzer_off");
   return readingsSingleUpdate( $hash, "buzzer", "on", 1 ) if($msgtype eq "buzzer_on");
+  return readingsSingleUpdate( $hash, "led", "on", 1 ) if($msgtype eq "led_on");
   return readingsSingleUpdate( $hash, "led", "bright", 1 ) if($msgtype eq "led_bright");
   return readingsSingleUpdate( $hash, "led", "dim", 1 ) if($msgtype eq "led_dim");
   return readingsSingleUpdate( $hash, "led", "off", 1 ) if($msgtype eq "led_off");
@@ -3053,6 +3302,8 @@ sub XiaomiDevice_ParseJSON($$)
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "change_sound_volume");
   return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "set_carpet_mode");
   return InternalTimer( gettimeofday() + 30, "XiaomiDevice_GetUpdate", $hash) if($msgtype eq "set_dnd_timer");
+  return InternalTimer( gettimeofday() + 5, "XiaomiDevice_GetSettings", $hash) if($msgtype eq "set_water_box_custom_mode");
+
 
   if($msgtype eq "wifi_setup")
   {
@@ -3558,7 +3809,7 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <br>
    Set DND end time
    </li><br>
-   <li><code>on / off</code> <i>(AirPurifier/EvpHumidifier)</i>
+   <li><code>on / off</code> <i>(AirPurifier/Humidifier)</i>
    <br>
    Turn the device on or off
    </li><br>
@@ -3702,7 +3953,7 @@ sub XiaomiDevice_DbLog_splitFn($) {
    <ul>
    <li><code>subType</code>
      <br>
-     VacuumCleaner / AirPurifier / AirPurifier3H / SmartFan / Humidifier / EvpHumidifier / RiceCooker / PowerPlug / SmartLamp
+     VacuumCleaner / AirPurifier / AirPurifier3H / SmartFan / SmartFan1X / Humidifier / EvpHumidifier / HumidifierMJJSQ / RiceCooker / PowerPlug / SmartLamp
    </li><br>
    <li><code>disable</code>
       <br>
