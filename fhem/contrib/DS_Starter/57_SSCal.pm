@@ -1718,16 +1718,17 @@ sub extractEventlist {                                    ## no critic 'complexi
                   } elsif ($p1 eq "UNTIL") {                                    # festes Intervallende angegeben        
                       $until = $p2;
                       $until =~ s/[-:]//gx;
-                      (undef,undef,undef,undef,$uets,undef) = explodeDateTime ($hash, $until, 0, 0, 0);
-                      if ($uets < $tstart) {
-                          Log3($name, 4, "$name - Ignore recurring event -> $data->{data}{$key}[$i]{summary} , interval end \"$nedate $netime\" is less than selection start \"$datetimestart\"");
-                          $ignore = 1;
-                      }
+                      $uets  = (explodeDateTime ($hash, $until, 0, 0, 0))[4];
                   } elsif ($p1 eq "BYMONTHDAY") {                               # Wiederholungseigenschaft -> Tag des Monats z.B. 13 (Tag 13)    
                       $bymonthday = $p2;
                   } elsif ($p1 eq "BYDAY") {                                    # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
                           $byday = $p2;
                   } 
+              }
+              
+              if (defined $uets && $uets < $tstart) {
+                  Log3($name, 4, "$name - Ignore recurring event -> $data->{data}{$key}[$i]{summary} , interval end \"$nedate $netime\" is less than selection start \"$datetimestart\"");
+                  $ignore = 1;
               }
               
               $count      = $count      ? $count      : 9999999;                # $count "unendlich" wenn kein COUNT angegeben
