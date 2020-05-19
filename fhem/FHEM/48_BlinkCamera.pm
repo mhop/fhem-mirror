@@ -45,13 +45,13 @@
 #   fix videodelete filename (change path to _)
 #   new attribute homeScreenV3 set to 1 to use new v3 api
 #   support blink cameras on homescreen - with new homeScreenV3
-
 #   added documentation for homeScreenV3 and BLinkMini - readonly mode
 #   added - for host name instaed of . after rest
 #   new camtype dependant camEnable / camDisable 
 #   ...Cam...active state corrected (was always disabled)
 #   getThumbnail also for Blink Mini
-# 
+
+#   FIX: camtype missing for old homescreen
 # 
 # 
 # 
@@ -1194,6 +1194,7 @@ sub BlinkCamera_ParseHomescreenOLD($$$)
 #        Debug "Device loop: ".$device->{device_id};
         $readUpdates->{"networkCamera".$device->{device_id}} = $device->{name}.":".$device->{active};
         $readUpdates->{"networkCamera".$device->{device_id}."Name"} = $device->{name};
+        $readUpdates->{"networkCamera".$device->{device_id}."Type"} = "camera";
         $readUpdates->{"networkCamera".$device->{device_id}."Active"} = $device->{active};
         $cameraGets .= $device->{name}.",".$device->{device_id}.",";
         $cameras .= $device->{device_id}.":".$device->{name}."\n";
