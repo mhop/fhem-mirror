@@ -111,7 +111,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.0"  => "16.05.2020  more changes according to PBP, switch to packages, fix cannot delete (and display in table) EventId of block 0 ",
+  "2.4.1"  => "20.05.2020  new function 'evalTimeAndWrite' ",
+  "2.4.0"  => "19.05.2020  more changes according to PBP, switch to packages, fix cannot delete (and display in table) EventId of block 0 ",
   "2.3.0"  => "25.04.2020  set compatibility to Calendar package 2.3.4-0631, some changes according to PBP ",
   "2.2.3"  => "24.03.2020  minor code change ",
   "2.2.2"  => "08.03.2020  review commandref ",
@@ -1639,6 +1640,7 @@ sub extractEventlist {                                    ## no critic 'complexi
       while ($data->{data}{$key}[$i]) {
           my $ignore = 0; 
           my $done   = 0;
+          my $next   = 0;
           ($nbdate,$nedate) = ("","");  
 
           my $uid = $data->{data}{$key}[$i]{ical_uid};                    # UID des Events    
@@ -1681,19 +1683,19 @@ sub extractEventlist {                                    ## no critic 'complexi
                   $ignore = 1;
                   $done   = 0;               
               } else {
-                  @row_array = writeValuesToArray ({ name        => $name,
-                                                     eventno     => $n,
-                                                     calref      => $data->{data}{$key}[$i],
-                                                     timezone    => $tz,
-                                                     begindate   => $bdate,
-                                                     begintime   => $btime,
-                                                     begints     => $bts,
-                                                     enddate     => $edate,
-                                                     endtime     => $etime,
-                                                     endts       => $ets,
-                                                     sumarrayref => \@row_array,
-                                                     uid         => $uid
-                                                   });
+                  writeValuesToArray ({ name        => $name,
+                                        eventno     => $n,
+                                        calref      => $data->{data}{$key}[$i],
+                                        timezone    => $tz,
+                                        begindate   => $bdate,
+                                        begintime   => $btime,
+                                        begints     => $bts,
+                                        enddate     => $edate,
+                                        endtime     => $etime,
+                                        endts       => $ets,
+                                        sumarrayref => \@row_array,
+                                        uid         => $uid
+                                     });
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -1755,45 +1757,33 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                       Log3($name, 5, "$name - YEARLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                      if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
-                          Log3($name, 4, "$name - Ignore YEARLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                          $ignore = 1;
-                          $done   = 0;                                        
-                      } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                          Log3($name, 4, "$name - Ignore YEARLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                          $ignore = 1;
-                          $done   = 0;                                        
-                      } elsif ($excl) {
-                          Log3($name, 4, "$name - YEARLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                          $ignore = 1;
-                          $done   = 0;                      
-                      } else {
-                          $bdate = $nbdate ? $nbdate : $bdate;
-                          $btime = $nbtime ? $nbtime : $btime;
-                          $bts   = $nbts   ? $nbts   : $bts;
-                          
-                          $edate = $nedate ? $nedate : $edate;
-                          $etime = $netime ? $netime : $etime;
-                          $ets   = $nets   ? $nets   : $ets;                  
-                          
-                          @row_array = writeValuesToArray ({ name        => $name,
-                                                             eventno     => $n,
-                                                             calref      => $data->{data}{$key}[$i],
-                                                             timezone    => $tz,
-                                                             begindate   => $bdate,
-                                                             begintime   => $btime,
-                                                             begints     => $bts,
-                                                             enddate     => $edate,
-                                                             endtime     => $etime,
-                                                             endts       => $ets,
-                                                             sumarrayref => \@row_array,
-                                                             uid         => $uid
-                                                           });  
-                          $ignore = 0;
-                          $done   = 1;
-                          $n++;
-                          next;
-                      }                                       
+                      ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'YEARLY',
+                                                                        name        => $name,
+                                                                        excl        => $excl,
+                                                                        eventno     => $n,
+                                                                        calref      => $data->{data}{$key}[$i],
+                                                                        timezone    => $tz,
+                                                                        begindate   => $bdate,
+                                                                        newbdate    => $nbdate,
+                                                                        begintime   => $btime,
+                                                                        newbtime    => $nbtime,
+                                                                        begints     => $bts,
+                                                                        enddate     => $edate,
+                                                                        newedate    => $nedate, 
+                                                                        endtime     => $etime,
+                                                                        newetime    => $netime,
+                                                                        endts       => $ets,
+                                                                        newendts    => $nets,
+                                                                        sumarrayref => \@row_array,
+                                                                        untilts     => $uets,
+                                                                        newbegints  => $nbts,
+                                                                        tstart      => $tstart,
+                                                                        tend        => $tend,
+                                                                        until       => $until,
+                                                                        uid         => $uid
+                                                                     });   
+                      
+                      next if($next);                                       
                       last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
                   }                      
               }
@@ -1820,45 +1810,33 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                           Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                          if (defined $uets && ($uets < $nbts)) {                                              # Event Ende (UNTIL) kleiner aktueller Select Start 
-                              Log3($name, 4, "$name - Ignore MONTHLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                              $ignore = 1;
-                              $done   = 0;                                        
-                          } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                              Log3($name, 4, "$name - Ignore MONTHLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                              $ignore = 1;
-                              $done   = 0;                                        
-                          } elsif ($excl) {
-                              Log3($name, 4, "$name - MONTHLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                              $ignore = 1;
-                              $done   = 0;                      
-                          } else {
-                              $bdate = $nbdate ? $nbdate : $bdate;
-                              $btime = $nbtime ? $nbtime : $btime;
-                              $bts   = $nbts   ? $nbts   : $bts;
-                              
-                              $edate = $nedate ? $nedate : $edate;
-                              $etime = $netime ? $netime : $etime;
-                              $ets   = $nets   ? $nets   : $ets;                  
-                              
-                              @row_array = writeValuesToArray ({ name        => $name,
-                                                                 eventno     => $n,
-                                                                 calref      => $data->{data}{$key}[$i],
-                                                                 timezone    => $tz,
-                                                                 begindate   => $bdate,
-                                                                 begintime   => $btime,
-                                                                 begints     => $bts,
-                                                                 enddate     => $edate,
-                                                                 endtime     => $etime,
-                                                                 endts       => $ets,
-                                                                 sumarrayref => \@row_array,
-                                                                 uid         => $uid
-                                                               });  
-                              $ignore = 0;
-                              $done   = 1;
-                              $n++;
-                              next;
-                          }                                       
+                          ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'MONTHLY',
+                                                                            name        => $name,
+                                                                            excl        => $excl,
+                                                                            eventno     => $n,
+                                                                            calref      => $data->{data}{$key}[$i],
+                                                                            timezone    => $tz,
+                                                                            begindate   => $bdate,
+                                                                            newbdate    => $nbdate,
+                                                                            begintime   => $btime,
+                                                                            newbtime    => $nbtime,
+                                                                            begints     => $bts,
+                                                                            enddate     => $edate,
+                                                                            newedate    => $nedate, 
+                                                                            endtime     => $etime,
+                                                                            newetime    => $netime,
+                                                                            endts       => $ets,
+                                                                            newendts    => $nets,
+                                                                            sumarrayref => \@row_array,
+                                                                            untilts     => $uets,
+                                                                            newbegints  => $nbts,
+                                                                            tstart      => $tstart,
+                                                                            tend        => $tend,
+                                                                            until       => $until,
+                                                                            uid         => $uid
+                                                                         });   
+                          
+                          next if($next);                                        
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
                       }
                   }
@@ -1921,45 +1899,33 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                               Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
-                              if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
-                                  Log3($name, 4, "$name - Ignore MONTHLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                                  $ignore = 1;
-                                  $done   = 0;                                        
-                              } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                                  Log3($name, 4, "$name - Ignore MONTHLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                                  $ignore = 1;
-                                  $done   = 0;                                        
-                              } elsif ($excl) {
-                                  Log3($name, 4, "$name - MONTHLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                                  $ignore = 1;
-                                  $done   = 0;                      
-                              } else {
-                                  $bdate = $nbdate ? $nbdate : $bdate;
-                                  $btime = $nbtime ? $nbtime : $btime;
-                                  $bts   = $nbts   ? $nbts   : $bts;
-                                  
-                                  $edate = $nedate ? $nedate : $edate;
-                                  $etime = $netime ? $netime : $etime;
-                                  $ets   = $nets   ? $nets   : $ets;                  
-                                  
-                                  @row_array = writeValuesToArray ({ name        => $name,
-                                                                     eventno     => $n,
-                                                                     calref      => $data->{data}{$key}[$i],
-                                                                     timezone    => $tz,
-                                                                     begindate   => $bdate,
-                                                                     begintime   => $btime,
-                                                                     begints     => $bts,
-                                                                     enddate     => $edate,
-                                                                     endtime     => $etime,
-                                                                     endts       => $ets,
-                                                                     sumarrayref => \@row_array,
-                                                                     uid         => $uid
-                                                                   });  
-                                  $ignore = 0;
-                                  $done   = 1;
-                                  $n++;
-                                  next;
-                              }                                       
+                              ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'MONTHLY',
+                                                                                name        => $name,
+                                                                                excl        => $excl,
+                                                                                eventno     => $n,
+                                                                                calref      => $data->{data}{$key}[$i],
+                                                                                timezone    => $tz,
+                                                                                begindate   => $bdate,
+                                                                                newbdate    => $nbdate,
+                                                                                begintime   => $btime,
+                                                                                newbtime    => $nbtime,
+                                                                                begints     => $bts,
+                                                                                enddate     => $edate,
+                                                                                newedate    => $nedate, 
+                                                                                endtime     => $etime,
+                                                                                newetime    => $netime,
+                                                                                endts       => $ets,
+                                                                                newendts    => $nets,
+                                                                                sumarrayref => \@row_array,
+                                                                                untilts     => $uets,
+                                                                                newbegints  => $nbts,
+                                                                                tstart      => $tstart,
+                                                                                tend        => $tend,
+                                                                                until       => $until,
+                                                                                uid         => $uid
+                                                                             });   
+                              
+                              next if($next);                                        
                               last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
                           }
                       }   
@@ -2003,48 +1969,37 @@ sub extractEventlist {                                    ## no critic 'complexi
 
                               Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
-                              if (defined $uets && ($uets < $nbts)) {                               # Event Ende (UNTIL) kleiner aktueller Select Start 
-                                  Log3($name, 4, "$name - Ignore WEEKLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                                  $ignore = 1;
-                                  $done   = 0;                                        
-                              } elsif ($nets < $tstart || $nbts > $tend) {                          # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                                  Log3($name, 4, "$name - Ignore WEEKLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                                  $ignore = 1;
-                                  $done   = 0;                                        
-                              } elsif ($excl) {
-                                  Log3($name, 4, "$name - WEEKLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                                  $ignore = 1;
-                                  $done   = 0;                      
-                              } else {
-                                  $bdate = $nbdate ? $nbdate : $bdate;
-                                  $btime = $nbtime ? $nbtime : $btime;
-                                  $bts   = $nbts   ? $nbts   : $bts;
-                                  
-                                  $edate = $nedate ? $nedate : $edate;
-                                  $etime = $netime ? $netime : $etime;
-                                  $ets   = $nets   ? $nets   : $ets;                  
-                                  
-                                  @row_array = writeValuesToArray ({ name        => $name,
-                                                                     eventno     => $n,
-                                                                     calref      => $data->{data}{$key}[$i],
-                                                                     timezone    => $tz,
-                                                                     begindate   => $bdate,
-                                                                     begintime   => $btime,
-                                                                     begints     => $bts,
-                                                                     enddate     => $edate,
-                                                                     endtime     => $etime,
-                                                                     endts       => $ets,
-                                                                     sumarrayref => \@row_array,
-                                                                     uid         => $uid
-                                                                   });
-                                  $ignore = 0;
-                                  $done   = 1;
-                                  $n++;
-                              }                     
+                              ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'WEEKLY',
+                                                                                name        => $name,
+                                                                                excl        => $excl,
+                                                                                eventno     => $n,
+                                                                                calref      => $data->{data}{$key}[$i],
+                                                                                timezone    => $tz,
+                                                                                begindate   => $bdate,
+                                                                                newbdate    => $nbdate,
+                                                                                begintime   => $btime,
+                                                                                newbtime    => $nbtime,
+                                                                                begints     => $bts,
+                                                                                enddate     => $edate,
+                                                                                newedate    => $nedate, 
+                                                                                endtime     => $etime,
+                                                                                newetime    => $netime,
+                                                                                endts       => $ets,
+                                                                                newendts    => $nets,
+                                                                                sumarrayref => \@row_array,
+                                                                                untilts     => $uets,
+                                                                                newbegints  => $nbts,
+                                                                                tstart      => $tstart,
+                                                                                tend        => $tend,
+                                                                                until       => $until,
+                                                                                uid         => $uid
+                                                                             });   
+                              
+                              next if($next);                      
                               last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);              
                           }
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $ci == $count);
-                          $btsstart += (7 * 86400 * $interval);                                    # addiere Tagesintervall, z.B. 4th Freitag ...                             
+                          $btsstart += (7 * 86400 * $interval);                              # addiere Tagesintervall, z.B. 4th Freitag ...                             
                       }    
                   
                   } else {    
@@ -2064,45 +2019,33 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                           Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                            
-                          if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
-                              Log3($name, 4, "$name - Ignore WEEKLY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                              $ignore = 1;
-                              $done   = 0;                                        
-                          } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                              Log3($name, 4, "$name - Ignore WEEKLY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                              $ignore = 1;
-                              $done   = 0;                                        
-                          } elsif ($excl) {
-                              Log3($name, 4, "$name - WEEKLY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                              $ignore = 1;
-                              $done   = 0;                      
-                          } else {
-                              $bdate = $nbdate ? $nbdate : $bdate;
-                              $btime = $nbtime ? $nbtime : $btime;
-                              $bts   = $nbts   ? $nbts   : $bts;
-                              
-                              $edate = $nedate ? $nedate : $edate;
-                              $etime = $netime ? $netime : $etime;
-                              $ets   = $nets   ? $nets   : $ets; 
-                                  
-                              @row_array = writeValuesToArray ({ name        => $name,
-                                                                 eventno     => $n,
-                                                                 calref      => $data->{data}{$key}[$i],
-                                                                 timezone    => $tz,
-                                                                 begindate   => $bdate,
-                                                                 begintime   => $btime,
-                                                                 begints     => $bts,
-                                                                 enddate     => $edate,
-                                                                 endtime     => $etime,
-                                                                 endts       => $ets,
-                                                                 sumarrayref => \@row_array,
-                                                                 uid         => $uid
-                                                               });                              
-                              $ignore = 0;
-                              $done   = 1;
-                              $n++;
-                              next;
-                          }
+                          ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'WEEKLY',
+                                                                            name        => $name,
+                                                                            excl        => $excl,
+                                                                            eventno     => $n,
+                                                                            calref      => $data->{data}{$key}[$i],
+                                                                            timezone    => $tz,
+                                                                            begindate   => $bdate,
+                                                                            newbdate    => $nbdate,
+                                                                            begintime   => $btime,
+                                                                            newbtime    => $nbtime,
+                                                                            begints     => $bts,
+                                                                            enddate     => $edate,
+                                                                            newedate    => $nedate, 
+                                                                            endtime     => $etime,
+                                                                            newetime    => $netime,
+                                                                            endts       => $ets,
+                                                                            newendts    => $nets,
+                                                                            sumarrayref => \@row_array,
+                                                                            untilts     => $uets,
+                                                                            newbegints  => $nbts,
+                                                                            tstart      => $tstart,
+                                                                            tend        => $tend,
+                                                                            until       => $until,
+                                                                            uid         => $uid
+                                                                         });   
+                          
+                          next if($next);                      
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
                       }                                    
                   }                         
@@ -2125,45 +2068,33 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                       Log3($name, 5, "$name - DAILY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                      if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
-                          Log3($name, 4, "$name - Ignore DAILY event due to UNTIL -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
-                          $ignore = 1;
-                          $done   = 0;                                        
-                      } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
-                          Log3($name, 4, "$name - Ignore DAILY event -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                          $ignore = 1;
-                          $done   = 0;                                        
-                      } elsif ($excl) {
-                          Log3($name, 4, "$name - DAILY recurring event is deleted -> $data->{data}{$key}[$i]{summary} , start: $nbdate $nbtime, end: $nedate $netime");
-                          $ignore = 1;
-                          $done   = 0;                      
-                      } else {
-                          $bdate = $nbdate ? $nbdate : $bdate;
-                          $btime = $nbtime ? $nbtime : $btime;
-                          $bts   = $nbts   ? $nbts   : $bts;
-                          
-                          $edate = $nedate ? $nedate : $edate;
-                          $etime = $netime ? $netime : $etime;
-                          $ets   = $nets   ? $nets   : $ets;                  
-                          
-                          @row_array = writeValuesToArray ({ name        => $name,
-                                                             eventno     => $n,
-                                                             calref      => $data->{data}{$key}[$i],
-                                                             timezone    => $tz,
-                                                             begindate   => $bdate,
-                                                             begintime   => $btime,
-                                                             begints     => $bts,
-                                                             enddate     => $edate,
-                                                             endtime     => $etime,
-                                                             endts       => $ets,
-                                                             sumarrayref => \@row_array,
-                                                             uid         => $uid
-                                                           });  
-                          $ignore = 0;
-                          $done   = 1;
-                          $n++;
-                          next;
-                      }                                       
+                      ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'DAILY',
+                                                                        name        => $name,
+                                                                        excl        => $excl,
+                                                                        eventno     => $n,
+                                                                        calref      => $data->{data}{$key}[$i],
+                                                                        timezone    => $tz,
+                                                                        begindate   => $bdate,
+                                                                        newbdate    => $nbdate,
+                                                                        begintime   => $btime,
+                                                                        newbtime    => $nbtime,
+                                                                        begints     => $bts,
+                                                                        enddate     => $edate,
+                                                                        newedate    => $nedate, 
+                                                                        endtime     => $etime,
+                                                                        newetime    => $netime,
+                                                                        endts       => $ets,
+                                                                        newendts    => $nets,
+                                                                        sumarrayref => \@row_array,
+                                                                        untilts     => $uets,
+                                                                        newbegints  => $nbts,
+                                                                        tstart      => $tstart,
+                                                                        tend        => $tend,
+                                                                        until       => $until,
+                                                                        uid         => $uid
+                                                                     });   
+                      
+                      next if($next);                      
                       last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
                   }                                 
               }                             
@@ -2183,19 +2114,19 @@ sub extractEventlist {                                    ## no critic 'complexi
               $etime = $netime ? $netime : $etime;
               $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = writeValuesToArray ({ name        => $name,
-                                                 eventno     => $n,
-                                                 calref      => $data->{data}{$key}[$i],
-                                                 timezone    => $tz,
-                                                 begindate   => $bdate,
-                                                 begintime   => $btime,
-                                                 begints     => $bts,
-                                                 enddate     => $edate,
-                                                 endtime     => $etime,
-                                                 endts       => $ets,
-                                                 sumarrayref => \@row_array,
-                                                 uid         => $uid
-                                               });          
+              writeValuesToArray ({ name        => $name,
+                                    eventno     => $n,
+                                    calref      => $data->{data}{$key}[$i],
+                                    timezone    => $tz,
+                                    begindate   => $bdate,
+                                    begintime   => $btime,
+                                    begints     => $bts,
+                                    enddate     => $edate,
+                                    endtime     => $etime,
+                                    endts       => $ets,
+                                    sumarrayref => \@row_array,
+                                    uid         => $uid
+                                 });          
           }
           
           $i++;
@@ -2262,19 +2193,19 @@ sub extractToDolist {                               ## no critic 'complexity'
                   $done   = 0; 
               
               } else {
-                  @row_array = writeValuesToArray ({ name        => $name,
-                                                     eventno     => $n,
-                                                     calref      => $data->{data}{$key}[$i],
-                                                     timezone    => $tz,
-                                                     begindate   => $bdate,
-                                                     begintime   => $btime,
-                                                     begints     => $bts,
-                                                     enddate     => $edate,
-                                                     endtime     => $etime,
-                                                     endts       => $ets,
-                                                     sumarrayref => \@row_array,
-                                                     uid         => $uid
-                                                   });
+                  writeValuesToArray ({ name        => $name,
+                                        eventno     => $n,
+                                        calref      => $data->{data}{$key}[$i],
+                                        timezone    => $tz,
+                                        begindate   => $bdate,
+                                        begintime   => $btime,
+                                        begints     => $bts,
+                                        enddate     => $edate,
+                                        endtime     => $etime,
+                                        endts       => $ets,
+                                        sumarrayref => \@row_array,
+                                        uid         => $uid
+                                     });
                   $ignore = 0;
                   $done   = 1;
               }       
@@ -2295,19 +2226,19 @@ sub extractToDolist {                               ## no critic 'complexity'
               $etime = $netime ? $netime : $etime;
               $ets   = $nets   ? $nets   : $ets;                  
               
-              @row_array = writeValuesToArray ({ name        => $name,
-                                                 eventno     => $n,
-                                                 calref      => $data->{data}{$key}[$i],
-                                                 timezone    => $tz,
-                                                 begindate   => $bdate,
-                                                 begintime   => $btime,
-                                                 begints     => $bts,
-                                                 enddate     => $edate,
-                                                 endtime     => $etime,
-                                                 endts       => $ets,
-                                                 sumarrayref => \@row_array,
-                                                 uid         => $uid
-                                               });
+              writeValuesToArray ({ name        => $name,
+                                    eventno     => $n,
+                                    calref      => $data->{data}{$key}[$i],
+                                    timezone    => $tz,
+                                    begindate   => $bdate,
+                                    begintime   => $btime,
+                                    begints     => $bts,
+                                    enddate     => $edate,
+                                    endtime     => $etime,
+                                    endts       => $ets,
+                                    sumarrayref => \@row_array,
+                                    uid         => $uid
+                                 });
           }
           $i++;
           $n++;
@@ -2321,7 +2252,270 @@ sub extractToDolist {                               ## no critic 'complexity'
                                          
   return "$name|$rowlist" if($am);                      # asynchroner Mode mit BlockingCall          
                                       
-return createReadings ("$name|$rowlist");         # synchoner Mode
+return createReadings ("$name|$rowlist");               # synchoner Mode
+}
+
+#############################################################################################
+#       
+#   bewertet Zeitgrenzen und excludierende Parameter - ruft Schreiben der Daten in Ergenis
+#   Array auf wenn Prüfung positiv
+#
+#############################################################################################
+sub evalTimeAndWrite {
+  my ($argref)  = @_;
+  my $name      = $argref->{name};
+  my $n         = $argref->{eventno};
+  my $calref    = $argref->{calref};
+  my $excl      = $argref->{excl};
+  my $tz        = $argref->{timezone};
+  my $bdate     = $argref->{begindate};
+  my $nbdate    = $argref->{newbdate};
+  my $btime     = $argref->{begintime};
+  my $nbtime    = $argref->{newbtime};
+  my $bts       = $argref->{begints};
+  my $edate     = $argref->{enddate};
+  my $nedate    = $argref->{newedate};
+  my $etime     = $argref->{endtime};
+  my $netime    = $argref->{newetime};
+  my $ets       = $argref->{endts};
+  my $uets      = $argref->{untilts};
+  my $nbts      = $argref->{newbegints};
+  my $tstart    = $argref->{tstart};
+  my $tend      = $argref->{tend};
+  my $nets      = $argref->{newendts};
+  my $aref      = $argref->{sumarrayref};
+  my $uid       = $argref->{uid};
+  my $recurring = $argref->{recurring};
+  my $until     = $argref->{until};
+  
+  my $ignore    = 0; 
+  my $done      = 0;
+  my $next      = 0;
+
+  if (defined $uets && ($uets < $nbts)) {                                    # Event Ende (UNTIL) kleiner aktueller Select Start 
+      Log3($name, 4, "$name - Ignore ".$recurring." event due to UNTIL -> ".$calref->{summary}." , start: $nbdate $nbtime, end: $nedate $netime, until: $until");
+      $ignore = 1;
+      $done   = 0;                                        
+  
+  } elsif ($nets < $tstart || $nbts > $tend) {                               # Event Ende kleiner Select Start oder Beginn Event größer als Select Ende
+      Log3($name, 4, "$name - Ignore ".$recurring." event -> ".$calref->{summary}." , start: $nbdate $nbtime, end: $nedate $netime");
+      $ignore = 1;
+      $done   = 0;                                        
+  
+  } elsif ($excl) {
+      Log3($name, 4, "$name - ".$recurring." recurring event is deleted -> ".$calref->{summary}." , start: $nbdate $nbtime, end: $nedate $netime");
+      $ignore = 1;
+      $done   = 0;                      
+  
+  } else {
+      $bdate = $nbdate ? $nbdate : $bdate;
+      $btime = $nbtime ? $nbtime : $btime;
+      $bts   = $nbts   ? $nbts   : $bts;
+      
+      $edate = $nedate ? $nedate : $edate;
+      $etime = $netime ? $netime : $etime;
+      $ets   = $nets   ? $nets   : $ets;                  
+      
+      writeValuesToArray ({ name        => $name,
+                            eventno     => $n,
+                            calref      => $calref,
+                            timezone    => $tz,
+                            begindate   => $bdate,
+                            begintime   => $btime,
+                            begints     => $bts,
+                            enddate     => $edate,
+                            endtime     => $etime,
+                            endts       => $ets,
+                            sumarrayref => $aref,
+                            uid         => $uid
+                         });  
+      $ignore = 0;
+      $done   = 1;
+      $next   = 1;
+      $n++;
+  }                                       
+
+return ($ignore, $done, $n, $next);
+}
+
+#############################################################################################
+#         schreibe Key/Value Pairs in zentrales Valuearray zur Readingerstellung
+#         $n           = Zusatz f. lfd. Nr. zur Unterscheidung exakt 
+#                        zeitgleicher Events
+#         $vh          = Referenz zum Kalenderdatenhash
+#         $aref        = Rferenz zum Ergebnisarray
+#         $uid         = UID des Ereignisses als Schlüssel im VCALENDER Hash 
+#                        (Berechnung der Vorwarnzeitenzeiten)                
+#
+#         Ergebisarray Aufbau:
+#                       0                            1               2
+#         (Index aus BeginTimestamp + lfNr) , (Blockindex_Reading) , (Wert)
+#
+#############################################################################################
+sub writeValuesToArray {                                                   ## no critic 'complexity'
+  my ($argref)  = @_;
+  my $name      = $argref->{name};
+  my $n         = $argref->{eventno};
+  my $vh        = $argref->{calref};
+  my $tz        = $argref->{timezone};
+  my $bdate     = $argref->{begindate};
+  my $btime     = $argref->{begintime};
+  my $bts       = $argref->{begints};
+  my $edate     = $argref->{enddate};
+  my $etime     = $argref->{endtime};
+  my $ets       = $argref->{endts};
+  my $aref      = $argref->{sumarrayref};
+  my $uid       = $argref->{uid};
+  
+  my $hash      = $defs{$name};
+  my $lang      = AttrVal("global", "language", "EN");
+  my $ts        = time();                                                  # Istzeit Timestamp
+  my $om        = $hash->{OPMODE};                                         # aktuelle Operation Mode
+  my $status    = "initialized";
+  my ($val,$uts,$td,$dleft,$bWday,$chts);
+  
+  my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
+ 
+  $upcoming = isUpcoming ($ts,0,$bts);                                     # initiales upcoming
+  $started  = isStarted  ($ts,$bts,$ets);
+  $ended    = isEnded    ($ts,$ets);
+  
+  if($bdate && $btime) {
+      push(@$aref, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
+      my ($ny,$nm,$nd,undef) = split(/[\s-]/x, TimeNow());                         # Datum Jetzt
+      my ($by,$bm,$bd)       = split("-", $bdate);                                 # Beginn Datum
+      my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
+      my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
+      if($btimes >= $ntimes) {
+          $dleft = int(($btimes - $ntimes)/86400);
+      }
+      
+      my @days;
+      (undef, undef, undef, undef, undef, undef, $bWday, undef, undef) = localtime($btimes);
+      if($lang eq "DE") {
+          @days = qw(Sontag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
+      } else {
+          @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday);
+      }
+      $bWday = $days[$bWday];
+  }
+  
+  push(@$aref, $bts+$n." 10_End "          .$edate." ".$etime."\n")   if($edate && $etime);
+  push(@$aref, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
+  push(@$aref, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
+  push(@$aref, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
+  push(@$aref, $bts+$n." 30_Weekday "      .$bWday."\n")              if(defined $bWday);
+  
+  # Vorwarnzeiten für veränderte Serientermine korrigieren/anpassen
+  my $origdtstart  = strftime "%Y%m%dT%H%M%S", localtime($bts);
+  my $isRecurrence = 0;
+  my $isAlldaychanded;                                                                                       # 0 -> Ganztagsevent wurde in Serienelement geändert in kein Ganztagsevent
+  
+  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                                 # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
+      next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_});
+      $isRecurrence = 1 if($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_} eq $origdtstart);
+  }
+  
+  my $l   = length (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}});                        # Anzahl Stellen (Länge) des aktuellen VALM TIMEVALUE Hashes
+  my $ens = 0;
+  
+  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}}) {
+      my $z = $_;
+      $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
+      
+      if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} && !$isRecurrence) {                # wenn keine Veränderung vorhanden ist ({RECURRENCEID}{index}=undef) gelten die Erinnerungszeiten Standarderinnerungszeiten
+          ($uts,$td) = evtNotTime ($name,$val,$bts);   
+          push(@$aref, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
+          
+          $alarmed = isAlarmed ($ts,$uts,$bts) if(!$alarmed);
+      
+      } elsif ($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} &&
+               $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} eq $origdtstart) {
+          my ($y, $m, $d)  = $bdate =~ /^(\d{4})-(\d{2})-(\d{2})/x;                                  # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
+          my ($h, $mi, $s) = $btime =~ /^(\d{2}):(\d{2}):(\d{2})/x;
+          
+          eval { $chts = fhemTimeLocal($s, $mi, $h, $d, $m-1, $y-1900);                              # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
+                 1;
+          } or do {
+              my $err = (split(" at", $@))[0];
+              Log3($name, 3, "$name - ERROR - invalid date/time format in 'writeValuesToArray' detected: $err ");
+          };                                       
+          
+          ($uts,$td) = evtNotTime ($name,$val,$chts);   
+          push(@$aref, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
+          
+          $alarmed = isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
+          
+          $isAlldaychanded = 0;          
+      }
+      
+      $ens++;
+  }
+
+  # restliche Keys extrahieren
+  for my $p (keys %{$vh}) {
+      $vh->{$p} = "" if(!defined $vh->{$p});
+      $vh->{$p} = jboolmap($vh->{$p});
+      next if($vh->{$p} eq "");
+        
+      $val = encode("UTF-8", $vh->{$p}); 
+
+      push(@$aref, $bts+$n." 01_Summary "       .$val."\n")       if($p eq "summary");
+      push(@$aref, $bts+$n." 03_Description "   .$val."\n")       if($p eq "description"); 
+      push(@$aref, $bts+$n." 35_Location "      .$val."\n")       if($p eq "location");
+      
+      if($p eq "gps") {
+          my ($address,$lng,$lat) = ("","","");
+          for my $r (keys %{$vh->{gps}}) {
+              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
+              next if($vh->{$p}{$r} eq "");
+              if ($r eq "address") {
+                  $address = encode("UTF-8", $vh->{$p}{$r})           if($vh->{$p}{$r});
+              }
+              if ($r eq "gps") {
+                  $lng = encode("UTF-8", $vh->{$p}{$r}{lng});
+                  $lat = encode("UTF-8", $vh->{$p}{$r}{lat});
+              }              
+          }
+          push(@$aref, $bts+$n." 40_gpsAddress "      .$address."\n");
+          $val = "lat=".$lat.",lng=".$lng;          
+          push(@$aref, $bts+$n." 45_gpsCoordinates "  .$val."\n");
+      }
+      
+      push(@$aref, $bts+$n." 50_isAllday "      .(defined $isAlldaychanded ? $isAlldaychanded : $val)."\n")  if($p eq "is_all_day");
+      push(@$aref, $bts+$n." 55_isRepeatEvt "   .$val."\n")                                                  if($p eq "is_repeat_evt");
+      
+      if($p eq "due") {                                                        
+          my (undef,undef,$duedate,$duetime,$duets,undef) = explodeDateTime ($hash, $val, 0, 0, 0);
+          push(@$aref, $bts+$n." 60_dueDateTime "  .$duedate." ".$duetime."\n"); 
+          push(@$aref, $bts+$n." 65_dueTimestamp " .$duets."\n");
+      }
+      
+      push(@$aref, $bts+$n." 85_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
+      push(@$aref, $bts+$n." 90_calName "         .getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
+
+      if($p eq "evt_repeat_setting") {
+          for my $r (keys %{$vh->{evt_repeat_setting}}) {
+              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
+              next if($vh->{$p}{$r} eq "");
+              $val = encode("UTF-8", $vh->{$p}{$r});                 
+              push(@$aref, $bts+$n." 70_repeatRule ".$val."\n") if($r eq "repeat_rule");
+          }
+      }     
+      
+      push(@$aref, $bts+$n." 95_IcalUID " .$val."\n") if($p eq "ical_uid");
+      push(@$aref, $bts+$n." 98_EventId " .$val."\n") if($p eq "evt_id");
+  }
+  
+  $status = "upcoming" if($upcoming);
+  $status = "alarmed"  if($alarmed);
+  $status = "started"  if($started);
+  $status = "ended"    if($ended);
+  
+  push(@$aref, $bts+$n." 17_Status "        .$status."\n");
+  push(@$aref, $bts+$n." 99_---------------------- " ."--------------------------------------------------------------------"."\n");
+    
+return;
 }
 
 #############################################################################################
@@ -2549,187 +2743,6 @@ sub DTfromStartandDiff {
   $eyear += 1900;
   
 return ($nbss,$nbmm,$nbhh,$bmday,$bmonth,$byear,$ness,$nemm,$nehh,$emday,$emonth,$eyear);
-}
-
-#############################################################################################
-#         schreibe Key/Value Pairs in zentrales Valuearray zur Readingerstellung
-#         $n           = Zusatz f. lfd. Nr. zur Unterscheidung exakt 
-#                        zeitgleicher Events
-#         $vh          = Referenz zum Kalenderdatenhash
-#         $aref        = Rferenz zum Ergebnisarray
-#         $uid         = UID des Ereignisses als Schlüssel im VCALENDER Hash 
-#                        (Berechnung der Vorwarnzeitenzeiten)                
-#
-#         Ergebisarray Aufbau:
-#                       0                            1               2
-#         (Index aus BeginTimestamp + lfNr) , (Blockindex_Reading) , (Wert)
-#
-#############################################################################################
-sub writeValuesToArray {                                                   ## no critic 'complexity'
-  my ($argref)  = @_;
-  my $name      = $argref->{name};
-  my $n         = $argref->{eventno};
-  my $vh        = $argref->{calref};
-  my $tz        = $argref->{timezone};
-  my $bdate     = $argref->{begindate};
-  my $btime     = $argref->{begintime};
-  my $bts       = $argref->{begints};
-  my $edate     = $argref->{enddate};
-  my $etime     = $argref->{endtime};
-  my $ets       = $argref->{endts};
-  my $aref      = $argref->{sumarrayref};
-  my $uid       = $argref->{uid};
-  
-  my @row_array = @{$aref};
-  my $hash      = $defs{$name};
-  my $lang      = AttrVal("global", "language", "EN");
-  my $ts        = time();                                                  # Istzeit Timestamp
-  my $om        = $hash->{OPMODE};                                         # aktuelle Operation Mode
-  my $status    = "initialized";
-  my ($val,$uts,$td,$dleft,$bWday,$chts);
-  
-  my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
- 
-  $upcoming = isUpcoming ($ts,0,$bts);                                     # initiales upcoming
-  $started  = isStarted  ($ts,$bts,$ets);
-  $ended    = isEnded    ($ts,$ets);
-  
-  if($bdate && $btime) {
-      push(@row_array, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
-      my ($ny,$nm,$nd,undef) = split(/[\s-]/x, TimeNow());                         # Datum Jetzt
-      my ($by,$bm,$bd)       = split("-", $bdate);                                 # Beginn Datum
-      my $ntimes             = fhemTimeLocal(00, 00, 00, $nd, $nm-1, $ny-1900);
-      my $btimes             = fhemTimeLocal(00, 00, 00, $bd, $bm-1, $by-1900);
-      if($btimes >= $ntimes) {
-          $dleft = int(($btimes - $ntimes)/86400);
-      }
-      
-      my @days;
-      (undef, undef, undef, undef, undef, undef, $bWday, undef, undef) = localtime($btimes);
-      if($lang eq "DE") {
-          @days = qw(Sontag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
-      } else {
-          @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday);
-      }
-      $bWday = $days[$bWday];
-  }
-  
-  push(@row_array, $bts+$n." 10_End "          .$edate." ".$etime."\n")   if($edate && $etime);
-  push(@row_array, $bts+$n." 15_Timezone "     .$tz."\n")                 if($tz);   
-  push(@row_array, $bts+$n." 20_daysLeft "     .$dleft."\n")              if(defined $dleft); 
-  push(@row_array, $bts+$n." 25_daysLeftLong " ."in ".$dleft." Tagen\n")  if(defined $dleft); 
-  push(@row_array, $bts+$n." 30_Weekday "      .$bWday."\n")              if(defined $bWday);
-  
-  # Vorwarnzeiten für veränderte Serientermine korrigieren/anpassen
-  my $origdtstart  = strftime "%Y%m%dT%H%M%S", localtime($bts);
-  my $isRecurrence = 0;
-  my $isAlldaychanded;                                                                                       # 0 -> Ganztagsevent wurde in Serienelement geändert in kein Ganztagsevent
-  
-  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}}) {                                 # $isRecurrence = 1 setzen wenn für die aktuelle Originalstartzeit ($bts) eine RECURRENCEID vorliegt -> Veränderung ist vorhanden
-      next if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_});
-      $isRecurrence = 1 if($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$_} eq $origdtstart);
-  }
-  
-  my $l   = length (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}});                        # Anzahl Stellen (Länge) des aktuellen VALM TIMEVALUE Hashes
-  my $ens = 0;
-  
-  for (keys %{$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}}) {
-      my $z = $_;
-      $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
-      
-      if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} && !$isRecurrence) {                # wenn keine Veränderung vorhanden ist ({RECURRENCEID}{index}=undef) gelten die Erinnerungszeiten Standarderinnerungszeiten
-          ($uts,$td) = evtNotTime ($name,$val,$bts);   
-          push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
-          
-          $alarmed = isAlarmed ($ts,$uts,$bts) if(!$alarmed);
-      
-      } elsif ($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} &&
-               $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} eq $origdtstart) {
-          my ($y, $m, $d)  = $bdate =~ /^(\d{4})-(\d{2})-(\d{2})/x;                                  # Timestamp für Berechnung Erinnerungszeit Begindatum/Zeit ...
-          my ($h, $mi, $s) = $btime =~ /^(\d{2}):(\d{2}):(\d{2})/x;
-          
-          eval { $chts = fhemTimeLocal($s, $mi, $h, $d, $m-1, $y-1900);                              # ... neu aus bdate/btime ableiten wegen Änderung durch Recurrance-id
-                 1;
-          } or do {
-              my $err = (split(" at", $@))[0];
-              Log3($name, 3, "$name - ERROR - invalid date/time format in 'writeValuesToArray' detected: $err ");
-          };                                       
-          
-          ($uts,$td) = evtNotTime ($name,$val,$chts);   
-          push(@row_array, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
-          
-          $alarmed = isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
-          
-          $isAlldaychanded = 0;          
-      }
-      
-      $ens++;
-  }
-
-  # restliche Keys extrahieren
-  for my $p (keys %{$vh}) {
-      $vh->{$p} = "" if(!defined $vh->{$p});
-      $vh->{$p} = jboolmap($vh->{$p});
-      next if($vh->{$p} eq "");
-        
-      $val = encode("UTF-8", $vh->{$p}); 
-
-      push(@row_array, $bts+$n." 01_Summary "       .$val."\n")       if($p eq "summary");
-      push(@row_array, $bts+$n." 03_Description "   .$val."\n")       if($p eq "description"); 
-      push(@row_array, $bts+$n." 35_Location "      .$val."\n")       if($p eq "location");
-      
-      if($p eq "gps") {
-          my ($address,$lng,$lat) = ("","","");
-          for my $r (keys %{$vh->{gps}}) {
-              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
-              next if($vh->{$p}{$r} eq "");
-              if ($r eq "address") {
-                  $address = encode("UTF-8", $vh->{$p}{$r})           if($vh->{$p}{$r});
-              }
-              if ($r eq "gps") {
-                  $lng = encode("UTF-8", $vh->{$p}{$r}{lng});
-                  $lat = encode("UTF-8", $vh->{$p}{$r}{lat});
-              }              
-          }
-          push(@row_array, $bts+$n." 40_gpsAddress "      .$address."\n");
-          $val = "lat=".$lat.",lng=".$lng;          
-          push(@row_array, $bts+$n." 45_gpsCoordinates "  .$val."\n");
-      }
-      
-      push(@row_array, $bts+$n." 50_isAllday "      .(defined $isAlldaychanded ? $isAlldaychanded : $val)."\n")  if($p eq "is_all_day");
-      push(@row_array, $bts+$n." 55_isRepeatEvt "   .$val."\n")                                                  if($p eq "is_repeat_evt");
-      
-      if($p eq "due") {                                                        
-          my (undef,undef,$duedate,$duetime,$duets,undef) = explodeDateTime ($hash, $val, 0, 0, 0);
-          push(@row_array, $bts+$n." 60_dueDateTime "  .$duedate." ".$duetime."\n"); 
-          push(@row_array, $bts+$n." 65_dueTimestamp " .$duets."\n");
-      }
-      
-      push(@row_array, $bts+$n." 85_percentComplete " .$val."\n")                            if($p eq "percent_complete" && $om eq "todolist");     
-      push(@row_array, $bts+$n." 90_calName "         .getCalFromId($hash,$val)."\n")  if($p eq "original_cal_id");
-
-      if($p eq "evt_repeat_setting") {
-          for my $r (keys %{$vh->{evt_repeat_setting}}) {
-              $vh->{$p}{$r} = "" if(!defined $vh->{$p}{$r});
-              next if($vh->{$p}{$r} eq "");
-              $val = encode("UTF-8", $vh->{$p}{$r});                 
-              push(@row_array, $bts+$n." 70_repeatRule ".$val."\n") if($r eq "repeat_rule");
-          }
-      }     
-      
-      push(@row_array, $bts+$n." 95_IcalUID " .$val."\n") if($p eq "ical_uid");
-      push(@row_array, $bts+$n." 98_EventId " .$val."\n") if($p eq "evt_id");
-  }
-  
-  $status = "upcoming" if($upcoming);
-  $status = "alarmed"  if($alarmed);
-  $status = "started"  if($started);
-  $status = "ended"    if($ended);
-  
-  push(@row_array, $bts+$n." 17_Status "        .$status."\n");
-  push(@row_array, $bts+$n." 99_---------------------- " ."--------------------------------------------------------------------"."\n");
-    
-return @row_array;
 }
 
 #############################################################################################
