@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.23.2" => "20.05.2020  english commandref ",
   "0.23.1" => "10.05.2020  some more changes for PBP severity 3 ",
   "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches, some changes for PBP ", 
   "0.22.0" => "09.05.2020  new attr 'digitalBorderDistance' for left and rigtht border distance of digital text ", 
@@ -2313,7 +2314,408 @@ return;
 <a name="Watches"></a>
 <h3>Watches</h3>
 
-At the moment only a german commandref is available.
+<br>
+The module Watches provides watches in different styles as Device. 
+The user can influence the design of the watches via attributes. <br>
+The clocks are based on scripts of these pages: <br>
+
+<a href='https://www.w3schools.com/graphics/canvas_clock_start.asp'>modern watch</a>, 
+<a href='http://www.3quarks.com/de/Bahnhofsuhr/'>Station clock</a>, 
+<a href='http://www.3quarks.com/de/Segmentanzeige/'>Digital display</a> 
+<br><br>
+
+A device of the model <b>Digital</b> can also be used as stopwatch, countdown timer or
+universal text display (for sixteen segment mode see attribute <a href="#digitalSegmentType">digitalSegmentType</a>). <br>
+As time source the client (browser time) as well as the FHEM server can be set 
+(attribute <a href="#timeSource">timeSource</a>). <br>
+
+<ul>
+  <a name="WatchesDefine"></a>
+  <b>Define</b>
+  
+  <ul>
+    define &lt;name&gt; Watches [Modern | Station | Digital]  
+    <br><br>
+    
+  <table>  
+     <colgroup> <col width=5%> <col width=95%> </colgroup>
+     <tr><td> <b>Modern</b>     </td><td>: creates an analog clock with a modern design </td></tr>
+     <tr><td> <b>Station</b>    </td><td>: creates a station clock </td></tr>
+     <tr><td> <b>Digital</b>    </td><td>: creates a digital display (clock, (CountDown)stop watch, static time display or text) </td></tr>
+  </table>
+  <br>
+  <br>
+  </ul>
+
+  <a name="WatchesSet"></a>
+  <b>Set</b> 
+  
+  <ul>
+  <ul>
+  
+    <a name="alarmSet"></a>
+    <li><b>alarmSet &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Sets the alarm time in the format hh hours (24), mm minutes and ss seconds. <br>
+      If the time reaches the defined value, an event of the reading "alarmed" is triggered. <br>
+      This set command is only available for digital stopwatches. <br><br>
+      
+      <ul>
+      <b>Example</b> <br>
+      set &lt;name&gt; alarmSet 0 30 10
+      </ul>
+      <br>
+      
+    </li>
+    <br>
+    
+    <a name="alarmDel"></a>
+    <li><b>alarmDel</b><br>
+      Clears the set alarm time and its status. <br>
+      This set command is only available for digital stopwatches. <br>
+    </li>
+    <br>
+    
+    <a name="countDownInit"></a>
+    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Sets the start time of a countdown stopwatch with hh hours(24), mm minutes and ss seconds. <br>
+      This set command is only available with a digital countdown stopwatch. <br><br>
+      
+      <ul>
+      <b>Example</b> <br>
+      set &lt;name&gt; countDownInit 0 30 10
+      </ul>
+      <br>
+      
+    </li>
+    <br>
+    
+    <a name="displayTextSet"></a>
+    <li><b>displayTextSet</b><br>
+      Sets the text to be displayed. <br> 
+      This set command is only available for a digital segment display with "digitalDisplayPattern = text". <br>
+      (default: blank display) <br><br>
+      
+      <b>Note:</b> <br>
+      The displayable characters depend on the attribute "digitalSegmentType". <br>
+      With the (default) seven-segment display, only numbers, hyphen, underscore and the letters 
+      A, b, C, d, E, F, H, L, n, o, P, r, t, U and Y are displayed. 
+      In addition to numbers, short texts such as "Error", "HELP", "run" or "PLAY" can also be displayed. <br>
+      For text display it is recommended to set the sixteen segment display with the attribute "digitalSegmentType" ! 
+    </li>
+    <br>
+    
+    <a name="displayTextDel"></a>
+    <li><b>displayTextDel</b><br>
+      Deletes the display text. <br>
+      This set command is only available for a digital segment display with "digitalDisplayPattern = text". <br>
+    </li>
+    <br>
+    
+    <a name="reset"></a>
+    <li><b>reset</b><br>
+      Stops the stopwatch (if running) and clears all specific readings or resets it to initialized. <br>
+      This set command is only available for digital stopwatches. <br>
+    </li>
+    <br>
+    
+    <a name="resume"></a>
+    <li><b>resume</b><br>
+      Resumes counting a stopped stopwatch. <br>
+      This set command is only available for digital stopwatches. <br>
+    </li>
+    <br>
+    
+    <a name="start"></a>
+    <li><b>start</b><br>
+      Starts the stopwatch. <br>
+      This set command is only available for digital stopwatches. <br>
+    </li>
+    <br>  
+    
+    <a name="stop"></a>
+    <li><b>stop</b><br>
+      Stop the stopwatch. The achieved time is retained. <br>
+      This set command is only available for digital stopwatches. <br>
+    </li>
+    <br>
+    
+    <a name="textTicker"></a>
+    <li><b>textTicker on | off </b><br>
+      Switches the ticker mode of a text display (see attribute digitalDisplayPattern) on or off. <br>
+      (default: off)      
+    </li>
+    <br>
+    
+    <a name="time"></a>
+    <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
+      Sets a static time display with hh hours(24), mm minutes and ss seconds. <br>
+      This set command is only available for a digital clock with static time display. <br><br>
+      
+      <ul>
+      <b>Example</b> <br>
+      set &lt;name&gt; time 8 15 3
+      </ul>
+      
+    </li>
+    <br>
+  
+  </ul>
+  </ul>
+  <br>
+
+  <a name="WatchesGet"></a>
+  <b>Get</b> 
+  
+  <ul>
+  
+    N/A
+    
+  </ul>
+  <br>
+
+  <a name="WatchesAttr"></a>
+  <b>Attribute</b>
+  <br><br>
+  
+  <ul>
+  <ul>
+  
+    <a name="disable"></a>
+    <li><b>disable</b><br>
+      Activates/deactivates the Device.
+    </li>
+    <br>
+    
+    <a name="hideDisplayName"></a>
+    <li><b>hideDisplayName</b><br>
+      Hides the Device/Alias name (link to detail view).    
+    </li>
+    <br>
+    
+    <a name="htmlattr"></a>
+    <li><b>htmlattr</b><br>
+      Additional HTML tags to resize the clock / display. <br><br>
+      <ul>
+        <b>Example: </b><br>
+        attr &lt;name&gt; htmlattr width="125" height="125" <br>
+      </ul>
+    </li>
+    <br>
+    
+    <a name="timeSource"></a>
+    <li><b>timeSource</b><br>
+      Selects the time source. The local client time (browser) or the FHEM server time can be displayed. <br>
+      This setting is not relevant for (countdown) stopwatches. <br>
+      [default: client]
+    </li>
+    <br>
+    
+  </ul>  
+    
+  The following attributes must be set specifically for a clock type. <br>
+  <br>
+   
+  <b>Model: Modern</b>  <br><br>
+  
+  <ul>
+    <a name="modernColorBackground"></a>
+    <li><b>modernColorBackground</b><br>
+      Background color of the clock.    
+    </li>
+    <br>
+    
+    <a name="modernColorFace"></a>
+    <li><b>modernColorFace</b><br>
+      Colouring of the dial.    
+    </li>
+    <br>
+    
+    <a name="modernColorFigure"></a>
+    <li><b>modernColorFigure</b><br>
+      Colour of the numbers on the dial and the pointer axle cover.    
+    </li>
+    <br>
+    
+    <a name="modernColorHand"></a>
+    <li><b>modernColorHand</b><br>
+      Colour of the watch hands.    
+    </li>
+    <br>
+    
+    <a name="modernColorRing"></a>
+    <li><b>modernColorRing</b><br>
+      Colour of the dial frame.    
+    </li>
+    <br>
+    
+    <a name="modernColorRingEdge"></a>
+    <li><b>modernColorRingEdge</b><br>
+      Colour of the outer ring of the dial frame.  
+    </li>
+    <br>
+  </ul>
+  <br>
+  
+  <b>Model: Station</b>  <br><br>
+  
+  <ul>
+    <a name="stationBody"></a>
+    <li><b>stationBody</b><br>
+      Type of watch case.     
+    </li>
+    <br>
+    
+    <a name="stationBoss"></a>
+    <li><b>stationBoss</b><br>
+      Type and colour of the pointer axle cover.    
+    </li>
+    <br>
+
+    <a name="stationHourHand"></a>
+    <li><b>stationHourHand</b><br>
+      Type of hour hand.    
+    </li>
+    <br>    
+    
+    <a name="stationMinuteHand"></a>
+    <li><b>stationMinuteHand</b><br>
+      Type of minute hand.    
+    </li>
+    <br> 
+
+    <a name="stationMinuteHandBehavoir"></a>
+    <li><b>stationMinuteHandBehavoir</b><br>
+      Behavior of the minute hand.    
+    </li>
+    <br>   
+
+    <a name="stationSecondHand"></a>
+    <li><b>stationSecondHand</b><br>
+      Type of second hand.   
+    </li>
+    <br>  
+
+    <a name="stationSecondHandBehavoir"></a>
+    <li><b>stationSecondHandBehavoir</b><br>
+      Behavior of the second hand.    
+    </li>
+    <br>  
+
+    <a name="stationStrokeDial"></a>
+    <li><b>stationStrokeDial</b><br>
+      Selection of the dial.    
+    </li>
+    <br>      
+    
+  </ul>
+  <br>
+  
+  <b>Model: Digital</b>  <br><br>
+  
+  <ul>
+    <a name="digitalBorderDistance"></a>
+    <li><b>digitalBorderDistance</b><br>
+      Left and right distance of the digital text display from the background edge. <br>
+      (default: 8)      
+    </li>
+    <br>  
+  
+    <a name="digitalColorBackground"></a>
+    <li><b>digitalColorBackground</b><br>
+      Digital clock background color.    
+    </li>
+    <br>  
+
+    <a name="digitalColorDigits"></a>
+    <li><b>digitalColorDigits</b><br>
+      Color of the bar display in a digital watch.    
+    </li>
+    <br> 
+
+    <a name="digitalDigitAngle"></a>
+    <li><b>digitalDigitAngle </b><br>
+      Adjusts the tilt angle of the displayed characters. <br>
+      (default: 9)      
+    </li>
+    <br> 
+    
+    <a name="digitalDigitDistance"></a>
+    <li><b>digitalDigitDistance </b><br>
+      Adjusts the character spacing. <br>
+      (default: 2)     
+    </li>
+    <br>  
+    
+    <a name="digitalDigitHeight"></a>
+    <li><b>digitalDigitHeight </b><br>
+      Adjusts the character height. <br>
+      (default: 20)      
+    </li>
+    <br>
+
+    <a name="digitalDigitWidth"></a>
+    <li><b>digitalDigitWidth </b><br>
+      Adjusts the character width. <br>
+      (default: 12)      
+    </li>
+    <br>     
+  
+    <a name="digitalDisplayPattern"></a>
+    <li><b>digitalDisplayPattern [countdownwatch | staticwatch | stopwatch | text | watch]</b><br>
+      Switching the digital display between a clock (default), a stopwatch, static time display or text display. 
+      The text to be displayed in text display mode can be defined with <br>
+      <b>set &lt;name&gt displayText</b>. <br><br>
+      
+      <b>Note:</b> For text display it is recommended to set the attribute "digitalSegmentType" to "16". <br><br>
+      
+    <ul>
+    <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+       <tr><td> <b>countdownwatch </b> </td><td>: CountDown Stopwatch            </td></tr>
+       <tr><td> <b>staticwatch</b>     </td><td>: static time display            </td></tr>
+       <tr><td> <b>stopwatch</b>       </td><td>: Stopwatch                      </td></tr>
+       <tr><td> <b>text</b>            </td><td>: Display of a definable text    </td></tr>
+       <tr><td> <b>watch</b>           </td><td>: Watch                          </td></tr>
+    </table>
+    </ul>
+    <br>
+    <br>
+    </li> 
+    
+    <a name="digitalSegmentDistance"></a>
+    <li><b>digitalSegmentDistance </b><br>
+      Defines the distance between the segments. <br>
+      (default: 0.5)      
+    </li>
+    <br> 
+    
+    <a name="digitalSegmentType"></a>
+    <li><b>digitalSegmentType </b><br>
+      Switches the segment number of the digital display. <br>
+      (default: 7)      
+    </li>
+    <br> 
+
+    <a name="digitalSegmentWidth"></a>
+    <li><b>digitalSegmentWidth </b><br>
+      Changes the width of the individual segments. <br>
+      (default: 1.5)     
+    </li>
+    <br> 
+
+    <a name="digitalTextDigitNumber"></a>
+    <li><b>digitalTextDigitNumber &lt;Quantity&gt; </b><br>
+      If &lt;Quantity&gt > 0, the number of digits of a text display (digitalDisplayPattern = text) is fixed. 
+      If &lt;Quantity&gt = 0 or not set, the setting is made automatically. In this case an adaptation is made
+      of the character size to the number depending on the set display size (see htmlattr). <br>
+      (default: 0)      
+    </li>
+    <br>      
+    
+  </ul>
+  </ul>
+  
+</ul>
 
 =end html
 =begin html_DE
@@ -2671,7 +3073,8 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <a name="digitalDisplayPattern"></a>
     <li><b>digitalDisplayPattern [countdownwatch | staticwatch | stopwatch | text | watch]</b><br>
       Umschaltung der Digitalanzeige zwischen einer Uhr (default), einer Stoppuhr, statischen Zeitanzeige oder Textanzeige. 
-      Der anzuzeigende Text im Modus Textanzeige kann mit set <b>displayText</b> definiert werden. <br><br>
+      Der anzuzeigende Text im Modus Textanzeige kann mit <br>
+      <b>set &lt;name&gt displayText</b>. <br><br>
       
       <b>Hinweis:</b> Bei Textanzeige wird empfohlen das Attribut "digitalSegmentType" auf "16" zu stellen. <br><br>
       
