@@ -304,6 +304,10 @@ MQTT2_SERVER_Read($@)
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
     ($hash->{cid}, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
+    if($hash->{protoNum} > 4) {
+      return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump); # ERROR
+    }
+
     my $desc = "keepAlive:$hash->{keepalive}";
     if($hash->{cflags} & 0x04) { # Last Will & Testament
       my ($wt, $wm);
