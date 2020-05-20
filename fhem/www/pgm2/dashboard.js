@@ -2,9 +2,10 @@
 // dashboard.js
 //###########################################################################################################################################
 // Released : 14.11.2013 Sascha Hermann
-// Modified : 24.09.2019 Heiko Maaz
+// Modified : 19.05.2020 Heiko Maaz
 //
 // Version : 
+// 2.0.9:   FW_readingsGroupReadyFn in if-condition, avoid "ReferenceError: FW_readingsGroupReadyFn is not defined"
 // 2.0.8:   dashboard_load_tab(tabIndex) test of defined fhemUrl
 // 2.0.7:   Insert Configdialog for Tabs. Change handling of parameters in both directions.
 // 2.0.6:   change Set and Detail Button.
@@ -538,7 +539,10 @@ function dashboard_init_tab(tabIndex) {
 	  makeResizable('#dashboard_tab' + tabIndex + ' .dashboard_widget');
 
 	  // call the initialization of reading groups
-	  FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
+	  if (typeof FW_readingsGroupReadyFn == 'function') { 
+          FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
+      } 
+	  // FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));                      // 19.05.2020 V2.0.9
 
 	  if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {
 		dashboard_setlock(tabIndex);
