@@ -78,6 +78,7 @@ sub DOIF_delAll($)
   delete ($hash->{var});
   delete ($hash->{accu});
   delete ($hash->{Regex});
+  delete ($hash->{defs});
 
   #foreach my $key (keys %{$hash->{Regex}}) {
   #  delete $hash->{Regex}{$key} if ($key !~ "STATE|DOIF_Readings|uiTable");
@@ -348,6 +349,21 @@ sub DOIF_RegisterCell
   return ""
 }
 
+sub DOIF_DEF_TPL 
+{
+  my ($hash,$table,$tail) =@_;
+  my ($beginning,$currentBlock,$err);
+  while($tail =~ /(?:^|\n)\s*DEF\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
+    ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+    if ($err) {
+        return ("DEF TPL: $err",$currentBlock);
+    } elsif ($currentBlock ne "") {
+      $hash->{$table}{tpl}{$1}=$currentBlock;
+    }
+  }
+  return ("",$tail);
+}
+
 sub parse_tpl
 {
   my ($hash,$wcmd,$table) = @_;
@@ -407,7 +423,7 @@ sub parse_tpl
     }
   }
   
-  ($err,$wcmd)=DOIF_uiTable_FOR($hash,$wcmd,$table);
+  ($err,$wcmd)=DOIF_FOR($hash,$table,$wcmd);
   if ($err) {
     return($err,"");
   }
@@ -423,14 +439,8 @@ sub parse_tpl
   my $beginning;
   my $currentBlock;
 
-  while($tail =~ /(?:^|\n)\s*DEF\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/g) {
-    ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
-    if ($err) {
-        return ("error in $table: $err","");
-    } elsif ($currentBlock ne "") {
-      $hash->{$table}{tpl}{$1}=$currentBlock;
-    }
-  }
+  ($err,$tail)=DOIF_DEF_TPL($hash,$table,$wcmd);
+  return ("$err: $tail") if ($err);
   return ("",$tail);
 }
 
@@ -450,9 +460,9 @@ sub import_tpl
   return "";
 }
 
-sub DOIF_uiTable_FOR
+sub DOIF_FOR
 {
-  my ($hash,$wcmd,$table)=@_;
+  my ($hash,$table,$wcmd)=@_;
   my $err="";
   my $tail=$wcmd;
   my $beginning;
@@ -467,7 +477,7 @@ sub DOIF_uiTable_FOR
       if ($tail =~ /^FOR\s*\(/) {
         ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
         if ($err) {
-          return ("error in $table: $err $currentBlock","");
+          return ("FOR: $err $currentBlock","");
         } elsif ($currentBlock ne "") {
           my ($array,$command) = SplitDoIf(',',$currentBlock);
           my $commandoutput="";
@@ -490,23 +500,13 @@ sub DOIF_uiTable_FOR
   return ("",$output);
 }
 
-sub DOIF_uiTable_def 
-{
-  my ($hash,$wcmd,$table) = @_;
-  return undef if (!$wcmd); 
-  my $err="";
-  delete ($hash->{Regex}{$table});
-  delete ($hash->{$table});
-  ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
-  return $err if ($err);
+sub DOIF_TPL {
+  my ($hash,$table,$tail) = @_;
   my $beginning;
   my $currentBlock;
   my $output="";
+  my $err;
   
-  #$wcmd=DOIF_uiTable_FOR($wcmd,$table);
-
-  my $tail=$wcmd;
-
   while ($tail ne "") {
     if ($tail =~ /TPL_/g) {
       my $prefix=substr($tail,0,pos($tail));
@@ -518,7 +518,7 @@ sub DOIF_uiTable_def
           my $templ=$hash->{$table}{tpl}{$template};
           ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
           if ($err) {
-            return "error in $table: $err";
+            return "error: $err";
           } elsif ($currentBlock ne "") {
             my @param = SplitDoIf(',',$currentBlock);
             for (my $j=0;$j<@param;$j++) {
@@ -528,7 +528,7 @@ sub DOIF_uiTable_def
           }
           $output.=($begin.$templ);
         }  else {
-          return ("no Template $template defined");
+          return ("no Template $template defined",$tail);
         }
       } else {
         $tail=substr($tail,4);
@@ -539,6 +539,27 @@ sub DOIF_uiTable_def
       $tail="";
     }
   }
+  return ("",$output);
+}
+
+
+sub DOIF_uiTable_def 
+{
+  my ($hash,$wcmd,$table) = @_;
+  return undef if (!$wcmd); 
+  my $err="";
+
+  delete ($hash->{Regex}{$table});
+  delete ($hash->{$table});
+
+  ($err,$wcmd)=parse_tpl($hash,$wcmd,$table);
+  return $err if ($err);
+  my $output="";
+  my $tail=$wcmd;
+
+  ($err,$output)=DOIF_TPL($hash,$table,$tail);
+  return ("$err: $output") if ($err);
+
   $wcmd=$output;
 
   my @rcmd = split(/\n/,$wcmd);
@@ -1592,13 +1613,9 @@ sub ReplaceAllReadingsDoIf
           return ($block,$err) if ($err);
           if ($condition >= 0) {
             if ($trigger) {
-              #$hash->{devices}{$condition} = AddItemDoIf($hash->{devices}{$condition},$device);
-              #$hash->{devices}{all} = AddItemDoIf($hash->{devices}{all},$device);
               AddRegexpTriggerDoIf($hash,"cond","",$condition,$device,((defined $reading) ? $reading :((defined $internal) ? ("&".$internal):"&STATE")));
               $event=1;
             }
-            #$hash->{readings}{$condition} = AddItemDoIf($hash->{readings}{$condition},"$device:$reading") if (defined ($reading) and $trigger);
-            #$hash->{internals}{$condition} = AddItemDoIf($hash->{internals}{$condition},"$device:$internal") if (defined ($internal));
             $hash->{readings}{all} = AddItemDoIf($hash->{readings}{all},"$device:$reading") if (defined ($reading) and $trigger);
             $hash->{internals}{all} = AddItemDoIf($hash->{internals}{all},"$device:$internal") if (defined ($internal));
             $hash->{trigger}{all} = AddItemDoIf($hash->{trigger}{all},"$device") if (!defined ($internal) and !defined($reading));
@@ -1609,7 +1626,6 @@ sub ReplaceAllReadingsDoIf
             }
           } elsif ($condition == -3) {
               AddRegexpTriggerDoIf($hash,"itimer","","itimer",$device,((defined $reading) ? $reading :((defined $internal) ? ("&".$internal):"&STATE")));
-              #$hash->{itimer}{all} = AddItemDoIf($hash->{itimer}{all},$device);
           } elsif ($condition == -4) {
             if ($trigger) {
               AddRegexpTriggerDoIf($hash,"DOIF_Readings","",$id,$device,((defined $reading) ? $reading :((defined $internal) ? ("&".$internal):"&STATE")));
@@ -2026,16 +2042,6 @@ sub DOIF_CheckCond($$) {
   if ($eventa) {
     $events=join(",",@{$eventa});
   }
-  #if (defined ($hash->{readings}{$condition})) {
-  #  foreach my $devReading (split(/ /,$hash->{readings}{$condition})) {
-  #    $devReading=~ s/\$DEVICE/$hash->{helper}{triggerDev}/g if ($devReading);
-  #  }
-  #}
-  #if (defined ($hash->{internals}{$condition})) {
-  #  foreach my $devInternal (split(/ /,$hash->{internals}{$condition})) {
-  #    $devInternal=~ s/\$DEVICE/$hash->{helper}{triggerDev}/g if ($devInternal);
-  #  }
-  #}
   my $command=$hash->{condition}{$condition};
   if ($command) {
     my $eventa=$hash->{helper}{triggerEvents};
@@ -2046,19 +2052,11 @@ sub DOIF_CheckCond($$) {
     $command =~ s/\$DEVICE/$hash->{helper}{triggerDev}/g;
     $command =~ s/\$EVENTS/$events/g;
     $command =~ s/\$EVENT/$hash->{helper}{event}/g;
-    #my $idx = 0;
-    #my $evt;
-    #foreach my $part (split(" ", $hash->{helper}{event})) {
-    #   $evt='\$EVTPART'.$idx;
-    #   $command =~ s/$evt/$part/g;
-    #   $idx++;
-    #}
   }
   $cmdFromAnalyze="$hash->{NAME}: ".sprintf("warning in condition c%02d",($condition+1));
   $lastWarningMsg="";
   $hs=$hash;
   my $ret=$hash->{MODEL} eq "Perl" ? eval("package DOIF; $command"):eval ($command);  
-  #my $ret = eval ($command);
   if($@){
     $@ =~ s/^(.*) at \(eval.*\)(.*)$/$1,$2/;
     $err = sprintf("condition c%02d",($condition+1)).": $@";
@@ -3136,6 +3134,16 @@ CmdDoIfPerl($$)
 
   return("","") if ($tail =~ /^ *$/);
 
+  ($err,$tail)=DOIF_DEF_TPL($hash,"defs",$tail);
+  return ($tail,$err) if ($err);
+ 
+  ($err,$tail)=DOIF_FOR($hash,"defs",$tail);
+  return($tail,$err) if ($err);    
+ 
+  ($err,$tail)=DOIF_TPL($hash,"defs",$tail);
+  return ($tail,$err) if ($err);
+  
+  $tail =~ s/\$VAR/\$hash->{var}/g;
   $tail =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
   
   while ($tail ne "") {
@@ -4039,8 +4047,8 @@ sub bar
   $size=100 if (!defined $size);
   
   my $prop=($value-$min)/($max-$min);
-  my $val1=$prop*$height;
-  my $y=$height+6.9-$val1;
+  my $val1=int($prop*$height+0.5);
+  my $y=$height+6-$val1;
   my $currColor;
 
   if (defined $func) {
@@ -4084,7 +4092,7 @@ sub bar
   $out.= sprintf('<rect x="15" y="6" width="10" height="%d" rx="2" ry="2" fill="none" stroke="rgb(160, 160, 160)" stroke-width="0.5"/>',$height);
   $out.= sprintf('<line  x1="15.5"  y1="%d" x2="24.5" y2="%d" fill="none" stroke="rgb(192,192,192)" stroke-width="1"/>',$null,$null) if ($min < 0 and $max > 0);;
 
-  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:18px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6, $height/2+11,color($currColor),sprintf($format,$value),$unit);
+  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:18px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6, $height/2+13,color($currColor),sprintf($format,$value),$unit);
 
   $out.= '</g>';
  	$out.= '</svg>';
@@ -6554,13 +6562,23 @@ Hier passiert das nicht mehr, da die ursprünglichen Zustände cmd_1 und cmd_2 j
 <b>Perl Modus</b><br>
 <br>
 Der Perl-Modus ist sowohl für einfache, als auch für komplexere Automatisierungsabläufe geeignet. Der Anwender hat mehr Einfluss auf den Ablauf der Steuerung als im FHEM-Modus.
-Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturiert programmieren. Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, dadurch wird maximale Performance gewährleistet.<br>
+Die Abläufe lassen sich, wie in höheren Programmiersprachen üblich, strukturiert programmieren. Mit Hilfe von Templates können generalisiert DOIFs definiert werden.
+Zum Zeitpunkt der Definition werden alle DOIF-spezifischen Angaben in Perl übersetzt, zum Zeitpunkt der Ausführung wird nur noch Perl ausgeführt, dadurch wird maximale Performance gewährleistet.<br>
 <br>
 Syntax Perl-Modus:<br>
 <br>
-<ol><code>define &lt;name&gt; DOIF &lt;Blockname&gt; {&lt;Ereignisblock: Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code></ol>
+<ol><code>define &lt;name&gt; DOIF &lt;Template-Definitionen (optional)&gt; &lt;DOIF-Blöcke&gt;</code></ol><br>
+Syntax Template-Definition:<br>
 <br>
-Ein Ereignisblock wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
+<code>DEF TPL_&lt;Template-Name&gt;(&ltDOIF-Block-Definition mit Platzhaltern: $1,$2,...&gt;)</code><br>
+<br>
+<u><a href="https://forum.fhem.de/index.php/topic,111266.msg1054775.html#msg1054775">Anwendungsbeispiel zu DOIF-Templates</a></u><br>
+<br>
+Syntax DOIF-Block:<br>
+<br>
+<code>&lt;Blockname (optional)&gt; {&lt;Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code><br>
+<br>
+Ein DOIF-Block wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
 Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
 <br>
 Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_State</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
