@@ -2798,16 +2798,21 @@ GlobalAttr($$$$)
   elsif($name eq "modpath") {
     return "modpath must point to a directory where the FHEM subdir is"
         if(! -d "$val/FHEM");
-    my $modpath = "$val/FHEM";
+    my $modpath = $val;
+    my $modpath_FHEM = "$modpath/FHEM";
+    my $modpath_lib = "$modpath/lib";
 
-    opendir(DH, $modpath) || return "Can't read $modpath: $!";
-    push @INC, $modpath if(!grep(/^\Q$modpath\E$/, @INC));
-    push @INC, $val if(!grep(/^\Q$val\E$/, @INC));
+    opendir(DH, $modpath_FHEM) || return "Can't read $modpath_FHEM: $!";
+
+    unshift @INC, $modpath_FHEM if(!grep(/^\Q$modpath_FHEM\E$/,@INC));
+    unshift @INC, $modpath_lib  if(!grep(/^\Q$modpath_lib\E$/, @INC));
+    unshift @INC, $modpath      if(!grep(/^\Q$modpath\E$/,     @INC)); #configDb
+
     $cvsid =~ m/(fhem.pl) (\d+) (\d+-\d+-\d+)/;
     $attr{global}{version} = "$1:$2/$3";
     my $counter = 0;
     my $oldVal = $attr{global}{modpath};
-    $attr{global}{modpath} = $val;
+    $attr{global}{modpath} = $modpath;
 
     if(configDBUsed()) {
       my $list = cfgDB_Read99(); # retrieve filelist from configDB

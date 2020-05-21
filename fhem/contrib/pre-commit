@@ -1,5 +1,8 @@
 #!/usr/bin/perl
-# $Id: commandref_join.pl 5361 2014-03-29 06:24:20Z rudolfkoenig $
+
+# Install this file into fhem_svn:/var/svn/fhem/hooks/ manually
+
+# $Id$
 
 use strict;
 use warnings;
@@ -34,6 +37,7 @@ foreach my $row (split("\n", $fList)) {
   my $pl = `svnlook pl $arg $repos $fName`;
   die ("Setting svn:externals is prohibited") if($pl =~ m/svn:externals/);
 
+  ################################
   # check for 80 chars per line conformity
   if($fName =~ m/CHANGED/) {
     my ($cCount, $cLineNo, $tLineNo, $lineNo) = (0,0,0,0,0);
@@ -55,13 +59,15 @@ foreach my $row (split("\n", $fList)) {
     next;
   }
   
-  err $fName, "filename ($fName) contains strange characters (not A-Za-z0-9_.-%)"
+  err $fName, "the filename ($fName) contains forbidden characters ".
+                        "(A-Za-z0-9_.-% is allowed)"
     if($fName =~ m/[^A-Za-z0-9_.%-\/]/);
 
   next unless($fName =~ /\.pm$/);
 
-  # check for SVN Id
-  if($fName =~ m,trunk/fhem/FHEM/[^/]+\.pm$,) {
+  ################################
+  # look for SVN Id
+  if($fName =~ m,trunk/fhem/(FHEM|lib)/[^/]+\.pm$,) {
     my $hasId = 0;
     open(FILE, "$svnlook $arg cat $repos $fName|") ||
         die("Cant svnlook cat $fName:$!\n");
@@ -81,6 +87,9 @@ foreach my $row (split("\n", $fList)) {
       unless($props =~ /Id/);
   }
 
+
+  ################################
+  # check the documentation
   next if($fName !~ m+FHEM/(\d\d)_(.*).pm$+);
   my ($modNum, $modName) = ($1, $2);
   my %ninetyniners = ("SUNRISE_EL"=>1, "Utils"=>1);
@@ -153,11 +162,13 @@ foreach my $row (split("\n", $fList)) {
       if(!$suffix && $docCount && !$hasLink);
     err $fName, "$lang: No summary description found"
       if(!$suffix && $docCount && !$hasSummary);
-    err $fName, "$lang: =end html$suffix: ".($nrEnd>0 ? "missing":"there are too many")."\n"
+    err $fName, "$lang: =end html$suffix: ".
+                              ($nrEnd>0 ? "missing":"there are too many")."\n"
       if($nrEnd);
 
     foreach $tag (TAGS) {
-      err $fName, "$lang: Unbalanced $tag ($tagcount{$tag}, last line ok: $llwct{$tag})"
+      err $fName, "$lang: Unbalanced $tag ($tagcount{$tag}, ".
+                "last line ok: $llwct{$tag})"
         if($tagcount{$tag});
     }
   }

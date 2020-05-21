@@ -1,15 +1,15 @@
 #!/usr/bin/perl
 
 ###############################
-# This is quite a big mess here.
-
-use IO::File;
-use strict;
-use warnings;
-
 # Server-Side script to check out the fhem SVN repository, and upload the
 # changed files to the server
 
+# $Id$
+
+use strict;
+use warnings;
+
+my $debug = 0;
 print "\n\n";
 print "fhemupdate.pl START: ".localtime()."\n";
 
@@ -17,13 +17,13 @@ my $homedir="/home/rko/fhemupdate";
 my $destdir="/var/www/html/fhem.de";
 
 chdir("$homedir/culfw");
-system("svn update .");
+system("svn update .") if(!$debug);
 
 chdir("$homedir/fhem");
-system("svn update .");
+system("svn update .") if(!$debug);
 die "SVN failed, exiting\n" if($?);
 
-`../copyfiles.sh`;
+`../copyfiles.sh` if(!$debug);
 
 #################################
 # new Style
@@ -48,7 +48,6 @@ my @filelist2 = (
   "FHEM/lib/SWAP/justme/.*",
   "FHEM/lib/Device/.*.pm",
   "FHEM/lib/Device/Firmata/.*.pm",
-  "FHEM/lib/Device/MySensors/.*.pm",
   "FHEM/lib/MP3/.*.pm",
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
@@ -78,36 +77,45 @@ my @filelist2 = (
 );
 
 
-# Can't make negative regexp to work, so do it with extra logic
-my %skiplist2 = (
-# "www/pgm2"  => ".pm\$",
-);
-
-# Read in the file timestamps
+# Collect file timestamp and size
 my %filetime2;
 my %filesize2;
-my %filedir2;
-foreach my $fspec (@filelist2) {
+sub
+statDir
+{
+  my ($fspec, $recursive) = @_;
   $fspec =~ m,^(.+)/([^/]+)$,;
   my ($dir,$pattern) = ($1, $2);
-  my $tdir = $dir;
+
   opendir DH, $dir || die("Can't open $dir: $!\n");
-  foreach my $file (grep { /$pattern/ && -f "$dir/$_" } readdir(DH)) {
-    next if($skiplist2{$tdir} && $file =~ m/$skiplist2{$tdir}/);
-    my @st = stat("$dir/$file");
-    my @mt = localtime($st[9]);
-    $filetime2{"$tdir/$file"} = sprintf "%04d-%02d-%02d_%02d:%02d:%02d",
-                $mt[5]+1900, $mt[4]+1, $mt[3], $mt[2], $mt[1], $mt[0];
-    $filesize2{"$tdir/$file"} = $st[7];
-    $filedir2{"$tdir/$file"} = $dir;
-  }
+  my @files = readdir(DH);
   closedir(DH);
+
+  foreach my $file (@files) {
+    my $fPath = "$dir/$file";
+    if(-d $fPath) {
+      statDir("$fPath/$pattern", 1) if($recursive && $file !~ m/^\./);
+    } else {
+      next if($file !~ m/$pattern/);
+      my @st = stat($fPath);
+      my @mt = localtime($st[9]);
+      $filetime2{$fPath} = sprintf "%04d-%02d-%02d_%02d:%02d:%02d",
+                  $mt[5]+1900, $mt[4]+1, $mt[3], $mt[2], $mt[1], $mt[0];
+      $filesize2{$fPath} = $st[7];
+    }
+  }
 }
 
+foreach my $fspec (@filelist2) {
+  statDir($fspec);
+}
+statDir("lib/.*.pm",1) if(-d "lib");
+
+#######################
+# read in the old times
 chdir("$homedir/fhem/fhemupdate");
 my %oldtime;
 my $fname = "controls_fhem.txt";
-
 if(open FH, $fname) {
   while(my $l = <FH>) {
     chomp($l);
@@ -120,30 +128,33 @@ if(open FH, $fname) {
 }
 
 
-my $cfh = new IO::File ">$fname" || die "Can't open $fname: $!\n";
+# Create the new controls_fhem.txt and copy the changed files
+open(FH, ">$fname") || die "Can't open $fname: $!\n";
 `svn info ..` =~ m/Revision: (\d+)/m;
-print $cfh "REV $1\n";
+print FH "REV $1\n";
 if(open(ADD, "../../fhemupdate.control.fhem")) {
-  print $cfh join("",<ADD>);
+  print FH join("",<ADD>);
   close ADD;
 }
-
 my $cnt;
 foreach my $f (sort keys %filetime2) {
   my $fn = $f;
   $fn =~ s/.txt$// if($fn =~ m/.pl.txt$/);
-  print $cfh "UPD $filetime2{$f} $filesize2{$f} $fn\n";
+  print FH "UPD $filetime2{$f} $filesize2{$f} $fn\n";
   my $newfname = $f;
   if(!$oldtime{$f} || $oldtime{$f} ne $filetime2{$f}) {
     $f =~ m,^(.*)/([^/]*)$,;
-    my ($tdir, $file) = ($1, $2);
-    system("mkdir -p $tdir") unless(-d $tdir);
-    system("cp ../$filedir2{$f}/$file $tdir/$file");
+    my ($dir, $file) = ($1, $2);
+    system("mkdir -p $dir") unless(-d $dir);
+    system("cp ../$dir/$file $dir/$file");
     $cnt++;
   }
 }
-close $cfh;
+close(FH);
 
+exit(0) if($debug);
+
+# copy and check in the controls file if it was changed.
 chdir("$homedir/fhem");
 my $diff=`diff -I '^REV' fhemupdate/$fname $fname`;
 if($diff) {
@@ -156,21 +167,20 @@ system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate/FHEM/firmware");
 system("cp -p FHEM/firmware/*.hex        fhemupdate/FHEM/firmware");
 
 
+# copy the stuff to the external dir
 my $rsyncopts="-a --delete --verbose";
 print "rsync $rsyncopts fhemupdate/. $destdir/fhemupdate/.\n";
 system("rsync $rsyncopts fhemupdate/. $destdir/fhemupdate/.");
 if(-f "commandref_changed") {
   system("cp docs/commandref.html docs/commandref_DE.html $destdir");
+  system("cp docs/commandref_modular*.html $destdir");
 }
 
 system("cp CHANGED MAINTAINER.txt $destdir");
 system("cp $destdir/stats/data/fhem_statistics_db.sqlite ..");
 
 chdir("$homedir");
-system("grep -v '^REV' fhem/fhemupdate/controls_fhem.txt > controls_fhem_5.5.txt");
-system("cp controls_fhem_5.5.txt $destdir/fhemupdate4/svn/controls_fhem.txt");
 
-#system("sh stats/dostats.sh"); disabled due to new reworked statistics2.cgi
 print "generating SVNLOG\n";
 system("sh mksvnlog.sh > SVNLOG");
 system("cp SVNLOG $destdir");
