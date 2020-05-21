@@ -1370,13 +1370,21 @@ sub MAX_saveConfig {
 	}
     }
 
-    $hash->{saveConfig} = 1;
-    my @ar =  MAX_ParseWeekProfile($hash);
-    delete $hash->{saveConfig};
     my @j_arr;
-    foreach my $line (@ar) {
-	push @lines, $line if ($line && (substr($line,0,1) ne '"'));
-	push @j_arr, $line if ($line && (substr($line,0,1) eq '"'));
+
+    if ($hash->{type} =~ m{Thermostat}xms) {
+
+	$hash->{saveConfig} = 1;
+	my @ar;
+	@ar = MAX_ParseWeekProfile($hash) if (defined($h{'50..weekProfile'}));
+	delete $hash->{saveConfig};
+
+	foreach my $s (@ar) {
+	    next if(!$s);
+	    (substr($s,0,1) eq '"') ? push @j_arr, $s : push @lines, $s;
+	}
+
+	push @lines , "setreading $name .wp_json ".'{'.join(',', @j_arr).'}';
     }
 
     push @lines , "setreading $name .wp_json ".'{'.join(',', @j_arr).'}';
@@ -1391,7 +1399,7 @@ sub MAX_saveConfig {
 
     readingsBeginUpdate($hash) if(!$bulk);
     readingsBulkUpdate($hash, 'lastConfigSave', $dir.$fname.'.max');
-    readingsBulkUpdate($hash, '.wp_json', '{'.join(',', @j_arr).'}');
+    readingsBulkUpdate($hash, '.wp_json', '{'.join(',', @j_arr).'}') if (@j_arr);
     readingsEndUpdate($hash, 1) if(!$bulk);
 
     return;
