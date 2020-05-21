@@ -831,7 +831,7 @@ sub Get {                                                                       
                 }
             }          
             $i = 0;
-            for my $key (sortVersion("desc",keys %hs)) {
+            for my $key (sortTopicNum("desc",keys %hs)) {
                 $val0 = $hs{$key};
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
                 $ret .= "</tr>";
@@ -856,7 +856,7 @@ sub Get {                                                                       
             $ret .= "<tbody>";
             $ret .= "<tr class=\"even\">";
             $i = 0;
-            for my $key (sortVersion("desc",keys %vNotesExtern)) {
+            for my $key (sortTopicNum("desc",keys %vNotesExtern)) {
                 ($val0,$val1) = split(/\s/x,$vNotesExtern{$key},2);
                 $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
                 $ret .= "</tr>";
@@ -3700,7 +3700,7 @@ sub explodeDateTime {                                    ## no critic 'complexit
       if($exdates) {
           my @exd = split(" ", $exdates);  
           # grep { !$seen{$_}++ } @exd;
-          for (@exd) { !$seen{$_}++ };
+          for (@exd) { $seen{$_}++ if(!$seen{$_}) };
       }
       $excl = 1 if($seen{$dtstart});                                            # check erfolgreich -> exclude recurring date weil (Serienelement gelöscht)
   
@@ -3796,7 +3796,7 @@ sub setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
-  my $v                    = (sortVersion("desc",keys %vNotesIntern))[0];
+  my $v                    = (sortTopicNum("desc",keys %vNotesIntern))[0];
   my $type                 = $hash->{TYPE};
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
@@ -3863,7 +3863,7 @@ sub calAsHtml {                                                                 
       my $FW_style = AttrVal($FW_wname, "stylesheetPrefix", "default");
       my @scspecs  = split(",", $hash->{HELPER}{tableSpecs}{smallScreenStyles});     # Eigenschaft smallScreen in Array lesen
       # grep { !$specs{$_}++ } @scspecs; 
-      for (@scspecs) { !$specs{$_}++ };
+      for (@scspecs) { $specs{$_}++ if(!$specs{$_}) };
       $small = 1 if($specs{$FW_style});                                              # Tabelle für small-Style anpassen                                   
   }
   
