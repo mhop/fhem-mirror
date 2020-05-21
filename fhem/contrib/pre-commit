@@ -67,7 +67,7 @@ foreach my $row (split("\n", $fList)) {
 
   ################################
   # look for SVN Id
-  if($fName =~ m,trunk/fhem/(FHEM|lib)/[^/]+\.pm$,) {
+  if($fName =~ m,trunk/fhem/(FHEM|lib)/.*.pm$,) {
     my $hasId = 0;
     open(FILE, "$svnlook $arg cat $repos $fName|") ||
         die("Cant svnlook cat $fName:$!\n");
