@@ -1306,123 +1306,96 @@ sub MAX_Save
  return;
 }
 
-sub MAX_saveConfig
-{
- my $name    = shift;
- my $fname   = shift;
- my $hash    = $defs{$name};
- my $devtype = int($hash->{devtype});
-    $fname   = $name if (!$fname);
- my $dir     = AttrVal('global','logdir','./log/');
- $dir .='/' if ($dir  !~ m/\/$/);
- my @lines;
- my %h;
+sub MAX_saveConfig {
+    my $name    = shift;
+    my $fname   = shift;
+       $fname   //= $name;
+    my $hash    = $defs{$name};
+    my $devtype = int($hash->{devtype});
+    my $dir     = AttrVal('global', 'logdir', './log/');
+    $dir .='/' if ($dir  !~ m/\/$/);
+    my @lines;
+    my %h;
 
- if (($devtype < 4) || ($devtype == 8)) # HT , HT+ , WT
- {
-  $h{'21comfortTemperature'}       = MAX_ReadingsVal($hash,"comfortTemperature");
-  $h{'22.comfortTemperature'}      = $h{'21comfortTemperature'};
+    if (($devtype < 4) || ($devtype == 8)) { # HT , HT+ , WT
 
-  $h{'23.ecoTemperature'}           = MAX_ReadingsVal($hash,"ecoTemperature");
-  #$h{'24.ecoTemperature'}          = $h{'23ecoTemperature'};
-
-  $h{'25.maximumTemperature'}       = MAX_ReadingsVal($hash,"maximumTemperature");
-  #$h{'26.maximumTemperature'}      = $h{'25maximumTemperature'};
-
-  $h{'27.minimumTemperature'}       = MAX_ReadingsVal($hash,"minimumTemperature");
-  #$h{'28.minimumTemperature'}      = $h{'27minimumTemperature'};
-
-  $h{'29.measurementOffset'}        = MAX_ReadingsVal($hash,"measurementOffset");
-  #$h{'30.measurementOffset'}       = $h{'29measurementOffset'};
-
-  $h{'31.windowOpenTemperature'}    = MAX_ReadingsVal($hash,"windowOpenTemperature");
-  #$h{'32.windowOpenTemperature'}   = $h{'31windowOpenTemperature'};
-
-  $h{'00groupid'}                  = MAX_ReadingsVal($hash, "groupid");
-  $h{'01.groupid'}                 = $h{'00groupid'};
-  $h{'09'}                         = '#';
-  $h{'50..weekProfile'}            = MAX_ReadingsVal($hash, ".weekProfile");
-  $h{'98.peers'}                   = ReadingsVal($name,'peers',undef);
-  $h{'99.PairedTo'}                = ReadingsVal($name,'PairedTo',undef);
-  $h{'35displayActualTemperature'} = ReadingsVal($name,'displayActualTemperature',undef) if ($devtype == 3);
-  $h{'36.displayActualTemperature'}= $h{'35displayActualTemperature'};
-  $h{'59'}                         = '#';
-  $h{'61.temperature'}             = MAX_ReadingsVal($hash,"temperature");
-  $h{'62.msgcnt'}                  = 0;
-  $h{'69'}                         = '#';
- }
-
- if (($devtype == 1) || ($devtype == 2) || ($devtype == 8)) # HT , HT+
- {
-  $h{'10decalcification'}     = MAX_ReadingsVal($hash,"decalcification");
-  $h{'11.decalcification'}    = $h{'10decalcification'};
-  $h{'12.boostDuration'}      = MAX_ReadingsVal($hash,"boostDuration");
-  $h{'13.boostValveposition'} = MAX_ReadingsVal($hash,"boostValveposition");
-  $h{'14.maxValveSetting'}    = MAX_ReadingsVal($hash,"maxValveSetting");
-  $h{'15.valveOffset'}        = MAX_ReadingsVal($hash,"valveOffset");
-
-  $h{'20'}                    = '#';
-  $h{'33.windowOpenDuration'}  = MAX_ReadingsVal($hash,"windowOpenDuration");
-  #$h{'34.windowOpenDuration'} = $h{'33windowOpenDuration'};
-  $h{'39'}                    = '#';
- }
-
- foreach (sort keys %h) 
- { 
-   if (defined($h{$_}))
-   {
-    if ($h{$_} eq '#')
-    {
-     push @lines,'##############################################';
-     next;
+	$h{'21comfortTemperature'}       = MAX_ReadingsVal($hash, 'comfortTemperature');
+	$h{'22.comfortTemperature'}      = $h{'21comfortTemperature'};
+	$h{'23.ecoTemperature'}          = MAX_ReadingsVal($hash, 'ecoTemperature');
+	$h{'25.maximumTemperature'}      = MAX_ReadingsVal($hash, 'maximumTemperature');
+	$h{'27.minimumTemperature'}      = MAX_ReadingsVal($hash, 'minimumTemperature');
+	$h{'29.measurementOffset'}       = MAX_ReadingsVal($hash, 'measurementOffset');
+	$h{'31.windowOpenTemperature'}   = MAX_ReadingsVal($hash, 'windowOpenTemperature');
+	$h{'00groupid'}                  = MAX_ReadingsVal($hash, 'groupid');
+	$h{'01.groupid'}                 = $h{'00groupid'};
+	$h{'02.SerialNr'}                = ReadingsVal($name, 'SerialNr', '???');
+	$h{'09'}                         = '#';
+	$h{'50..weekProfile'}            = MAX_ReadingsVal($hash, '.weekProfile');
+	$h{'98.peers'}                   = ReadingsVal($name, 'peers', '???');
+	$h{'99.PairedTo'}                = ReadingsVal($name, 'PairedTo', '???');
+	$h{'35displayActualTemperature'} = ReadingsVal($name, 'displayActualTemperature', '???') if ($devtype == 3);
+	$h{'36.displayActualTemperature'}= $h{'35displayActualTemperature'} if ($devtype == 3);
+	$h{'59'}                         = '#';
+	$h{'61.temperature'}             = MAX_ReadingsVal($hash, 'temperature');
+	$h{'62.msgcnt'}                  = 0;
+	$h{'69'}                         = '#';
     }
-    my $r = substr($_,2,length($_)); # die Sortierung abschneiden
-    if (substr($r,0,1) ne '.')
-    {
-     push @lines,'set '.$fname.' '.$r.' '.$h{$_};
+
+    if (($devtype == 1) || ($devtype == 2) || ($devtype == 8)) { # HT , HT+
+ 
+	$h{'10decalcification'}     = MAX_ReadingsVal($hash, 'decalcification');
+	$h{'11.decalcification'}    = $h{'10decalcification'};
+	$h{'12.boostDuration'}      = MAX_ReadingsVal($hash, 'boostDuration');
+	$h{'13.boostValveposition'} = MAX_ReadingsVal($hash, 'boostValveposition');
+	$h{'14.maxValveSetting'}    = MAX_ReadingsVal($hash, 'maxValveSetting');
+	$h{'15.valveOffset'}        = MAX_ReadingsVal($hash, 'valveOffset');
+	$h{'20'}                    = '#';
+	$h{'33.windowOpenDuration'} = MAX_ReadingsVal($hash,'windowOpenDuration');
+	$h{'39'}                    = '#';
     }
-    else
-    {
-     push @lines,'setreading '.$fname.' '.substr($r,1,length($r)).' '.$h{$_};
+
+    foreach my $val (sort keys %h) {
+	next if (!defined($h{$val}) || (defined($h{$val}) && ($h{$val} eq '???')));
+
+	if ($h{$val} eq '#') {
+	    push @lines,'##############################################';
+	    next;
+	}
+	my $r = substr($val,2,length($val)); # die Sortierung abschneiden
+	if (substr($r,0,1) ne '.') {
+	    push @lines,'set '.$fname.' '.$r.' '.$h{$val};
+	}
+	else {
+	    push @lines,'setreading '.$fname.' '.substr($r,1,length($r)).' '.$h{$val};
+	}
     }
-   }
- }
 
- $hash->{saveConfig} = 1;
- my @ar =  MAX_ParseWeekProfile($hash);
- delete $hash->{saveConfig};
- my @json;
- foreach (@ar) 
- {
-  push @lines , $_ if ($_ && (substr($_,0,1) ne '"'));
-  push @json  , $_ if ($_ && (substr($_,0,1) eq '"'));
- }
+    $hash->{saveConfig} = 1;
+    my @ar =  MAX_ParseWeekProfile($hash);
+    delete $hash->{saveConfig};
+    my @j_arr;
+    foreach my $line (@ar) {
+	push @lines, $line if ($line && (substr($line,0,1) ne '"'));
+	push @j_arr, $line if ($line && (substr($line,0,1) eq '"'));
+    }
 
- my $json = '{'; $json .= join(',',@json); $json .= '}';
+    push @lines , "setreading $name .wp_json ".'{'.join(',', @j_arr).'}';
+    my $error = FileWrite($dir.$fname.'.max', @lines);
 
- push @lines , "setreading $name .wp_json ".$json;
- my $error = FileWrite($dir.$fname.'.max', @lines);
+    if ($error) { 
+	Log3($name, 2, "$name, configSave : $error");
+	return $error;
+    }
 
- if ($error)
- { Log3 $hash,2,"$name, configSave : $error"; }
- else
- { 
-  if(exists($hash->{".updateTimestamp"})) # readingsBulkUpdate ist aktiv, wird von fhem.pl gesetzt/gelöscht
-  { 
-   readingsBulkUpdate($hash,'lastConfigSave',$dir.$fname.'.max');
-   readingsBulkUpdate($hash,'.wp_json',$json);
-  }
-  else
-  { readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash,'lastConfigSave',$dir.$fname.'.max');
-     readingsBulkUpdate($hash,'.wp_json',$json);
-    readingsEndUpdate($hash,1);
-  }
- }
+    my $bulk = (exists($hash->{'.updateTimestamp'})) ? 1 : 0;  # readingsBulkUpdate ist aktiv, wird von fhem.pl gesetzt/gelöscht
 
- return $error;
+    readingsBeginUpdate($hash) if(!$bulk);
+    readingsBulkUpdate($hash, 'lastConfigSave', $dir.$fname.'.max');
+    readingsBulkUpdate($hash, '.wp_json', '{'.join(',', @j_arr).'}');
+    readingsEndUpdate($hash, 1) if(!$bulk);
+
+    return;
 }
-
 sub MAXX_Restore
 {
  my $name   = shift;
