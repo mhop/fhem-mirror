@@ -1,4 +1,4 @@
-REV 21975
+REV 21983
 DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
@@ -21,7 +21,7 @@ MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
 MOV FHEM/firmware/LaCrosseGateway.bin unused
-UPD 2020-05-20_07:45:04 341216 ./CHANGED
+UPD 2020-05-21_07:45:03 341362 ./CHANGED
 UPD 2020-05-14_07:45:02 42336 ./MAINTAINER.txt
 UPD 2020-05-08_07:45:03 39570 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -42,7 +42,7 @@ UPD 2019-01-06_07:45:02 3796 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2020-04-04_07:45:02 31685 FHEM/00_MQTT.pm
 UPD 2020-04-09_07:45:02 18584 FHEM/00_MQTT2_CLIENT.pm
-UPD 2020-04-09_07:45:02 20638 FHEM/00_MQTT2_SERVER.pm
+UPD 2020-05-21_07:45:03 20826 FHEM/00_MQTT2_SERVER.pm
 UPD 2020-05-14_07:45:02 32099 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2019-04-01_07:45:02 35447 FHEM/00_Neuron.pm
@@ -483,7 +483,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2020-05-16_07:45:03 47798 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2020-05-03_07:45:02 299446 FHEM/98_DOIF.pm
+UPD 2020-05-21_07:45:03 299349 FHEM/98_DOIF.pm
 UPD 2020-03-06_07:45:03 112474 FHEM/98_DOIFtools.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
 UPD 2019-07-10_07:45:02 25584 FHEM/98_FReplacer.pm
@@ -512,7 +512,7 @@ UPD 2017-11-04_07:45:02 25677 FHEM/98_ModbusTrovis5576.pm
 UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
-UPD 2020-05-07_07:45:03 32107 FHEM/98_RandomTimer.pm
+UPD 2020-05-21_07:45:03 34071 FHEM/98_RandomTimer.pm
 UPD 2020-04-24_07:45:02 96973 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -744,11 +744,11 @@ UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
 UPD 2020-05-20_07:45:08 4293297 docs/commandref.html
-UPD 2020-05-19_07:45:10 2635959 docs/commandref_DE.html
+UPD 2020-05-21_07:45:09 2636419 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-05-20_07:45:11 232418 docs/commandref_modular.html
-UPD 2020-05-20_07:45:12 243093 docs/commandref_modular_DE.html
+UPD 2020-05-21_07:45:10 232418 docs/commandref_modular.html
+UPD 2020-05-21_07:45:11 243093 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2195,7 +2195,7 @@ UPD 2018-11-17_07:45:02 5751 www/pgm2/darkstyle.css
 UPD 2019-06-20_10:05:58 6801 www/pgm2/darksvg_defs.svg
 UPD 2019-06-20_10:05:58 5705 www/pgm2/darksvg_style.css
 UPD 2015-07-28_14:05:34 30 www/pgm2/darktouchpadstyle.css
-UPD 2019-09-28_07:45:02 41657 www/pgm2/dashboard.js
+UPD 2020-05-21_07:45:03 41950 www/pgm2/dashboard.js
 UPD 2015-07-28_14:05:34 14618 www/pgm2/dashboard_darkstyle.css
 UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
