@@ -4185,7 +4185,19 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
   }
 
-  return @{$hash->{helper}{cmds}{cmdList}};
+  if($hash->{helper}{cmds}{TmplKey}  
+     ne InternalVal($name,"peerList","").":".CUL_HM_getTemplateModify()){
+    my @arr1 = (map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name)),
+                split(" ",CUL_HMTmplSetCmd($name)));
+    
+    $hash->{helper}{cmds}{TmplCmds} = \@arr1;      
+
+    $hash->{helper}{cmds}{TmplKey}  = InternalVal($name,"peerList","")
+                                     .":".CUL_HM_getTemplateModify()
+                                     ;   
+  }
+
+  return (@{$hash->{helper}{cmds}{cmdList}},@{$hash->{helper}{cmds}{TmplCmds}});
 #    foreach(@arr1){
 #      next if(!$_);
 #      my ($cmdS,$val) = split(":",$_,2);
@@ -4254,6 +4266,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     splice @a, 1, 0,"pct";#insert the actual command
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
+
     foreach(@cmdArr){
       next if(!$_);
       my ($cmdS,$val) = split(":",$_,2);
@@ -4318,15 +4331,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
 	}
 
-    if($hash->{helper}{cmds}{TmplKey}  
-       ne InternalVal($name,"peerList","").":".CUL_HM_getTemplateModify()){
-          $hash->{helper}{cmds}{TmplKey}  = InternalVal($name,"peerList","")
-                                           .":".CUL_HM_getTemplateModify()
-                                           ;   
-          $hash->{helper}{cmds}{TmplCmds}  = CUL_HMTmplSetParam($name);   
-          $hash->{helper}{cmds}{TmplCmds} .= CUL_HMTmplSetCmd($name);      
-    }
-    $usg .= $hash->{helper}{cmds}{TmplCmds};
     return $usg;
   }
   elsif($h eq "" && @a != 2) {
@@ -8353,7 +8357,7 @@ sub CUL_HMTmplSetCmd($){
   my %a;
   my @peerIds = map{CUL_HM_id2Name($_)} grep !/00000000/,split(",",AttrVal($name,"peerIDs",""));
   foreach my $peer($peerIds[0],"0"){ 
-  $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
+    $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
     foreach my $t(keys %HMConfig::culHmTpl){
@@ -8366,9 +8370,10 @@ sub CUL_HMTmplSetCmd($){
       }
       if($f == 0){
         if($typShLg){
-          foreach(@peerIds){
-            $a{$_}{$t."_short"} = 1;
-            $a{$_}{$t."_long"} = 1;
+          foreach my $pAss (@peerIds){
+            $pAss = "self".substr($pAss,-2) if($pAss =~ m/^${name}_chn-..$/);
+            $a{$pAss}{$t."_short"} = 1;
+            $a{$pAss}{$t."_long"} = 1;
           }
         }
         else{
