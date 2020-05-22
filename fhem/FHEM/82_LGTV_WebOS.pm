@@ -231,6 +231,7 @@ my %openApps = (
     'Smart-IPTV'         => 'com.1827622.109556',
     'Spotify'            => 'spotify-beehive',
     'DuplexIPTV'         => 'com.duplexiptv.app',
+    'Disney+'            => 'com.disney.disneyplus-prod',
 );
 
 my %openAppsPackageName = reverse %openApps;
@@ -2008,7 +2009,7 @@ sub LGTV_WebOS_WakeUp_Udp($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.3",
+  "version": "v3.2.4",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
