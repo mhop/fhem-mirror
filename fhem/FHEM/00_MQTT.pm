@@ -40,11 +40,11 @@ my @clients = qw(
   MQTT_BRIDGE
 );
 
+use DevIo;
+
 sub MQTT_Initialize($) {
 
   my $hash = shift @_;
-
-  require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
   # Provider
   $hash->{Clients} = join (':',@clients);
@@ -441,6 +441,7 @@ sub Start($) {
     }
   } else {
     $hash->{".cinitmark"} = 1;
+    $hash->{".reconnectmark"} = 1;
   }
    
   DevIo_CloseDev($hash);
@@ -484,8 +485,8 @@ sub Init($) {
   send_connect($hash);
   readingsSingleUpdate($hash,"connection","connecting",1);
   $hash->{ping_received}=1;
-  Timer($hash);
   $hash->{".reconnectmark"} = 1;
+  Timer($hash);
   return undef;
 }
 
