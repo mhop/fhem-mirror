@@ -48,7 +48,7 @@ sub GFPROBT_Define($$$) {
     
     $hash->{NAME} = $name;
     $hash->{STATE} = "initialized";
-    $hash->{VERSION} = "2.1.0";
+    $hash->{VERSION} = "2.0.0";
     $hash->{loglevel} = 4;
     Log3 $hash, 3, "GFPROBT: G.F.Pro Eco Watering Bluetooth ".$hash->{VERSION};
     
@@ -776,8 +776,8 @@ sub GFPROBT_execGatttool($) {
                 $json{'timer'.$timercnt."-Weekdays"} = join(",", @{$timers{$hour}{$minute}{$duration}});
                 if ($ecoValuesHex ne "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00") {
                   #get week of eco activation based on known eco sequence
-                  my $defaultEcoValues = "0000000000280e0e0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
-                  $defaultEcoValues .= "0000000000280e0e0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
+                  my $defaultEcoValues = "0000000000280e0d0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
+                  $defaultEcoValues .= "0000000000280e0d0b14110e0d0b1914111d16120f0b07040302020000fefefdfcf9f6f3f1eeeaf2efecf6f5f3f2eff6f5f3e300";
                   my $ecoVals = join("", split(" ", $ecoValuesHex));
                   #search ecoVals in defaultEcoValues to get activation week
                   my $weekPos = index($defaultEcoValues, $ecoVals);
