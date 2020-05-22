@@ -12,29 +12,37 @@
 ###########################################
 # Example sketches from MySensors.org
 # simple stateFormat versions
-name:A_01a1_air_humidity_dht
+name:air_humidity_dht
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard DHT sketch without battery reading<br>NOTE: Untested first template version
+order:A_01a1
 attr DEVICE stateFormat T: temperature1 H: humidity
-attr DEVICE model A_01a1_air_humidity_dht
+attr DEVICE model air_humidity_dht
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
-name:A_01a2_air_humidity_Si7021
+name:air_humidity_Si7021
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard DHT sketch with battery reading<br>NOTE: Untested first template version
+order:A_01a2
 attr DEVICE stateFormat T: temperature1 H: humidity Bat: batteryLevel
-attr DEVICE model A_01a2_air_humidity_Si7021
+attr DEVICE model air_humidity_Si7021
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
-name:A_02a_atmospheric_pressure
+name:atmospheric_pressure
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard Atmospheric Pressure sketch (BME280)NOTE: Untested first template version
+order:A_02a
 attr DEVICE stateFormat T: temperature H: humidity1 P: pressure2 Forecast: forecast2
-attr DEVICE model A_02a_atmospheric_pressure
+attr DEVICE model atmospheric_pressure
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
-name:A_03a_bed_occupancy
+name:bed_occupancy
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard bed occupancy sketch (MPR121) <br>NOTE: Sketch is still in MySensors 1.x format and has to be changed for use with recent arduino libs.NOTE: Untested first template version
+oder:A_03a
 attr DEVICE stateFormat Left: motion Right: motion1
-attr DEVICE model A_03a_bed_occupancy
+attr DEVICE model bed_occupancy
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #A_04a_Dimmer - LED
 #A_05a_Display and Time
@@ -51,11 +59,13 @@ attr DEVICE model A_03a_bed_occupancy
 #A_16a1_Light Level - BH1750
 #A_16a2_Light Level - LM393
 
-name:A_17a_Motion
+name:Motion
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard motion sketch
+order:A_17a
 attr DEVICE stateFormat Motion: motion1
-attr DEVICE model A_17a_Motion
+attr DEVICE model Motion
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #A_18a_Orientation Actuator
 #A_19a_Orientation Sensor
@@ -64,14 +74,16 @@ attr DEVICE model A_17a_Motion
 #A_22a_Pulse Water Meter
 #A_23a_Rain Gauge
 
-name:A_24a_Relay_Actuator
+name:Relay_Actuator
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard relay actuator sketch
+order:A_24a
 attr DEVICE setCommands on:status1:on off:status1:off
 attr DEVICE setExtensionsEvent 1
 attr DEVICE devStateIcon .*on:on .*off:off on.(for.timer|till.*):on-for-timer:off off.(for.timer|till.*):off-for-timer:on blink.*:light_toggle:off
 set DEVICE attrTemplate speechcontrol_type_switch
-attr DEVICE model A_24a_Relay_Actuator
+attr DEVICE model Relay_Actuator
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #A_25a_RFID
@@ -84,11 +96,13 @@ attr DEVICE model A_24a_Relay_Actuator
 #A_32a_Starry Sky
 
 
-name:A_33a_temperature
+name:temperature
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard temperature sketch (DS18B20) NOTE: Untested first template version
+order:A_33a
 attr DEVICE stateFormat T0: temperature T1: temperature1 T2: temperature2
-attr DEVICE model A_33a_temperature
+attr DEVICE model temperature
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #A_34a_UV
 #A_35a_Whole House Fan
@@ -97,33 +111,38 @@ attr DEVICE model A_33a_temperature
 # Example sketches from MySensors.org
 # Advanced stateFormat and devStateIcon versions
 
-name:B_01a1_air_humidity_dht
+name:air_humidity_dht
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard DHT sketch without battery reading<br>NOTE: Untested first template version
+order:B_01a1
 attr DEVICE stateFormat temp_temperature\
  temperature1 \
 humidity\
  humidity
-attr DEVICE model B_01a1_air_humidity_dht
+attr DEVICE model air_humidity_dht
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
-name:B_02a_atmospheric_pressure
+name:atmospheric_pressure
 filter:TYPE=MYSENSORS_DEVICE
 desc:Applies to standard Atmospheric Pressure sketch (BME280)NOTE: Untested first template version
+order:B_02a
 attr DEVICE stateFormat temp_temperature\
  temperature \
 humidity\
  humidity1 <br>
 weather_barometric_pressure\
  pressure2 Forecast: forecast2
-attr DEVICE model B_02a_atmospheric_pressure
+attr DEVICE model atmospheric_pressure
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 ###########################################
 # Advanced sketches 
 
 #4 relay
-name:C_04_4ch_unified_icon
+name:4ch_unified_icon
 filter:TYPE=MYSENSORS_DEVICE
 desc:Device with 4 relays attached <br>NOTE: Clicking on icons will issue a corresponding toggle command
+order:C_04
 attr DEVICE devStateIcon {\
     "<div><a href=\"/fhem?cmd.dummy=set ".$name." status1 toggle&XHR=1\">status1:"\
     . FW_makeImage(lc ReadingsVal($name, "status1", "off"))\
@@ -136,4 +155,5 @@ attr DEVICE devStateIcon {\
     }
 attr DEVICE stateFormat P1: status1 P2: status2 P3: status3 P4: status4 Status: state
 attr DEVICE webCmd :
-attr DEVICE model C_04_4ch_unified_icon
+attr DEVICE model 4ch_unified_icon
+setreading DEVICE attrTemplateVersion 20200522 or prior

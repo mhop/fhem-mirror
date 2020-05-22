@@ -38,6 +38,7 @@ attr DEVICE timeout 10
 attr DEVICE verbose 2
 attr DEVICE room WHICHROOM
 attr DEVICE model clever_tanken_single_station
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Station overview, one product, Forum: https://forum.fhem.de/index.php/topic,94640.msg873841.html#msg873841
 name:clever_tanken_multi_station
@@ -64,6 +65,7 @@ attr DEVICE readingMaxAge 10
 attr DEVICE readingMaxAgeReplacementMode delete
 attr DEVICE room WHICHROOM
 attr DEVICE model clever_tanken_multi_station
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Contributed by subseven & yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754
 name:fuel_oil_check
@@ -108,6 +110,7 @@ attr DEVICE stateFormat {	my $price = 0.0;;\
 }
 attr DEVICE webCmd reread
 attr DEVICE model fuel_oil_check
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
@@ -127,6 +130,7 @@ attr DEVICE room WHICHROOM
 attr DEVICE readingMaxAge 10
 attr DEVICE readingMaxAgeReplacementMode delete
 attr DEVICE model DWD_weather_warnings
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #German river water levels, Wiki: https://wiki.fhem.de/wiki/Flusspegel
 name:pegelonline
@@ -143,6 +147,7 @@ attr DEVICE stateFormat {sprintf("%.0f",ReadingsVal("DEVICE","value",0))}
 attr DEVICE timeout 5
 attr DEVICE room WHICHROOM
 attr DEVICE model pegelonline
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080; enhanced by JoeALLb: https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164
 name:ORF_weather
@@ -174,6 +179,7 @@ attr DEVICE reading01Regex (?s)Temperatur.*?.*?>.*?(?<temperature>[\d,]+)&thinsp
 attr DEVICE room WHICHROOM
 attr DEVICE stateFormat W: wind, H: humidity%rH, T: temperature°C
 attr DEVICE model ORF_weather
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Geschwindigkeitsüberwachung, Forum: https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805
 name:blitzer
@@ -189,6 +195,7 @@ attr DEVICE getHeader2 Accept: */*
 attr DEVICE readingEncode utf8
 attr DEVICE room WHICHROOM
 attr DEVICE model blitzer
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #homebridge-videodoorbell, Forum: https://forum.fhem.de/index.php/topic,94291.msg870289.html#msg870289
@@ -213,6 +220,7 @@ attr DEVICE set01Header06 Content-Type: application/x-www-form-urlencoded
 attr DEVICE set01NoArg 1
 attr DEVICE room WHICHROOM
 attr DEVICE model homebridge_videodoorbell
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # Pihole Statistics, Website: https://wolf-u.li/5987/einbindung-der-pihole-statistiken-in-fhem/
 name:pihole_statistics
@@ -227,6 +235,7 @@ attr DEVICE stateFormat DNS Anfragen: dns_queries_today<br>Geblockte Seiten: ads
 attr DEVICE userReadings ads_blocked_today_formatted {round(ReadingsNum($name,"ads_percentage_today",0),0)}
 attr DEVICE room WHICHROOM
 attr DEVICE model pihole_statistics
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # Pharmacy Emergency Service Germany, Forum: https://forum.fhem.de/index.php?topic=87234.0
 name:pharmacy_emergency_service_germany
@@ -272,6 +281,7 @@ attr DEVICE stateFormat Name, Telefon, Strasse in Plz Ort
 attr DEVICE timeout 60
 attr DEVICE room WHICHROOM
 attr DEVICE model pharmacy_emergency_service_germany
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #################################
 #HP Printers
@@ -300,6 +310,7 @@ attr DEVICE stateFormat Modell: Model SN: Serial_Number
 attr DEVICE userReadings Memory_Usage {100-(ReadingsNum("DEVICE","Available_Memory","")/2.56)}
 attr DEVICE room WHICHROOM
 attr DEVICE model hp_printer_config
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # Printer cartridge states
 name:hp_printer_cartridge_status
@@ -328,6 +339,7 @@ attr DEVICE reading08XPath-Strict //ccdyn:ConsumableInfo[5]/dd:ConsumableSelecti
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE room WHICHROOM
 attr DEVICE model hp_printer_cartridge_status
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # Printer statistics
 name:hp_printer_statistics
@@ -378,6 +390,7 @@ attr DEVICE reading51XPath-Strict //pudyn:Consumable[dd:MarkerColor='Black']/dd:
 attr DEVICE stateFormat Total: Printer_Pages_Total Monochrome: Printer_Pages_Monochrome Color: Printer_Pages_Color
 attr DEVICE room WHICHROOM
 attr DEVICE model hp_printer_statistics
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # Printer status
 name:hp_printer_status
@@ -392,6 +405,7 @@ attr DEVICE reading01XPath-Strict //psdyn:LocString[@lang='de']/text()
 attr DEVICE stateFormat Status
 attr DEVICE room WHICHROOM
 attr DEVICE model hp_printer_status
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #################################
@@ -416,6 +430,7 @@ attr DEVICE reading04Regex Ink_B.*?='([\d]+)'
 attr DEVICE stateFormat C: Cyan% M: Magenta% Y: Yellow% B: Black%
 attr DEVICE room WHICHROOM
 attr DEVICE model epson_printer_cartridge_status
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #################################
 #Brother Printers
@@ -444,6 +459,7 @@ attr DEVICE reading05Name Status
 attr DEVICE reading05RegOpt gm
 attr DEVICE reading05Regex <th>1<\/th><td>(.*?)<
 attr DEVICE model brother_printer_cartridge_status
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #################################
 #Brother Scanners
@@ -483,6 +499,7 @@ attr DEVICE reading12XPath-Strict //PaperJams/text()
 attr DEVICE stateFormat Pages: ScannedPagesTotal Modell: Model SN: Serial_Number
 attr DEVICE room WHICHROOM
 attr DEVICE model brother_scanner_ads_status
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #################################
 #RESOL Solaranlage, Forum: https://forum.fhem.de/index.php/topic,86678.0.html
@@ -509,6 +526,7 @@ attr DEVICE room WHICHROOM
 attr DEVICE stateFormat Dachtemperatur: Temperatur_Sensor1 Drehzahl Pumpe: Drehzahl_Pumpe Laufzeit Heute: Tageslaufzeit
 attr DEVICE timeout 5ercent="([\d\.]+)
 attr DEVICE model resol_solar
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #################################
 #Show updates for CUL_HM devices, Forum: https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144
@@ -622,6 +640,7 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 }
 attr DEVICE webCmd reread
 attr DEVICE model homematic_fw_check_v2
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
@@ -712,6 +731,7 @@ attr DEVICE userReadings updatableDevices {\
 }
 attr DEVICE webCmd reread
 attr DEVICE model aculfw_fw_check
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 #Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg992348.html#msg992348
@@ -800,6 +820,7 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model tasmota_firmware_updates
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Contributed by OdfFHEM, see https://forum.fhem.de/index.php/topic,97694.msg998835.html#msg998835
 name:zigbee2mqtt_daemon_updates
@@ -887,6 +908,7 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model zigbee2mqtt_daemon_updates
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 
 
@@ -963,6 +985,7 @@ attr DEVICE userReadings updatableDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model ESPEasy_firmware_updates
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #Contributed by yersinia, see 
 name:dnscrypt-proxy_updates
@@ -980,4 +1003,5 @@ attr DEVICE myInstalledVersion 2.0.31
 attr DEVICE room WHICHROOM
 attr DEVICE enableControlSet 1
 attr DEVICE model dnscrypt-proxy_updates
+setreading DEVICE attrTemplateVersion 20200522 or prior
 
