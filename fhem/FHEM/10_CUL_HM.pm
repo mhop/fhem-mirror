@@ -296,7 +296,6 @@ sub CUL_HM_updateConfig($){##########################
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
-      #$hash->{helper}{role}{dev} = 1;
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
@@ -3835,8 +3834,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   $h = $culHmGlobalGetsDev->{$cmd}    if(!defined($h) && $roleD);
   $h = ""                             if(!defined($h) && (eval "defined(&HMinfo_GetFn)" && $cmd eq "regTable"));
 
-  my @h;
-  @h = split(" ", $h) if($h);
+  my @hArr;
+  @hArr = split(" ", $h) if($h);
 
   if(!defined($h)) {
     my @arr = ();
@@ -3881,7 +3880,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     return "$cmd requires no parameters";
 
   }
-  elsif($h !~ m/\.\.\./ && @h != @a-2) {
+  elsif($h !~ m/\.\.\./ && @hArr != @a-2) {
     return "$cmd requires parameter: $h";
   }
   my $devHash = CUL_HM_getDeviceHash($hash);
@@ -3966,30 +3965,11 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
     push @arr,"$_ $culHmModelGets->{$md}{$_}"   foreach (keys %{$culHmModelGets->{$md}});
-    my   @arr1;
-    if (defined $hash->{helper}{regLst}){
-      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){  
-        next if (!defined $culHmReglSets->{$rl});
-                                              foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
-      }
-    }
-    else{#ignore e.g. for virtuals
-    }
-    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(( $roleV|| !$st||$st eq"no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_ ".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_ ".${$culHmSubTypeDevSets->{$st}}{$_}}};
-    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_ ".$culHmGlobalSetsChn->{$_}         }};
-    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_ ".${$culHmSubTypeSets->{$st}}{$_}   }};
-    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_ ".${$culHmModelSets->{$md}}{$_}     }};
-    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."00"}}{$_} }};
-    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_ ".${$culHmChanSets->{$md."xx"}}{$_} }};
-    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_ ".${$culHmChanSets->{$md.$chn}}{$_} }};
-    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_ ".${$culHmFunctSets->{$fkt}}{$_}    }};
 
     my $info .= " Gets ------\n";
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
-    $info .= join("\n",sort @arr1);
+    $info .= join("\n",sort CUL_HM_SetList($name));
     my $a = CUL_HMTmplSetCmd($name)." ";
     $a =~ s/:.*? /:\[template\]\n/g;
     $info .= $a;
@@ -4155,6 +4135,84 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   CUL_HM_ProcessCmdStack($devHash) if ($rxType & 0x03);#burst/all
   return "";
 }
+
+sub CUL_HM_TemplateModify(){
+   $modules{CUL_HM}{helper}{tmplTimestamp} = time();
+}
+sub CUL_HM_getTemplateModify(){
+   return $modules{CUL_HM}{helper}{tmplTimestamp};
+}
+sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++++++++++++++++
+  my($name)=@_;
+  my $hash = $defs{$name};
+  my $roleC = $hash->{helper}{role}{chn} ? 1 : 0; #entity may act in multiple roles
+  my $roleD = $hash->{helper}{role}{dev} ? 1 : 0;
+  my $roleV = $hash->{helper}{role}{vrt} ? 1 : 0;
+  my $fkt   = $hash->{helper}{fkt}       ? $hash->{helper}{fkt}:"";
+  my $devName = InternalVal($name,"device",$name);
+  my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
+  my $cmdKey = ":$roleC"
+              .":$roleD"
+              .":$roleV"
+              .":$fkt"
+              .":$defs{$devName}{helper}{mId}"
+              .":$chn"
+              ;
+  if($hash->{helper}{cmds}{cmdKey} ne $cmdKey){
+    my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
+    my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
+    my @arr1 = ();
+   
+    if (defined $hash->{helper}{regLst}){
+      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
+        next if (!defined $culHmReglSets->{$rl});
+        foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
+      }
+    }
+    
+    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
+    if(( $roleV||!$st||$st eq "no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
+    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
+    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
+    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
+    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
+    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
+    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."xx"}}{$_} }};
+    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
+    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
+    my @arr1cmd = CUL_HM_noDup(@arr1);
+    $hash->{helper}{cmds}{cmdList} = \@arr1cmd;
+    $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
+  }
+
+  return @{$hash->{helper}{cmds}{cmdList}};
+#    foreach(@arr1){
+#      next if(!$_);
+#      my ($cmdS,$val) = split(":",$_,2);
+#      if (!$val){ # no agruments possible
+#        $_ = "$cmdS:noArg";
+#      }
+#      elsif($val !~ m/^\[.*\]$/ ||
+#            $val =~ m/\[.*\[/   ||
+#            $val =~ m/(\<|\>)]/
+#            ){
+#        $_ = $cmdS;
+#      }
+#      else{
+#        $val =~ s/(\[|\])//g;
+#        my @vArr = split('\|',$val);
+#        foreach (@vArr){
+#          if ($_ =~ m/(.*)\.\.(.*)/ ){
+#            my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
+#            pop @list;
+#            $_ = join(",",@list);
+#          }
+#        }
+#        $_ = "$cmdS:".join(",",@vArr);
+#      }
+#    }
+#    @arr1 = ("--") if (!scalar @arr1);
+ }
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
   return "no value specified" if(@a < 2);
@@ -4168,6 +4226,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
   my $flag    = 'A0'; #set flag
   my $cmd     = $a[1];
+
   my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
   return "" if (!defined $chn);
 
@@ -4179,60 +4238,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $oCmd = $cmd;# we extend press to press/L/S if press is defined
   $cmd = "press" if ($cmd =~ m/^press/);# substitude pressL/S with press for cmd search
   my $h = undef;
-  $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
-  $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV|| !$st||$st eq"no")&& $roleD);
-  $h = $culHmSubTypeDevSets->{$st}{$cmd}if(!defined($h) && !$roleV                    && $roleD);
-  $h = $culHmGlobalSetsChn->{$cmd}      if(!defined($h) && !$roleV                    && $roleC);
-  $h = $culHmSubTypeSets->{$st}{$cmd}   if(!defined($h) && $culHmSubTypeSets->{$st}   && $roleC);
-  $h = $culHmModelSets->{$md}{$cmd}     if(!defined($h) && $culHmModelSets->{$md}  );
-  $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
-  $h = $culHmChanSets->{$md."xx"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."xx"} && $roleC); 
-  $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
-  $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
 
-  $h = "parameter" if ($cmd =~ m/^tplPara..._/);
-  $h = "template"  if ($cmd =~ m/^tplSet_/);
-  $h = "peerSmart" if ($cmd eq "peerSmart" && defined $hash->{helper}{peerFriend} );
-
-  if( !defined($h) && defined $hash->{helper}{regLst}){
-    foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
-      next if (!defined $culHmReglSets->{$rl});
-      $h = $culHmReglSets->{$rl}{$cmd};
-      last if (defined($h));
-    }
+  my @cmdArr = CUL_HM_SetList($name);
+  if ($cmd ne '?'){
+    ($h) = map{(my $foo = $_) =~ s/.*://; $foo;}grep /^${cmd}:/,@cmdArr;
   }
-
+  
   $cmd = $oCmd;# necessary for press/S/L - check better implementation
 
-  my @h;
-  @h = split(" ", $h) if($h);
+  my @hArr;
+  @hArr = split(" ", $h) if($h);
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
 
   if   (!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
     splice @a, 1, 0,"pct";#insert the actual command
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
-    my @arr1 = ();
-    if (defined $hash->{helper}{regLst}){
-      foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
-        next if (!defined $culHmReglSets->{$rl});
-                                              foreach(keys %{$culHmReglSets->{$rl}}      ){push @arr1,"$_:".$culHmReglSets->{$rl}{$_}         };
-      }
-    }
-    else{#ignore e.g. for virtuals
-    }
-    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(( $roleV||!$st||$st eq "no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
-    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
-    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
-    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
-    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
-    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."xx"}}{$_} }};
-    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
-    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
-    @arr1 = CUL_HM_noDup(@arr1);
-    foreach(@arr1){
+    foreach(@cmdArr){
       next if(!$_);
       my ($cmdS,$val) = split(":",$_,2);
       if (!$val){ # no agruments possible
@@ -4257,12 +4279,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $_ = "$cmdS:".join(",",@vArr);
       }
     }
-    @arr1 = ("--") if (!scalar @arr1);
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1)." ";
-
+    @cmdArr = ("--") if (!scalar @cmdArr);
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdArr)." ";
+    
     my $pl = CUL_HM_getPeerOption($name);
     $usg .= " peerSmart:$pl" if ($pl); 
-    
+   
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
@@ -4273,9 +4295,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 	  $tl = $ok ? $tl : "";
       $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
 	}
-
-    $usg .= CUL_HMTmplSetParam($name);   
-    $usg .= CUL_HMTmplSetCmd($name);
 	if (   $usg =~ m/ tplDel/ 
         && eval "defined(&HMinfo_templateDel)"
         && keys %{$hash->{helper}{tmpl}}){
@@ -4285,6 +4304,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $usg =~ s/ tplDel//;#not an option
     }
+
 	if ( $usg =~ m/ (press|event|trgPress|trgEvent)/){
       my $peers = join",",grep/./,split",",InternalVal($name,"peerList","");
       if ($peers){
@@ -4297,12 +4317,22 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $usg =~ s/trg(Press|Event)[SL]\S*? //g;
       }
 	}
+
+    if($hash->{helper}{cmds}{TmplKey}  
+       ne InternalVal($name,"peerList","").":".CUL_HM_getTemplateModify()){
+          $hash->{helper}{cmds}{TmplKey}  = InternalVal($name,"peerList","")
+                                           .":".CUL_HM_getTemplateModify()
+                                           ;   
+          $hash->{helper}{cmds}{TmplCmds}  = CUL_HMTmplSetParam($name);   
+          $hash->{helper}{cmds}{TmplCmds} .= CUL_HMTmplSetCmd($name);      
+    }
+    $usg .= $hash->{helper}{cmds}{TmplCmds};
     return $usg;
   }
   elsif($h eq "" && @a != 2) {
     return "$cmd requires no parameters";
   }
-  elsif($h !~ m/\.\.\./ && @h != @a-2) {
+  elsif($h !~ m/\.\.\./ && @hArr != @a-2) {
     return "$cmd requires parameter: $h";
   }
 
@@ -7735,6 +7765,8 @@ sub CUL_HM_protState($$){
     $hash->{helper}{prt}{sProc} = 3;
   }
   $hash->{protState} = $state;
+  CUL_HM_UpdtReadSingle($hash,"commState",$state,
+                          ($hash->{helper}{prt}{sProc} == 1)?0:1);
   if (!$hash->{helper}{role}{chn}){
     CUL_HM_UpdtReadSingle($hash,"state",$state,
                           ($hash->{helper}{prt}{sProc} == 1)?0:1);
@@ -8319,9 +8351,9 @@ sub CUL_HMTmplSetCmd($){
   my $name = shift;
   return "" if(not scalar devspec2array("TYPE=HMinfo"));
   my %a;
-
-  foreach my $peerId(split(",",AttrVal($name,"peerIDs","")),"0"){ 
-    my $peer = CUL_HM_id2Name($peerId);
+  my @peerIds = map{CUL_HM_id2Name($_)} grep !/00000000/,split(",",AttrVal($name,"peerIDs",""));
+  foreach my $peer($peerIds[0],"0"){ 
+  $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
     foreach my $t(keys %HMConfig::culHmTpl){
@@ -8334,11 +8366,18 @@ sub CUL_HMTmplSetCmd($){
       }
       if($f == 0){
         if($typShLg){
-          $a{$peer}{$t."_short"} = 1;
-          $a{$peer}{$t."_long"} = 1;
+          foreach(@peerIds){
+            $a{$_}{$t."_short"} = 1;
+            $a{$_}{$t."_long"} = 1;
+          }
         }
         else{
-          $a{$peer}{$t} = 1;
+          if ($peer eq "0"){
+            $a{$peer}{$t} = 1;
+          }
+          else{
+            $a{$_}{$t} = 1 foreach(@peerIds);
+          }
         }
       }
     }
@@ -8358,17 +8397,17 @@ sub CUL_HMTmplSetParam($){
       my @pv = split(" ",$defs{$name}{helper}{tmpl}{$t});
       my $pCnt = 0;     #parameter count
       $t =~ s/[:>]/_/g; # replace illegal chars for command
-      for my $pm (split(" ",$HMConfig::culHmTpl{$tn}{p})){
-        my $pvi = $pm.":".$pv[$pCnt];# current value
+      my $tnH = $HMConfig::culHmTpl{$tn};
+      for my $pm (split(" ",$tnH->{p})){
         my ($reg1) = map{(my $foo = $_) =~ s/:.*//; $foo;}
                      grep/p$pCnt/,
-                     map{$_.":".$HMConfig::culHmTpl{$tn}{reg}{$_}}
-                     keys%{$HMConfig::culHmTpl{$tn}{reg}}
+                     map{$_.":".$tnH->{reg}{$_}}
+                     keys%{$tnH->{reg}}
                      ;
-                     #c eq "lit"
         my $literals = "";
-        if(defined $culHmRegDefine->{$reg1}{c} && $culHmRegDefine->{$reg1}{c} eq "lit"){
-          $literals = ":".join(",",keys%{$culHmRegDefine->{$reg1}{lit}})
+        my $reglH = $culHmRegDefine->{$reg1};
+        if(defined $reglH->{c} && $reglH->{c} eq "lit"){
+          $literals = ":".join(",",keys%{$reglH->{lit}})
         }
         push @tCmd,"tplPara".sprintf("%02d%d_",$tCnt,$pCnt++).join("_",$t,$pm).$literals;
       }
@@ -9806,10 +9845,13 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
   $name = substr($name,6) if ($name =~ m/^sUpdt:/);
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s/_chn-\d\d$//;
-  return if (  !$defs{$name}                  #device unknown, ignore
-             || CUL_HM_Set($defs{$name},$name,"help") !~ m/statusRequest/);
-  if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
-    CUL_HM_qEntity($name,"qReqStat") ;
+  
+  foreach my $chNm(CUL_HM_getAssChnNames($name)){
+    next if (  !$defs{$chNm}                  #device unknown, ignore
+               || CUL_HM_Set($defs{$chNm},$chNm,"help") !~ m/statusRequest/);
+    if ($force || ((CUL_HM_getAttrInt($chNm,"autoReadReg") & 0x0f) > 3)){
+      CUL_HM_qEntity($chNm,"qReqStat") ;
+    }
   }
 }
 sub CUL_HM_qAutoRead($$){
