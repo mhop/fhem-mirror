@@ -72,7 +72,7 @@ set DEVICE attrTemplate speechcontrol_type_thermostat
 
 ######################################################################
 name:MAX_ShutterContact_dark
-filter:TYPE=MAX:filter:devtype=(4|6)
+filter:TYPE=MAX:FILTER=devtype=(4|6)
 desc:To configure a ShutterContact
 order:M3
 par:ICON;ICON as set, defaults to MAX;{ AttrVal("DEVICE","icon","hm-sec-win") }
