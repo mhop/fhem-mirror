@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 our %SSChatBot_vNotesIntern = (
+  "1.6.0"  => "22.05.2020  replace \" H\" with \"%20H\" in attachments due to problem in HttpUtils ",
   "1.5.0"  => "15.03.2020  slash commands set in interactive answer field 'value' will be executed ",
   "1.4.0"  => "15.03.2020  rename '1_sendItem' to 'asyncSendItem' because of Aesthetics ",
   "1.3.1"  => "14.03.2020  new reading recActionsValue which extract the value from actions, review logs of SSChatBot_CGI ",
@@ -92,7 +93,7 @@ use vars qw(%SSChatBot_vHintsExt_en);
 use vars qw(%SSChatBot_vHintsExt_de);
 
 ################################################################
-sub SSChatBot_Initialize($) {
+sub SSChatBot_Initialize {
  my ($hash) = @_;
  $hash->{DefFn}             = "SSChatBot_Define";
  $hash->{UndefFn}           = "SSChatBot_Undef";
@@ -124,7 +125,7 @@ return;
 #         ($hash)     [1]         [2]        [3]      [4]  
 #
 ################################################################
-sub SSChatBot_Define($@) {
+sub SSChatBot_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
   
@@ -172,7 +173,7 @@ sub SSChatBot_Define($@) {
   # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
   SSChatBot_initonboot($hash);
 
-return undef;
+return;
 }
 
 ################################################################
@@ -185,7 +186,7 @@ return undef;
 # internen Timern, sofern diese im Modul zum Pollen verwendet 
 # wurden.
 ################################################################
-sub SSChatBot_Undef($$) {
+sub SSChatBot_Undef {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   
@@ -193,7 +194,7 @@ sub SSChatBot_Undef($$) {
   SSChatBot_removeExtension($hash->{HELPER}{INFIX});
   RemoveInternalTimer($hash);
    
-return undef;
+return;
 }
 
 #######################################################################################################
@@ -203,7 +204,7 @@ return undef;
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
-sub SSChatBot_DelayedShutdown($) {
+sub SSChatBot_DelayedShutdown {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
@@ -220,7 +221,7 @@ return 0;
 # FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 #################################################################
-sub SSChatBot_Delete($$) {
+sub SSChatBot_Delete {
   my ($hash, $arg) = @_;
   my $name  = $hash->{NAME};
   my $index = $hash->{TYPE}."_".$hash->{NAME}."_botToken";
@@ -228,11 +229,11 @@ sub SSChatBot_Delete($$) {
   # gespeicherte Credentials löschen
   setKeyValue($index, undef);
     
-return undef;
+return;
 }
 
 ################################################################
-sub SSChatBot_Attr($$$$) {
+sub SSChatBot_Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash = $defs{$name};
     my ($do,$val,$cache);
@@ -272,11 +273,11 @@ sub SSChatBot_Attr($$$$) {
         }        
     }
     
-return undef;
+return;
 }
 
 ################################################################
-sub SSChatBot_Set($@) {
+sub SSChatBot_Set {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -369,7 +370,7 @@ sub SSChatBot_Set($@) {
           $text       = $h->{text}        if(defined $h->{text});
           $users      = $h->{users}       if(defined $h->{users});
           $fileUrl    = $h->{fileUrl}     if(defined $h->{fileUrl});
-		  $attachment = $h->{attachments} if(defined $h->{attachments});
+		  $attachment = SSChatBot_formString($h->{attachments}, "attachement") if(defined $h->{attachments});
       }
       
       if($a) {
@@ -380,7 +381,7 @@ sub SSChatBot_Set($@) {
        
       return "Your sendstring is incorrect. It must contain at least text with the \"text=\" tag like text=\"...\"\nor only some text like \"this is a test\" without the \"text=\" tag." if(!$text);
       
-      $text = SSChatBot_formText($text);
+      $text = SSChatBot_formString($text, "text");
       
       $users = AttrVal($name,"defaultPeer", "") if(!$users);
       return "You haven't defined any receptor for send the message to. ".
@@ -416,7 +417,7 @@ return;
 }
 
 ################################################################
-sub SSChatBot_Get($@) {
+sub SSChatBot_Get {
     my ($hash, @a) = @_;
     return "\"get X\" needs at least an argument" if ( @a < 2 );
     my $name = shift @a;
@@ -563,7 +564,7 @@ return $ret;                                                        # not genera
 ######################################################################################
 #                   initiale Startroutinen nach Restart FHEM
 ######################################################################################
-sub SSChatBot_initonboot ($) {
+sub SSChatBot_initonboot {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my ($ret,$csrf,$fuuid);
@@ -642,6 +643,8 @@ return;
 
 ######################################################################################
 #                            Eintrag zur SendQueue hinzufügen
+#
+# ($name,$opmode,$method,$userid,$text,$fileUrl,$channel,$attachment)
 ######################################################################################
 sub SSChatBot_addQueue ($$$$$$$$) {
     my ($name,$opmode,$method,$userid,$text,$fileUrl,$channel,$attachment) = @_;
@@ -690,7 +693,7 @@ return;
 #                       1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
 #                            eventuell verzögert wiederholen)
 #############################################################################################
-sub SSChatBot_checkretry ($$) {  
+sub SSChatBot_checkretry {  
   my ($name,$retry) = @_;
   my $hash          = $defs{$name};  
   my $idx           = $hash->{OPIDX};
@@ -757,10 +760,8 @@ sub SSChatBot_checkretry ($$) {
 return
 }
 
-#############################################################################################################################
-#######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
-#############################################################################################################################
-sub SSChatBot_getapisites($) {
+
+sub SSChatBot_getapisites ($) {
    my ($name)       = @_;
    my $hash         = $defs{$name};
    my $inaddr       = $hash->{INADDR};
@@ -826,7 +827,7 @@ return;
 ####################################################################################  
 #      Auswertung Abruf apisites
 ####################################################################################
-sub SSChatBot_getapisites_parse ($) {
+sub SSChatBot_getapisites_parse {
    my ($param, $err, $myjson) = @_;
    my $hash         = $param->{hash};
    my $name         = $hash->{NAME};
@@ -928,7 +929,7 @@ return SSChatBot_chatop($name);
 #############################################################################################
 #                                     Ausführung Operation
 #############################################################################################
-sub SSChatBot_chatop ($) {  
+sub SSChatBot_chatop {  
    my ($name) = @_;
    my $hash               = $defs{$name};
    my $inprot             = $hash->{INPROT};
@@ -1007,12 +1008,14 @@ sub SSChatBot_chatop ($) {
             };
    
    HttpUtils_NonblockingGet ($param);   
+
+return;
 } 
   
 #############################################################################################
 #                                Callback from SSChatBot_chatop
 #############################################################################################
-sub SSChatBot_chatop_parse ($) {  
+sub SSChatBot_chatop_parse {  
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1205,7 +1208,7 @@ return;
 ###############################################################################
 #   Test ob JSON-String empfangen wurde
 ###############################################################################
-sub SSChatBot_evaljson($$) { 
+sub SSChatBot_evaljson { 
   my ($hash,$myjson) = @_;
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
@@ -1232,7 +1235,7 @@ return($hash,$success,$myjson);
 ###############################################################################
 #                       JSON Boolean Test und Mapping
 ###############################################################################
-sub SSChatBot_jboolmap($){ 
+sub SSChatBot_jboolmap { 
   my ($bool) = @_;
   
   if(JSON::is_bool($bool)) {
@@ -1247,7 +1250,7 @@ return $bool;
 #  Auflösung Errorcodes SVS API
 #  Übernahmewerte sind $hash, $errorcode
 ##############################################################################
-sub SSChatBot_experror ($$) {
+sub SSChatBot_experror {
   my ($hash,$errorcode) = @_;
   my $device = $hash->{NAME};
   my $error;
@@ -1268,7 +1271,7 @@ return ($error);
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
 ################################################################
-sub SSChatBot_sortVersion (@){
+sub SSChatBot_sortVersion {
   my ($sseq,@versions) = @_;
 
   my @sorted = map {$_->[0]}
@@ -1289,7 +1292,7 @@ return @sorted;
 ######################################################################################
 #                            botToken speichern
 ######################################################################################
-sub SSChatBot_setToken ($$@) {
+sub SSChatBot_setToken {
     my ($hash, $token, $ao) = @_;
     my $name           = $hash->{NAME};
     my ($success, $credstr, $index, $retcode);
@@ -1322,7 +1325,7 @@ return ($success);
 ######################################################################################
 #                             botToken lesen
 ######################################################################################
-sub SSChatBot_getToken ($$$) {
+sub SSChatBot_getToken {
     my ($hash,$boot, $ao) = @_;
     my $name               = $hash->{NAME};
     my ($success, $token, $index, $retcode, $credstr);
@@ -1381,7 +1384,7 @@ return ($success, $token);
 #############################################################################################
 #                      FHEMWEB Extension hinzufügen           
 #############################################################################################
-sub SSChatBot_addExtension($$$) {
+sub SSChatBot_addExtension {
   my ($name, $func, $link) = @_;
 
   my $url                        = "/$link";  
@@ -1397,7 +1400,7 @@ return;
 #############################################################################################
 #                      FHEMWEB Extension löschen           
 #############################################################################################
-sub SSChatBot_removeExtension($) {
+sub SSChatBot_removeExtension {
   my ($link) = @_;
 
   my $url  = "/$link";
@@ -1420,7 +1423,7 @@ return;
 #############################################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 #############################################################################################
-sub SSChatBot_trim ($) {
+sub SSChatBot_trim {
   my $str = shift;
   $str =~ s/^\s+|\s+$//g;
 
@@ -1430,7 +1433,7 @@ return ($str);
 #############################################################################################
 #                        Länge Senedequeue updaten          
 #############################################################################################
-sub SSChatBot_updQLength ($;$) {
+sub SSChatBot_updQLength {
   my ($hash,$rst) = @_;
   my $name        = $hash->{NAME};
  
@@ -1452,26 +1455,37 @@ return;
 
 #############################################################################################
 #             Text für den Versand an Synology Chat formatieren 
-#             und nicht erlaubte Zeichen entfernen           
+#             und nicht erlaubte Zeichen entfernen 
+#
+#             $txt  : der zu formatierende String
+#             $func : ein Name zur Identifizierung der aufrufenden Funktion
 #############################################################################################
-sub SSChatBot_formText ($) {
-  my $txt = shift;
+sub SSChatBot_formString {
+  my $txt  = shift;
+  my $func = shift;
   my (%replacements,$pat);
   
-  %replacements = (
-      '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
-      " H" => "%20H",                           # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
-      "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
-      "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
-      "+"  => "%2B",
-  );
+  if($func ne "attachement") {
+      %replacements = (
+          '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
+          " H" => "%20H",                           # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+          "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
+          "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
+          "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
+          "+"  => "%2B",
+      );
   
-  $txt =~ s/\n/ESC_newline_ESC/g;
+  } else {
+      %replacements = (
+          " H" => "%20H"                            # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+      );    
+  }
+  
+  $txt    =~ s/\n/ESC_newline_ESC/g;
   my @acr = split (/\s+/, $txt);
               
   $txt = "";
-  foreach (@acr) {                              # Einzeiligkeit für Versand herstellen
+  foreach (@acr) {                                  # Einzeiligkeit für Versand herstellen
       $txt .= " " if($txt);
       $_ =~ s/ESC_newline_ESC/\\n/g;
       $txt .= $_;
@@ -1488,7 +1502,7 @@ return ($txt);
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 #############################################################################################
-sub SSChatBot_getclhash($;$$) {      
+sub SSChatBot_getclhash {      
   my ($hash,$nobgd)= @_;
   my $name  = $hash->{NAME};
   my $ret;
@@ -1539,7 +1553,7 @@ return ($ret);
 #                          Versionierungen des Moduls setzen
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
-sub SSChatBot_setVersionInfo($) {
+sub SSChatBot_setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
@@ -1574,7 +1588,7 @@ return;
 #                         Common Gateway Interface
 #                   parsen von outgoing Messages Chat -> FHEM       
 #############################################################################################
-sub SSChatBot_CGI() {
+sub SSChatBot_CGI {
   my ($request) = @_;
   my ($hash,$name,$link,$args);
   my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
@@ -1770,7 +1784,7 @@ sub SSChatBot_CGI() {
               $cr = $cr ne ""?$cr:"command '$command' executed";
               Log3($name, 4, "$name - FHEM command return: ".$cr);
               
-              $cr = SSChatBot_formText($cr);   
+              $cr = SSChatBot_formString($cr, "command");   
 
               SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                 
           }
@@ -1801,7 +1815,7 @@ sub SSChatBot_CGI() {
 				  $cr = $cr ne ""?$cr:"command '$arg' executed";
 				  Log3($name, 4, "$name - FHEM command return: ".$cr);
 				  
-				  $cr = SSChatBot_formText($cr);   
+				  $cr = SSChatBot_formString($cr, "command");   
 
 				  SSChatBot_addQueue($name, "sendItem", "chatbot", $userid, $cr, "", "", "");                                
 			  }
