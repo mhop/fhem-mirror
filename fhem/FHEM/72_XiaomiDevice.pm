@@ -631,7 +631,7 @@ sub XiaomiDevice_Set($$@) {
         $list  .=  ' lab_status:yes,no';
       }
     }
-    if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.m1s roborock.vacuum.s5e roborock.vacuum.s6 roborock.vacuum.t6
+    if(!defined($hash->{model}) || ($hash->{model} ne "roborock.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.m1s roborock.vacuum.s5e roborock.vacuum.s6 roborock.vacuum.t6
       $list  .=  ' clean_segment clean_segment_stop:noArg clean_segment_resume:noArg';
     }
     if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.s5e")) {

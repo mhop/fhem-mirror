@@ -95,12 +95,12 @@ netatmo_Define($$)
   $hash->{helper}{last_status_store} = 0;
 
   my $subtype;
-  if($a[2] eq "WEBHOOK") {
+  if(uc $a[2] eq "WEBHOOK") {
     $subtype = "WEBHOOK";
     $hash->{model} = "WEBHOOK";
 
     my $d = $modules{$hash->{TYPE}}{defptr}{"WEBHOOK"};
-    return "Netatmo webkook already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
+    return "Netatmo webhook already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
 
     $modules{$hash->{TYPE}}{defptr}{"WEBHOOK"} = $hash;
 
@@ -129,7 +129,7 @@ netatmo_Define($$)
     $modules{$hash->{TYPE}}{defptr}{"D$device"} = $hash;
 
   }
-  elsif( ($a[2] eq "PUBLIC" && @a > 3 ) )
+  elsif( (uc $a[2] eq "PUBLIC" && @a > 3 ) )
   {
     $hash->{openRequests} = 0;
 
@@ -237,7 +237,7 @@ netatmo_Define($$)
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}) && defined($name));
     $attr{$name}{devStateIcon} = ".*:no-icon" if( !defined($attr{$name}{devStateIcon}) && defined($name));
 
-  } elsif( ($a[2] eq "MODULE" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "MODULE" && @a == 5 ) ) {
     $subtype = "MODULE";
 
     my $device = $a[@a-2];
@@ -255,7 +255,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"M$module"} = $hash;
 
-  } elsif( ($a[2] eq "FORECAST" && @a == 4 ) ) {
+  } elsif( (uc $a[2] eq "FORECAST" && @a == 4 ) ) {
     $subtype = "FORECAST";
     $hash->{model} = "FORECAST";
 
@@ -280,7 +280,7 @@ netatmo_Define($$)
     $attr{$name}{IODev} = $account->{NAME} if( !defined($attr{$name}{IODev}) && $account);
 
 
-  } elsif( ($a[2] eq "RELAY" && @a == 4 ) ) {
+  } elsif( (uc $a[2] eq "RELAY" && @a == 4 ) ) {
     $subtype = "RELAY";
 
     my $device = $a[3];
@@ -296,7 +296,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"R$device"} = $hash;
 
-  } elsif( ($a[2] eq "THERMOSTAT" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "THERMOSTAT" && @a == 5 ) ) {
     $subtype = "THERMOSTAT";
 
     my $device = $a[@a-2];
@@ -314,7 +314,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"T$module"} = $hash;
 
-  } elsif( ($a[2] eq "HEATINGHOME" && @a == 4 ) ) {
+  } elsif( (uc $a[2] eq "HEATINGHOME" && @a == 4 ) ) {
     $subtype = "HEATINGHOME";
     $hash->{model} = "HEATINGHOME";
 
@@ -331,7 +331,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"E$home"} = $hash;
 
-  } elsif( ($a[2] eq "HEATINGROOM" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "HEATINGROOM" && @a == 5 ) ) {
     $subtype = "HEATINGROOM";
     $hash->{model} = "HEATINGROOM";
 
@@ -350,7 +350,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"O$room"} = $hash;
 
-  } elsif( ($a[2] eq "HOME" && @a == 4 ) ) {
+  } elsif( (uc $a[2] eq "HOME" && @a == 4 ) ) {
     $subtype = "HOME";
     $hash->{model} = "HOME";
 
@@ -367,7 +367,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"H$home"} = $hash;
 
-  } elsif( ($a[2] eq "PERSON" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "PERSON" && @a == 5 ) ) {
     $subtype = "PERSON";
     $hash->{model} = "PERSON";
 
@@ -384,7 +384,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"P$person"} = $hash;
 
-  } elsif( ($a[2] eq "CAMERA" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "CAMERA" && @a == 5 ) ) {
     $subtype = "CAMERA";
 
     my $home = $a[@a-2];
@@ -400,7 +400,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"C$camera"} = $hash;
 
-  } elsif( ($a[2] eq "TAG" && @a == 5 ) ) {
+  } elsif( (uc $a[2] eq "TAG" && @a == 5 ) ) {
     $subtype = "TAG";
 
     my $camera = $a[@a-2];
@@ -416,7 +416,7 @@ netatmo_Define($$)
 
     $modules{$hash->{TYPE}}{defptr}{"G$tag"} = $hash;
 
-  } elsif( @a == 6  || ($a[2] eq "ACCOUNT" && @a == 7 ) ) {
+  } elsif( @a == 6  || (uc $a[2] eq "ACCOUNT" && @a == 7 ) ) {
     $subtype = "ACCOUNT";
     $hash->{model} = "ACCOUNT";
     $hash->{network} = "ok";
@@ -5780,8 +5780,9 @@ netatmo_pollForecast($)
   Log3 $name, 4, "$name: pollForecast (forecastdata)";
 
   my $locale = AttrVal($name, "locale", "en-US");
+  my $url = decode_base64('aHR0cHM6Ly9hcHAubmV0YXRtby5uZXQvYXBpL3NpbXBsaWZpZWRmdXR1cmVtZWFzdXJl');
   HttpUtils_NonblockingGet({
-      url => "https://app.netatmo.net/api/simplifiedfuturemeasure",
+      url => $url,
       timeout => 60,
       noshutdown => 1,
       data => { device_id => $hash->{Station}, locale => $locale},
