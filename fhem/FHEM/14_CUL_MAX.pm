@@ -576,6 +576,9 @@ sub CUL_MAX_Parse
     return $shash->{NAME};
   }
 
+
+    readingsSingleUpdate($shash, 'state', get_CUL_States($shash), 1);
+
   #convert adresses to lower case
   $src     = lc($src);
   $dst     = lc($dst);
@@ -1251,6 +1254,8 @@ sub CUL_MAX_SQH
         IOWrite($hash, '', ($needPreamble ? 'Zs' : 'Zf') . $packet->{packet});
         Log3 $hash, 4, $name.', Send Queue packet send : '.($needPreamble ? 'Zs' : 'Zf').$packet->{packet}.' to '.$packet->{dst_name}.' with '.$io_name;
 
+	readingsSingleUpdate($hash, 'state', get_CUL_States($hash), 1);
+
         if ($packet->{dst} ne '000000')
         {
          $packet->{sent} = 1;
@@ -1327,6 +1332,28 @@ sub CUL_MAX_SQH
   #Log3 $hash, 5, $name.', Send Queue in not empty yet, next run in '.sprintf("%.1f",($timeout-gettimeofday())).' seconds';
   InternalTimer($timeout, 'CUL_MAX_SQH', $hash, 0);
  return;
+}
+
+sub get_CUL_States {
+
+    my $hash = shift;
+    my $ret  = '';
+    my $iodev;
+    my $state = sub {return (ReadingsVal(shift, 'state', '???') eq 'Initialized') ? 'ok' : 'UAS'};
+
+    $iodev = $hash->{IODev}{NAME} if(exists($hash->{IODev}{NAME}));
+    $ret = $iodev.':'.&$state($iodev) if ($iodev);
+
+    if (exists($hash->{IOgrp})) {
+	foreach my $cul (split(',' , $hash->{IOgrp})) {
+	    next if (!$cul || ($cul eq $iodev));
+	    $ret .= ',' if ($ret);
+	    $ret .= "$cul:".&$state($cul);
+	}
+	$ret .= " Last:$hash->{LASTInputDev}" if (exists($hash->{LASTInputDev}));
+    }
+
+    return ($ret) ? $ret : '???';
 }
 
 sub CUL_MAX_RenameFn
