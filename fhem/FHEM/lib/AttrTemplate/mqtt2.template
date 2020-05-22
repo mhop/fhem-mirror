@@ -647,6 +647,23 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_AlarmSensor
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+# SYMFONSIK sound controller
+name:zigbee2mqtt_symfonsik_sound_controller
+desc: IKEA SYMFONSIK sound controller via zigbee2mqtt <br>Tested with: IKEA E1744 SYMFONSIK sound controller
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_16
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).+, ? $1 : undef }
+par:ICON;ICON as set, defaults to it_remote;{ AttrVal("DEVICE","icon","it_remote") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Action: action  Volume: volume  Batterie: battery %
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE model zigbee2mqtt_symfonsik_sound_controller
+attr DEVICE userReadings volume:brightness.* {int(ReadingsVal($name,"brightness",10)/2.55)}
+deletereading -q DEVICE (?!associatedWith).*
+setreading DEVICE attrTemplateVersion 20200522
+
 
 ###########################################
 # TASMOTA
