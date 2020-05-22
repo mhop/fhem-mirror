@@ -848,8 +848,9 @@ sub HMinfo_tempListTmplView() { ###############################################
     push @tlFileMiss,"$fName - $err"  if ($err);
   }
   
-  my @tNfound;    # templates found in files
-  push @tNfound, @{$defs{hm}{helper}{weekplanList}} if ($defs{$n}{helper}{weekplanList});
+  my @tNfound = ();    # templates found in files
+  push @tNfound, @{$defs{hm}{helper}{weekplanList}} if ($defs{$n}{helper}{weekplanList} 
+                                                 && ref($defs{$n}{helper}{weekplanList}) eq 'ARRAY');
 
   ####################################################
   my $ret = "";
@@ -1640,6 +1641,26 @@ sub HMinfo_SetFn($@) {#########################################################
     return $cmd." done:" ."\n triggered:"  ."\n    ".(join "\n    ",sort @entities)
                          ;
   }
+  elsif($cmd eq "cmdRequestG"){##perform statusRequest for all devicesregister Read-------
+    my $action = $a[0] ? $a[0]:"status";
+    my $st = gettimeofday();
+    $action = ($action eq "ping" ? "ping":"status"); #we have status or ping to search devices
+    my %h;    
+    if($action eq "ping"){
+      foreach my $defN (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
+        next if(($defs{$defN}{helper}{rxType} & 0xe3) == 0);
+        next if (1 == CUL_HM_Set($defs{$defN},$defN,"sysTime"));
+        foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
+          last if(1== CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"));
+        }
+      }
+    }
+    else{
+      $h{$_} = $_  foreach(devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")); # all non-virtual devices. CUL_HM will select statusRequest
+      CUL_HM_qStateUpdatIfEnab($_,1)foreach(map{$h{$_}}keys %h);#issue status-request 
+    }
+    return;
+  }
 
   elsif($cmd eq "templateSet"){##template: set of register --------------------
     return HMinfo_templateSet(@a);
@@ -1656,7 +1677,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     $ret = HMinfo_status($hash);
   }
-  elsif($cmd =~ m/tempList[G]?/){##handle thermostat templist from file -------
+  elsif($cmd =~ m/tempList[G]?/)   {##handle thermostat templist from file ----
     my $action = $a[0]?$a[0]:"";
     HMinfo_listOfTempTemplates(); # refresh - maybe there are new entries in the files. 
     if    ($action eq "genPlot"){#generatelog and gplot file 
@@ -1731,6 +1752,7 @@ sub HMinfo_SetFn($@) {#########################################################
   else{
     my @cmdLst =     
            ( "autoReadReg"
+            ,"cmdRequestG:ping,status"
             ,"clear"    #:msgStat,msgEvents,all,rssi,register,trigger,readings"  
             ,"clearG:msgEvents,msgErrors,msgStat,readings,register,oldRegs,rssi,trigger,attack,all"
             ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
@@ -1759,6 +1781,8 @@ sub HMInfo_help(){ ############################################################
            ."\n set loadConfig [-typeFilter-] -file-               # restores register and peer readings if missing"
            ."\n set verifyConfig [-typeFilter-] -file-             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [-typeFilter-]                     # trigger update readings if attr autoReadReg is set"
+           ."\n set cmdRequestG [ping|status]                      # trigger a status-request for ping) one channel per device"
+           ."\n                                                    #                            status) all channel that support statusRequest"
            ."\n set tempList [-typeFilter-][save|restore|verify|status|genPlot][-filename-]# handle tempList of thermostat devices"
            ."\n set x-deviceReplace <old device> <new device>      # WARNING:replace a device with another"
            ."\n  ---infos---"
@@ -2545,6 +2569,7 @@ sub HMinfo_templateChk_Get($){ ################################################
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter, no param" if(!defined $param);
+  CUL_HM_TemplateModify();
   $tmplDefChange = 1;# signal we have a change!
   if ($param eq "del"){
     return "template in use, cannot be deleted" if(HMinfo_templateUsg("","",$name));
@@ -3120,6 +3145,13 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher.
       </li>
+      <li><a name="#HMinfocmdRequestG">cmdRequestG</a> <br>
+          issues a status request to update the system and performs access check to devices<br>
+          ping: for one channel per CUL_HM device<br>
+          status: for all channels that suport statusRequest<br>
+          Ping will generate a message to the device. If not answered the device is unaccessible. Check protState for errors in case.
+      </li>
+            ,"cmdRequestG:ping,status"
       <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|readings|msgStat|register|rssi]<br>
           executes a set clear ...  on all HM entities<br>
           <ul>
@@ -3581,6 +3613,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       </li>
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           Aktiviert das automatische Lesen der Konfiguration f&uuml;r ein CUL_HM Ger&auml;t, wenn das Attribut autoReadReg auf 1 oder h&ouml;her steht.
+      </li>
+      <li><a name="#HMinfocmdRequestG">cmdRequestG</a> <br>
+          commando cmdRequestG wird an alle Entites verschickt um einen update zu erzwingen und die Zugriffe zu prüfen.<br>
+          Das Kommando geht nur an Entites, welche auch statusRequest unterstützen. <br>
+          ping: es wird an einen der kanäle ein status request verschickt<br>
+          status: jede entity welche das kommando unterstützt wird angesprochen<br>
       </li>
       <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|msgErrors|readings|msgStat|register|rssi]<br>
           F&uuml;hrt ein set clear ... f&uuml;r alle HM Instanzen aus<br>
