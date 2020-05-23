@@ -2343,9 +2343,10 @@ sub ShadingProcessing {
           . $shuttersDev
           . " Nach dem return" );
 
-    my $getShadingPos    = $shutters->getShadingPos;
-    my $getStatus        = $shutters->getStatus;
-    my $oldShadingStatus = $shutters->getShadingStatus;
+    my $getShadingPos       = $shutters->getShadingPos;
+    my $getStatus           = $shutters->getStatus;
+    my $oldShadingStatus    = $shutters->getShadingStatus;
+    my $homemode            = $shutters->getHomemode;
 
     ASC_Debug( 'ShadingProcessing: '
           . $shutters->getShuttersDev
