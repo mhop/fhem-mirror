@@ -605,6 +605,13 @@ sub CUL_HM_Define($$) {##############################
 
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
+
+  my @arr1 = ();
+  $hash->{helper}{cmds}{TmplCmds} = \@arr1;    
+  $hash->{helper}{cmds}{cmdList}  = \@arr1;    
+  $hash->{helper}{cmds}{cmdKey}   = "";
+  $hash->{helper}{cmds}{TmplKey}  = "";
+  
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
   $hash->{NOTIFYDEV} = "global";
 
@@ -3969,11 +3976,12 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     my $info .= " Gets ------\n";
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
-    $info .= join("\n",sort CUL_HM_SetList($name));
-    my $a = CUL_HMTmplSetCmd($name)." ";
-    $a =~ s/:.*? /:\[template\]\n/g;
-    $info .= $a;
-    $info .= join("\n",split(" ",CUL_HMTmplSetParam($name)));
+    $info .= join("\n",map{if($_ !~ m/]../){(my $foo = $_) =~ s/\|/\n\t/g; $foo;}else{$_}} sort (CUL_HM_SetList($name)));
+
+    #my $a = CUL_HMTmplSetCmd($name)." ";
+    #$a =~ s/:.*? /:\[template\]\n/g;
+    #$info .= $a;
+    #$info .= join("\n",split(" ",CUL_HMTmplSetParam($name)));
     return $info;
   }
   elsif($cmd eq "tplInfo"){  ##################################################
@@ -4140,7 +4148,7 @@ sub CUL_HM_TemplateModify(){
    $modules{CUL_HM}{helper}{tmplTimestamp} = time();
 }
 sub CUL_HM_getTemplateModify(){
-   return $modules{CUL_HM}{helper}{tmplTimestamp};
+   return (defined $modules{CUL_HM}{helper}{tmplTimestamp} ? $modules{CUL_HM}{helper}{tmplTimestamp} : 'no');
 }
 sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++++++++++++++++
   my($name)=@_;
@@ -4184,16 +4192,17 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
     $hash->{helper}{cmds}{cmdList} = \@arr1cmd;
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
   }
-
-  if($hash->{helper}{cmds}{TmplKey}  
-     ne InternalVal($name,"peerList","").":".CUL_HM_getTemplateModify()){
-    my @arr1 = (map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name)),
-                split(" ",CUL_HMTmplSetCmd($name)));
-    
+  my $tmplStamp = CUL_HM_getTemplateModify();
+  if( $hash->{helper}{cmds}{TmplKey} ne InternalVal($name,"peerList","").":".$tmplStamp){
+    my @arr1 =  map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name));
+    push @arr1, map{(my $foo = $_) =~ s/:(.*)/:[$1]/; $foo;}
+                map{(my $foo = $_) =~ s/,/|/g; $foo;} 
+                split(" ",CUL_HMTmplSetCmd($name));
+   
     $hash->{helper}{cmds}{TmplCmds} = \@arr1;      
 
     $hash->{helper}{cmds}{TmplKey}  = InternalVal($name,"peerList","")
-                                     .":".CUL_HM_getTemplateModify()
+                                     .":$tmplStamp"
                                      ;   
   }
 
@@ -8357,6 +8366,7 @@ sub CUL_HMTmplSetCmd($){
   my %a;
   my @peerIds = map{CUL_HM_id2Name($_)} grep !/00000000/,split(",",AttrVal($name,"peerIDs",""));
   foreach my $peer($peerIds[0],"0"){ 
+    next if (!defined $peer);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
@@ -8381,7 +8391,7 @@ sub CUL_HMTmplSetCmd($){
             $a{$peer}{$t} = 1;
           }
           else{
-            $a{$_}{$t} = 1 foreach(@peerIds);
+            $a{$_}{$t} = 1  foreach(map{$_ =~ m/^${name}_chn-..$/ ? "self".substr($peer,-2) : $_}@peerIds);
           }
         }
       }
