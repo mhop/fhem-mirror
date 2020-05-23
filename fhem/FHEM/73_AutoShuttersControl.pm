@@ -2151,7 +2151,7 @@ sub EventProcessingShadingBrightness {
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
     my $reading = $shutters->getBrightnessReading;
-    my $outTemp = $ascDev->getOutTemp;
+    my $outTemp = ( $shutters->getOutTemp != -100 ? $shutters->getOutTemp : $ascDev->getOutTemp );
 
     Log3( $name, 4,
         "AutoShuttersControl ($shuttersDev) - EventProcessingShadingBrightness"
@@ -2185,8 +2185,6 @@ sub EventProcessingShadingBrightness {
             && $shutters->getRainProtectionStatus eq 'unprotected'
             && $shutters->getWindProtectionStatus eq 'unprotected' )
         {
-            $outTemp = $shutters->getOutTemp
-              if ( $shutters->getOutTemp != -100 );
             ShadingProcessing(
                 $hash,
                 $shuttersDev,
@@ -2224,16 +2222,16 @@ sub EventProcessingTwilightDevice {
     );
 
     if ( $events =~ m{(azimuth|elevation|SunAz|SunAlt):\s(\d+.\d+)}xms ) {
-        my $name = $device;
+        my $name    = $device;
         my ( $azimuth, $elevation );
         my $outTemp = $ascDev->getOutTemp;
 
-        $azimuth   = $2 if ( $1 eq 'azimuth'   || $1 eq 'SunAz' );
-        $elevation = $2 if ( $1 eq 'elevation' || $1 eq 'SunAlt' );
+        $azimuth    = $2 if ( $1 eq 'azimuth'   || $1 eq 'SunAz' );
+        $elevation  = $2 if ( $1 eq 'elevation' || $1 eq 'SunAlt' );
 
-        $azimuth = $ascDev->getAzimuth
+        $azimuth    = $ascDev->getAzimuth
           if ( !defined($azimuth) && !$azimuth );
-        $elevation = $ascDev->getElevation
+        $elevation  = $ascDev->getElevation
           if ( !defined($elevation) && !$elevation );
 
         ASC_Debug( 'EventProcessingTwilightDevice: '
@@ -2356,7 +2354,7 @@ sub ShadingProcessing {
 
     if (
         (
-               $outTemp < $shutters->getShadingMinOutsideTemperature - 3
+               $outTemp < $shutters->getShadingMinOutsideTemperature - 4
             || $azimuth < $azimuthLeft
             || $azimuth > $azimuthRight
             || !$shutters->getIsDay
@@ -2381,7 +2379,7 @@ sub ShadingProcessing {
         || $elevation < $shutters->getShadingMinElevation
         || $elevation > $shutters->getShadingMaxElevation
         || $brightness < $shutters->getShadingStateChangeCloudy
-        || $outTemp < $shutters->getShadingMinOutsideTemperature )
+        || $outTemp < $shutters->getShadingMinOutsideTemperature - 1 )
     {
         $shutters->setShadingStatus('out reserved')
           if ( $shutters->getShadingStatus eq 'in'
@@ -2456,6 +2454,8 @@ sub ShadingProcessing {
       if (
            IsAfterShuttersTimeBlocking($shuttersDev)
         && !$shutters->getShadingManualDriveStatus
+        && $shutters->getRoommatesStatus ne 'gotosleep'
+        && $shutters->getRoommatesStatus ne 'asleep'
         && (
             (
                    $shutters->getShadingStatus eq 'out'
@@ -2464,9 +2464,23 @@ sub ShadingProcessing {
             || (   $shutters->getShadingStatus eq 'in'
                 && $shutters->getShadingLastStatus eq 'out' )
         )
-        && $shutters->getRoommatesStatus ne 'asleep'
-        && $shutters->getRoommatesStatus ne 'gotosleep'
-        && ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) < 2
+        && (   $shutters->getShadingMode eq 'always'
+            || $shutters->getShadingMode eq $homemode )
+        && (
+               $shutters->getModeUp eq 'always'
+            || $shutters->getModeUp eq $homemode
+            || (   $shutters->getModeUp eq 'home'
+                && $homemode ne 'asleep' )
+            || $shutters->getModeUp eq 'off'
+        )
+        && (
+            ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) < 2
+            || (  !$shutters->getQueryShuttersPos( $shutters->getShadingPos )
+                && $shutters->getIfInShading
+                && $shutters->getStatus != $shutters->getShadingPos )
+            || (  !$shutters->getIfInShading
+                && $shutters->getStatus == $shutters->getShadingPos )
+        )
       );
 
     return;
@@ -2761,7 +2775,13 @@ sub EventProcessingExternalTriggerDevice {
         $shutters->setLastDrive('external trigger device inactive');
         $shutters->setNoDelay(1);
         $shutters->setExternalTriggerState(1);
-        ShuttersCommandSet( $hash, $shuttersDev, $triggerPosInactive );
+        ShuttersCommandSet( $hash, $shuttersDev,
+            (
+              $shutters->getIsDay
+                ? $triggerPosInactive
+                : $shutters->getClosedPos
+            )
+        );
     }
 
     ASC_Debug(
@@ -8419,7 +8439,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.29",
+  "version": "v0.8.30",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
