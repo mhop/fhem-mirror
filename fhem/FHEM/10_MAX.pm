@@ -32,95 +32,86 @@ use AttrTemplate;
 use Date::Parse;
 
 my %device_types = (
-
-  1 => "HeatingThermostat",
-  2 => "HeatingThermostatPlus",
-  3 => "WallMountedThermostat",
-  4 => "ShutterContact",
-  5 => "PushButton",
-  6 => "virtualShutterContact",
-  7 => "virtualThermostat",
-  8 => "PlugAdapter"
+  0 => 'Cube',
+  1 => 'HeatingThermostat',
+  2 => 'HeatingThermostatPlus',
+  3 => 'WallMountedThermostat',
+  4 => 'ShutterContact',
+  5 => 'PushButton',
+  6 => 'virtualShutterContact',
+  7 => 'virtualThermostat',
+  8 => 'PlugAdapter'
 
 );
 
 my %msgId2Cmd = (
-                 "00" => "PairPing",
-                 "01" => "PairPong",
-                 "02" => "Ack",
-                 "03" => "TimeInformation",
+                 '00' => 'PairPing',
+                 '01' => 'PairPong',
+                 '02' => 'Ack',
+                 '03' => 'TimeInformation',
 
-                 "10" => "ConfigWeekProfile",
-                 "11" => "ConfigTemperatures", #like eco/comfort etc
-                 "12" => "ConfigValve",
+                 '10' => 'ConfigWeekProfile',
+                 '11' => 'ConfigTemperatures', #like eco/comfort etc
+                 '12' => 'ConfigValve',
 
-                 "20" => "AddLinkPartner",
-                 "21" => "RemoveLinkPartner",
-                 "22" => "SetGroupId",
-                 "23" => "RemoveGroupId",
+                 '20' => 'AddLinkPartner',
+                 '21' => 'RemoveLinkPartner',
+                 '22' => 'SetGroupId',
+                 '23' => 'RemoveGroupId',
 
-                 "30" => "ShutterContactState",
+                 '30' => 'ShutterContactState',
 
-                 "40" => "SetTemperature", # to thermostat
-                 "42" => "WallThermostatControl", # by WallMountedThermostat
+                 '40' => 'SetTemperature', # to thermostat
+                 '42' => 'WallThermostatControl', # by WallMountedThermostat
                  # Sending this without payload to thermostat sets desiredTempeerature to the comfort/eco temperature
                  # We don't use it, we just do SetTemperature
-                 "43" => "SetComfortTemperature",
-                 "44" => "SetEcoTemperature",
+                 '43' => 'SetComfortTemperature',
+                 '44' => 'SetEcoTemperature',
 
-                 "50" => "PushButtonState",
+                 '50' => 'PushButtonState',
 
-                 "60" => "ThermostatState", # by HeatingThermostat
+                 '60' => 'ThermostatState', # by HeatingThermostat
 
-                 "70" => "WallThermostatState",
+                 '70' => 'WallThermostatState',
 
-                 "82" => "SetDisplayActualTemperature",
+                 '82' => 'SetDisplayActualTemperature',
 
-                 "F1" => "WakeUp",
-                 "F0" => "Reset",
+                 'F1' => 'WakeUp',
+                 'F0' => 'Reset',
                );
 
 my %msgCmd2Id = reverse %msgId2Cmd;
 
-my $defaultWeekProfile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
+my $defaultWeekProfile = '444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520';
 
-my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
+my @ctrl_modes = ( 'auto', 'manual', 'temporary', 'boost' );
 
 my %boost_durations = (0 => 0, 1 => 5, 2 => 10, 3 => 15, 4 => 20, 5 => 25, 6 => 30, 7 => 60);
 
 my %boost_durationsInv = reverse %boost_durations;
 
-my %decalcDays    = (0 => "Sat", 1 => "Sun", 2 => "Mon", 3 => "Tue", 4 => "Wed", 5 => "Thu", 6 => "Fri");
+my %decalcDays    = (0 => 'Sat', 1 => 'Sun', 2 => 'Mon', 3 => 'Tue', 4 => 'Wed', 5 => 'Thu', 6 => 'Fri');
 
-my @weekDays      = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+my @weekDays      = ('Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri');
 
 my %decalcDaysInv = reverse %decalcDays;
 
 my %readingDef = ( #min/max/default
-  "maximumTemperature"    => [ \&MAX_validTemperature, "on"],
-  "minimumTemperature"    => [ \&MAX_validTemperature, "off"],
-  "comfortTemperature"    => [ \&MAX_validTemperature, 21],
-  "ecoTemperature"        => [ \&MAX_validTemperature, 17],
-  "windowOpenTemperature" => [ \&MAX_validTemperature, 12],
-  "windowOpenDuration"    => [ \&MAX_validWindowOpenDuration,   15],
-  "measurementOffset"     => [ \&MAX_validMeasurementOffset, 0],
-  "boostDuration"         => [ \&MAX_validBoostDuration, 5 ],
-  "boostValveposition"    => [ \&MAX_validValveposition, 80 ],
-  "decalcification"       => [ \&MAX_validDecalcification, "Sat 12:00" ],
-  "maxValveSetting"       => [ \&MAX_validValveposition, 100 ],
-  "valveOffset"           => [ \&MAX_validValveposition, 00 ],
-  "groupid"               => [ \&MAX_validGroupid, 0 ],
-  ".weekProfile"          => [ \&MAX_validWeekProfile, $defaultWeekProfile ]
+  'maximumTemperature'    => [ \&MAX_validTemperature, 'on' ],
+  'minimumTemperature'    => [ \&MAX_validTemperature, 'off' ],
+  'comfortTemperature'    => [ \&MAX_validTemperature, 21 ],
+  'ecoTemperature'        => [ \&MAX_validTemperature, 17 ],
+  'windowOpenTemperature' => [ \&MAX_validTemperature, 12 ],
+  'windowOpenDuration'    => [ \&MAX_validWindowOpenDuration, 15 ],
+  'measurementOffset'     => [ \&MAX_validMeasurementOffset, 0 ],
+  'boostDuration'         => [ \&MAX_validBoostDuration, 5 ],
+  'boostValveposition'    => [ \&MAX_validValveposition, 80 ],
+  'decalcification'       => [ \&MAX_validDecalcification, 'Sat 12:00' ],
+  'maxValveSetting'       => [ \&MAX_validValveposition, 100 ],
+  'valveOffset'           => [ \&MAX_validValveposition, 00 ],
+  'groupid'               => [ \&MAX_validGroupid, 0 ],
+  '.weekProfile'          => [ \&MAX_validWeekProfile, $defaultWeekProfile ]
  );
-
-#my %interfaces = (
-#  "Cube" => undef,
-#  "HeatingThermostat" => "thermostat;battery;temperature",
-#  "HeatingThermostatPlus" => "thermostat;battery;temperature",
-#  "WallMountedThermostat" => "thermostat;temperature;battery",
-#  "ShutterContact" => "switch_active;battery",
-#  "PushButton" => "switch_passive;battery"
-#  );
 
 
 sub MAX_validTemperature { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] =~ /^\d+(\.[05])?$/ && $_[0] >= 4.5 && $_[0] <= 30.5); }
@@ -134,34 +125,34 @@ sub MAX_validValveposition      { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0]
 sub MAX_validWeekProfile        { return length($_[0]) == 4*13*7; }
 sub MAX_validGroupid            { return $_[0] =~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 255; }
 
-sub MAX_validDecalcification
-{ 
-  my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
-  return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; 
+sub MAX_validDecalcification {
+    my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
+    return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; 
 }
 
-sub MAX_Initialize
-{
-  my ($hash) = shift;
+sub MAX_Initialize {
 
-  $hash->{Match}         = "^MAX";
-  $hash->{DefFn}         = "MAX_Define";
-  $hash->{UndefFn}       = "MAX_Undef";
-  $hash->{ParseFn}       = "MAX_Parse";
-  $hash->{SetFn}         = "MAX_Set";
-  $hash->{GetFn}         = "MAX_Get";
-  $hash->{RenameFn}      = "MAX_RenameFn";
-  $hash->{NotifyFn}      = "MAX_Notify";
-  $hash->{DbLog_splitFn} = "MAX_DbLog_splitFn";
-  $hash->{AttrFn}        = "MAX_Attr";
-  $hash->{AttrList}      = "IODev CULdev actCycle do_not_notify:1,0 ignore:0,1 dummy:0,1 keepAuto:0,1 debug:0,1 scanTemp:0,1 skipDouble:0,1 externalSensor ".
-  "model:HeatingThermostat,HeatingThermostatPlus,WallMountedThermostat,ShutterContact,PushButton,Cube,PlugAdapter autosaveConfig:1,0 ".
-  "peers sendMode:peers,group,Broadcast dTempCheck:0,1 windowOpenCheck:0,1 DbLog_log_onoff:0,1 ".$readingFnAttributes;
+    my ($hash) = shift;
+
+    $hash->{Match}         = '^MAX';
+    $hash->{DefFn}         = \&MAX_Define;
+    $hash->{UndefFn}       = \&MAX_Undef;
+    $hash->{ParseFn}       = \&MAX_Parse;
+    $hash->{SetFn}         = \&MAX_Set;
+    $hash->{GetFn}         = \&MAX_Get;
+    $hash->{RenameFn}      = \&MAX_RenameFn;
+    $hash->{NotifyFn}      = \&MAX_Notify;
+    $hash->{DbLog_splitFn} = \&MAX_DbLog_splitFn;
+    $hash->{AttrFn}        = \&MAX_Attr;
+    $hash->{AttrList}      = 'IODev CULdev actCycle do_not_notify:1,0 ignore:0,1 dummy:0,1 keepAuto:0,1 debug:0,1 scanTemp:0,1 skipDouble:0,1 externalSensor '.
+			     'model:HeatingThermostat,HeatingThermostatPlus,WallMountedThermostat,ShutterContact,PushButton,Cube,PlugAdapter autosaveConfig:1,0 '.
+			     'peers sendMode:peers,group,Broadcast dTempCheck:0,1 windowOpenCheck:0,1 DbLog_log_onoff:0,1 '.$readingFnAttributes;
 
   return;
 }
 
 #############################
+
 sub MAX_Define {
 
     my $hash = shift;
@@ -173,8 +164,8 @@ sub MAX_Define {
 
     my $devtype = MAX_TypeToTypeId($type);
 
-    return "$name, invalid MAX type $type !" if (!$devtype);
-    return "$name, invalid address $addr !"  if (($addr !~ m/^[a-fA-F0-9]{6}$/ix) || ($addr eq '000000'));
+    return "$name, invalid MAX type $type !" if ($devtype < 0);
+    return "$name, invalid address $addr !"  if (($addr !~ m{\A[a-fA-F0-9]{6}\z}xms) || ($addr eq '000000'));
 
     $addr = lc($addr); # all addr should be lowercase
 
@@ -206,39 +197,43 @@ sub MAX_Define {
 	Log3($name, 2, $msg);
     }
 
-    Log3 $hash, 5, 'Max_define, '.$name.' '.$type.' with addr '.$addr;
-
     $hash->{type}                = $type;
     $hash->{devtype}             = $devtype;
     $hash->{addr}                = $addr;
-    $hash->{TimeSlot}            = -1 if ($type =~ /.*Thermostat.*/); # wird durch CUL_MAX neu gesetzt 
+    $hash->{TimeSlot}            = -1 if ($type =~ m{Thermostat}xms); # wird durch CUL_MAX neu gesetzt 
     $hash->{'.count'}            = 0; # ToDo Kommentar
     $hash->{'.sendToAddr'}       = '-1'; # zu wem haben wird direkt gesendet ?
     $hash->{'.sendToName'}       = '';
-    $hash->{'.timer'}            = 300;
+    $hash->{'.timer'}            = 300 if (($type ne 'PushButton') && ($type ne 'Cube'));
     $hash->{SVN}                 = (qw($Id$))[2];
     $modules{MAX}{defptr}{$addr} = $hash;
 
-    #$hash->{internals}{interfaces} = $interfaces{$type}; # wozu ?
+    CommandAttr(undef,"$name model $type"); # Forum Stats werten nur attr model aus
 
-    AssignIoPort($hash);
-
-    CommandAttr(undef,$name.' model '.$type); # Forum Stats werten nur attr model aus
-
-    if ($init_done == 1) {
+    if (($init_done == 1) && (($hash->{devtype} > 0) && ($hash->{devtype} < 4) || ($type eq 'virtualThermostat'))) {
     #nur beim ersten define setzen:
-	if (($hash->{devtype} < 4) || ($hash->{devtype} == 7)) {
-    	    $attr{$name}{room} = 'MAX' if( not defined( $attr{$name}{room} ) );
-    	    MAX_ReadingsVal($hash,'groupid');
-    	    MAX_ReadingsVal($hash,'windowOpenTemperature') if ($hash->{devtype} == 7);
-    	    readingsBeginUpdate($hash);
-    	    MAX_ParseWeekProfile($hash);
-    	    readingsEndUpdate($hash,0);
-	}
+	readingsBeginUpdate($hash);
+    	MAX_ReadingsVal($hash, 'groupid');
+    	MAX_ReadingsVal($hash, 'windowOpenTemperature') if ($hash->{TYPE} eq 'virtualThermostat');
+    	MAX_ParseWeekProfile($hash);
+    	readingsEndUpdate($hash, 0);
+
+	my ($io) = devspec2array('TYPE=CUL_MAX');
+	($io)    = devspec2array('TYPE=MAXLAN') if (!$io);
+	$attr{$name}{IODev} = $io  if (!exists($attr{$name}{IODev}) && $io);
+	$attr{$name}{room} = 'MAX' if (!exists($attr{$name}{room}));
+    }
+
+    if ($type ne 'Cube') {
+	AssignIoPort($hash);
+    }
+    else {
+	CommandAttr(undef, "$name dummy 1");
+	CommandDeleteAttr(undef, "$name IODev") if (exists($attr{$name}{IODev}));
     }
 
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+5, 'MAX_Timer', $hash, 0) if ($hash->{devtype} != 5);
+    InternalTimer(gettimeofday()+5, 'MAX_Timer', $hash, 0) if (($type ne 'PushButton') && ($type ne 'Cube'));
 
     return;
 }
@@ -246,423 +241,399 @@ sub MAX_Define {
 
 sub MAX_Timer
 {
-  my $hash = shift;
-  my $name = $hash->{NAME};
+    my $hash = shift;
+    my $name = $hash->{NAME};
 
-  if (!$init_done)
-  {
-   InternalTimer(gettimeofday()+5,"MAX_Timer", $hash, 0);
-   return;
-  }
-
-  AssignIoPort($hash, AttrVal($name,'IODev','')) if (exists($hash->{IODevMissing})); # mit proposed $_
-
-  InternalTimer(gettimeofday() + $hash->{'.timer'}, "MAX_Timer", $hash, 0) if ($hash->{'.timer'});
-
-  return if (IsDummy($name) || IsIgnored($name));
-
-  if ($hash->{devtype} && (($hash->{devtype} < 4) || ($hash->{devtype} == 8)))
-  {
-   my $dt = ReadingsNum($name,'desiredTemperature',0);
-   if ($dt == ReadingsNum($name,'windowOpenTemperature','0')) # kein check bei offenen Fenster
-   {
-    my $age = sprintf "%02d:%02d", (gmtime(ReadingsAge($name,'desiredTemperature', 0)))[2,1];
-    readingsSingleUpdate($hash,'windowOpen', $age,1) if (AttrNum($name,'windowOpenCheck',0));
-    $hash->{'.timer'} = 60;
-    return;
-   }
-
-   if ((ReadingsVal($name,'mode','manu') eq 'auto') && AttrNum($name,'dTempCheck',0))
-   {
-    $hash->{saveConfig} = 1;     # verhindern das alle weekprofile Readings neu geschrieben werden
-    MAX_ParseWeekProfile($hash); # $hash->{helper}{dt} aktualisieren
-    delete $hash->{saveConfig};
-
-    my $c = ($dt != $hash->{helper}{dt}) ? sprintf("%.1f", ($dt-$hash->{helper}{dt})) : 0;
-    delete $hash->{helper}{dtc} if (!$c && exists($hash->{helper}{dtc}));
-    if ($c && (!exists($hash->{helper}{dtc}))) {$hash->{helper}{dtc}=1; $c=0; }; # um eine Runde verzögern
-    readingsBeginUpdate($hash);
-     readingsBulkUpdate($hash,'dTempCheck', $c);
-     readingsBulkUpdate($hash,'windowOpen', '0') if (AttrNum($name,'windowOpenCheck',0));
-    readingsEndUpdate($hash,1);
-    $hash->{'.timer'} = 300;
-    Log3 $hash,3,$name.', Tempcheck NOK Reading : '.$dt.' <-> WeekProfile : '.$hash->{helper}{dt} if ($c);
-   }
-  }
-   elsif ((($hash->{devtype} == 4) || ($hash->{devtype} == 6)) && AttrNum($name,'windowOpenCheck',1))
-  {
-   if (ReadingsNum($name,'onoff',0))
-   {
-    my $age = (sprintf "%02d:%02d", (gmtime(ReadingsAge($name,'onoff', 0)))[2,1]);
-    readingsSingleUpdate($hash,'windowOpen', $age ,1);
-    $hash->{'.timer'} = 60;
-   }
-   else 
-   {
-    readingsSingleUpdate($hash,'windowOpen', '0',1);
-    $hash->{'.timer'} = 300;
-   }
-  }
-  return;
-}
-
-
-sub MAX_Attr
-{
-  my ($cmd, $name, $attrName, $attrVal) = @_;
-  my $hash = $defs{$name};
-
- if ($cmd eq 'del')
- {
-   return 'FHEM statistics are using this, please do not delete or change !' if ($attrName eq 'model');
-   $hash->{'.actCycle'} = 0 if ($attrName eq 'actCycle');
-   if ($attrName eq 'externalSensor') 
-   {
-    delete($hash->{NOTIFYDEV}); 
-    notifyRegexpChanged($hash,'global');
-   }
-   return;
- }
-
- if ($cmd eq 'set') 
- {
-  if ($attrName eq 'model')
-  {
-    #$$attrVal = $hash->{type}; bzw. $_[3] = $hash->{type} , muss das sein ?
-    return "$name, model is $hash->{type}" if ($attrVal ne $hash->{type});
-  }
-  elsif ($attrName eq 'dummy')
-  {
-   $attr{$name}{scanTemp}  = '0' if (AttrNum($name,'scanTemp',0) && int($attrVal));
-  }
-  elsif ($attrName eq 'CULdev')
-  {
-    # ohne Abfrage von init_done : Reihenfoleproblem in der fhem.cfg !
-    return "$name, invalid CUL device $attrVal" if (!exists($defs{$attrVal}) && $init_done);
-  }
-  elsif ($attrName eq 'actCycle')
-  {
-    my @ar = split(':',$attrVal);
-    $ar[0] = 0 if (!$ar[0]);
-    $ar[1] = 0 if (!$ar[1]);
-    my $v = (int($ar[0])*3600) + (int($ar[1])*60);
-    $hash->{'.actCycle'} = $v if ($v >= 0);
-  } 
-  elsif ($attrName eq 'externalSensor')
-  {
-   return $name.', attribute externalSensor is not supported for this device !' if ($hash->{devtype}>2) && ($hash->{devtype}<6);
-    my ($sd,$sr,$sn) = split (':',$attrVal);
-    if($sd && $sr && $sn)
-    {
-     notifyRegexpChanged($hash,'$sd:$sr');
-     $hash->{NOTIFYDEV}=$sd;
+    if (!$init_done) {
+	InternalTimer(gettimeofday()+5, 'MAX_Timer', $hash, 0);
+	return;
     }
-  }
- }
- return;
+
+    $hash->{'.timer'} //= 0;
+
+    return if ((int($hash->{'.timer'}) < 60) || IsDummy($name) || IsIgnored($name));
+
+    InternalTimer(gettimeofday() + $hash->{'.timer'}, 'MAX_Timer', $hash, 0);
+
+    if (exists($hash->{IODevMissing})) {
+	Log3($hash, 1, "$name, Missing IODEV, call AssignIOPort");
+	AssignIoPort($hash);
+    }
+
+    if (($hash->{TYPE} =~ m{Thermostat}xms) || ($hash->{TYPE} eq 'PlugAdapter')) {
+	my $dt = ReadingsNum($name, 'desiredTemperature', 0);
+	if ($dt == ReadingsNum($name, 'windowOpenTemperature', '0')) { # kein check bei offenen Fenster
+   
+	    my $age = sprintf '%02d:%02d', (gmtime(ReadingsAge($name, 'desiredTemperature', 0)))[2,1];
+	    readingsSingleUpdate($hash,'windowOpen', $age, 1) if (AttrNum($name, 'windowOpenCheck', 0));
+	    $hash->{'.timer'} = 60;
+	    return;
+	}
+
+	if ((ReadingsVal($name, 'mode', 'manu') eq 'auto') && AttrNum($name, 'dTempCheck', 0)) {
+	    $hash->{saveConfig} = 1;     # verhindern das alle weekprofile Readings neu geschrieben werden
+	    MAX_ParseWeekProfile($hash); # $hash->{helper}{dt} aktualisieren
+	    delete $hash->{saveConfig};
+
+	    my $c = ($dt != $hash->{helper}{dt}) ? sprintf('%.1f', ($dt-$hash->{helper}{dt})) : 0;
+	    delete $hash->{helper}{dtc} if (!$c && exists($hash->{helper}{dtc}));
+	    if ($c && (!exists($hash->{helper}{dtc}))) {
+		$hash->{helper}{dtc} = 1;
+		$c = 0; 
+	    }; # um eine Runde verzögern
+
+	    readingsBeginUpdate($hash);
+	    readingsBulkUpdate($hash, 'dTempCheck', $c);
+	    readingsBulkUpdate($hash, 'windowOpen', '0') if (AttrNum($name, 'windowOpenCheck', 0));
+	    readingsEndUpdate($hash, 1);
+	    $hash->{'.timer'} = 300;
+	    Log3($hash, 3, "name, Tempcheck NOK Reading : $dt <-> WeekProfile : $hash->{helper}{dt}") if ($c);
+	}
+	return;
+    }
+
+    if (($hash->{TYPE} =~ m{ShutterContact\z}xms) && AttrNum($name, 'windowOpenCheck', 1)) {
+	if (ReadingsNum($name, 'onoff', 0)) {
+	    my $age = (sprintf '%02d:%02d', (gmtime(ReadingsAge($name, 'onoff', 0)))[2,1]);
+	    readingsSingleUpdate($hash, 'windowOpen', $age, 1);
+	    $hash->{'.timer'} = 60;
+	}
+	else  {
+	    readingsSingleUpdate($hash, 'windowOpen', '0', 1);
+	    $hash->{'.timer'} = 300;
+	}
+    }
+    return;
 }
 
-sub MAX_Undef
-{
-  my $hash = shift;
-  delete($modules{MAX}{defptr}{$hash->{addr}});
-  return;
+
+sub MAX_Attr {
+
+    my ($cmd, $name, $attrName, $attrVal) = @_;
+    my $hash = $defs{$name};
+
+    if ($cmd eq 'del') {
+
+	return 'FHEM statistics are using this, please do not delete or change !' if ($attrName eq 'model');
+	$hash->{'.actCycle'} = 0 if ($attrName eq 'actCycle');
+	if ($attrName eq 'externalSensor') {
+	    delete($hash->{NOTIFYDEV}); 
+	    notifyRegexpChanged($hash, 'global');
+	}
+	return;
+    }
+
+    if ($cmd eq 'set') {
+	if ($attrName eq 'model') {
+	    #$$attrVal = $hash->{type}; bzw. $_[3] = $hash->{type} , muss das sein ?
+	    return "$name, model is $hash->{type}" if ($attrVal ne $hash->{type});
+	}
+
+	if ($attrName eq 'dummy') {
+	    $attr{$name}{scanTemp}  = '0' if (AttrNum($name, 'scanTemp', 0) && int($attrVal));
+	}
+  
+	if ($attrName eq 'CULdev') {
+	    # ohne Abfrage von init_done : Reihenfoleproblem in der fhem.cfg !
+	    return "$name, invalid CUL device $attrVal" if (!exists($defs{$attrVal}) && $init_done);
+	}
+
+	if ($attrName eq 'actCycle') {
+	    my @ar = split(':',$attrVal);
+	    $ar[0] = 0 if (!$ar[0]);
+	    $ar[1] = 0 if (!$ar[1]);
+	    my $v = (int($ar[0])*3600) + (int($ar[1])*60);
+	    $hash->{'.actCycle'} = $v if ($v >= 0);
+	} 
+
+	if ($attrName eq 'externalSensor') {
+	    return $name.', attribute externalSensor is not supported for this device !' if ($hash->{devtype}>2) && ($hash->{devtype}<6);
+	    my ($sd, $sr, $sn) = split (':', $attrVal);
+	    if($sd && $sr && $sn) {
+		notifyRegexpChanged($hash, "$sd:$sr");
+		$hash->{NOTIFYDEV}=$sd;
+	    }
+	}
+    }
+    return;
 }
 
-sub MAX_TypeToTypeId
-{
-  my $type = shift;
-  foreach my $id (keys %device_types)
-  {
-    return $id if ($type eq $device_types{$id});
-  }
-  return 0;
+sub MAX_Undef {
+    my $hash = shift;
+    delete($modules{MAX}{defptr}{$hash->{addr}});
+    return;
 }
 
-sub MAX_CheckIODev
-{
-  my $hash = shift;
+sub MAX_TypeToTypeId {
+    my $type = shift;
+    foreach my $id (keys %device_types) {
+	return $id if ($type eq $device_types{$id});
+    }
+    return -1;
+}
+
+sub MAX_CheckIODev {
+
+    my $hash = shift;
     return 'device has no valid IODev' if (!exists($hash->{IODev}));
     return 'device IODev has no TYPE' if (!exists($hash->{IODev}{TYPE}));
     return 'device IODev TYPE must be CUL_MAX or MAXLAN' if ($hash->{IODev}{TYPE} ne 'MAXLAN' && $hash->{IODev}{TYPE} ne 'CUL_MAX');
     return 'can not send a command with this IODev (missing IODev->Send)'  if (!exists($hash->{IODev}{Send}));
-    return 'ok';
+    return  $hash->{IODev}{TYPE};
 }
 
-# Print number in format "0.0", pass "on" and "off" verbatim, convert 30.5 and 4.5 to "on" and "off"
-# Used for "desiredTemperature", "ecoTemperature" etc. but not "temperature"
 
-sub MAX_SerializeTemperature
-{
- my $t = shift;
- return $t    if ( $t =~ /^(on|off)$/ );
- return 'off' if ( $t ==  4.5 );
- return 'on'  if ( $t == 30.5 );
- return sprintf('%2.1f', $t);
+sub MAX_SerializeTemperature {
+    # Print number in format "0.0", pass "on" and "off" verbatim, convert 30.5 and 4.5 to "on" and "off"
+    # Used for "desiredTemperature", "ecoTemperature" etc. but not "temperature"
+
+    my $t = shift;
+    return $t    if ( ($t eq 'on') || ($t eq 'off') );
+    return 'off' if ( $t ==  4.5 );
+    return 'on'  if ( $t == 30.5 );
+    return sprintf('%2.1f', $t);
 }
 
-sub MAX_Validate # Todo : kann das weg ?
-{
-  my $name = shift;
-  my $val  = shift;
-  return 1 if (!exists($readingDef{$name}));
-  return $readingDef{$name}[0]->($val);
+sub MAX_Validate {
+    my $name = shift;
+    my $val  = shift // 999;
+    return 0 if (!exists($readingDef{$name}));
+    return $readingDef{$name}[0]->($val);
 }
 
-# Get a reading, validating it's current value (maybe forcing to the default if invalid)
-# "on" and "off" are converted to their numeric values
 
-sub MAX_ReadingsVal
-{
-  my $hash    = shift;
-  my $reading = shift;
-  my $newval  = shift;
-  my $name    = $hash->{NAME};
+sub MAX_ReadingsVal {
+    # Get a reading, validating it's current value (maybe forcing to the default if invalid)
+    # "on" and "off" are converted to their numeric values
 
-  if (defined($newval))
-  {
-    return if ($newval eq '');
-    if (exists($hash->{".updateTimestamp"})) # readingsBulkUpdate ist aktiv, wird von fhem.pl gesetzt/gelöscht
-    {
-      readingsBulkUpdate($hash,$reading,$newval);
-    }
-     else
-    {
-      readingsSingleUpdate($hash,$reading,$newval,1);
-    }
-   return;
-  }
+    my $hash    = shift;
+    my $reading = shift;
+    my $newval  = shift;
+    my $name    = $hash->{NAME};
 
-  my $val = ReadingsVal($name,$reading,"");
-  # $readingDef{$name} array is [validatingFunc, defaultValue]
-  if (exists($readingDef{$reading}) && (!$readingDef{$reading}[0]->($val)))
-  {
-    #Error: invalid value
-    my $err = "invalid or missing value $val for READING $reading";
-    $val = $readingDef{$reading}[1];
-    Log3 $hash, 3, "$name, $err , forcing to $val";
+    my $bulk = (exists($hash->{'.updateTimestamp'})) ? 1 : 0;  # readingsBulkUpdate ist aktiv, wird von fhem.pl gesetzt/gelöscht
 
-    #Save default value to READINGS
-    if (exists($hash->{".updateTimestamp"})) # readingsBulkUpdate ist aktiv, wird von fhem.pl gesetzt/gelöscht
-    {
-      readingsBulkUpdate($hash,$reading,$val);
-      readingsBulkUpdate($hash,'error',$err);
+    if (defined($newval)) {
+	return if ($newval eq '');
+	($bulk) ? readingsBulkUpdate($hash, $reading, $newval) : readingsSingleUpdate($hash, $reading, $newval, 1);
+	return;
     }
-     else
-    {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash,$reading,$val);
-      readingsBulkUpdate($hash,'error',$err);
-      readingsEndUpdate($hash,0);
+
+    my $val = ReadingsVal($name, $reading, '');
+    # $readingDef{$name} array is [validatingFunc, defaultValue]
+    if (exists($readingDef{$reading}) && (!$readingDef{$reading}[0]->($val))) {
+	#Error: invalid value
+	my $err = "invalid or missing value $val for READING $reading";
+	$val = $readingDef{$reading}[1];
+	Log3($name, 3, "$name, $err , forcing to $val");
+
+	# Save default value to READINGS
+	readingsBeginUpdate($hash) if (!$bulk);
+	readingsBulkUpdate($hash, $reading, $val);
+	readingsBulkUpdate($hash, 'error', $err);
+	readingsEndUpdate($hash,0) if (!$bulk);
     }
-  }
-  return MAX_ParseTemperature($val); # ToDo : nochmal alle Aufrufe duchsehen ob das hier Sinn macht
+
+    return MAX_ParseTemperature($val);
 }
 
-sub MAX_ParseWeekProfile
-{
-  my $hash  = shift;
-  my @lines = undef;
+sub MAX_ParseWeekProfile {
 
-  # Format of weekprofile: 16 bit integer (high byte first) for every control point, 13 control points for every day
-  # each 16 bit integer value is parsed as
-  # int time = (value & 0x1FF) * 5;
-  # int hour = (time / 60) % 24;
-  # int minute = time % 60;
-  # int temperature = ((value >> 9) & 0x3F) / 2;
+    my $hash  = shift;
+    my @lines;
 
-  my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
+    # Format of weekprofile: 16 bit integer (high byte first) for every control point, 13 control points for every day
+    # each 16 bit integer value is parsed as
+    # int time = (value & 0x1FF) * 5;
+    # int hour = (time / 60) % 24;
+    # int minute = time % 60;
+    # int temperature = ((value >> 9) & 0x3F) / 2;
 
-  my (undef,$min,$hour,undef,undef,undef,$wday) = localtime(gettimeofday());
-  # (Sun,Mon,Tue,Wed,Thu,Fri,Sat) -> localtime
-  # (Sat,Sun,Mon,Tue,Wed,Thu,Fri) -> MAX intern
-  $wday++; # localtime = MAX Day;
-  $wday -= 7 if ($wday > 6);
-  my $daymins = ($hour*60)+$min;
+    my $curWeekProfile = MAX_ReadingsVal($hash, '.weekProfile');
 
-  $hash->{helper}{dt} = -1;
+    my (undef,$min,$hour,undef,undef,undef,$wday) = localtime(gettimeofday());
+    # (Sun,Mon,Tue,Wed,Thu,Fri,Sat) -> localtime
+    # (Sat,Sun,Mon,Tue,Wed,Thu,Fri) -> MAX intern
+    $wday++; # localtime = MAX Day;
+    $wday -= 7 if ($wday > 6);
+    my $daymins = ($hour*60)+$min;
 
-  #parse weekprofiles for each day
-  for (my $i=0;$i<7;$i++) 
-  {
-    $hash->{helper}{myday} = $i if ($i == $wday);
+    $hash->{helper}{dt} = -1;
 
-    my (@time_prof, @temp_prof);
-    for(my $j=0;$j<13;$j++) 
-    {
-      $time_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))& 0x1FF) * 5;
-      $temp_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
-    }
+    #parse weekprofiles for each day
+    for (my $i=0; $i<7; $i++) {
+	$hash->{helper}{myday} = $i if ($i == $wday);
 
-    my @hours;
-    my @minutes;
-    my $j; # ToDo umschreiben ! 
+	my (@time_prof, @temp_prof);
+	for(my $j=0; $j<13; $j++) {
+	    $time_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))& 0x1FF) * 5;
+	    $temp_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
+	}
 
-    for($j=0;$j<13;$j++) 
-    {
-      $hours[$j] = ($time_prof[$j] / 60 % 24);
-      $minutes[$j] = ($time_prof[$j]%60);
-      #if 00:00 reached, last point in profile was found
-      if (int($hours[$j]) == 0 && int($minutes[$j]) == 0) 
-      {
-        $hours[$j] = 24;
-        last;
-      }
-    }
+	my @hours;
+	my @minutes;
+	my $j; # ToDo umschreiben ! 
 
-    my $time_prof_str = "00:00";
-    my $temp_prof_str;
-    my $line ='';
-    my $json_ti ='';
-    my $json_te ='';
+	for ($j=0; $j<13; $j++) {
+	    $hours[$j] = ($time_prof[$j] / 60 % 24);
+	    $minutes[$j] = ($time_prof[$j]%60);
+	    # if 00:00 reached, last point in profile was found
 
-    for (my $k=0;$k<=$j;$k++) 
-    { 
-      $time_prof_str .= sprintf("-%02d:%02d", $hours[$k], $minutes[$k]);
-      $temp_prof_str .= sprintf("%2.1f °C",$temp_prof[$k]);
+	    if (int($hours[$j]) == 0 && int($minutes[$j]) == 0) {
+		$hours[$j] = 24;
+		last;
+	    }
+	}
 
-      my $t = (sprintf("%2.1f",$temp_prof[$k])+0);
-      $line .=  $t.',';
-      $json_te .="\"$t\"";
+	my $time_prof_str = '00:00';
+	my $temp_prof_str;
+	my $line ='';
+	my $json_ti ='';
+	my $json_te ='';
 
-      $t = sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
-      $line .=  $t;
-      $json_ti .="\"$t\"";
+	for (my $k=0; $k<=$j; $k++) {
+	    $time_prof_str .= sprintf('-%02d:%02d', $hours[$k], $minutes[$k]);
+	    $temp_prof_str .= sprintf('%2.1f °C', $temp_prof[$k]);
 
-      if (($i == $wday) && (((($hours[$k]*60)+$minutes[$k]) > $daymins) && ($hash->{helper}{dt} < 0)))
-      {
-       # der erste Schaltpunkt in der Zukunft ist es
-       $hash->{helper}{dt} = sprintf("%.1f",$temp_prof[$k]);
-      }
+	    my $t = (sprintf('%2.1f', $temp_prof[$k])+0);
+	    $line .=  $t.',';
+	    $json_te .= "\"$t\"";
+
+	    $t = sprintf('%02d:%02d', $hours[$k], $minutes[$k]);
+	    $line .=  $t;
+	    $json_ti .= "\"$t\"";
+
+	    if (($i == $wday) && (((($hours[$k]*60)+$minutes[$k]) > $daymins) && ($hash->{helper}{dt} < 0))) {
+		# der erste Schaltpunkt in der Zukunft ist es
+		$hash->{helper}{dt} = sprintf('%.1f', $temp_prof[$k]);
+	    }
  
-      if ($k < $j) 
-      {
-        $time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
-        $temp_prof_str .= "  /  ";
-        $line .= ','; $json_ti .=','; $json_te .=',';
-      }
+	    if ($k < $j) {
+		$time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
+		$temp_prof_str .= "  /  ";
+		$line .= ','; 
+		$json_ti .= ',';
+		$json_te .= ',';
+	    }
+	}
+
+	if (!defined($hash->{saveConfig})) {
+	    readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
+	    readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
+	}
+	else {
+	    push @lines , 'set '.$hash->{NAME}.' weekProfile '.$decalcDays{$i}.' '.$line;
+	    push @lines , 'setreading '.$hash->{NAME}." weekprofile-$i-$decalcDays{$i}-time ".$time_prof_str;
+	    push @lines , 'setreading '.$hash->{NAME}." weekprofile-$i-$decalcDays{$i}-temp ".$temp_prof_str;
+	    push @lines , '"'.$decalcDays{$i}.'":{"time":['.$json_ti.'],"temp":['.$json_te.']}';
+	}
     }
-    if (!defined($hash->{saveConfig}))
-    {
-     readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
-     readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
-    }
-    else
-    {
-     push @lines ,'set '.$hash->{NAME}.' weekProfile '.$decalcDays{$i}.' '.$line;
-     push @lines ,'setreading '.$hash->{NAME}." weekprofile-$i-$decalcDays{$i}-time ".$time_prof_str;
-     push @lines ,'setreading '.$hash->{NAME}." weekprofile-$i-$decalcDays{$i}-temp ".$temp_prof_str;
-     push @lines ,'"'.$decalcDays{$i}.'":{"time":['.$json_ti.'],"temp":['.$json_te.']}';
-    }
-  }
- return @lines;
+
+    return @lines;
 }
 #############################
 
-sub MAX_WakeUp
-{
-  my $hash = shift;
-  #3F corresponds to 31 seconds wakeup (so its probably the lower 5 bits)
-  return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, "3F", callbackParam => "31" );
+sub MAX_WakeUp {
+    my $hash = shift;
+    #3F corresponds to 31 seconds wakeup (so its probably the lower 5 bits)
+    return ($hash->{IODev}{Send})->($hash->{IODev}, 'WakeUp', $hash->{addr}, '3F', callbackParam => '31');
 }
 
-sub MAX_Get
-{
-  my $hash = shift;
-  my $name = shift;
-  my $cmd  = shift;
+sub MAX_Get {
 
-  return "no get value specified" if(!$cmd);
+    my $hash = shift;
+    my $name = shift;
+    my $cmd  = shift // '?';
+    my $dev  = shift // '';
 
-  my $dev  = shift;
+    return if (IsDummy($name) || IsIgnored($name) || ($hash->{devtype} == 6));
 
-  return if (IsDummy($name) || IsIgnored($name) || ($hash->{devtype} == 6));
+    my $backuped_devs = MAX_BackupedDevs($name);
 
-  my $backuped_devs = MAX_BackupedDevs($name);
+    return  if (!$backuped_devs);
 
-  return  if(!$backuped_devs);
+    return "$name, get show_savedConfig : missing device name !" if (($cmd eq 'show_savedConfig') && !$dev);
 
-  if ($cmd eq 'show_savedConfig')
-  {
-   my $ret;
-   my $dir = AttrVal('global','logdir','./log/');
-   $dir .='/' if ($dir  !~ m/\/$/);
+    if ($cmd eq 'show_savedConfig') {
+	my $ret;
+	my $dir = AttrVal('global', 'logdir', './log/');
+	$dir .='/' if ($dir  !~ m/\/$/);
 
-   my ($error,@lines) = FileRead($dir.$dev.'.max');
-   return $error if($error);
-   foreach (@lines) { $ret .= $_."\n"; }
-   return $ret;
-  }
-
-  return 'unknown argument '.$cmd.' , choose one of show_savedConfig:'.$backuped_devs;
-}
-
-sub MAX_Set
-{
-  my ($hash, $devname, @ar) = @_;
-  my ($setting, @args) = @ar;
-  my $ret = '';
-  my $devtype = int($hash->{devtype});
-
-  return if (IsDummy($devname) || IsIgnored($devname) || !$devtype || ($setting eq 'valveposition'));
-
-  if ($setting eq 'mode')
-  {
-    if ($args[0] eq 'auto') { $setting='desiredTemperature';}
-    if ($args[0] eq 'manual') 
-    { $setting ='desiredTemperature'; 
-      $args[0] = ReadingsVal($devname,'desiredTemperature','20') if (!$args[1]);
+	my ($error, @lines) = FileRead($dir.$dev.'.max');
+	return $error if($error);
+	foreach (@lines) { $ret .= $_."\n"; }
+	return $ret;
     }
-  }
 
-  if (($setting eq "export_Weekprofile") && ReadingsVal($devname,'.wp_json',''))
-  {
-   return CommandSet(undef, $args[0].' profile_data '.$devname.' '.ReadingsVal($devname,'.wp_json',''));
-  }
-  elsif ($setting eq "saveConfig")
-  {
-   return MAX_saveConfig($devname,$args[0]);
-  }
-  elsif ($setting eq "saveAll")
-  {
-   return MAX_Save('all');
-  }
-  elsif (($setting eq "restoreReadings") || ($setting eq "restoreDevice"))
-  {
-   my $f = $args[0];
-   $args[0] =~ s/(.)/sprintf("%x",ord($1))/eg;
-   return if (!$f || ($args[0] eq 'c2a0'));
-   return MAXX_Restore($devname,$setting,$f);
-  }
-  elsif($setting eq "deviceRename") 
-  {
-    my $newName = $args[0];
-    return CommandRename(undef,$devname.' '.$newName);
-  }
+    return "unknown argument $cmd , choose one of show_savedConfig:$backuped_devs";
+}
+
+sub MAX_Set 
+{
+    my ($hash, $devname, $setting, @args) = @_;
+    $setting  // return "set $devname needs at least one argument !";
+
+    my $ret = '';
+    my $devtype = int($hash->{devtype});
+
+    return if (IsDummy($devname) 
+	   || IsIgnored($devname) 
+           || !$devtype 
+           || ($setting eq 'valveposition')
+	   || (($setting eq 'temperature') 
+		&& (($devtype != 7) || ($hash->{IODev}->{TYPE} ne 'CUL_MAX')))
+	    );
+
+    if ($setting eq 'mode') {
+	$setting = 'desiredTemperature' if ($args[0] eq 'auto');
+
+	if ($args[0] eq 'manual') { 
+	    $setting ='desiredTemperature'; 
+	    $args[0] = ReadingsVal($devname, 'desiredTemperature', '20') if (!$args[1]);
+	}
+    }
+
+    if (($setting eq 'export_Weekprofile') && ReadingsVal($devname, '.wp_json', '')) {
+	return CommandSet(undef, $args[0].' profile_data '.$devname.' '.ReadingsVal($devname,'.wp_json',''));
+    }
+
+    return MAX_saveConfig($devname, $args[0]) if ($setting eq 'saveConfig');
+
+    return MAX_Save('all') if ($setting eq 'saveAll');
+
+    if (($setting eq "restoreReadings") || ($setting eq "restoreDevice")) {
+	my $f = $args[0];
+	$args[0] =~ s/(.)/sprintf("%x",ord($1))/eg;
+	return if (!$f || ($args[0] eq 'c2a0'));
+	return MAXX_Restore($devname ,$setting, $f);
+    }
+
+    if ($setting eq 'deviceRename') {
+	my $newName = $args[0];
+	return CommandRename(undef, "$devname $newName");
+    }
 
     if ($setting ne '?') {
 	my $error =  MAX_CheckIODev($hash);
-	if ($error ne 'ok') {
+	if (($error ne 'CUL_MAX') && ($error ne 'MAXLAN')) {
 	    Log3($hash, 2, "$devname, $error");
 	    return $error;
 	}
     }
 
-  if($setting eq 'desiredTemperature' and $hash->{type} =~ /.*Thermostat.*/) 
-  {
-    return $devname.', missing value' if(!@args);
+    if (($setting eq 'desiredTemperature') && ($hash->{type} =~ m{Thermostat}xms)) {
+	return "$devname, missing value" if (!@args);
 
-    my $temperature;
-    my $until = undef;
-    my $ctrlmode = 1; # 0=auto, 1=manual; 2=temporary
+	my $temperature;
+	my $until = undef;
+	my $ctrlmode = 1; # 0=auto, 1=manual; 2=temporary
     
 
-    if($args[0] eq "auto") 
-    {
-      # This enables the automatic/schedule mode where the thermostat follows the weekly program
-      # There can be a temperature supplied, which will be kept until the next switch point of the weekly program
+	if ($args[0] eq "auto") {
+    	    # This enables the automatic/schedule mode where the thermostat follows the weekly program
+    	    # There can be a temperature supplied, which will be kept until the next switch point of the weekly program
 
-      if(@args == 2) 
+    	    if(@args == 2) 
       {
         if($args[1] eq "eco") 
         {
@@ -799,7 +770,8 @@ sub MAX_Set
       #MAX_ReadingsVal($hash,'temperature',$temperature);
     }
   }
-  elsif(grep (/^\Q$setting\E$/, ("boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset")) and $hash->{type} =~ /.*Thermostat.*/)
+
+  if(grep (/^\Q$setting\E$/, ("boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset")) and $hash->{type} =~ /.*Thermostat.*/)
   {
 
     $args[0] =~ s/ //g;
@@ -852,7 +824,8 @@ sub MAX_Set
      { MAX_ReadingsVal($hash,$setting,$val); }
     
   }
-  elsif($setting eq "groupid")
+
+  if($setting eq "groupid")
   {
     return "argument needed" if(@args == 0);
 
@@ -876,9 +849,10 @@ sub MAX_Set
      else { MAX_ReadingsVal($hash,'groupid','0',1); return; } # Virtueller FK / WT
     }
   }
-  elsif( grep (/^\Q$setting\E$/, ("ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" )) and $hash->{type} =~ /.*Thermostat.*/) 
+
+  if( grep (/^\Q$setting\E$/, ("ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" )) and $hash->{type} =~ /.*Thermostat.*/) 
   {
-    if(!MAX_Validate($setting, $args[0])) 
+    if (!MAX_Validate($setting, $args[0])) 
     {
       $ret = $devname.', invalid value '.$args[0].' for '.$setting;
       Log3 $hash, 1, $ret;
@@ -919,8 +893,9 @@ sub MAX_Set
       return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ), callbackParam => "$setting,$args[0]");
      }
     } else {MAX_ReadingsVal($hash,$setting,$args[0]); }
-  } 
-  elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") 
+  }
+
+  if($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") 
   {
     return $devname.', invalid arg' if($args[0] ne '0' and $args[0] ne '1');
     MAX_ReadingsVal($hash,'lastcmd','set_displayActualTemperature'. $args[0]);
@@ -990,7 +965,8 @@ sub MAX_Set
      }
     }
   } 
-  elsif($setting eq "factoryReset") 
+
+  if($setting eq "factoryReset") 
   {
     MAX_ReadingsVal($hash,'lastcmd','set_factoryReset');
     if(exists($hash->{IODev}{RemoveDevice})) 
@@ -1003,12 +979,14 @@ sub MAX_Set
       #CUL_MAX
       return ($hash->{IODev}{Send})->($hash->{IODev},"Reset",$hash->{addr});
     }
-  } 
-   elsif($setting eq "wakeUp") 
+  }
+
+  if($setting eq "wakeUp") 
   {
     return MAX_WakeUp($hash);
   }
-   elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) 
+
+  if($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) 
   {
     return "Invalid arguments.  You must specify at least one: <weekDay> <temp[,hh:mm]>\nExample: Mon 10,06:00,17,09:00" if((@args%2 == 1)||(@args == 0));
 
@@ -1040,7 +1018,7 @@ sub MAX_Set
         }
         my $temperature = $controlpoints[$j];
         return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 24 || $min > 59 || ($hour == 24 && $min > 0));
-        return "Invalid temperature (Must be one of: off|on|5|5.5|6|6.5..30)" if(!MAX_validTemperature($temperature));
+        return "Invalid temperature (Must be one of: off|on|5|5.5|6|6.5..30)" if (!MAX_validTemperature($temperature));
         $temperature = MAX_ParseTemperature($temperature); #replace "on" and "off" by their values
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
       }
@@ -1069,12 +1047,13 @@ sub MAX_Set
        readingsBeginUpdate($hash);
         MAX_ParseWeekProfile($hash);
        readingsEndUpdate($hash,0);
-       MAX_saveConfig($devname,'') if (AttrNum($devname,'autosaveConfig',1));
+       MAX_saveConfig($devname) if (AttrNum($devname,'autosaveConfig', 0));
       }
  
     }
   }# letztes Set Kommando 
-  elsif (($setting =~ /(open|close)/) && ($devtype == 6) && ($hash->{IODev}->{TYPE} eq 'CUL_MAX'))
+
+  if (($setting =~ /(open|close)/) && ($devtype == 6) && ($hash->{IODev}->{TYPE} eq 'CUL_MAX'))
   {
       my $dest     = '';
       my $state    = ($setting eq 'open') ? '12' : '10';
@@ -1144,21 +1123,24 @@ sub MAX_Set
     Log3 $hash, 3, "$devname, $ret" if ($ret);
     return $ret;
   }
-  elsif ($setting eq 'temperature')
+
+  if ($setting eq 'temperature')
   {
     return if (($devtype != 7) || ($hash->{IODev}->{TYPE} ne 'CUL_MAX'));
 
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,'temperature', $args[0]);
     readingsEndUpdate($hash,1);
-
+    return;
   }
-  else
-  {
+
+
     my $templist = join(",",map { MAX_SerializeTemperature($_/2) }  (9..61));
-    #$ret  = "Unknown argument $setting, choose one of deviceRename ";
+
     $ret  = "deviceRename";
     $ret .= " wakeUp:noArg factoryReset:noArg groupid" if (($devtype < 5) || ($devtype == 8));
+
+    my $check = MAX_CheckIODev($hash);
 
     my @ar;
     #Build list of devices which this device can be associated to
@@ -1176,13 +1158,14 @@ sub MAX_Set
       { push  @ar, $modules{MAX}{defptr}{$_}->{NAME}; }
      }
 
-     if($hash->{IODev}->{TYPE} eq "CUL_MAX") 
+     if ($check eq 'CUL_MAX')
      {
-      push @ar, "fakeShutterContact";
-      push @ar, "fakeWallThermostat";
+      push @ar, 'fakeShutterContact';
+      push @ar, 'fakeWallThermostat';
      }
-    } 
-     elsif($hash->{type} =~ /WallMountedThermostat/)
+    }
+
+    if($hash->{type} =~ /WallMountedThermostat/)
     {
      foreach (keys %{$modules{MAX}{defptr}})
      {
@@ -1196,10 +1179,11 @@ sub MAX_Set
       { push  @ar, $modules{MAX}{defptr}{$_}->{NAME}; }
      }
 
-     push @ar, "fakeShutterContact" if($hash->{IODev}->{TYPE} eq "CUL_MAX");
+     push @ar, 'fakeShutterContact' if ($check eq 'CUL_MAX');
 
     }
-     elsif($hash->{type} eq "ShutterContact") 
+
+    if($hash->{type} eq "ShutterContact") 
     {
      foreach ( keys %{$modules{MAX}{defptr}} ) 
      {
@@ -1255,17 +1239,20 @@ sub MAX_Set
       #{
         #$ret .= " maximumTemperature:$templist minimumTemperature:$templist";
       #}
-    } 
-    elsif($devtype == 3) # WT 
+    }
+ 
+    if($devtype == 3) # WT 
     {
       $ret .= " displayActualTemperature:0,1";
-    } 
-    elsif($devtype == 6) # virtual SC
+    }
+ 
+    if($devtype == 6) # virtual SC
     {
       $ret .= " groupid";
       $ret .= " open:noArg close:noArg" if (ReadingsNum($devname,'groupid',0));
     } 
-    elsif($devtype == 7) # virtual WT
+
+    if($devtype == 7) # virtual WT
     {
       MAX_ReadingsVal($hash,'groupid');
       MAX_ReadingsVal($hash,'.weekprofile');
@@ -1277,7 +1264,8 @@ sub MAX_Set
       $ret .= " restoreReadings:$backuped_devs" if ($backuped_devs);
       $ret .= " ".$wplist if ($wplist);
     } 
-    elsif ($devtype == 8) # PlugAdapter
+
+    if ($devtype == 8) # PlugAdapter
     {
       $ret .= " desiredTemperature:eco,comfort,boost,auto,$templist comfortTemperature:$templist ecoTemperature:$templist";
       $ret .= " saveConfig weekProfile";
@@ -1286,30 +1274,30 @@ sub MAX_Set
     }
  
     return AttrTemplate_Set ($hash, $ret, $devname, $setting, @args);
-  } # set ?
- return;
 }
 
-sub MAX_Save
-{
- my $dev = shift;
- $dev = 'all' if (!defined($dev));
+sub MAX_Save {
 
- if ($dev eq 'all')
- {
-  my   $list = join(",", map { defined($_->{type}) && $_->{type} =~ /.*Thermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
-  my @ar = split(',' , $list);
-  foreach (@ar) { MAX_saveConfig($_,''); }
- }
- else { return MAX_saveConfig($dev,''); }
+    my $dev = shift // 'all';
 
- return;
+    if ($dev eq 'all') {
+	my   $list = join(",", map { defined($_->{type}) && $_->{type} =~ /.*Thermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+	my @ar = split(',' , $list);
+	foreach my $dev (@ar) {
+	    MAX_saveConfig($dev);
+	}
+    }
+    else { 
+	return MAX_saveConfig($dev);
+    }
+
+    return;
 }
 
 sub MAX_saveConfig {
     my $name    = shift;
-    my $fname   = shift;
-       $fname   //= $name;
+    my $fname   = shift // $name;
+
     my $hash    = $defs{$name};
     my $devtype = int($hash->{devtype});
     my $dir     = AttrVal('global', 'logdir', './log/');
@@ -1387,7 +1375,6 @@ sub MAX_saveConfig {
 	push @lines , "setreading $name .wp_json ".'{'.join(',', @j_arr).'}';
     }
 
-    push @lines , "setreading $name .wp_json ".'{'.join(',', @j_arr).'}';
     my $error = FileWrite($dir.$fname.'.max', @lines);
 
     if ($error) { 
@@ -1404,82 +1391,81 @@ sub MAX_saveConfig {
 
     return;
 }
+
 sub MAXX_Restore
 {
- my $name   = shift;
- my $action = shift;
- my $fname  = shift;
- my $hash   = $defs{$name};
- $fname     = $name if (!$fname);
- my $dir    = AttrVal('global','logdir','./log/');
- $dir .='/' if ($dir  !~ m/\/$/);
+    my $name   = shift;
+    my $action = shift // '';
+    my $fname  = shift // $name;
+    my $hash   = $defs{$name};
 
- my ($error, @lines) = FileRead($dir.$fname.'.max');
+    my $dir    = AttrVal('global', 'logdir', './log/');
+    $dir .='/' if ($dir !~ m/\/$/);
 
- if ($error)
- {
-  Log3 $hash,2,"$name, $action : $error";
-  return $error;
- }
+    my ($error, @lines) = FileRead($dir.$fname.'.max');
 
- if (@lines && $action)
- {
-  readingsBeginUpdate($hash);
-  foreach (@lines)
-  {
-   my ($cmd,$dname,$reading,$val,$val2) = split(' ',$_);
-   next if ((!defined($cmd)) || (!defined($dname)) || (!defined($reading)) || (!defined($val)));
-   $val .=' '.$val2 if($val2); 
-   readingsBulkUpdate($hash,$reading,$val) if ($cmd eq 'setreading');
-  }
+    if ($error) {
+	Log3($name, 2, "$name, $action : $error");
+	return $error;
+    }
 
-  MAX_ParseWeekProfile($hash);
-  readingsEndUpdate($hash,0);
- }
- 
-if (@lines && ($action eq 'restoreDevice'))
- {
-  foreach (@lines)
-  {
-   my ($cmd,$dname,$reading,$val,$val2) = split(' ',$_);
-   next if ((!defined($cmd)) || (!defined($dname)) || (!defined($reading)) || (!defined($val)));
-   $val .=' '.$val2 if($val2);
-   $error.= CommandSet(undef,$name.' '.$reading.' '.$val) if  ($cmd eq 'set');
-  }
- }
- return $error;
+     my $has_wp = 0;
+
+    if (@lines) {
+	readingsBeginUpdate($hash);
+	foreach my $line (@lines) {
+	    my ($cmd, $dname, $reading, @val) = split(' ', $line);
+	    next if (!$cmd || !$dname || !$reading || !@val);
+	    $has_wp = 1 if ($reading eq '.weekProfile');
+
+	    readingsBulkUpdate($hash, $reading, join(' ', @val)) if ($cmd eq 'setreading');
+	    $error.= CommandSet(undef, "$name $reading ".join(' ', @val)) if  (($cmd eq 'set') && ($action eq 'restoreDevice'));
+	}
+
+	MAX_ParseWeekProfile($hash) if ($has_wp);
+	readingsEndUpdate($hash, 0);
+    }
+
+    return $error;
 }
 
 
 #############################
-sub MAX_ParseDateTime
-{
-  my ($byte1,$byte2,$byte3) = @_;
-  my $day = $byte1 & 0x1F;
-  my $month = (($byte1 & 0xE0) >> 4) | ($byte2 >> 7);
-  my $year = $byte2 & 0x3F;
-  my $time = ($byte3 & 0x3F);
-  if($time%2){
-    $time = int($time/2).":30";
-  }else{
-    $time = int($time/2).":00";
-  }
-  return { "day" => $day, "month" => $month, "year" => $year, "time" => $time, "str" => "$day.$month.$year $time" };
+
+sub MAX_ParseDateTime {
+
+    my ($byte1,$byte2,$byte3) = @_;
+    my $day = $byte1 & 0x1F;
+    my $month = (($byte1 & 0xE0) >> 4) | ($byte2 >> 7);
+    my $year = $byte2 & 0x3F;
+    my $time = ($byte3 & 0x3F);
+
+    $time = ($time%2) ? int($time/2).':30' : int($time/2).':00';
+
+    return {   'day' => $day,
+	     'month' => $month,
+	      'year' => $year,
+	      'time' => $time,
+	       'str' => "$day.$month.$year $time"
+	    };
 }
 
 #############################
+
 sub MAX_Parse
 {
   my $hash = shift;
+  my $name = $hash->{NAME};
+
   my $msg  = shift;
-  my ($MAX,$isToMe,$msgtype,$addr,@args) = split(",",$msg);
+  my ($MAX,$isToMe,$msgtype,$addr,@args) = split(',',$msg);
 
   # ToDo args undef
   # $isToMe is 1 if the message was direct at the device $hash, and 0
   # if we just snooped a message directed at a different device (by CUL_MAX).
   # MAX = Aufruf via CUL_MAx , MAX2 = zweiter Durchlauf aus MAX_Parse selbst nochmal
 
-  Log3 $hash, 5, "MAX_Parse, $msg";
+  Log3($name, 5, "MAX_Parse, $msg");
 
   return  if (($MAX ne 'MAX') && ($MAX ne 'MAX2'));
 
@@ -1517,10 +1503,11 @@ sub MAX_Parse
   ################################################################
 
   my $shash = $modules{MAX}{defptr}{$addr};
+
   if (!defined($shash->{NAME}))
   {
    Log3 $hash, 1, 'MAX_Parse, ohne Namen msg: '.$msg;
-   return $hash->{NAME};
+   return $name;
   }
   else
   {
@@ -1536,21 +1523,18 @@ sub MAX_Parse
 
   my $skipDouble = AttrNum($sname,'skipDouble',0); # Pakete mit gleichem MSGCNT verwerfen, bsp WT/FK an alle seine HTs ?
   my $debug      = AttrNum($sname,'debug',0);
-  my $iogrp      = AttrVal($hash->{NAME} , 'IOgrp' ,''); # hat CUL_MAX eine IO Gruppe ?
-  my @ios        = split(',',$iogrp);
+  #my $iogrp      = AttrVal($hash->{NAME} , 'IOgrp' ,''); # hat CUL_MAX eine IO Gruppe ?
+  #my @ios        = split(',', AttrVal($name, 'IOgrp' ,''));
 
   if ($MAX eq 'MAX')
   {
    readingsBeginUpdate($shash);
    readingsBulkUpdate($shash,'.lastact',time());
-   readingsBulkUpdate($shash,'Activity','alive') if (($hash->{TYPE} eq 'CUL_MAX') && InternalVal($sname,'.actCycle','0'));
-  }
-
-  if ($iogrp && $debug)
-  {
-    foreach (@ios)
-    {
-     readingsBulkUpdate($shash,$_.'_RSSI' , $shash->{helper}{io}{$_}{'rssi'}) if (defined($shash->{helper}{io}{$_}{'rssi'}));
+   readingsBulkUpdate($shash, 'Activity', 'alive') if (($hash->{TYPE} eq 'CUL_MAX') && InternalVal($sname,'.actCycle','0'));
+   if (exists($shash->{helper}{io}) && $debug) {
+	foreach my $cul (keys %{$shash->{helper}{io}}) {
+    	    readingsBulkUpdate($shash, $cul.'_RSSI', $shash->{helper}{io}{$cul}{'rssi'});
+	}
     }
   }
 
@@ -1560,7 +1544,7 @@ sub MAX_Parse
     Log3 $hash, 2, "$sname changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
     $shash->{type} = $devicetype;
     readingsBulkUpdate($shash, "SerialNr", $args[1]) if (defined($args[1]));
-    readingsBulkUpdate($shash, "groupid",  $args[2]) if (defined($args[2]) && !$isToMe);# ToDo prüfen, wird hier die groupid beim repairing platt gemacht ?
+    #readingsBulkUpdate($shash, "groupid",  $args[2]) if (defined($args[2]) && !$isToMe);# ToDo prüfen, wird hier die groupid beim repairing platt gemacht ?
     $shash->{IODev} = $hash;
   } 
   elsif($msgtype eq "ThermostatState") 
@@ -1773,7 +1757,7 @@ sub MAX_Parse
     }
 
     MAX_ParseWeekProfile($shash);
-    MAX_saveConfig($shash->{NAME},'') if (AttrNum($shash->{NAME},'autosaveConfig',1));
+    MAX_saveConfig($shash->{NAME}) if (AttrNum($shash->{NAME}, 'autosaveConfig', 0));
   } 
   elsif($msgtype eq "Error") # ToDo : kommen die Errors nur von MAXLAN ? 
   {
@@ -1804,7 +1788,7 @@ sub MAX_Parse
     readingsBulkUpdate($shash, ".weekProfile", $curWeekProfile);
     readingsBulkUpdate($shash, 'lastcmd','ConfigWeekProfile');
     MAX_ParseWeekProfile($shash);
-    MAX_saveConfig($shash->{NAME},'') if (AttrNum($shash->{NAME},'autosaveConfig',1));
+    MAX_saveConfig($shash->{NAME}) if (AttrNum($shash->{NAME}, 'autosaveConfig', 0));
     Log3 $shash, 5, "$shash->{NAME}, new weekProfile: " . MAX_ReadingsVal($shash, ".weekProfile");
   } 
   elsif(grep /^$msgtype$/, ("AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" )) 
@@ -1827,7 +1811,7 @@ sub MAX_Parse
       readingsBulkUpdate($shash, $args[0], $args[1]);
       readingsBulkUpdate($shash, 'lastcmd',$args[0].' '.$args[1]);
     }
-   MAX_saveConfig($shash->{NAME},'') if (AttrNum($shash->{NAME},'autosaveConfig',1));
+   MAX_saveConfig($shash->{NAME}) if (AttrNum($shash->{NAME}, 'autosaveConfig', 0));
   } 
   elsif(grep /^$msgtype$/, ("AckSetGroupId", "AckRemoveGroupId" )) 
   {
@@ -1871,7 +1855,7 @@ sub MAX_Parse
 
     readingsBulkUpdate($shash, 'peers', join(',',@peers)) if (@peers);
     readingsBulkUpdate($shash, 'lastcmd',join(' ',@args));
-    MAX_saveConfig($shash->{NAME},'') if (AttrNum($shash->{NAME},'autosaveConfig',1));
+    MAX_saveConfig($shash->{NAME}) if (AttrNum($shash->{NAME}, 'autosaveConfig', 0));
   }
   elsif($msgtype eq "Ack") 
   {
@@ -2046,27 +2030,26 @@ sub MAX_Parse
 #}
 
 #############################
-sub MAX_DbLog_splitFn
-{
-  my $event = shift;
-  my $name  = shift;
-  my ($reading, $value, $unit) = '';
+sub MAX_DbLog_splitFn {
 
-  my @parts = split(/ /,$event);
-  $reading = shift @parts;
-  $reading =~ tr/://d;
-  $value = $parts[0];
-  $value = $parts[1]  if (defined($value) && (lc($value) =~ m/auto/));
+    my $event = shift;
+    my $name  = shift;
+    my ($reading, $value, $unit) = '';
 
-  if (!AttrNum($name,'DbLog_log_onoff',0))
-  {
-   $value = '4.5'  if ( $value eq 'off' );
-   $value = '30.5' if ( $value eq 'on' );
-  }
+    my @parts = split(/ /,$event);
+    $reading = shift @parts;
+    $reading =~ tr/://d;
+    $value = $parts[0];
+    $value = $parts[1]  if (defined($value) && (lc($value) =~ m/auto/));
 
-  $unit = '\xB0C' if ( lc($reading) =~ m/temp/ );
-  $unit = '%'     if ( lc($reading) =~ m/valve/ );
-  return ($reading, $value, $unit);
+    if (!AttrNum($name, 'DbLog_log_onoff', 0)) {
+	$value = '4.5'  if ( $value eq 'off' );
+	$value = '30.5' if ( $value eq 'on' );
+    }
+
+    $unit = '\xB0C' if ( lc($reading) =~ m/temp/ );
+    $unit = '%'     if ( lc($reading) =~ m/valve/ );
+    return ($reading, $value, $unit);
 }
 
 sub MAX_RenameFn
@@ -2090,55 +2073,57 @@ sub MAX_RenameFn
 
 sub MAX_Notify
 {
-  # $hash is my hash, $dev_hash is the hash of the changed device
-  my $hash     = shift;
-  my $dev_hash = shift;
-  my $name = $hash->{NAME};
-  my ($sd,$sr,$sn,$sm) = split(':',AttrVal($name,'externalSensor','::'));
+    # $hash is my hash, $dev_hash is the hash of the changed device
+    my $hash     = shift;
+    my $dev_hash = shift;
+    my $name = $hash->{NAME};
 
-  return  if ($dev_hash->{NAME} ne $sd);
+    my ($sd,$sr,$sn,$sm) = split(':', AttrVal($name, 'externalSensor', '::'));
 
-  my $events = deviceEvents($dev_hash,0);
-  my $reading; my $val; my $ret;
+    return  if ($dev_hash->{NAME} ne $sd);
 
-  foreach ( @{$events} )
-  {
-   Log3 $hash,5,$name.', NOTIFY EVENT -> Dev : '.$dev_hash->{NAME}.' | Event : '.$_;
-   ($reading,$val) = split(': ',$_);
-   $reading =~ s/ //g;
-   if (!defined($val) && defined($reading)) # das muss state sein
-   {
-    $val     = $reading;
-    $reading = 'state';
-   }
-   last if ($reading eq $sr);
-  }
-  return if (!defined($val) || ($reading ne $sr)); # der Event war nicht dabei
+    my $events = deviceEvents($dev_hash,0);
+    my $reading; 
+    my $val; 
+    my $ret;
 
-  if (($hash->{devtype} < 6) || ($hash->{devtype} == 8))
-  {
-   return if (!exists($hash->{READINGS}{desiredTemperature}{VAL}));
-   my $dt = MAX_ParseTemperature($hash->{READINGS}{desiredTemperature}{VAL});
+    foreach  my $event ( @{$events} ) {
+	Log3($name, 5, "$name, NOTIFY EVENT -> Dev : $dev_hash->{NAME} | Event : $event");
+	($reading,$val) = split(': ',$event);
+	$reading =~ s/ //g;
+	if (!defined($val) && defined($reading)) { # das muss state sein
+	    $val     = $reading;
+	    $reading = 'state';
+	}
+	last if ($reading eq $sr);
+    }
 
-   Log3 $hash,5,$name.', updating externalTemp with '.$val;
-   setReadingsVal($hash,'externalTemp',$val,TimeNow());
-   $ret = CommandSet(undef,$hash->{IODev}{NAME}." fakeWT $name $dt $val") if ($sn);
-  }
-  elsif ($hash->{devtype} == 6)
-  {
-    Log3 $hash,5,"$name, $reading - $val";
-    return if (($val !~ m/$sn/) && ($val !~ m/$sm/));
-    Log3 $hash,4,"$name, got external open/close trigger -> $sd:$sr:$val";
-    $ret = CommandSet(undef,$name.' open q')  if ($val =~ m/$sn/);
-    $ret = CommandSet(undef,$name.' close q') if ($val =~ m/$sm/);
-  }
-  elsif ($hash->{devtype} == 7)
-  {
-   setReadingsVal($hash,'temperature',sprintf("%.1f",$val),TimeNow());
-  }
+    return if (!defined($val) || ($reading ne $sr)); # der Event war nicht dabei
 
-  Log3 $hash,3,"$name, NotifyFN : $ret" if ($ret);
-  return;
+    if (($hash->{devtype} < 6) || ($hash->{devtype} == 8)) {
+	return if (!exists($hash->{READINGS}{desiredTemperature}{VAL}));
+	my $dt = MAX_ParseTemperature($hash->{READINGS}{desiredTemperature}{VAL});
+
+	Log3($name, 5, "$name, updating externalTemp with $val");
+	setReadingsVal($hash, 'externalTemp', $val, TimeNow());
+
+	my $check = MAX_CheckIODev($hash);
+	$ret = $check  if ($check ne 'CUL_MAX');
+	$ret = CommandSet(undef,$hash->{IODev}{NAME}." fakeWT $name $dt $val") if (!$ret && $sn);
+    }
+
+    if ($hash->{devtype} == 6) {
+	Log3($name, 5, "$name, $reading - $val");
+	return if (($val !~ m/$sn/) && ($val !~ m/$sm/));
+	Log3($name, 4, "$name, got external open/close trigger -> $sd:$sr:$val");
+	$ret = CommandSet(undef,$name.' open q')  if ($val =~ m/$sn/);
+	$ret = CommandSet(undef,$name.' close q') if ($val =~ m/$sm/);
+    }
+
+    setReadingsVal($hash, 'temperature', sprintf('%.1f', $val), TimeNow()) if ($hash->{devtype} == 7);
+
+    Log3($name, 3, "$name, NotifyFN : $ret") if ($ret);
+    return;
 }
 
 sub MAX_FileList
@@ -2350,6 +2335,7 @@ sub MAX_today
     as it is the only member of the MAX! family that does not send cyclical status messages !</li><br>
     <a name="CULdev"></a><li>CULdev &lt;name&gt; default none (only with CUL_MAX)<br>
     send device when the CUL_MAX device is using a IOgrp (Multi IO)</li><br>
+    <a name="DbLog_log_onoff"></a><li>DbLog_log_onoff (0|1) log on  and off or the real values 30.5 and 4.5</li><br>
     <a name="dummy"></a><li>dummy (0|1) default 0<br>sets device to a read-only device</li><br>
     <a name="debug"></a><li>debug (0|1) default 0<br>creates extra readings (only with CUL_MAX)</li><br>
     <a name="dTempCheck"></a><li>dTempCheck (0|1) default 0<br>
@@ -2557,6 +2543,10 @@ sub MAX_today
     <b>Wichtig</b> : Der Einsatz ist Nicht sinnvoll beim ECO Taster, da dieser als einziges Mitglied der MAX! Familie keine zyklischen Statusnachrichten verschickt !</li><br>
     <a name="CULdev"></a><li>CULdev &lt;name&gt; default leer (nur mit CUL_MAX)<br>
     CUL der zum senden benutzt wird wenn CUL_MAX eine IO Gruppe verwendet (Multi IO )</li><br>
+
+    <a name="DbLog_log_onoff"></a><li>DbLog_log_onoff (0|1) schreibe die Werte on und off als Text in die DB oder ersetzt sie direkt durch
+    ihre numerischen Werte 30.5 and 4.5<br>Hilfreich bei Plots da auf eine extra Plotfunktion verzichtet werden kann.</li><br>
+
     <a name="debug"></a><li>debug (0|1) default 0<br>erzeugt zus&auml;tzliche Readings (nur mit CUL_MAX)</li><br>
 
     <a name="dTempCheck"></a><li>dTempCheck (0|1) default 0<br>&uuml;berwacht im Abstand von 5 Minuten ob das Reading desiredTemperatur
