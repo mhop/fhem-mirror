@@ -3976,6 +3976,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     my $info .= " Gets ------\n";
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
+    $hash->{helper}{cmds}{TmplTs}=gettimeofday();# force re-arrange of template commands
     $info .= join("\n",map{if($_ !~ m/]../){(my $foo = $_) =~ s/\|/\n\t/g; $foo;}else{$_}} sort (CUL_HM_SetList($name)));
 
     #my $a = CUL_HMTmplSetCmd($name)." ";
@@ -4192,8 +4193,10 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
     $hash->{helper}{cmds}{cmdList} = \@arr1cmd;
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
   }
+
   my $tmplStamp = CUL_HM_getTemplateModify();
-  if( $hash->{helper}{cmds}{TmplKey} ne InternalVal($name,"peerList","").":".$tmplStamp){
+  my $tmplAssTs = (defined $hash->{helper}{cmds}{TmplTs} ? $hash->{helper}{cmds}{TmplTs}:"noAssTs");# template assign timestamp
+  if( $hash->{helper}{cmds}{TmplKey} ne InternalVal($name,"peerList","").":$tmplStamp:$tmplAssTs"){
     my @arr1 =  map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name));
     push @arr1, map{(my $foo = $_) =~ s/:(.*)/:[$1]/; $foo;}
                 map{(my $foo = $_) =~ s/,/|/g; $foo;} 
@@ -4203,6 +4206,7 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
 
     $hash->{helper}{cmds}{TmplKey}  = InternalVal($name,"peerList","")
                                      .":$tmplStamp"
+                                     .":$tmplAssTs"
                                      ;   
   }
 
@@ -6490,7 +6494,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
     }    
   }
-################################################################################################################
+###############################################################################
   elsif($cmd  =~ m/^(pair|getVersion)$/) { ####################################
     $state = "";
     my $serial = ReadingsVal($name, "D-serialNr", undef);
@@ -8477,6 +8481,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
 }
 sub CUL_HM_setTmplDisp($){ # remove register if outdated
   my $tHash = shift;
+  $tHash->{helper}{cmds}{TmplTs} = gettimeofday(); #set marker to update command list
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
   if ($tHash->{helper}{expert}{tpl} && (%HMConfig::culHmTpl)){
     foreach (keys %{$tHash->{helper}{tmpl}}){
