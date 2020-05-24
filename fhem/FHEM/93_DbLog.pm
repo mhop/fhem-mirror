@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
+  "4.9.13"  => "12.05.2020 commandRef changed, AutoInactiveDestroy => 1 for dbh ",
   "4.9.12"  => "28.04.2020 fix line breaks in set function, Forum: #110673 ",
   "4.9.11"  => "22.03.2020 logfile entry if DBI module not installed, Forum: #109382 ",
   "4.9.10"  => "31.01.2020 fix warning, Forum: #107950 ",
@@ -421,15 +423,17 @@ sub DbLog_Attr(@) {
       
       if( $aName eq 'valueFn' ) {
           my %specials= (
-             "%TIMESTAMP" => $name,
-             "%DEVICE" => $name,
-             "%DEVICETYPE" => $name,
-             "%EVENT" => $name,
-             "%READING" => $name,
-             "%VALUE" => $name,
-             "%UNIT" => $name,
-             "%IGNORE" => $name,
-             "%CN" => $name,
+             "%TIMESTAMP"     => $name,
+             "%LASTTIMESTAMP" => $name,
+             "%DEVICE"        => $name,
+             "%DEVICETYPE"    => $name,
+             "%EVENT"         => $name,
+             "%READING"       => $name,
+             "%VALUE"         => $name,
+             "%LASTVALUE"     => $name,
+             "%UNIT"          => $name,
+             "%IGNORE"        => $name,
+             "%CN"            => $name
           );
           my $err = perlSyntaxCheck($aVal, %specials);
           return $err if($err);
@@ -1463,25 +1467,31 @@ sub DbLog_Log($$) {
               $DoIt = DbLog_checkDefMinInt($name,$dev_name,$now,$reading,$value);
         
               if ($DoIt) {
+                  my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};    # patch Forum:#111423
+                  my $lastv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};   
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
                   
                   # Device spezifische DbLogValueFn-Funktion anwenden
                   if($DbLogValueFn ne '') {
-                      my $TIMESTAMP  = $timestamp;
-                      my $DEVICE     = $dev_name;
-                      my $EVENT      = $event;
-                      my $READING    = $reading;
-                      my $VALUE      = $value;
-                      my $UNIT       = $unit;
-                      my $IGNORE     = 0;
-                      my $CN         = " ";
+                      my $TIMESTAMP     = $timestamp;
+                      my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
+                      my $DEVICE        = $dev_name;
+                      my $EVENT         = $event;
+                      my $READING       = $reading;
+                      my $VALUE         = $value;
+                      my $LASTVALUE     = $lastv // "";                      # patch Forum:#111423
+                      my $UNIT          = $unit;
+                      my $IGNORE        = 0;
+                      my $CN            = " ";
 
                       eval $DbLogValueFn;
                       Log3 $name, 2, "DbLog $name -> error device \"$dev_name\" specific DbLogValueFn: ".$@ if($@);
                       
                       if($IGNORE) {
-                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $DbLogValueFn
+                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);  # patch Forum:#111423
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);  
                           Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                                   if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                           next;  
@@ -1494,28 +1504,32 @@ sub DbLog_Log($$) {
                       } else {
                           Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
                       }
-                      $reading   = $READING    if($READING ne '');
-                      $value     = $VALUE      if(defined $VALUE);
-                      $unit      = $UNIT       if(defined $UNIT);
+                      $reading   = $READING  if($READING ne '');
+                      $value     = $VALUE    if(defined $VALUE);
+                      $unit      = $UNIT     if(defined $UNIT);
                   }
                   
                   # zentrale valueFn im DbLog-Device abarbeiten
                   if($value_fn ne '') {
-                      my $TIMESTAMP  = $timestamp;
-                      my $DEVICE     = $dev_name;
-                      my $DEVICETYPE = $dev_type;
-                      my $EVENT      = $event;
-                      my $READING    = $reading;
-                      my $VALUE      = $value;
-                      my $UNIT       = $unit;
-                      my $IGNORE     = 0;
-                      my $CN         = " ";
+                      my $TIMESTAMP     = $timestamp;
+                      my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
+                      my $DEVICE        = $dev_name;
+                      my $DEVICETYPE    = $dev_type;
+                      my $EVENT         = $event;
+                      my $READING       = $reading;
+                      my $VALUE         = $value;
+                      my $LASTVALUE     = $lastv // "";                      # patch Forum:#111423
+                      my $UNIT          = $unit;
+                      my $IGNORE        = 0;
+                      my $CN            = " ";
 
                       eval $value_fn;
                       Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
                       
                       if($IGNORE) {
-                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
+                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);  # patch Forum:#111423
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);                           
                           Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                                   if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                           next;  
@@ -1578,22 +1592,27 @@ sub DbLog_Log($$) {
       if(@row_array) {
           # synchoner Mode
           return if($hash->{HELPER}{REOPEN_RUNS});              # return wenn "reopen" mit Ablaufzeit gestartet ist          
+          
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 ($name, 5, "DbLog $name -> DbLog_Push Returncode: $error") if($error && $vb4show);
+          
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
           Log3 ($name, 2, "DbLog $name - Last database write cycle done") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
-          my $state = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
+          
+          my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
+          my $evt   = ($state eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
           readingsSingleUpdate($hash, "state", $state, $evt);
           $hash->{HELPER}{OLDSTATE} = $state;
           
           # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
+      
       } else {
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
           Log3 ($name, 2, "DbLog $name - no data for last database write cycle") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
       }
   }
+  
   if($net && AttrVal($name, "showNotifyTime", undef)) {
       readingsSingleUpdate($hash, "notify_processing_time", sprintf("%.4f",$net), 1);
   }
@@ -2328,12 +2347,12 @@ sub DbLog_PushAsync(@) {
   my ($useac,$useta) = DbLog_commitMode($hash);
   eval {
       if(!$useac) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } elsif($useac == 1) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } else {
           # Server default
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       }
   };
   if ($@) {
@@ -2989,12 +3008,12 @@ sub DbLog_ConnectPush($;$$) {
   my ($useac,$useta) = DbLog_commitMode($hash);
   eval {
       if(!$useac) {
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, mysql_enable_utf8 => $utf8 });
+          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } elsif($useac == 1) {
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });
+          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } else {
           # Server default
-          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });
+          $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       }
   };  
    
@@ -3056,12 +3075,12 @@ sub DbLog_ConnectNewDBH($) {
   my ($useac,$useta) = DbLog_commitMode($hash);
   eval {
       if(!$useac) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } elsif($useac == 1) {
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } else {
           # Server default
-          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, mysql_enable_utf8 => $utf8 });
+          $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } 
   };
       
@@ -3766,14 +3785,29 @@ sub DbLog_configcheck($) {
   my $dbi     = $DBI::VERSION;                                                   # DBI Version
   my %drivers = DBI->installed_drivers();
   my $dv      = "";
-  if($dbmodel =~ /MYSQL/i) {
+  if($dbmodel =~ /MYSQL/xi) {
       for (keys %drivers) {
-          $dv = $_ if($_ =~ /mysql|mariadb/);
+          $dv = $_ if($_ =~ /mysql|mariadb/x);
       }
   }
-  my $dbd = ($dbmodel =~ /POSTGRESQL/i)?"Pg: ".$DBD::Pg::VERSION:                # DBD Version
-            ($dbmodel =~ /MYSQL/i && $dv)?"$dv: ".$DBD::mysql::VERSION:
-            ($dbmodel =~ /SQLITE/i)?"SQLite: ".$DBD::SQLite::VERSION:"Undefined";
+  my $dbd = ($dbmodel =~ /POSTGRESQL/xi)   ? "Pg: ".$DBD::Pg::VERSION:           # DBD Version
+            ($dbmodel =~ /MYSQL/xi && $dv) ? "$dv: ".$DBD::mysql::VERSION:
+            ($dbmodel =~ /SQLITE/xi)       ? "SQLite: ".$DBD::SQLite::VERSION:"Undefined";
+  
+  my $dbdhint = "";
+  my $dbdupd  = 0;  
+  if($dbmodel =~ /MYSQL/xi && $dv) {                                             # check DBD Mindest- und empfohlene Version
+      my $dbdver = $DBD::mysql::VERSION * 1;                                     # String to Zahl Konversion
+      if($dbdver < 4.032) {
+          $dbdhint = "<b>Caution:</b> Your DBD version doesn't support UTF8. ";
+          $dbdupd  = 1;
+      } elsif ($dbdver < 4.042) {
+          $dbdhint = "<b>Caution:</b> Full UTF-8 support exists from DBD version 4.032, but installing DBD version 4.042 is highly suggested. ";          
+          $dbdupd  = 1;
+      } else {
+          $dbdhint = "Your DBD version fulfills UTF8 support, no need to update DBD.";
+      }
+  }
             
   my ($errcm,$supd,$uptb) = DbLog_checkModVer($name);                            # DbLog Version
   
@@ -3783,14 +3817,14 @@ sub DbLog_configcheck($) {
   $check .= "Used DBI (Database independent interface) version: $dbi <br>";
   $check .= "Used DBD (Database driver) version $dbd <br>";
   if($errcm) {
-      $check .= "<b>Recommendation:</b> ERROR - $errcm <br><br>";
+      $check .= "<b>Recommendation:</b> ERROR - $errcm. $dbdhint <br><br>";
   }
   if($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
-      $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! <br><br>";
+      $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! $dbdhint <br><br>";
   } else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
-      $check .= "<b>Recommendation:</b> No update of DbLog is needed. <br><br>";  
+      $check .= "<b>Recommendation:</b> No update of DbLog is needed. $dbdhint <br><br>";  
   }
   
   ### Configuration read check
@@ -3819,20 +3853,28 @@ sub DbLog_configcheck($) {
   my ($chutf8mod,$chutf8dat);
   if($dbmodel =~ /MYSQL/) {
       @ce = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_connection'");
-      $chutf8mod = @ce?uc($ce[1]):"no result";
+      $chutf8mod = @ce ? uc($ce[1]) : "no result";
       @se = DbLog_sqlget($hash,"SHOW VARIABLES LIKE 'character_set_database'");
-      $chutf8dat = @se?uc($se[1]):"no result";
+      $chutf8dat = @se ? uc($se[1]) : "no result";
+      
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
       } else {
           $rec = "Both encodings should be identical. You can adjust the usage of UTF8 connection by setting the UTF8 parameter in file '$hash->{CONFIGURATION}' to the right value. ";
       }
+
+      if(uc($chutf8mod) ne "UTF8" && uc($chutf8dat) ne "UTF8") {
+          $dbdhint = "";
+      } else {
+          $dbdhint .= " If you want use UTF8 database option, you must update DBD (Database driver) to at least version 4.032. " if($dbdupd);
+      }
+      
   }
   if($dbmodel =~ /POSTGRESQL/) {
       @ce = DbLog_sqlget($hash,"SHOW CLIENT_ENCODING");
-      $chutf8mod = @ce?uc($ce[0]):"no result";
+      $chutf8mod = @ce ? uc($ce[0]) : "no result";
       @se = DbLog_sqlget($hash,"select character_set_name from information_schema.character_sets");
-      $chutf8dat = @se?uc($se[0]):"no result";
+      $chutf8dat = @se ? uc($se[0]) : "no result";
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
       } else {
@@ -3841,7 +3883,7 @@ sub DbLog_configcheck($) {
   }  
   if($dbmodel =~ /SQLITE/) {
       @ce = DbLog_sqlget($hash,"PRAGMA encoding");
-      $chutf8dat = @ce?uc($ce[0]):"no result";
+      $chutf8dat = @ce ? uc($ce[0]) : "no result";
       @se = DbLog_sqlget($hash,"PRAGMA table_info($history)");
       $rec = "This is only an information about text encoding used by the main database.";
   }  
@@ -3862,7 +3904,7 @@ sub DbLog_configcheck($) {
   $check .= "<u><b>Result of encoding check</u></b><br><br>";
   $check .= "Encoding used by Client (connection): $chutf8mod <br>" if($dbmodel !~ /SQLITE/);
   $check .= "Encoding used by DB $dbname: $chutf8dat <br>";
-  $check .= "<b>Recommendation:</b> $rec <br><br>";
+  $check .= "<b>Recommendation:</b> $rec $dbdhint <br><br>";
         
   ### Check Betriebsmodus
   #######################################################################
@@ -4540,25 +4582,36 @@ sub DbLog_AddLog($$$$$) {
           if(!defined $read_val) {$read_val = "";}
           if(!defined $ut || $ut eq "") {$ut = AttrVal("$dev_name", "unit", "");}   
           $event       = "addLog";
-          
+           
           $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME}  = $now;
           $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE} = $read_val;
           $ts = TimeNow();
+          
           # Anwender spezifische Funktion anwenden 
           if($value_fn ne '') {
-              my $TIMESTAMP  = $ts;
-              my $DEVICE     = $dev_name;
-              my $DEVICETYPE = $dev_type;
-              my $EVENT      = $event;
-              my $READING    = $dev_reading;
-              my $VALUE      = $read_val;
-              my $UNIT       = $ut;
-              my $IGNORE     = 0;
-              my $CN         = $cn?$cn:"";
+              my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME};    # patch Forum:#111423
+              my $lastv = $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE};
+          
+              my $TIMESTAMP     = $ts;
+              my $LASTTIMESTAMP = $lastt // 0;                                                   # patch Forum:#111423
+              my $DEVICE        = $dev_name;
+              my $DEVICETYPE    = $dev_type;
+              my $EVENT         = $event;
+              my $READING       = $dev_reading;
+              my $VALUE         = $read_val;
+              my $LASTVALUE     = $lastv // "";                                                  # patch Forum:#111423
+              my $UNIT          = $ut;
+              my $IGNORE        = 0;
+              my $CN            = $cn?$cn:"";
 
               eval $value_fn;
               Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
-              next if($IGNORE);  # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
+              
+              if($IGNORE) {                                                                                # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);  # patch Forum:#111423
+                 $defs{$dev_name}{Helper}{DBLOG}{$dev_reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);                 
+                 next;  
+              }
               
               my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
               eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
@@ -4640,21 +4693,33 @@ sub DbLog_addCacheLine($$$$$$$$) {
   } else {
       $value_fn = '';
   }
+  
   if($value_fn ne '') {
-      my $TIMESTAMP  = $i_timestamp;
-      my $DEVICE     = $i_dev;
-      my $DEVICETYPE = $i_type;
-      my $EVENT      = $i_evt;
-      my $READING    = $i_reading;
-      my $VALUE      = $i_val;
-      my $UNIT       = $i_unit;
-      my $IGNORE     = 0;
-      my $CN         = " ";
+      my $lastt;
+      my $lastv;
+      if($defs{$i_dev}) { 
+          $lastt = $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$hash->{NAME}}{TIME};
+          $lastv = $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$hash->{NAME}}{VALUE};
+      }
+                
+      my $TIMESTAMP     = $i_timestamp;
+      my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
+      my $DEVICE        = $i_dev;
+      my $DEVICETYPE    = $i_type;
+      my $EVENT         = $i_evt;
+      my $READING       = $i_reading;
+      my $VALUE         = $i_val;
+      my $LASTVALUE     = $lastv // "";                      # patch Forum:#111423
+      my $UNIT          = $i_unit;
+      my $IGNORE        = 0;
+      my $CN            = " ";
 
       eval $value_fn;
       Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
-      if($IGNORE) {
-          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt in $value_fn
+      
+      if($IGNORE) {                                          # kein add wenn $IGNORE=1 gesetzt           
+          $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$hash->{NAME}}{TIME}  = $lastt if($defs{$i_dev} && $lastt);  # patch Forum:#111423
+          $defs{$i_dev}{Helper}{DBLOG}{$i_reading}{$hash->{NAME}}{VALUE} = $lastv if($defs{$i_dev} && defined $lastv);                   
           Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $i_timestamp, Device: $i_dev, Type: $i_type, Event: $i_evt, Reading: $i_reading, Value: $i_val, Unit: $i_unit";
           next;  
       }
@@ -4698,7 +4763,6 @@ sub DbLog_addCacheLine($$$$$$$$) {
 
 return;
 }
-
 
 #########################################################################################
 #
@@ -5076,12 +5140,12 @@ sub DbLog_reduceLogNbl($) {
     
     my ($useac,$useta) = DbLog_commitMode($hash);
     if(!$useac) {
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0 });};
+        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 0 });};
     } elsif($useac == 1) {
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
+        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 1 });};
     } else {
         # Server default
-        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
+        eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
     }
     if ($@) {
         $err = encode_base64($@,"");
@@ -5500,12 +5564,12 @@ sub DbLog_deldaysNbl($) {
 
   my ($useac,$useta) = DbLog_commitMode($hash);
   if(!$useac) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1 });};
   } elsif($useac == 1) {
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
   } else {
       # Server default
-      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1 });};
+      eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
   }
   if ($@) {
       $error = encode_base64($@,"");
@@ -6277,7 +6341,9 @@ sub DbLog_showChildHandles ($$$$) {
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",       
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
-    #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary)    
+    #    # optional enable(1) / disable(0) UTF-8 support 
+    #    # (full UTF-8 support exists from DBD::mysql version 4.032, but installing 
+    #    # 4.042 is highly suggested)   
     #    utf8 => 1   
     #);                                                              
     ####################################################################################
@@ -7049,10 +7115,11 @@ sub DbLog_showChildHandles ($$$$) {
        
        The attribute <i>DbLogValueFn</i> will be propagated to all devices if DbLog is used. 
        This attribute contains a Perl expression that can use and change values of $TIMESTAMP, $READING, $VALUE (value of 
-       reading) and $UNIT (unit of reading value). That means the changed values are logged.
-       You also have readonly access to $DEVICE (the source device name) and $EVENT for evaluation in your expression. <br>
-       $DEVICE and $EVENT cannot be changed. <br>
-       If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
+       reading) and $UNIT (unit of reading value). That means the changed values are logged. <br>
+       Furthermore you have readonly access to $DEVICE (the source device name), $EVENT, $LASTTIMESTAMP and $LASTVALUE 
+       for evaluation in your expression.
+       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged dataset of $DEVICE / $READING. <br>
+       If the $TIMESTAMP is to be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
        be changed.
        In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br>
 
@@ -7436,9 +7503,10 @@ attr SMA_Energymeter DbLogValueFn
        </code><br>
       
        The attribute contains a Perl expression that can use and change values of $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, 
-       $VALUE (value of reading) and $UNIT (unit of reading value).
-       You also have readonly-access to $EVENT for evaluation in your expression. <br>
-       If $TIMESTAMP should be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
+       $VALUE (value of reading) and $UNIT (unit of reading value). <br>
+       Furthermore you have readonly access to $EVENT, $LASTTIMESTAMP and $LASTVALUE for evaluation in your expression.
+       The variables $LASTTIMESTAMP and $LASTVALUE contain time and value of the last logged dataset of $DEVICE / $READING. <br>
+       If $TIMESTAMP is to be changed, it must meet the condition "yyyy-mm-dd hh:mm:ss", otherwise the $timestamp wouldn't 
        be changed.
        In addition you can set the variable $IGNORE=1 if you want skip a dataset from logging. <br><br>
        
@@ -7599,7 +7667,9 @@ attr SMA_Energymeter DbLogValueFn
     #    connection => "mysql:database=fhem;host=&lt;database host&gt;;port=3306",    
     #    user => "fhemuser",                                          
     #    password => "fhempassword",
-    #    # optional enable(1) / disable(0) UTF-8 support (at least V 4.042 is necessary)    
+    #    # optional enable(1) / disable(0) UTF-8 support 
+    #    # (full UTF-8 support exists from DBD::mysql version 4.032, but installing 
+    #    # 4.042 is highly suggested)    
     #    utf8 => 1   
     #);                                                              
     ####################################################################################
@@ -8439,9 +8509,10 @@ attr SMA_Energymeter DbLogValueFn
        
        Wird DbLog genutzt, wird in allen Devices das Attribut <i>DbLogValueFn</i> propagiert.
        Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $READING, $VALUE (Wert des Readings) und 
-       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
-       Außerdem hat man lesenden Zugriff auf $DEVICE (den Namen des Devices) und $EVENT für eine Auswertung im Perl-Ausdruck. 
-       $DEVICE und $EVENT kann nicht verändert werden. <br>
+       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt. <br>
+       Außerdem hat man Lesezugriff auf $DEVICE (den Namen des Quellgeräts), $EVENT, $LASTTIMESTAMP und $LASTVALUE 
+       zur Bewertung in Ihrem Ausdruck. <br>
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von $DEVICE / $READING. <br>
        Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
        geänderte $timestamp nicht übernommen.
        Zusätzlich kann durch Setzen der Variable "$IGNORE=1" der Datensatz vom Logging ausgeschlossen werden. <br> 
@@ -8826,10 +8897,10 @@ attr SMA_Energymeter DbLogValueFn
        </code><br>
       
        Es kann über einen Perl-Ausdruck auf die Variablen $TIMESTAMP, $DEVICE, $DEVICETYPE, $READING, $VALUE (Wert des Readings) und 
-       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt.
-       Außerdem hat man lesenden Zugriff auf $EVENT für eine Auswertung im Perl-Ausdruck. 
-       Diese Variable kann aber nicht verändert werden. <br>
-       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden, ansonsten wird der 
+       $UNIT (Einheit des Readingswert) zugegriffen werden und diese verändern, d.h. die veränderten Werte werden geloggt. <br>
+       Außerdem hat man Lesezugriff auf $EVENT, $LASTTIMESTAMP und $LASTVALUE zur Bewertung im Ausdruck. <br>
+       Die Variablen $LASTTIMESTAMP und $LASTVALUE enthalten Zeit und Wert des zuletzt protokollierten Datensatzes von $DEVICE / $READING. <br>
+       Soll $TIMESTAMP verändert werden, muss die Form "yyyy-mm-dd hh:mm:ss" eingehalten werden. Anderenfalls wird der 
        geänderte $timestamp nicht übernommen.
        Zusätzlich kann durch Setzen der Variable "$IGNORE=1" ein Datensatz vom Logging ausgeschlossen werden. <br><br>
        
