@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 57_SSCal: changes according to PBP, switch to packages, minor fixes
+                      CAUTION: use FHEM::SSCal::calAsHtml now instead of
+                               SSCal_calAsHtml in weblink devices and own code 
  - changed: 93_DbLog: improve configCheck, new vars $LASTTIMESTAMP & $LASTVALUE
                       usable in attributes valueFn / DbLogValueFn Forum:#111423
  - new:  98_DSBMobile: reactivated Module
