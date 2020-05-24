@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     60_Watches: little helper module for some kind of watches or
+                        digital text display, Forum: #93454
  - changed: 57_SSCal: changes according to PBP, switch to packages, minor fixes
                       CAUTION: use FHEM::SSCal::calAsHtml now instead of
                                SSCal_calAsHtml in weblink devices and own code 

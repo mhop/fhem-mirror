@@ -308,6 +308,7 @@ FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wetter
 FHEM/59_WWO.pm               baumrasen            Unterstützende Dienste/Wettermodule
 FHEM/60_allergy.pm           markus-m             Unterstützende Dienste
 FHEM/60_EM.pm                rudolfkoenig         SlowRF
+FHEM/60_Watches.pm           DS_Starter           Sonstiges
 FHEM/61_EMWZ.pm              rudolfkoenig         SlowRF
 FHEM/62_EMEM.pm              rudolfkoenig         SlowRF
 FHEM/63_EMGZ.pm              rudolfkoenig         SlowRF
@@ -630,7 +631,7 @@ www/gplot/*                  rudolfkoenig         Frontends/SVG/Plots/logProxy
 www/images/*                 Wuppi68              Frontends
 www/jscolor/*                justme1968           Frontends
 www/pgm2/*                   rudolfkoenig         Frontends/FHEMWEB
-www/pgm2/dashboard/*         svenson08            Frontends
+www/pgm2/dashboard*          DS_Starter           Frontends
 www/pgm2/doif.js                     Ellert       Frontends
 www/pgm2/fhemweb_fbcalllist.js       markusbloch  Frontends
 www/pgm2/fhemweb_iconButtons.js      Ellert       Frontends
