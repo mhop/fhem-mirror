@@ -3458,7 +3458,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
       }
       else{
-        Log 1,"waiting for: $pendType, got:RegisterRead # await msgNo:$rspWait->{mNo}, rec:$mNoInt";
+        Log 1,"waiting for: $pendType, got:RegisterRead # await msgNo:".(defined $rspWait->{mNo} ? $rspWait->{mNo} :"-no msgNo").", rec:$mNoInt";
       }
       $ret = "done";
     }
