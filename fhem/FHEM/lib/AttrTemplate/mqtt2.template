@@ -522,12 +522,27 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Human_Motion_Sensor
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+name:zigbee2mqtt_Light_Intensity_Sensor
+desc: Light Intensity Sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia light intensity sensor GZCGQ01LM
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_08a1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).+, ? $1 : undef }
+par:ICON;ICON as set, defaults to weather_sun;{ AttrVal("DEVICE","icon","weather_sun") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Lux: illuminance_lux Luminance: illuminance
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model zigbee2mqtt_Light_Intensity_Sensor
+setreading DEVICE attrTemplateVersion 20200525
+
 #source post: https://forum.fhem.de/index.php/topic,94495.msg975785.html#msg975785
 # Osram Lightify, Smart+ Motion Sensor
 name:zigbee2mqtt_TempMotion_sensor
 desc: Temperature and motion sensor via zigbee2mqtt <br>Tested with: Osram Lightify Motion Sensor
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-order:L_08a
+order:L_08a2
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).+, ? $1 : undef }
 attr DEVICE icon ICON
@@ -2172,6 +2187,7 @@ attr DEVICE setList\
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
+  shellies/DEVNAME/light/0:.* state\
   shellies/DEVNAME/light/0/power:.* light_0_power\
   shellies/DEVNAME/light/0/energy:.* light_0_energy\
   shellies/DEVNAME/temperature:.* temperature\
