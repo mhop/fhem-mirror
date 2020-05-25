@@ -38,7 +38,8 @@ attr DEVCID bridgeRegexp \
   wallpanel[/]([^/]+)[/].*:.* "$1"\
   (wled)[/]([^/]+)[/].*:.* "$1_$2"\
   (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
-  (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"
+  (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"\
+  Advantech[/]([^/]+)[/].*:.* "$1"
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -52,7 +53,7 @@ setreading DEVCID associatedWith DEVICE
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVCID model MQTT2_CLIENT_general_bridge
-setreading DEVCID attrTemplateVersion 20200522 or prior
+setreading DEVCID attrTemplateVersion 20200523
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -64,6 +65,7 @@ order:000002
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
 attr IODEVNAME irgnoreRegexp cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
+setreading IODEVNAME attrTemplateVersion 20200523
 
 name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
@@ -648,6 +650,7 @@ attr DEVICE model zigbee2mqtt_AlarmSensor
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # SYMFONSIK sound controller
+#contributed by KurtK: https://forum.fhem.de/index.php/topic,94495.msg1056562.html#msg1056562
 name:zigbee2mqtt_symfonsik_sound_controller
 desc: IKEA SYMFONSIK sound controller via zigbee2mqtt <br>Tested with: IKEA E1744 SYMFONSIK sound controller
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
@@ -2169,6 +2172,8 @@ attr DEVICE setList\
 deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/light/0/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
+  shellies/DEVNAME/light/0/power:.* light_0_power\
+  shellies/DEVNAME/light/0/energy:.* light_0_energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/temperature_f:.* temperature_f\
   shellies/DEVNAME/overtemperature:.* overtemperature\
@@ -2181,7 +2186,7 @@ attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellydimmer
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200525
 
 
 ###########################################
