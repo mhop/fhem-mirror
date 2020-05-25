@@ -2151,7 +2151,10 @@ sub EventProcessingShadingBrightness {
     my $name = $hash->{NAME};
     $shutters->setShuttersDev($shuttersDev);
     my $reading = $shutters->getBrightnessReading;
-    my $outTemp = ( $shutters->getOutTemp != -100 ? $shutters->getOutTemp : $ascDev->getOutTemp );
+    my $outTemp =
+      (   $shutters->getOutTemp != -100
+        ? $shutters->getOutTemp
+        : $ascDev->getOutTemp );
 
     Log3( $name, 4,
         "AutoShuttersControl ($shuttersDev) - EventProcessingShadingBrightness"
@@ -2222,16 +2225,16 @@ sub EventProcessingTwilightDevice {
     );
 
     if ( $events =~ m{(azimuth|elevation|SunAz|SunAlt):\s(\d+.\d+)}xms ) {
-        my $name    = $device;
+        my $name = $device;
         my ( $azimuth, $elevation );
         my $outTemp = $ascDev->getOutTemp;
 
-        $azimuth    = $2 if ( $1 eq 'azimuth'   || $1 eq 'SunAz' );
-        $elevation  = $2 if ( $1 eq 'elevation' || $1 eq 'SunAlt' );
+        $azimuth   = $2 if ( $1 eq 'azimuth'   || $1 eq 'SunAz' );
+        $elevation = $2 if ( $1 eq 'elevation' || $1 eq 'SunAlt' );
 
-        $azimuth    = $ascDev->getAzimuth
+        $azimuth = $ascDev->getAzimuth
           if ( !defined($azimuth) && !$azimuth );
-        $elevation  = $ascDev->getElevation
+        $elevation = $ascDev->getElevation
           if ( !defined($elevation) && !$elevation );
 
         ASC_Debug( 'EventProcessingTwilightDevice: '
@@ -2343,10 +2346,10 @@ sub ShadingProcessing {
           . $shuttersDev
           . " Nach dem return" );
 
-    my $getShadingPos       = $shutters->getShadingPos;
-    my $getStatus           = $shutters->getStatus;
-    my $oldShadingStatus    = $shutters->getShadingStatus;
-    my $homemode            = $shutters->getHomemode;
+    my $getShadingPos    = $shutters->getShadingPos;
+    my $getStatus        = $shutters->getStatus;
+    my $oldShadingStatus = $shutters->getShadingStatus;
+    my $homemode         = $shutters->getHomemode;
 
     ASC_Debug( 'ShadingProcessing: '
           . $shutters->getShuttersDev
@@ -2776,9 +2779,11 @@ sub EventProcessingExternalTriggerDevice {
         $shutters->setLastDrive('external trigger device inactive');
         $shutters->setNoDelay(1);
         $shutters->setExternalTriggerState(1);
-        ShuttersCommandSet( $hash, $shuttersDev,
+        ShuttersCommandSet(
+            $hash,
+            $shuttersDev,
             (
-              $shutters->getIsDay
+                  $shutters->getIsDay
                 ? $triggerPosInactive
                 : $shutters->getClosedPos
             )
@@ -5000,6 +5005,15 @@ sub setAdvDelay {
 
     $self->{ $self->{shuttersDev} }->{AdvDelay} = $advDelay;
     return;
+}
+
+sub getHomemode {
+    my $self = shift;
+
+    my $homemode = $shutters->getRoommatesStatus;
+    $homemode = $ascDev->getResidentsStatus
+      if ( $homemode eq 'none' );
+    return $homemode;
 }
 
 sub getAdvDelay {
@@ -8440,7 +8454,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.30",
+  "version": "v0.8.31",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
