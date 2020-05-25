@@ -695,6 +695,11 @@ HttpUtils_DataComplete($)
       $hash->{httpdata} = $data;
       $hash->{buf} = "";
 
+    } elsif($hdr =~ m/Connection:\s*Upgrade/i) {
+      $hash->{httpdatalen} = 0;
+      $hash->{httpheader} = $hdr;
+      $hash->{httpdata} = $hash->{buf} = "";
+
     } else {
       $hash->{httpdatalen} = -2;
 

@@ -5,6 +5,7 @@ package main;
 use strict;
 
 sub DevIo_CloseDev($@);
+sub DevIo_DecodeWS($$);
 sub DevIo_Disconnected($);
 sub DevIo_Expect($$$);
 sub DevIo_OpenDev($$$;$);
@@ -77,6 +78,8 @@ DevIo_SimpleRead($)
     DevIo_Disconnected($hash);
     return undef;
   }
+
+  return DevIo_DecodeWS($hash, $buf) if($hash->{WEBSOCKET});
   return $buf;
 }
 
@@ -122,6 +125,62 @@ DevIo_TimeoutRead($$;$$)
   return $answer;
 }
 
+sub
+DevIo_DecodeWS($$)
+{
+  my ($hash, $buf) = @_;
+  # https://tools.ietf.org/html/rfc6455
+  $hash->{".WSBUF"} = "" if(!defined($hash->{".WSBUF"}));
+  $hash->{".WSBUF"} .= $buf;
+  my $data = $hash->{".WSBUF"};
+  return "" if(length($data) < 2);
+
+  my $fin  = (ord(substr($data,0,1)) & 0x80)?1:0;
+  my $op   = (ord(substr($data,0,1)) & 0x0F);
+  my $mask = (ord(substr($data,1,1)) & 0x80)?1:0;
+  my $len  = (ord(substr($data,1,1)) & 0x7F);
+  my $i = 2;
+
+  # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
+  #Log 1, "OP:$op/$len/$mask/$fin";
+  if($op == 8) {         # Close, Normal, empty mask. #104718
+    syswrite($hash->{TCPDev}, pack("CCn",0x88,0x2,1000));
+    DevIo_CloseDev($hash);
+    return undef;
+
+  } elsif($op == 9) {   # Ping
+    syswrite($hash->{TCPDev}, chr(0x8A).chr(0)); # Pong
+    $hash->{".WSBUF"} = substr($data, 2);
+    return DevIo_DecodeWS($hash, "");
+  }
+
+  if( $len == 126 ) {
+    return "" if(length($data) < 4);
+    $len = unpack('n', substr($data, $i, 2));
+    $i += 2;
+  } elsif( $len == 127 ) {
+    return "" if(length($data) < 10);
+    $len = unpack( 'q', substr($hash->{".WSBUF"},$i,8) );
+    $i += 8;
+  }
+
+  my @m;
+  if($mask) {
+    return "" if(length($data) < $i+4);
+    @m = unpack("C*", substr($data,$i,4));
+    $i += 4;
+  }
+  return "" if(length($data) < $i+$len);
+
+  $hash->{".WSBUF"} = substr($data, $i+$len);
+  $data = substr($data, $i, $len);
+  if($mask) {
+    my $idx = 0;
+    $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
+  }
+  return $data;
+}
+
 ########################
 # Function to write data
 sub
@@ -139,6 +198,19 @@ DevIo_SimpleWrite($$$;$)
     $hash->{USBDev}->write($msg);
 
   } elsif($hash->{TCPDev}) {
+    if($hash->{WEBSOCKET}) {
+      my $len = length($msg);
+      if($len < 126) {
+        $msg = chr(0x81) . chr($len) . $msg;
+      } else {
+        if ($len < 65536) {
+          $msg = chr(0x81) . chr(0x7E) . pack('n', $len) . $msg;
+        } else {
+          $msg = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) .
+                 chr(0x00) . chr(0x00) . pack('N', $len) . $msg;
+        }
+      }
+    }
     syswrite($hash->{TCPDev}, $msg);
 
   } elsif($hash->{DIODev}) { 
@@ -210,7 +282,8 @@ DevIo_Expect($$$)
 # Open a device for reading/writing data.
 # Possible values for $hash->{DeviceName}:
 # - device@baud[78][NEO][012] => open device, set serial-line parameters
-# - hostname:port => TCP/IP client connection
+# - hostname:port => TCP/IP client connection (set $hash->{SSL}=>1 for TLS)
+# - ws:hostname:port => websocket connection
 # - device@directio => open device without additional "magic"
 # - UNIX:(SEQPACKET|STREAM):filename => Open filename as a UNIX socket
 # - FHEM:DEVIO:IoDev[:IoPort] => Cascade I/O over another FHEM Device
@@ -336,7 +409,16 @@ DevIo_OpenDev($$$;$)
       DevIo_setStates($hash, "disconnected");
       return &$doCb("");
     }
-  } elsif($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
+
+  } elsif($dev =~ m/^(ws:)?(.+):([0-9]+)$/) { # TCP (host:port) or websocket
+   
+    my ($proto, $host, $port) = ($1 ? $1 : "", $2, $3);
+    $dev = "$host:$port";
+    if($proto eq "ws:")  {
+      require MIME::Base64;
+      return $doCb("websocket is only supported with callback") if(!$callback);
+    }
+    
 
     # This part is called every time the timeout (5sec) is expired _OR_
     # somebody is communicating over another TCP connection. As the connect
@@ -368,6 +450,7 @@ DevIo_OpenDev($$$;$)
         return 0;
       }
 
+      $hash->{WEBSOCKET} = 1 if($proto eq "ws:");
       $hash->{TCPDev} = $conn;
       $hash->{FD} = $conn->fileno();
       $hash->{CD} = $conn;
@@ -382,7 +465,15 @@ DevIo_OpenDev($$$;$)
         url     => $hash->{SSL} ? "https://$dev/" : "http://$dev/",
         NAME    => $hash->{NAME},
         sslargs => $hash->{sslargs} ? $hash->{sslargs} : {},
-        noConn2 => 1,
+        noConn2 => $proto eq "ws:" ? 0 : 1,
+        keepalive=>$proto eq "ws:" ? 1 : 0,
+        httpversion=>$proto eq "ws:" ? "1.1" : "1.0",
+        header  => $proto eq "ws:" ?  {
+            "Connection" => "Upgrade",
+            "Upgrade" => "websocket",
+            "Sec-WebSocket-Key"=>encode_base64(pack("H*",createUniqueId()),""),
+            "Sec-WebSocket-Version" => 13
+          } : undef,
         callback=> sub() {
           my ($h, $err, undef) = @_;
           &$doTcpTail($err ? undef : $h->{conn});
@@ -517,6 +608,8 @@ DevIo_CloseDev($@)
       $hash->{TCPDev}->close();
     }
     delete($hash->{TCPDev});
+    delete($hash->{".WSBUF"});
+    delete($hash->{WEBSOCKET});
 
   } elsif($hash->{USBDev}) {
     if($isFork) { # SerialPort close resets the serial parameters.
