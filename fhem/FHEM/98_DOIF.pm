@@ -211,7 +211,7 @@ sub DOIF_Widget_Update
       } devspec2array("TYPE=FHEMWEB");
   } else {
       map { 
-         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','doifId','$doifId','$value','display:inline;$style')","");
+         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','doifId','$doifId','$value','display:inline-table;$style')","");
       } devspec2array("TYPE=FHEMWEB") if ($value ne "");
   }
 }
@@ -235,7 +235,7 @@ sub DOIF_Widget_Register
     $cmd = $cmd eq '' ? $reading : $cmd;
     return "<div class='fhemWidget' cmd='$cmd' reading='$reading' dev='$dev' arg='$widget' current='$value' type='$type'></div>";
   } else {
-    return "<div class='dval' doifId='$doifId' style='display:inline;$style'>$value</div>";
+    return "<div class='dval' doifId='$doifId' style='display:inline-table;$style'>$value</div>";
   }
 }
  
@@ -3873,7 +3873,8 @@ sub FW_makeImage {
    $style.="color:$color;" if (defined ($color));
    $style.="font-size:$font_size"."pt;" if (defined ($font_size));
    $style.="font-weight:$font_weight;" if (defined ($font_weight));
-   return ($text,$style);
+   return ('<div style="display:inline-table;'.$style.'">'.$text.'</div>');
+   #return ($text,$style);
 
  }
  
@@ -4117,8 +4118,8 @@ sub hum_bar {
 sub  polarToCartesian {
   my ($centerX,$centerY,$radius,$angleInDegrees)=@_;
   my $angleInRadians = ($angleInDegrees-230) * ::pi() / 180.0;
-  my $x= $centerX + ($radius * cos($angleInRadians));
-  my $y= $centerY + ($radius * sin($angleInRadians));
+  my $x= sprintf('%1.1f',$centerX + ($radius * cos($angleInRadians)));
+  my $y= sprintf('%1.1f',$centerY + ($radius * sin($angleInRadians)));
   return($x,$y);
 }
 
@@ -6579,7 +6580,7 @@ Syntax DOIF-Block:<br>
 <code>&lt;Blockname (optional)&gt; {&lt;Perlcode mit Ereignis-/Zeittriggern in eckigen Klammern&gt;}</code><br>
 <br>
 Ein DOIF-Block wird ausgeführt, wenn dieser bedingt durch <a href="#DOIF_Operanden">Ereignis- und Zeittrigger in eckigen Klammern</a> innerhalb des Blocks, getriggert wird.
-Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Ereignisblöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Ereignisblocks ist optional.<br>
+Es wird die vollständige Perl-Syntax unterstützt. Es können beliebig viele Blöcke innerhalb eines DOIF-Devices definiert werden. Sie werden unabhängig voneinander durch passende Trigger ausgeführt. Der Name eines Blocks ist optional.<br>
 <br>
 Der Status des Moduls wird nicht vom Modul gesetzt, er kann vom Anwender mit Hilfe der Funktion <code>set_State</code> verändert werden, siehe <a href="#DOIF_Spezifische_Perl-Funktionen_im_Perl-Modus">spezifische Perl-Funktionen im Perl-Modus</a>.
 FHEM-Befehle werden durch den Aufruf der Perlfunktion <code>fhem("...")</code> ausgeführt. Für den häufig genutzten fhem-Befehl <b>set</b> wurde eine kompatible Perlfunktion namens <b>fhem_set</b> definiert.
