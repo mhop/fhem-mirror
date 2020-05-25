@@ -416,7 +416,7 @@ DevIo_OpenDev($$$;$)
     $dev = "$host:$port";
     if($proto eq "ws:")  {
       require MIME::Base64;
-      return $doCb("websocket is only supported with callback") if(!$callback);
+      return &$doCb('websocket is only supported with callback') if(!$callback);
     }
     
 
