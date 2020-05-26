@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.24.0" => "26.05.2020  entry of countDownInit can be in format <seconds> ",
   "0.23.2" => "20.05.2020  english commandref ",
   "0.23.1" => "10.05.2020  some more changes for PBP severity 3 ",
   "0.23.0" => "10.05.2020  attr 'digitalBorderDistance' now also valid for digital watches, some changes for PBP ", 
@@ -216,7 +217,7 @@ sub Set {                                                    ## no critic 'compl
       $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
       $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
       $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
-      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>23 || $prop1>59 || $prop2>59);
       
       my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
             
@@ -228,13 +229,19 @@ sub Set {                                                    ## no critic 'compl
       delReadings ($name, "alarmed");
       
   } elsif ($opt eq "countDownInit") {
-      $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
-      $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
-      $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
-      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+      my $ct;
+      if($prop && $prop1) {                                                # Format: hh mm ss
+          $prop2 = ($prop2 ne "") ? $prop2 : 70;                           # Sekunden
+          return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13" \nor alternatively only one entry in seconds.} if($prop>23 || $prop1>59 || $prop2>59);
+          $ct = $prop*3600 + $prop1*60 + $prop2;                           # in Sekunden umgewandelt !
+          
+      } elsif ($prop && !$prop1) {                                         # Format: Sekundenangabe
+          $ct = $prop;
+          
+      } else {
+         return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13" \nor alternatively only one entry in seconds.};   
       
-      my $st = int(time*1000);                                             # Millisekunden ! 
-      my $ct = $prop*3600 + $prop1*60 + $prop2;                            # Sekunden !
+      }
       
       delReadings         ($name, "countInitVal");
       
@@ -277,7 +284,7 @@ sub Set {                                                    ## no critic 'compl
       readingsSingleUpdate($hash, "state", "initialized", 1);
       
   } elsif ($opt eq "time") {
-      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>24 || $prop1>59 || $prop2>59);
+      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>23 || $prop1>59 || $prop2>59);
   
       readingsBeginUpdate ($hash); 
       readingsBulkUpdate  ($hash, "hour",   $prop);
@@ -2355,7 +2362,7 @@ As time source the client (browser time) as well as the FHEM server can be set
   
     <a name="alarmSet"></a>
     <li><b>alarmSet &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Sets the alarm time in the format hh hours (24), mm minutes and ss seconds. <br>
+      Sets the alarm time in the format hh hours, mm minutes and ss seconds. <br>
       If the time reaches the defined value, an event of the reading "alarmed" is triggered. <br>
       This set command is only available for digital stopwatches. <br><br>
       
@@ -2376,13 +2383,15 @@ As time source the client (browser time) as well as the FHEM server can be set
     <br>
     
     <a name="countDownInit"></a>
-    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Sets the start time of a countdown stopwatch with hh hours(24), mm minutes and ss seconds. <br>
+    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; | &lt;seconds&gt; </b><br>
+      Sets the start time of a countdown stopwatch.
+      The format can be &lt;hh&gt; hours, &lt;mm&gt; minutes and &lt;ss&gt; seconds or alternatively only one entry in seconds. <br>
       This set command is only available with a digital countdown stopwatch. <br><br>
       
       <ul>
-      <b>Example</b> <br>
-      set &lt;name&gt; countDownInit 0 30 10
+      <b>Examples</b> <br>
+      set &lt;name&gt; countDownInit 0 30 10 <br>
+      set &lt;name&gt; countDownInit 3600
       </ul>
       <br>
       
@@ -2448,7 +2457,7 @@ As time source the client (browser time) as well as the FHEM server can be set
     
     <a name="time"></a>
     <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Sets a static time display with hh hours(24), mm minutes and ss seconds. <br>
+      Sets a static time display with hh hours, mm minutes and ss seconds. <br>
       This set command is only available for a digital clock with static time display. <br><br>
       
       <ul>
@@ -2765,7 +2774,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   
     <a name="alarmSet"></a>
     <li><b>alarmSet &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Setzt die Alarmzeit im Format hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+      Setzt die Alarmzeit im Format hh-Stunden, mm-Minuten und ss-Sekunden. <br>
       Erreicht die Zeit den definierten Wert, wird ein Event des Readings "alarmed" ausgelöst. <br>
       Dieses Set-Kommando ist nur bei digitalen Stoppuhren vorhanden. <br><br>
       
@@ -2786,13 +2795,15 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     <br>
     
     <a name="countDownInit"></a>
-    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Setzt die Startzeit einer CountDown-Stoppuhr mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+    <li><b>countDownInit &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; | &lt;Sekunden&gt; </b><br>
+      Setzt die Startzeit einer CountDown-Stoppuhr.
+      Das Format kann sein &lt;hh&gt; Stunden, &lt;mm&gt; Minuten und &lt;ss&gt; Sekunden oder alternativ nur eine Angabe in Sekunden. <br>
       Dieses Set-Kommando ist nur bei einer digitalen CountDown-Stoppuhr vorhanden. <br><br>
       
       <ul>
       <b>Beispiel</b> <br>
-      set &lt;name&gt; countDownInit 0 30 10
+      set &lt;name&gt; countDownInit 0 30 10 <br>
+      set &lt;name&gt; countDownInit 3600
       </ul>
       <br>
       
@@ -2858,7 +2869,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     
     <a name="time"></a>
     <li><b>time &lt;hh&gt; &lt;mm&gt; &lt;ss&gt; </b><br>
-      Setzt eine statische Zeitanzeige mit hh-Stunden(24), mm-Minuten und ss-Sekunden. <br>
+      Setzt eine statische Zeitanzeige mit hh-Stunden, mm-Minuten und ss-Sekunden. <br>
       Dieses Set-Kommando ist nur bei einer Digitaluhr mit statischer Zeitanzeige vorhanden. <br><br>
       
       <ul>
