@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 my %SSChatBot_vNotesIntern = (
+  "1.7.0"  => "26.05.2020  send SVG Plots ",
   "1.6.1"  => "22.05.2020  changes according to PBP ",
   "1.6.0"  => "22.05.2020  replace \" H\" with \"%20H\" in attachments due to problem in HttpUtils ",
   "1.5.0"  => "15.03.2020  slash commands set in interactive answer field 'value' will be executed ",
@@ -364,9 +365,10 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
       # text="First line of message to post.\nAlso you can have a second line of message." users="user1"
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
-      # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2"  
+      # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2" 
+      # text="aktuelles SVG-Plot" svg="<SVG-Device>" users="user1,user2"      
       return if(!$hash->{HELPER}{USERFETCHED});
-      my ($text,$users);
+      my ($text,$users,$svgdev);
       my ($fileUrl,$attachment) = ("","");
       my $cmd                   = join(" ", map { my $p = $_; $p =~ s/\s//g; $p; } @items);
       my ($arr,$h)              = parseParams($cmd);
@@ -374,7 +376,8 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
       if($h) {
           $text       = $h->{text}        if(defined $h->{text});
           $users      = $h->{users}       if(defined $h->{users});
-          $fileUrl    = $h->{fileUrl}     if(defined $h->{fileUrl});
+          $fileUrl    = $h->{fileUrl}     if(defined $h->{fileUrl});             # ein File soll über einen Link hochgeladen und versendet werden
+          $svgdev     = $h->{svg}         if(defined $h->{svg});                 # ein SVG-Plot soll versendet werden
           $attachment = SSChatBot_formString($h->{attachments}, "attachement") if(defined $h->{attachments});
       }
       
@@ -383,8 +386,21 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
           shift @t; shift @t;
           $text = join(" ", @t) if(!$text);
       }      
-       
-      return "Your sendstring is incorrect. It must contain at least text with the \"text=\" tag like text=\"...\"\nor only some text like \"this is a test\" without the \"text=\" tag." if(!$text);
+
+      if($svgdev) {                                                             # Versenden eines Plotfiles         
+          my ($err, $file) = SSChatBot_PlotToFile ($name, $svgdev);
+          return if($err);
+          
+          my $FW    = $hash->{FW};
+          my $csrf  = $defs{$FW}{CSRFTOKEN} // "";
+          $fileUrl  = (split("sschat", $hash->{OUTDEF}))[0];
+          $fileUrl .= "sschat/www/images/$file?&fwcsrf=$csrf";
+          
+          $fileUrl  = SSChatBot_formString($fileUrl, "text");
+          $text     = $svgdev if(!$text);                                      # Name des SVG-Plots als Standardtext
+      }
+      
+      return qq{Your sendstring is incorrect. It must contain at least text with the "text=" tag like text="..."\nor only some text like "this is a test" without the "text=" tag.} if(!$text);
       
       $text = SSChatBot_formString($text, "text");
       
@@ -628,14 +644,14 @@ sub SSChatBot_initonboot {
       
           my $host        = hostname();                                 # eigener Host
           my $fqdn        = hostfqdn();                                 # MYFQDN eigener Host 
-          chop($fqdn) if($fqdn =~ /^.*\.$/);                            # eventuellen "." nach dem FQDN entfernen
+          chop($fqdn)     if($fqdn =~ /\.$/);                           # eventuellen "." nach dem FQDN entfernen
           my $FWchatport  = $defs{$FW}{PORT};
           my $FWprot      = AttrVal($FW, "HTTPS", 0);
           $FWname         = AttrVal($FW, "webname", 0);
           CommandAttr(undef, "$FW csrfToken none") if(!AttrVal($FW, "csrfToken", ""));
-          $csrf           = $defs{$FW}{CSRFTOKEN}?$defs{$FW}{CSRFTOKEN}:"";
+          $csrf           = $defs{$FW}{CSRFTOKEN} // "";
      
-          $hash->{OUTDEF} = ($FWprot?"https":"http")."://".($fqdn?$fqdn:$host).":".$FWchatport."/".$FWname."/outchat?botname=".$name."&fwcsrf=".$csrf; 
+          $hash->{OUTDEF} = ($FWprot ? "https" : "http")."://".($fqdn // $host).":".$FWchatport."/".$FWname."/outchat?botname=".$name."&fwcsrf=".$csrf; 
 
           SSChatBot_addExtension($name, "SSChatBot_CGI", "outchat");
           $hash->{HELPER}{INFIX} = "outchat"; 
@@ -658,13 +674,10 @@ sub SSChatBot_addQueue ($$$$$$$$) {
     my $hash = $defs{$name};
     
     if(!$text && $opmode !~ /chatUserlist|chatChannellist/) {
-        Log3($name, 2, "$name - ERROR - can't add message to queue: \"text\" is empty");
+        my $err = qq{can't add message to queue: "text" is empty};
+        Log3($name, 2, "$name - ERROR - $err");
         
-        readingsBeginUpdate         ($hash);
-        readingsBulkUpdateIfChanged ($hash,"Errorcode", "none");
-        readingsBulkUpdateIfChanged ($hash,"Error",     "can't add message to queue: \"text\" is empty");
-        readingsBulkUpdate          ($hash,"state",     "Error");
-        readingsEndUpdate           ($hash, 1);       
+        SSChatBot_setErrorState ($hash, $err);      
 
         return;        
     }
@@ -847,13 +860,9 @@ sub SSChatBot_getapisites_parse {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - ERROR message: $err");
        
-        readingsBeginUpdate         ($hash); 
-        readingsBulkUpdateIfChanged ($hash, "Error",       $err);
-        readingsBulkUpdateIfChanged ($hash, "Errorcode", "none");
-        readingsBulkUpdate          ($hash, "state",    "Error");                    
-        readingsEndUpdate           ($hash,1); 
+        SSChatBot_setErrorState ($hash, $err);              
+        SSChatBot_checkretry    ($name,1);
         
-        SSChatBot_checkretry($name,1);
         return;
         
     } elsif ($myjson ne "") {          
@@ -902,13 +911,8 @@ sub SSChatBot_getapisites_parse {
                 $errorcode = "805";
                 $error = SSChatBot_experror($hash,$errorcode);                   # Fehlertext zum Errorcode ermitteln
             
-                readingsBeginUpdate         ($hash);
-                readingsBulkUpdateIfChanged ($hash,"Errorcode", $errorcode);
-                readingsBulkUpdateIfChanged ($hash,"Error",     $error);
-                readingsBulkUpdate          ($hash,"state",     "Error");
-                readingsEndUpdate           ($hash, 1); 
- 
-                SSChatBot_checkretry($name,1);  
+                SSChatBot_setErrorState ($hash, $error, $errorcode);   
+                SSChatBot_checkretry    ($name,1);  
                 return;                
             }
                         
@@ -916,12 +920,7 @@ sub SSChatBot_getapisites_parse {
             $errorcode = "806";
             $error     = SSChatBot_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
             
-            readingsBeginUpdate         ($hash);
-            readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
-            readingsBulkUpdateIfChanged ($hash, "Error",     $error);
-            readingsBulkUpdate          ($hash,"state",      "Error");
-            readingsEndUpdate           ($hash, 1);
-
+            SSChatBot_setErrorState ($hash, $error, $errorcode);
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
             
             SSChatBot_checkretry($name,1);    
@@ -952,12 +951,7 @@ sub SSChatBot_chatop {
        $errorcode = "810";
        $error     = SSChatBot_experror($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
        
-       readingsBeginUpdate         ($hash);
-       readingsBulkUpdateIfChanged ($hash, "Errorcode",  $errorcode);
-       readingsBulkUpdateIfChanged ($hash, "Error",      $error);
-       readingsBulkUpdate          ($hash,"state",      "Error");
-       readingsEndUpdate           ($hash, 1);
-
+       SSChatBot_setErrorState ($hash, $error, $errorcode);
        Log3($name, 2, "$name - ERROR - $error"); 
        
        SSChatBot_checkretry($name,1);
@@ -1040,13 +1034,8 @@ sub SSChatBot_chatop_parse {                                        ## no critic
         $errorcode = "none";
         $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
-        readingsBeginUpdate         ($hash); 
-        readingsBulkUpdateIfChanged ($hash, "Error",           $err);
-        readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
-        readingsBulkUpdate          ($hash, "state",        "Error");                    
-        readingsEndUpdate           ($hash,1);         
-
-        SSChatBot_checkretry($name,1);        
+        SSChatBot_setErrorState ($hash, $err, $errorcode);
+        SSChatBot_checkretry    ($name,1);        
         return;
    
    } elsif ($myjson ne "") {    
@@ -1190,15 +1179,10 @@ sub SSChatBot_chatop_parse {                                        ## no critic
             $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
             $error     = SSChatBot_experror($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
             if ($error =~ /not found/) {
-                $error .= " New error: ".($cherror?$cherror:"");
+                $error .= " New error: ".($cherror // "");
             }
             
-            readingsBeginUpdate         ($hash);
-            readingsBulkUpdateIfChanged ($hash,"Errorcode", $errorcode);
-            readingsBulkUpdateIfChanged ($hash,"Error",     $error);
-            readingsBulkUpdate          ($hash,"state",     "Error");
-            readingsEndUpdate           ($hash, 1);
-       
+            SSChatBot_setErrorState ($hash, $error, $errorcode);       
             Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
             SSChatBot_checkretry($name,1);
@@ -1229,10 +1213,7 @@ sub SSChatBot_evaljson {
           # Fehlertext zum Errorcode ermitteln
           $error = SSChatBot_experror($hash,$errorcode);
             
-          readingsBeginUpdate         ($hash);
-          readingsBulkUpdateIfChanged ($hash, "Errorcode", $errorcode);
-          readingsBulkUpdateIfChanged ($hash, "Error",     $error);
-          readingsEndUpdate           ($hash, 1);  
+          SSChatBot_setErrorState ($hash, $error, $errorcode);
   };
   
 return($hash,$success,$myjson);
@@ -1504,6 +1485,27 @@ sub SSChatBot_formString {
 return ($txt);
 }
 
+####################################################################################
+#       zentrale Funktion Error State in Readings setzen
+#       $error = Fehler als Text
+#       $errc  = Fehlercode gemäß %SSChatBot_errlist
+####################################################################################
+sub SSChatBot_setErrorState {                   
+    my $hash  = shift;
+    my $error = shift;
+    my $errc  = shift;
+    
+    my $errcode = $errc // "none";
+    
+    readingsBeginUpdate         ($hash); 
+    readingsBulkUpdateIfChanged ($hash, "Error",     $error);
+    readingsBulkUpdateIfChanged ($hash, "Errorcode", $errcode);
+    readingsBulkUpdate          ($hash, "state",     "Error");                    
+    readingsEndUpdate           ($hash,1);
+
+return;
+}
+
 #############################################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
@@ -1565,6 +1567,40 @@ sub SSChatBot_delclhash {
   delete($hash->{HELPER}{CL});
   
 return;
+}
+
+####################################################################################
+#       Ausgabe der SVG-Funktion "plotAsPng" in eine Datei schreiben
+#       Die Datei wird im Verzeichnis "/opt/fhem/www/images" erstellt
+#
+####################################################################################
+sub SSChatBot_PlotToFile {
+    my $name   = shift;
+	my $svgdev = shift;
+    my $hash   = $defs{$name};
+    my $file   = $name."_SendPlot.png";
+    my $path   = $attr{global}{modpath}."/www/images";
+    my $err    = "";
+    
+    if(!$defs{$svgdev}) {
+        my $err = qq{SVG device "$svgdev" doesn't exist};
+        Log3($name, 1, "$name - ERROR - $err !");
+        
+        SSChatBot_setErrorState ($hash, $err);
+        return $err;
+    }
+	
+	open (my $FILE, ">", "$path/$file") or do {
+                                                my $err = qq{>PlotToFile< can't open $path/$file for write access};
+                                                Log3($name, 1, "$name - ERROR - $err !");
+                                                SSChatBot_setErrorState ($hash, $err);
+                                                return $err;
+	                                          };
+    binmode $FILE;
+    print   $FILE plotAsPng($svgdev);
+    close   $FILE;
+
+return ($err, $file);
 }
 
 #############################################################################################
