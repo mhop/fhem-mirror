@@ -49,7 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 my %SSChatBot_vNotesIntern = (
-  "1.7.0"  => "26.05.2020  send SVG Plots ",
+  "1.7.0"  => "26.05.2020  send SVG Plots possible ",
   "1.6.1"  => "22.05.2020  changes according to PBP ",
   "1.6.0"  => "22.05.2020  replace \" H\" with \"%20H\" in attachments due to problem in HttpUtils ",
   "1.5.0"  => "15.03.2020  slash commands set in interactive answer field 'value' will be executed ",
@@ -464,14 +464,14 @@ sub SSChatBot_Get {                    ## no critic 'complexity'
     return if(IsDisabled($name));             
               
     if ($opt eq "storedToken") {
-        if (!$hash->{TOKEN}) {return "Token of $name is not set - make sure you've set it with \"set $name botToken <TOKEN>\"";}
+        if (!$hash->{TOKEN}) {return qq{Token of $name is not set - make sure you've set it with "set $name botToken <TOKEN>"};}
         # Token abrufen
         my ($success, $token) = SSChatBot_getToken($hash,0,"botToken");
-        unless ($success) {return "Token couldn't be retrieved successfully - see logfile"};
+        unless ($success) {return qq{Token couldn't be retrieved successfully - see logfile}};
         
-        return "Stored Token to act as Synology Chat Bot:\n".
-               "=========================================\n".
-               "$token \n"
+        return qq{Stored Token to act as Synology Chat Bot:\n}.
+               qq{=========================================\n}.
+               qq{$token \n}
                ;   
     
     } elsif ($opt eq "chatUserlist") {
