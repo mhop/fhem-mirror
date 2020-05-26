@@ -35,6 +35,7 @@
 # 19.11.18 GA add support for attribute maxOffTime
 # 05.03.19 GA fix reading maxOffTimeCalculation was set but not used
 # 30.12.19 GA fix access to ReadingsVal via $name (reported by stromer-12)
+# 26.05.20 GA fix division by zero if minRoomsOn is >0  and roomsCounted is zero
 
 ##############################################
 # $Id$
@@ -437,8 +438,9 @@ PWM_Calculate($)
 
   if ($minRoomsOn > 0) {
 
-    my $roomsCounted  = 0;
-    my $pulseSum      = 0;
+    my $roomsCounted = 0;
+    my $pulseSum     = 0;
+    my $avgPulse     = 0;
 
     foreach my $room (sort { $RoomsPulses{$b} <=> $RoomsPulses{$a} } keys %RoomsPulses) {
 
@@ -451,13 +453,15 @@ PWM_Calculate($)
     }
     $minRoomsOnList =~ s/,$//;
 
-    if ($roomsActive == 0 or $hash->{NoRoomsToStayOnThreshold} == 0 or $pulseSum/$roomsCounted < $hash->{NoRoomsToStayOnThreshold}) {
+    $avgPulse = $pulseSum/$roomsCounted if ($roomsCounted > 0);
+
+    if ($roomsActive == 0 or $hash->{NoRoomsToStayOnThreshold} == 0 or $avgPulse < $hash->{NoRoomsToStayOnThreshold}) {
       $minRoomsOn = 0;
       $minRoomsOnList = "";
     } 
  
     #Log3 ($hash, 3, "PWM_Calculate: newpulseSum $newpulseSum avg ".$newpulseSum/$roomsActive." minRoomsOn(".$minRoomsOn.")") if ($roomsActive > 0);
-    Log3 ($hash, 3, "PWM_Calculate: pulseSum $pulseSum avg ".$pulseSum/$roomsCounted." minRoomsOn(".$minRoomsOn.")") if ($roomsActive > 0);
+    Log3 ($hash, 3, "PWM_Calculate: pulseSum $pulseSum avg ".$avgPulse." minRoomsOn(".$minRoomsOn.")") if ($roomsActive > 0);
 
   }
 
