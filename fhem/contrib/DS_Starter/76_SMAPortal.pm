@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $
+# $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -43,7 +43,7 @@ use POSIX;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;      ## no critic 'eval'
 use Data::Dumper;
 use Blocking;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday time);
 use Time::Local;
 use LWP::UserAgent;
 use HTTP::Cookies;
@@ -78,6 +78,7 @@ BEGIN {
           Debug
           FmtDateTime
           FmtTime
+          fhemTzOffset
           FW_makeImage
           fhemTimeGm
           getKeyValue
@@ -133,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.2"  => "26.05.2020  improve stability of data retrieval ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
@@ -649,8 +651,8 @@ sub CallInfo {
       Log3 ($name, 4, "$name - ###      start of set/get data from SMA Sunny Portal         ###");
       Log3 ($name, 4, "$name - ################################################################"); 
   
-      $hash->{HELPER}{RETRIES} = AttrVal($name, "getDataRetries", 3)-1;
-      $hash->{HELPER}{RUNNING_PID} = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
+      $hash->{HELPER}{RETRIES}               = AttrVal($name, "getDataRetries", 3)-1;
+      $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
   } else {
@@ -699,7 +701,24 @@ sub GetSetData {                                                       ## no cri
                  );
   
   # Sunny Home Manager Seite abfragen 
-  my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
+  
+  # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
+  my $cstring      = ReadingsVal($name, "daycount", "");
+  my ($day,$count) = split(":", $cstring);
+  my $mday         = (localtime(time))[3];
+  if(!$day || $day != $mday) {
+      $count = 0;
+      $day   = $mday;
+  }
+  $count++;
+  $cstring = "$day:$count";  
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 0);
+  
+  # my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
+  my $cts    = time;
+  my $offset = fhemTzOffset($cts);
+  my $time   = int(($cts + $offset) * 1000);                                          # add Timestamp in Millisekunden and UTC
+  my $livedata = $ua->get( 'https://www.sunnyportal.com/homemanager?t='.$time );      # V2.6.2
 
   if(($livedata->content =~ m/FeedIn/ix) && ($livedata->content !~ m/expired/ix)) {
       Log3 $name, 4, "$name - Login to SMA-Portal successful";
@@ -725,7 +744,7 @@ sub GetSetData {                                                       ## no cri
           Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
           if($res eq "true") {
               $state = "ok - switched consumer $d to $op";
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none"], 0);
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL"], 0);
           } else {
               $state = "Error - couldn't switched consumer $d to $op";
           }
@@ -856,7 +875,7 @@ sub GetSetData {                                                       ## no cri
           } else {
               Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
               $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful but get data with next data cycle."]}';
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", gettimeofday()], 0);
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL"], 0);
               $login_state = 1;
               $reread      = 1;
           }
@@ -1118,7 +1137,8 @@ return;
 }
 
 ################################################################
-##             regelmäßig Cookie-Datei löschen
+#             regelmäßig Cookie-Datei löschen
+#             $must = 1 -> Cookie Zwangslöschung  
 ################################################################
 sub delcookiefile {
    my ($hash,$must) = @_;
@@ -1136,7 +1156,7 @@ sub delcookiefile {
        $delfile = unlink($cookieLocation);
    }
    
-   $oldlogintime = $hash->{HELPER}{oldlogintime}?$hash->{HELPER}{oldlogintime}:0;
+   $oldlogintime = $hash->{HELPER}{oldlogintime} // 0;
    
    if($init_done == 1) {
        # Abfrage ob gettimeofday() größer ist als gettimeofday()+$validperiod
@@ -1662,12 +1682,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 21740 2020-04-21 15:01:42Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1712,16 +1732,19 @@ return;
 #              
 ################################################################
 sub setFromBlocking {
-  my ($name,$getp,$setp,$logintime) = @_;
-  my $hash                          = $defs{$name};
-  
+  my ($name,$getp,$setp,$logintime,$counter) = @_;
+  my $hash                                   = $defs{$name};
+
   $getp      = $getp       // "NULL";
   $setp      = $setp       // "NULL";
   $logintime = $logintime  // "NULL";
+  $counter   = $counter    // "NULL";
 
-  $hash->{HELPER}{GETTER}       = $getp      if($getp      ne "NULL");
-  $hash->{HELPER}{SETTER}       = $setp      if($setp      ne "NULL");
-  $hash->{HELPER}{oldlogintime} = $logintime if($logintime ne "NULL");
+  $hash->{HELPER}{GETTER}       = $getp                if($getp      ne "NULL");
+  $hash->{HELPER}{SETTER}       = $setp                if($setp      ne "NULL");
+  $hash->{HELPER}{oldlogintime} = $logintime           if($logintime ne "NULL");
+  
+  readingsSingleUpdate($hash, "daycount", $counter, 1) if($counter   ne "NULL");
 
 return;
 }
