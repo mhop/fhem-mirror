@@ -543,8 +543,8 @@ sub Read {
         my $topic = $mqtt->topic();
         GP_ForallClients($hash,sub {
           my $client = shift;
-          Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
           if (grep { $topic =~ $_ } @{$client->{subscribeExpr}}) {
+            Log3($client->{NAME},5,"publish received for $topic, ".$mqtt->message());
             readingsSingleUpdate($client,"transmission-state","incoming publish received",1);
             my $fn = $modules{$defs{$client->{NAME}}{TYPE}}{OnMessageFn};
             if($fn) {
