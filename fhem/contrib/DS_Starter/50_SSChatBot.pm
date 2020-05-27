@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 my %SSChatBot_vNotesIntern = (
+  "1.8.0"  => "27.05.2020  send SVG Plots with options like svg='<SVG-Device>,<zoom>,<offset>' possible ",
   "1.7.0"  => "26.05.2020  send SVG Plots possible ",
   "1.6.1"  => "22.05.2020  changes according to PBP ",
   "1.6.0"  => "22.05.2020  replace \" H\" with \"%20H\" in attachments due to problem in HttpUtils ",
@@ -366,9 +367,9 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2" 
-      # text="aktuelles SVG-Plot" svg="<SVG-Device>" users="user1,user2"      
+      # text="aktuelles SVG-Plot" svg="<SVG-Device>,<zoom>,<offset>" users="user1,user2"      
       return if(!$hash->{HELPER}{USERFETCHED});
-      my ($text,$users,$svgdev);
+      my ($text,$users,$svg);
       my ($fileUrl,$attachment) = ("","");
       my $cmd                   = join(" ", map { my $p = $_; $p =~ s/\s//g; $p; } @items);
       my ($arr,$h)              = parseParams($cmd);
@@ -377,7 +378,7 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
           $text       = $h->{text}        if(defined $h->{text});
           $users      = $h->{users}       if(defined $h->{users});
           $fileUrl    = $h->{fileUrl}     if(defined $h->{fileUrl});             # ein File soll über einen Link hochgeladen und versendet werden
-          $svgdev     = $h->{svg}         if(defined $h->{svg});                 # ein SVG-Plot soll versendet werden
+          $svg        = $h->{svg}         if(defined $h->{svg});                 # ein SVG-Plot soll versendet werden
           $attachment = SSChatBot_formString($h->{attachments}, "attachement") if(defined $h->{attachments});
       }
       
@@ -387,8 +388,8 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
           $text = join(" ", @t) if(!$text);
       }      
 
-      if($svgdev) {                                                             # Versenden eines Plotfiles         
-          my ($err, $file) = SSChatBot_PlotToFile ($name, $svgdev);
+      if($svg) {                                                             # Versenden eines Plotfiles         
+          my ($err, $file) = SSChatBot_PlotToFile ($name, $svg);
           return if($err);
           
           my $FW    = $hash->{FW};
@@ -397,7 +398,7 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
           $fileUrl .= "sschat/www/images/$file?&fwcsrf=$csrf";
           
           $fileUrl  = SSChatBot_formString($fileUrl, "text");
-          $text     = $svgdev if(!$text);                                      # Name des SVG-Plots als Standardtext
+          $text     = $svg if(!$text);                                       # Name des SVG-Plots + Optionen als Standardtext
       }
       
       return qq{Your sendstring is incorrect. It must contain at least text with the "text=" tag like text="..."\nor only some text like "this is a test" without the "text=" tag.} if(!$text);
@@ -1576,11 +1577,16 @@ return;
 ####################################################################################
 sub SSChatBot_PlotToFile {
     my $name   = shift;
-	my $svgdev = shift;
+	my $svg    = shift;
     my $hash   = $defs{$name};
     my $file   = $name."_SendPlot.png";
     my $path   = $attr{global}{modpath}."/www/images";
     my $err    = "";
+    
+    my @options = split ",", $svg;
+    my $svgdev  = $options[0];
+    my $zoom    = $options[1];
+    my $offset  = $options[2];
     
     if(!$defs{$svgdev}) {
         my $err = qq{SVG device "$svgdev" doesn't exist};
@@ -1597,7 +1603,7 @@ sub SSChatBot_PlotToFile {
                                                 return $err;
 	                                          };
     binmode $FILE;
-    print   $FILE plotAsPng($svgdev);
+    print   $FILE plotAsPng(@options);
     close   $FILE;
 
 return ($err, $file);
