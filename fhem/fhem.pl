@@ -485,7 +485,7 @@ prepareFhemTestFile();
 
 if(int(@ARGV) < 1) {
   print "Usage:\n";
-  print "as server: perl fhem.pl [-d] {<configfile>|configDb}\n";
+  print "as server: perl fhem.pl [-d] {<configfile>|configDB}\n";
   print "as client: perl fhem.pl [host:]port cmd cmd cmd...\n";
   print "testing:   perl fhem.pl -t <testfile>.t\n";
   if($^O =~ m/Win/) {
