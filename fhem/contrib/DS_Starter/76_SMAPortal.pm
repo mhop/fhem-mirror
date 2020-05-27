@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.2"  => "26.05.2020  improve stability of data retrieval ",
+  "2.6.2"  => "26.05.2020  improve stability of data retrieval, new command delCookieFile ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
@@ -281,7 +281,8 @@ sub Set {                                                           ## no critic
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
-                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
+                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
+                 "delCookieFile:noArg "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           my $lfd = 0;
@@ -384,6 +385,13 @@ sub Set {                                                           ## no critic
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
+      
+  } elsif ($opt eq "delCookieFile") {
+      my $cf  = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
+      my $err = delcookiefile ($hash, 1);
+      my $ret = $err ? qq{WARNING - Cookie file "$cf" not deleted: $err} : qq{Cookie file "$cf" deleted};
+      Log3 ($name, 3, qq{$name - $ret}) if($err);
+      return $ret;
       
   } else {
       return "$setlist";
@@ -691,7 +699,20 @@ sub GetSetData {                                                       ## no cri
   my $ua = LWP::UserAgent->new;
 
   # Define user agent type
-  $ua->agent("$useragent");
+  # $ua->agent("$useragent");
+  
+  # Header Daten
+  $ua->default_header("Accept"           => "*/*",
+                      "Accept-Encoding"  => "gzip, deflate, br",
+                      "Accept-Language"  => "en-US;q=0.7,en;q=0.3",
+                      "Connection"       => "keep-alive",
+                      "Cookie"           => "collapseNavi_state=shown",
+                      "DNT"              => 1,
+                      "Host"             => "www.sunnyportal.com",
+                      "Referer"          => "https://www.sunnyportal.com/FixedPages/HoManLive.aspx",
+                      "User-Agent"       => $useragent,
+                      "X-Requested-With" => "XMLHttpRequest"
+                     );
   
   # Cookies
   $ua->cookie_jar(HTTP::Cookies->new( file           => "$cookieLocation",
@@ -709,6 +730,7 @@ sub GetSetData {                                                       ## no cri
   if(!$day || $day != $mday) {
       $count = 0;
       $day   = $mday;
+      Log3 ($name, 2, qq{$name - reset day cycle count to >0< });
   }
   $count++;
   $cstring = "$day:$count";  
@@ -949,7 +971,7 @@ sub ParseData {                                                    ## no critic 
       # Livedaten konnte nicht gelesen werden, neuer Versuch zeitverzögert
       delete($hash->{HELPER}{RUNNING_PID});
       $hash->{HELPER}{RETRIES} -= 1;
-      InternalTimer(gettimeofday()+1, "FHEM::SMAPortal::retrygetdata", $hash, 0);
+      InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }  
   
@@ -1026,9 +1048,9 @@ sub ParseData {                                                    ## no critic 
                   $batteryout = 1;
               }        
               
-              $errMsg  = 1 if($k =~ /^ErrorMessages$/x);
-              $warnMsg = 1 if($k =~ /^WarningMessages$/x);
-              $infoMsg = 1 if($k =~ /^InfoMessages$/x);
+              if($k =~ /^ErrorMessages$/x)   { $errMsg  = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
+              if($k =~ /^WarningMessages$/x) { $warnMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
+              if($k =~ /^InfoMessages$/x)    { $infoMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
 
               Log3 ($name, 4, "$name - $k - $new_val");
               readingsBulkUpdate($hash, "L1_$k", $new_val);
@@ -1144,6 +1166,7 @@ sub delcookiefile {
    my ($hash,$must) = @_;
    my $name         = $hash->{NAME};
    my ($validperiod, $cookieLocation, $oldlogintime, $delfile);
+   my $err = "";
    
    RemoveInternalTimer($hash,"FHEM::SMAPortal::delcookiefile");
    
@@ -1153,16 +1176,13 @@ sub delcookiefile {
    
    if($must) {
        # Cookie Zwangslöschung
-       $delfile = unlink($cookieLocation);
+       $delfile = unlink($cookieLocation) or $err = $!;
    }
    
    $oldlogintime = $hash->{HELPER}{oldlogintime} // 0;
    
-   if($init_done == 1) {
-       # Abfrage ob gettimeofday() größer ist als gettimeofday()+$validperiod
-       if (gettimeofday() > $oldlogintime+$validperiod) {
-            $delfile = unlink($cookieLocation);
-       }
+   if($init_done == 1 && gettimeofday() > $oldlogintime+$validperiod) {      # löschen wenn gettimeofday()+$validperiod abgelaufen
+       $delfile = unlink($cookieLocation) or $err = $!;
    } 
            
    if($delfile) {
@@ -1173,7 +1193,7 @@ sub delcookiefile {
    
    InternalTimer(gettimeofday()+30, "FHEM::SMAPortal::delcookiefile", $hash, 0);
 
-return;
+return ($err);
 }
 
 ################################################################
@@ -1801,7 +1821,7 @@ sub analyzeLivedata {                                                 ## no crit
               }              
               if($k =~ m/ErrorMessages/x && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Live data cannot be retrieved. Check cabling / configuration of energy meters. Try reread data ...";
+                  Log3 $name, 3, "$name - Live data cannot be retrieved. Try reread data ...";
                   $retry = 1;
                   return ($reread,$retry);
               }
@@ -2031,7 +2051,8 @@ sub PortalAsHtml {                                                              
       my $lang    = AttrVal("global","language","EN");
       my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                   # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = $hash->{HELPER}{LASTLDSUCCTIME} // "0000-00-00 00:00:00";      # letzte erfolgreiche Updatezeit Live Daten
+      # my $lup     = $hash->{HELPER}{LASTLDSUCCTIME} // "0000-00-00 00:00:00";      # letzte erfolgreiche Updatezeit Live Daten
+      my $lup     = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");      # letzte Updatezeit (Forecast trifft ausreichend auch wenn keine Live-Daten updated) 
       
       my $lupt    = "last update:";  
       my $lblPv4h = "4h:";
@@ -2757,6 +2778,12 @@ return;
      <br>
      
      <ul>
+     <li><b> set &lt;name&gt; delCookieFile </b> </li>  
+     The active cookie will be deleted.   
+     </ul> 
+     <br>
+     
+     <ul>
      <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> </li>  
      If the attribute "detailLevel" is set to 3 or higher, consumer data are fetched from the SMA Sunny Portal.
      Once these data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
@@ -2960,6 +2987,12 @@ return;
      <ul>
      <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
+     </ul> 
+     <br>
+     
+     <ul>
+     <li><b> set &lt;name&gt; delCookieFile </b> </li>  
+     Das aktive Cookie wird gelöscht.   
      </ul> 
      <br>
      
