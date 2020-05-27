@@ -697,9 +697,6 @@ sub GetSetData {                                                       ## no cri
   Log3 ($name, 5, "$name - data get: $getp, data set: ".(($d && $op)?($d." ".$op):$setp));
   
   my $ua = LWP::UserAgent->new;
-
-  # Define user agent type
-  # $ua->agent("$useragent");
   
   # Header Daten
   $ua->default_header("Accept"           => "*/*",
@@ -1825,7 +1822,7 @@ sub analyzeLivedata {                                                          #
               }              
               if($k =~ m/ErrorMessages/x && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Live data cannot be retrieved. $attstr";
+                  Log3 $name, 3, "$name - Live data can't be retrieved. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }
