@@ -721,7 +721,7 @@ sub GetSetData {                                                       ## no cri
   # Sunny Home Manager Seite abfragen 
   
   # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
-  my $cstring      = ReadingsVal($name, "daycount", "");
+  my $cstring      = ReadingsVal($name, "dailyCallCounter", "");
   my ($day,$count) = split(":", $cstring);
   my $mday         = (localtime(time))[3];
   if(!$day || $day != $mday) {
@@ -1761,7 +1761,7 @@ sub setFromBlocking {
   $hash->{HELPER}{SETTER}       = $setp                if($setp      ne "NULL");
   $hash->{HELPER}{oldlogintime} = $logintime           if($logintime ne "NULL");
   
-  readingsSingleUpdate($hash, "daycount", $counter, 1) if($counter   ne "NULL");
+  readingsSingleUpdate($hash, "dailyCallCounter", $counter, 1) if($counter   ne "NULL");
 
 return;
 }
