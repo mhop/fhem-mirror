@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.2"  => "26.05.2020  improve stability of data retrieval, new command delCookieFile ",
+  "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, some more improvements ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
@@ -1171,7 +1171,7 @@ sub delcookiefile {
    RemoveInternalTimer($hash,"FHEM::SMAPortal::delcookiefile");
    
    # Gültigkeitsdauer Cookie in Sekunden
-   $validperiod    = AttrVal($name, "cookielifetime", 3000);    
+   $validperiod    = AttrVal($name, "cookielifetime", 3600);    
    $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
    
    if($must) {
@@ -1772,10 +1772,14 @@ return;
 ################################################################
 #                 analysiere Livedaten
 ################################################################
-sub analyzeLivedata {                                                 ## no critic 'complexity'
+sub analyzeLivedata {                                                          ## no critic 'complexity'
   my ($hash,$lc)      = @_;
   my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
+  
+  my $max    = AttrVal($name, "getDataRetries", 1);    
+  my $act    = AttrVal($name, "getDataRetries", 1) - $hash->{HELPER}{RETRIES};    # Index aktueller Wiederholungsversuch
+  my $attstr = "Attempts read data again ... ($act of $max)";
 
   my $livedata_content = decode_json($lc);
   for my $k (keys %$livedata_content) {
@@ -1804,24 +1808,24 @@ sub analyzeLivedata {                                                 ## no crit
                   $reread = 1;
               }
               if($k =~ m/WarningMessages/x && $new_val =~ /.*Updating of the live data was interrupted.*/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - Updating of the live data was interrupted. Try reread data ...";
+                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }
               if($k =~ m/WarningMessages/x && $new_val =~ /.*The current consumption could not be determined. The current purchased electricity is unknown.*/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. Try reread data ...";
+                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }  
               if($k =~ m/ErrorMessages/x && $new_val =~ /.*Communication with the Sunny Home Manager is currently not possible.*/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. Try reread data ...";
+                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }              
               if($k =~ m/ErrorMessages/x && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Live data cannot be retrieved. Try reread data ...";
+                  Log3 $name, 3, "$name - Live data cannot be retrieved. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }
@@ -2817,7 +2821,8 @@ return;
      <ul>
        <a name="cookielifetime"></a>
        <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
-       Validity period of a received Cookie (default: 3000 seconds).  
+       Validity period of a received Cookie. <br>
+       (default: 3600)  
        </li><br>
        
        <a name="cookieLocation"></a>
@@ -3030,7 +3035,8 @@ return;
      <ul>
        <a name="cookielifetime"></a>
        <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
-       Gültigkeitszeitraum für einen empfangenen Cookie (default: 3000 Sekunden).  
+       Gültigkeitszeitraum für einen empfangenen Cookie. <br>
+       (default: 3600)
        </li><br>
        
        <a name="cookieLocation"></a>
