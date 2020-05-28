@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.7.2"  => "28.05.2020  delete cookie file if max read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
                            "current PV generation and consumption available in SMA graphics, some more improvements ",
@@ -748,9 +749,16 @@ sub GetSetData {                                                       ## no cri
                   $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
               }
           }
-          my $plantOid = $hash->{HELPER}{PLANTOID};
-          my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {'mode' => $op, 'serialNumber' => $serial, 'SUSyID' => $id, 'plantOid' => $plantOid} );
-          $res         = $res->decoded_content();
+          my $plantOid = $hash->{HELPER}{PLANTOID};      
+          my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
+                                          'mode'         => $op, 
+                                          'serialNumber' => $serial, 
+                                          'SUSyID'       => $id, 
+                                          'plantOid'     => $plantOid
+                                      } 
+                                  ); 
+                                  
+          $res = $res->decoded_content();
           Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
           if($res eq "true") {
               $state = "ok - switched consumer $d to $op";
@@ -950,21 +958,26 @@ sub ParseData {                                                    ## no critic 
   $ccyeardata_content       = decode_json($cy) if($cy);
   
   my $timeout = AttrVal($name, "timeout", 30);
-  if($reread) {
-      # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
+  if($reread) {                                  # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
       delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       return;
   }
-  if($retry && $hash->{HELPER}{RETRIES}) {
-      # Livedaten konnte nicht gelesen werden, neuer Versuch zeitverzögert
+  
+  if($retry && $hash->{HELPER}{RETRIES}) {       # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert
       delete($hash->{HELPER}{RUNNING_PID});
       $hash->{HELPER}{RETRIES} -= 1;
       InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }  
+  
+  if($retry && !$hash->{HELPER}{RETRIES}) {      # Livedaten konnten nicht gelesen werden, max. Versuche erreicht -> Cookie File löschen
+      delete($hash->{HELPER}{RUNNING_PID});
+      delcookiefile ($hash, 1);                  
+      return;
+  }
   
   my $dl = AttrVal($name, "detailLevel", 1);
   delread($hash, $dl+1);
