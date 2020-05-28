@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
                            "current PV generation and consumption available in SMA graphics, some more improvements ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
@@ -388,7 +389,7 @@ sub Set {                                                           ## no critic
       CallInfo($hash);
       
   } elsif ($opt eq "delCookieFile") {
-      my $cf  = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
+      my $cf  = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
       my $err = delcookiefile ($hash, 1);
       my $ret = $err ? qq{WARNING - Cookie file "$cf" not deleted: $err} : qq{Cookie file "$cf" deleted};
       Log3 ($name, 3, qq{$name - $ret}) if($err);
@@ -681,7 +682,7 @@ sub GetSetData {                                                       ## no cri
   my $hash                 = $defs{$name}; 
   my $login_state          = 0;
   my $useragent            = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
-  my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/mycookies.txt");
+  my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
   my ($ccyeardata_content) = ("");
   my $state                = "ok";
@@ -1162,7 +1163,7 @@ sub delcookiefile {
    
    # Gültigkeitsdauer Cookie in Sekunden
    $validperiod    = AttrVal($name, "cookielifetime", 3600);    
-   $cookieLocation = AttrVal($name, "cookieLocation", "./log/mycookies.txt"); 
+   $cookieLocation = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
    
    if($must) {
        # Cookie Zwangslöschung
@@ -2864,7 +2865,8 @@ return;
        
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
-       The path and filename of received Cookies (default: ./log/mycookies.txt).
+       The path and filename of received Cookies. <br>
+       (default: ./log/&lt;name&gt;_cookie.txt)
        <br><br> 
   
         <ul>
@@ -3078,7 +3080,8 @@ return;
        
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
-       Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies (default: ./log/mycookies.txt).
+       Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies. <br>
+       (default: ./log/&lt;name&gt;_cookie.txt)
        <br><br> 
   
         <ul>
