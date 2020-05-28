@@ -28,6 +28,7 @@ use Blocking;
 # REMINDER: Don't forget to update version number in META.json info at bottom of file
 #
 our %HVAC_DaikinAC_VERSION = (
+  "1.0.9"  => "28.05.2020  Added on and off shortcut commands, as expected by for example the Alexa module",
   "1.0.8"  => "21.04.2020  Initial checkin into FHEM repository. Fixed some syntax errors in documentation HTML. No code changes",
   "1.0.7"  => "11.04.2020  Added two examples to define Usage error and documentation; add interval and interval_powered attributes on startup for clarity; Poll daily and monthly power usage statistics once per hour, so that the current days and current months usage are represented correctly",
   "1.0.6"  => "04.04.2020  Bugfix in pwrconsumption code that caused 'Label not found' error",
@@ -384,6 +385,14 @@ sub HVAC_DaikinAC_Set($@) {
 			return undef;
 		};
 		$hash->{"INITIALIZED"} or return "Not initialized - nu current values";
+		$cmd eq "on" && do {
+			$s = "pow=1";
+			last SWITCH;
+		};
+		$cmd eq "off" && do {
+			$s = "pow=0";
+			last SWITCH;
+		};
 		$cmd eq "power" && do {
 			my $val = shift @a or goto usage;;
 			my %str2i = qw(off 0 on 1);
@@ -470,7 +479,9 @@ usage:
 		"reboot:nodata" . " " .
 		"shum:slider,0,5,100" . " " .
 		"stemp:slider,18,0.5,30" . " " .
-		"power:on,off";
+		"power:on,off" . " " .
+		"on" . " " .
+		"off";
 } # Set()
 
 # Attr
@@ -1187,6 +1198,8 @@ attr [devicename] devStateIcon off.*:control_standby@gray on.*cool:frost@blue on
   <ul>
    <li><b>refresh</b>: Force immediate poll of device - will also request and update version and device info</li>
    <li><b>power</b>: [ on | off ] Set power status (on or off)</li>
+   <li><b>on</b>: Shortcut for "power on"</li>
+   <li><b>off</b>: Shortcut for "power off"</li>
    <li><b>mode</b>: [ auto | dehumidify | cool | heat | vent ] Set new operation mode</li>
    <li><b>rate</b>: [ auto | silent | lowest | low | medium | high | highest ] Set fan speed (silent not supported on all Wifi controllers, even if the unit itsself supports the mode)</li>
    <li><b>swing</b>: [ none | vertical | horizontal | 3d ] Set airflow swing setting (horizontal or 3D not present on all units)</li>
@@ -1250,7 +1263,7 @@ attr [devicename] devStateIcon off.*:control_standby@gray on.*cool:frost@blue on
     "Heating",
     "Cooling"
   ],
-  "version": "v1.0.8",
+  "version": "v1.0.9",
   "release_status": "stable",
   "author": [
     "Roel Bouwman (roel@bouwman.net)"
