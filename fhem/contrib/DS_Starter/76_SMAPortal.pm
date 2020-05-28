@@ -134,7 +134,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, some more improvements ",
+  "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
+                           "some more improvements ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
@@ -720,18 +721,7 @@ sub GetSetData {                                                       ## no cri
   
   # Sunny Home Manager Seite abfragen 
   
-  # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
-  my $cstring      = ReadingsVal($name, "dailyCallCounter", "");
-  my ($day,$count) = split(":", $cstring);
-  my $mday         = (localtime(time))[3];
-  if(!$day || $day != $mday) {
-      $count = 0;
-      $day   = $mday;
-      Log3 ($name, 2, qq{$name - reset day cycle count to >0< });
-  }
-  $count++;
-  $cstring = "$day:$count";  
-  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 0);
+  handleCounter ($name, "dailyCallCounter");                                          # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
   
   # my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
   my $cts    = time;
@@ -893,8 +883,11 @@ sub GetSetData {                                                       ## no cri
               $livedata_content = "{\"Login-Status\":\"failed\"}";
           } else {
               Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
+              handleCounter ($name, "dailyIssueCookieCounter");                                          # Cookie Ausstellungszähler setzen
+              
               $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful but get data with next data cycle."]}';
               BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL"], 0);
+              
               $login_state = 1;
               $reread      = 1;
           }
@@ -1746,7 +1739,31 @@ return;
 }
 
 ################################################################
-#              
+#       statistische Counter managen 
+#       $name = Name Device
+#       $rd   = Name des Zählerreadings
+################################################################
+sub handleCounter {
+    my $name  = shift;
+    my $rd    = shift;
+    
+  my $cstring      = ReadingsVal($name, $rd, "");
+  my ($day,$count) = split(":", $cstring);
+  my $mday         = (localtime(time))[3];
+  if(!$day || $day != $mday) {
+      $count = 0;
+      $day   = $mday;
+      Log3 ($name, 2, qq{$name - reset counter "$rd" to >0< });
+  }
+  $count++;
+  $cstring = "$rd:$day:$count";  
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 0);
+
+return;
+}
+
+################################################################
+#        Werte aus BlockingCall heraus setzen
 ################################################################
 sub setFromBlocking {
   my ($name,$getp,$setp,$logintime,$counter) = @_;
@@ -1761,7 +1778,10 @@ sub setFromBlocking {
   $hash->{HELPER}{SETTER}       = $setp                if($setp      ne "NULL");
   $hash->{HELPER}{oldlogintime} = $logintime           if($logintime ne "NULL");
   
-  readingsSingleUpdate($hash, "dailyCallCounter", $counter, 1) if($counter   ne "NULL");
+  if($counter ne "NULL") {
+      my @cparts = split ":", $counter, 2;
+      readingsSingleUpdate($hash, $cparts[0], $cparts[1], 1);
+  }
 
 return;
 }
@@ -2050,10 +2070,9 @@ sub PortalAsHtml {                                                              
   # Headerzeile generieren                                                                                                             
   if ($header) {
       my $lang    = AttrVal("global","language","EN");
-      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                   # Linktext als Aliasname oder "SMA Sunny Portal"
+      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                                          # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      # my $lup     = $hash->{HELPER}{LASTLDSUCCTIME} // "0000-00-00 00:00:00";      # letzte erfolgreiche Updatezeit Live Daten
-      my $lup     = ReadingsTimestamp($name, "state", "0000-00-00 00:00:00");      # letzte Updatezeit (Forecast trifft ausreichend auch wenn keine Live-Daten updated) 
+      my $lup     = ReadingsTimestamp($name, "L2_ForecastToday_Consumption", "0000-00-00 00:00:00");      # letzter Forecast Update  
       
       my $lupt    = "last update:";  
       my $lblPv4h = "4h:";
