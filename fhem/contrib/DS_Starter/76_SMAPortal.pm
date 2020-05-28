@@ -135,7 +135,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
-                           "some more improvements ",
+                           "current PV generation and consumption available in SMA graphics, some more improvements ",
   "2.6.1"  => "21.04.2020  update time in portalgraphics changed to last successful live data retrieval, credentials are not shown in list device ",  
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
@@ -2045,25 +2045,31 @@ sub PortalAsHtml {                                                              
   my $co4h = ReadingsNum ($name,"L2_Next04Hours_Consumption", 0);
   my $coRe = ReadingsNum ($name,"L2_RestOfDay_Consumption", 0); 
   my $coTo = ReadingsNum ($name,"L2_Tomorrow_Consumption", 0);
+  my $coCu = ReadingsNum ($name,"L1_GridConsumption", 0);
 
   my $pv4h = ReadingsNum($name,"L2_Next04Hours_PV", 0);
   my $pvRe = ReadingsNum($name,"L2_RestOfDay_PV", 0); 
   my $pvTo = ReadingsNum($name,"L2_Tomorrow_PV", 0);
+  my $pvCu = ReadingsNum($name,"L1_PV", 0);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
       $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
       $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
+      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
       $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
       $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
       $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
+      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
   } else {
       $co4h .= "&nbsp;Wh";
       $coRe .= "&nbsp;Wh";
       $coTo .= "&nbsp;Wh";
+      $coCu .= "&nbsp;W";
       $pv4h .= "&nbsp;Wh";
       $pvRe .= "&nbsp;Wh";
       $pvTo .= "&nbsp;Wh";
+      $pvCu .= "&nbsp;W";
   }
 
   
@@ -2075,14 +2081,17 @@ sub PortalAsHtml {                                                              
       my $lup     = ReadingsTimestamp($name, "L2_ForecastToday_Consumption", "0000-00-00 00:00:00");      # letzter Forecast Update  
       
       my $lupt    = "last update:";  
-      my $lblPv4h = "4h:";
+      my $lblPv4h = "next 4h:";
       my $lblPvRe = "today:";
       my $lblPvTo = "tomorrow:";
+      my $lblPvCu = "actual";
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
           $lupt    = "Stand:"; 
+          $lblPv4h = "nächste 4h:";
           $lblPvRe = "heute:";
           $lblPvTo = "morgen:";
+          $lblPvCu = "aktuell";
       }  
 
       $header  = "<table align=\"$hdrAlign\">"; 
@@ -2096,12 +2105,24 @@ sub PortalAsHtml {                                                              
       
       # Header Information pv 
       if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
-          $header .= "<tr> <td><b>PV&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$pv4h</td> <td><b>$lblPvRe</b></td> <td align=right>$pvRe</td> <td><b>$lblPvTo</b></td> <td align=right>$pvTo</td> </tr>";
+          $header .= "<tr>";
+          $header .= "<td><b>PV&nbsp;=></b></td>"; 
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>"; 
+          $header .= "<td><b>$lblPv4h</b></td> <td align=right>$pv4h</td>"; 
+          $header .= "<td><b>$lblPvRe</b></td> <td align=right>$pvRe</td>"; 
+          $header .= "<td><b>$lblPvTo</b></td> <td align=right>$pvTo</td>"; 
+          $header .= "</tr>";
       }
       
       # Header Information co 
       if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
-          $header .= "<tr> <td><b>CO&nbsp;=></b></td> <td><b>$lblPv4h</b></td> <td align=right>$co4h</td> <td><b>$lblPvRe</b></td> <td align=right>$coRe</td> <td><b>$lblPvTo</b></td> <td align=right>$coTo</td> </tr>"; 
+          $header .= "<tr>";
+          $header .= "<td><b>CO&nbsp;=></b></td>";
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>";           
+          $header .= "<td><b>$lblPv4h</b></td> <td align=right>$co4h</td>"; 
+          $header .= "<td><b>$lblPvRe</b></td> <td align=right>$coRe</td>"; 
+          $header .= "<td><b>$lblPvTo</b></td> <td align=right>$coTo</td>"; 
+          $header .= "</tr>"; 
       }
 
       $header .= "</table>";     
