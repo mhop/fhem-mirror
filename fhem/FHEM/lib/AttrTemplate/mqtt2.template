@@ -45,9 +45,9 @@ attr DEVCID comment Do not use very open bridgeRegexp expressions! This might le
 attr DEVCID room NEWDEVROOM
 attr DEVICE icon mqtt_bridge_2
 attr DEVCID setStateList on off
-deleteAttr DEVICE readingList
+deleteattr DEVICE readingList
 deletereading -q DEVICE (?!associatedWith).*
-deleteAttr DEVCID readingList
+deleteattr DEVCID readingList
 deletereading -q DEVCID (?!associatedWith).*
 setreading DEVCID associatedWith DEVICE
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
@@ -948,7 +948,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a single device including all readings
 order:A_02a
 set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=0
-deleteAttr DEVICE jsonMap
+deleteattr DEVICE jsonMap
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -2479,10 +2479,11 @@ di5\
 di6
 attr DEVICE webCmd : 
 copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_CH5
-copy DEVICE DEVICE_CH6
+deleteattr DEVICE_CH2 stateFormat
+copy DEVICE_CH2 DEVICE_CH3
+copy DEVICE_CH2 DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH5
+copy DEVICE_CH2 DEVICE_CH6
 attr DEVICE_CH2 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do2":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE_CH3 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do3":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
 attr DEVICE_CH4 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do4":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
