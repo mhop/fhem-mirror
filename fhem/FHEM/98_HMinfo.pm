@@ -2686,7 +2686,7 @@ sub HMinfo_templateSet(@){#####################################################
       my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
       $max = 0 if (!$max);
       $max =~ s/([0-9\.]+).*/$1/;
-      return "$regV out of range: $min to $max"                           if ($min && ($regV < $min || ($max && $regV > $max)));
+      return "$regV out of range: $min to $max"                           if ($regV !~ m /^set_/ && $min && ($regV < $min || ($max && $regV > $max)));
     }
     push @regCh,"$regN,$regV";
   }
