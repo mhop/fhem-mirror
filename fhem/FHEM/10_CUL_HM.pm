@@ -634,7 +634,7 @@ sub CUL_HM_Undef($$) {###############################
   if ($chn){# delete a channel
     my $devHash = $defs{$devName};
     delete $devHash->{"channel_$chn"} if ($devName);
-    $devHash->{helper}{role}{chn}=1 if($chn eq "01");# return chan 01 role
+    $devHash->{helper}{role}{chn} = 1 if($chn eq "01");# return chan 01 role
   }
   else{# delete a device
      CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
@@ -3977,6 +3977,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
     $hash->{helper}{cmds}{TmplTs}=gettimeofday();# force re-arrange of template commands
+    $hash->{helper}{cmds}{cmdKey}="";
     $info .= join("\n",map{if($_ !~ m/]../){(my $foo = $_) =~ s/\|/\n\t/g; $foo;}else{$_}} sort (CUL_HM_SetList($name)));
 
     #my $a = CUL_HMTmplSetCmd($name)." ";
@@ -4189,7 +4190,12 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
     if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."xx"}}{$_} }};
     if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
     if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
+    my $pl = CUL_HM_getPeerOption($name);
+    $pl =~ s/,/|/g;
+    push @arr1,"peerSmart:[$pl]" if ($pl); 
+
     my @arr1cmd = CUL_HM_noDup(@arr1);
+
     $hash->{helper}{cmds}{cmdList} = \@arr1cmd;
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
   }
@@ -4211,32 +4217,6 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
   }
 
   return (@{$hash->{helper}{cmds}{cmdList}},@{$hash->{helper}{cmds}{TmplCmds}});
-#    foreach(@arr1){
-#      next if(!$_);
-#      my ($cmdS,$val) = split(":",$_,2);
-#      if (!$val){ # no agruments possible
-#        $_ = "$cmdS:noArg";
-#      }
-#      elsif($val !~ m/^\[.*\]$/ ||
-#            $val =~ m/\[.*\[/   ||
-#            $val =~ m/(\<|\>)]/
-#            ){
-#        $_ = $cmdS;
-#      }
-#      else{
-#        $val =~ s/(\[|\])//g;
-#        my @vArr = split('\|',$val);
-#        foreach (@vArr){
-#          if ($_ =~ m/(.*)\.\.(.*)/ ){
-#            my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
-#            pop @list;
-#            $_ = join(",",@list);
-#          }
-#        }
-#        $_ = "$cmdS:".join(",",@vArr);
-#      }
-#    }
-#    @arr1 = ("--") if (!scalar @arr1);
  }
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
@@ -4307,9 +4287,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     @cmdArr = ("--") if (!scalar @cmdArr);
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdArr)." ";
-    
-    my $pl = CUL_HM_getPeerOption($name);
-    $usg .= " peerSmart:$pl" if ($pl); 
    
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
@@ -4825,6 +4802,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "value:$data out of range $reg->{min} to $reg->{max} for Reg \""
            .$regName."\""
             if (!($conv =~ m/^(lit|hex|min2time)$/)&&
+                $data !~ m/^set_/ &&
                 ($data < $reg->{min} ||$data > $reg->{max})); # none number
     return"invalid value. use:". join(",",sort keys%{$reg->{lit}})
             if ($conv eq 'lit' && !defined($reg->{lit}{$data}));
@@ -5994,7 +5972,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my ($pDev,$pCh) = unpack 'A6A2',CUL_HM_name2Id($peer,$devHash)."01";
       return "button cannot be identified" if (!$pCh);
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
-      my $msg = sprintf("3E%s%s%s%s%02X%02X",
+      my $msg = sprintf("3E%s%s%s%s%02X%02X%s",
                                      $id,$dst,$pDev,$modeCode
                                     ,hex($pCh)+$mode
                                     ,$hash->{helper}{count}
@@ -8766,8 +8744,8 @@ sub CUL_HM_getRegInfo($) { #
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $st  = AttrVal    ($devHash->{NAME},"subType", "" );
   my $md  = CUL_HM_getAliasModel($hash);#AttrVal    ($devHash->{NAME},"model"  , "" );
-  my $roleD  = $hash->{helper}{role}{dev};
-  my $roleC  = $hash->{helper}{role}{chn};
+  my $roleD  = $hash->{helper}{role}{dev} ? 1 : 0;
+  my $roleC  = $hash->{helper}{role}{chn} ? 1 : 0;
   my $chn = $roleD ? "00" : InternalVal($hash->{NAME}   ,"chanNo" ,"00");
   my @regArr = CUL_HM_getRegN($st,$md,$chn);
 
