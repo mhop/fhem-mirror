@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.0"  => "28.05.2020  bisherige Tagesleistung und der Tagesverbrauch ",
+  "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
                            "current PV generation and consumption available in SMA graphics, some more improvements ",
@@ -199,12 +199,12 @@ sub Initialize {
                            "cookielifetime ".
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
-                           "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
+                           "getDataRetries:4,5,6,7,8,9,10,11,12,13,14,15 ".
                            "interval ".
                            "showPassInLog:1,0 ".
                            "timeout ". 
                            "userAgent ".
-                           "verbose5Data:none,liveData,balanceData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
+                           "verbose5Data:none,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -688,7 +688,7 @@ sub GetSetData {                                                       ## no cri
   my ($ccyeardata_content) = ("");
   my $state                = "ok";
   my ($reread,$retry)      = (0,0);  
-  my ($forecast_content,$balancedata_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","","");
+  my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
   my ($livedata_content,$d,$op); 
   
   if($setp ne "none") {
@@ -749,15 +749,15 @@ sub GetSetData {                                                       ## no cri
                   $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
               }
           }
-          my $plantOid = $hash->{HELPER}{PLANTOID};
+          my $plantOid = $hash->{HELPER}{PLANTOID};      
           my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
-                                           'mode'         => $op, 
-                                           'serialNumber' => $serial, 
-                                           'SUSyID'       => $id, 
-                                           'plantOid'     => $plantOid
-                                       } 
-                                   );
-          
+                                          'mode'         => $op, 
+                                          'serialNumber' => $serial, 
+                                          'SUSyID'       => $id, 
+                                          'plantOid'     => $plantOid
+                                      } 
+                                  ); 
+                                  
           $res = $res->decoded_content();
           Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
           if($res eq "true") {
@@ -768,7 +768,7 @@ sub GetSetData {                                                       ## no cri
           }
       }
       
-      ### Daten abrufen mit GET oder POST
+      ### Daten abrufen mit GET
       if($getp ne "none") {                                   
           
           # JSON Wetterdaten
@@ -776,6 +776,11 @@ sub GetSetData {                                                       ## no cri
           my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
           $weatherdata_content = $weatherdata->content;
           Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
+          
+          
+          
+          
+          
           
           # Abruf Tagesbilanz
           Log3 ($name, 1, "$name - Getting Daily balance");
@@ -807,6 +812,9 @@ $ua->default_header (  "Accept"           => "application/json, text/javascript,
                                      
           $balancedata_content = $balancedata->decoded_content();
           Log3 ($name, 1, "$name - Data received:\n".Dumper $balancedata_content) if($v5d eq "balanceData");
+          
+          
+          
           
           
           
@@ -991,21 +999,32 @@ sub ParseData {                                                    ## no critic 
   $ccyeardata_content       = decode_json($cy) if($cy);
   
   my $timeout = AttrVal($name, "timeout", 30);
-  if($reread) {
-      # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
+  if($reread) {                                             # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
       delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       return;
   }
-  if($retry && $hash->{HELPER}{RETRIES}) {
-      # Livedaten konnte nicht gelesen werden, neuer Versuch zeitverzögert
+  
+  if($retry && $hash->{HELPER}{RETRIES}) {                  # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert
       delete($hash->{HELPER}{RUNNING_PID});
+      my $max = AttrVal($name, "getDataRetries", 1);    
+      my $act = $max - $hash->{HELPER}{RETRIES};            # Index aktueller Wiederholungsversuch
+      
+      delcookiefile ($hash, 1) if($max - $act <= 1);        # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+      
       $hash->{HELPER}{RETRIES} -= 1;
       InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }  
+  
+  if($retry && !$hash->{HELPER}{RETRIES}) {                 # Daten konnten trotz maxRetry nicht abgerufen werden.        
+      delete $hash->{HELPER}{RUNNING_PID};
+      $hash->{HELPER}{GETTER} = "all";
+      $hash->{HELPER}{SETTER} = "none";      
+      return;
+  }
   
   my $dl = AttrVal($name, "detailLevel", 1);
   delread($hash, $dl+1);
@@ -1837,7 +1856,7 @@ sub analyzeLivedata {                                                          #
   my ($reread,$retry) = (0,0);
   
   my $max    = AttrVal($name, "getDataRetries", 1);    
-  my $act    = AttrVal($name, "getDataRetries", 1) - $hash->{HELPER}{RETRIES};    # Index aktueller Wiederholungsversuch
+  my $act    = $max - $hash->{HELPER}{RETRIES};                                # Index aktueller Wiederholungsversuch
   my $attstr = "Attempts read data again ... ($act of $max)";
 
   my $livedata_content = decode_json($lc);
@@ -2939,7 +2958,9 @@ return;
        
        <a name="getDataRetries"></a>
        <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal (default: 3). </li><br>
+       Maximal number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal. <br>
+       (default: 3) 
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;seconds&gt; </b><br>
@@ -3154,8 +3175,10 @@ return;
        
        <a name="getDataRetries"></a>
        <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Anzahl der Wiederholungen (get data) im Fall dass keine Live-Daten vom SMA Sunny Portal geliefert 
-       wurden (default: 3). </li><br>
+       Maximale Anzahl von Wiederholungen (get data) für den Fall, dass keine Live-Daten aus dem SMA Sunny Portal geholt 
+       werden konnten. <br>
+       (default: 3)
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
