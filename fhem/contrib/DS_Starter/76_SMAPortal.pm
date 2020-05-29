@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.7.2"  => "28.05.2020  delete cookie file if max read retries reached ",
+  "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
                            "current PV generation and consumption available in SMA graphics, some more improvements ",
@@ -199,7 +199,7 @@ sub Initialize {
                            "cookielifetime ".
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
-                           "getDataRetries:1,2,3,4,5,6,7,8,9,10 ".
+                           "getDataRetries:4,5,6,7,8,9,10,11,12,13,14,15 ".
                            "interval ".
                            "showPassInLog:1,0 ".
                            "timeout ". 
@@ -958,7 +958,7 @@ sub ParseData {                                                    ## no critic 
   $ccyeardata_content       = decode_json($cy) if($cy);
   
   my $timeout = AttrVal($name, "timeout", 30);
-  if($reread) {                                  # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
+  if($reread) {                                             # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
       delete($hash->{HELPER}{RUNNING_PID});
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
@@ -966,16 +966,22 @@ sub ParseData {                                                    ## no critic 
       return;
   }
   
-  if($retry && $hash->{HELPER}{RETRIES}) {       # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert
+  if($retry && $hash->{HELPER}{RETRIES}) {                  # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert
       delete($hash->{HELPER}{RUNNING_PID});
+      my $max = AttrVal($name, "getDataRetries", 1);    
+      my $act = $max - $hash->{HELPER}{RETRIES};            # Index aktueller Wiederholungsversuch
+      
+      delcookiefile ($hash, 1) if($max - $act <= 1);        # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+      
       $hash->{HELPER}{RETRIES} -= 1;
       InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }  
   
-  if($retry && !$hash->{HELPER}{RETRIES}) {      # Livedaten konnten nicht gelesen werden, max. Versuche erreicht -> Cookie File löschen
-      delete($hash->{HELPER}{RUNNING_PID});
-      delcookiefile ($hash, 1);                  
+  if($retry && !$hash->{HELPER}{RETRIES}) {                 # Daten konnten trotz maxRetry nicht abgerufen werden.        
+      delete $hash->{HELPER}{RUNNING_PID};
+      $hash->{HELPER}{GETTER} = "all";
+      $hash->{HELPER}{SETTER} = "none";      
       return;
   }
   
@@ -1809,7 +1815,7 @@ sub analyzeLivedata {                                                          #
   my ($reread,$retry) = (0,0);
   
   my $max    = AttrVal($name, "getDataRetries", 1);    
-  my $act    = AttrVal($name, "getDataRetries", 1) - $hash->{HELPER}{RETRIES};    # Index aktueller Wiederholungsversuch
+  my $act    = $max - $hash->{HELPER}{RETRIES};                                # Index aktueller Wiederholungsversuch
   my $attstr = "Attempts read data again ... ($act of $max)";
 
   my $livedata_content = decode_json($lc);
@@ -2911,7 +2917,9 @@ return;
        
        <a name="getDataRetries"></a>
        <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal (default: 3). </li><br>
+       Maximal number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal. <br>
+       (default: 3) 
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;seconds&gt; </b><br>
@@ -3126,8 +3134,10 @@ return;
        
        <a name="getDataRetries"></a>
        <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Anzahl der Wiederholungen (get data) im Fall dass keine Live-Daten vom SMA Sunny Portal geliefert 
-       wurden (default: 3). </li><br>
+       Maximale Anzahl von Wiederholungen (get data) für den Fall, dass keine Live-Daten aus dem SMA Sunny Portal geholt 
+       werden konnten. <br>
+       (default: 3)
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
