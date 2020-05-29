@@ -971,9 +971,10 @@ sub ParseData {                                                    ## no critic 
       my $max = AttrVal($name, "getDataRetries", 1);    
       my $act = $max - $hash->{HELPER}{RETRIES};            # Index aktueller Wiederholungsversuch
       
-      delcookiefile ($hash, 1) if($max - $act <= 1);        # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
-      
       $hash->{HELPER}{RETRIES} -= 1;
+      
+      delcookiefile ($hash, 1) if($max - $act <= 1);        # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+     
       InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
   }
@@ -1807,7 +1808,7 @@ sub analyzeLivedata {                                                          #
   my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
   
-  my $max    = AttrVal($name, "getDataRetries", 1);    
+  my $max    = AttrVal($name, "getDataRetries", 3);    
   my $act    = $max - $hash->{HELPER}{RETRIES};                                # Index aktueller Wiederholungsversuch
   my $attstr = "Attempts read data again ... ($act of $max)";
 
