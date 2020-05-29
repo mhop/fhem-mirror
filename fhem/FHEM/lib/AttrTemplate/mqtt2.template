@@ -817,19 +817,19 @@ name:tasmota_POW_USB_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Plug with additional USB outlet flashed with Tasmota. <br>For use e.g. with Gosund SP112 or Blitzwolf SH5<br>NOTE: a second device will be created for the USB channel.<br>NOTE: still untested template, feedback is welcome!
 order:A_01c1
-set DEVICE attrTemplate tasmota_2channel_split
+set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0
 set DEVICE attrTemplate tasmota_POW
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+#attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
 par:ICON;ICON as set, defaults to usb;{ AttrVal("DEVICE_CH2","icon","usb") }
 attr DEVICE_CH2 icon ICON
 attr DEVICE_CH2 comment Channel 2 (USB outlets) for DEVICE
-setreading DEVICE_CH2 associatedWith DEVICE
+#setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 devStateIcon on:usb:off off:usb@red:on
 attr DEVICE_CH2 setStateList on off toggle
-#set DEVICE_CH2 attrTemplate speechcontrol_alaxaName_firstrun
+set DEVICE_CH2 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2 model tasmota_POW_USB_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200522 or prior
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200529
 
 # plug with LED flashed with Tasmota.
 name:tasmota_plug_with_rgbw_split
@@ -983,25 +983,28 @@ order:A_02
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:SETCHANNELINFO;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
-setreading DEVICE associatedWith DEVICE_CH2
+#attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+#setreading DEVICE associatedWith DEVICE_CH2
 copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList \
   STATTOPIC/POWER2:.* state
 attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
-attr DEVICE_CH2 comment Channel 2 for DEVICE
-setreading DEVICE_CH2 associatedWith DEVICE
+#attr DEVICE_CH2 comment Channel 2 for DEVICE
+#setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    CMNDTOPIC/POWER2 0\
   on:noArg     CMNDTOPIC/POWER2 1\
   toggle:noArg CMNDTOPIC/POWER2 2
 attr DEVICE_CH2 setStateList on off toggle
 attr DEVICE,DEVICE_CH2 model tasmota_2channel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200522 or prior
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200529
+option:{SETCHANNELINFO}
+set DEVICE attrTemplate set_associatedWith \CHANNELS=2
 option:{ CALLSPEECHRECOGN }  
-set DEVICE attrTemplate speechcontrol_type_switch
-set DEVICE_CH2 attrTemplate speechcontrol_type_switch
+set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
+#set DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
 
 #contributed by 87insane
@@ -1084,16 +1087,17 @@ desc:sonoff 4 channel device flashed with Tasmota. <br>NOTE: a second, third and
 order:A_04
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
-setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
-setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
-attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
+set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0 SETCHANNELINFO=0
+#attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+#setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
+#setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
+#attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
 #attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct POWER1:0 POWER3:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
 #create device for CH3
 copy DEVICE DEVICE_CH3
-#attr DEVICE_CH2 jsonMap POWER3:state Dimmer:pct POWER1:0 POWER2:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
-attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+#attr DEVICE_CH2 jsonMap POWER3:state Dimmer:pct POWER1:0 POWER2:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
+#setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
+#attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg    CMNDTOPIC/POWER3 0\
   on:noArg     CMNDTOPIC/POWER3 1\
@@ -1104,8 +1108,8 @@ attr DEVICE_CH3 readingList \
 #create device for CH4
 copy DEVICE DEVICE_CH4
 #attr DEVICE_CH2 jsonMap POWER4:state Dimmer:pct POWER1:0 POWER2:0 POWER3:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
-setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
-attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
+#setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
+#attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg    CMNDTOPIC/POWER4 0\
   on:noArg     CMNDTOPIC/POWER4 1\
@@ -1115,11 +1119,12 @@ attr DEVICE_CH4 readingList \
 attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20200522 or prior
-set DEVICE attrTemplate speechcontrol_type_switch
-set DEVICE_CH2 attrTemplate speechcontrol_type_switch
-set DEVICE_CH3 attrTemplate speechcontrol_type_switch
-set DEVICE_CH4 attrTemplate speechcontrol_type_switch
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20200529
+#set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate set_associatedWith \CHANNELS=4
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
+#set DEVICE_CH3 attrTemplate speechcontrol_type_switch
+#set DEVICE_CH4 attrTemplate speechcontrol_type_switch
 
 
 # 4-way multi socket 3AC+USB device flashed with Tasmota.
@@ -2382,7 +2387,6 @@ par:CMNDTOPIC;Command topic prefix;{ AttrVal("DEVICE","readingList","") =~ m,([^
 par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 attr DEVICE model 8channel_ethernet_board_split
-setreading DEVICE attrTemplateVersion 20200522 or prior
 attr DEVICE setStateList on off
 set DEVICE attrTemplate speechcontrol_type_switch
 deletereading -q DEVICE (?!associatedWith).*
@@ -2393,14 +2397,6 @@ copy DEVICE DEVICE_CH5
 copy DEVICE DEVICE_CH6
 copy DEVICE DEVICE_CH7
 copy DEVICE DEVICE_CH8
-setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
-setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
-setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
 attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
@@ -2425,8 +2421,8 @@ attr DEVICE_CH7 setList on:noArg CMNDTOPIC setr=xxxxxx1x\
   off:noArg CMNDTOPIC setr=xxxxxx0x
 attr DEVICE_CH8 setList on:noArg CMNDTOPIC setr=xxxxxxx1\
   off:noArg CMNDTOPIC setr=xxxxxxx0
-setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
-
+set DEVICE attrTemplate set_associatedWith \CHANNELS=8
+setreading DEVICE attrTemplateVersion 20200529
 
 name:8channel_ethernet_board_unified
 filter:TYPE=MQTT2_DEVICE
@@ -2450,6 +2446,106 @@ attr DEVICE setList out1:0,1 {my $command = $EVTPART1."xxxxxxx";; "CMNDTOPIC set
   out8:0,1 {"CMNDTOPIC setr=xxxxxxx".$EVTPART1}
 attr DEVICE model 8channel_ethernet_board_unified
 setreading DEVICE attrTemplateVersion 20200522 or prior
+
+
+###############
+#Advantech ADAM6060 ethernet board
+#
+# input by cberl, see forum https://forum.fhem.de/index.php/topic,111429.0.html
+
+name:6channel_ethernet_board_6input_split
+filter:TYPE=MQTT2_DEVICE
+desc:For use with Advantech ADAM-6060-D 6-ch digital Input and 6-ch relay output.
+NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,111429.0.html">Forum Thread</a>. You have to configure MQTT first with the Adam/Apax.Net Utility - cloud function: Set your broker and look for the topic; MQTT may not be available on all firmware revisions.<br>Split version - you'll get 6 independent devices.
+order:W_04
+par:DEVNAME;Device's name in the topic tree;{ AttrVal("DEVICE","readingList","") =~ m,Advantech/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green
+attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do1":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }\
+Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
+attr DEVICE setExtensionsEvent 1
+attr DEVICE setList on:noArg Advantech/DEVNAME/ctl/do1:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do1:r {"v":false}
+attr DEVICE stateFormat status\
+state\
+<br>\
+DigiIn\
+di1\
+di2\
+di3\
+di4\
+di5\
+di6
+attr DEVICE webCmd : 
+copy DEVICE DEVICE_CH2
+copy DEVICE DEVICE_CH3
+copy DEVICE DEVICE_CH4
+copy DEVICE DEVICE_CH5
+copy DEVICE DEVICE_CH6
+attr DEVICE_CH2 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do2":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH3 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do3":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH4 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do4":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH5 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do5":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH6 readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do6":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }
+attr DEVICE_CH2 setList on:noArg Advantech/DEVNAME/ctl/do2:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do2:r {"v":false}
+attr DEVICE_CH3 setList on:noArg Advantech/DEVNAME/ctl/do3:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do3:r {"v":false}
+attr DEVICE_CH4 setList on:noArg Advantech/DEVNAME/ctl/do4:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do4:r {"v":false}
+attr DEVICE_CH5 setList on:noArg Advantech/DEVNAME/ctl/do5:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do5:r {"v":false}
+attr DEVICE_CH6 setList on:noArg Advantech/DEVNAME/ctl/do6:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do6:r {"v":false}
+set DEVICE attrTemplate set_associatedWith \CHANNELS=6
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplate speechcontrol_type_switch
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplateVersion 20200529
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 model 6channel_ethernet_board_6input_split
+
+
+name:6channel_ethernet_board_6input_unified
+filter:TYPE=MQTT2_DEVICE
+desc:desc:For use with Advantech ADAM-6060-D 6-ch digital Input and 6-ch relay output.
+NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,111429.0.html">Forum Thread</a>. You have to configure MQTT first with the Adam/Apax.Net Utility - cloud function: Set your broker and look for the topic; MQTT may not be available on all firmware revisions.
+order:W_04a
+par:DEVNAME;Device's name in the topic tree;{ AttrVal("DEVICE","readingList","") =~ m,Advantech/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green 2.on:on:do2+off 2.off:off:do2+on 3.on:on:do3+off 3.off:off:do3+on 4.on:on:do4+off 4.off:off:do4+on 5.on:on:do5+off 5.off:off:do5+on 6.on:on:do6+off 6.off:off:do6+on
+attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
+Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
+attr DEVICE setExtensionsEvent 1
+attr DEVICE event-on-change-reading .*
+attr DEVICE jsonMap do1:state c:0 q:0 s:0 t:0
+attr DEVICE setList on:noArg Advantech/DEVNAME/ctl/do1:r {"v":true}\
+  off:noArg Advantech/DEVNAME/ctl/do1:r {"v":false}\
+  do2:on,off {my $payload = $EVTPART1 eq "on" ? "true" : "false";; qq(Advantech/DEVNAME/ctl/do2:r {"v":$payload})}\
+  do3:on,off {my $payload = $EVTPART1 eq "on" ? "true" : "false";; qq(Advantech/DEVNAME/ctl/do3:r {"v":$payload})}\
+  do4:on,off {my $payload = $EVTPART1 eq "on" ? "true" : "false";; qq(Advantech/DEVNAME/ctl/do4:r {"v":$payload})}\
+  do5:on,off {my $payload = $EVTPART1 eq "on" ? "true" : "false";; qq(Advantech/DEVNAME/ctl/do5:r {"v":$payload})}\
+  do6:on,off {my $payload = $EVTPART1 eq "on" ? "true" : "false";; qq(Advantech/DEVNAME/ctl/do6:r {"v":$payload})}
+attr DEVICE stateFormat status\
+state\
+2:do2\
+3:do3\
+4:do4\
+5:do5\
+6:do6\
+<br>\
+DigiIn\
+di1\
+di2\
+di3\
+di4\
+di5\
+di6
+attr DEVICE webCmd : 
+set DEVICE attrTemplate speechcontrol_type_switch
+attr DEVICE model 6channel_ethernet_board_6input_unified
+setreading DEVICE attrTemplateVersion 20200529
 
 
 
