@@ -976,13 +976,6 @@ sub ParseData {                                                    ## no critic 
       $hash->{HELPER}{RETRIES} -= 1;
       InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
       return;
-  }  
-  
-  if($retry && !$hash->{HELPER}{RETRIES}) {                 # Daten konnten trotz maxRetry nicht abgerufen werden.        
-      delete $hash->{HELPER}{RUNNING_PID};
-      $hash->{HELPER}{GETTER} = "all";
-      $hash->{HELPER}{SETTER} = "none";      
-      return;
   }
   
   my $dl = AttrVal($name, "detailLevel", 1);
