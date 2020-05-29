@@ -179,8 +179,8 @@ use vars qw(%HMCCU_SCRIPTS);
 		'manu' => 'V:MANU_MODE:?temperature',
 		'on' => 'V:MANU_MODE:30.5',
 		'off' => 'V:MANU_MODE:4.5',
-		'auto' => 'V:AUTO_MODE:true',
-		'boost' => 'V:BOOST_MODE:true',
+		'auto' => 'V:AUTO_MODE:1',
+		'boost' => 'V:BOOST_MODE:1',
 		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
@@ -188,8 +188,8 @@ use vars qw(%HMCCU_SCRIPTS);
 		'manu' => 'V:MANU_MODE:?temperature',
 		'on' => 'V:MANU_MODE:30.5',
 		'off' => 'V:MANU_MODE:4.5',
-		'auto' => 'V:AUTO_MODE:true',
-		'boost' => 'V:BOOST_MODE:true'
+		'auto' => 'V:AUTO_MODE:1',
+		'boost' => 'V:BOOST_MODE:1'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_POINT_TEMPERATURE:?temperature',
