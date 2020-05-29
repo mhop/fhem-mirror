@@ -1,0 +1,83 @@
+###########################################
+# $Id$
+#
+# This file provides add-on templates for use within any other attrTemplate 
+#
+# NOTE: This type of attrTemplate is not intented for seperate use!
+#
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+
+###########
+# multichannel helper to set relations
+name:set_associatedWith
+filter:NAME=speechrecognTesting
+order:Z00001
+desc:template to set associatedWith reading for multichannel devices; call e.g. with CHANNELS=4.
+
+# 2 channels
+option:{return 1 if CHANNELS==2;;return 0}
+setreading DEVICE associatedWith DEVICE_CH2
+setreading DEVICE_CH2 associatedWith DEVICE
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
+attr DEVICE_CH2 comment Channel 2 for DEVICE
+
+# 3 channels
+option:{return 1 if CHANNELS==3;;return 0}
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2 and DEVICE_CH3 
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE and DEVICE_CH3
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE and DEVICE_CH2 
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2
+
+# 4 channels
+option:{return 1 if CHANNELS==4;;return 0}
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
+setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
+
+# 6 channels
+option:{return 1 if CHANNELS==6;;return 0}
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5 and DEVICE_CH6
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5 and DEVICE_CH6
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH4, DEVICE_CH5 and DEVICE_CH6
+attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH5 and DEVICE_CH6
+attr DEVICE_CH5 comment Channel 5 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4 and DEVICE_CH6
+attr DEVICE_CH6 comment Channel 6 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4 and DEVICE_CH5
+setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH5,DEVICE_CH6
+setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH6
+setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5
+
+# 8 channels
+option:{return 1 if CHANNELS==8;;return 0}
+attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH5, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH5 comment Channel 5 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH6, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH6 comment Channel 6 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH7 and DEVICE_CH8
+attr DEVICE_CH7 comment Channel 7 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6, and DEVICE_CH8
+attr DEVICE_CH8 comment Channel 8 for DEVICE, see also DEVICE, DEVICE_CH2, DEVICE_CH3, DEVICE_CH4, DEVICE_CH5, DEVICE_CH6 and DEVICE_CH7
+setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH5 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH6 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH7,DEVICE_CH8
+setreading DEVICE_CH7 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH8
+setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7
