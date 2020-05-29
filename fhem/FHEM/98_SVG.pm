@@ -1928,7 +1928,7 @@ SVG_render($$$$$$$$$$)
     my $f_log = int($hmax{$a}) ? ((SVG_log10($hmax{$a}) -
                         SVG_log10($hmin{$a})) / ($hmax{$a}-$hmin{$a})) : 1;
     if( $log eq 'log' ) {
-      foreach my $i (1..int(@{$dxp})-1) {
+      foreach my $i (0..int(@{$dyp})-1) {
         $dyp->[$i] = (SVG_log10($dyp->[$i])-SVG_log10($hmin{$a})) / $f_log;
       }
     }
