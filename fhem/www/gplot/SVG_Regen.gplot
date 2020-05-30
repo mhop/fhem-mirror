@@ -1,0 +1,16 @@
+# Created by FHEM/98_SVG.pm, 2016-09-24 12:51:49
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title 'Niederschlag'
+set ytics 
+set y2tics 
+set grid
+set ylabel ""
+set y2label "mm"
+
+#logdb myWH1080:Rain-total
+
+plot "<IN>" using 1:2 axes x1y2 title 'Regen' ls l0 lw 1 with lines

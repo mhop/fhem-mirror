@@ -1,0 +1,22 @@
+# Created by FHEM/98_SVG.pm, 2016-10-10 21:36:42
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title 'OG'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Humidity"
+set y2label "Temperature"
+
+#logdb OG_RL_Wohn1:temperature
+#logdb OG_RL_Wohn2:temperature
+#logdb OG_RL_Kueche:temperature
+#logdb OG_RL_Flur:temperature
+
+plot "<IN>" using 1:2 axes x1y2 title 'Wohn1' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Wohn2' ls l1 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Küche' ls l2 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Flur' ls l0 lw 1 with lines

@@ -1,0 +1,18 @@
+# Created by FHEM/98_SVG.pm, 2016-09-23 19:59:20
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title 'Wetterstation'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Druck"
+set y2label "Wind"
+
+#logdb myWH1080:Wind-Gust
+#logdb myWH1080:rel-Pressure
+
+plot "<IN>" using 1:2 axes x1y2 title 'Böhen' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y1 title 'Druck' ls l1 lw 1 with lines

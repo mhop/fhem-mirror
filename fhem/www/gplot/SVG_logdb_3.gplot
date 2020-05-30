@@ -1,0 +1,24 @@
+# Created by FHEM/98_SVG.pm, 2017-11-09 18:05:35
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title 'Heizung DG'
+set ytics 
+set y2tics 
+set grid
+set ylabel ""
+set y2label "Temperature"
+
+#logdb DG_VL:temperature::
+#logdb rl7:temperature::
+#logdb RL_Bad:temperature::
+#logdb rl9:temperature::
+#logdb OG_VL:temperature::
+
+plot "<IN>" using 1:2 axes x1y2 title 'VL' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Studio' ls l1 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Bad' ls l2 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Schlaf' ls l3 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Vl og' ls l4 lw 1 with lines
