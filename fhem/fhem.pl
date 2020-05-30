@@ -480,7 +480,7 @@ my %ra = (
 ###################################################
 # Start the program
 my $fhemdebug;
-$fhemdebug = shift @ARGV if($ARGV[0] eq "-d");
+$fhemdebug = shift @ARGV if($ARGV[0] && $ARGV[0] eq "-d");
 prepareFhemTestFile();
 
 if(int(@ARGV) < 1) {
@@ -6087,7 +6087,7 @@ applyGlobalAttrFromEnv()
 sub
 prepareFhemTestFile()
 {
-  return if($ARGV[0] ne "-t" || @ARGV < 2);
+  return if($ARGV[0] && $ARGV[0] ne "-t" || @ARGV < 2);
   shift @ARGV;
 
   if($ARGV[0] !~ m,^(.*?)([^/]+)\.t$, || !-r $ARGV[0]) {
