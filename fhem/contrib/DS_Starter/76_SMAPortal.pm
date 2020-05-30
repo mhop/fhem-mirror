@@ -604,7 +604,7 @@ sub Attr {
             unless ($aVal =~ /^\d+$/x) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
         }
         if($aName =~ m/interval/x) {
-            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 120);
+            return qq{The interval must be >= 30 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 30);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }        
     }
@@ -723,21 +723,20 @@ sub GetSetData {                                                       ## no cri
                                     )
                  );
   
-  # Sunny Home Manager Seite abfragen 
-  
   handleCounter ($name, "dailyCallCounter");                                          # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
   
-  # my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
   my $cts      = time;
   my $offset   = fhemTzOffset($cts);
   my $time     = int(($cts + $offset) * 1000);                                        # add Timestamp in Millisekunden and UTC
+  
+  ### Live-Daten abrufen 
+  #########################
   my $livedata = $ua->get( 'https://www.sunnyportal.com/homemanager?t='.$time );      # V2.6.2
 
   if(($livedata->content =~ m/FeedIn/ix) && ($livedata->content !~ m/expired/ix)) {
       Log3 $name, 4, "$name - Login to SMA-Portal successful";
       
-      # JSON Live Daten
-      $livedata_content = $livedata->content;
+      $livedata_content = $livedata->content;                                         # JSON Live Daten
       $login_state      = 1;
       Log3 ($name, 4, "$name - Getting live data");
       Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
