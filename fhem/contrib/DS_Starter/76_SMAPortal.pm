@@ -134,6 +134,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.8.0"  => "30.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
+                           "new attribute maxCallCycle ",
   "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
   "2.7.0"  => "27.05.2020  improve stability of data retrieval, new command delCookieFile, new readings dailyCallCounter and dailyIssueCookieCounter ".
@@ -178,9 +180,12 @@ my %vNotesIntern = (
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
   "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
   "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
-  "1.1.0"  => "09.03.2019  make get data more stable, new attribute \"getDataRetries\" ",
+  "1.1.0"  => "09.03.2019  make get data more stable, new attribute 'getDataRetries' ",
   "1.0.0"  => "03.03.2019  initial "
 );
+
+# Voreinstellungen
+my $maxretries = 4;                    # max. Anzahl Wiederholunegn in einem Abtuf-Cycle
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -196,10 +201,9 @@ sub Initialize {
   $hash->{GetFn}         = \&Get;
   $hash->{DbLog_splitFn} = \&DbLog_split;
   $hash->{AttrList}      = "cookieLocation ".
-                           "cookielifetime ".
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
-                           "getDataRetries:4,5,6,7,8,9,10,11,12,13,14,15 ".
+                           "maxCallCycle:5,6,7,8,9,10,11,12,13,14,15 ".
                            "interval ".
                            "showPassInLog:1,0 ".
                            "timeout ". 
@@ -229,7 +233,6 @@ sub Define {
   setVersionInfo($hash);                                   # Versionsinformationen setzen
   getcredentials($hash,1);                                 # Credentials lesen und in RAM laden ($boot=1)
   CallInfo      ($hash);                                   # Start Daten Abrufschleife
-  delcookiefile ($hash);                                   # Start Schleife regelmäßiges Löschen Cookiefile
  
 return;
 }
@@ -284,8 +287,7 @@ sub Set {                                                           ## no critic
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
-                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
-                 "delCookieFile:noArg "
+                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           my $lfd = 0;
@@ -388,14 +390,7 @@ sub Set {                                                           ## no critic
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
-      
-  } elsif ($opt eq "delCookieFile") {
-      my $cf  = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
-      my $err = delcookiefile ($hash, 1);
-      my $ret = $err ? qq{WARNING - Cookie file "$cf" not deleted: $err} : qq{Cookie file "$cf" deleted};
-      Log3 ($name, 3, qq{$name - $ret}) if($err);
-      return $ret;
-      
+        
   } else {
       return "$setlist";
   } 
@@ -592,11 +587,9 @@ sub Attr {
         if($do) {
             delread($hash);
             delete $hash->{MODE};
-            RemoveInternalTimer($hash);            
-            delcookiefile($hash,1);            
+            RemoveInternalTimer($hash);                      
         } else {
-            InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo",      $hash, 0);
-            InternalTimer(gettimeofday()+5.0, "FHEM::SMAPortal::delcookiefile", $hash, 0);
+            InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }
         
         readingsBeginUpdate($hash);
@@ -620,15 +613,16 @@ return;
 }
 
 ################################################################
-##               Hauptschleife BlockingCall
-##   $hash->{HELPER}{GETTER} -> Flag für get Informationen
-##   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
+#               Hauptschleife BlockingCall
+#   $hash->{HELPER}{GETTER} -> Flag für get Informationen
+#   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
+#   $nc = 1 wenn ein neuer Abrufcyclus gestartet werden soll
 ################################################################
 sub CallInfo {
-  my ($hash)   = @_;
-  my $name     = $hash->{NAME};
-  my $timeout  = AttrVal($name, "timeout", 30);
-  my $interval = AttrVal($name, "interval", 300);
+  my ($hash,$nc) = @_;
+  my $name       = $hash->{NAME};
+  my $timeout    = AttrVal($name, "timeout", 30);
+  my $interval   = AttrVal($name, "interval", 300);
   my $new;
   
   RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
@@ -644,7 +638,7 @@ sub CallInfo {
           $hash->{MODE} = "Manual";
       } else {
           $new = gettimeofday()+$interval; 
-          InternalTimer($new, "FHEM::SMAPortal::CallInfo", $hash, 0);
+          InternalTimer($new, "FHEM::SMAPortal::CallInfo", $hash, 0);          # Wiederholungsintervall
           $hash->{MODE} = "Automatic - next polltime: ".FmtTime($new);
       }
 
@@ -662,7 +656,15 @@ sub CallInfo {
       Log3 ($name, 4, "$name - ###      start of set/get data from SMA Sunny Portal         ###");
       Log3 ($name, 4, "$name - ################################################################"); 
   
-      $hash->{HELPER}{RETRIES}               = AttrVal($name, "getDataRetries", 3)-1;
+      $hash->{HELPER}{ACTCYCLE} = 0 if(!$nc);
+      my $ac                    = $hash->{HELPER}{ACTCYCLE};
+      my $maxac                 = AttrVal($name, "maxCallCycle", 5);
+      
+      Log3 ($name, 3, "$name - Running data cycle: $ac of maximum $maxac");
+      
+      readingsSingleUpdate($hash, "state", "running - call cycle $ac", 1);  
+      
+      $hash->{HELPER}{RETRIES}               = $maxretries;
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
@@ -726,162 +728,37 @@ sub GetSetData {                                                       ## no cri
   handleCounter ($name, "dailyCallCounter");                                          # Abfragezähler setzen (Anzahl tägliche Wiederholungen von GetSetData)
   
   # my $livedata = $ua->get('https://www.sunnyportal.com/homemanager');
-  my $cts    = time;
-  my $offset = fhemTzOffset($cts);
-  my $time   = int(($cts + $offset) * 1000);                                          # add Timestamp in Millisekunden and UTC
+  my $cts      = time;
+  my $offset   = fhemTzOffset($cts);
+  my $time     = int(($cts + $offset) * 1000);                                        # add Timestamp in Millisekunden and UTC
   my $livedata = $ua->get( 'https://www.sunnyportal.com/homemanager?t='.$time );      # V2.6.2
 
   if(($livedata->content =~ m/FeedIn/ix) && ($livedata->content !~ m/expired/ix)) {
       Log3 $name, 4, "$name - Login to SMA-Portal successful";
-          # JSON Live Daten
-          $livedata_content = $livedata->content;
-          $login_state      = 1;
-          Log3 ($name, 4, "$name - Getting live data");
-          Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
       
-      ### einen Verbraucher schalten mit POST 
-      if($setp ne "none") {                                      
-          my ($serial,$id);
-          foreach my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-              my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-              if($h && $h eq $d) {
-                  $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
-                  $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
-              }
-          }
-          my $plantOid = $hash->{HELPER}{PLANTOID};      
-          my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
-                                          'mode'         => $op, 
-                                          'serialNumber' => $serial, 
-                                          'SUSyID'       => $id, 
-                                          'plantOid'     => $plantOid
-                                      } 
-                                  ); 
-                                  
-          $res = $res->decoded_content();
-          Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
-          if($res eq "true") {
-              $state = "ok - switched consumer $d to $op";
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL"], 0);
-          } else {
-              $state = "Error - couldn't switched consumer $d to $op";
-          }
-      }
-      
-      ### Daten abrufen mit GET
-      if($getp ne "none") {                                   
-          
-          # JSON Wetterdaten
-          Log3 ($name, 4, "$name - Getting weather data");
-          my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
-          $weatherdata_content = $weatherdata->content;
-          Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
-          
-          # JSON Forecast Daten
-          my $dl = AttrVal($name, "detailLevel", 1);
-          if($dl > 1) {
-              Log3 ($name, 4, "$name - Getting forecast data");
+      # JSON Live Daten
+      $livedata_content = $livedata->content;
+      $login_state      = 1;
+      Log3 ($name, 4, "$name - Getting live data");
+      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($livedata_content)) if($v5d eq "liveData");
 
-              my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
-              Log3 ($name, 5, "$name - Return Code: ".$forecast_page->code) if($v5d eq "forecastData"); 
-
-              if ($forecast_page->content =~ m/ForecastChartDataPoint/ix) {
-                  $forecast_content = $forecast_page->content;
-                  Log3 ($name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content)) if($v5d eq "forecastData"); 
-              }
-          }
-          
-          # JSON Consumer Livedaten und historische Energiedaten
-          if($dl > 2) {
-              Log3 ($name, 4, "$name - Getting consumer live data");
-
-              my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
-              
-              Log3 ($name, 5, "$name - Return Code: ".$consumerlivedata->code) if($v5d eq "consumerLiveData"); 
-
-              if ($consumerlivedata->content =~ m/HoManConsumerLiveData/ix) {
-                  $consumerlivedata_content = $consumerlivedata->content;
-                  Log3 ($name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content)) if($v5d eq "consumerLiveData"); 
-              }
-              
-              if($hash->{HELPER}{PLANTOID}) {              
-                  my $PlantOid = $hash->{HELPER}{PLANTOID};
-                  my $dds      = (split(/\s+/x, TimeNow()))[0];
-                  my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];
-                  
-                  my ($mds,$me,$ye,$mde,$yds,$yde);
-                  if($dds =~ /(.*)-(.*)-(.*)/x) {
-                      $mds = "$1-$2-01";
-                      $me  = (($2+1)<=12)?$2+1:1;
-                      $me  = sprintf("%02d", $me);
-                      $ye  = ($2>$me)?$1+1:$1;
-                      $mde = "$ye-$me-01";
-                      $yds = "$1-01-01";
-                      $yde = ($1+1)."-01-01";
-                  }
-                  
-                  my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
-                  my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
-                  my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
-                  
-                  # Energiedaten aktueller Tag
-                  Log3 ($name, 4, "$name - Getting consumer energy data of current day");
-                  Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
-                  Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");                  
-                  my $ccdaydata = $ua->get($ccdd);
-                  
-                  Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
-
-                  if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                      $ccdaydata_content = $ccdaydata->content;
-                      Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
-                  }
-
-                  # Energiedaten aktueller Monat
-                  Log3 ($name, 4, "$name - Getting consumer energy data of current month");
-                  Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
-                  Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
-                  my $ccmonthdata = $ua->get($ccmd);
-                  
-                  Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
-
-                  if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                      $ccmonthdata_content = $ccmonthdata->content;
-                      Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
-                  }       
-
-                  # Energiedaten aktuelles Jahr
-                  Log3 ($name, 4, "$name - Getting consumer energy data of current year");
-                  Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
-                  Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
-                  my $ccyeardata = $ua->get($ccyd);
-                  
-                  Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
-
-                  if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                      $ccyeardata_content = $ccyeardata->content;
-                      Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
-                  }               
-              }
-          }
-      }
-  
   } else {
       my $usernameField = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$txtUserName";
       my $passwordField = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$txtPassword";
       my $loginField    = "__EVENTTARGET";
       my $loginButton   = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$LoginBtn";
       
-      Log3 ($name, 3, "$name - User not logged in. Try login with credentials ...");
+      Log3 ($name, 4, "$name - User not logged in. Try login with credentials ...");
       
       # Credentials abrufen
       my ($success, $username, $password) = getcredentials($hash,0);
   
-      unless ($success) {
+      if(!$success) {
           Log3($name, 1, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");   
           $login_state = 0;
       
       } else {    
+          
           my $loginp = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx',[$usernameField => $username, $passwordField => $password, "__EVENTTARGET" => $loginButton]);
         
           Log3 ($name, 4, "$name - ".$loginp->code);
@@ -892,13 +769,10 @@ sub GetSetData {                                                       ## no cri
               $livedata_content = "{\"Login-Status\":\"failed\"}";
           } else {
               Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
-              handleCounter ($name, "dailyIssueCookieCounter");                                          # Cookie Ausstellungszähler setzen
+              handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
               
-              $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful but get data with next data cycle."]}';
+              $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful."]}';
               BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL"], 0);
-              
-              $login_state = 1;
-              $reread      = 1;
           }
 
           my $shmp = $ua->get('https://www.sunnyportal.com/FixedPages/HoManLive.aspx');
@@ -906,7 +780,159 @@ sub GetSetData {                                                       ## no cri
       }
   }
   
-  ($reread,$retry) = analyzeLivedata($hash,$livedata_content) if($getp ne "none");
+  ($reread,$retry) = analyzeData($hash,$livedata_content);
+  
+  goto &GetSetData if($reread);
+  
+  # Wiederholung Datenabruf innerhalb eines Cycle
+  my $ac    = $hash->{HELPER}{ACTCYCLE};
+  my $maxcc = AttrVal($name, "maxCallCycle", 5);
+  my $retc  = $hash->{HELPER}{RETRIES};
+  
+  if($getp ne "none" && $retry && $retc >= 0 && $ac <= $maxcc) {      # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert   
+      my $act = $maxretries - $retc;                                  # Index aktueller Wiederholungsversuch
+      
+      $hash->{HELPER}{RETRIES} -= 1;
+      
+      if($maxretries - $act == 0) {                                   # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+          Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
+          sleep 3;                                                    # Verzögerung next cycle
+          return "$name|1|$login_state|$getp|$setp";                  # threshold exceed         
+      }
+      
+      # sleep 3;                                                      # Perl Sleep -> nur im BlockingCall !
+      goto &GetSetData;
+  }      
+      
+      
+  ### Verbraucher schalten
+  #######################################
+  if($setp ne "none") {                                   
+      my ($serial,$id);
+      foreach my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+          if($h && $h eq $d) {
+              $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
+              $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
+          }
+      }
+      my $plantOid = $hash->{HELPER}{PLANTOID};      
+      my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
+                                      'mode'         => $op, 
+                                      'serialNumber' => $serial, 
+                                      'SUSyID'       => $id, 
+                                      'plantOid'     => $plantOid
+                                  } 
+                              ); 
+                              
+      $res = $res->decoded_content();
+      Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
+      if($res eq "true") {
+          $state = "ok - switched consumer $d to $op";
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL"], 0);
+      } else {
+          $state = "Error - couldn't switched consumer $d to $op";
+      }
+  } 
+  
+  ### Daten abrufen 
+  #########################
+  if($getp ne "none") {                                   
+      
+      # JSON Wetterdaten
+      Log3 ($name, 4, "$name - Getting weather data");
+      my $weatherdata = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
+      $weatherdata_content = $weatherdata->content;
+      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
+      
+      # JSON Forecast Daten
+      my $dl = AttrVal($name, "detailLevel", 1);
+      if($dl > 1) {
+          Log3 ($name, 4, "$name - Getting forecast data");
+
+          my $forecast_page = $ua->get('https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData');
+          Log3 ($name, 5, "$name - Return Code: ".$forecast_page->code) if($v5d eq "forecastData"); 
+
+          if ($forecast_page->content =~ m/ForecastChartDataPoint/ix) {
+              $forecast_content = $forecast_page->content;
+              Log3 ($name, 5, "$name - Forecast data received:\n".Dumper decode_json($forecast_content)) if($v5d eq "forecastData"); 
+          }
+      }
+      
+      # JSON Consumer Livedaten und historische Energiedaten
+      if($dl > 2) {
+          Log3 ($name, 4, "$name - Getting consumer live data");
+
+          my $consumerlivedata = $ua->get('https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues');
+          
+          Log3 ($name, 5, "$name - Return Code: ".$consumerlivedata->code) if($v5d eq "consumerLiveData"); 
+
+          if ($consumerlivedata->content =~ m/HoManConsumerLiveData/ix) {
+              $consumerlivedata_content = $consumerlivedata->content;
+              Log3 ($name, 5, "$name - Consumer live data received:\n".Dumper decode_json($consumerlivedata_content)) if($v5d eq "consumerLiveData"); 
+          }
+          
+          if($hash->{HELPER}{PLANTOID}) {              
+              my $PlantOid = $hash->{HELPER}{PLANTOID};
+              my $dds      = (split(/\s+/x, TimeNow()))[0];
+              my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];
+              
+              my ($mds,$me,$ye,$mde,$yds,$yde);
+              if($dds =~ /(.*)-(.*)-(.*)/x) {
+                  $mds = "$1-$2-01";
+                  $me  = (($2+1)<=12)?$2+1:1;
+                  $me  = sprintf("%02d", $me);
+                  $ye  = ($2>$me)?$1+1:$1;
+                  $mde = "$ye-$me-01";
+                  $yds = "$1-01-01";
+                  $yde = ($1+1)."-01-01";
+              }
+              
+              my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
+              my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
+              my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
+              
+              # Energiedaten aktueller Tag
+              Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+              Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
+              Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");                  
+              my $ccdaydata = $ua->get($ccdd);
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
+
+              if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
+                  $ccdaydata_content = $ccdaydata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
+              }
+
+              # Energiedaten aktueller Monat
+              Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+              Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
+              Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
+              my $ccmonthdata = $ua->get($ccmd);
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
+
+              if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
+                  $ccmonthdata_content = $ccmonthdata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
+              }       
+
+              # Energiedaten aktuelles Jahr
+              Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+              Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
+              Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
+              my $ccyeardata = $ua->get($ccyd);
+              
+              Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
+
+              if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
+                  $ccyeardata_content = $ccyeardata->content;
+                  Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
+              }               
+          }
+      }
+  }
 
   # Daten müssen als Einzeiler zurückgegeben werden
   my ($st,$lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","","");
@@ -919,7 +945,7 @@ sub GetSetData {                                                       ## no cri
   $cm = encode_base64($ccmonthdata_content,"")      if($ccmonthdata_content);
   $cy = encode_base64($ccyeardata_content,"")       if($ccyeardata_content);
 
-return "$name|$login_state|$reread|$retry|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
+return "$name|0|$login_state|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
 }
 
 ################################################################
@@ -930,22 +956,36 @@ sub ParseData {                                                    ## no critic 
   my @a        = split("\\|",$string);
   my $hash     = $defs{$a[0]};
   my $name     = $hash->{NAME};
+  my $timeout  = AttrVal($name, "timeout", 30);
   
-  my ($login_state,$reread,$retry,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state);
+  my ($login_state,$retry,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state,$exceed);
   
-  $login_state = $a[1];
-  $reread      = $a[2];
-  $retry       = $a[3];
-  $getp        = $a[4];
-  $setp        = $a[5];
-  $state       = decode_base64($a[6]);
-  $lc          = decode_base64($a[7]);
-  $fc          = decode_base64($a[8])  if($a[8]);
-  $wc          = decode_base64($a[9])  if($a[9]);
-  $cl          = decode_base64($a[10]) if($a[10]);
-  $cd          = decode_base64($a[11]) if($a[11]);
-  $cm          = decode_base64($a[12]) if($a[12]);
-  $cy          = decode_base64($a[13]) if($a[13]);
+  $exceed      = $a[1];  
+  $login_state = $a[2];
+  $getp        = $a[3];
+  $setp        = $a[4];  
+  
+  my $ac    = $hash->{HELPER}{ACTCYCLE};
+  my $maxac = AttrVal($name, "maxCallCycle", 5);
+  
+  if($exceed && $ac <= $maxac) {                  
+      delete($hash->{HELPER}{RUNNING_PID}); 
+      delcookiefile ($hash);      
+      $hash->{HELPER}{GETTER} = $getp;
+      $hash->{HELPER}{SETTER} = $setp;
+      $hash->{HELPER}{ACTCYCLE}++;    
+      CallInfo($hash,1);                            # neuer Abrufcycle 
+      return;
+  } 
+  
+  $state       = decode_base64($a[5]);
+  $lc          = decode_base64($a[6]);
+  $fc          = decode_base64($a[7])  if($a[7]);
+  $wc          = decode_base64($a[8])  if($a[8]);
+  $cl          = decode_base64($a[9])  if($a[9]);
+  $cd          = decode_base64($a[10]) if($a[10]);
+  $cm          = decode_base64($a[11]) if($a[11]);
+  $cy          = decode_base64($a[12]) if($a[12]);
   
   my ($livedata_content,$forecast_content,$weatherdata_content,$consumerlivedata_content);
   my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content);
@@ -956,28 +996,6 @@ sub ParseData {                                                    ## no critic 
   $ccdaydata_content        = decode_json($cd) if($cd);
   $ccmonthdata_content      = decode_json($cm) if($cm);
   $ccyeardata_content       = decode_json($cy) if($cy);
-  
-  my $timeout = AttrVal($name, "timeout", 30);
-  if($reread) {                                             # login war erfolgreich, aber set/get muss jetzt noch ausgeführt werden
-      delete($hash->{HELPER}{RUNNING_PID});
-      readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
-      $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
-      $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
-      return;
-  }
-  
-  if($retry && $hash->{HELPER}{RETRIES}) {                  # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert
-      delete($hash->{HELPER}{RUNNING_PID});
-      my $max = AttrVal($name, "getDataRetries", 1);    
-      my $act = $max - $hash->{HELPER}{RETRIES};            # Index aktueller Wiederholungsversuch
-      
-      $hash->{HELPER}{RETRIES} -= 1;
-      
-      delcookiefile ($hash, 1) if($max - $act <= 1);        # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
-     
-      InternalTimer(gettimeofday()+3, "FHEM::SMAPortal::retrygetdata", $hash, 0);
-      return;
-  }
   
   my $dl = AttrVal($name, "detailLevel", 1);
   delread($hash, $dl+1);
@@ -1112,12 +1130,12 @@ sub ParseData {                                                    ## no critic 
       extractWeatherData($hash,$weatherdata_content);
   }
   
-  my $pv  = ReadingsNum($name, "L1_PV", 0);
-  my $fi  = ReadingsNum($name, "L1_FeedIn", 0);
+  my $pv  = ReadingsNum($name, "L1_PV"             , 0);
+  my $fi  = ReadingsNum($name, "L1_FeedIn"         , 0);
   my $gc  = ReadingsNum($name, "L1_GridConsumption", 0);
   my $sum = $fi-$gc;
   
-  if(!$hash->{HELPER}{RETRIES} && !$pv && !$fi && !$gc) {
+  if(!$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 ($name, 2, "$name - $state");
@@ -1137,6 +1155,7 @@ sub ParseData {                                                    ## no critic 
   } 
   readingsEndUpdate($hash, 1);
   
+  delcookiefile ($hash); 
   delete($hash->{HELPER}{RUNNING_PID});
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
@@ -1159,43 +1178,25 @@ sub ParseAborted {
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
   
+  delcookiefile ($hash);
+  
 return;
 }
 
 ################################################################
-#             regelmäßig Cookie-Datei löschen
-#             $must = 1 -> Cookie Zwangslöschung  
+#             Cookie-Datei löschen 
 ################################################################
 sub delcookiefile {
-   my ($hash,$must) = @_;
-   my $name         = $hash->{NAME};
-   my ($validperiod, $cookieLocation, $oldlogintime, $delfile);
-   my $err = "";
-   
-   RemoveInternalTimer($hash,"FHEM::SMAPortal::delcookiefile");
-   
-   # Gültigkeitsdauer Cookie in Sekunden
-   $validperiod    = AttrVal($name, "cookielifetime", 3600);    
-   $cookieLocation = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
-   
-   if($must) {
-       # Cookie Zwangslöschung
-       $delfile = unlink($cookieLocation) or $err = $!;
-   }
-   
-   $oldlogintime = $hash->{HELPER}{oldlogintime} // 0;
-   
-   if($init_done == 1 && gettimeofday() > $oldlogintime+$validperiod) {      # löschen wenn gettimeofday()+$validperiod abgelaufen
-       $delfile = unlink($cookieLocation) or $err = $!;
-   } 
-           
+   my ($hash,$source) = @_;
+   my $name = $hash->{NAME};
+   my $err  = "";
+
+   my $cookieLocation = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
+   my $delfile        = unlink ($cookieLocation) or $err = $!;
+    
    if($delfile) {
        Log3 $name, 3, "$name - Cookie file deleted: $cookieLocation";  
-   } 
-   
-   return if(IsDisabled($name));
-   
-   InternalTimer(gettimeofday()+30, "FHEM::SMAPortal::delcookiefile", $hash, 0);
+   }
 
 return ($err);
 }
@@ -1771,7 +1772,7 @@ sub handleCounter {
   }
   $count++;
   $cstring = "$rd:$day:$count";  
-  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 0);
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 1);
 
 return;
 }
@@ -1790,27 +1791,30 @@ sub setFromBlocking {
 
   $hash->{HELPER}{GETTER}       = $getp                if($getp      ne "NULL");
   $hash->{HELPER}{SETTER}       = $setp                if($setp      ne "NULL");
-  $hash->{HELPER}{oldlogintime} = $logintime           if($logintime ne "NULL");
+  
+  if($logintime ne "NULL") {
+      $hash->{HELPER}{oldlogintime} = $logintime;
+      readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
+  }
   
   if($counter ne "NULL") {
       my @cparts = split ":", $counter, 2;
       readingsSingleUpdate($hash, $cparts[0], $cparts[1], 1);
   }
 
-return;
+return 1;
 }
 
 ################################################################
-#                 analysiere Livedaten
+#                 analysiere abgerufene Daten
 ################################################################
-sub analyzeLivedata {                                                          ## no critic 'complexity'
+sub analyzeData {                                                          ## no critic 'complexity'
   my ($hash,$lc)      = @_;
   my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
-  
-  my $max    = AttrVal($name, "getDataRetries", 3);    
-  my $act    = $max - $hash->{HELPER}{RETRIES};                                # Index aktueller Wiederholungsversuch
-  my $attstr = "Attempts read data again ... ($act of $max)";
+    
+  my $act    = $maxretries - $hash->{HELPER}{RETRIES};                     # Index aktueller Wiederholungsversuch
+  my $attstr = "Attempts read data again ... ($act of $maxretries)";
 
   my $livedata_content = decode_json($lc);
   for my $k (keys %$livedata_content) {
@@ -1833,28 +1837,28 @@ sub analyzeLivedata {                                                          #
           }
 
           if ($new_val && $k !~ /__type/ix) {
-              if($k =~ m/InfoMessages/x && $new_val =~ /.*login to SMA-Portal successful.*/) {                                                                                                      ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/InfoMessages/x && $new_val =~ /login to SMA-Portal successful/) {                                                                                                      ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Login war erfolgreich, Daten neu lesen
                   Log3 $name, 3, "$name - Read portal data ...";
                   $reread = 1;
               }
-              if($k =~ m/WarningMessages/x && $new_val =~ /.*Updating of the live data was interrupted.*/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/WarningMessages/x && $new_val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }
-              if($k =~ m/WarningMessages/x && $new_val =~ /.*The current consumption could not be determined. The current purchased electricity is unknown.*/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/WarningMessages/x && $new_val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }  
-              if($k =~ m/ErrorMessages/x && $new_val =~ /.*Communication with the Sunny Home Manager is currently not possible.*/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $new_val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
                   Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
                   $retry = 1;
                   return ($reread,$retry);
               }              
-              if($k =~ m/ErrorMessages/x && $new_val =~ /.*The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters.*/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $new_val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
                   Log3 $name, 3, "$name - Live data can't be retrieved. $attstr";
                   $retry = 1;
@@ -1865,23 +1869,6 @@ sub analyzeLivedata {                                                          #
   }
   
 return ($reread,$retry);
-}
-
-################################################################
-#                    Restart get Data
-################################################################
-sub retrygetdata {
-  my ($hash)  = @_;
-  my $name    = $hash->{NAME};
-  my $timeout = AttrVal($name, "timeout", 30);
-  
-  my $getp = $hash->{HELPER}{GETTER};
-  my $setp = $hash->{HELPER}{SETTER};
-
-  $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
-  $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
-      
-return;
 }
 
 ################################################################
@@ -2833,12 +2820,6 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; delCookieFile </b> </li>  
-     The active cookie will be deleted.   
-     </ul> 
-     <br>
-     
-     <ul>
      <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> </li>  
      If the attribute "detailLevel" is set to 3 or higher, consumer data are fetched from the SMA Sunny Portal.
      Once these data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
@@ -2869,13 +2850,7 @@ return;
    <b>Attributes</b>
    <ul>
      <br>
-     <ul>
-       <a name="cookielifetime"></a>
-       <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
-       Validity period of a received Cookie. <br>
-       (default: 3600)  
-       </li><br>
-       
+     <ul>       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        The path and filename of received Cookies. <br>
@@ -2908,12 +2883,6 @@ return;
        <a name="disable"></a>
        <li><b>disable</b><br>
        Deactivate/activate the device. </li><br>
-       
-       <a name="getDataRetries"></a>
-       <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Maximal number of repetitions (get data) in case of no live data are fetched from the SMA Sunny Portal. <br>
-       (default: 3) 
-       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;seconds&gt; </b><br>
@@ -2924,6 +2893,13 @@ return;
        <b>Note:</b> 
        The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
        120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       </li><br>
+       
+       <a name="maxCallCycle"></a>
+       <li><b>maxCallCycle &lt;Anzahl&gt; </b><br>
+       Maximum number of retrieval cycles per data retrieval from the SMA Sunny Portal. Each retrieval cycle contains an 
+       internally defined number repeat requests. <br>
+       (default: 5) 
        </li><br>
        
        <a name="showPassInLog"></a>
@@ -3050,12 +3026,6 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; delCookieFile </b> </li>  
-     Das aktive Cookie wird gelöscht.   
-     </ul> 
-     <br>
-     
-     <ul>
      <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> </li>  
      Ist das Atttribut detailLevel auf 3 oder höher gesetzt, werden Verbraucherdaten aus dem SMA Sunny Portal abgerufen.
      Sobald diese Werte vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
@@ -3086,13 +3056,7 @@ return;
    <b>Attribute</b>
    <ul>
      <br>
-     <ul>
-       <a name="cookielifetime"></a>
-       <li><b>cookielifetime &lt;Sekunden&gt; </b><br>
-       Gültigkeitszeitraum für einen empfangenen Cookie. <br>
-       (default: 3600)
-       </li><br>
-       
+     <ul>       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies. <br>
@@ -3125,13 +3089,6 @@ return;
        <a name="disable"></a>
        <li><b>disable</b><br>
        Deaktiviert das Device. </li><br>
-       
-       <a name="getDataRetries"></a>
-       <li><b>getDataRetries &lt;Anzahl&gt; </b><br>
-       Maximale Anzahl von Wiederholungen (get data) für den Fall, dass keine Live-Daten aus dem SMA Sunny Portal geholt 
-       werden konnten. <br>
-       (default: 3)
-       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
@@ -3142,6 +3099,13 @@ return;
        <b>Hinweis:</b> 
        Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
        Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       </li><br>
+       
+       <a name="maxCallCycle"></a>
+       <li><b>maxCallCycle &lt;Anzahl&gt; </b><br>
+       Maximale Anzahl Abrufzyklen pro Datenabruf aus dem SMA Sunny Portal. Jeder Abrufzyklus enthält eine intern festgelegte Zahl
+       Abrufwiederholungen. <br>
+       (default: 5)
        </li><br>
        
        <a name="showPassInLog"></a>
