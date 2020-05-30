@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $
+# $Id: 49_SSCam.pm 21684 2020-04-14 20:02:29Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -54,6 +54,7 @@ eval "use Cache::Cache;1;" or my $SScamMMCacheCache     = "Cache::Cache";       
 
 # Versions History intern
 our %SSCam_vNotesIntern = (
+  "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
   "9.2.2"  => "14.04.2020  increase read timeout of Redis server cache, fix autocreate bug with https ",
   "9.2.1"  => "24.02.2020  set compatibility to SVS version 8.2.7 ",
   "9.2.0"  => "10.12.2019  attribute \"recChatTxt\" for sending recordings by SSChatBot ",
@@ -420,7 +421,7 @@ sub FW_pH(@);                                           # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
 sub SSCam_TBotSendIt($$$$$$$;$$$);
-sub SSChatBot_formText($); 
+sub SSChatBot_formString; 
 sub SSChatBot_addQueue($$$$$$$$); 
 sub SSChatBot_getapisites($);
 
@@ -8791,8 +8792,8 @@ sub SSCam_sendChat ($$) {
                # Eintrag zur SendQueue hinzufügen
                # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
                $fileUrl = $rootUrl."/".$mtype."/".$fname;
-               $subject = SSChatBot_formText($subject); 
-               $ret     = SSChatBot_addQueue($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", ""); 
+               $subject = SSChatBot_formString ($subject, "text"); 
+               $ret     = SSChatBot_addQueue   ($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", ""); 
 
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
@@ -8851,8 +8852,8 @@ sub SSCam_sendChat ($$) {
                # Eintrag zur SendQueue hinzufügen
                # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
                $fileUrl = $rootUrl."/".$mtype."/".$fname;
-               $subject = SSChatBot_formText($subject); 
-               $ret     = SSChatBot_addQueue($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", "");  
+               $subject = SSChatBot_formString ($subject, "text"); 
+               $ret     = SSChatBot_addQueue   ($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", "");  
            
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
@@ -10340,12 +10341,12 @@ sub SSCam_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 21684 2020-04-14 20:02:29Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 21273 2020-02-24 22:04:43Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 21684 2020-04-14 20:02:29Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
