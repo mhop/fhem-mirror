@@ -154,12 +154,14 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 #
 # 2.0.1     tolerate empty field in energyDetails response
 #
+# 2.1.0     generate daily readings at ~23:59 instead of 22:00
+#
 ###############################################################################
 
 sub SolarEdgeAPI_SetVersion($)
 {
   my ($hash) = @_;
-  $hash->{VERSION} = "2.0.1";
+  $hash->{VERSION} = "2.1.0";
 }
 
 ###############################################################################
@@ -703,7 +705,7 @@ sub SolarEdgeAPI_RestartHttpRequestTimers($)
 
   Log3 $name, 3, "SolarEdgeAPI ($name) - restarting timer";
 
-  # remove any active timer
+  # remove all active timers
   RemoveInternalTimer($hash);
 
   # Do the next http request now. This will start a timer for the next one.
@@ -721,9 +723,9 @@ sub SolarEdgeAPI_GetTimeOfNextDailyReading($)
   my $epoch = time();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($epoch);
 
-  if ($hour >= 22)
+  if (($hour >= 23) and ($min >= 59))
   {
-    # If it is after 10pm the next reading should occur tomorrow.
+    # If it is 23:59 the next reading should occur tomorrow.
 
     # add 24 hours to epoch to get a time during the following day
     $epoch += 24 * 60 * 60;
@@ -732,8 +734,8 @@ sub SolarEdgeAPI_GetTimeOfNextDailyReading($)
     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($epoch);
   }
 
-  # change hour to 10pm and convert to epoch
-  $epoch = fhemTimeLocal(5, 0, 22, $mday, $mon, $year); # $sec, $min, $hour, $mday, $month, $year
+  # change hour:minute to 23:59 and convert to epoch
+  $epoch = fhemTimeLocal(0, 59, 23, $mday, $mon, $year); # $sec, $min, $hour, $mday, $month, $year
 
   return $epoch;
 }
@@ -1401,7 +1403,7 @@ EOF
     All reading names start with the name of the group of readings followed by "-".<br>
     All readings that belong to the same group have the same timing: Some groups of readings are generated<br>
     periodically. The period is defined by attributes intervalAtDayTime, intervalAtNighttime, dayTimeStartHour and<br>
-    nightTimeStartHour. Other readings are generated once per day only. Reading groups which are update<br>
+    nightTimeStartHour. Other readings are generated once per day only. Reading groups which are updated<br>
     once per day have a name starting with "daily". Each update of a group of readings requires on http<br>
     request to the SolarEdge server. The number of queries is limited to 300 per day, according to API<br>
     documentation.<br>

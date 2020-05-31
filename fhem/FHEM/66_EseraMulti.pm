@@ -236,7 +236,10 @@ EseraMulti_Parse($$)
         elsif ($readingId == 3) 
         {
           $nameOfReading = "humidity";
-          readingsSingleUpdate($rhash, $nameOfReading, $value / 100.0, 1);
+          if ($value != 10000) # Esera 11133 sporadically reports 100% by mistake
+          {
+            readingsSingleUpdate($rhash, $nameOfReading, $value / 100.0, 1);
+          }
         }
         elsif ($readingId == 4) 
         {

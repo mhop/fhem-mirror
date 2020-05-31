@@ -90,7 +90,8 @@ EseraOneWire_Initialize($)
                          "4:EseraAnalogInOut" => "^SYS3",
                          "5:EseraIButton" => "^DS2401",
 			 "6:EseraCount" => "^DS2423",
-                         "7:EseraShutter" => "^11231|^11209"};
+                         "7:EseraShutter" => "^11231|^11209",
+                         "8:EseraDimmer" => "^11221|^11222"};
 }
 
 sub
@@ -1043,7 +1044,7 @@ EseraOneWire_Read($)
       }
       else
       {
-        Log3 $name, 5, "EseraOneWire ($name) - readings ignored because controller is not initialized (2)";
+        Log3 $name, 5, "EseraOneWire ($name) - readings ignored because controller is not initialized (3)";
       }
     }
     elsif ($ascii =~ m/^1_SYS(\d+)/)
@@ -1054,7 +1055,7 @@ EseraOneWire_Read($)
       }
       else
       {
-        Log3 $name, 5, "EseraOneWire ($name) - readings ignored because controller is not initialized (2)";
+        Log3 $name, 5, "EseraOneWire ($name) - readings ignored because controller is not initialized (4)";
       }
     }
     else
