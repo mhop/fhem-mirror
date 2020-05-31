@@ -2081,7 +2081,7 @@ attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
-  white:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"white":"$EVTPART1"}\
+  white:colorpicker,BRI,0,1,255 shellies/DEVNAME/color/0/set {"white":"$EVTPART1"}\
   gain:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1"}\
   rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"mode\":\"color\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
   white_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"turn":"on","white":"$EVTPART1"}\
@@ -2103,7 +2103,7 @@ attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shelly2rgbw_color
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200531
 
 #contributed by user sledge
 name:shelly2rgbw_4w_split
@@ -2120,8 +2120,8 @@ attr DEVICE readingList shellies/DEVNAME/white/0/status:.* {json2nameValue($EVEN
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   on:noArg shellies/DEVNAME/white/0/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/0/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE (?!associatedWith).*
@@ -2131,7 +2131,7 @@ attr DEVICE setStateList on off
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
 attr DEVICE webCmd on:off:pct
 set DEVICE x_mqttcom announce
-attr DEVICE jsonMap brightness:pct
+#attr DEVICE jsonMap brightness:pct
 attr DEVICE autocreate 0
 attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/1:.* state\
@@ -2139,24 +2139,24 @@ attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH2 setList off:noArg shellies/DEVNAME/white/1/command off\
   on:noArg shellies/DEVNAME/white/1/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/2:.* state\
   shellies/DEVNAME/white/2/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH3 setList off:noArg shellies/DEVNAME/white/2/command off\
   on:noArg shellies/DEVNAME/white/2/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/3:.* state\
   shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/online:.* online
 attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   on:noArg shellies/DEVNAME/white/3/command on\
-  pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
-  pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
+  brightness_on:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
   
 #shellydimmer
