@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.8.1"  => "31.05.2020  attribute timeout, maxCallCycle deleted ",
   "2.8.0"  => "31.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
                            "new attribute maxCallCycle ",
   "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
@@ -185,10 +186,11 @@ my %vNotesIntern = (
 );
 
 # Voreinstellungen
-my $maxretries = 4;                    # max. Anzahl Wiederholunegn in einem Abruf-Zyklus
-my $sleepretry = 0.5;                  # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
-my $sleepexc   = 2;                    # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
-my $maxcycles  = 5;                    # max. Anzahl Datenabruf Zyklen
+my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
+my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie
+my $sleepretry   = 0.5;                    # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
+my $sleepexc     = 2;                      # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
+my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -206,10 +208,8 @@ sub Initialize {
   $hash->{AttrList}      = "cookieLocation ".
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
-                           "maxCallCycle:5,6,7,8,9,10,11,12,13,14,15 ".
                            "interval ".
                            "showPassInLog:1,0 ".
-                           "timeout ". 
                            "userAgent ".
                            "verbose5Data:none,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
                            $readingFnAttributes;
@@ -603,7 +603,7 @@ sub Attr {
     }
     
     if ($cmd eq "set") {
-        if ($aName =~ m/timeout|interval/x) {
+        if ($aName =~ m/interval/x) {
             unless ($aVal =~ /^\d+$/x) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
         }
         if($aName =~ m/interval/x) {
@@ -621,15 +621,16 @@ return;
 #   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
 #   $nc = 1 wenn Cycle Zähler nicht zurückgesetzt werden soll
 #   $nr = 1 wenn Retry Zähler nicht zurückgesetzt werden soll
+#
 ################################################################
 sub CallInfo {
   my ($hash,$nc,$nr) = @_;
   my $name           = $hash->{NAME};
-  my $timeout        = AttrVal($name, "timeout", 30);
-  my $interval       = AttrVal($name, "interval", 300);
   my $new;
   
   RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
+  
+  my ($interval,$maxcycles,$timeout,$ctime) = controlParams ($name);
   
   if($init_done == 1) {
       if(!$hash->{CREDENTIALS}) {
@@ -660,17 +661,21 @@ sub CallInfo {
           Log3 ($name, 3, "$name - ################################################################");
           Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
           Log3 ($name, 3, "$name - ################################################################"); 
+          Log3 ($name, 4, "$name - calculated cycles summary time: $ctime");
+          Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
+          Log3 ($name, 4, "$name - calculated timeout:             $timeout");
       }
       
       $hash->{HELPER}{ACTCYCLE} = 1 if(!$nc);
       $hash->{HELPER}{RETRIES}  = 1 if(!$nr);
       
       my $ac     = $hash->{HELPER}{ACTCYCLE};
-      my $maxac  = AttrVal($name, "maxCallCycle", $maxcycles);
       
-      Log3 ($name, 3, "$name - Running data cycle: $ac of maximum $maxac");
+      Log3 ($name, 3, "$name - Running data cycle: $ac of $maxcycles");
       
-      readingsSingleUpdate($hash, "state", "running - call cycle $ac", 1);  
+      readingsBeginUpdate         ($hash);
+      readingsBulkUpdateIfChanged ($hash,"state","running - call cycle $ac");
+      readingsEndUpdate           ($hash,1); 
       
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
@@ -680,6 +685,37 @@ sub CallInfo {
   }
     
 return;  
+}
+
+################################################################
+#             Steuerparameter berechnen / festlegen
+################################################################
+sub controlParams {
+  my $name = shift;
+
+  # Voreinstellungen
+  my $timeout      = 290;                    # Standard Timeout
+  my $definterval  = 300;                    # Standard Interval
+  my $buffer       = 10;                     # Sicherheitspuffer zum nächsten Intervall
+
+  my $interval     = AttrVal($name, "interval",     $definterval);        # 0 wenn manuell gesteuert
+  my $maxcycles    = $defmaxcycles;
+   
+  if(!$interval) {
+      return ($interval,$maxcycles,$timeout,"n.a.");
+  }
+  
+  # Zeit eines Zyklus
+  my $proctime = ($maxretries * 0.1);
+  my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;    # kalkulierte Zykluszeit
+
+  # max Anzahl Zyklen
+  $maxcycles = int(($interval - $buffer) / $ctime); 
+
+  # Timeout kalkulieren
+  my $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
+
+return ($interval,$maxcycles,$timeout,$ctime);
 }
 
 ################################################################
@@ -796,7 +832,7 @@ sub GetSetData {                                                       ## no cri
   
   if($setp eq "none" && $retry && $retc < $maxretries) {                       # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
       $hash->{HELPER}{RETRIES}++;
-      if($maxretries - $retc == 1) {                                           # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+      if($retc == $thold) {                                                    # Schwellenwert Leseversuche erreicht -> Cookie File löschen
           Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
           sleep $sleepexc;                                                     # Threshold exceed  -> Retry mit Cookie löschen
           $exceed = 1;
@@ -809,9 +845,9 @@ sub GetSetData {                                                       ## no cri
   }  
 
   # Wiederholung Datenabruf in einem neuen Cycle
-  my $ac    = $hash->{HELPER}{ACTCYCLE};
-  my $maxcc = AttrVal($name, "maxCallCycle", $maxcycles);
-  if($setp eq "none" && $retry && $ac < $maxcc) {                              # neuer Zyklus (nicht wenn Verbraucher schalten)     
+  my $ac        = $hash->{HELPER}{ACTCYCLE};
+  my $maxcycles = (controlParams $name)[1];
+  if($setp eq "none" && $retry && $ac < $maxcycles) {                          # neuer Zyklus (nicht wenn Verbraucher schalten)     
       Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
       $newcycle = 1;
       return "$name|$exceed|$newcycle|$login_state|$getp|$setp";          
@@ -969,7 +1005,6 @@ sub ParseData {                                                    ## no critic 
   my @a        = split("\\|",$string);
   my $hash     = $defs{$a[0]};
   my $name     = $hash->{NAME};
-  my $timeout  = AttrVal($name, "timeout", 30);
   
   my ($login_state,$newcycle,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state,$exceed);
   
@@ -979,8 +1014,8 @@ sub ParseData {                                                    ## no critic 
   $getp        = $a[4];
   $setp        = $a[5];  
   
-  my $ac    = $hash->{HELPER}{ACTCYCLE};
-  my $maxac = AttrVal($name, "maxCallCycle", $maxcycles);
+  my $ac        = $hash->{HELPER}{ACTCYCLE};
+  my $maxcycles = (controlParams $name)[1];
   
   if($exceed) {                  
       delete($hash->{HELPER}{RUNNING_PID}); 
@@ -991,7 +1026,7 @@ sub ParseData {                                                    ## no critic 
       return;
   } 
   
-  if($newcycle && $ac < $maxac) {                  
+  if($newcycle && $ac < $maxcycles) {                  
       delete($hash->{HELPER}{RUNNING_PID});     
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;
@@ -2921,22 +2956,10 @@ return;
        120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
        </li><br>
        
-       <a name="maxCallCycle"></a>
-       <li><b>maxCallCycle &lt;Anzahl&gt; </b><br>
-       Maximum number of retrieval cycles per data retrieval from the SMA Sunny Portal. Each retrieval cycle contains an 
-       internally defined number repeat requests. <br>
-       (default: 5) 
-       </li><br>
-       
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
        If set, the used password will be displayed in Logfile output. 
        (default = 0) </li><br>
-       
-       <a name="timeout"></a>
-       <li><b>timeout &lt;seconds&gt; </b><br>
-       Timeout value for HTTP-calls to the SMA Sunny Portal (default: 30 seconds).  
-       </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;identifier&gt; </b><br>
@@ -3127,22 +3150,10 @@ return;
        Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
        </li><br>
        
-       <a name="maxCallCycle"></a>
-       <li><b>maxCallCycle &lt;Anzahl&gt; </b><br>
-       Maximale Anzahl Abrufzyklen pro Datenabruf aus dem SMA Sunny Portal. Jeder Abrufzyklus enthält eine intern festgelegte Zahl
-       Abrufwiederholungen. <br>
-       (default: 5)
-       </li><br>
-       
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
        Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. 
        (default = 0) </li><br>
-       
-       <a name="timeout"></a>
-       <li><b>timeout &lt;Sekunden&gt; </b><br>
-       Timeout-Wert für HTTP-Aufrufe zum SMA Sunny Portal (default: 30 Sekunden).  
-       </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;Kennung&gt; </b><br>
