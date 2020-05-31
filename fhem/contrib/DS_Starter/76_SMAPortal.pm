@@ -43,7 +43,7 @@ use POSIX;
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;      ## no critic 'eval'
 use Data::Dumper;
 use Blocking;
-use Time::HiRes qw(gettimeofday time);
+use Time::HiRes qw(gettimeofday time sleep);
 use Time::Local;
 use LWP::UserAgent;
 use HTTP::Cookies;
@@ -134,7 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.0"  => "30.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
+  "2.8.0"  => "31.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
                            "new attribute maxCallCycle ",
   "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
@@ -185,7 +185,10 @@ my %vNotesIntern = (
 );
 
 # Voreinstellungen
-my $maxretries = 4;                    # max. Anzahl Wiederholunegn in einem Abtuf-Cycle
+my $maxretries = 4;                    # max. Anzahl Wiederholunegn in einem Abruf-Zyklus
+my $sleepretry = 0.5;                  # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
+my $sleepexc   = 2;                    # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
+my $maxcycles  = 5;                    # max. Anzahl Datenabruf Zyklen
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -616,13 +619,14 @@ return;
 #               Hauptschleife BlockingCall
 #   $hash->{HELPER}{GETTER} -> Flag für get Informationen
 #   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
-#   $nc = 1 wenn ein neuer Abrufcyclus gestartet werden soll
+#   $nc = 1 wenn Cycle Zähler nicht zurückgesetzt werden soll
+#   $nr = 1 wenn Retry Zähler nicht zurückgesetzt werden soll
 ################################################################
 sub CallInfo {
-  my ($hash,$nc) = @_;
-  my $name       = $hash->{NAME};
-  my $timeout    = AttrVal($name, "timeout", 30);
-  my $interval   = AttrVal($name, "interval", 300);
+  my ($hash,$nc,$nr) = @_;
+  my $name           = $hash->{NAME};
+  my $timeout        = AttrVal($name, "timeout", 30);
+  my $interval       = AttrVal($name, "interval", 300);
   my $new;
   
   RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
@@ -651,20 +655,23 @@ sub CallInfo {
       
       my $getp = $hash->{HELPER}{GETTER};
       my $setp = $hash->{HELPER}{SETTER};
+     
+      if(!$nc && !$nr) {
+          Log3 ($name, 3, "$name - ################################################################");
+          Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
+          Log3 ($name, 3, "$name - ################################################################"); 
+      }
       
-      Log3 ($name, 4, "$name - ################################################################");
-      Log3 ($name, 4, "$name - ###      start of set/get data from SMA Sunny Portal         ###");
-      Log3 ($name, 4, "$name - ################################################################"); 
-  
-      $hash->{HELPER}{ACTCYCLE} = 0 if(!$nc);
-      my $ac                    = $hash->{HELPER}{ACTCYCLE};
-      my $maxac                 = AttrVal($name, "maxCallCycle", 5);
+      $hash->{HELPER}{ACTCYCLE} = 1 if(!$nc);
+      $hash->{HELPER}{RETRIES}  = 1 if(!$nr);
+      
+      my $ac     = $hash->{HELPER}{ACTCYCLE};
+      my $maxac  = AttrVal($name, "maxCallCycle", $maxcycles);
       
       Log3 ($name, 3, "$name - Running data cycle: $ac of maximum $maxac");
       
       readingsSingleUpdate($hash, "state", "running - call cycle $ac", 1);  
       
-      $hash->{HELPER}{RETRIES}               = $maxretries;
       $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SMAPortal::GetSetData", "$name|$getp|$setp", "FHEM::SMAPortal::ParseData", $timeout, "FHEM::SMAPortal::ParseAborted", $hash);
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
   
@@ -690,6 +697,7 @@ sub GetSetData {                                                       ## no cri
   my ($ccyeardata_content) = ("");
   my $state                = "ok";
   my ($reread,$retry)      = (0,0);  
+  my ($exceed,$newcycle)   = (0,0);
   my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
   my ($livedata_content,$d,$op); 
   
@@ -771,7 +779,7 @@ sub GetSetData {                                                       ## no cri
               handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
               
               $livedata_content = '{"Login-Status":"successful", "InfoMessages":["login to SMA-Portal successful."]}';
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL"], 0);
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL", "NULL"], 0);
           }
 
           my $shmp = $ua->get('https://www.sunnyportal.com/FixedPages/HoManLive.aspx');
@@ -784,26 +792,32 @@ sub GetSetData {                                                       ## no cri
   goto &GetSetData if($reread);
   
   # Wiederholung Datenabruf innerhalb eines Cycle
-  my $ac    = $hash->{HELPER}{ACTCYCLE};
-  my $maxcc = AttrVal($name, "maxCallCycle", 5);
   my $retc  = $hash->{HELPER}{RETRIES};
   
-  if($getp ne "none" && $retry && $retc >= 0 && $ac <= $maxcc) {      # Livedaten konnten nicht gelesen werden, neuer Versuch zeitverzögert   
-      my $act = $maxretries - $retc;                                  # Index aktueller Wiederholungsversuch
-      
-      $hash->{HELPER}{RETRIES} -= 1;
-      
-      if($maxretries - $act == 0) {                                   # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
-          Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
-          sleep 3;                                                    # Verzögerung next cycle
-          return "$name|1|$login_state|$getp|$setp";                  # threshold exceed         
+  if($setp eq "none" && $retry && $retc < $maxretries) {                       # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
+      $hash->{HELPER}{RETRIES}++;
+      if($maxretries - $retc == 1) {                                           # Schwellenwert erreicht ($max-1 Leseversuche) -> Cookie File löschen
+          Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
+          sleep $sleepexc;                                                     # Threshold exceed  -> Retry mit Cookie löschen
+          $exceed = 1;
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", "NULL", $hash->{HELPER}{RETRIES}], 1);
+          return "$name|$exceed|$newcycle|$login_state|$getp|$setp";                
       }
       
-      # sleep 3;                                                      # Perl Sleep -> nur im BlockingCall !
+      sleep $sleepretry;                                                     
       goto &GetSetData;
-  }      
-      
-      
+  }  
+
+  # Wiederholung Datenabruf in einem neuen Cycle
+  my $ac    = $hash->{HELPER}{ACTCYCLE};
+  my $maxcc = AttrVal($name, "maxCallCycle", $maxcycles);
+  if($setp eq "none" && $retry && $ac < $maxcc) {                              # neuer Zyklus (nicht wenn Verbraucher schalten)     
+      Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
+      $newcycle = 1;
+      return "$name|$exceed|$newcycle|$login_state|$getp|$setp";          
+  }
+  
+  
   ### Verbraucher schalten
   #######################################
   if($setp ne "none") {                                   
@@ -828,7 +842,7 @@ sub GetSetData {                                                       ## no cri
       Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
       if($res eq "true") {
           $state = "ok - switched consumer $d to $op";
-          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL"], 0);
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL", "NULL"], 0);
       } else {
           $state = "Error - couldn't switched consumer $d to $op";
       }
@@ -944,7 +958,7 @@ sub GetSetData {                                                       ## no cri
   $cm = encode_base64($ccmonthdata_content,"")      if($ccmonthdata_content);
   $cy = encode_base64($ccyeardata_content,"")       if($ccyeardata_content);
 
-return "$name|0|$login_state|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
+return "$name|$exceed|$newcycle|$login_state|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
 }
 
 ################################################################
@@ -957,34 +971,43 @@ sub ParseData {                                                    ## no critic 
   my $name     = $hash->{NAME};
   my $timeout  = AttrVal($name, "timeout", 30);
   
-  my ($login_state,$retry,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state,$exceed);
+  my ($login_state,$newcycle,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state,$exceed);
   
-  $exceed      = $a[1];  
-  $login_state = $a[2];
-  $getp        = $a[3];
-  $setp        = $a[4];  
+  $exceed      = $a[1];
+  $newcycle    = $a[2];
+  $login_state = $a[3];
+  $getp        = $a[4];
+  $setp        = $a[5];  
   
   my $ac    = $hash->{HELPER}{ACTCYCLE};
-  my $maxac = AttrVal($name, "maxCallCycle", 5);
+  my $maxac = AttrVal($name, "maxCallCycle", $maxcycles);
   
-  if($exceed && $ac <= $maxac) {                  
+  if($exceed) {                  
       delete($hash->{HELPER}{RUNNING_PID}); 
       delcookiefile ($hash);      
       $hash->{HELPER}{GETTER} = $getp;
-      $hash->{HELPER}{SETTER} = $setp;
-      $hash->{HELPER}{ACTCYCLE}++;    
-      CallInfo($hash,1);                            # neuer Abrufcycle 
+      $hash->{HELPER}{SETTER} = $setp;   
+      CallInfo($hash,1,1);                          # neuer Versuch (nach Threshold exceed) im gleichen Cycle mit gelöschtem Cookie 
       return;
   } 
   
-  $state       = decode_base64($a[5]);
-  $lc          = decode_base64($a[6]);
-  $fc          = decode_base64($a[7])  if($a[7]);
-  $wc          = decode_base64($a[8])  if($a[8]);
-  $cl          = decode_base64($a[9])  if($a[9]);
-  $cd          = decode_base64($a[10]) if($a[10]);
-  $cm          = decode_base64($a[11]) if($a[11]);
-  $cy          = decode_base64($a[12]) if($a[12]);
+  if($newcycle && $ac < $maxac) {                  
+      delete($hash->{HELPER}{RUNNING_PID});     
+      $hash->{HELPER}{GETTER} = $getp;
+      $hash->{HELPER}{SETTER} = $setp;
+      $hash->{HELPER}{ACTCYCLE}++;    
+      CallInfo($hash,1,0);                          # neuer Abrufcycle 
+      return;
+  }
+  
+  $state       = decode_base64($a[6]);
+  $lc          = decode_base64($a[7]);
+  $fc          = decode_base64($a[8])  if($a[8]);
+  $wc          = decode_base64($a[9])  if($a[9]);
+  $cl          = decode_base64($a[10]) if($a[10]);
+  $cd          = decode_base64($a[11]) if($a[11]);
+  $cm          = decode_base64($a[12]) if($a[12]);
+  $cy          = decode_base64($a[13]) if($a[13]);
   
   my ($livedata_content,$forecast_content,$weatherdata_content,$consumerlivedata_content);
   my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content);
@@ -1771,33 +1794,37 @@ sub handleCounter {
   }
   $count++;
   $cstring = "$rd:$day:$count";  
-  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring], 1);
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring, "NULL"], 1);
 
 return;
 }
 
 ################################################################
 #        Werte aus BlockingCall heraus setzen
+#   Erwartete Liste:
+#   @setl = $name,$getp,$setp,$logintime,$setread,$retries
 ################################################################
 sub setFromBlocking {
-  my ($name,$getp,$setp,$logintime,$counter) = @_;
-  my $hash                                   = $defs{$name};
+  my (@setl) = @_;
+  my $hash   = $defs{$setl[0]};
 
-  $getp      = $getp       // "NULL";
-  $setp      = $setp       // "NULL";
-  $logintime = $logintime  // "NULL";
-  $counter   = $counter    // "NULL";
+  my $getp      = $setl[1]  // "NULL";
+  my $setp      = $setl[2]  // "NULL";
+  my $logintime = $setl[3]  // "NULL";
+  my $setread   = $setl[4]  // "NULL";
+  my $retries   = $setl[5]  // "NULL";
 
-  $hash->{HELPER}{GETTER}       = $getp                if($getp      ne "NULL");
-  $hash->{HELPER}{SETTER}       = $setp                if($setp      ne "NULL");
+  $hash->{HELPER}{GETTER}   = $getp     if($getp    ne "NULL");
+  $hash->{HELPER}{SETTER}   = $setp     if($setp    ne "NULL");
+  $hash->{HELPER}{RETRIES}  = $retries  if($retries ne "NULL");
   
   if($logintime ne "NULL") {
       $hash->{HELPER}{oldlogintime} = $logintime;
       readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
   }
   
-  if($counter ne "NULL") {
-      my @cparts = split ":", $counter, 2;
+  if($setread ne "NULL") {
+      my @cparts = split ":", $setread, 2;
       readingsSingleUpdate($hash, $cparts[0], $cparts[1], 1);
   }
 
@@ -1812,7 +1839,7 @@ sub analyzeData {                                                          ## no
   my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
     
-  my $act    = $maxretries - $hash->{HELPER}{RETRIES};                     # Index aktueller Wiederholungsversuch
+  my $act    = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
   my $attstr = "Attempts read data again ... ($act of $maxretries)";
 
   my $livedata_content = decode_json($lc);
