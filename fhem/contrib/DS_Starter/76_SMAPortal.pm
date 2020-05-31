@@ -666,7 +666,10 @@ sub CallInfo {
           Log3 ($name, 4, "$name - calculated timeout:             $timeout");
       }
       
-      $hash->{HELPER}{ACTCYCLE} = 1 if(!$nc);
+      if(!$nc) {
+          $hash->{HELPER}{ACTCYCLE}   = 1;
+          $hash->{HELPER}{CYCLEBTIME} = (gettimeofday())[0];
+      }
       $hash->{HELPER}{RETRIES}  = 1 if(!$nr);
       
       my $ac     = $hash->{HELPER}{ACTCYCLE};
@@ -696,24 +699,26 @@ sub controlParams {
   # Voreinstellungen
   my $timeout      = 290;                    # Standard Timeout
   my $definterval  = 300;                    # Standard Interval
-  my $buffer       = 10;                     # Sicherheitspuffer zum nächsten Intervall
+  my $buffer       = 5;                      # Sicherheitspuffer zum nächsten Intervall
 
-  my $interval     = AttrVal($name, "interval",     $definterval);        # 0 wenn manuell gesteuert
+  my $interval     = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
   my $maxcycles    = $defmaxcycles;
-   
-  if(!$interval) {
-      return ($interval,$maxcycles,$timeout,"n.a.");
-  }
   
-  # Zeit eines Zyklus
+  # prognostizierte Zeit eines Zyklus
   my $proctime = ($maxretries * 0.1);
-  my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;    # kalkulierte Zykluszeit
+  my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;
+  $ctime       = ReadingsVal ($name, "lastCycleTime", $ctime);
+  $ctime       = 10 if($ctime > 10);                                     # Ausreißer ignorieren
+   
+  if(!$interval) {                                                       # manueller Datenabruf 
+      return ($interval,$maxcycles,$timeout,$ctime);
+  }
 
   # max Anzahl Zyklen
   $maxcycles = int(($interval - $buffer) / $ctime); 
 
   # Timeout kalkulieren
-  my $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
+  $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
 
 return ($interval,$maxcycles,$timeout,$ctime);
 }
@@ -804,7 +809,7 @@ sub GetSetData {                                                       ## no cri
           
           my $loginp = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx',[$usernameField => $username, $passwordField => $password, "__EVENTTARGET" => $loginButton]);
         
-          Log3 ($name, 4, "$name - ".$loginp->code);
+          Log3 ($name, 5, "$name - Login-Page return code: ".$loginp->code);
           Log3 ($name, 5, "$name - Login-Page return: ".$loginp->content);
         
           if($loginp->content =~ /Logincontrol1_ErrorLabel/ix) {
@@ -828,7 +833,7 @@ sub GetSetData {                                                       ## no cri
   goto &GetSetData if($reread);
   
   # Wiederholung Datenabruf innerhalb eines Cycle
-  my $retc  = $hash->{HELPER}{RETRIES};
+  my $retc  = $hash->{HELPER}{RETRIES};                                        # aktuelle Retry-Zähler
   
   if($setp eq "none" && $retry && $retc < $maxretries) {                       # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
       $hash->{HELPER}{RETRIES}++;
@@ -1035,6 +1040,12 @@ sub ParseData {                                                    ## no critic 
       return;
   }
   
+  # Laufzeit für einen Cycle berechnen
+  my $btime  = $hash->{HELPER}{CYCLEBTIME};
+  my $etime  = (gettimeofday())[0];
+  my $cycles = $hash->{HELPER}{ACTCYCLE};
+  my $ctime  = int(($etime - $btime) / $cycles);    # durchschnittliche Laufzeit für einen Zyklus
+  
   $state       = decode_base64($a[6]);
   $lc          = decode_base64($a[7]);
   $fc          = decode_base64($a[8])  if($a[8]);
@@ -1046,6 +1057,7 @@ sub ParseData {                                                    ## no critic 
   
   my ($livedata_content,$forecast_content,$weatherdata_content,$consumerlivedata_content);
   my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content);
+  
   $livedata_content         = decode_json($lc);
   $forecast_content         = decode_json($fc) if($fc);
   $weatherdata_content      = decode_json($wc) if($wc);
@@ -1066,89 +1078,92 @@ sub ParseData {                                                    ## no critic 
   my ($batteryin,$batteryout);
   
   if($getp ne "none") {
-  for my $k (keys %$livedata_content) {
-      my $new_val = ""; 
-      if (defined $livedata_content->{$k}) {
-          if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/ix)) {
-              Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
-              if($livedata_content->{$k} =~ m/ARRAY/ix) {
-                  my $hd0 = $livedata_content->{$k}[0];
-                  if(!defined $hd0) {
-                      next;
+      for my $k (keys %$livedata_content) {
+          my $new_val = ""; 
+          if (defined $livedata_content->{$k}) {
+              if (($livedata_content->{$k} =~ m/ARRAY/i) || ($livedata_content->{$k} =~ m/HASH/ix)) {
+                  Log3 $name, 4, "$name - Livedata content \"$k\": ".($livedata_content->{$k});
+                  if($livedata_content->{$k} =~ m/ARRAY/ix) {
+                      my $hd0 = $livedata_content->{$k}[0];
+                      if(!defined $hd0) {
+                          next;
+                      }
+                      chomp $hd0;
+                      $hd0 =~ s/[;']//gx;
+                      $hd0 = encode("utf8", $hd0);
+                      Log3 $name, 4, "$name - Livedata \"$k\": $hd0";
+                      $new_val = $hd0;
                   }
-                  chomp $hd0;
-                  $hd0 =~ s/[;']//gx;
-                  $hd0 = encode("utf8", $hd0);
-                  Log3 $name, 4, "$name - Livedata \"$k\": $hd0";
-                  $new_val = $hd0;
+              } else {
+                  $new_val = $livedata_content->{$k};
               }
-          } else {
-              $new_val = $livedata_content->{$k};
-          }
-        
-          if ($new_val && $k !~ /__type/ix) {
-              if($k =~ /^FeedIn$/x) {
-                  $new_val     = $new_val." W";
-                  $FeedIn_done = 1        
-              }
-              if($k =~ /^GridConsumption$/x) {
-                  $new_val              = $new_val." W";
-                  $GridConsumption_done = 1;
-              }
-              if($k =~ /^PV$/x) {
-                  $new_val = $new_val." W";
-                  $PV_done = 1; 
-              }
-              if($k =~ /^AutarkyQuote$/x) {
-                  $new_val           = $new_val." %";
-                  $AutarkyQuote_done = 1;
-              }
-              if($k =~ /^SelfConsumption$/x) {
-                  $new_val              = $new_val." W";
-                  $SelfConsumption_done = 1;
-              } 
-              if($k =~ /^SelfConsumptionQuote$/x) {              
-                  $new_val                   = $new_val." %";
-                  $SelfConsumptionQuote_done = 1; 
-              }
-              if($k =~ /^SelfSupply$/x) {
-                  $new_val         = $new_val." W";
-                  $SelfSupply_done = 1;
-              }
-              if($k =~ /^TotalConsumption$/x) {
-                  $new_val = $new_val." W";
-              }
-              if($k =~ /^BatteryIn$/x) {
-                  $new_val   = $new_val." W";
-                  $batteryin = 1;
-              }
-              if($k =~ /^BatteryOut$/x) {
-                  $new_val    = $new_val." W";
-                  $batteryout = 1;
-              }        
-              
-              if($k =~ /^ErrorMessages$/x)   { $errMsg  = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
-              if($k =~ /^WarningMessages$/x) { $warnMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
-              if($k =~ /^InfoMessages$/x)    { $infoMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
+            
+              if ($new_val && $k !~ /__type/ix) {
+                  if($k =~ /^FeedIn$/x) {
+                      $new_val     = $new_val." W";
+                      $FeedIn_done = 1        
+                  }
+                  if($k =~ /^GridConsumption$/x) {
+                      $new_val              = $new_val." W";
+                      $GridConsumption_done = 1;
+                  }
+                  if($k =~ /^PV$/x) {
+                      $new_val = $new_val." W";
+                      $PV_done = 1; 
+                  }
+                  if($k =~ /^AutarkyQuote$/x) {
+                      $new_val           = $new_val." %";
+                      $AutarkyQuote_done = 1;
+                  }
+                  if($k =~ /^SelfConsumption$/x) {
+                      $new_val              = $new_val." W";
+                      $SelfConsumption_done = 1;
+                  } 
+                  if($k =~ /^SelfConsumptionQuote$/x) {              
+                      $new_val                   = $new_val." %";
+                      $SelfConsumptionQuote_done = 1; 
+                  }
+                  if($k =~ /^SelfSupply$/x) {
+                      $new_val         = $new_val." W";
+                      $SelfSupply_done = 1;
+                  }
+                  if($k =~ /^TotalConsumption$/x) {
+                      $new_val = $new_val." W";
+                  }
+                  if($k =~ /^BatteryIn$/x) {
+                      $new_val   = $new_val." W";
+                      $batteryin = 1;
+                  }
+                  if($k =~ /^BatteryOut$/x) {
+                      $new_val    = $new_val." W";
+                      $batteryout = 1;
+                  }        
+                  
+                  if($k =~ /^ErrorMessages$/x)   { $errMsg  = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
+                  if($k =~ /^WarningMessages$/x) { $warnMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
+                  if($k =~ /^InfoMessages$/x)    { $infoMsg = 1; $new_val = qq{<html><b>Message got from SMA Sunny Portal:</b><br>$new_val</html>};}
 
-              Log3 ($name, 4, "$name - $k - $new_val");
-              readingsBulkUpdate($hash, "L1_$k", $new_val);
+                  Log3 ($name, 4, "$name - $k - $new_val");
+                  readingsBulkUpdate($hash, "L1_$k", $new_val);
+              }
           }
       }
-  }
+      
+      readingsBulkUpdate($hash, "L1_FeedIn",               "0 W") if(!$FeedIn_done);
+      readingsBulkUpdate($hash, "L1_GridConsumption",      "0 W") if(!$GridConsumption_done);
+      readingsBulkUpdate($hash, "L1_PV",                   "0 W") if(!$PV_done);
+      readingsBulkUpdate($hash, "L1_AutarkyQuote",         "0 %") if(!$AutarkyQuote_done);
+      readingsBulkUpdate($hash, "L1_SelfConsumption",      "0 W") if(!$SelfConsumption_done);
+      readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", "0 %") if(!$SelfConsumptionQuote_done);
+      readingsBulkUpdate($hash, "L1_SelfSupply",           "0 W") if(!$SelfSupply_done);
+      
+      if(defined $batteryin || defined $batteryout) {
+          readingsBulkUpdate($hash, "L1_BatteryIn",        "0 W") if(!$batteryin);
+          readingsBulkUpdate($hash, "L1_BatteryOut",       "0 W") if(!$batteryout);
+      }
+      
+      readingsEndUpdate($hash, 1);
   
-  readingsBulkUpdate($hash, "L1_FeedIn",               "0 W") if(!$FeedIn_done);
-  readingsBulkUpdate($hash, "L1_GridConsumption",      "0 W") if(!$GridConsumption_done);
-  readingsBulkUpdate($hash, "L1_PV",                   "0 W") if(!$PV_done);
-  readingsBulkUpdate($hash, "L1_AutarkyQuote",         "0 %") if(!$AutarkyQuote_done);
-  readingsBulkUpdate($hash, "L1_SelfConsumption",      "0 W") if(!$SelfConsumption_done);
-  readingsBulkUpdate($hash, "L1_SelfConsumptionQuote", "0 %") if(!$SelfConsumptionQuote_done);
-  readingsBulkUpdate($hash, "L1_SelfSupply",           "0 W") if(!$SelfSupply_done);
-  if(defined $batteryin || defined $batteryout) {
-      readingsBulkUpdate($hash, "L1_BatteryIn",        "0 W") if(!$batteryin);
-      readingsBulkUpdate($hash, "L1_BatteryOut",       "0 W") if(!$batteryout);
-  }  
-  readingsEndUpdate($hash, 1);
   }
   
   readingsDelete($hash,"L1_ErrorMessages")   if(!$errMsg);
@@ -1207,15 +1222,18 @@ sub ParseData {                                                    ## no critic 
           $op         = ($op eq "auto")?"off (automatic)":$op;
           readingsBulkUpdate($hash, "L3_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "state", $state);
-      readingsBulkUpdate($hash, "summary", "$sum W");
+      readingsBulkUpdate($hash, "state"        , $state);
+      readingsBulkUpdate($hash, "lastCycleTime", $ctime);
+      readingsBulkUpdate($hash, "summary"      , "$sum W");
   } 
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate($hash, 1);  
   
   delcookiefile ($hash); 
   delete($hash->{HELPER}{RUNNING_PID});
+  
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
+  
   SPGRefresh($hash,0,1);
   
 return;
@@ -1816,8 +1834,8 @@ return;
 #       $rd   = Name des Zählerreadings
 ################################################################
 sub handleCounter {
-    my $name  = shift;
-    my $rd    = shift;
+  my $name  = shift;
+  my $rd    = shift;
     
   my $cstring      = ReadingsVal($name, $rd, "");
   my ($day,$count) = split(":", $cstring);
