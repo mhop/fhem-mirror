@@ -88,6 +88,7 @@ FBDECT_SetHttp($@)
   my ($hash, @a) = @_;
   my %cmd;
   my $p = $hash->{props};
+  my $unittype = ReadingsVal($hash->{NAME}, "unittype", "");
 
   if($p =~ m/switch/) {
     $cmd{off} = $cmd{on} = $cmd{toggle} = "noArg";
@@ -95,6 +96,12 @@ FBDECT_SetHttp($@)
   if($p =~ m/actuator/) {
     $cmd{"desired-temp"} = "slider,7.5,0.5,28.5,1";
     $cmd{open} = $cmd{closed} = "noArg";
+  }
+  if($p =~ m/dimmer/) {
+    $cmd{"dim"} = "slider,0,1,255,1";
+  }
+  if($p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
+    $cmd{open} = $cmd{closed} = $cmd{stop} = "noArg";
   }
   if(!$cmd{$a[1]}) {
     my $cmdList = join(" ", map { "$_:$cmd{$_}" } sort keys %cmd);
@@ -114,7 +121,7 @@ FBDECT_SetHttp($@)
     return undef;
   }
 
-  if($cmd =~ m/^(open|closed|desired-temp)$/) {
+  if($cmd =~ m/^(open|closed|desired-temp)$/ && $p =~ m/actuator/) {
     if($cmd eq "desired-temp") { 
       return "Usage: set $name desired-temp value" if(int(@a) != 3);
       return "desired-temp must be between 7.5 and 28.5"
@@ -124,6 +131,19 @@ FBDECT_SetHttp($@)
     my $val = ($cmd eq "open"  || $a2==28.5) ? 254 :
               ($cmd eq "closed"|| $a2== 7.5) ? 253: int(2*$a2);
     IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
+    return undef;
+  }
+
+  if($cmd eq "dim") {
+    return "Usage: set $name dim value"
+        if(int(@a) != 3 || $a[2] !~ m/^\d+$/ || !($a[2]>=0 && $a[2]<=100));
+    IOWrite($hash, ReadingsVal($name,"AIN",0),"setlevelpercentage&level=$a[2]");
+    return undef;
+  }
+
+  if($cmd =~ m/^(open|closed|stop)$/ &&
+    $p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
+    IOWrite($hash, ReadingsVal($name,"AIN",0),"setblind&param=$cmd");
     return undef;
   }
 }
@@ -220,11 +240,14 @@ my %fbhttp_readings = (
    batterylow      => '"batterylow:$val"',
    celsius         => 'sprintf("temperature:%.1f C (measured)", $val/10)',
    energy          => 'sprintf("energy:%d Wh", $val)',
+   etsideviceid    => '"etsideviceid:$val"',
    functionbitmask => '"FBPROP:$fbprop"',
    fwversion       => '"fwversion:$val"',
    id              => '"ID:$val"',
    identifier      => '"AIN:$val"',
    komfort         => 'sprintf("day-temp:%.1f C", $val/2)',
+   level           => '"level:$val"',
+   levelpercentage => '"dim:$val"',
    lock            => '"locked:".($val ? "yes":"no")',
    mode            => '"mode:$val"',
    name            => '"FBNAME:$val"',
@@ -238,6 +261,7 @@ my %fbhttp_readings = (
    tsoll           => 'sprintf("desired-temp:%s", $val)',
    members         => '"members:$val"',
    devicelock      => '"devicelock:".($val ? "yes":"no")',
+   unittype        => '"unittype:".($unittype{$val} ? $unittype{$val} : $val)',
    errorcode       => '"errorcode:".($ecTxt{$val} ? $ecTxt{$val} : ">$val<")',
    windowopenactiv => '"windowopenactiv:".($val ? "yes":"no")',
    battery         => 'sprintf("battery:%s %%", $val)',
@@ -284,14 +308,19 @@ FBDECT_ParseHttp($$$)
 
   my %ll = (
     0 => "HANFUN",
+    2 => "lightSwitch",
     4 => "alarmSensor",
+    5 => "avmButton",
     6 => "actuator",
     7 => "powerMeter",
     8 => "tempSensor",
     9 => "switch",
    10 => "repeater",
    11 => "microphone",
-   13 => "HANFUN2"
+   13 => "HANFUNUnit",
+   15 => "switch",
+   16 => "dimmer",
+   17 => "colorswitch",
   );
   my %ecTxt = (0 => "noError (0)",
                1 => "notMounted (1)",
@@ -300,6 +329,29 @@ FBDECT_ParseHttp($$$)
                4 => "installationPreparation (4)",
                5 => "installationInProgress (5)",
                6 => "installationIsAdapting (6)");
+  my %unittype = (
+    273 => "SIMPLE_BUTTONAHA-HTTP-API",
+    256 => "SIMPLE_ON_OFF_SWITCHABLE",
+    257 => "SIMPLE_ON_OFF_SWITCH",
+    262 => "AC_OUTLET",
+    263 => "AC_OUTLET_SIMPLE_POWER_METERING",
+    264 => "SIMPLE_LIGHT",
+    265 => "DIMMABLE_LIGHT",
+    266 => "DIMMER_SWITCH",
+    277 => "COLOR_BULB",
+    278 => "DIMMABLE_COLOR_BULB",
+    281 => "BLIND",
+    282 => "LAMELLAR",
+    512 => "SIMPLE_DETECTOR",
+    513 => "DOOR_OPEN_CLOSE_DETECTOR",
+    514 => "WINDOW_OPEN_CLOSE_DETECTOR",
+    515 => "MOTION_DETECTOR",
+    518 => "FLOOD_DETECTOR",
+    519 => "GLAS_BREAK_DETECTOR",
+    520 => "VIBRATION_DETECTOR",
+    640 => "SIREN",
+  );
+
 
   my $lsn = int($h{functionbitmask});
   my @fb;
@@ -587,9 +639,18 @@ FBDECT_Undef($$)
 
   <a name="FBDECTset"></a>
   <b>Set</b>
+  Note: not all commands are supported for all devices.
   <ul>
   <li>on/off<br>
     set the device on or off.
+    </li>
+
+  <li>dim &lt;value&gt;<br>
+    dim the device (if it is supported), value is between 0 and 100 (in %)
+    </li>
+
+  <li>open/close/stop<br>
+    set the blind correspondingly
     </li>
 
   <li>desired-temp &lt;value&gt;<br>
@@ -691,6 +752,15 @@ FBDECT_Undef($$)
     Gew&uuml;nschte Temperatur beim Comet DECT setzen. 7.5 entspricht aus, 28.5
     bedeutet an.
     </li>
+
+  <li>dim &lt;value&gt;<br>
+    Helligkeit oder Rolladenstand (zwischen 0 und 100, in Prozent) setzen.
+    </li>
+
+  <li>open/close/stop<br>
+    Rollade &ouml;ffnen, schlie&szlig;en oder stoppen.
+    </li>
+
   <li>
     Die <a href="#setExtensions">set extensions</a> werden
     unterst&uuml;tzt.
