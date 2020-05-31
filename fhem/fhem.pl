@@ -5137,7 +5137,11 @@ json2nameValue($;$$)
       if($s eq '\\') { 
         $esc = !$esc;
       } elsif($s eq '"' && !$esc) {
-        return (undef,substr($t,1,$off-1), substr($t,$off+1));
+        my $val = substr($t,1,$off-1);
+        $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
+        my %t = ( n =>"\n", '"'=>'"', '\\'=>'\\' );
+        $val =~ s/\\([n"\\])/$t{$1}/ge;
+        return (undef, $val, substr($t,$off+1));
       } else {
         $esc = 0;
       }
@@ -5198,7 +5202,6 @@ json2nameValue($;$$)
     if($val =~ m/^"/) {
       ($err, $val, $in) = lStr($val);
       return ($err,undef) if($err);
-      $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
       setVal($ret, $map, $prefix, $name, $val);
 
     } elsif($val =~ m/^{/) { # }
@@ -5218,7 +5221,7 @@ json2nameValue($;$$)
         setVal($ret, $map, $prefix, $firstLevel ? $k : "${name}_$k", $r2{$k});
       }
 
-    } elsif($val =~ m/^\[/) { 
+    } elsif($val =~ m/^\[/) {
       ($err, $val, $in) = lObj($val, '[', ']');
       return ($err,undef) if($err);
       my $idx = 1;
