@@ -143,7 +143,7 @@ FBDECT_SetHttp($@)
 
   if($cmd =~ m/^(open|closed|stop)$/ &&
     $p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
-    IOWrite($hash, ReadingsVal($name,"AIN",0),"setblind&param=$cmd");
+    IOWrite($hash, ReadingsVal($name,"AIN",0),"setblind&target=$cmd");
     return undef;
   }
 }
