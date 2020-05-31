@@ -1108,8 +1108,6 @@ attr DEVICE_CH3 readingList \
 #create device for CH4
 copy DEVICE DEVICE_CH4
 #attr DEVICE_CH2 jsonMap POWER4:state Dimmer:pct POWER1:0 POWER2:0 POWER3:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
-#setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
-#attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg    CMNDTOPIC/POWER4 0\
   on:noArg     CMNDTOPIC/POWER4 1\
@@ -1120,11 +1118,8 @@ attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20200529
-#set DEVICE attrTemplate speechcontrol_type_switch
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
-#set DEVICE_CH3 attrTemplate speechcontrol_type_switch
-#set DEVICE_CH4 attrTemplate speechcontrol_type_switch
 
 
 # 4-way multi socket 3AC+USB device flashed with Tasmota.
@@ -2099,6 +2094,7 @@ deletereading -q DEVICE status_.*
 attr DEVICE readingList \
   shellies/DEVNAME/color/0/status:.* {json2nameValue($EVENT)}\
   shellies/DEVNAME/color/0:.* state\
+  shellies/DEVNAME/online:.* online\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
@@ -2129,18 +2125,14 @@ attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE associatedWith DEVICE_CH1,DEVICE_CH2,DEVICE_CH4
+setreading DEVICE attrTemplateVersion 20200531
+attr DEVICE model shelly2rgbw_4w_split
+attr DEVICE setStateList on off
+set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
 attr DEVICE webCmd on:off:pct
 set DEVICE x_mqttcom announce
 attr DEVICE jsonMap brightness:pct
-set DEVICE attrTemplate speechcontrol_type_light
-attr DEVICE model shelly2rgbw_4w_split
-setreading DEVICE attrTemplateVersion 20200522 or prior
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
 attr DEVICE autocreate 0
-attr DEVICE setStateList on off
-copy DEVICE DEVICE_CH2
-setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/1:.* state\
   shellies/DEVNAME/white/1/set:.* { json2nameValue($EVENT) }\
@@ -2149,9 +2141,6 @@ attr DEVICE_CH2 setList off:noArg shellies/DEVNAME/white/1/command off\
   on:noArg shellies/DEVNAME/white/1/command on\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"mode":"white","brightness":"$EVTPART1"}\
   pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/1/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
-attr DEVICE_CH2 setStateList on off
-copy DEVICE DEVICE_CH3
-setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE_CH3 readingList shellies/DEVNAME/white/2/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/2:.* state\
   shellies/DEVNAME/white/2/set:.* { json2nameValue($EVENT) }\
@@ -2160,8 +2149,6 @@ attr DEVICE_CH3 setList off:noArg shellies/DEVNAME/white/2/command off\
   on:noArg shellies/DEVNAME/white/2/command on\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"mode":"white","brightness":"$EVTPART1"}\
   pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/2/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
-attr DEVICE_CH3 setStateList on off
-copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/white/3/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/3:.* state\
   shellies/DEVNAME/white/3/set:.* { json2nameValue($EVENT) }\
@@ -2170,9 +2157,8 @@ attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   on:noArg shellies/DEVNAME/white/3/command on\
   pct:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
   pct_on:colorpicker,BRI,0,1,100 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
-setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
-attr DEVICE_CH4 setStateList on off
-
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
+  
 #shellydimmer
 # contributed by zeppelin, https://forum.fhem.de/index.php/topic,94495.msg994764.html#msg994764
 name:shellydimmer
@@ -2197,6 +2183,7 @@ attr DEVICE readingList \
   shellies/DEVNAME/light/0/energy:.* light_0_energy\
   shellies/DEVNAME/temperature:.* temperature\
   shellies/DEVNAME/temperature_f:.* temperature_f\
+  shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/overtemperature:.* overtemperature\
   shellies/DEVNAME/overload:.* overload\
   shellies/DEVNAME/loaderror:.* loaderror\
@@ -2207,7 +2194,7 @@ attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellydimmer
-setreading DEVICE attrTemplateVersion 20200525
+setreading DEVICE attrTemplateVersion 20200531
 
 
 ###########################################
@@ -2309,21 +2296,15 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model ESPurna_4socketUSB_split
-setreading DEVICE attrTemplateVersion 20200522 or prior
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
 attr DEVICE stateFormat <a href="http://ip" target="_blank">ip\
 LWT\
 </a>\
 state
 deletereading -q DEVICE (?!associatedWith).*
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_USB
-setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4,DEVICE_USB
-setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4,DEVICE_USB
-setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB
-setreading DEVICE_USB associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
+setreading DEVICE attrTemplateVersion 20200531
+set DEVICE attrTemplate set_associatedWith \CHANNELS=5 \MAKECOPIES=1
+rename DEVICE_CH5 DEVICE_USB 
 attr DEVICE_CH2 readingList DEVNAME/relay/1:.* { $EVENT ? {"state"=>"on"} : {"state"=>"off"} }\
   DEVNAME/status:.* { $EVENT ? {"LWT"=>"Online"} : {"LWT"=>"Offline"} }\
   DEVNAME/ip:.* ip
@@ -2373,7 +2354,7 @@ attr DEVICE stateFormat <a href="http://ip" target="_blank">ip\
 LWT\
 </a>\
 state
-setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH4,DEVICE_CH4,DEVICE_USB
+
 
 ###############
 #DP83848 based Ethernet Board
@@ -2388,15 +2369,9 @@ par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 attr DEVICE model 8channel_ethernet_board_split
 attr DEVICE setStateList on off
-set DEVICE attrTemplate speechcontrol_type_switch
 deletereading -q DEVICE (?!associatedWith).*
-copy DEVICE DEVICE_CH2
-copy DEVICE DEVICE_CH3
-copy DEVICE DEVICE_CH4
-copy DEVICE DEVICE_CH5
-copy DEVICE DEVICE_CH6
-copy DEVICE DEVICE_CH7
-copy DEVICE DEVICE_CH8
+setreading DEVICE attrTemplateVersion 20200529
+set DEVICE attrTemplate set_associatedWith \CHANNELS=8 \MAKECOPIES=1
 attr DEVICE readingList STATETOPIC.* { $EVENT =~ /output...([01])[01]{7}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH2 readingList STATETOPIC.* { $EVENT =~ /output...[01]([01])[01]{6}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
 attr DEVICE_CH3 readingList STATETOPIC.* { $EVENT =~ /output...[01]{2}([01])[01]{5}/;;  my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? return : {"state"=>$newstate} }
@@ -2421,9 +2396,9 @@ attr DEVICE_CH7 setList on:noArg CMNDTOPIC setr=xxxxxx1x\
   off:noArg CMNDTOPIC setr=xxxxxx0x
 attr DEVICE_CH8 setList on:noArg CMNDTOPIC setr=xxxxxxx1\
   off:noArg CMNDTOPIC setr=xxxxxxx0
-set DEVICE attrTemplate set_associatedWith \CHANNELS=8
-setreading DEVICE attrTemplateVersion 20200529
-
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplate speechcontrol_type_switch
+  
+  
 name:8channel_ethernet_board_unified
 filter:TYPE=MQTT2_DEVICE
 desc:For use with some 8-channel ethernet boards. Might be usefull for other stuff based on TI's <a href="https://www.waveshare.com/wiki/DP83848_Ethernet_Board">DP83848 ethernet chipset</a>.<br>NOTE: First experimental version, for configuration and to contribute see <a href="https://forum.fhem.de/index.php/topic,107536.msg1016379.html#msg1016379">Forum Thread</a>. You have to configure MQTT first, might be found under http://<device-ip-adress>/zm.cgi!
@@ -2463,7 +2438,10 @@ attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green
 attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do1":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }\
-Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
+  Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
+  Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
+attr DEVICE jsonMap do1:0 do2:0 do3:0 do4:0 do5:0 do6:0 c:0 q:0 s:0 t:0
+attr DEVICE event-on-change-reading .*
 attr DEVICE setExtensionsEvent 1
 attr DEVICE setList on:noArg Advantech/DEVNAME/ctl/do1:r {"v":true}\
   off:noArg Advantech/DEVNAME/ctl/do1:r {"v":false}
@@ -2624,9 +2602,12 @@ attr DEVICE readingList BASEPATH/boiler_data { json2nameValue($EVENT,'',$JSONMAP
   BASEPATH/tapwater_active:.* tapwater_active\
   BASEPATH/heating_active:.* heating_active
 attr DEVICE stateFormat { my $h=ReadingsNum($name,"heating_active",0); my $t=ReadingsNum($name,"tapwater_active",0); !$h && !$t ? "idle" : ($h && !$t ? "heating" : "tapwater")}
-attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red 
+attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
+attr DEVICE setList wWComfort:select,hot,intelligent BASEPATH/boiler_cmd { "cmd":"comfort", "data": "$EVTPART1" }
+attr DEVICE webCmd wWComfort
+attr DEVICE eventMap Hot:hot Eco:intelligent
 attr DEVICE model ems-esp_boiler
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200529
 
 #ems-esp thermostat device
 name:ems-esp_thermostat_read-only
