@@ -98,7 +98,7 @@ FBDECT_SetHttp($@)
     $cmd{open} = $cmd{closed} = "noArg";
   }
   if($p =~ m/dimmer/) {
-    $cmd{"dim"} = "slider,0,1,255,1";
+    $cmd{"dim"} = "slider,0,1,100,1";
   }
   if($p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
     $cmd{open} = $cmd{closed} = $cmd{stop} = "noArg";
