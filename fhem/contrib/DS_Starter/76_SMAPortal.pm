@@ -25,7 +25,7 @@
 #
 #       Credits (Thanks to all!):
 #           Brun von der Gönne <brun at goenne dot de> :  author of 98_SHM.pm
-#           BerndArnold                                :  author of 98_SHMForecastRelative.pm
+#           BerndArnold                                :  author of 98_SHMForecastRelative.pm / add get statistic data
 #           Wzut/XGuide                                :  creation of SMAPortal graphics
 #       
 #       FHEM Forum: http://forum.fhem.de/index.php/topic,27667.0.html 
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.0"  => "01.06.2020  add get today statistic data ",
   "2.8.1"  => "31.05.2020  attribute timeout, maxCallCycle deleted ",
   "2.8.0"  => "31.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
                            "new attribute maxCallCycle ",
@@ -211,7 +212,7 @@ sub Initialize {
                            "interval ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
-                           "verbose5Data:none,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
+                           "verbose5Data:none,balanceData,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -708,7 +709,7 @@ sub controlParams {
   my $proctime = ($maxretries * 0.1);
   my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;
   $ctime       = ReadingsVal ($name, "lastCycleTime", $ctime);
-  $ctime       = 10 if($ctime > 10);                                     # Ausreißer ignorieren
+  $ctime       = 7 if($ctime > 7);                                       # Ausreißer ignorieren
    
   if(!$interval) {                                                       # manueller Datenabruf 
       return ($interval,$maxcycles,$timeout,$ctime);
@@ -739,7 +740,8 @@ sub GetSetData {                                                       ## no cri
   my $state                = "ok";
   my ($reread,$retry)      = (0,0);  
   my ($exceed,$newcycle)   = (0,0);
-  my ($forecast_content,$weatherdata_content,$consumerlivedata_content,$ccdaydata_content,$ccmonthdata_content) = ("","","","","");
+  my ($forecast_content,$weatherdata_content,$consumerlivedata_content) = ("","","");
+  my ($balancedataday_content,$ccdaydata_content,$ccmonthdata_content)  = ("","","");
   my ($livedata_content,$d,$op); 
   
   if($setp ne "none") {
@@ -751,6 +753,9 @@ sub GetSetData {                                                       ## no cri
   Log3 ($name, 5, "$name - data get: $getp, data set: ".(($d && $op)?($d." ".$op):$setp));
   
   my $ua = LWP::UserAgent->new;
+  
+  # $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+  # $ua->add_handler( response_done => sub { shift->dump; return } );
   
   # Header Daten
   $ua->default_header("Accept"           => "*/*",
@@ -891,7 +896,9 @@ sub GetSetData {                                                       ## no cri
   
   ### Daten abrufen 
   #########################
-  if($getp ne "none") {                                   
+  if($getp ne "none") { 
+
+      my $dl = AttrVal($name, "detailLevel", 1);                                  # selcted Detail Level  
       
       # JSON Wetterdaten
       Log3 ($name, 4, "$name - Getting weather data");
@@ -899,8 +906,26 @@ sub GetSetData {                                                       ## no cri
       $weatherdata_content = $weatherdata->content;
       Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($weatherdata_content)) if($v5d eq "weatherData");
       
+      
+      # JSON Statistic Data Tag (anchorTime beachten !) 
+      Log3 ($name, 4, "$name - Getting statistic day data");
+      my $req = HTTP::Request->new( 'POST', 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues' );                              
+                
+      my $anchort = int ($time / 1000);                                           # anchorTime -> abzurufendes Datum
+      my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my $cont    = qq{"tabNumber":$tab,"anchorTime":$anchort};
+      
+      $req->header  ( "Content-Type"   => "application/json; charset=utf-8" );
+      $req->header  ( "Content-Length" => 39 );      
+      $req->content ( "{$cont}" );               
+      
+      my $res                 = $ua->request( $req );
+      $balancedataday_content = $res->content;
+      
+      Log3 ($name, 5, "$name - Data received:\n".Dumper decode_json($balancedataday_content)) if($v5d eq "balanceData");
+      
+      
       # JSON Forecast Daten
-      my $dl = AttrVal($name, "detailLevel", 1);
       if($dl > 1) {
           Log3 ($name, 4, "$name - Getting forecast data");
 
@@ -989,17 +1014,18 @@ sub GetSetData {                                                       ## no cri
   }
 
   # Daten müssen als Einzeiler zurückgegeben werden
-  my ($st,$lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","","");
-  $st = encode_base64($state,"");
-  $lc = encode_base64($livedata_content,"");
-  $fc = encode_base64($forecast_content,"")         if($forecast_content);
-  $wc = encode_base64($weatherdata_content,"")      if($weatherdata_content);
-  $cl = encode_base64($consumerlivedata_content,"") if($consumerlivedata_content);
-  $cd = encode_base64($ccdaydata_content,"")        if($ccdaydata_content);
-  $cm = encode_base64($ccmonthdata_content,"")      if($ccmonthdata_content);
-  $cy = encode_base64($ccyeardata_content,"")       if($ccyeardata_content);
+  my ($st,$bcd,$lc,$fc,$wc,$cl,$cd,$cm,$cy) = ("","","","","","","","","");
+  $st  = encode_base64 ( $state,"");
+  $bcd = encode_base64 ( $balancedataday_content,   "" )      if($balancedataday_content);  
+  $lc  = encode_base64 ( $livedata_content,         "" )      if($livedata_content);  
+  $fc  = encode_base64 ( $forecast_content,         "" )      if($forecast_content);
+  $wc  = encode_base64 ( $weatherdata_content,      "" )      if($weatherdata_content);
+  $cl  = encode_base64 ( $consumerlivedata_content, "" )      if($consumerlivedata_content);
+  $cd  = encode_base64 ( $ccdaydata_content,        "" )      if($ccdaydata_content);
+  $cm  = encode_base64 ( $ccmonthdata_content,      "" )      if($ccmonthdata_content);
+  $cy  = encode_base64 ( $ccyeardata_content,       "" )      if($ccyeardata_content);
 
-return "$name|$exceed|$newcycle|$login_state|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy";
+return "$name|$exceed|$newcycle|$login_state|$getp|$setp|$st|$lc|$fc|$wc|$cl|$cd|$cm|$cy|$bcd";
 }
 
 ################################################################
@@ -1011,7 +1037,7 @@ sub ParseData {                                                    ## no critic 
   my $hash     = $defs{$a[0]};
   my $name     = $hash->{NAME};
   
-  my ($login_state,$newcycle,$getp,$setp,$fc,$wc,$cl,$cd,$cm,$cy,$lc,$state,$exceed);
+  my ($login_state,$newcycle,$getp,$setp,$state,$exceed);
   
   $exceed      = $a[1];
   $newcycle    = $a[2];
@@ -1047,24 +1073,18 @@ sub ParseData {                                                    ## no critic 
   my $ctime  = int(($etime - $btime) / $cycles);    # durchschnittliche Laufzeit für einen Zyklus
   
   $state       = decode_base64($a[6]);
-  $lc          = decode_base64($a[7]);
-  $fc          = decode_base64($a[8])  if($a[8]);
-  $wc          = decode_base64($a[9])  if($a[9]);
-  $cl          = decode_base64($a[10]) if($a[10]);
-  $cd          = decode_base64($a[11]) if($a[11]);
-  $cm          = decode_base64($a[12]) if($a[12]);
-  $cy          = decode_base64($a[13]) if($a[13]);
   
   my ($livedata_content,$forecast_content,$weatherdata_content,$consumerlivedata_content);
-  my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content);
+  my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content,$balancedataday_content);
   
-  $livedata_content         = decode_json($lc);
-  $forecast_content         = decode_json($fc) if($fc);
-  $weatherdata_content      = decode_json($wc) if($wc);
-  $consumerlivedata_content = decode_json($cl) if($cl);
-  $ccdaydata_content        = decode_json($cd) if($cd);
-  $ccmonthdata_content      = decode_json($cm) if($cm);
-  $ccyeardata_content       = decode_json($cy) if($cy);
+  $livedata_content         = decode_json( decode_base64($a[7])  )   if($a[7]);
+  $forecast_content         = decode_json( decode_base64($a[8])  )   if($a[8]);
+  $weatherdata_content      = decode_json( decode_base64($a[9])  )   if($a[9]);
+  $consumerlivedata_content = decode_json( decode_base64($a[10]) )   if($a[10]);
+  $ccdaydata_content        = decode_json( decode_base64($a[11]) )   if($a[11]);
+  $ccmonthdata_content      = decode_json( decode_base64($a[12]) )   if($a[12]);
+  $ccyeardata_content       = decode_json( decode_base64($a[13]) )   if($a[13]);
+  $balancedataday_content   = decode_json( decode_base64($a[14]) )   if($a[14]);
   
   my $dl = AttrVal($name, "detailLevel", 1);
   delread($hash, $dl+1);
@@ -1172,14 +1192,14 @@ sub ParseData {                                                    ## no critic 
   
   if ($forecast_content && $forecast_content !~ m/undefined/ix) {
       # Auswertung der Forecast Daten
-      extractForecastData($hash,$forecast_content);
-      extractPlantData($hash,$forecast_content);
-      extractConsumerData($hash,$forecast_content);
+      extractForecastData ($hash,$forecast_content);
+      extractPlantData    ($hash,$forecast_content);
+      extractConsumerData ($hash,$forecast_content);
   }
   
   if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/ix) {
       # Auswertung Consumer Live Daten
-      extractConsumerLiveData($hash,$consumerlivedata_content);
+      extractConsumerLiveData ($hash,$consumerlivedata_content);
   }
   
   if ($ccdaydata_content && $ccdaydata_content !~ m/undefined/ix) {
@@ -1189,17 +1209,22 @@ sub ParseData {                                                    ## no critic 
   
   if ($ccmonthdata_content && $ccmonthdata_content !~ m/undefined/ix) {
       # Auswertung Consumer Energiedaten des aktuellen Monats
-      extractConsumerHistData($hash,$ccmonthdata_content,"month");
+      extractConsumerHistData ($hash,$ccmonthdata_content,"month");
   }
   
   if ($ccyeardata_content && $ccyeardata_content !~ m/undefined/ix) {
       # Auswertung Consumer Energiedaten des aktuellen Jahres
-      extractConsumerHistData($hash,$ccyeardata_content,"year");
+      extractConsumerHistData ($hash,$ccyeardata_content,"year");
   }
   
   if ($weatherdata_content && $weatherdata_content !~ m/undefined/ix) {
       # Auswertung Wetterdaten
-      extractWeatherData($hash,$weatherdata_content);
+      extractWeatherData ($hash,$weatherdata_content);
+  }
+  
+  if ($balancedataday_content && $balancedataday_content !~ m/undefined/ix) {
+      # Auswertung Statistik Daten Tag
+      extractStatisticData ($hash,$balancedataday_content,"Day");
   }
   
   my $pv  = ReadingsNum($name, "L1_PV"             , 0);
@@ -1409,17 +1434,17 @@ sub extractForecastData {                                          ## no critic 
       readingsBulkUpdate($hash, "L2_Next04Hours_Consumption",              int( $nextFewHoursSum{'Consumption'} )." Wh" );
       readingsBulkUpdate($hash, "L2_Next04Hours_PV",                       int( $nextFewHoursSum{'PV'}          )." Wh" );
       readingsBulkUpdate($hash, "L2_Next04Hours_Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours_IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_Next04Hours_IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h"  );
       readingsBulkUpdate($hash, "L2_ForecastToday_Consumption",            $consum_sum." Wh" );                           
       readingsBulkUpdate($hash, "L2_ForecastToday_PV",                     $PV_sum." Wh");                                 
-      readingsBulkUpdate($hash, "L2_RestOfDay_Consumption",                int( $restOfDaySum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_PV",                         int( $restOfDaySum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_Total",                      int( $restOfDaySum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'} )." h" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_Consumption",                 int( $tomorrowSum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_PV",                          int( $tomorrowSum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_Total",                       int( $tomorrowSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'} )." h" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_Consumption",                int( $restOfDaySum{'Consumption'}    )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_PV",                         int( $restOfDaySum{'PV'}             )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_Total",                      int( $restOfDaySum{'Total'}          )." Wh" );
+      readingsBulkUpdate($hash, "L2_RestOfDay_IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'}    )." h"  );
+      readingsBulkUpdate($hash, "L2_Tomorrow_Consumption",                 int( $tomorrowSum{'Consumption'}     )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_PV",                          int( $tomorrowSum{'PV'}              )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_Total",                       int( $tomorrowSum{'Total'}           )." Wh" );
+      readingsBulkUpdate($hash, "L2_Tomorrow_IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'}     )." h"  );
   }
 
   readingsEndUpdate($hash, 1);
@@ -1436,8 +1461,6 @@ sub extractWeatherData {
   my ($tsymbol,$ttoday,$ttomorrow);
   
   Log3 ($name, 4, "$name - ##### extracting weather data #### ");
-  
-  my $dl = AttrVal($name, "detailLevel", 1);
   
   readingsBeginUpdate($hash);
   
@@ -1486,6 +1509,58 @@ sub extractWeatherData {
   readingsEndUpdate($hash, 1); 
 
 return;
+}
+
+################################################################
+#          Auswertung Statistic Daten
+#          $period = Day | Month | Year
+################################################################
+sub extractStatisticData {
+  my ($hash,$statistic,$period) = @_;
+  my $name = $hash->{NAME};
+  
+  my $sd;
+  my @da = ();
+  
+  Log3 ($name, 4, "$name - ##### extracting statistic data #### ");
+
+  my %ch = (                                                         # Zieldatenhash
+      Energy                => 1,
+      FeedIn                => 1,
+      GridConsumption       => 1,
+      SelfConsumption       => 1,
+      SelfSupply            => 1,
+      DirectConsumption     => 1,
+      TotalConsumption      => 1,
+      BackupOut             => 1,
+      BackupIn              => 1,
+      SelfConsumptionRate   => 1,
+      DirectConsumptionRate => 1,
+      AutarkyRate           => 1,
+  );  
+  
+  if(ref $statistic eq "HASH") {
+      $sd = decode_json ($statistic->{d});
+  }
+
+  if($sd && ref $sd eq "ARRAY") {
+      for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
+          my $k = $a->{Key};
+          my $v = $a->{Value};
+          push @da, "$k:$v" if(defined $ch{$k});                  
+      }
+  }
+
+  readingsBeginUpdate($hash);                                         # generiere Readings
+  
+  for my $elem (@da) {
+      my ($rn,$rval) = split ":", $elem;
+      readingsBulkUpdate($hash, "L1_Today_".$rn, $rval);      
+  }
+
+  readingsEndUpdate($hash, 1); 
+  
+return; 
 }
 
 ################################################################
@@ -1843,7 +1918,8 @@ sub handleCounter {
   if(!$day || $day != $mday) {
       $count = 0;
       $day   = $mday;
-      Log3 ($name, 2, qq{$name - reset counter "$rd" to >0< });
+      Log3 ($name, 2, qq{$name - reset counter "$rd" to >0< }) if(!$defs{$name}->{HELPER}{$rd});
+      $defs{$name}->{HELPER}{$rd} = 1;                              # nur im fork setzen um doppelten Logeintrag zu vermeiden
   }
   $count++;
   $cstring = "$rd:$day:$count";  
@@ -2950,7 +3026,7 @@ return;
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>L1</b>  </td><td>- only live data and weather data are generated. </td></tr>
+          <tr><td> <b>L1</b>  </td><td>- live data, statistic day data and weather data are generated. </td></tr>
           <tr><td> <b>L2</b>  </td><td>- as L1 and additional forecast of the current data, the data of the next 4 hours as well as PV-Generation / Consumption the rest of day and the next day </td></tr>
           <tr><td> <b>L3</b>  </td><td>- as L2 and additional forecast of the planned switch-on times of consumers, whose current state and energy data as well as their battery usage data </td></tr>
           <tr><td> <b>L4</b>  </td><td>- as L3 and additional a detailed forecast of the next 24 hours </td></tr>
@@ -3015,6 +3091,7 @@ return;
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
+     <li>Tagesstatistiken </li>
      <li>Batteriedaten (In/Out) sowie Nutzungsdaten durch Verbraucher </li>
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
@@ -3144,7 +3221,7 @@ return;
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>L1</b>  </td><td>- nur Live-Daten und Wetter-Daten werden generiert. </td></tr>
+          <tr><td> <b>L1</b>  </td><td>- Live-Daten, Tagesstatistiken und Wetter-Daten werden generiert. </td></tr>
           <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung / Verbrauch des Resttages und des Folgetages </td></tr>
           <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten der geplanten Einschaltzeiten von Verbrauchern, deren aktueller Status und Energiedaten sowie Batterie-Nutzungsdaten</td></tr>
           <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
