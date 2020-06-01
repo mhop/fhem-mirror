@@ -142,7 +142,7 @@ DevIo_DecodeWS($$)
   my $i = 2;
 
   # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
-  #Log 1, "OP:$op/$len/$mask/$fin";
+  Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
   if($op == 8) {         # Close, Normal, empty mask. #104718
     syswrite($hash->{TCPDev}, pack("CCn",0x88,0x2,1000));
     DevIo_CloseDev($hash);
@@ -283,7 +283,7 @@ DevIo_Expect($$$)
 # Possible values for $hash->{DeviceName}:
 # - device@baud[78][NEO][012] => open device, set serial-line parameters
 # - hostname:port => TCP/IP client connection (set $hash->{SSL}=>1 for TLS)
-# - ws:hostname:port => websocket connection
+# - ws:hostname:port => websocket connection (wss: sets $hash->{SSL}=1)
 # - device@directio => open device without additional "magic"
 # - UNIX:(SEQPACKET|STREAM):filename => Open filename as a UNIX socket
 # - FHEM:DEVIO:IoDev[:IoPort] => Cascade I/O over another FHEM Device
@@ -410,10 +410,14 @@ DevIo_OpenDev($$$;$)
       return &$doCb("");
     }
 
-  } elsif($dev =~ m/^(ws:)?(.+):([0-9]+)$/) { # TCP (host:port) or websocket
+  } elsif($dev =~ m/^(ws:|wss:)?(.+):([0-9]+)$/) {# TCP (host:port) or websocket
    
     my ($proto, $host, $port) = ($1 ? $1 : "", $2, $3);
     $dev = "$host:$port";
+    if($proto eq "wss:")  {
+      $hash->{SSL} = 1;
+      $proto = "ws:";
+    }
     if($proto eq "ws:")  {
       require MIME::Base64;
       return &$doCb('websocket is only supported with callback') if(!$callback);
