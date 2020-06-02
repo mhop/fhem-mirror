@@ -2426,6 +2426,8 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 ###############
 #Advantech ADAM6060 ethernet board
 #
+#specials: send retained messages, eventMap, event-on-change-reading and timestamp-on-change-reading via one-line Perl...
+#
 # input by cberl, see forum https://forum.fhem.de/index.php/topic,111429.0.html
 
 name:6channel_ethernet_board_6input_split
@@ -2437,11 +2439,9 @@ par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green
-attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ m/do1":(true)/g;; my $newstate = $1 ? "on" : "off";; $newstate eq ReadingsVal($NAME,"state","unknown") ? undef : {"state"=>$newstate} }\
-  Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
+attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; my $rets = json2nameValue($EVENT,'',$JSONMAP);; my %cleaned = map { $_,$rets->{$_} } grep { ReadingsVal($NAME,$_,"unknown") ne $rets->{$_} } keys %{$rets};; return \%cleaned }\
   Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
-attr DEVICE jsonMap do1:0 do2:0 do3:0 do4:0 do5:0 do6:0 c:0 q:0 s:0 t:0
-attr DEVICE event-on-change-reading .*
+attr DEVICE jsonMap do1:state do2:0 do3:0 do4:0 do5:0 do6:0 c:0 q:0 s:0 t:0
 attr DEVICE setExtensionsEvent 1
 attr DEVICE setList on:noArg Advantech/DEVNAME/ctl/do1:r {"v":true}\
   off:noArg Advantech/DEVNAME/ctl/do1:r {"v":false}
@@ -2479,7 +2479,7 @@ attr DEVICE_CH6 setList on:noArg Advantech/DEVNAME/ctl/do6:r {"v":true}\
   off:noArg Advantech/DEVNAME/ctl/do6:r {"v":false}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=6
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplate speechcontrol_type_switch
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplateVersion 20200529
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 attrTemplateVersion 20200602
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6 model 6channel_ethernet_board_6input_split
 
 
@@ -2492,10 +2492,10 @@ par:ICON;ICON as set, defaults to on;{ AttrVal("DEVICE","icon","on") }
 attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE devStateIcon disconnect:rc_STOP@red connect:rc_STOP@green 2.on:on:do2+off 2.off:off:do2+on 3.on:on:do3+off 3.off:off:do3+on 4.on:on:do4+off 4.off:off:do4+on 5.on:on:do5+off 5.off:off:do5+on 6.on:on:do6+off 6.off:off:do6+on
-attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; json2nameValue($EVENT,'',$JSONMAP) }\
+attr DEVICE readingList Advantech/DEVNAME/data:.* { $EVENT =~ s/true/"on"/g;; $EVENT =~ s/false/"off"/g;; my $rets = json2nameValue($EVENT,'',$JSONMAP);; my %cleaned = map { $_,$rets->{$_} } grep { ReadingsVal($NAME,$_,"unknown") ne $rets->{$_} } keys %{$rets};; return \%cleaned }
+\
 Advantech/DEVNAME/Device_Status:.* { json2nameValue($EVENT) }
 attr DEVICE setExtensionsEvent 1
-attr DEVICE event-on-change-reading .*
 attr DEVICE jsonMap do1:state c:0 q:0 s:0 t:0
 attr DEVICE setList on:noArg Advantech/DEVNAME/ctl/do1:r {"v":true}\
   off:noArg Advantech/DEVNAME/ctl/do1:r {"v":false}\
@@ -2522,7 +2522,7 @@ di6
 attr DEVICE webCmd : 
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model 6channel_ethernet_board_6input_unified
-setreading DEVICE attrTemplateVersion 20200529
+setreading DEVICE attrTemplateVersion 20200602
 
 
 
@@ -3278,6 +3278,38 @@ set DEVICE attrTemplate speechcontrol_type_light_255
 farewell:template has been applied successfully. <br>Note: webCmd and eventMap are just examples; adopt this to your needs.
 attr DEVICE model wled_controller
 setreading DEVICE attrTemplateVersion 20200522 or prior
+
+###########################################
+# sonos2mqtt
+# The sonos2mqtt bridge device (entire hex id of devices as bridgeRegexp)
+name:sonos2mqtt_bridge
+desc:The sonos2mqtt bridge device
+filter:TYPE=MQTT2_DEVICE
+order:M_05
+par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+attr DEVICE bridgeRegexp\
+  BASE_TOPIC/(RINCON_[A-Z0-9]+):.* "$1"
+attr DEVICE readingList\
+  BASE_TOPIC/connected:.* connected\
+  homeassistant/music_player/RINCON_([0-9A-Z]+)/sonos/config:.* { $TOPIC =~ m,(RINCON_[0-9A-Z]+),; { "config_$1"=>$EVENT }}\
+  BASE_TOPIC/status/[^/]+/avtransport:.* {}\
+  BASE_TOPIC/status/[^/]+/renderingcontrol:.* {}
+
+name:sonos2mqtt_speaker
+desc:A sonos2mqtt speaker device
+filter:TYPE=MQTT2_DEVICE
+order:M_05a
+par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;techname of the device ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](RINCON_[0-9A-Z]+):.*, ? $1 : undef }
+par:DEVNAME;friendly name as set in sonos gadget itself;{ lc(ReadingsVal("DEVICE","name","unknown")) }
+attr DEVICE readingList\
+  BASE_TOPIC/status/DEVNAME/avtransport:.* { json2nameValue($EVENT,'AV_',$JSONMAP) }\
+  BASE_TOPIC/status/DEVNAME/renderingcontrol:.* { json2nameValue($EVENT,'REND_',$JSONMAP) }\
+  BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList\
+  stop:noArg BASE_TOPIC/DEV_ID/control { "command": "stop" }\
+  play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
+  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }"
 
 
 ###########################################
