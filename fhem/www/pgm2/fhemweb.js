@@ -898,9 +898,8 @@ FW_execRawDef(data)
       return doNext();
     }
     if(str != "") {
-      str = str.replace(/\\\n/g, "\n")
-               .replace(/;;/g, ";");
-      FW_cmd(FW_root+"?cmd.x="+encodeURIComponent(str)+"&XHR=1",
+      str = str.replace(/\\\n/g, "\n");
+      FW_cmd(FW_root+"?cmd="+encodeURIComponent(str)+"&XHR=1",
       function(r){
         if(r)
           return FW_okDialog('<pre>'+r+'</pre>');
