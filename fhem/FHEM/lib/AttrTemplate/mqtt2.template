@@ -3309,7 +3309,7 @@ attr DEVICE readingList\
 attr DEVICE setList\
   stop:noArg BASE_TOPIC/DEV_ID/control { "command": "stop" }\
   play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
-  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }"
+  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }
 
 
 ###########################################
