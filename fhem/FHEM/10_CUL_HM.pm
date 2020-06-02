@@ -3906,8 +3906,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
   elsif($cmd =~ m/^(reg|regVal)$/) {  #########################################
     my (undef,undef,$regReq,$list,$peerId) = (@a,0,0);
-    return if(!defined $regReq);
-    if ($regReq eq 'all'){
+
+    if (!defined $regReq or $regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
 
       my @peers; # get all peers we have a reglist
@@ -6432,7 +6432,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           next;
         }
         else{
-          Log3 $name,2,"peering execute:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
+          Log3 $name,4,"peering execute:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
         }
         CUL_HM_PushCmdStack($PInfo{$myNo}{hash},"++".$flag."01${id}$PInfo{$myNo}{DId}"
                             .$PInfo{$myNo}{chn}
@@ -6644,6 +6644,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   return ("",1);# no not generate trigger out of command
+}
+sub CUL_HM_Ping($) {
+  my($defN) = @_;
+  return 0 if (($defs{$defN}{helper}{rxType} & 0xe3) == 0);     # no ping for config devices
+  return 1 if (1 == CUL_HM_Set($defs{$defN},$defN,"sysTime"));
+  foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
+    return 1 if(1== CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"));
+  }
+  return 0;
 }
 
 #+++++++++++++++++ set/get support subroutines+++++++++++++++++++++++++++++++++
@@ -7760,8 +7769,7 @@ sub CUL_HM_protState($$){
     $hash->{helper}{prt}{sProc} = 3;
   }
   $hash->{protState} = $state;
-  CUL_HM_UpdtReadSingle($hash,"commState",$state,
-                          ($hash->{helper}{prt}{sProc} == 1)?0:1);
+  CUL_HM_UpdtReadSingle($hash,"commState",$state,1);
   if (!$hash->{helper}{role}{chn}){
     CUL_HM_UpdtReadSingle($hash,"state",$state,
                           ($hash->{helper}{prt}{sProc} == 1)?0:1);
