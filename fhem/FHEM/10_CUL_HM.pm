@@ -4167,6 +4167,7 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list++++++++++++++++
               .":$fkt"
               .":$defs{$devName}{helper}{mId}"
               .":$chn"
+              .InternalVal($name,"peerList","")
               ;
   if($hash->{helper}{cmds}{cmdKey} ne $cmdKey){
     my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
