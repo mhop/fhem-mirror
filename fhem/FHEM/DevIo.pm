@@ -163,6 +163,14 @@ my %wsCloseCode = (
 );
 
 sub
+DevIo_Ping($;$)
+{
+  my ($hash,$msg) = @_;
+  $msg="" if(!defined($msg));
+  syswrite($hash->{TCPDev}, DevIo_MaskWS(0x9, $msg)) if($hash->{WEBSOCKET});
+}
+
+sub
 DevIo_DecodeWS($$)
 {
   my ($hash, $buf) = @_;
@@ -216,8 +224,14 @@ DevIo_DecodeWS($$)
 
   } elsif($op == 9) {   # Ping
     syswrite($hash->{TCPDev}, DevIo_MaskWS(0xA, $data)); # Pong
+    Log3 $hash, 5, "Websocket ping: $data" if($data);
     $hash->{".WSBUF"} = substr($data, 2);
     return DevIo_DecodeWS($hash, "");
+
+  } elsif($op == 10) {   # Pong
+    Log3 $hash, 5, "Websocket pong: $data" if($data);
+    return ""
+
   }
 
   return $data;
