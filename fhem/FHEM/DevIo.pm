@@ -225,7 +225,6 @@ DevIo_DecodeWS($$)
   } elsif($op == 9) {   # Ping
     syswrite($hash->{TCPDev}, DevIo_MaskWS(0xA, $data)); # Pong
     Log3 $hash, 5, "Websocket ping: $data" if($data);
-    $hash->{".WSBUF"} = substr($data, 2);
     return DevIo_DecodeWS($hash, "");
 
   } elsif($op == 10) {   # Pong
