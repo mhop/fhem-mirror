@@ -126,6 +126,33 @@ DevIo_TimeoutRead($$;$$)
 }
 
 sub
+DevIo_MaskWS($$)
+{
+  my ($opcode,$msg) = @_;
+  $opcode = pack("C",$opcode|0x80);
+
+  my $len = length($msg);
+  my $lb;
+  if($len < 126) {
+    $lb = chr(0x80+$len);
+  } else {
+    if ($len < 65536) {
+      $lb = chr(0x8E) . pack('n', $len);
+    } else {
+      $lb = chr(0x8F) . chr(0x00) . chr(0x00) .
+            chr(0x00) . chr(0x00) . pack('N', $len);
+    }
+  }
+
+  my $mask = pack("L",rand(2**32));
+  my @m = unpack("C*", $mask);
+  my $idx = 0;
+  $msg = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $msg));
+  return $opcode.$lb.$mask.$msg;
+}
+
+
+sub
 DevIo_DecodeWS($$)
 {
   my ($hash, $buf) = @_;
@@ -140,19 +167,6 @@ DevIo_DecodeWS($$)
   my $mask = (ord(substr($data,1,1)) & 0x80)?1:0;
   my $len  = (ord(substr($data,1,1)) & 0x7F);
   my $i = 2;
-
-  # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
-  Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
-  if($op == 8) {         # Close, Normal, empty mask. #104718
-    syswrite($hash->{TCPDev}, pack("CCn",0x88,0x2,1000));
-    DevIo_CloseDev($hash);
-    return undef;
-
-  } elsif($op == 9) {   # Ping
-    syswrite($hash->{TCPDev}, chr(0x8A).chr(0)); # Pong
-    $hash->{".WSBUF"} = substr($data, 2);
-    return DevIo_DecodeWS($hash, "");
-  }
 
   if( $len == 126 ) {
     return "" if(length($data) < 4);
@@ -178,6 +192,20 @@ DevIo_DecodeWS($$)
     my $idx = 0;
     $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
   }
+
+  # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
+  Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
+  if($op == 8) {         # Close, Normal, empty mask. #104718
+    syswrite($hash->{TCPDev}, DevIo_MaskWS(0x8,$data));
+    DevIo_CloseDev($hash);
+    return undef;
+
+  } elsif($op == 9) {   # Ping
+    syswrite($hash->{TCPDev}, DevIo_MaskWS(0xA, $data)); # Pong
+    $hash->{".WSBUF"} = substr($data, 2);
+    return DevIo_DecodeWS($hash, "");
+  }
+
   return $data;
 }
 
@@ -198,19 +226,7 @@ DevIo_SimpleWrite($$$;$)
     $hash->{USBDev}->write($msg);
 
   } elsif($hash->{TCPDev}) {
-    if($hash->{WEBSOCKET}) {
-      my $len = length($msg);
-      if($len < 126) {
-        $msg = chr(0x81) . chr($len) . $msg;
-      } else {
-        if ($len < 65536) {
-          $msg = chr(0x81) . chr(0x7E) . pack('n', $len) . $msg;
-        } else {
-          $msg = chr(0x81) . chr(0x7F) . chr(0x00) . chr(0x00) .
-                 chr(0x00) . chr(0x00) . pack('N', $len) . $msg;
-        }
-      }
-    }
+    $msg = DevIo_MaskWS($hash->{binary} ? 0x2:0x1, $msg) if($hash->{WEBSOCKET});
     syswrite($hash->{TCPDev}, $msg);
 
   } elsif($hash->{DIODev}) { 
