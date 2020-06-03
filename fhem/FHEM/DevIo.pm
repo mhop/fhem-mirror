@@ -137,10 +137,9 @@ DevIo_MaskWS($$)
     $lb = chr(0x80+$len);
   } else {
     if ($len < 65536) {
-      $lb = chr(0x8E) . pack('n', $len);
+      $lb = chr(0xFE).pack('n',$len);
     } else {
-      $lb = chr(0x8F) . chr(0x00) . chr(0x00) .
-            chr(0x00) . chr(0x00) . pack('N', $len);
+      $lb = chr(0xFF).chr(0x00).chr(0x00).chr(0x00).chr(0x00).pack('N',$len);
     }
   }
 
@@ -151,6 +150,17 @@ DevIo_MaskWS($$)
   return $opcode.$lb.$mask.$msg;
 }
 
+my %wsCloseCode = (
+  1000=>"normal",
+  1001=>"going away",
+  1002=>"protocol error",
+  1003=>"cannot accept datatype",
+  1007=>"inconsistent data",
+  1008=>"policy violation",
+  1009=>"too big",
+  1010=>"missing extension",
+  1011=>"unexpected condition"
+);
 
 sub
 DevIo_DecodeWS($$)
@@ -195,7 +205,11 @@ DevIo_DecodeWS($$)
 
   # $op: 0=>Continuation, 1=>Text, 2=>Binary, 8=>Close, 9=>Ping, 10=>Pong
   Log3 $hash, 5, "Websocket msg: OP:$op LEN:$len MASK:$mask FIN:$fin";
-  if($op == 8) {         # Close, Normal, empty mask. #104718
+  if($op == 8) {         # Close
+    my $clCode = unpack("n", substr($data,0,2));
+    $clCode = "$clCode ($wsCloseCode{$clCode})" if($wsCloseCode{$clCode});
+    $clCode .= " ".substr($data, 2) if($len > 2);
+    Log3 $hash, 5, "Websocket close, reason: $clCode";
     syswrite($hash->{TCPDev}, DevIo_MaskWS(0x8,$data));
     DevIo_CloseDev($hash);
     return undef;
