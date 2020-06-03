@@ -71,6 +71,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.25.0" => "03.06.2020  set reading 'stoptime' in type 'stopwatch' ",                               
   "0.24.0" => "26.05.2020  entry of countDownInit can be in format <seconds> ",
   "0.23.2" => "20.05.2020  english commandref ",
   "0.23.1" => "10.05.2020  some more changes for PBP severity 3 ",
@@ -169,7 +170,7 @@ sub Define {
   }
   
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);      # Modul Meta.pm nicht vorhanden
-  $hash->{MODEL}                 = $a[2];
+  $hash->{MODEL}                 = uc($a[2]);
   
   setVersionInfo($hash);                                      # Versionsinformationen setzen
   
@@ -190,7 +191,6 @@ sub Set {                                                    ## no critic 'compl
   my $prop1 = $a[3];
   my $prop2 = $a[4];
   my $prop3 = $a[5];
-  my $model = $hash->{MODEL};
   my $addp  = AttrVal($name, "digitalDisplayPattern", "watch");
     
   return if(IsDisabled($name));
@@ -497,7 +497,8 @@ sub digitalWatch {
     var tticker_$d         = '$rdtt';                 // Tickereinstellung initialisieren
     var zmodulo_$d         = 0;                       // Hilfszähler
     var distBorderright_$d = '$bdist';                // Abstand zum rechten Rand
-    var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand    
+    var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand   
+    var allowSetStopTime;                             // erlaube / verbiete Setzen Reading stoptime 
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1082,11 +1083,12 @@ sub digitalWatch {
     }
     
     // localStorage Set 
-    function localStoreSet_$d (hours, minutes, seconds, sumsecs) {
-        if (Number.isInteger(hours))   { localStorage.setItem('h_$d',  hours);   }
-        if (Number.isInteger(minutes)) { localStorage.setItem('m_$d',  minutes); }
-        if (Number.isInteger(seconds)) { localStorage.setItem('s_$d',  seconds); }
-        if (Number.isInteger(sumsecs)) { localStorage.setItem('ss_$d', sumsecs); }
+    function localStoreSet_$d (hours, minutes, seconds, sumsecs, aSetStopT) {
+        if (Number.isInteger(hours))     { localStorage.setItem('h_$d',   hours);     }
+        if (Number.isInteger(minutes))   { localStorage.setItem('m_$d',   minutes);   }
+        if (Number.isInteger(seconds))   { localStorage.setItem('s_$d',   seconds);   }
+        if (Number.isInteger(sumsecs))   { localStorage.setItem('ss_$d',  sumsecs);   }
+        if (Number.isInteger(aSetStopT)) { localStorage.setItem('ast_$d', aSetStopT); }
     }
     
     // localStorage speichern letzte Alarmzeit
@@ -1190,7 +1192,9 @@ sub digitalWatch {
                             } 
                   );
             
-            if (state_$d == 'started' || state_$d == 'resumed') {                 
+            if (state_$d == 'started' || state_$d == 'resumed') { 
+                localStoreSet_$d        (NaN, NaN, NaN, NaN, 1);                     // set Reading stoptime freischalten
+                
                 if (modulo2_$d != zmodulo_$d) {
                     command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
                     url_$d  = makeCommand(command);
@@ -1248,6 +1252,16 @@ sub digitalWatch {
                 
                 sumsecs_$d = parseInt(hours_$d*3600) + parseInt(minutes_$d*60) + parseInt(seconds_$d);
                 localStoreSet_$d        (NaN, NaN, NaN, sumsecs_$d);
+                
+                allowSetStopTime = localStorage.getItem('ast_$d');
+                if(allowSetStopTime == 1) {
+                    ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);             // Reading mit Stoppzeit setzen
+
+                    command = '{ CommandSetReading(undef, "$d stoptime '+ddt_$d+'") }';
+                    url_$d  = makeCommand(command);
+                    \$.get(url_$d);
+                }
+                localStoreSet_$d        (NaN, NaN, NaN, NaN, 0);                      // set Reading stoptime verbieten
             }
 
             if (state_$d == 'initialized') {
@@ -1256,7 +1270,7 @@ sub digitalWatch {
                 seconds_$d = 0;
 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm_$d ('$d', 'NaN');                                  // letzte Alarmzeit zurücksetzen                
+                localStoreSetLastalm_$d ('$d', 'NaN');                                  // letzte Alarmzeit zurücksetzen                 
             }
         }
         
@@ -1555,7 +1569,7 @@ sub stationWatch {
               command = '{ CommandSetReading(undef, "$d alarmed '+acttime+'") }';
               url_$d  = makeCommand(command);
               
-              localStoreSetLastalm_$d (dev, acttime);                                        // aktuelle Alarmzeit sichern 
+              localStoreSetLastalm_$d (dev, acttime);                                          // aktuelle Alarmzeit sichern 
               
               if(acttime == almtime) {
                  \$.get(url_$d);
@@ -1745,7 +1759,7 @@ sub stationWatch {
                   modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
 
                   if (modulo2_$d != zmodulo_$d) {
-                      command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';     // alarmTime Reading lesen
+                      command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';           // alarmTime Reading lesen
                       url_$d  = makeCommand(command);
                       \$.get( url_$d, function (data) {
                                           almtime0_$d = data.replace(/\\n/g, '');
