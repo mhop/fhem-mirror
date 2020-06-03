@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8
+#  Version 4.8.002
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -100,7 +100,7 @@ use vars qw(%HMCCU_SCRIPTS);
 # Command-Defintion:
 #   Command => 'Datapoint-Definition [...]'
 # Datapoint-Definition:
-#   Paramset:Datapoint:FixedValue[,FixedValue]
+#   Paramset:Datapoint:[Parameter=]FixedValue[,FixedValue]
 #   Paramset:Datapoint:?Parameter
 #   Paramset:Datapoint:?Parameter=Default-Value
 #   Paramset:Datapoint:#Parameter
@@ -115,21 +115,21 @@ use vars qw(%HMCCU_SCRIPTS);
 
 %HMCCU_ROLECMDS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		'on' => 'V:MOTION_DETECTION_ACTIVE:true',
-		'off' => 'V:MOTION_DETECTION_ACTIVE:false'
+		'on' => 'V:MOTION_DETECTION_ACTIVE:active=true',
+		'off' => 'V:MOTION_DETECTION_ACTIVE:active=false'
 	},
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'
 	},
 	'KEY' => {
-		'on' => 'V:PRESS_SHORT:true',
-		'off' => 'V:PRESS_SHORT:true',
-		'press' => 'V:PRESS_SHORT:true'
+		'on' => 'V:PRESS_SHORT:1',
+		'off' => 'V:PRESS_SHORT:1',
+		'press' => 'V:PRESS_SHORT:1'
 	},
 	'KEY_TRANSCEIVER' => {
-		'on' => 'V:PRESS_SHORT:true',
-		'off' => 'V:PRESS_SHORT:true',
-		'press' => 'V:PRESS_SHORT:true'
+		'on' => 'V:PRESS_SHORT:1',
+		'off' => 'V:PRESS_SHORT:1',
+		'press' => 'V:PRESS_SHORT:1'
 	},
 	'BLIND' => {
 		'pct' => 'V:LEVEL:?level',
@@ -137,7 +137,7 @@ use vars qw(%HMCCU_SCRIPTS);
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+10',
 		'down' => 'V:LEVEL:?delta=-10',
-		'stop' => 'V:STOP:true'
+		'stop' => 'V:STOP:1'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'pct' => 'V:LEVEL:?level',
@@ -145,7 +145,7 @@ use vars qw(%HMCCU_SCRIPTS);
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+10',
 		'down' => 'V:LEVEL:?delta=-10',
-		'stop' => 'V:STOP:true'
+		'stop' => 'V:STOP:1'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'pct' => 'V:LEVEL:?level',
@@ -153,30 +153,34 @@ use vars qw(%HMCCU_SCRIPTS);
 		'close' => 'V:LEVEL:0',
 		'up' => 'V:LEVEL:?delta=+10',
 		'down' => 'V:LEVEL:?delta=-10',
-		'stop' => 'V:STOP:true'
+		'stop' => 'V:STOP:1'
 	},
 	'SWITCH' => {
-		'on' => 'V:STATE:true',
-		'off' => 'V:STATE:false'
+		'on' => 'V:STATE:1',
+		'off' => 'V:STATE:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?duration V:STATE:1'
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {
-		'on' => 'V:STATE:true',
-		'off' => 'V:STATE:false'
+		'on' => 'V:STATE:1',
+		'off' => 'V:STATE:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?duration V:STATE:1'
 	},
 	'DIMMER' => {
-		'pct' => 'V:LEVEL:?level',
+		'pct' => 'V:LEVEL:?level V:ON_TIME:?time=0.0 V:RAMP_TIME:?ramp=0.5',
 		'on' => 'V:LEVEL:100',
 		'off' => 'V:LEVEL:0',
-		'stop' => 'V:RAMP_STOP:true'
+		'stop' => 'V:RAMP_STOP:1'
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
-		'pct' => 'V:LEVEL:?level',
+		'pct' => 'V:LEVEL:?level V:ON_TIME:?time V:RAMP_TIME:?ramp',
 		'on' => 'V:LEVEL:100',
 		'off' => 'V:LEVEL:0'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'desired-temp' => 'V:SET_TEMPERATURE:?temperature',
-		'manu' => 'V:MANU_MODE:?temperature',
+		'manu' => 'V:MANU_MODE:?temperature=20',
 		'on' => 'V:MANU_MODE:30.5',
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
@@ -185,7 +189,7 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_TEMPERATURE:?temperature',
-		'manu' => 'V:MANU_MODE:?temperature',
+		'manu' => 'V:MANU_MODE:?temperature=20',
 		'on' => 'V:MANU_MODE:30.5',
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
@@ -196,7 +200,7 @@ use vars qw(%HMCCU_SCRIPTS);
 		'auto' => 'V:CONTROL_MODE:0',
 		'manu' => 'V:CONTROL_MODE:1',
 		'holiday' => 'V:CONTROL_MODE:2',
-		'boost' => 'V:BOOST_MODE:true',
+		'boost' => 'V:BOOST_MODE:1',
 		'on' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:30.5',
 		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5'
 	}
@@ -243,12 +247,12 @@ use vars qw(%HMCCU_SCRIPTS);
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
-		'webCmd' => 'desired-temp',
+		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
-		'webCmd' => 'desired-temp:auto:manu:boost',
+		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	}
 );
