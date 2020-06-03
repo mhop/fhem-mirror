@@ -25,7 +25,7 @@ par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
 par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
-par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
+par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
 defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVCID bridgeRegexp \
@@ -39,7 +39,10 @@ attr DEVCID bridgeRegexp \
   (wled)[/]([^/]+)[/].*:.* "$1_$2"\
   (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
   (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"\
-  Advantech[/]([^/]+)[/].*:.* "$1"
+  Advantech[/]([^/]+)[/].*:.* "$1"\
+  sonos[/](RINCON_[A-Z0-9]+):.* "$1"\
+  (sonos)[/][^/]+/.* "$1"\
+  (tvheadend)[/][^/:]+.* "$1"  
 attr DEVCID autocreate 1
 attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
 attr DEVCID room NEWDEVROOM
@@ -53,7 +56,7 @@ setreading DEVCID associatedWith DEVICE
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVCID model MQTT2_CLIENT_general_bridge
-setreading DEVCID attrTemplateVersion 20200523
+setreading DEVCID attrTemplateVersion 20200603
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -3287,6 +3290,8 @@ desc:The sonos2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 order:M_05
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
+attr DEVICE icon ICON
 attr DEVICE bridgeRegexp\
   BASE_TOPIC/(RINCON_[A-Z0-9]+):.* "$1"
 attr DEVICE readingList\
@@ -3294,7 +3299,10 @@ attr DEVICE readingList\
   homeassistant/music_player/RINCON_([0-9A-Z]+)/sonos/config:.* { $TOPIC =~ m,(RINCON_[0-9A-Z]+),; { "config_$1"=>$EVENT }}\
   BASE_TOPIC/status/[^/]+/avtransport:.* {}\
   BASE_TOPIC/status/[^/]+/renderingcontrol:.* {}
+attr DEVICE model sonos2mqtt_bridge
+setreading DEVICE attrTemplateVersion 20200603
 
+  
 name:sonos2mqtt_speaker
 desc:A sonos2mqtt speaker device
 filter:TYPE=MQTT2_DEVICE
@@ -3302,6 +3310,8 @@ order:M_05a
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;techname of the device ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/](RINCON_[0-9A-Z]+):.*, ? $1 : undef }
 par:DEVNAME;friendly name as set in sonos gadget itself;{ lc(ReadingsVal("DEVICE","name","unknown")) }
+par:ICON;ICON as set, defaults to audio_volume_low;{ AttrVal("DEVICE","icon","audio_volume_low") }
+attr DEVICE icon ICON
 attr DEVICE readingList\
   BASE_TOPIC/status/DEVNAME/avtransport:.* { json2nameValue($EVENT,'AV_',$JSONMAP) }\
   BASE_TOPIC/status/DEVNAME/renderingcontrol:.* { json2nameValue($EVENT,'REND_',$JSONMAP) }\
@@ -3309,7 +3319,13 @@ attr DEVICE readingList\
 attr DEVICE setList\
   stop:noArg BASE_TOPIC/DEV_ID/control { "command": "stop" }\
   play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
-  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }
+  pause:noArg BASE_TOPIC/DEV_ID/control { "command": "pause" }\
+  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
+  mute:on,off { my $value = $EVTPART1 eq "on" ? "mute" : "unmute";; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
+  next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
+  previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }
+attr DEVICE model sonos2mqtt_speaker
+setreading DEVICE attrTemplateVersion 20200603
 
 
 ###########################################
