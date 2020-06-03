@@ -134,10 +134,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.0" => "03.06.2020  refactoring login process ",
+  "2.10.0" => "03.06.2020  refactored login process ",
   "2.9.0"  => "01.06.2020  add get today statistic data ",
   "2.8.1"  => "31.05.2020  attribute timeout, maxCallCycle deleted ",
-  "2.8.0"  => "31.05.2020  refactoring process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
+  "2.8.0"  => "31.05.2020  refactored process logic, attribute cookielifetime & getDataRetries deleted, command delCookieFile deleted ".
                            "new attribute maxCallCycle ",
   "2.7.2"  => "28.05.2020  delete cookie file if threshold of read retries reached ",
   "2.7.1"  => "28.05.2020  change cookie default location to ./log/<name>_cookie.txt ",
@@ -880,55 +880,7 @@ sub GetSetData {                                                       ## no cri
   if(!$login_state) {
       $st = encode_base64 ( $state,"");
       return "$name|0|0|$login_state|$getp|$setp|$st";
-  }
-  
-
-  
-  ### Live-Daten abrufen 
-  #########################
-  Log3 ($name, 4, "$name - Getting Live data");
-  
-  my $livedata = $ua->get( 'https://www.sunnyportal.com/homemanager?t='.$time );      # V2.6.2
-  $livedata_content = $livedata->content;                                                  # JSON Live Daten
-
-  Log3 ($name, 5, "$name - Liva Data received:\n".Dumper ($livedata_content)) if($v5d eq "liveData");
-
-  ($reread,$retry,$login_state,$state) = analyzeData($hash,$login_state,$state,$livedata);
-  
-  if(!$login_state) {
-      $st = encode_base64 ( $state,"");
-      return "$name|0|0|$login_state|$getp|$setp|$st";
-  }
-  
-  goto &GetSetData if($reread);
-  
-  # Wiederholung Datenabruf innerhalb eines Cycle
-  my $retc  = $hash->{HELPER}{RETRIES};                                                    # aktuelle Retry-Zähler
-  
-  if($setp eq "none" && $retry && $retc < $maxretries) {                                   # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
-      $hash->{HELPER}{RETRIES}++;
-      if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
-          Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
-          sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
-          $exceed = 1;
-          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", "NULL", $hash->{HELPER}{RETRIES}], 1);
-          return "$name|$exceed|$newcycle|$login_state|$getp|$setp";                
-      }
-      
-      sleep $sleepretry;                                                     
-      goto &GetSetData;
   }  
-
-  # Wiederholung Datenabruf in einem neuen Cycle
-  my $ac        = $hash->{HELPER}{ACTCYCLE};
-  my $maxcycles = (controlParams $name)[1];
-  if($setp eq "none" && $retry && $ac < $maxcycles) {                                      # neuer Zyklus (nicht wenn Verbraucher schalten)     
-      Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
-      $newcycle = 1;
-      return "$name|$exceed|$newcycle|$login_state|$getp|$setp";          
-  }
-  
-  
   
   ### Verbraucher schalten
   #######################################
@@ -961,12 +913,57 @@ sub GetSetData {                                                       ## no cri
   } 
   
   ### Daten abrufen 
-  #########################
+  #############################
   if($getp ne "none") { 
 
       my $dl = AttrVal($name, "detailLevel", 1);                                  # selcted Detail Level  
       
-      # JSON Wetterdaten
+      ### JSON Live-Daten
+      ####################
+      Log3 ($name, 4, "$name - Getting Live data");
+      
+      my $livedata = $ua->get( 'https://www.sunnyportal.com/homemanager?t='.$time );           # V2.6.2
+      $livedata_content = $livedata->content;                                                  # JSON Live Daten
+
+      Log3 ($name, 5, "$name - Liva Data received:\n".Dumper ($livedata_content)) if($v5d eq "liveData");
+
+      ($reread,$retry,$login_state,$state) = analyzeData($hash,$login_state,$state,$livedata);
+      
+      if(!$login_state) {
+          $st = encode_base64 ( $state,"");
+          return "$name|0|0|$login_state|$getp|$setp|$st";
+      }
+      
+      goto &GetSetData if($reread);
+      
+      # Wiederholung Datenabruf innerhalb eines Cycle
+      my $retc  = $hash->{HELPER}{RETRIES};                                                    # aktuelle Retry-Zähler
+      
+      if($setp eq "none" && $retry && $retc < $maxretries) {                                   # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
+          $hash->{HELPER}{RETRIES}++;
+          if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+              Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
+              sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
+              $exceed = 1;
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", "NULL", $hash->{HELPER}{RETRIES}], 1);
+              return "$name|$exceed|$newcycle|$login_state|$getp|$setp";                
+          }
+          
+          sleep $sleepretry;                                                     
+          goto &GetSetData;
+      }  
+
+      # Wiederholung Datenabruf in einem neuen Cycle
+      my $ac        = $hash->{HELPER}{ACTCYCLE};
+      my $maxcycles = (controlParams $name)[1];
+      if($setp eq "none" && $retry && $ac < $maxcycles) {                                      # neuer Zyklus (nicht wenn Verbraucher schalten)     
+          Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
+          $newcycle = 1;
+          return "$name|$exceed|$newcycle|$login_state|$getp|$setp";          
+      }
+      
+      ### JSON Wetterdaten
+      #####################
       Log3 ($name, 4, "$name - Getting weather data");
       
       my $weatherdata      = $ua->get('https://www.sunnyportal.com/Dashboard/Weather');
@@ -978,7 +975,8 @@ sub GetSetData {                                                       ## no cri
       }
       
       
-      # JSON Statistic Data Tag (anchorTime beachten !) 
+      ### JSON Statistic Data Tag (anchorTime beachten !)
+      ####################################################      
       Log3 ($name, 4, "$name - Getting statistic day data");
       
       my $req = HTTP::Request->new( 'POST', 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues' );                              
@@ -1000,7 +998,8 @@ sub GetSetData {                                                       ## no cri
       }
       
       
-      # JSON Forecast Daten
+      ### JSON Forecast Daten
+      ########################
       if($dl > 1) {
           Log3 ($name, 4, "$name - Getting forecast data");
 
@@ -1013,7 +1012,8 @@ sub GetSetData {                                                       ## no cri
           }
       }
       
-      # JSON Consumer Livedaten und historische Energiedaten
+      ### JSON Consumer Livedaten und historische Energiedaten
+      #########################################################
       if($dl > 2) {
           Log3 ($name, 4, "$name - Getting consumer live data");
 
@@ -1986,10 +1986,14 @@ return 1;
 #                 analysiere abgerufene Daten
 ################################################################
 sub analyzeData {                                                          ## no critic 'complexity'
-  my ($hash,$login_state,$state,$ad) = @_;
-  my $name                           = $hash->{NAME};
-  my ($reread,$retry)                = (0,0);
+  my $hash            = shift;
+  my $login_state     = shift;
+  my $state           = shift;
+  my $ad              = shift;
+  my $name            = $hash->{NAME};
+  my ($reread,$retry) = (0,0);
   my $data = "";
+  my @da   = ();
     
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
@@ -1998,48 +2002,47 @@ sub analyzeData {                                                          ## no
 
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
-  if (ref $data eq "HASH") {
-      for my $k (keys %$data) {
-          my $new_val = "";
-          
-          if (defined $data->{$k}) {
-              if (($data->{$k} =~ m/ARRAY/ix) || ($data->{$k} =~ m/HASH/ix)) {
-                  if($data->{$k} =~ m/ARRAY/ix) {
-                      my $val = Dumper($data->{$k}[0]);
-                      next if(!$val);
-                      chomp $val;
-                      $val =~ s/[;']//gx;
-                      $val = ($val =~ /^undef$/x)? "none" : $val;
-                      $new_val = $val;
-                  }
-              
-              } else {
-                  $new_val = $data->{$k};
-              }
+  if(ref $data eq "HASH") {
+      for my $k (keys %{$data}) {
+          my $val = $data->{$k};
+          next if(!defined $val);
 
-              if ($new_val && $k !~ /__type/ix) {
-                  if($k =~ m/WarningMessages/x && $new_val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                      Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
-                      $retry = 1;
-                      return ($reread,$retry,$login_state,$state);
-                  }
-                  if($k =~ m/WarningMessages/x && $new_val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                      Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
-                      $retry = 1;
-                      return ($reread,$retry,$login_state,$state);
-                  }  
-                  if($k =~ m/ErrorMessages/x && $new_val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                      # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                      Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
-                      $retry = 1;
-                      return ($reread,$retry,$login_state,$state);
-                  }              
-                  if($k =~ m/ErrorMessages/x && $new_val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                      # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                      Log3 $name, 3, "$name - Live data can't be retrieved. $attstr";
-                      $retry = 1;
-                      return ($reread,$retry,$login_state,$state);
-                  }
+          if(ref $val eq "ARRAY") {
+              for my $a (@{$val}) {                    
+                  push @da, $a;
+              }
+          }
+          
+          if(ref $val eq "HASH") {
+              for my $b (keys %{$val}) {                    
+                  push @da, $b;
+              }              
+          }
+          
+          $val = join " ", @da if(@da);
+
+          if ($val && $k !~ /__type/ix) {
+              if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$login_state,$state);
+              }
+              if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$login_state,$state);
+              }  
+              if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$login_state,$state);
+              }              
+              if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+                  Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$login_state,$state);
               }
           }
       }
@@ -2132,8 +2135,8 @@ sub PortalAsHtml {                                                              
   
   # Kontext des aufrufenden SMAPortalSPG-Devices speichern für Refresh
   $hash->{HELPER}{SPGDEV}    = $wlname;                                                 # Name des aufrufenden SMAPortalSPG-Devices
-  $hash->{HELPER}{SPGROOM}   = $FW_room?$FW_room:"";                                    # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
-  $hash->{HELPER}{SPGDETAIL} = $FW_detail?$FW_detail:"";                                # Name des SMAPortalSPG-Devices (wenn Detailansicht)
+  $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                            # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
+  $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                            # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
   my $dl  = AttrVal    ($name, "detailLevel", 1);
   my $pv0 = ReadingsNum($name, "L2_ThisHour_PvMeanPower",   undef);
@@ -2162,7 +2165,7 @@ sub PortalAsHtml {                                                              
       return $ret;
   }
 
-  @pgCDev = split(',',AttrVal($wlname,"consumerList",""));                              # definierte Verbraucher ermitteln
+  @pgCDev                  = split(',',AttrVal($wlname,"consumerList",""));             # definierte Verbraucher ermitteln
   ($legend_style, $legend) = split('_',AttrVal($wlname,'consumerLegend','icon_top'));
 
   $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
