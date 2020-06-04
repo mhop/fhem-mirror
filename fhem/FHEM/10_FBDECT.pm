@@ -88,7 +88,10 @@ FBDECT_SetHttp($@)
   my ($hash, @a) = @_;
   my %cmd;
   my $p = $hash->{props};
-  my $unittype = ReadingsVal($hash->{NAME}, "unittype", "");
+  my $name = $hash->{NAME};
+  my $unittype = ReadingsVal($name, "unittype", "");
+
+  $cmd{raw} = "textField";
 
   if($p =~ m/switch/) {
     $cmd{off} = $cmd{on} = $cmd{toggle} = "noArg";
@@ -110,7 +113,6 @@ FBDECT_SetHttp($@)
   SetExtensionsCancel($hash);
 
   my $cmd = $a[1];
-  my $name = $hash->{NAME};
   return "" if(IsDisabled($name));
   Log3 $name, 3, "FBDECT set $name $cmd";
 
@@ -146,6 +148,15 @@ FBDECT_SetHttp($@)
     IOWrite($hash, ReadingsVal($name,"AIN",0),"setblind&target=$cmd");
     return undef;
   }
+
+  if($cmd eq "raw") {
+    shift @a; shift @a;
+    return "Usage set $name raw <arguments>" if(!@a);
+    IOWrite($hash, ReadingsVal($name,"AIN",0),join("&", @a));
+    return undef;
+  }
+
+  return "Internal Error, unknown command $cmd";
 }
 
 ###################################
@@ -664,6 +675,11 @@ FBDECT_Undef($$)
   <li>msgInterval &lt;sec&gt;<br>
     Number of seconds between the sensor messages (FBAHA IODev only).
     </li>
+
+  <li>raw ...<br>
+    Used for debugging.<br>
+    Sends switchcmd=..., further parameters are joined with &amp;.
+    </li>
   </ul>
   <br>
 
@@ -768,6 +784,11 @@ FBDECT_Undef($$)
   <li>msgInterval &lt;sec&gt;<br>
     Anzahl der Sekunden zwischen den Sensornachrichten (nur mit FBAHA als
     IODev).
+    </li>
+
+  <li>raw ...<br>
+    Dient zum debuggen.<br>
+    Sendet switchcmd=..., weitere Parameter werden per &amp; zusammengeklebt.
     </li>
   </ul>
   <br>
