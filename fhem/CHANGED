@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix shading drive out of closed Pos
  - feature: 60_Watches: set reading 'stoptime' in digital stopwatch
  - feature: 58_HVAC_DaikinAC: added on and off shortcut commands so that
             the module works out-of-the box with other modules that

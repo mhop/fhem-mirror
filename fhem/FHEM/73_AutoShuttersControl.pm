@@ -2478,10 +2478,15 @@ sub ShadingProcessing {
             || $shutters->getModeUp eq 'off'
         )
         && (
-            ( int( gettimeofday() ) - $shutters->getShadingStatusTimestamp ) < 2
+            (
+                (
+                    int( gettimeofday() ) -
+                    $shutters->getShadingStatusTimestamp
+                ) < 2
+                && $shutters->getStatus != $shutters->getClosedPos
+            )
             || (  !$shutters->getQueryShuttersPos( $shutters->getShadingPos )
-                && $shutters->getIfInShading
-                && $shutters->getStatus != $shutters->getShadingPos )
+                && $shutters->getIfInShading )
             || (  !$shutters->getIfInShading
                 && $shutters->getStatus == $shutters->getShadingPos )
         )
@@ -8454,7 +8459,7 @@ sub getBlockAscDrivesAfterManual {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.8.31",
+  "version": "v0.8.32",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
