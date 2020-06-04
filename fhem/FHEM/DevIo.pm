@@ -466,8 +466,6 @@ DevIo_OpenDev($$$;$)
       return &$doCb('websocket is only supported with callback') if(!$callback);
     }
     $path = "/" if(!defined($path) || $path eq "");
-Log 1, "P:>$path<";
-    
 
     # This part is called every time the timeout (5sec) is expired _OR_
     # somebody is communicating over another TCP connection. As the connect
@@ -480,7 +478,6 @@ Log 1, "P:>$path<";
     delete($readyfnlist{"$name.$dev"});
     my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
 
-    
     # Do common TCP/IP "afterwork":
     # if connected: set keepalive, fill selectlist, FD, TCPDev.
     # if not: report the error and schedule reconnect
@@ -531,6 +528,7 @@ Log 1, "P:>$path<";
         keepalive=>$proto eq "ws:" ? 1 : 0,
         httpversion=>$proto eq "ws:" ? "1.1" : "1.0",
         header  => \%header,
+        sslargs => $hash->{sslargs},
         callback=> sub() {
           my ($h, $err, undef) = @_;
           $err = "HTTP CODE $h->{code}"
