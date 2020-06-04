@@ -733,7 +733,7 @@ sub controlParams {
   }
 
   # max Anzahl Zyklen
-  $maxcycles = int(($interval - $buffer) / $ctime); 
+  $maxcycles = int(($interval - $buffer) / $ctime) if($ctime); 
 
   # Timeout kalkulieren
   $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
@@ -1380,9 +1380,10 @@ return ($err);
 ################################################################
 ##         Auswertung Forecast Daten
 ################################################################
-sub extractForecastData {                                          ## no critic 'complexity'                      
+sub extractForecastData {              ## no critic 'complexity'                      
   my ($hash,$forecast) = @_;
-  my $name = $hash->{NAME};
+  my $name             = $hash->{NAME};
+  my @da               = ();
   
   my $dl = AttrVal($name, "detailLevel", 1);
   
@@ -1405,8 +1406,6 @@ sub extractForecastData {                                          ## no critic 
       Log3 ($name, 4, "$name - Plant ID  not set !");
   }
   
-  
-  readingsBeginUpdate($hash);
 
   # Counter for forecast objects
   my $obj_nr = 0;
@@ -1476,21 +1475,21 @@ sub extractForecastData {                                          ## no critic 
               my $time_str = "ThisHour";
               $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
               if($time_str =~ /NextHour/x && $dl >= 4) {
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
-                  readingsBulkUpdate( $hash, "L4_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
-                  readingsBulkUpdate( $hash, "L4_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L4_${time_str}_Total", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+                  push @da, "L4_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                     
+                  push @da, "L4_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                        # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                    
+                  push @da, "L4_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                         # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
+                  push @da, "L4_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
+                  push @da, "L4_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
                   
                   # add WeatherId Helper to show weather icon
                   $hash->{HELPER}{"L4_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});       
               }
               if($time_str =~ /ThisHour/x && $dl >= 2) {
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Time", TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind) );
-                  readingsBulkUpdate( $hash, "L2_${time_str}_PvMeanPower", int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh" );                                     # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Consumption", int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh" );                      # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
-                  readingsBulkUpdate( $hash, "L2_${time_str}_IsConsumptionRecommended", ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no") );
-                  readingsBulkUpdate( $hash, "L2_${time_str}_Total", (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh" );
+                  push @da, "L2_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                    
+                  push @da, "L2_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                       # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                 
+                  push @da, "L2_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                        # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
+                  push @da, "L2_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
+                  push @da, "L2_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
                   
                   # add WeatherId Helper to show weather icon
                   $hash->{HELPER}{"L2_".${time_str}."_WeatherId"} = int($fc_obj->{'WeatherId'}) if(defined $fc_obj->{'WeatherId'});            
@@ -1503,20 +1502,27 @@ sub extractForecastData {                                          ## no critic 
   }
   
   if($dl >= 2) {
-      readingsBulkUpdate($hash, "L2_Next04Hours_Consumption",              int( $nextFewHoursSum{'Consumption'} )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours_PV",                       int( $nextFewHoursSum{'PV'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours_Total",                    int( $nextFewHoursSum{'Total'}       )." Wh" );
-      readingsBulkUpdate($hash, "L2_Next04Hours_IsConsumptionRecommended", int( $nextFewHoursSum{'ConsumpRcmd'} )." h"  );
-      readingsBulkUpdate($hash, "L2_ForecastToday_Consumption",            $consum_sum." Wh" );                           
-      readingsBulkUpdate($hash, "L2_ForecastToday_PV",                     $PV_sum." Wh");                                 
-      readingsBulkUpdate($hash, "L2_RestOfDay_Consumption",                int( $restOfDaySum{'Consumption'}    )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_PV",                         int( $restOfDaySum{'PV'}             )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_Total",                      int( $restOfDaySum{'Total'}          )." Wh" );
-      readingsBulkUpdate($hash, "L2_RestOfDay_IsConsumptionRecommended",   int( $restOfDaySum{'ConsumpRcmd'}    )." h"  );
-      readingsBulkUpdate($hash, "L2_Tomorrow_Consumption",                 int( $tomorrowSum{'Consumption'}     )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_PV",                          int( $tomorrowSum{'PV'}              )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_Total",                       int( $tomorrowSum{'Total'}           )." Wh" );
-      readingsBulkUpdate($hash, "L2_Tomorrow_IsConsumptionRecommended",    int( $tomorrowSum{'ConsumpRcmd'}     )." h"  );
+      push @da, "L2_Next04Hours_Consumption:".                  int( $nextFewHoursSum{'Consumption'} )." Wh";
+      push @da, "L2_Next04Hours_PV:".                           int( $nextFewHoursSum{'PV'}          )." Wh";
+      push @da, "L2_Next04Hours_Total:".                        int( $nextFewHoursSum{'Total'}       )." Wh";
+      push @da, "L2_Next04Hours_IsConsumptionRecommended:".     int( $nextFewHoursSum{'ConsumpRcmd'} )." h";
+      push @da, "L2_ForecastToday_Consumption:".                $consum_sum." Wh";    
+      push @da, "L2_ForecastToday_PV:".                         $PV_sum." Wh";
+      push @da, "L2_RestOfDay_Consumption:".                    int( $restOfDaySum{'Consumption'}    )." Wh";
+      push @da, "L2_RestOfDay_PV:".                             int( $restOfDaySum{'PV'}             )." Wh";
+      push @da, "L2_RestOfDay_Total:".                          int( $restOfDaySum{'Total'}          )." Wh";
+      push @da, "L2_RestOfDay_IsConsumptionRecommended:".       int( $restOfDaySum{'ConsumpRcmd'}    )." h";
+      push @da, "L2_Tomorrow_Consumption:".                     int( $tomorrowSum{'Consumption'}     )." Wh";
+      push @da, "L2_Tomorrow_PV:".                              int( $tomorrowSum{'PV'}              )." Wh";
+      push @da, "L2_Tomorrow_Total:".                           int( $tomorrowSum{'Total'}           )." Wh";
+      push @da, "L2_Tomorrow_IsConsumptionRecommended:".        int( $tomorrowSum{'ConsumpRcmd'}     )." h";
+  }
+
+  readingsBeginUpdate($hash);                                   # generiere Readings
+  
+  for my $elem (@da) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
   }
 
   readingsEndUpdate($hash, 1);
@@ -1557,7 +1563,7 @@ sub extractWeatherData {
   readingsBeginUpdate($hash);
   
   for my $elem (@da) {
-      my ($rn,$rval) = split ":", $elem;
+      my ($rn,$rval) = split ":", $elem, 2;
       readingsBulkUpdate($hash, $rn, $rval);      
   }
 
@@ -1594,7 +1600,7 @@ sub extractStatisticData {
   readingsBeginUpdate($hash);                                         # generiere Readings
   
   for my $elem (@da) {
-      my ($rn,$rval) = split ":", $elem;
+      my ($rn,$rval) = split ":", $elem, 2;
       readingsBulkUpdate($hash, $rn, $rval);      
   }
 
@@ -1608,23 +1614,30 @@ return;
 ################################################################
 sub extractPlantData {
   my ($hash,$forecast) = @_;
-  my $name = $hash->{NAME};
+  my $name             = $hash->{NAME};
   my ($amount,$unit);
+  my @da = ();
   
   Log3 ($name, 4, "$name - ##### extracting plant data #### ");
-  
-  readingsBeginUpdate($hash);
   
   my $ppp = $forecast->{'PlantPeakPower'};
   if($ppp) {
       $amount = $forecast->{'PlantPeakPower'}{'Amount'}; 
-      $unit   = $forecast->{'PlantPeakPower'}{'StandardUnit'}{'Symbol'}; 
+      $unit   = $forecast->{'PlantPeakPower'}{'StandardUnit'}{'Symbol'};
+
+      push @da, "L2_PlantPeakPower:$amount $unit";             
+      
       Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Amount\": $amount";
       Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Symbol\": $unit";
   }
 
-  readingsBulkUpdate($hash, "L2_PlantPeakPower", "$amount $unit"); 
+  readingsBeginUpdate($hash);                                         # generiere Readings
   
+  for my $elem (@da) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
   readingsEndUpdate($hash, 1); 
   
 return;
@@ -1638,12 +1651,11 @@ sub extractConsumerData {
   my $name = $hash->{NAME};
   my %consumers;
   my ($key,$val);
+  my @da = ();
   
   my $dl = AttrVal($name, "detailLevel", 1);
   
   Log3 ($name, 4, "$name - ##### extracting consumer data #### ");
-  
-  readingsBeginUpdate($hash);
   
   # Schleife über alle Consumer Objekte
   my $i = 0;
@@ -1686,22 +1698,29 @@ sub extractConsumerData {
                my $rb  = "L3_${cn}_PlannedOpTimeBegin"; 
                my $re  = "L3_${cn}_PlannedOpTimeEnd";
                my $rp  = "L3_${cn}_Planned";
-               if($pos) {             
-                   readingsBulkUpdate($hash, $rb, $pos); 
-                   readingsBulkUpdate($hash, $rp, "yes");                  
+               if($pos) {              
+                   push @da, "$rb:$pos";
+                   push @da, "$rp:yes";                   
                } else {
-                   readingsBulkUpdate($hash, $rb, "undefined"); 
-                   readingsBulkUpdate($hash, $rp, "no");  
+                   push @da, "$rb:undefined";  
+                   push @da, "$rp:no";
                }   
                if($poe) {             
-                   readingsBulkUpdate($hash, $re, $poe);          
+                   push @da, "$re:$poe";              
                } else {
-                   readingsBulkUpdate($hash, $re, "undefined");
+                   push @da, "$re:undefined"; 
                }                  
           }
       }
   }
   
+  readingsBeginUpdate($hash);                                          # generiere Readings
+  
+  for my $elem (@da) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
   readingsEndUpdate($hash, 1); 
   
 return;
@@ -1715,10 +1734,9 @@ sub extractConsumerLiveData {
   my $name = $hash->{NAME};
   my %consumers;
   my ($key,$val,$i,$res);
+  my @da = ();
   
   Log3 ($name, 4, "$name - ##### extracting consumer live data #### ");
-  
-  readingsBeginUpdate($hash);
   
   # allen Consumer Objekte die ID zuordnen
   $i = 0;
@@ -1735,8 +1753,8 @@ sub extractConsumerLiveData {
       $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
       $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
       $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
-
-      readingsBulkUpdate($hash, "L3_${cn}_Power", $cpower." W") if(defined($cpower));      
+ 
+      push @da, "L3_${cn}_Power:".$cpower." W" if(defined $cpower);  
       
       $i++;
   }
@@ -1753,7 +1771,7 @@ sub extractConsumerLiveData {
           my $ltchange         = TimeAdjust($hash,$c->{'Parameters'}[0]{'Timestamp'}{'DateTime'},$tkind);  # letzter Schaltzeitpunkt der Bluetooth-Steckdose (Verbraucher)
           my $cn               = $consumers{"${i}_ConsumerName"};                                          # Verbrauchername
           next if(!$cn);
-          $cn     = replaceJunkSigns($cn);                                                                 # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
+          $cn = replaceJunkSigns($cn);                                                                     # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
           
           if(!$GriSwStt && $GriSwAuto) {
               $res = "off (automatic)";
@@ -1765,14 +1783,21 @@ sub extractConsumerLiveData {
               $res = "undefined";            
           }
           
-          readingsBulkUpdate($hash, "L3_${cn}_Switch", $res);
-          readingsBulkUpdate($hash, "L3_${cn}_SwitchLastTime", $ltchange);
+          push @da, "L3_${cn}_Switch:$res";
+          push @da, "L3_${cn}_SwitchLastTime:$ltchange";
           
           $i++;
       }
   }
   
-  readingsEndUpdate($hash, 1); 
+  readingsBeginUpdate($hash);                                         # generiere Readings
+  
+  for my $elem (@da) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
+  readingsEndUpdate($hash, 1);
   
 return;
 }
