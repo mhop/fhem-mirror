@@ -453,9 +453,9 @@ DevIo_OpenDev($$$;$)
       return &$doCb("");
     }
 
-  } elsif($dev =~ m/^(ws:|wss:)?(.+):([0-9]+)$/) {# TCP (host:port) or websocket
+  } elsif($dev =~ m/^(ws:|wss:)?([^:]+):([0-9]+)(.*?)$/) {# TCP or websocket
    
-    my ($proto, $host, $port) = ($1 ? $1 : "", $2, $3);
+    my ($proto, $host, $port, $path) = ($1 ? $1 : "", $2, $3, $4);
     $dev = "$host:$port";
     if($proto eq "wss:")  {
       $hash->{SSL} = 1;
@@ -465,6 +465,8 @@ DevIo_OpenDev($$$;$)
       require MIME::Base64;
       return &$doCb('websocket is only supported with callback') if(!$callback);
     }
+    $path = "/" if(!defined($path) || $path eq "");
+Log 1, "P:>$path<";
     
 
     # This part is called every time the timeout (5sec) is expired _OR_
@@ -507,22 +509,32 @@ DevIo_OpenDev($$$;$)
 
     if($callback) { # reuse the nonblocking connect from HttpUtils.
       use HttpUtils;
+
+      my %header = ();
+      if($proto eq "ws:") {
+        %header = (
+          "Connection" => "Upgrade",
+          "Upgrade" => "websocket",
+          "Sec-WebSocket-Key"=>encode_base64(pack("H*",createUniqueId()),""),
+          "Sec-WebSocket-Version" => 13
+        );
+      }
+      map { $header{$_} = $hash->{header}{$_} } keys %{$hash->{header}}
+        if($hash->{header});
+
       my $err = HttpUtils_Connect({     # Nonblocking
         timeout => $timeout,
-        url     => $hash->{SSL} ? "https://$dev/" : "http://$dev/",
+        url     => $hash->{SSL} ? "https://$dev$path" : "http://$dev$path",
         NAME    => $hash->{NAME},
         sslargs => $hash->{sslargs} ? $hash->{sslargs} : {},
         noConn2 => $proto eq "ws:" ? 0 : 1,
         keepalive=>$proto eq "ws:" ? 1 : 0,
         httpversion=>$proto eq "ws:" ? "1.1" : "1.0",
-        header  => $proto eq "ws:" ?  {
-            "Connection" => "Upgrade",
-            "Upgrade" => "websocket",
-            "Sec-WebSocket-Key"=>encode_base64(pack("H*",createUniqueId()),""),
-            "Sec-WebSocket-Version" => 13
-          } : undef,
+        header  => \%header,
         callback=> sub() {
           my ($h, $err, undef) = @_;
+          $err = "HTTP CODE $h->{code}"
+                if($proto eq "ws:" && !$err && $h->{code} != 101);
           &$doTcpTail($err ? undef : $h->{conn});
           return &$doCb($err ? $err : &$doTailWork());
         }
