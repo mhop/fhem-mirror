@@ -453,7 +453,7 @@ DevIo_OpenDev($$$;$)
       return &$doCb("");
     }
 
-  } elsif($dev =~ m/^(ws:|wss:)?([^:]+):([0-9]+)(.*?)$/) {# TCP or websocket
+  } elsif($dev =~ m,^(ws:|wss:)?([^/:]+):([0-9]+)(.*?)$,) {# TCP or websocket
    
     my ($proto, $host, $port, $path) = ($1 ? $1 : "", $2, $3, $4);
     $dev = "$host:$port";
