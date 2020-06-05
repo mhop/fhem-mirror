@@ -683,19 +683,19 @@ HttpUtils_DataComplete($)
   if(!defined($hl)) {
     return 0 if($hash->{buf} !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
     my ($hdr, $data) = ($1, $2);
-    if($hdr =~ m/Transfer-Encoding:\s*chunked/si) {
+    if($hdr =~ m/Transfer-Encoding:\s*chunked/i) {
       $hash->{httpheader} = $hdr;
       $hash->{httpdata} = "";
       $hash->{buf} = $data;
       $hash->{httpdatalen} = -1;
 
-    } elsif($hdr =~ m/Content-Length:\s*(\d+)/si) {
+    } elsif($hdr =~ m/Content-Length:\s*(\d+)/i) {
       $hash->{httpdatalen} = $1;
       $hash->{httpheader} = $hdr;
       $hash->{httpdata} = $data;
       $hash->{buf} = "";
 
-    } elsif($hdr =~ m/Connection:\s*Upgrade/i) {
+    } elsif($hdr =~ m/Upgrade:\s*websocket/i) {
       $hash->{httpdatalen} = 0;
       $hash->{httpheader} = $hdr;
       $hash->{httpdata} = $hash->{buf} = "";
