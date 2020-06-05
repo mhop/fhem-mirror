@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 46_TeslaPowerwall2AC: New API Implementation
  - changed: 76_SMAPortal: module refactored, attributes cookielifetime, 
                           getDataRetries, timeout, maxCallCycle are deleted !
  - bugfix:  73_AutoShuttersControl: fix shading drive out of closed Pos
