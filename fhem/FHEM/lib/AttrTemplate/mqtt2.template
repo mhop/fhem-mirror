@@ -798,7 +798,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Applies to Sonoff POW devices<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
+desc:Applies to Sonoff POW devices and other Tasmota flashed devices with power meassuring abilities.<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
@@ -806,13 +806,14 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
-attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
+#devStateIcon causes problems in some cases; therefore deactivated and changed stateFormat to multiline variant
+#attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
+attr DEVICE stateFormat { my $onl = ReadingsVal($name,"LWT","false"); my $ipaddress = ReadingsVal($name,"IPAddress","none"); my $state = ReadingsVal($name,"state","unknown"); my $en_line = sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1")); my $utime = ReadingsVal($name,"Uptime","unknown"); qq(<a href="http://$ipaddress"target="_blank"> \n$state\n uptime: $utime $en_line) }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200604
 
 
 # sonoff 1 channel + USB device flashed with Tasmota.
@@ -2608,7 +2609,7 @@ attr DEVICE stateFormat { my $h=ReadingsNum($name,"heating_active",0); my $t=Rea
 attr DEVICE devStateIcon idle:sani_heating heating:sani_heating@red tapwater:sani_water_hot@red
 attr DEVICE setList wWComfort:select,hot,intelligent BASEPATH/boiler_cmd { "cmd":"comfort", "data": "$EVTPART1" }
 attr DEVICE webCmd wWComfort
-attr DEVICE eventMap Hot:hot Eco:intelligent
+attr DEVICE eventMap hot:Hot intelligent:Eco
 attr DEVICE model ems-esp_boiler
 setreading DEVICE attrTemplateVersion 20200529
 
@@ -3323,7 +3324,8 @@ attr DEVICE setList\
   volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
   mute:on,off { my $value = $EVTPART1 eq "on" ? "mute" : "unmute";; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
   next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
-  previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }
+  previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }\
+  setAVTUri:textField BASE_TOPIC/DEV_ID/control { "command": "setavtransporturi", "input": "$EVTPART1","command": "play" }
 attr DEVICE model sonos2mqtt_speaker
 setreading DEVICE attrTemplateVersion 20200603
 
