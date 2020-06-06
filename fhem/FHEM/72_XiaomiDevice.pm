@@ -68,8 +68,9 @@ my %vacuum_states = ( '0' => "Unknown",
                      '15' => "Docking" ,
                      '16' => "Goto" ,
                      '17' => "Zoned Clean" ,
-                     '18' => "Targeted Clean" ,
-                    '100' => "Fully Charged" , );
+                     '18' => "Segment Clean" ,
+                     '100' => "Fully Charged" ,
+                     '101' => "Device offline" , );
 
 
 my %vacuum_errors = ( '0' => "None",
@@ -95,7 +96,8 @@ my %vacuum_errors = ( '0' => "None",
                      '20' => "Unknown",
                      '21' => "Laser pressure sensor problem",
                      '22' => "Charge sensor problem",
-                     '23' => "Dock problem",
+                     '23' => "Docking problem",
+                     '24' => "Exclusion zone",
                     '254' => "Bin full",
                     '255' => "Internal error" , );
 
@@ -139,7 +141,7 @@ sub XiaomiDevice_Initialize($) {
   $hash->{WriteFn}      = "XiaomiDevice_Write";
   $hash->{DbLog_splitFn}= "XiaomiDevice_DbLog_splitFn";
   $hash->{AttrFn}       = "XiaomiDevice_Attr";
-  $hash->{AttrList}     = "subType:AirPurifier,AirPurifier3H,Humidifier,EvpHumidifier,HumidifierMJJSQ,VacuumCleaner,SmartFan,SmartFan1X,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names map_names ".
+  $hash->{AttrList}     = "subType:AirPurifier,AirPurifier3H,Humidifier,EvpHumidifier,HumidifierMJJSQ,VacuumCleaner,SmartFan,SmartFan1X,SmartLamp,EyeCare,WaterPurifier,Camera,RiceCooker,PowerPlug intervalData intervalSettings preset disable:0,1 zone_names point_names map_names segment_names ".
                           $readingFnAttributes;
 
 }
@@ -218,6 +220,7 @@ sub XiaomiDevice_Define($$$) {
   $hash->{helper}{ip} = $a[2];
   $hash->{helper}{port} = '54321';
 
+  delete($hash->{helper}{packet}) if(defined($hash->{helper}{packet}));
   $hash->{helper}{packetid} = 1;
 
   $hash->{helper}{delay} = 60;
@@ -312,7 +315,7 @@ sub XiaomiDevice_Define($$$) {
 
   XiaomiDevice_ReadZones($hash) if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner");
 
-  InternalTimer( gettimeofday() + 10, "XiaomiDevice_Init", $hash, 0);
+  InternalTimer( gettimeofday() + 10, "XiaomiDevice_Init", $hash);
 
   return undef;
 }
@@ -336,7 +339,8 @@ sub XiaomiDevice_Get($@) {
 
 
 
-  my $usage = "Unknown argument $command, choose one of data:noArg settings:noArg wifi_stats:noArg device_info:noArg";
+  my $usage = "Unknown argument $command, choose one of data:noArg settings:noArg device_info:noArg";
+  $usage .= " wifi_stats:noArg" if(!defined($hash->{model}) || $hash->{model} ne "zhimi.fan.za4");
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner"){
     $usage = "Unknown argument $command, choose one of data:noArg settings:noArg clean_summary:noArg timer_clean:noArg timer_dnd:noArg log_status:noArg serial_number:noArg wifi_stats:noArg device_info:noArg timezone:noArg";
     $usage .= " map sound:noArg" if(!defined($hash->{model}) || $hash->{model} ne "roborock.vacuum.c1");
@@ -606,8 +610,10 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  ' carpet_mode:on,off';
     $list  .=  '  sleep:noArg wakeup:noArg';
 
-    $list  .=  ' fan_power:slider,1,1,100' if(defined($hash->{model}) && $hash->{model} eq "rockrobo.vacuum.v1");
-    $list  .=  ' cleaning_mode:quiet,balanced,turbo,max,mop';
+    $list  .=  ' fan_power:slider,1,1,100' if(!defined($hash->{model}) || $hash->{model} eq "rockrobo.vacuum.v1");
+    $list  .=  ' cleaning_mode:off,quiet,balanced,turbo,max';
+    $list  .=  ',mop' if(!defined($hash->{model}) || ($hash->{model} ne "rockrobo.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1" && $hash->{model} ne "rockrobo.vacuum.m1s"));
+    $list  .=  ',auto' if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.s5e" || $hash->{model} eq "roborock.vacuum.s6" || $hash->{model} eq "roborock.vacuum.t6"));
 
     if(!defined($hash->{model}) || $hash->{model} ne "roborock.vacuum.c1") {
     if(defined($hash->{helper}{zone_names})) {
@@ -632,7 +638,11 @@ sub XiaomiDevice_Set($$@) {
       }
     }
     if(!defined($hash->{model}) || ($hash->{model} ne "roborock.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.m1s roborock.vacuum.s5e roborock.vacuum.s6 roborock.vacuum.t6
-      $list  .=  ' clean_segment clean_segment_stop:noArg clean_segment_resume:noArg';
+      if(defined($hash->{helper}{segment_names})) {
+        $list  .=  ' segment:'.$hash->{helper}{segment_names}.' segment_stop:noArg segment_resume:noArg';
+      } else {
+        $list  .=  ' segment segment_stop:noArg segment_resume:noArg';
+      }
     }
     if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.s5e")) {
       $list  .=  ' water_box_mode:off,low,medium,high,auto';
@@ -693,7 +703,15 @@ sub XiaomiDevice_Set($$@) {
 
   if ($cmd eq 'json')
   {
-    return XiaomiDevice_WriteJSON($hash, join(" ", @arg) );
+    return undef if(!defined($hash->{helper}{dev}));
+
+    my $json = join(" ", @arg);
+    $json =~ /"id":(.*),"method/;
+    my $packetid = $1;
+    $hash->{helper}{packet}{$packetid} = "json_command";
+    Log3 $name, 0, "$name: sending raw json request\n".$json;
+
+    return XiaomiDevice_WriteJSON($hash, $json );
   }
 
   if ($cmd eq 'remotecontrol')
@@ -874,9 +892,9 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "set_custom_mode";
     if($hash->{model} ne "rockrobo.vacuum.v1") {
-      $arg[0] = ($arg[0] eq "quiet") ? "101" : ($arg[0] eq "balanced") ? "102" : ($arg[0] eq "turbo") ? "103" : ($arg[0] eq "max") ? "104" : ($arg[0] eq "mop") ? "105" : ($arg[0] eq "auto") ? "106" : "102";
+      $arg[0] = ($arg[0] eq "off") ? "0" : ($arg[0] eq "quiet") ? "101" : ($arg[0] eq "balanced") ? "102" : ($arg[0] eq "turbo") ? "103" : ($arg[0] eq "max") ? "104" : ($arg[0] eq "mop") ? "105" : ($arg[0] eq "auto") ? "106" : "102";
     } else {
-      $arg[0] = ($arg[0] eq "quiet") ? "38" : ($arg[0] eq "balanced") ? "60" : ($arg[0] eq "turbo") ? "77" : ($arg[0] eq "max") ? "90" : ($arg[0] eq "mop") ? "1" : "60";
+      $arg[0] = ($arg[0] eq "off") ? "0" : ($arg[0] eq "quiet") ? "38" : ($arg[0] eq "balanced") ? "60" : ($arg[0] eq "turbo") ? "77" : ($arg[0] eq "max") ? "90" : ($arg[0] eq "mop") ? "1" : "60";
     }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_custom_mode","params":['.$arg[0].']}' );
   }
@@ -1063,21 +1081,24 @@ sub XiaomiDevice_Set($$@) {
     $hash->{helper}{packet}{$packetid} = "lab_status";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_lab_status","params":['.(($arg[0] eq "yes")?'1':'0').']}' );
   }
-  elsif ($cmd eq 'clean_segment')
+  elsif ($cmd eq 'segment')
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "clean_segment";
+    my $segment = join(",", @arg);
+    $segment = $hash->{helper}{segments}{$arg[0]} if(defined($hash->{helper}{segments}) && defined($hash->{helper}{segments}{$arg[0]}));
+
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_segment_clean","params":['.$arg[0].']}' );
   }
-  elsif ($cmd eq 'clean_segment_stop')
+  elsif ($cmd eq 'segment_stop')
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "clean_segment_stop";
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"stop_segment_clean","params":[]}' );
   }
-  elsif ($cmd eq 'clean_segment_resume')
+  elsif ($cmd eq 'segment_resume')
   {
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
@@ -1623,6 +1644,11 @@ sub XiaomiDevice_Set($$@) {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"s_sound","params":['.($arg[0] eq "off" ? 'false' : 'true' ).']}' );
       return undef;
     }
+    if(defined($hash->{model}) && $hash->{model} eq "zhimi.fan.za4")
+    {
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_buzzer","params":['.($arg[0] eq "off" ? '0' : '2' ).']}' );
+      return undef;
+    }
     XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_buzzer","params":["'.$arg[0].'"]}' );
   }
   elsif ($cmd eq 'led')
@@ -1834,6 +1860,10 @@ sub XiaomiDevice_ReadZones($) {
     delete $hash->{helper}{zone_names};
     delete $hash->{helper}{points};
     delete $hash->{helper}{point_names};
+    delete $hash->{helper}{maps};
+    delete $hash->{helper}{map_names};
+    delete $hash->{helper}{segments};
+    delete $hash->{helper}{segment_names};
     return undef;
   }
 
@@ -1879,6 +1909,20 @@ sub XiaomiDevice_ReadZones($) {
     delete $hash->{helper}{map_names};
   }
 
+  if(defined($attr{$name}) && defined($attr{$name}{segment_names})) {
+    my @definitionnames;
+    my @definitions = split(" ",$attr{$name}{segment_names});
+    foreach my $singledefinition (@definitions) {
+      my @definitionparts = split(":",$singledefinition);
+      push(@definitionnames,$definitionparts[0]);
+      $hash->{helper}{segments}{$definitionparts[0]} = $definitionparts[1];
+    }
+    $hash->{helper}{segment_names} = join(',',@definitionnames);
+  } else {
+    delete $hash->{helper}{segments};
+    delete $hash->{helper}{segment_names};
+  }
+
   return undef;
 }
 
@@ -1895,7 +1939,7 @@ sub XiaomiDevice_GetUpdate($)
   if(defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner")
   {
     my $currentstate = ReadingsVal($name,"state","-");
-    if($currentstate eq "Cleaning" || $currentstate eq "Spot cleaning" || $currentstate eq "Zoned Clean" || $currentstate eq "Goto")
+    if($currentstate eq "Cleaning" || $currentstate eq "Spot cleaning" || $currentstate eq "Zoned Clean" || $currentstate eq "Segment Clean" || $currentstate eq "Goto")
     {
       $timerinterval = 90 if($timerinterval > 90);
     }
@@ -2153,12 +2197,15 @@ sub XiaomiDevice_GetDeviceDetails($)
 
   my $packetid = $hash->{helper}{packetid};
   $hash->{helper}{packetid} = $packetid+1;
-  $hash->{helper}{packet}{$packetid} = "wifi_stats";
-  XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"miIO.wifi_assoc_state","params":[""]}' );
-  $packetid = $hash->{helper}{packetid};
-  $hash->{helper}{packetid} = $packetid+1;
   $hash->{helper}{packet}{$packetid} = "device_info";
   XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"miIO.info","params":[""]}' );
+
+  return undef if(defined($hash->{model}) && $hash->{model} eq "zhimi.fan.za4");
+
+  $packetid = $hash->{helper}{packetid};
+  $hash->{helper}{packetid} = $packetid+1;
+  $hash->{helper}{packet}{$packetid} = "wifi_stats";
+  XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"miIO.wifi_assoc_state","params":[""]}' );
 
   return undef if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} ne "VacuumCleaner");
 
@@ -2329,13 +2376,29 @@ sub XiaomiDevice_ParseJSON($$)
 
   my $msgid = $json->{id};
   my $msgtype = $hash->{helper}{packet}{$msgid};
-  delete $hash->{helper}{packet}{$msgid};
+
+  if($msgtype eq "json_command"){
+    delete $hash->{helper}{packet}{$msgid};
+  }
+  elsif($msgid>5){ #keep last 3 in case of duplicate replies
+    delete $hash->{helper}{packet}{$msgid-5};
+    delete $hash->{helper}{packet}{$msgid-4};
+    delete $hash->{helper}{packet}{$msgid-3};
+  }
+
   if(!defined($msgtype))
   {
     Log3 $name, 2, "$name: Message type for ID $msgid not found";
     Log3 $name, 3, "$name: ".Dumper($json);
     return undef;
   }
+
+  if($msgtype eq "json_command")
+  {
+    Log3 $name, 0, "$name: result for json request w/ id ".$msgid.", return is \n".Dumper($json);;
+    return undef;
+  }
+
   Log3 $name, 4, "$name: parse id ".$json->{id}." / ".$msgtype;
 
   Log3 $name, 4, "$name: msg ref is ".ref($json->{result});
@@ -2700,7 +2763,7 @@ sub XiaomiDevice_ParseJSON($$)
     $fanspeed = 0 if($json->{result}[2] eq "off");
     readingsBulkUpdate( $hash, "level", $fanspeed, 1 ) if(defined($json->{result}[6]));
     readingsBulkUpdate( $hash, "mode", (int($json->{result}[6])>0)?"natural":"straight", 1 ) if(defined($json->{result}[6]));
-    readingsBulkUpdate( $hash, "buzzer", $json->{result}[7], 1 ) if(defined($json->{result}[7]));
+    readingsBulkUpdate( $hash, "buzzer", ($json->{result}[7] eq "0" ? "off" : $json->{result}[7] eq "2" ? "on" : $json->{result}[7]), 1 ) if(defined($json->{result}[7]));
     readingsBulkUpdate( $hash, "led", ($json->{result}[8] eq "0" ? 'bright' : $json->{result}[1] eq "1" ? 'dim' : 'off' ), 1 ) if(defined($json->{result}[8]));
     readingsBulkUpdate( $hash, "poweroff_time", $json->{result}[9], 1 ) if(defined($json->{result}[9]));
     readingsBulkUpdate( $hash, "ac_power", $json->{result}[10], 1 ) if(defined($json->{result}[10]));
@@ -2915,17 +2978,18 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "dnd", (($json->{result}[0]{dnd_enabled} ne "0")?"on":"off"), 1 ) if(defined($json->{result}[0]{dnd_enabled}));
     if(defined($json->{result}[0]{fan_power}) && int($json->{result}[0]{fan_power}) > 100) {
       my $cleaning_int = int($json->{result}[0]{fan_power});
-      my $cleaningmode = ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : ($cleaning_int == 106) ? "auto" : "unknown";
+      my $cleaningmode = ($cleaning_int <= 0) ? "off" : ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : ($cleaning_int == 106) ? "auto" : "unknown";
       readingsBulkUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     } elsif(defined($json->{result}[0]{fan_power})) {
       my $cleaning_int = int($json->{result}[0]{fan_power});
-      my $cleaningmode = ($cleaning_int > 89) ? "max" : ($cleaning_int > 74) ? "turbo" : ($cleaning_int > 40) ? "balanced" : ($cleaning_int > 10) ? "quiet" : "mop";
+      my $cleaningmode = ($cleaning_int <= 0) ? "off" : ($cleaning_int > 89) ? "max" : ($cleaning_int > 74) ? "turbo" : ($cleaning_int > 40) ? "balanced" : ($cleaning_int > 10) ? "quiet" : "mop";
       readingsBulkUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     }
     readingsBulkUpdate( $hash, "water_box_carriage_status", (($json->{result}[0]{water_box_carriage_status} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{water_box_carriage_status}));
     readingsBulkUpdate( $hash, "water_box_status", (($json->{result}[0]{water_box_status} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{water_box_status}));
     readingsBulkUpdate( $hash, "water_box_mode", $vacuum_waterbox{$json->{result}[0]{water_box_mode}}, 1) if(defined($json->{result}[0]{water_box_mode}));
     readingsBulkUpdate( $hash, "mop_forbidden_enable", (($json->{result}[0]{mop_forbidden_enable} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{mop_forbidden_enable}));
+    readingsBulkUpdate( $hash, "lock_status", (($json->{result}[0]{lock_status} ne "0")?"on":"off"), 1 ) if(defined($json->{result}[0]{lock_status}));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -2999,11 +3063,11 @@ sub XiaomiDevice_ParseJSON($$)
     readingsSingleUpdate( $hash, "fan_power", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
     if(defined($json->{result}[0]) && int($json->{result}[0]) > 100) {
       my $cleaning_int = int($json->{result}[0]);
-      my $cleaningmode = ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : "unknown";
+      my $cleaningmode = ($cleaning_int <= 0) ? "off" : ($cleaning_int == 101) ? "quiet" : ($cleaning_int == 102) ? "balanced" : ($cleaning_int == 103) ? "turbo" : ($cleaning_int == 104) ? "max" : ($cleaning_int == 105) ? "mop" : ($cleaning_int == 106) ? "auto" : "unknown";
       readingsSingleUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     } elsif(defined($json->{result}[0])) {
       my $cleaning_int = int($json->{result}[0]);
-      my $cleaningmode = ($cleaning_int > 89) ? "max" : ($cleaning_int > 74) ? "turbo" : ($cleaning_int > 40) ? "balanced" : ($cleaning_int > 10) ? "quiet" : "mop";
+      my $cleaningmode = ($cleaning_int <= 0) ? "off" : ($cleaning_int > 89) ? "max" : ($cleaning_int > 74) ? "turbo" : ($cleaning_int > 40) ? "balanced" : ($cleaning_int > 10) ? "quiet" : "mop";
       readingsSingleUpdate( $hash, "cleaning_mode", $cleaningmode, 1 );
     }
     return undef;
@@ -3408,7 +3472,7 @@ sub XiaomiDevice_initSend($)
 
   Log3 $name, 5, "$name: initSend";
 
-  #InternalTimer(gettimeofday() + 10, "XiaomiDevice_connectFail", $hash, 0);
+  #InternalTimer(gettimeofday() + 10, "XiaomiDevice_connectFail", $hash);
 
   my $data = "21310020FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
   XiaomiDevice_Write($hash,pack('H*', $data));
@@ -3445,7 +3509,7 @@ sub XiaomiDevice_Read($) {
   {
     Log3 $name, 2, "$name: Read error";
     XiaomiDevice_disconnect($hash);
-    InternalTimer(gettimeofday() + 30, "XiaomiDevice_connect", $hash, 0);
+    InternalTimer(gettimeofday() + 30, "XiaomiDevice_connect", $hash);
     return undef;
   }
 
@@ -3578,10 +3642,10 @@ sub XiaomiDevice_Write($$)
     if(length($msg) > 40){
       my $currentstate = ReadingsVal($name,"state","-");
       if(lc($currentstate) =~ /clean/ || lc($currentstate) =~ /goto/){
-        InternalTimer(gettimeofday() + 150, "XiaomiDevice_connectFail", $hash, 0);
+        InternalTimer(gettimeofday() + 150, "XiaomiDevice_connectFail", $hash);
         #Log3 $hash, 5, "$name: cleaning, higher timeout";
       } else {
-        InternalTimer(gettimeofday() + 45, "XiaomiDevice_connectFail", $hash, 0);
+        InternalTimer(gettimeofday() + 45, "XiaomiDevice_connectFail", $hash);
       }
     }
   }
@@ -3615,7 +3679,7 @@ sub XiaomiDevice_Attr($$$) {
 
   if($attrName eq "zone_names" || $attrName eq "point_names" || $attrName eq "map_names") {
     my $hash = $defs{$name};
-    InternalTimer( gettimeofday() + 2, "XiaomiDevice_ReadZones", $hash, 0);
+    InternalTimer( gettimeofday() + 2, "XiaomiDevice_ReadZones", $hash);
   }
 
   if( $cmd eq "set" ) {
