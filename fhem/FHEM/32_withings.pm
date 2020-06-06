@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 12 / 2020-02-20
+# Release 13 / 2020-04-25
 
 
 package main;
@@ -165,7 +165,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      117 => { name => "unknown 117", reading => "unknown117", }, #?
                      118 => { name => "unknown 118", reading => "unknown118", }, #?
                      119 => { name => "unknown 119", reading => "unknown119", }, #?
-                     120 => { name => "unknown 120", reading => "unknown120", }, #vasistas
+                     120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
                      123 => { name => "unknown 123", reading => "unknown123", },#
@@ -186,6 +186,11 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      138 => { name => "unknown 138", reading => "unknown138", },#
                      139 => { name => "unknown 139", reading => "unknown139", },#
                      140 => { name => "unknown 140", reading => "unknown140", },#
+                     141 => { name => "unknown 141", reading => "unknown141", },#
+                     142 => { name => "unknown 142", reading => "unknown142", },#
+                     143 => { name => "unknown 143", reading => "unknown143", },#
+                     144 => { name => "unknown 144", reading => "unknown144", },#
+                     145 => { name => "unknown 145", reading => "unknown145", },#
                       #-10 => { name => "Speed", reading => "speed", },
                       #-11 => { name => "Pace", reading => "pace", },
                       #-12 => { name => "Altitude", reading => "altitude", },
@@ -325,7 +330,9 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'snoring' => { name => "Snoring", reading => "snoringDuration", unit => "s", },
                         'snoringepisodecount' => { name => "Snoring Episode Count", reading => "snoringEpisodeCount", unit => 0, },
                         'breathing_event_probability' => { name => "Breathing Event Probability", reading => "breathingEventProbability", unit => 0, },
+                        'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
+                        'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
 
                         # 'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
                         # 'steps' => { name => "Steps", reading => "steps", unit => 0, },
@@ -877,7 +884,7 @@ sub withings_getSessionKey($) {
             Log3 $name, 4, "$name: account email: ".$account->{email};
           }
       }
-      Log3 $name, 4, "$name: accountid ".$hash->{AccountID};
+      Log3 $name, 4, "$name: accountid ".$hash->{AccountID} if($hash->{AccountID});
     }
     else
     {
@@ -1773,7 +1780,7 @@ sub withings_getUserReadingsDaily($) {
     url => "https://scalews.withings.com/cgi-bin/v2/activity",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, subcategory => '37', startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
+    data => {sessionid => $hash->{IODev}->{SessionKey},  userid=> $hash->{User}, startdateymd => $startdateymd, enddateymd => $enddateymd, appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getbyuserid'},
       hash => $hash,
       type => 'userDailyActivity',
       enddate => int($enddate),
@@ -1956,7 +1963,7 @@ sub withings_parseProperties($$) {
   my ($hash,$json) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "$name: parsedevice";
+  Log3 $name, 5, "$name: parsedevice\n".Dumper($json);
 
   #parse
   my $detail = $json->{body};
@@ -3525,7 +3532,7 @@ sub withings_Dispatch($$$) {
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "$name: dispatch ".$param->{type};
+  Log3 $name, 4, "$name: dispatch ".$param->{type};
 
   my $urldata = Dumper($param->{data});
   $urldata =~ s/\$VAR1 = \{\n//g;
