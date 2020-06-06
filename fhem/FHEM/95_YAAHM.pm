@@ -25,11 +25,12 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #
+########################################################################################
 #  TODO: 
 #     Wenn Geräteaktion auf Wecken steht, wird bei manuellem Wecken nicht ausgelöst. Also besser umstellen von ZEIT auf Weckevent
 #     Wieso Tageszeit ab 8:00, wenn schon um 7:30 geweckt wurde ?
-#
-########################################################################################
+#     Nach Umstellung auf Winterzeit werden die Timer eine Stunde zu früh ausgelöst
+#     Nach Umstellung auf Winterzeit wird GetDayStatus vor Mitternacht ausgelöst und setzt falschen Tag und weitere Fehler
 
 package main;
 
@@ -51,7 +52,7 @@ my $yaahmname;
 my $yaahmlinkname   = "Profile";     # link text
 my $yaahmhiddenroom = "ProfileRoom"; # hidden room
 my $yaahmpublicroom = "Unsorted";    # public room
-my $yaahmversion    = "3.1";
+my $yaahmversion    = "3.13";
 my $firstcall       = 1;
     
 my %yaahm_transtable_EN = ( 
@@ -553,6 +554,15 @@ sub YAAHM_Attr($$$) {
     $yaahm_tt = \%yaahm_transtable_EN;
   }
   
+  #-- in any attribute redefinition try to repaiR WT table
+  if( !$hash->{DATA}{"WT"} ){
+   $hash->{DATA}{"WT"} = ();
+   push(@{$hash->{DATA}{"WT"}},{%defaultwakeuptable});
+   $hash->{DATA}{"WT"}[0]{"name"} = $yaahm_tt->{"wakeup"};
+   push(@{$hash->{DATA}{"WT"}},{%defaultsleeptable});
+   $hash->{DATA}{"WT"}[1]{"name"} = $yaahm_tt->{"sleep"};
+  }
+  
   #---------------------------------------
   if ( $attrName eq "timeHelper" ) {
     my $dh = (defined($attr{$name}{"timeHelper"})) ? $attr{$name}{"timeHelper"} : undef;
@@ -811,7 +821,8 @@ sub YAAHM_Set($@) {
      return "[YAAHM] missing name for new weekly profile"
        if( !defined($args[0]) );
      #-- find index
-     $imax = int(@{$hash->{DATA}{"WT"}});
+     $imax = int(@{$hash->{DATA}{"WT"}})
+       if( $hash->{DATA}{"WT"} );
      $if= undef;
      for( my $j=0;$j<$imax;$j++){
        if($hash->{DATA}{"WT"}[$j]{"name"} eq $args[0]){
@@ -993,8 +1004,10 @@ sub YAAHM_Get($@) {
     return $res;
   } else {
     $res = "0,1";
-    for(my $i = 2; $i<int( @{$hash->{DATA}{"WT"}});$i++){
-      $res .= ",".$i;
+    if( $hash->{DATA}{"WT"} ){
+      for(my $i = 2; $i<int( @{$hash->{DATA}{"WT"}});$i++){
+        $res .= ",".$i;
+      }
     }
     return "Unknown argument $arg choose one of next:".$res." sayNext:".$res." version:noArg template:noArg";
   }
@@ -1573,7 +1586,7 @@ sub YAAHM_checkstate($) {
     $devs = $devl[$istate+1];
     if( defined($devs) && ($devs ne "") ){
       $devh = Value($dev);
-      if( $devs ne $devh ){
+      if( $devh !~ /$devs/){
         $isf = 1;
         push(@devf,"<tr><td style=\"text-align:left;padding:5px\">".$dev."</td><td style=\"text-align:left;padding:5px\"><div style=\"color:red\">".$yaahm_tt->{'notok'}.
           "</div></td><td style=\"text-align:left;padding:5px\">".$devh."</td></tr>");
@@ -1747,7 +1760,7 @@ sub YAAHM_startDeviceActions($) {
 
     #-- neither earliest nor latest
     if( (!defined($early)||($early eq "")) && (!defined($late)||($late eq "")) ){
-      $cond = "($cond and ([$name:exec] eq \"0\"))";
+      $cond = "($cond and ([".$name.".xtimer_".$i.".IF:exec] eq \"0\"))";
     #-- only latest
     }elsif( (!defined($early)||($early eq "")) && defined($late) && $late =~ /\d?\d:\d\d(:\d\d)?/ ){
       $cond = "((($cond and [?00:00-$late]) or [$late]) and ([".$name.".xtimer_".$i.".IF:exec] eq \"0\"))";
@@ -1996,6 +2009,7 @@ sub YAAHM_setWeeklyTime($) {
   my ($daytype_0,$daytype_1,$weektime_0,$weektime_1,$ring_0x,$ring_1x,$ring_0e,$ring_1e,$ring_0,$ring_1,$nexttime,$wupad,$wupam);
   
   #-- iterate over timers
+  if( $hash->{DATA}{"WT"} ){
   for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
     #-- obtain next time spec => will override all
     $nexttime  = $hash->{DATA}{"WT"}[$i]{ "next" };
@@ -2164,7 +2178,7 @@ sub YAAHM_setWeeklyTime($) {
     readingsEndUpdate($hash,1);  
     
     YAAHM_sayWeeklyTime($hash,$i,0);                                   
-  }
+  }}
    YAAHM_startDeviceActions($name);
 }
 
@@ -2583,8 +2597,10 @@ sub YAAHM_GetDayStatus($) {
   }
   
   #-- iterate over timers to reset the "done" flag
-  for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
-   $hash->{DATA}{"WT"}[$i]{"done"} = 0;
+  if( $hash->{DATA}{"WT"} ){
+    for( my $i=0;$i<int( @{$hash->{DATA}{"WT"}} );$i++){
+     $hash->{DATA}{"WT"}[$i]{"done"} = 0;
+    }
   }
   
   my ($ret,$line,$fline,$date);
@@ -3580,7 +3596,8 @@ sub YAAHM_toptable($){
     }
     
     my $dailyno    = scalar keys %dailytable;
-    my $weeklyno   = int( @{$hash->{DATA}{"WT"}} );
+    my $weeklyno   = int( @{$hash->{DATA}{"WT"}} )
+      if( $hash->{DATA}{"WT"} );
     
     #--
     $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/yaahm.js\"></script><script type=\"text/javascript\">\n";
@@ -3670,7 +3687,7 @@ sub YAAHM_toptable($){
     #-- manual next time table, just below mode/state table
     $ret .= "<table class=\"readings\">";   
     my $nval  = "";
-    my $wupn;
+    my $wupn  = "";
     $ret .= "<tr class=\"odd\"><td class=\"col1\" style=\"padding:5px; border-left: 1px solid gray; border-top:1px solid gray; border-bottom:1px solid gray; border-bottom-left-radius:10px; border-top-left-radius:10px;\">".$yaahm_tt->{"manual"}."</td>\n";
     for (my $i=0;$i<$weeklyno;$i++){
       if($i<$weeklyno-1){
@@ -3847,7 +3864,8 @@ sub YAAHM_Longtable($){
     
     %dailytable = %{$hash->{DATA}{"DT"}};
     my $dailyno    = scalar keys %dailytable;
-    my $weeklyno   = int( @{$hash->{DATA}{"WT"}} );
+    my $weeklyno   = int( @{$hash->{DATA}{"WT"}} )
+      if( $hash->{DATA}{"WT"} );
 
     #--
     $ret = YAAHM_toptable($name);
@@ -4168,6 +4186,8 @@ sub YAAHM_Longtable($){
       $ret .= sprintf("<tr class=\"%s\"><td class=\"col1\" style=\"text-align:left;padding-left:5px\">$event</td>\n", ($row&1)?"odd":"even"); 
       for (my $i=0;$i<$weeklyno;$i++){
         $sval = $hash->{DATA}{"WT"}[$i]{$key};
+        $sval = ""
+          if(!$sval);
         $ret .= sprintf("<td class=\"col2\" style=\"text-align:left;padding-left:5px\"><input type=\"text\" id=\"wt%s%d_s\" size=\"4\" maxlength=\"120\" value=\"$sval\"/></td>",$key,$i);
       }
       $ret .= "</tr>\n";
