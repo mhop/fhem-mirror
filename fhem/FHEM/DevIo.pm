@@ -353,7 +353,7 @@ DevIo_OpenDev($$$;$)
     no strict "refs";
     $callback->($hash,$r) if($callback);
     use strict "refs";
-    return $r;
+    return ($callback ? undef : $r);
   };
 
   # Call initFn
