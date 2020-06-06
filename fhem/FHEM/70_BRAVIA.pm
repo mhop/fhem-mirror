@@ -859,7 +859,7 @@ sub SendCommand($$;$$@) {
         $data .= "\"level\":\"private\"},";
         $data .= "[{\"value\":\"yes\",\"function\":\"WOL\"}]],\"id\":8,\"version\":\"1.0\"}";
       } else {
-        $URL .= "/cers/api/register?name=".urlEncode($id)."&registrAtionType=initial&deviceId=".$device;
+        $URL .= "/cers/api/register?name=".::urlEncode($id)."&registrAtionType=initial&deviceId=".$device;
       }
     } elsif ($service eq "getStatus") {
       $URL .= $port->{SERVICE};

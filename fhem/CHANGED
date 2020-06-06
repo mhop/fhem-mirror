@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_BRAVIA: fix register procedure
  - change:  32_withings: added sleep apnea readings
  - feature: 72_XiaomiDevice: Vacuum segments, Zhimi ZA4 fan readings
  - changed: 46_TeslaPowerwall2AC: New API Implementation
