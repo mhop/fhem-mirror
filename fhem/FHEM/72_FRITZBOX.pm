@@ -1225,7 +1225,7 @@ sub FRITZBOX_Readout_Run_Shell($)
    push @readoutCmdArray, [ "box_wlan_2.4GHz", "ctlmgr_ctl r wlan settings/ap_enabled", "onoff" ];
 # 2nd WLAN
    push @readoutCmdArray, [ "box_wlan_5GHz", "ctlmgr_ctl r wlan settings/ap_enabled_scnd", "onoff" ];
-# Gäste WLAN
+# GÃ¤ste WLAN
    push @readoutCmdArray, [ "box_guestWlan", "ctlmgr_ctl r wlan settings/guest_ap_enabled", "onoff" ];
    push @readoutCmdArray, [ "box_guestWlanRemain", "ctlmgr_ctl r wlan settings/guest_time_remain", ];
 # Dect
@@ -4842,9 +4842,9 @@ sub FRITZBOX_fritztris($)
 1;
 
 =pod
-=item device
 =item summary Controls some features of AVM's Fritz!Box, FRITZ!Repeater and Fritz!Fon.
 =item summary_DE Steuert einige Funktionen von AVM's Fritz!Box, Fritz!Repeater und Fritz!Fon.
+=item device
 
 =begin html
 
