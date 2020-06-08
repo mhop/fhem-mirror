@@ -709,6 +709,7 @@ while (1) {
   if($gotSig) {
     CommandShutdown(undef, undef) if($gotSig eq "TERM");
     CommandRereadCfg(undef, "")   if($gotSig eq "HUP");
+    $attr{global}{verbose} = 5    if($gotSig eq "USR1");
     $gotSig = undef;
   }
 
@@ -3441,6 +3442,7 @@ SignalHandling()
 {
   if($^O ne "MSWin32") {
     $SIG{TERM} = sub { $gotSig = "TERM"; };
+    $SIG{USR1} = sub { $gotSig = "USR1"; };
     $SIG{PIPE} = 'IGNORE';
     $SIG{CHLD} = 'IGNORE';
     $SIG{HUP}  = sub { $gotSig = "HUP"; };
