@@ -1090,6 +1090,11 @@ ZWave_Cmd($$@)
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
 
+  if($cmd eq "returnRouteAdd") {
+    $a[0] = hex($defs{$a[0]}{nodeIdHex})
+      if($defs{$a[0]} && $defs{$a[0]}{nodeIdHex});
+  }
+
   if($cmdFmt !~ m/%s/ && $cmd !~ m/^config/) {
     for(my $i1 = 0; $i1<int(@a); $i1++) {
       return "Error: $a[$i1] is not a decimal number"
