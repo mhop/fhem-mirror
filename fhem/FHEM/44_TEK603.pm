@@ -27,6 +27,7 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 
 use Digest::CRC; # libdigest-crc-perl
 
@@ -41,8 +42,6 @@ sub TEK603_reconnect($);
 
 sub TEK603_Initialize($) {
 	my ($hash) = @_;
-
-	require $attr{global}{modpath} . '/FHEM/DevIo.pm';
 
 	$hash->{ReadFn}		= 'TEK603_read';
 	$hash->{ReadyFn}	= 'TEK603_ready';
@@ -139,16 +138,28 @@ sub TEK603_undef($$) {
 }
 
 
-sub TEK603_ready($) {
+sub TEK603_ready() {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	return if (IsDisabled($name));
 	return DevIo_OpenDev($hash, 1, 'TEK603_doInit') if($hash->{STATE} eq 'disconnected');
 
 	# This is relevant for windows/USB only
+	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
 	my $po = $hash->{USBDev};
-	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-	return ($InBytes > 0);
+
+	if ($po) {
+		($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+		return ($InBytes > 0);
+	}
+
+	# Someone set us up the bomb
+	Log3($hash->{NAME}, 1, qq[Can't read from $hash->{DeviceName}]);
+
+	# disable device
+	Log3($hash->{NAME}, 1, qq[Disabled device due read errors]);
+	CommandAttr(undef, $hash->{NAME} . ' disable 1');
+	return;
 }
 
 sub TEK603_read($) {
