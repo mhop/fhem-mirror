@@ -1158,7 +1158,7 @@ sub _checkLogin {
                   Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
               }
 
-              if($location eq "/FixedPages/HoManLive.aspx" && $retcode eq "302") {          # Weiterleitung -> Login erfolgeich
+              if($location =~ /\/FixedPages\// && $retcode eq "302") {                      # Weiterleitung -> Login erfolgeich
                   Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
