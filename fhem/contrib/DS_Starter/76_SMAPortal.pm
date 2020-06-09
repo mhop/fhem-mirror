@@ -751,7 +751,7 @@ sub GetSetData {                                                       ## no cri
   my ($string) = @_;
   my ($name,$getp,$setp)   = split("\\|",$string);
   my $hash                 = $defs{$name}; 
-  my $login_state          = 0;
+  my $errstate             = 0;
   my $useragent            = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
   my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
@@ -764,7 +764,6 @@ sub GetSetData {                                                       ## no cri
   my ($st,$lc)                                                          = ("","");
   my ($livedata,$livedata_content)                                      = ("","");
   my ($weatherdata,$weatherdata_content)                                = ("","");
-  my ($forecastdata,$forecastdata_content)                              = ("","");
   my ($consumerlivedata,$consumerlivedata_content)                      = ("","");
   my ($d,$op,$paref); 
   my @da     = ();
@@ -806,12 +805,12 @@ sub GetSetData {                                                       ## no cri
 
   ### Login 
   ##############
-  $paref = [ $name, $ua, $state, $login_state ];
-  ($state, $login_state) = _checkLogin ($paref);
+  $paref = [ $name, $ua, $state, $errstate ];
+  ($state, $errstate) = _checkLogin ($paref);
 
-  if(!$login_state) {
+  if($errstate) {
       $st = encode_base64 ( $state,"");
-      return "$name|0|0|$login_state|$getp|$setp|$st";
+      return "$name|0|0|$errstate|$getp|$setp|$st";
   }  
   
   ### Verbraucher schalten
@@ -862,12 +861,12 @@ sub GetSetData {                                                       ## no cri
                                                   tag  => "liveData"
                                                });
                               
-      $paref = [ $hash,$login_state,$state,$livedata ];
-      ($reread,$retry,$login_state,$state) = analyzeData($paref);
+      $paref = [ $hash,$errstate,$state,$livedata ];
+      ($reread,$retry,$errstate,$state) = analyzeData($paref);
       
-      if(!$login_state) {
+      if($errstate) {
           $st = encode_base64 ( $state,"");
-          return "$name|0|0|$login_state|$getp|$setp|$st";
+          return "$name|0|0|$errstate|$getp|$setp|$st";
       }
       
       goto &GetSetData if($reread);
@@ -882,7 +881,7 @@ sub GetSetData {                                                       ## no cri
               sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
               $exceed = 1;
               BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", "NULL", $hash->{HELPER}{RETRIES}], 1);
-              return "$name|$exceed|$newcycle|$login_state|$getp|$setp";                
+              return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
           }
           
           sleep $sleepretry;                                                     
@@ -895,7 +894,7 @@ sub GetSetData {                                                       ## no cri
       if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
           Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
           $newcycle = 1;
-          return "$name|$exceed|$newcycle|$login_state|$getp|$setp";          
+          return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
       }
       
       
@@ -908,12 +907,12 @@ sub GetSetData {                                                       ## no cri
                                                         tag  => "weatherData"
                                                      });
                               
-      $paref = [ $hash,$login_state,$state,$weatherdata ];
-      ($reread,$retry,$login_state,$state) = analyzeData($paref);
+      $paref = [ $hash,$errstate,$state,$weatherdata ];
+      ($reread,$retry,$errstate,$state) = analyzeData($paref);
       
-      if(!$login_state) {
+      if($errstate) {
           $st = encode_base64 ( $state,"");
-          return "$name|0|0|$login_state|$getp|$setp|$st";
+          return "$name|0|0|$errstate|$getp|$setp|$st";
       }
       
       
@@ -947,18 +946,25 @@ sub GetSetData {                                                       ## no cri
       ### Forecast Daten abrufen
       ###########################
       if($dl > 1) {
-          ($forecastdata,$forecastdata_content) = _getData ({ name => $name,
-                                                              ua   => $ua,
-                                                              call => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
-                                                              tag  => "forecastData"
-                                                           });
+          my ($forecastdata,$forecastdata_content) = _getData ({ name => $name,
+                                                                 ua   => $ua,
+                                                                 call => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
+                                                                 tag  => "forecastData"
+                                                              });
                                   
-          $paref = [ $hash,$login_state,$state,$forecastdata ];
-          ($reread,$retry,$login_state,$state) = analyzeData($paref);
+          $paref = [ $hash,$errstate,$state,$forecastdata ];
+          ($reread,$retry,$errstate,$state) = analyzeData($paref);
           
-          if(!$login_state) {
-              $st = encode_base64 ( $state,"");
-              return "$name|0|0|$login_state|$getp|$setp|$st";
+          if($errstate) {
+              $st = encode_base64 ($state, "");
+              return "$name|0|0|$errstate|$getp|$setp|$st";
+          }
+          
+          if ($forecastdata_content && $forecastdata_content !~ m/undefined/ix) {
+              $forecastdata_content = decode_json ($forecastdata_content);
+              extractPlantData    ($hash,\@da,$forecastdata_content);
+              extractForecastData ($hash,\@da,$forecastdata_content);
+              extractConsumerData ($hash,\@da,$forecastdata_content);
           }
       }
       
@@ -974,12 +980,12 @@ sub GetSetData {                                                       ## no cri
                                                                       tag  => "consumerLiveData"
                                                                    });
                                   
-          $paref = [ $hash,$login_state,$state,$consumerlivedata ];
-          ($reread,$retry,$login_state,$state) = analyzeData($paref);
+          $paref = [ $hash,$errstate,$state,$consumerlivedata ];
+          ($reread,$retry,$errstate,$state) = analyzeData($paref);
           
-          if(!$login_state) {
+          if($errstate) {
               $st = encode_base64 ( $state,"");
-              return "$name|0|0|$login_state|$getp|$setp|$st";
+              return "$name|0|0|$errstate|$getp|$setp|$st";
           }
           
           
@@ -1057,13 +1063,6 @@ sub GetSetData {                                                       ## no cri
                       });
   }
   
-  if ($forecastdata_content && $forecastdata_content !~ m/undefined/ix) {
-      $forecastdata_content = decode_json ($forecastdata_content);
-      extractForecastData ($hash,\@da,$forecastdata_content);
-      extractPlantData    ($hash,\@da,$forecastdata_content);
-      extractConsumerData ($hash,\@da,$forecastdata_content);
-  }
-  
   if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/ix) {
       $consumerlivedata_content = decode_json ($consumerlivedata_content);
       extractConsumerLiveData ($hash,\@da,$consumerlivedata_content);
@@ -1101,7 +1100,7 @@ sub GetSetData {                                                       ## no cri
       $lc = encode_base64 ( $lc, ""); 
   }
 
-return "$name|$exceed|$newcycle|$login_state|$getp|$setp|$st|$lc";
+return "$name|$exceed|$newcycle|$errstate|$getp|$setp|$st|$lc";
 }
 
 ################################################################
@@ -1112,7 +1111,7 @@ sub _checkLogin {
   my $name        = $paref->[0];
   my $ua          = $paref->[1];
   my $state       = $paref->[2];
-  my $login_state = $paref->[3];
+  my $errstate    = $paref->[3];
 
   my $hash     = $defs{$name};
   my $v5d      = AttrVal($name, "verbose5Data", "none");  
@@ -1140,7 +1139,7 @@ sub _checkLogin {
           if(!$success) {
               Log3($name, 1, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});   
               $state       = "Credentials couldn't be read";
-              $login_state = 0;
+              $errstate = 1;
           
           } else {
               my $usernameField = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$txtUserName";
@@ -1164,12 +1163,12 @@ sub _checkLogin {
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL", "NULL"], 0);
-                  $login_state = 1;                             
+                  $errstate = 0;                             
               
               } else {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
                   $state       = "login failed - check user and password";
-                  $login_state = 0; 
+                  $errstate = 1; 
               }                         
           }         
       }
@@ -1181,15 +1180,15 @@ sub _checkLogin {
           Log3 ($name, 5, "$name - Redirect return code: ".$retcode);
           Log3 ($name, 5, "$name - Redirect Header Location: ".$location); 
       }      
-      $login_state = 1;
+      $errstate = 0;
   
   } else {
-      $login_state = 0;
+      $errstate = 1;
       $state       = $loginp->status_line;
       Log3 ($name, 1, "$name - ERROR Login Page: ".$state);
   }
   
-return ($state, $login_state); 
+return ($state, $errstate); 
 }
 
 ################################################################
@@ -1231,11 +1230,11 @@ sub ParseData {                                                    ## no critic 
   my $name   = $hash->{NAME};
   my @da     = ();
   
-  my ($login_state,$newcycle,$getp,$setp,$state,$exceed,$lc);
+  my ($errstate,$newcycle,$getp,$setp,$state,$exceed,$lc);
   
   $exceed      = $a[1];
   $newcycle    = $a[2];
-  $login_state = $a[3];
+  $errstate    = $a[3];
   $getp        = $a[4];
   $setp        = $a[5];  
   
@@ -1291,7 +1290,7 @@ sub ParseData {                                                    ## no critic 
   my $gc  = ReadingsNum($name, "L1_GridConsumption", 0);
   my $sum = $fi-$gc;
   
-  if($login_state && !$pv && !$fi && !$gc) {
+  if(!$errstate && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 ($name, 2, "$name - $state");
@@ -1299,7 +1298,7 @@ sub ParseData {                                                    ## no critic 
   
   readingsBeginUpdate($hash);
   
-  if($login_state) {
+  if(!$errstate) {
       if($setp ne "none") {
           my ($d,$op) = split(":",$setp);
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
@@ -1452,16 +1451,7 @@ sub extractForecastData {              ## no critic 'complexity'
 
   my $PV_sum     = 0;
   my $consum_sum = 0;
-  my $sum        = 0;
-  
-  my $plantOid              = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
-  $hash->{HELPER}{PLANTOID} = $plantOid;                                           # wichtig für erweiterte Selektionen
-  if ($hash->{HELPER}{PLANTOID}) {
-      Log3 ($name, 4, "$name - Plant ID set to: ".$hash->{HELPER}{PLANTOID});
-  } else {
-      Log3 ($name, 4, "$name - Plant ID  not set !");
-  }
-  
+  my $sum        = 0; 
 
   # Counter for forecast objects
   my $obj_nr = 0;
@@ -1651,6 +1641,14 @@ sub extractPlantData {
   my ($amount,$unit);
   
   Log3 ($name, 4, "$name - ##### extracting plant data #### ");
+  
+  my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
+  if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
+      Log3 ($name, 4, "$name - Plant ID: ".$plantOid);
+      $hash->{HELPER}{PLANTOID} = $plantOid;                                           
+  } else {
+      Log3 ($name, 4, "$name - Plant ID  not set !");
+  }
   
   my $ppp = $forecast->{'PlantPeakPower'};
   if($ppp) {
@@ -2032,7 +2030,7 @@ return 1;
 sub analyzeData {                                                          ## no critic 'complexity'
   my $paref           = shift;
   my $hash            = $paref->[0];
-  my $login_state     = $paref->[1];
+  my $errstate        = $paref->[1];
   my $state           = $paref->[2];
   my $ad              = $paref->[3];
   my $name            = $hash->{NAME};
@@ -2070,24 +2068,24 @@ sub analyzeData {                                                          ## no
               if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
                   $retry = 1;
-                  return ($reread,$retry,$login_state,$state);
+                  return ($reread,$retry,$errstate,$state);
               }
               if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
                   $retry = 1;
-                  return ($reread,$retry,$login_state,$state);
+                  return ($reread,$retry,$errstate,$state);
               }  
               if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
                   Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
                   $retry = 1;
-                  return ($reread,$retry,$login_state,$state);
+                  return ($reread,$retry,$errstate,$state);
               }              
               if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
                   Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
                   $retry = 1;
-                  return ($reread,$retry,$login_state,$state);
+                  return ($reread,$retry,$errstate,$state);
               }
           }
       }
@@ -2103,10 +2101,10 @@ sub analyzeData {                                                          ## no
       
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat) if($v5d eq "loginData");
       
-      $login_state = 0;
+      $errstate = 1;
   }
   
-return ($reread,$retry,$login_state,$state);
+return ($reread,$retry,$errstate,$state);
 }
 
 ################################################################
