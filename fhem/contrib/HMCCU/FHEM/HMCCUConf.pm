@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.002
+#  Version 4.8.003
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -212,15 +212,18 @@ use vars qw(%HMCCU_SCRIPTS);
 
 %HMCCU_ATTR = (
 	'BLIND' => {
-		'webCmd' => 'up:down:stop:pct',
+		'substexcl' => 'pct',
+		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
-		'webCmd' => 'up:down:stop:pct',
+		'substexcl' => 'pct',
+		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
-		'webCmd' => 'up:down:stop:pct',
+		'substexcl' => 'pct',
+		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'SWITCH' => {
@@ -232,25 +235,29 @@ use vars qw(%HMCCU_SCRIPTS);
 		'widgetOverride' => 'toggle:uzsuToggle,off,on'
 	},
 	'DIMMER' => {
+		'substexcl' => 'pct',
 		'webCmd' => 'pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
-		'ccureadingname' => 'LEVEL$:pct',
+		'substexcl' => 'pct',
 		'webCmd' => 'pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
+		'substexcl' => 'desired-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
+		'substexcl' => 'desired-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
+		'substexcl' => 'desired-temp',
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
@@ -280,10 +287,10 @@ use vars qw(%HMCCU_SCRIPTS);
 		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
 	},
 	'ROTARY_HANDLE_SENSOR' => {
-		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'tilted', '2' => 'open' }
 	},
 	'ROTARY_HANDLE_TRANSCEIVER' => {
-		'STATE' => { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
+		'STATE' => { '0' => 'closed', '1' => 'tilted', '2' => 'open' }
 	},
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		'STATE' => { '0' => 'ok', '1' => 'alarm', 'false' => 'ok', 'true' => 'alarm' }

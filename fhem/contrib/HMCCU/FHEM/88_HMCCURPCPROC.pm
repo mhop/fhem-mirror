@@ -362,9 +362,9 @@ sub HMCCURPCPROC_Define ($$)
 
 sub HMCCURPCPROC_InitDevice ($$)
 {
-	my ($ioHash, $dev_hash) = @_;
-	my $name = $dev_hash->{NAME};
-	my $iface = $dev_hash->{hmccu}{devspec};
+	my ($ioHash, $devHash) = @_;
+	my $name = $devHash->{NAME};
+	my $iface = $devHash->{hmccu}{devspec};
 	
 	# Check if interface is valid
 	my ($ifname, $ifport) = HMCCU_GetRPCServerInfo ($ioHash, $iface, 'name,port'); 
@@ -375,37 +375,37 @@ sub HMCCURPCPROC_InitDevice ($$)
 		my $dh = $defs{$d};
 		next if (!exists($dh->{TYPE}) || !exists($dh->{NAME}));
 		if ($dh->{TYPE} eq 'HMCCURPCPROC' && $dh->{NAME} ne $name && IsDisabled ($dh->{NAME}) != 1) {
-			return 4 if ($dev_hash->{host} eq $dh->{host} && exists ($dh->{rpcport}) &&
+			return 4 if ($devHash->{host} eq $dh->{host} && exists ($dh->{rpcport}) &&
 				$dh->{rpcport} == $ifport);
 		}
 	}
 	
 	# Detect local IP address and check if CCU is reachable
-	my $localaddr = HMCCU_TCPConnect ($dev_hash->{host}, $ifport);
+	my $localaddr = HMCCU_TCPConnect ($devHash->{host}, $ifport);
 	return 5 if ($localaddr eq '');
-	$dev_hash->{hmccu}{localaddr} = $localaddr;
-	$dev_hash->{hmccu}{defaultaddr} = $dev_hash->{hmccu}{localaddr};
+	$devHash->{hmccu}{localaddr} = $localaddr;
+	$devHash->{hmccu}{defaultaddr} = $devHash->{hmccu}{localaddr};
 
 	# Get unique ID for RPC server: last 2 segments of local IP address
 	# Do not append random digits because of https://forum.fhem.de/index.php/topic,83544.msg797146.html#msg797146
-	my $id1 = HMCCU_GetIdFromIP ($dev_hash->{hmccu}{localaddr}, '');
+	my $id1 = HMCCU_GetIdFromIP ($devHash->{hmccu}{localaddr}, '');
 	my $id2 = HMCCU_GetIdFromIP ($ioHash->{ccuip}, '');
 	return 3 if ($id1 eq '' || $id2 eq '');
-	$dev_hash->{rpcid} = $id1.$id2;
+	$devHash->{rpcid} = $id1.$id2;
 	
 	# Set I/O device and store reference for RPC device in I/O device
 	my $ioname = $ioHash->{NAME};
-	return 2 if (!HMCCU_AssignIODevice ($dev_hash, $ioname, $ifname));
+	return 2 if (!HMCCU_AssignIODevice ($devHash, $ioname, $ifname));
 
 	# Store internals
-	$dev_hash->{rpcport}      = $ifport;
-	$dev_hash->{rpcinterface} = $ifname;
-	$dev_hash->{ccuip}        = $ioHash->{ccuip};
-	$dev_hash->{ccutype}      = $ioHash->{ccutype};
-	$dev_hash->{CCUNum}       = $ioHash->{CCUNum};
-	$dev_hash->{ccustate}     = $ioHash->{ccustate};
+	$devHash->{rpcport}      = $ifport;
+	$devHash->{rpcinterface} = $ifname;
+	$devHash->{ccuip}        = $ioHash->{ccuip};
+	$devHash->{ccutype}      = $ioHash->{ccutype};
+	$devHash->{CCUNum}       = $ioHash->{CCUNum};
+	$devHash->{ccustate}     = $ioHash->{ccustate};
 	
-	HMCCU_Log ($dev_hash, 1, "Initialized version $HMCCURPCPROC_VERSION for interface $ifname with I/O device $ioname");
+	HMCCU_Log ($devHash, 1, "Initialized version $HMCCURPCPROC_VERSION for interface $ifname with I/O device $ioname");
 
 	# Set some attributes
 	if ($init_done) {
@@ -414,8 +414,8 @@ sub HMCCURPCPROC_InitDevice ($$)
 	}
 	
 	# RPC device ready
-	HMCCURPCPROC_ResetRPCState ($dev_hash);
-	HMCCURPCPROC_SetState ($dev_hash, 'Initialized');
+	HMCCURPCPROC_ResetRPCState ($devHash);
+	HMCCURPCPROC_SetState ($devHash, 'Initialized');
 	
 	return 0;
 }
@@ -1284,7 +1284,7 @@ sub HMCCURPCPROC_RegisterCallback ($$)
 	return (0, "Can't get RPC parameters for ID $clkey")
 		if (!defined($cburl) || !defined($clurl) || !defined($rpctype));
 	
-	$hash->{hmccu}{rpc}{port} = $port;
+	$hash->{hmccu}{rpc}{port}  = $port;
 	$hash->{hmccu}{rpc}{clurl} = $clurl;
 	$hash->{hmccu}{rpc}{cburl} = $cburl;
 
@@ -1319,8 +1319,8 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 	return (0, "RPC server $clkey not in state registered or running")
 		if ($rpchash->{state} ne 'registered' && $rpchash->{state} ne 'running' && $force == 0);
 
-	$cburl = $rpchash->{cburl} if (exists ($rpchash->{cburl}));
-	$clurl = $rpchash->{clurl} if (exists ($rpchash->{clurl}));
+	$cburl = $rpchash->{cburl} if (exists($rpchash->{cburl}));
+	$clurl = $rpchash->{clurl} if (exists($rpchash->{clurl}));
 	$cburl = HMCCU_GetRPCCallbackURL ($ioHash, $localaddr, $rpchash->{cbport}, $clkey, $port) if ($cburl eq '');
 	$clurl = HMCCU_BuildURL ($ioHash, $port) if ($clurl eq '');
 	return (0, "Can't get RPC parameters for ID $clkey") if ($cburl eq '' || $clurl eq '');
@@ -1335,8 +1335,8 @@ sub HMCCURPCPROC_DeRegisterCallback ($$)
 			HMCCURPCPROC_SetRPCState ($hash, $force == 0 ? 'deregistered' : $rpchash->{state},
 				"Callback for RPC server $clkey deregistered", 1);
 
-			$rpchash->{cburl} = '';
-			$rpchash->{clurl} = '';
+			$rpchash->{cburl}  = '';
+			$rpchash->{clurl}  = '';
 			$rpchash->{cbport} = 0;
 		
 			return (1, 'working');
@@ -1373,68 +1373,61 @@ sub HMCCURPCPROC_InitRPCServer ($$$$)
 
 	# Callback for events
 	HMCCU_Log ($name, 4, "Adding callback for events for server $clkey");
-	$server->add_method (
-	   { name => "event",
-	     signature => ["string string string string string","string string string string int",
-		 "string string string string double","string string string string boolean",
-		 "string string string string i4"],
-	     code => \&HMCCURPCPROC_EventCB
-	   }
-	);
+	$server->add_method ({
+		name => "event",
+		signature => ["string string string string string","string string string string int",
+			"string string string string double","string string string string boolean",
+			"string string string string i4"],
+	   code => \&HMCCURPCPROC_EventCB
+	});
 
 	# Callback for new devices
 	HMCCU_Log ($name, 4, "Adding callback for new devices for server $clkey");
-	$server->add_method (
-	   { name => "newDevices",
-	     signature => ["string string array"],
-        code => \&HMCCURPCPROC_NewDevicesCB
-	   }
-	);
+	$server->add_method ({
+		name => "newDevices",
+	   signature => ["string string array"],
+      code => \&HMCCURPCPROC_NewDevicesCB
+	});
 
 	# Callback for deleted devices
 	HMCCU_Log ($name, 4, "Adding callback for deleted devices for server $clkey");
-	$server->add_method (
-	   { name => "deleteDevices",
-	     signature => ["string string array"],
-        code => \&HMCCURPCPROC_DeleteDevicesCB
-	   }
-	);
+	$server->add_method ({
+		name => "deleteDevices",
+	   signature => ["string string array"],
+      code => \&HMCCURPCPROC_DeleteDevicesCB
+	});
 
 	# Callback for modified devices
 	HMCCU_Log ($name, 4, "Adding callback for modified devices for server $clkey");
-	$server->add_method (
-	   { name => "updateDevice",
-	     signature => ["string string string int", "string string string i4"],
-	     code => \&HMCCURPCPROC_UpdateDeviceCB
-	   }
-	);
+	$server->add_method ({
+		name => "updateDevice",
+	   signature => ["string string string int", "string string string i4"],
+	   code => \&HMCCURPCPROC_UpdateDeviceCB
+	});
 
 	# Callback for replaced devices
 	HMCCU_Log ($name, 4, "Adding callback for replaced devices for server $clkey");
-	$server->add_method (
-	   { name => "replaceDevice",
-	     signature => ["string string string string"],
-	     code => \&HMCCURPCPROC_ReplaceDeviceCB
-	   }
-	);
+	$server->add_method ({
+		name => "replaceDevice",
+	   signature => ["string string string string"],
+	   code => \&HMCCURPCPROC_ReplaceDeviceCB
+	});
 
 	# Callback for readded devices
 	HMCCU_Log ($name, 4, "Adding callback for readded devices for server $clkey");
-	$server->add_method (
-	   { name => "readdedDevice",
-	     signature => ["string string array"],
-	     code => \&HMCCURPCPROC_ReaddDeviceCB
-	   }
-	);
+	$server->add_method ({
+		name => "readdedDevice",
+	   signature => ["string string array"],
+	   code => \&HMCCURPCPROC_ReaddDeviceCB
+	});
 	
 	# Dummy implementation, always return an empty array
 	HMCCU_Log ($name, 4, "Adding callback for list devices for server $clkey");
-	$server->add_method (
-	   { name => "listDevices",
-	     signature => ["array string"],
-	     code => \&HMCCURPCPROC_ListDevicesCB
-	   }
-	);
+	$server->add_method ({
+		name => "listDevices",
+	   signature => ["array string"],
+	   code => \&HMCCURPCPROC_ListDevicesCB
+	});
 
 	return $server;
 }
@@ -2087,12 +2080,10 @@ sub HMCCURPCPROC_HandleConnection ($$$$)
 	$rpcsrv->{hmccu}{evttime}    = time ();
 	
 	# Initialize statistic counters
-	foreach my $et (@RPC_EVENT_TYPES) {
+	foreach my $et (@RPC_EVENT_TYPES, 'total') {
 		$rpcsrv->{hmccu}{rec}{$et} = 0;
 		$rpcsrv->{hmccu}{snd}{$et} = 0;
 	}
-	$rpcsrv->{hmccu}{rec}{total} = 0;
-	$rpcsrv->{hmccu}{snd}{total} = 0;
 
 	# Signal handler
 	$SIG{INT} = sub { $run = 0; HMCCU_Log ($name, 2, "$clkey received signal INT"); };	
@@ -2561,9 +2552,7 @@ sub HMCCURPCPROC_ReaddDevicesCB ($$$)
 	my $devcount = scalar(@$a);
 	
 	HMCCU_Log ($name, 2, "$cb ReaddDevice received $devcount device addresses");
-	foreach my $dev (@$a) {
-		HMCCURPCPROC_Write ($server, 'RA', $cb, $dev);
-	}
+	foreach my $dev (@$a) { HMCCURPCPROC_Write ($server, 'RA', $cb, $dev); }
 
 	return;
 }
@@ -2619,19 +2608,10 @@ sub HMCCURPCPROC_EncValue ($$)
 	
 	# Try to detect type if type not specified
 	if (!defined($type)) {
-		if (lc($value) =~ /^(true|false)$/) {
-			$type = 'boolean';
-		}
-		elsif ($value =~ /^[-+]?\d+$/) {
-			$type = 'integer';
-		}
-		elsif ($value =~ /^[-+]?[0-9]*\.[0-9]+$/) {
-			# A float must contain at least a dot followed by a digit
-			$type = 'float';
-		}
-		elsif ($value eq '' || $value =~ /^([a-zA-Z_ ]+|'.+'|".+")$/) {
-			$type = 'string';
-		}
+		if (lc($value) =~ /^(true|false)$/)                           { $type = 'boolean'; }
+		elsif ($value =~ /^[-+]?\d+$/)                                { $type = 'integer'; }
+		elsif ($value =~ /^[-+]?[0-9]*\.[0-9]+$/)                     { $type = 'float'; }
+		elsif ($value eq '' || $value =~ /^([a-zA-Z_ ]+|'.+'|".+")$/) { $type = 'string'; }
 	}
 	
 	if (defined($type)) {

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCU.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.034
+#  Version 4.4.038
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -55,7 +55,7 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.4.034';
+my $HMCCU_VERSION = '4.4.038';
 
 # Timeout for CCU requests
 my $HMCCU_TIMEOUT_REQUEST = 4;
@@ -231,7 +231,7 @@ sub HMCCU_GetAttribute ($$$$);
 sub HMCCU_GetFlags ($);
 sub HMCCU_GetAttrReadingFormat ($$);
 sub HMCCU_GetAttrStripNumber ($);
-sub HMCCU_GetAttrSubstitute ($$);
+sub HMCCU_GetAttrSubstitute ($;$);
 sub HMCCU_IODeviceStates ();
 sub HMCCU_IsFlag ($$);
 
@@ -245,6 +245,7 @@ sub HMCCU_CreateDevice ($$$$$);
 sub HMCCU_DeleteDevice ($);
 sub HMCCU_DeviceDescToStr ($$);
 sub HMCCU_ExecuteRoleCommand ($@);
+sub HMCCU_ExecuteGetParameterCommand ($$$$);
 sub HMCCU_DisplayWeekProgram ($;$);
 sub HMCCU_ExistsDeviceModel ($$$;$);
 sub HMCCU_FindParamDef ($$$);
@@ -456,11 +457,7 @@ sub HMCCU_Define ($$)
 		InternalTimer (gettimeofday()+$hash->{hmccu}{ccu}{delay}, "HMCCU_InitDevice", $hash);
 	}
 	
-	$hash->{hmccu}{evtime}     = 0;
-	$hash->{hmccu}{evtimeout}  = 0;
-	$hash->{hmccu}{updatetime} = 0;
-	$hash->{hmccu}{rpccount}   = 0;
-	$hash->{hmccu}{defaults}   = 0;
+	$hash->{hmccu}{$_} = 0 for ('evtime', 'evtimeout', 'updatetime', 'rpccount', 'defaults');
 
 	HMCCU_UpdateReadings ($hash, { 'state' => 'Initialized', 'rpcstate' => 'inactive' });
 
@@ -917,13 +914,13 @@ sub HMCCU_SetDefaultsTemplate ($$)
 	my ($hash, $template) = @_;
 	my $name = $hash->{NAME};
 	
-	$hash->{hmccu}{defaults} = 1;
+	$hash->{hmccu}{semDefaults} = 1;
 	foreach my $a (keys %{$template}) {
 		next if ($a =~ /^_/);
 		my $v = $template->{$a};
 		CommandAttr (undef, "$name $a $v");
 	}
-	$hash->{hmccu}{defaults} = 0;
+	$hash->{hmccu}{semDefaults} = 0;
 }
 
 ######################################################################
@@ -1286,7 +1283,7 @@ sub HMCCU_Set ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a // return 'No set command specified';
 	my $options = "var clear delete execute hmscript cleardefaults:noArg datapoint defaults:noArg ".
-		"importdefaults rpcregister:all rpcserver:on,off,restart ackmessages:noArg authentication ".
+		"importdefaults rpcregister:all rpcserver:on,off ackmessages:noArg authentication ".
 		"prgActivate prgDeactivate";
 	$opt = lc($opt);
 	
@@ -1309,7 +1306,7 @@ sub HMCCU_Set ($@)
 	my $ccureadings = AttrVal ($name, "ccureadings", $ccuflags =~ /noReadings/ ? 0 : 1);
 	my $ccureqtimeout = AttrVal ($name, "ccuReqTimeout", $HMCCU_TIMEOUT_REQUEST);
 	my $readingformat = HMCCU_GetAttrReadingFormat ($hash, $hash);
-	my $substitute = HMCCU_GetAttrSubstitute ($hash, $hash);
+	my $substitute = HMCCU_GetAttrSubstitute ($hash);
 	my $result;
 
 	# Add program names to command execute
@@ -1570,27 +1567,23 @@ sub HMCCU_Set ($@)
 			my $res = AnalyzeCommandChain (undef, "set $rpcdev register");
 			$result .= $res if (defined($res));
 		}
-		return HMCCU_SetState ($hash, "OK", $result);
+		return HMCCU_SetState ($hash, 'OK', $result);
 	}
 	elsif ($opt eq 'rpcserver') {
 		my $action = shift @$a;
-		$action = shift @$a if ($action eq $opt);
-		$usage = "Usage: set $name $opt {'on'|'off'|'restart'}";
+# 		$action = shift @$a if ($action eq $opt);
+		$usage = "Usage: set $name $opt {'on'|'off'}";
 
 		return HMCCU_SetError ($hash, $usage)
-			if (!defined($action) || $action !~ /^(on|off|restart)$/);
+			if (!defined($action) || $action !~ /^(on|off)$/);
 		   
 		if ($action eq 'on') {
 			return HMCCU_SetError ($hash, 'Start of RPC server failed')
 				if (!HMCCU_StartExtRPCServer ($hash));
 		}
-		elsif ($action eq 'off') {
+		else {
 			return HMCCU_SetError ($hash, 'Stop of RPC server failed')
 				if (!HMCCU_StopExtRPCServer ($hash));
-		}
-		elsif ($action eq 'restart') {
-			return "HMCCU: No RPC server running" if (!HMCCU_IsRPCServerRunning ($hash));
-   		return HMCCU_SetError ($hash, 'HMCCU: restart of RPC server not supported');
 		}
 		
 		return HMCCU_SetState ($hash, 'OK');
@@ -2113,9 +2106,9 @@ sub HMCCU_ParseObject ($$$)
 # Parameter channel can be a channel name or a channel address without
 # interface specification.
 # Filter rule syntax is either:
-#   [N:]{Channel-Number|Channel-Name-Expr}!Datapoint-Expr
+#   [N:]{Channel-No[,Channel-No]|Channel-Name-Expr}!Datapoint-Expr
 # or
-#   [N:][Channel-Number.]Datapoint-Expr
+#   [N:][Channel-No[,Channel-No].]Datapoint-Expr
 # Multiple filter rules must be separated by ;
 ######################################################################
  
@@ -2155,6 +2148,7 @@ sub HMCCU_FilterReading ($$$;$)
 	foreach my $r (split (';', $rf)) {
 		my $rm = 1;
 		my $cn = '';
+		my $cnl = '';
 		
 		# Negative filter
 		if ($r =~ /^N:/) {
@@ -2164,9 +2158,10 @@ sub HMCCU_FilterReading ($$$;$)
 		
 		# Get filter criteria
 		my ($c, $f) = split ("!", $r);
-		if (defined ($f)) {
+		if (defined($f)) {
 			next if ($c eq '' || $chnnam eq '' || $chnnum eq '');
 			$cn = $c if ($c =~ /^([0-9]{1,2})$/);
+			$cnl = $c if ($c =~ /^[0-9]{1,2}(,[0-9]{1,2})+$/);
 		}
 		else {
 			$c = '';
@@ -2174,18 +2169,24 @@ sub HMCCU_FilterReading ($$$;$)
 				$cn = $1;
 				$f = $2;
 			}
+			elsif ($r =~ /^[0-9]{1,2}(,[0-9]{1,2})+\.(.+)$/) {
+				($cnl, $f) = split /\./, $r, 2;
+			}
 			else {
 				$cn = '';
 				$f = $r;
 			}
 		}
 
-		HMCCU_Trace ($hash, 2, "    check rm=$rm f=$f cn=$cn c=$c");
+		$cnl = ",$cnl," if ($cnl ne '');
+	
+		HMCCU_Trace ($hash, 2, "    check rm=$rm f=$f cn=$cn cnl=$cnl c=$c");
 		# Positive filter
 		return 1 if (
 			$rm && (
 				(
 					($cn ne '' && "$chnnum" eq "$cn") ||
+					($cnl ne '' && $cnl =~ /,$chnnum,/) ||
 					($c ne '' && $chnnam =~ /$c/) ||
 					($cn eq '' && $c eq '') ||
 					($chnnum eq 'd')
@@ -2659,22 +2660,18 @@ sub HMCCU_Substitute ($$$$$;$$)
 
 	my $substrule = '';
 	my $ioHash;
+	my $rc = 0;
+	my $newvalue;
 	
 	if (defined($hashOrRule)) {
 		if (ref($hashOrRule) eq 'HASH') {
 			$ioHash = HMCCU_GetHash ($hashOrRule);
-			my $substitute = HMCCU_GetAttrSubstitute ($hashOrRule, $ioHash)
-				if (defined($ioHash));
+			$substrule = HMCCU_GetAttrSubstitute ($hashOrRule, $ioHash);
 		}
 		else {
 			$substrule = $hashOrRule;
 		}
 	}
-
-	my $rc = 0;
-	my $newvalue;
-
-#	return $value if (!defined ($substrule) || $substrule eq '');
 
 	# Remove channel number from datapoint if specified
 	if ($dpt =~ /^([0-9]{1,2})\.(.+)$/) {
@@ -2699,7 +2696,7 @@ sub HMCCU_Substitute ($$$$$;$$)
 					}
 					if ($d eq $dpt && ($c == -1 || !defined($chn) || $c == $chn)) {
 						($rc, $newvalue) = HMCCU_SubstRule ($value, $ruletoks[1], $mode);
-						return $newvalue;
+						return $newvalue if ($rc == 1);
 					}
 				}
 			}
@@ -2714,6 +2711,17 @@ sub HMCCU_Substitute ($$$$$;$$)
 	# Original value not modified by rules. Use default conversion depending on type/role
 	# Default conversion can be overriden by attribute ccudef-substitute in I/O device
 
+	# Substitute by rules defined in CONVERSIONS table		
+	if (!defined($type) || $type eq '') {
+		$type = defined($devDesc) && defined($devDesc->{INDEX}) ? $devDesc->{TYPE} : 'DEFAULT';
+	}
+	if (exists($HMCCU_CONVERSIONS->{$type}{$dpt}{$value})) {
+		return $HMCCU_CONVERSIONS->{$type}{$dpt}{$value};
+	}
+	elsif (exists($HMCCU_CONVERSIONS->{DEFAULT}{$dpt}{$value})) {
+		return $HMCCU_CONVERSIONS->{DEFAULT}{$dpt}{$value};
+	}
+	
 	# Substitute enumerations
 	if (defined($devDesc) && defined($ioHash)) {
 		my $paramDef = HMCCU_GetParamDef ($ioHash, $devDesc, 'VALUES', $dpt);
@@ -2730,18 +2738,6 @@ sub HMCCU_Substitute ($$$$$;$$)
 				return $enumList[$idx] if ($idx >= 0 && $idx < scalar(@enumList));
 			}
 		}
-	}
-		
-	if ((!defined($type) || $type eq '') && defined($devDesc) && defined($devDesc->{INDEX})) {
-		$type = $devDesc->{TYPE};
-	}
-	$type = 'DEFAULT' if (!defined($type) || $type eq '');
-	
-	if (exists($HMCCU_CONVERSIONS->{$type}{$dpt}{$value})) {
-		return $HMCCU_CONVERSIONS->{$type}{$dpt}{$value};
-	}
-	elsif (exists($HMCCU_CONVERSIONS->{DEFAULT}{$dpt}{$value})) {
-		return $HMCCU_CONVERSIONS->{DEFAULT}{$dpt}{$value};
 	}
 	
 	return $value;
@@ -3376,7 +3372,7 @@ sub HMCCU_GetChannelRole ($;$)
 	my ($clHash, $chnNo) = @_;
 	
 	return '' if (!defined($clHash->{hmccu}{role}) || $clHash->{hmccu}{role} eq '');
-	
+
 	if (!defined($chnNo)) {
 		if ($clHash->{TYPE} eq 'HMCCUCHN') {
 			my ($ad, $cc) = HMCCU_SplitChnAddr ($clHash->{ccuaddr});
@@ -3407,17 +3403,23 @@ sub HMCCU_GetDeviceConfig ($)
 	my ($ioHash) = @_;
 	
 	my ($cDev, $cPar, $cLnk) = (0, 0, 0);
+	my $c = 0;
 	
 	foreach my $iface (keys %{$ioHash->{hmccu}{interfaces}}) {
-# 		next if ($ioHash->{hmccu}{interfaces}{$iface}{type} eq 'B');
 		if (exists($ioHash->{hmccu}{interfaces}{$iface}{device})) {
 			my $rpcHash = $defs{$ioHash->{hmccu}{interfaces}{$iface}{device}};
 			HMCCU_Log ($ioHash, 2, "Reading Device Descriptions for interface $iface");
-			$cDev += HMCCURPCPROC_GetDeviceDesc ($rpcHash);
+			$c = HMCCURPCPROC_GetDeviceDesc ($rpcHash);
+			HMCCU_Log ($ioHash, 2, "Read $c Device Descriptions for interface $iface");
+			$cDev += $c;
 			HMCCU_Log ($ioHash, 2, "Reading Paramset Descriptions for interface $iface");
-			$cPar += HMCCURPCPROC_GetParamsetDesc ($rpcHash);
+			$c = HMCCURPCPROC_GetParamsetDesc ($rpcHash);
+			HMCCU_Log ($ioHash, 2, "Read $c Paramset Descriptions for interface $iface");
+			$cPar += $c;
 			HMCCU_Log ($ioHash, 2, "Reading Peer Descriptions for interface $iface");
-			$cLnk += HMCCURPCPROC_GetPeers ($rpcHash);
+			$c = HMCCURPCPROC_GetPeers ($rpcHash);
+			HMCCU_Log ($ioHash, 2, "Read $c Peer Descriptions for interface $iface");
+			$cLnk += $c;
 		}
 		else {
 			HMCCU_Log ($ioHash, 2, "No RPC device found for interface $iface. Can't read device config.");
@@ -4276,7 +4278,7 @@ sub HMCCU_RefreshReadings ($)
 {
 	my ($clHash) = @_;
 	
-	return if ($clHash->{hmccu}{defaults} == 1);
+	return if ($clHash->{hmccu}{semDefaults} == 1);
 	
 	my $ioHash = HMCCU_GetHash ($clHash) // return;
 	
@@ -4314,12 +4316,21 @@ sub HMCCU_UpdateInternalValues ($$$$$)
 	
 	my %weekDay = ('SUNDAY', 0, 'MONDAY', 1, 'TUESDAY', 2, 'WEDNESDAY', 3,
 		'THURSDAY', 4, 'FRIDAY', 5, 'SATURDAY', 6);
+	my $weekDayExp = join('|', keys %weekDay);
 	
 	# Store time/value tables
-	if ($type eq 'SVAL' && $chkey =~ /^[0-9d]+\.P([0-9])_([A-Z]+)_([A-Z]+)_([0-9]+)$/) {
-		my ($prog, $valName, $day, $time) = ($1, $2, $3, $4);
-		if (exists($weekDay{$day})) {
-			$ch->{hmccu}{tt}{$prog}{$valName}{$weekDay{$day}}{$time} = $value;
+	if ($type eq 'SVAL') {
+		if ($chkey =~ /^[0-9d]+\.P([0-9])_([A-Z]+)_($weekDayExp)_([0-9]+)$/) {
+			my ($prog, $valName, $day, $time) = ($1, $2, $3, $4);
+			if (exists($weekDay{$day})) {
+				$ch->{hmccu}{tt}{$prog}{$valName}{$weekDay{$day}}{$time} = $value;
+			}
+		}
+		elsif ($chkey =~ /^[0-9d]+\.([A-Z]+)_($weekDayExp)_([0-9]+)$/) {
+			my ($valName, $day, $time) = ($1, $2, $3);
+			if (exists($weekDay{$day})) {
+				$ch->{hmccu}{tt}{1}{$valName}{$weekDay{$day}}{$time} = $value;
+			}
 		}
 	}
 	
@@ -6126,14 +6137,14 @@ sub HMCCU_SetDefaultAttributes ($;$)
 	my ($clHash, $parRef) = @_;
 	my $clName = $clHash->{NAME};
 	
-	$parRef //= { mode => 'update', role => undef, ctrlChn => '' };
+	$parRef //= { mode => 'update', role => undef, ctrlChn => undef };
 	my $role = $parRef->{role} // HMCCU_GetChannelRole ($clHash, $parRef->{ctrlChn});
 
 	if ($role ne '' && exists($HMCCU_ATTR->{$role})) {
 		HMCCU_Log ($clHash, 2, "Default attributes found for role $role");
-		$clHash->{hmccu}{defaults} = 1;
+		$clHash->{hmccu}{semDefaults} = 1;
 		if ($parRef->{mode} eq 'reset') {
-			my @removeAttr = ('ccureadingname', 'ccuscaleval', 'eventMap', 'substexcl',
+			my @removeAttr = ('ccureadingname', 'ccuscaleval', 'eventMap',
 				'substitute', 'webCmd', 'widgetOverride'
 			);
 			foreach my $a (@removeAttr) {
@@ -6143,10 +6154,11 @@ sub HMCCU_SetDefaultAttributes ($;$)
 		foreach my $a (keys %{$HMCCU_ATTR->{$role}}) {
 			CommandAttr (undef, "$clName $a ".$HMCCU_ATTR->{$role}{$a});
 		}
-		$clHash->{hmccu}{defaults} = 0;
+		$clHash->{hmccu}{semDefaults} = 0;
 		return 1;
 	}
 	else {
+		HMCCU_Log ($clHash, 2, "Cannot detect control channel role of $clName");
 		return 0;
 	}
 }
@@ -6319,8 +6331,13 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 			elsif ($parTypes[0] == 0 && $parTypes[1] == 0) {
 				$cmdDef .= ':noArg';
 			}
-			
-			$clHash->{hmccu}{roleCmds}{$cmd}{channel}  = $cmdChn;			
+
+			if (exists($clHash->{hmccu}{roleCmds}{$cmd}{channel})) {
+				$clHash->{hmccu}{roleCmds}{$cmd}{channel} = '?';
+			}
+			else {
+				$clHash->{hmccu}{roleCmds}{$cmd}{channel} = $cmdChn;
+			}
 			$clHash->{hmccu}{roleCmds}{$cmd}{usage}    = $usage;
 			$clHash->{hmccu}{roleCmds}{$cmd}{subcount} = $cnt;
 			push @cmdList, $cmdDef;
@@ -6338,16 +6355,21 @@ sub HMCCU_UpdateRoleCommands ($$;$)
 
 sub HMCCU_ExecuteRoleCommand ($@)
 {
-	my ($ioHash, $clHash, $command, $a, $h) = @_;
+	my ($ioHash, $clHash, $command, $cc, $a, $h) = @_;
 
 	my $rc;
 	my %dpval;
 	my %cfval;
 	my ($devAddr, undef) = HMCCU_SplitChnAddr ($clHash->{ccuaddr});
 	my $usage = $clHash->{hmccu}{roleCmds}{$command}{usage};
-	my $channel = $clHash->{hmccu}{roleCmds}{$command}{channel};
-	my $chnAddr = "$devAddr:$channel";
 	my $c = 0;
+
+	my $channel = $clHash->{hmccu}{roleCmds}{$command}{channel};
+	if ("$channel" eq '?') {
+		return HMCCU_SetError ($clHash, -12) if ($cc eq '');
+		$channel = $cc;
+	}
+	my $chnAddr = "$devAddr:$channel";
 	
 	foreach my $cmdNo (sort keys %{$clHash->{hmccu}{roleCmds}{$command}{subcmd}}) {
 		my $cmd = $clHash->{hmccu}{roleCmds}{$command}{subcmd}{$cmdNo};
@@ -6414,6 +6436,106 @@ sub HMCCU_ExecuteRoleCommand ($@)
 }
 
 ######################################################################
+# Execute toggle command
+######################################################################
+
+sub HMCCU_ExecuteToggleCommand ($@)
+{
+	my ($clHash, $cc, $cd) = @_;
+	
+	# Get state values related to control channel and datapoint
+	my $stateVals = HMCCU_GetStateValues ($clHash, $cd, $cc);
+	my %stateCmds = split (/[:,]/, $stateVals);
+	my @states = keys %stateCmds;
+	
+	my $ccuif = $clHash->{ccuif};
+	my ($devAddr, undef) = HMCCU_SplitChnAddr ($clHash->{ccuaddr}); 
+	my $stc = scalar(@states);
+	return HMCCU_SetError ($clHash, -15) if ($stc == 0);
+
+	my $curState = defined($clHash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL}) ?
+		$clHash->{hmccu}{dp}{"$cc.$cd"}{VALUES}{SVAL} : $states[0];
+
+	my $newState = '';
+	my $st = 0;
+	while ($st < $stc) {
+		if ($states[$st] eq $curState	) {
+			$newState = ($st == $stc-1) ? $states[0] : $states[$st+1];
+			last;
+		}
+		$st++;
+	}
+
+	return HMCCU_SetError ($clHash, "Current device state doesn't match any state value")
+		if ($newState eq '');
+
+	my $rc = HMCCU_SetMultipleDatapoints ($clHash,
+		{ "001.$ccuif.$devAddr:$cc.$cd" => $stateCmds{$newState} }
+	);
+	return HMCCU_SetError ($clHash, HMCCU_Min(0, $rc))
+}
+
+######################################################################
+# Execute commands to fetch device parameters
+######################################################################
+
+sub HMCCU_ExecuteGetParameterCommand ($$$$)
+{
+	my ($ioHash, $clHash, $command, $addList) = @_;
+
+	my %parSets = ('config' => 'MASTER,LINK', 'values' => 'VALUES', 'update' => 'VALUES,MASTER,LINK');
+	my $defParamset = $parSets{$command};
+	
+	my %objects;
+	foreach my $a (@$addList) {
+		my $devDesc = HMCCU_GetDeviceDesc ($ioHash, $a, $clHash->{ccuif});
+		return HMCCU_SetError ($clHash, "Can't get device description") if (!defined($devDesc));
+		
+		my $paramset = $defParamset eq '' ? $devDesc->{PARAMSETS} : $defParamset;
+		my ($da, $dc) = HMCCU_SplitChnAddr ($a);
+		$dc = 'd' if ($dc eq '');
+
+		foreach my $ps (split (',', $paramset)) {
+			next if ($devDesc->{PARAMSETS} !~ /$ps/);
+
+			if ($ps eq 'LINK') {
+				foreach my $rcv (HMCCU_GetReceivers ($ioHash, $a, $clHash->{ccuif})) {
+					my ($rc, $result) = HMCCU_RPCRequest ($clHash, 'getRawParamset', $a, $rcv, undef);
+					next if ($rc < 0);
+					foreach my $p (keys %$result) { $objects{$da}{$dc}{"LINK.$rcv"}{$p} = $result->{$p}; }					
+				}
+			}
+			else {
+				my ($rc, $result) = HMCCU_RPCRequest ($clHash, 'getRawParamset', $a, $ps, undef);
+				if ($rc >= 0) {
+					foreach my $p (keys %$result) { $objects{$da}{$dc}{$ps}{$p} = $result->{$p}; }
+				}
+			}
+		}
+	}
+	
+	my $res = '';
+	if (scalar(keys %objects) > 0) {
+		my $convRes = HMCCU_UpdateParamsetReadings ($ioHash, $clHash, \%objects);
+		if (defined($convRes)) {
+			foreach my $da (sort keys %$convRes) {
+				$res .= "Device $da\n";
+				foreach my $dc (sort keys %{$convRes->{$da}}) {
+					foreach my $ps (sort keys %{$convRes->{$da}{$dc}}) { 
+						$res .= "  Channel $dc [$ps]\n".
+							join ("\n", map { 
+								"    ".$_.' = '.$convRes->{$da}{$dc}{$ps}{$_}
+							} sort keys %{$convRes->{$da}{$dc}{$ps}})."\n";
+					}
+				}
+			}
+		}
+	}
+	
+	return $res eq '' ? 'No data found' : $res;
+}
+
+######################################################################
 # Get week program(s) as html table
 ######################################################################
 
@@ -6432,10 +6554,9 @@ sub HMCCU_DisplayWeekProgram ($;$)
 		$s .= '<p><b>Week Program '.$w.'</b></p><br/><table border="1">';
 		foreach my $d (sort keys %{$p->{ENDTIME}}) {
 			$s .= '<tr><td><b>'.$weekDay[$d].'</b></td>';
-			my $h24 = 0;
 			foreach my $h (sort { $a <=> $b } keys %{$p->{ENDTIME}{$d}}) {
-				$s .= '<td>'.($h24 == 0 ? $p->{ENDTIME}{$d}{$h}.' / '.$p->{TEMPERATURE}{$d}{$h} : '&nbsp;').'</td>';
-				$h24 = 1 if ($h24 == 0 && $p->{ENDTIME}{$d}{$h} eq '24:00');
+				$s .= '<td>'.$p->{ENDTIME}{$d}{$h}.' / '.$p->{TEMPERATURE}{$d}{$h}.'</td>';
+				last if ($p->{ENDTIME}{$d}{$h} eq '24:00');
 			}
 			$s .= '</tr>';
 		}
@@ -6510,7 +6631,7 @@ sub HMCCU_CheckParameter ($$;$$$)
 # datapoint name.
 # If controldatapoint is not specified it will synchronized with
 # statedatapoint.
-# Return (sc, sd, cc, cd)
+# Return (sc, sd, cc, cd, sdCnt, cdCnt)
 ######################################################################
 
 sub HMCCU_GetSpecialDatapoints ($)
@@ -6529,6 +6650,7 @@ sub HMCCU_GetSpecialDatapoints ($)
 		HMCCU_Log ($hash, 2, "No CCU address defined");
 	}
 	my ($sc, $sd, $cc, $cd) = ($dc // '', '', $dc // '', '');
+	my ($rsdCnt, $rcdCnt) = (0, 0);
 	my $statedatapoint = AttrVal ($name, 'statedatapoint', '');
 	my $controldatapoint = AttrVal ($name, 'controldatapoint', '');
 	
@@ -6580,7 +6702,7 @@ sub HMCCU_GetSpecialDatapoints ($)
 			}
 		}
 		elsif ($type eq 'HMCCUDEV') {
-			my ($rsdCnt, $rcdCnt) = (0, 0);
+			# Count matching roles to prevent ambiguous definitions 
 			my ($rsc, $rsd, $rcc, $rcd) = ('', '', '', '');
 			foreach my $roleDef (split(',', $hash->{hmccu}{role})) {
 				my ($rc, $role) = split(':', $roleDef);
@@ -6623,7 +6745,7 @@ sub HMCCU_GetSpecialDatapoints ($)
 	$hash->{hmccu}{control}{dpt} = $cd;
 	$hash->{hmccu}{control}{chn} = $cc;
 
-	return ($sc, $sd, $cc, $cd);
+	return ($sc, $sd, $cc, $cd, $rsdCnt, $rcdCnt);
 }
 
 ######################################################################
@@ -6711,24 +6833,15 @@ sub HMCCU_GetAttrStripNumber ($)
 # Substitute ${xxx} by datapoint value.
 ######################################################################
 
-sub HMCCU_GetAttrSubstitute ($$)
+sub HMCCU_GetAttrSubstitute ($;$)
 {
 	my ($clhash, $iohash) = @_;
-	my $clname = $clhash->{NAME};
-	my $ioname = $iohash->{NAME};
 
-	my $substdef = AttrVal ($ioname, 'ccudef-substitute', '');
-	my $subst = AttrVal ($clname, 'substitute', $substdef);
+	my $substdef = defined($iohash) ? AttrVal ($iohash->{NAME}, 'ccudef-substitute', '') : '';
+	my $subst = AttrVal ($clhash->{NAME}, 'substitute', $substdef);
 	$subst .= ";$substdef" if ($subst ne $substdef && $substdef ne '');
-	HMCCU_Trace ($clhash, 2, "subst = $subst");
 	
-	return $subst if ($subst !~ /\$\{.+\}/);
-
-	$subst = HMCCU_SubstVariables ($clhash, $subst, undef);
-
-	HMCCU_Trace ($clhash, 2, "subst_vars = $subst");
-	
-	return $subst;
+	return $subst !~ /\$\{.+\}/ ? $subst : HMCCU_SubstVariables ($clhash, $subst, undef);
 }
 
 ######################################################################
@@ -6930,7 +7043,7 @@ sub HMCCU_BulkUpdate ($$$$)
 {
 	my ($hash, $reading, $orgval, $subval) = @_;
 	
-	my $excl = AttrVal ($hash->{NAME}, 'substexcl', 'control|pct');
+	my $excl = AttrVal ($hash->{NAME}, 'substexcl', '');
 
 	readingsBulkUpdate ($hash, $reading, ($excl ne '' && $reading =~ /$excl/ ? $orgval : $subval));
 }
