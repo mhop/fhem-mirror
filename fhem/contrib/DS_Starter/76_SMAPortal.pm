@@ -231,7 +231,7 @@ sub Initialize {
                            "interval ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
-                           "verbose5Data:none,loginData,balanceData,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
+                           "verbose5Data:none,loginData,balanceDayData,liveData,weatherData,forecastData,consumerLiveData,consumerDayData,consumerMonthData,consumerYearData ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -756,14 +756,13 @@ sub GetSetData {                                                       ## no cri
   my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
   my $dl                   = AttrVal($name, "detailLevel", 1);                                          # selected Detail Level
-  my ($ccyeardata_content) = ("");
   my $state                = "ok";
   my ($reread,$retry)      = (0,0);  
   my ($exceed,$newcycle)   = (0,0);
-  my ($balancedataday_content,$ccdaydata_content,$ccmonthdata_content)  = ("","","");
-  my ($st,$lc)                                                          = ("","");
+  my ($st,$lc)             = ("","");
+  my @da                   = ();
+  my ($ccdaydata_content,$ccmonthdata_content,$ccyeardata_content)  = ("","","");
   my ($d,$op,$paref); 
-  my @da     = ();
   
   if($setp ne "none") {
       # Verbraucher soll in den Status $op geschaltet werden
@@ -858,8 +857,11 @@ sub GetSetData {                                                       ## no cri
                                                      tag  => "liveData"
                                                   });
                               
-      $paref = [ $hash,$errstate,$state,$livedata ];
-      ($reread,$retry,$errstate,$state) = analyzeData($paref);
+      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
+                                                         errstate => $errstate,
+                                                         state    => $state,
+                                                         data     => $livedata
+                                                      });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -912,8 +914,11 @@ sub GetSetData {                                                       ## no cri
                                                            tag  => "weatherData"
                                                         });
                               
-      $paref = [ $hash,$errstate,$state,$weatherdata ];
-      ($reread,$retry,$errstate,$state) = analyzeData($paref);
+      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
+                                                         errstate => $errstate,
+                                                         state    => $state,
+                                                         data     => $weatherdata
+                                                      });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -928,25 +933,29 @@ sub GetSetData {                                                       ## no cri
       
       
       ### Statistic Data Tag (anchorTime beachten !)
-      ################################################      
-      Log3 ($name, 4, "$name - Getting statistic day data");
-      
-      my $req = HTTP::Request->new( 'POST', 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues' );                              
-                
+      ################################################                       
       my $anchort = int ($time / 1000);                                           # anchorTime -> abzurufendes Datum
       my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-      my $cont    = qq{"tabNumber":$tab,"anchorTime":$anchort};
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+                         
+      my ($balancedataday,$balancedataday_content) = _putData ({ name    => $name,
+                                                                 ua      => $ua,
+                                                                 call    => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                                                 fields  => \%fields,
+                                                                 content => $cont,
+                                                                 tag     => "balanceDayData"
+                                                              });
+                                                              
+      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
+                                                         errstate => $errstate,
+                                                         state    => $state,
+                                                         data     => $balancedataday
+                                                      });
       
-      $req->header  ( "Content-Type"   => "application/json; charset=utf-8" );
-      $req->header  ( "Content-Length" => 39 );      
-      $req->content ( "{$cont}" );               
-      
-      my $res                    = $ua->request( $req );
-      my $balancedataday_content = $res->content;
-      
-      if($v5d eq "balanceData") {
-          Log3 ($name, 5, "$name - Return Code: ".$res->code); 
-          Log3 ($name, 5, "$name - Statistic data received:\n".Dumper decode_json($balancedataday_content));
+      if($errstate) {
+          $st = encode_base64 ( $state,"");
+          return "$name|0|0|$errstate|$getp|$setp|$st";
       }
       
       if ($balancedataday_content && $balancedataday_content !~ m/undefined/ix) {
@@ -964,8 +973,11 @@ sub GetSetData {                                                       ## no cri
                                                                  tag  => "forecastData"
                                                               });
                                   
-          $paref = [ $hash,$errstate,$state,$forecastdata ];
-          ($reread,$retry,$errstate,$state) = analyzeData($paref);
+          ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
+                                                             errstate => $errstate,
+                                                             state    => $state,
+                                                             data     => $forecastdata
+                                                          });
           
           if($errstate) {
               $st = encode_base64 ($state, "");
@@ -991,8 +1003,11 @@ sub GetSetData {                                                       ## no cri
                                                                          tag  => "consumerLiveData"
                                                                       });
                                   
-          $paref = [ $hash,$errstate,$state,$consumerlivedata ];
-          ($reread,$retry,$errstate,$state) = analyzeData($paref);
+          ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
+                                                             errstate => $errstate,
+                                                             state    => $state,
+                                                             data     => $consumerlivedata
+                                                          });
           
           if($errstate) {
               $st = encode_base64 ( $state,"");
@@ -1177,7 +1192,7 @@ return ($state, $errstate);
 }
 
 ################################################################
-#                      Standard Abruf Daten
+#                      Standard Abruf Daten GET
 ################################################################
 sub _getData {
   my $paref = shift;
@@ -1193,6 +1208,37 @@ sub _getData {
   Log3 ($name, 4, "$name - Getting $tag");
   
   my $data  = $ua->get( $call );  
+  my $dcont = $data->content;                                                  
+
+  $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
+  
+  if($v5d eq $tag) {
+      Log3 ($name, 5, "$name - Return Code: ".$data->code); 
+      Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
+  }
+  
+return ($data,$dcont); 
+}
+
+################################################################
+#                      Standard Abruf Daten POST
+################################################################
+sub _putData {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $ua      = $paref->{ua};
+  my $call    = $paref->{call};
+  my $fields  = $paref->{fields};
+  my $content = $paref->{content};
+  my $tag     = $paref->{tag};
+  my $v5d     = AttrVal($name, "verbose5Data", "none");
+  
+  my $cont;   
+
+  Log3 ($name, 4, "$name - Getting $tag");
+
+  my $data  = $ua->post( $call, %$fields, Content => $content );
+                         
   my $dcont = $data->content;                                                  
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
@@ -2044,10 +2090,10 @@ return 1;
 ################################################################
 sub analyzeData {                                                          ## no critic 'complexity'
   my $paref           = shift;
-  my $hash            = $paref->[0];
-  my $errstate        = $paref->[1];
-  my $state           = $paref->[2];
-  my $ad              = $paref->[3];
+  my $hash            = $paref->{hash};
+  my $errstate        = $paref->{errstate};
+  my $state           = $paref->{state};
+  my $ad              = $paref->{data};
   my $name            = $hash->{NAME};
   my ($reread,$retry) = (0,0);
   my $data            = "";
@@ -2114,7 +2160,7 @@ sub analyzeData {                                                          ## no
           $state      = ($p1 // "")." ".($p2 // "");          
       }
       
-      Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat) if($v5d eq "loginData");
+      Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
       $errstate = 1;
   }
