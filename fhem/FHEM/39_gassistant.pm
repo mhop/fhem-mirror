@@ -94,7 +94,7 @@ gassistant_Define($$)
 
   #CommandAttr(undef, "$name gassistantFHEM-filter room=GoogleAssistant") if( !AttrVal($name, 'gassistantFHEM-filter', undef ) );
 
-  if( !AttrVal($name, 'devStateIcon', undef )) {
+  if( !AttrVal($name, 'stateFormat', undef )) {
     CommandAttr(undef, "$name stateFormat gassistant-fhem-connection");
     CommandAttr(undef, "$name devStateIcon { my \$error = ReadingsVal(\$name,\"gassistant-fhem-lastServerError\",\"none\") eq \"none\"?\"10px-kreis-gruen\":\"10px-kreis-rot\";; my \$onoff = substr(ReadingsVal(\$name, \"gassistant-fhem\", \"running\"),0,7) eq \"running\"?\"control_on_off\\\@green\":\"control_on_off\\\@red\";; my \$reload = ReadingsVal(\$name, \"gassistant-fhem-connection\", \"connected\") eq \"connected\"?\"audio_repeat\\\@green\":\"audio_repeat\\\@orange\";;\"<div><a>\".FW_makeImage(\$error).\"<\/a> <a href=\\\"\/fhem?cmd.dummy=set \$name reload&XHR=1\\\">\".FW_makeImage(\$reload, \"reload\").\"<\/a><a href=\\\"\/fhem?cmd.dummy=set \$name restart&XHR=1\\\">&nbsp;&nbsp;\".FW_makeImage(\$onoff, \"restart\").\"<\/a><\/div>\"}");
     CommandAttr(undef, "$name icon gassistant");
