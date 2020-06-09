@@ -762,9 +762,6 @@ sub GetSetData {                                                       ## no cri
   my ($exceed,$newcycle)   = (0,0);
   my ($balancedataday_content,$ccdaydata_content,$ccmonthdata_content)  = ("","","");
   my ($st,$lc)                                                          = ("","");
-  my ($livedata,$livedata_content)                                      = ("","");
-  my ($weatherdata,$weatherdata_content)                                = ("","");
-  my ($consumerlivedata,$consumerlivedata_content)                      = ("","");
   my ($d,$op,$paref); 
   my @da     = ();
   
@@ -855,11 +852,11 @@ sub GetSetData {                                                       ## no cri
       
       ### Live-Daten
       ################
-      ($livedata,$livedata_content) = _getData ({ name => $name,
-                                                  ua   => $ua,
-                                                  call => 'https://www.sunnyportal.com/homemanager?t='.$time,
-                                                  tag  => "liveData"
-                                               });
+      my ($livedata,$livedata_content) = _getData ({ name => $name,
+                                                     ua   => $ua,
+                                                     call => 'https://www.sunnyportal.com/homemanager?t='.$time,
+                                                     tag  => "liveData"
+                                                  });
                               
       $paref = [ $hash,$errstate,$state,$livedata ];
       ($reread,$retry,$errstate,$state) = analyzeData($paref);
@@ -897,15 +894,23 @@ sub GetSetData {                                                       ## no cri
           return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
       }
       
+      if ($livedata_content && $livedata_content !~ m/undefined/ix) {
+          extractLiveData ({ hash    => $hash,
+                             live    => $livedata_content,
+                             daref   => \@da
+                          });
+      }
+      
+      
       
       
       ### Wetterdaten
       #####################      
-      ($weatherdata,$weatherdata_content) = _getData ({ name => $name,
-                                                        ua   => $ua,
-                                                        call => 'https://www.sunnyportal.com/Dashboard/Weather',
-                                                        tag  => "weatherData"
-                                                     });
+      my ($weatherdata,$weatherdata_content) = _getData ({ name => $name,
+                                                           ua   => $ua,
+                                                           call => 'https://www.sunnyportal.com/Dashboard/Weather',
+                                                           tag  => "weatherData"
+                                                        });
                               
       $paref = [ $hash,$errstate,$state,$weatherdata ];
       ($reread,$retry,$errstate,$state) = analyzeData($paref);
@@ -915,11 +920,15 @@ sub GetSetData {                                                       ## no cri
           return "$name|0|0|$errstate|$getp|$setp|$st";
       }
       
+      if ($weatherdata_content && $weatherdata_content !~ m/undefined/ix) {
+          extractWeatherData ($hash,\@da,$weatherdata_content);
+      }
       
       
       
-      ### JSON Statistic Data Tag (anchorTime beachten !)
-      ####################################################      
+      
+      ### Statistic Data Tag (anchorTime beachten !)
+      ################################################      
       Log3 ($name, 4, "$name - Getting statistic day data");
       
       my $req = HTTP::Request->new( 'POST', 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues' );                              
@@ -932,15 +941,18 @@ sub GetSetData {                                                       ## no cri
       $req->header  ( "Content-Length" => 39 );      
       $req->content ( "{$cont}" );               
       
-      my $res                 = $ua->request( $req );
-      $balancedataday_content = $res->content;
+      my $res                    = $ua->request( $req );
+      my $balancedataday_content = $res->content;
       
       if($v5d eq "balanceData") {
           Log3 ($name, 5, "$name - Return Code: ".$res->code); 
           Log3 ($name, 5, "$name - Statistic data received:\n".Dumper decode_json($balancedataday_content));
       }
       
-      
+      if ($balancedataday_content && $balancedataday_content !~ m/undefined/ix) {
+          extractStatisticData ($hash,\@da,$balancedataday_content,"Day");
+      }
+  
       
       
       ### Forecast Daten abrufen
@@ -961,7 +973,6 @@ sub GetSetData {                                                       ## no cri
           }
           
           if ($forecastdata_content && $forecastdata_content !~ m/undefined/ix) {
-              $forecastdata_content = decode_json ($forecastdata_content);
               extractPlantData    ($hash,\@da,$forecastdata_content);
               extractForecastData ($hash,\@da,$forecastdata_content);
               extractConsumerData ($hash,\@da,$forecastdata_content);
@@ -971,14 +982,14 @@ sub GetSetData {                                                       ## no cri
       
       
       
-      ### JSON Consumer Livedaten und historische Energiedaten
-      #########################################################
+      ### Consumer Livedaten und historische Energiedaten
+      #####################################################
       if($dl > 2) {          
-          ($consumerlivedata,$consumerlivedata_content) = _getData ({ name => $name,
-                                                                      ua   => $ua,
-                                                                      call => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
-                                                                      tag  => "consumerLiveData"
-                                                                   });
+          my ($consumerlivedata,$consumerlivedata_content) = _getData ({ name => $name,
+                                                                         ua   => $ua,
+                                                                         call => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                                                         tag  => "consumerLiveData"
+                                                                      });
                                   
           $paref = [ $hash,$errstate,$state,$consumerlivedata ];
           ($reread,$retry,$errstate,$state) = analyzeData($paref);
@@ -986,6 +997,10 @@ sub GetSetData {                                                       ## no cri
           if($errstate) {
               $st = encode_base64 ( $state,"");
               return "$name|0|0|$errstate|$getp|$setp|$st";
+          }
+          
+          if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/ix) {
+              extractConsumerLiveData ($hash,\@da,$consumerlivedata_content);
           }
           
           
@@ -1021,6 +1036,10 @@ sub GetSetData {                                                       ## no cri
                   $ccdaydata_content = $ccdaydata->content;
                   Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
               }
+              
+              if ($ccdaydata_content && $ccdaydata_content !~ m/undefined/ix) {
+                  extractConsumerHistData($hash,\@da,$ccdaydata_content,"day");
+              }
 
               # Energiedaten aktueller Monat
               Log3 ($name, 4, "$name - Getting consumer energy data of current month");
@@ -1033,7 +1052,11 @@ sub GetSetData {                                                       ## no cri
               if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
                   $ccmonthdata_content = $ccmonthdata->content;
                   Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
-              }       
+              } 
+
+              if ($ccmonthdata_content && $ccmonthdata_content !~ m/undefined/ix) {
+                  extractConsumerHistData ($hash,\@da,$ccmonthdata_content,"month");
+              }              
 
               # Energiedaten aktuelles Jahr
               Log3 ($name, 4, "$name - Getting consumer energy data of current year");
@@ -1046,51 +1069,13 @@ sub GetSetData {                                                       ## no cri
               if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
                   $ccyeardata_content = $ccyeardata->content;
                   Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
-              }               
+              }
+
+              if ($ccyeardata_content && $ccyeardata_content !~ m/undefined/ix) {
+                  extractConsumerHistData ($hash,\@da,$ccyeardata_content,"year");
+              }
           }
       }
-  }
-  
-  
-  # Extraktion der Daten
-  ########################
-  
-  if ($livedata_content && $livedata_content !~ m/undefined/ix) {
-      $livedata_content = decode_json ($livedata_content);
-      extractLiveData ({ hash    => $hash,
-                         live    => $livedata_content,
-                         daref   => \@da
-                      });
-  }
-  
-  if ($consumerlivedata_content && $consumerlivedata_content !~ m/undefined/ix) {
-      $consumerlivedata_content = decode_json ($consumerlivedata_content);
-      extractConsumerLiveData ($hash,\@da,$consumerlivedata_content);
-  }
-  
-  if ($ccdaydata_content && $ccdaydata_content !~ m/undefined/ix) {
-      $ccdaydata_content = decode_json ($ccdaydata_content);
-      extractConsumerHistData($hash,\@da,$ccdaydata_content,"day");
-  }
-  
-  if ($ccmonthdata_content && $ccmonthdata_content !~ m/undefined/ix) {
-      $ccmonthdata_content = decode_json ($ccmonthdata_content);
-      extractConsumerHistData ($hash,\@da,$ccmonthdata_content,"month");
-  }
-  
-  if ($ccyeardata_content && $ccyeardata_content !~ m/undefined/ix) {
-      $ccyeardata_content = decode_json ($ccyeardata_content);
-      extractConsumerHistData ($hash,\@da,$ccyeardata_content,"year");
-  }
-  
-  if ($weatherdata_content && $weatherdata_content !~ m/undefined/ix) {
-      $weatherdata_content = decode_json ($weatherdata_content);
-      extractWeatherData ($hash,\@da,$weatherdata_content);
-  }
-  
-  if ($balancedataday_content && $balancedataday_content !~ m/undefined/ix) {
-      $balancedataday_content = decode_json ($balancedataday_content);
-      extractStatisticData ($hash,\@da,$balancedataday_content,"Day");
   }
 
   # Daten müssen als Einzeiler zurückgegeben werden
@@ -1158,7 +1143,7 @@ sub _checkLogin {
                   Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
               }
 
-              if($location =~ /\/FixedPages\// && $retcode eq "302") {                      # Weiterleitung -> Login erfolgeich
+              if($location =~ /\/FixedPages\//x && $retcode eq "302") {                     # Weiterleitung -> Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
@@ -1374,11 +1359,13 @@ sub extractLiveData {
   my $name    = $hash->{NAME};
   my $val     = "";
   
-  my ($errMsg,$warnMsg,$infoMsg) = (0,0,0);
-
-  readingsBeginUpdate($hash);
-  
   Log3 ($name, 4, "$name - ##### extracting live data #### ");
+  
+  $live = eval{decode_json($live)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                           return;
+                                         };
+                                                 
+  my ($errMsg,$warnMsg,$infoMsg) = (0,0,0);
   
   if (ref $live eq "HASH") {
       push @$daref, "L1_FeedIn:"                .($live->{FeedIn}               // 0)." W";
@@ -1443,6 +1430,10 @@ sub extractForecastData {              ## no critic 'complexity'
   my $dl = AttrVal($name, "detailLevel", 1);
   
   Log3 ($name, 4, "$name - ##### extracting forecast data #### ");
+  
+  $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                   return;
+                                                 };
    
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   $year    += 1900;
@@ -1578,6 +1569,10 @@ sub extractWeatherData {
   
   Log3 ($name, 4, "$name - ##### extracting weather data #### ");
   
+  $weather = eval{decode_json($weather)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                 return;
+                                               };
+  
   for my $k (keys %$weather) {
       next if(!$k);
 
@@ -1615,6 +1610,10 @@ sub extractStatisticData {
   
   Log3 ($name, 4, "$name - ##### extracting statistic data #### ");
   
+  $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                     return;
+                                                   };
+  
   if(ref $statistic eq "HASH") {
       $sd = decode_json ($statistic->{d});
   }
@@ -1641,6 +1640,10 @@ sub extractPlantData {
   my ($amount,$unit);
   
   Log3 ($name, 4, "$name - ##### extracting plant data #### ");
+  
+  $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                   return;
+                                                 };
   
   my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
   if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
@@ -1678,6 +1681,10 @@ sub extractConsumerData {
   my $dl = AttrVal($name, "detailLevel", 1);
   
   Log3 ($name, 4, "$name - ##### extracting consumer data #### ");
+  
+  $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                   return;
+                                                 };
   
   # Schleife über alle Consumer Objekte
   my $i = 0;
@@ -1752,6 +1759,10 @@ sub extractConsumerLiveData {
   
   Log3 ($name, 4, "$name - ##### extracting consumer live data #### ");
   
+  $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                     return;
+                                                   };
+  
   # allen Consumer Objekte die ID zuordnen
   $i = 0;
   for my $c (@{$clivedata->{'MeasurementData'}}) {
@@ -1821,6 +1832,10 @@ sub extractConsumerHistData {                                                  #
   my ($i,$gcr,$gct,$pcr,$pct,$tct,$bcr,$bct);
   
   Log3 ($name, 4, "$name - ##### extracting consumer history data #### ");
+  
+  $chdata = eval{decode_json($chdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                               return;
+                                             };
   
   my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
