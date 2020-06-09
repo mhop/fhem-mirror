@@ -1388,7 +1388,7 @@ sub extractLiveData {
       push @$daref, "L1_SelfConsumption:"       .($live->{SelfConsumption}      // 0)." W";
       push @$daref, "L1_SelfConsumptionQuote:"  .($live->{SelfConsumptionQuote} // 0)." %";
       push @$daref, "L1_SelfSupply:"            .($live->{SelfSupply}           // 0)." W";
-      push @$daref, "L1_Today_TotalConsumption:".($live->{TotalConsumption}     // 0)." W";
+      push @$daref, "L1_TotalConsumption:"      .($live->{TotalConsumption}     // 0)." W";
       
       push @$daref, "L1_BatteryIn:"             .$live->{BatteryIn}. " W" if(defined $live->{BatteryIn});
       push @$daref, "L1_BatteryOut:"            .$live->{BatteryOut}." W" if(defined $live->{BatteryOut});
