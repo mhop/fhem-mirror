@@ -855,16 +855,16 @@ sub GetSetData {                                                       ## no cri
       ### Live-Daten
       ################
       my ($livedata,$livedata_content)  = _getData ({ name => $name,
-                                                     ua   => $ua,
-                                                     call => 'https://www.sunnyportal.com/homemanager?t='.$time,
-                                                     tag  => "liveData"
+                                                      ua   => $ua,
+                                                      call => 'https://www.sunnyportal.com/homemanager?t='.$time,
+                                                      tag  => "liveData"
                                                    });
                               
-      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
-                                                         errstate => $errstate,
-                                                         state    => $state,
-                                                         data     => $livedata
-                                                      });
+      ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
+                                                          errstate => $errstate,
+                                                          state    => $state,
+                                                          data     => $livedata
+                                                       });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -900,10 +900,7 @@ sub GetSetData {                                                       ## no cri
       }
       
       if ($livedata_content && $livedata_content !~ m/undefined/ix) {
-          extractLiveData ({ hash    => $hash,
-                             live    => $livedata_content,
-                             daref   => \@da
-                          });
+          extractLiveData ($hash,\@da,$livedata_content);
       }
       
       
@@ -917,11 +914,11 @@ sub GetSetData {                                                       ## no cri
                                                            tag  => "weatherData"
                                                         });
                               
-      ($reread,$retry,$errstate,$state)      = analyzeData ({ hash     => $hash,
-                                                              errstate => $errstate,
-                                                              state    => $state,
-                                                              data     => $weatherdata
-                                                           });
+      ($reread,$retry,$errstate,$state)      = _analyzeData ({ name     => $name,
+                                                               errstate => $errstate,
+                                                               state    => $state,
+                                                               data     => $weatherdata
+                                                            });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -950,11 +947,11 @@ sub GetSetData {                                                       ## no cri
                                                                  tag     => "balanceDayData"
                                                               });
                                                               
-      ($reread,$retry,$errstate,$state)            = analyzeData ({ hash     => $hash,
-                                                                    errstate => $errstate,
-                                                                    state    => $state,
-                                                                    data     => $balancedataday
-                                                                 });
+      ($reread,$retry,$errstate,$state)            = _analyzeData ({ name     => $name,
+                                                                     errstate => $errstate,
+                                                                     state    => $state,
+                                                                     data     => $balancedataday
+                                                                  });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -976,11 +973,11 @@ sub GetSetData {                                                       ## no cri
                                                                  tag  => "forecastData"
                                                               });
                                   
-          ($reread,$retry,$errstate,$state)        = analyzeData ({ hash     => $hash,
-                                                                    errstate => $errstate,
-                                                                    state    => $state,
-                                                                    data     => $forecastdata
-                                                                 });
+          ($reread,$retry,$errstate,$state)        = _analyzeData ({ name     => $name,
+                                                                     errstate => $errstate,
+                                                                     state    => $state,
+                                                                     data     => $forecastdata
+                                                                  });
           
           if($errstate) {
               $st = encode_base64 ($state, "");
@@ -1006,11 +1003,11 @@ sub GetSetData {                                                       ## no cri
                                                                          tag  => "consumerLiveData"
                                                                       });
                                   
-          ($reread,$retry,$errstate,$state)                = analyzeData ({ hash     => $hash,
-                                                                            errstate => $errstate,
-                                                                            state    => $state,
-                                                                            data     => $consumerlivedata
-                                                                         });
+          ($reread,$retry,$errstate,$state)                = _analyzeData ({ name     => $name,
+                                                                             errstate => $errstate,
+                                                                             state    => $state,
+                                                                             data     => $consumerlivedata
+                                                                          });
           
           if($errstate) {
               $st = encode_base64 ( $state,"");
@@ -1045,53 +1042,59 @@ sub GetSetData {                                                       ## no cri
               # Energiedaten aktueller Tag
               Log3 ($name, 4, "$name - Getting consumer energy data of current day");
               Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
-              Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");                  
-              my $ccdaydata = $ua->get($ccdd);
+              Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
               
-              Log3 ($name, 5, "$name - Return Code: ".$ccdaydata->code) if($v5d eq "consumerDayData"); 
-
-              if ($ccdaydata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                  $ccdaydata_content = $ccdaydata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current day received:\n".Dumper decode_json($ccdaydata_content)) if($v5d eq "consumerDayData"); 
-              }
-              
-              if ($ccdaydata_content && $ccdaydata_content !~ m/undefined/ix) {
-                  extractConsumerHistData($hash,\@da,$ccdaydata_content,"day");
+              ($errstate,$state) = _dispatch ({ name     => $name,
+                                                ua       => $ua,
+                                                call     => $ccdd,
+                                                tag      => "consumerDayData",
+                                                state    => $state, 
+                                                function => "extractConsumerHistData",
+                                                addon    => "day",
+                                                daref    => \@da
+                                             });
+              if($errstate) {
+                  $st = encode_base64 ( $state,"");
+                  return "$name|0|0|$errstate|$getp|$setp|$st";
               }
 
               # Energiedaten aktueller Monat
               Log3 ($name, 4, "$name - Getting consumer energy data of current month");
               Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
               Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
-              my $ccmonthdata = $ua->get($ccmd);
-              
-              Log3 ($name, 5, "$name - Return Code: ".$ccmonthdata->code) if($v5d eq "consumerMonthData"); 
-
-              if ($ccmonthdata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                  $ccmonthdata_content = $ccmonthdata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current month received:\n".Dumper decode_json($ccmonthdata_content)) if($v5d eq "consumerMonthData"); 
-              } 
-
-              if ($ccmonthdata_content && $ccmonthdata_content !~ m/undefined/ix) {
-                  extractConsumerHistData ($hash,\@da,$ccmonthdata_content,"month");
-              }              
+             
+              ($errstate,$state) = _dispatch ({ name     => $name,
+                                                ua       => $ua,
+                                                call     => $ccmd,
+                                                tag      => "consumerMonthData",
+                                                state    => $state, 
+                                                function => "extractConsumerHistData",
+                                                addon    => "month",
+                                                daref    => \@da
+                                             });
+              if($errstate) {
+                  $st = encode_base64 ( $state,"");
+                  return "$name|0|0|$errstate|$getp|$setp|$st";
+              }            
 
               # Energiedaten aktuelles Jahr
               Log3 ($name, 4, "$name - Getting consumer energy data of current year");
               Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
               Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
-              my $ccyeardata = $ua->get($ccyd);
               
-              Log3 ($name, 5, "$name - Return Code: ".$ccyeardata->code) if($v5d eq "consumerMonthData"); 
-
-              if ($ccyeardata->content =~ m/ConsumerBalanceDeviceInfo/ix) {
-                  $ccyeardata_content = $ccyeardata->content;
-                  Log3 ($name, 5, "$name - Consumer energy data of current year received:\n".Dumper decode_json($ccyeardata_content)) if($v5d eq "consumerYearData"); 
-              }
-
-              if ($ccyeardata_content && $ccyeardata_content !~ m/undefined/ix) {
-                  extractConsumerHistData ($hash,\@da,$ccyeardata_content,"year");
-              }
+              ($errstate,$state) = _dispatch ({ name     => $name,
+                                                ua       => $ua,
+                                                call     => $ccyd,
+                                                tag      => "consumerYearData",
+                                                state    => $state, 
+                                                function => "extractConsumerHistData",
+                                                addon    => "year",
+                                                daref    => \@da
+                                             });
+              if($errstate) {
+                  $st = encode_base64 ( $state,"");
+                  return "$name|0|0|$errstate|$getp|$setp|$st";
+              }  
           }
       }
   }
@@ -1195,6 +1198,46 @@ return ($state, $errstate);
 }
 
 ################################################################
+#                    Dispatcher
+################################################################
+sub _dispatch {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $call     = $paref->{call};                   # Seitenaufruf zur Datenquelle
+  my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
+  my $state    = $paref->{state};                  
+  my $fn       = $paref->{function};               # aufzurufende Funktion zur Datenextraktion
+  my $fnaddon  = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};
+  
+  my ($reread,$retry,$errstate)     = (0,0,0);
+  
+  my ($data,$data_cont)             = _getData ({ name => $name,
+                                                  ua   => $ua,
+                                                  call => $call,
+                                                  tag  => $tag
+                                               });
+                          
+  ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
+                                                      errstate => $errstate,
+                                                      state    => $state,
+                                                      data     => $data
+                                                   });
+  
+  return ($errstate,$state) if($errstate);
+  
+  if ($data_cont && $data_cont !~ m/undefined/ix) {
+      no strict "refs";                                  ## no critic 'NoStrict'       
+      &{$fn} ($hash,$daref,$data_cont,$fnaddon);
+      use strict "refs";
+  }
+  
+return ($errstate,$state); 
+}
+
+################################################################
 #                      Standard Abruf Daten GET
 ################################################################
 sub _getData {
@@ -1204,12 +1247,11 @@ sub _getData {
   my $call  = $paref->{call};
   my $tag   = $paref->{tag};
   
-  my $cont;
-  
-  my $v5d   = AttrVal($name, "verbose5Data", "none");   
+  my $cont;   
 
   Log3 ($name, 4, "$name - Getting $tag");
   
+  my $v5d   = AttrVal($name, "verbose5Data", "none");
   my $data  = $ua->get( $call );  
   my $dcont = $data->content;                                                  
 
@@ -1252,6 +1294,89 @@ sub _putData {
   }
   
 return ($data,$dcont); 
+}
+
+################################################################
+#                 analysiere abgerufene Daten
+################################################################
+sub _analyzeData {                                                          ## no critic 'complexity'
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $errstate        = $paref->{errstate};
+  my $state           = $paref->{state};
+  my $ad              = $paref->{data};
+  my $hash            = $defs{$name};
+  my ($reread,$retry) = (0,0);
+  my $data            = "";
+  my @da              = ();
+    
+  my $v5d        = AttrVal($name, "verbose5Data", "none");
+  my $ad_content = encode("utf8", $ad->decoded_content); 
+  my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
+  my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
+
+  $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
+  
+  if(ref $data eq "HASH") {
+      for my $k (keys %{$data}) {
+          my $val = $data->{$k};
+          next if(!defined $val);
+
+          if(ref $val eq "ARRAY") {
+              for my $a (@{$val}) {                    
+                  push @da, $a;
+              }
+          }
+          
+          if(ref $val eq "HASH") {
+              for my $b (keys %{$val}) {                    
+                  push @da, $b;
+              }              
+          }
+          
+          $val = join " ", @da if(@da);
+
+          if ($val && $k !~ /__type/ix) {
+              if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$errstate,$state);
+              }
+              if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$errstate,$state);
+              }  
+              if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$errstate,$state);
+              }              
+              if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
+                  Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
+                  $retry = 1;
+                  return ($reread,$retry,$errstate,$state);
+              }
+          }
+      }
+  
+  } else {
+      my $njdat = $ad->as_string;
+      
+      if($njdat =~ /401\s-\sUnauthorized/x) {
+          Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
+          my($p1,$p2) = $njdat =~ /<h2>401\s-\sUnauthorized:.(.*)?<\/h2>.*?<h3>(.*)?<\/h3>/sx;
+          $state      = ($p1 // "")." ".($p2 // "");          
+      }
+      
+      Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
+      
+      $errstate = 1;
+  }
+  
+return ($reread,$retry,$errstate,$state);
 }
 
 ################################################################
@@ -1401,10 +1526,9 @@ return ($err);
 ##         Auswertung Live Daten
 ################################################################
 sub extractLiveData {
-  my $paref   = shift;
-  my $hash    = $paref->{hash};
-  my $live    = $paref->{live};
-  my $daref   = $paref->{daref};
+  my $hash    = shift;
+  my $daref   = shift;
+  my $live    = shift;  
   my $name    = $hash->{NAME};
   my $val     = "";
   
@@ -2095,89 +2219,6 @@ sub delReadingFromBlocking {
   readingsDelete($hash, $reading);
 
 return 1;
-}
-
-################################################################
-#                 analysiere abgerufene Daten
-################################################################
-sub analyzeData {                                                          ## no critic 'complexity'
-  my $paref           = shift;
-  my $hash            = $paref->{hash};
-  my $errstate        = $paref->{errstate};
-  my $state           = $paref->{state};
-  my $ad              = $paref->{data};
-  my $name            = $hash->{NAME};
-  my ($reread,$retry) = (0,0);
-  my $data            = "";
-  my @da              = ();
-    
-  my $v5d        = AttrVal($name, "verbose5Data", "none");
-  my $ad_content = encode("utf8", $ad->decoded_content); 
-  my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
-
-  $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
-  
-  if(ref $data eq "HASH") {
-      for my $k (keys %{$data}) {
-          my $val = $data->{$k};
-          next if(!defined $val);
-
-          if(ref $val eq "ARRAY") {
-              for my $a (@{$val}) {                    
-                  push @da, $a;
-              }
-          }
-          
-          if(ref $val eq "HASH") {
-              for my $b (keys %{$val}) {                    
-                  push @da, $b;
-              }              
-          }
-          
-          $val = join " ", @da if(@da);
-
-          if ($val && $k !~ /__type/ix) {
-              if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
-                  $retry = 1;
-                  return ($reread,$retry,$errstate,$state);
-              }
-              if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
-                  $retry = 1;
-                  return ($reread,$retry,$errstate,$state);
-              }  
-              if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
-                  $retry = 1;
-                  return ($reread,$retry,$errstate,$state);
-              }              
-              if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
-                  $retry = 1;
-                  return ($reread,$retry,$errstate,$state);
-              }
-          }
-      }
-  
-  } else {
-      my $njdat = $ad->as_string;
-      
-      if($njdat =~ /401\s-\sUnauthorized/x) {
-          Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
-          my($p1,$p2) = $njdat =~ /<h2>401\s-\sUnauthorized:.(.*)?<\/h2>.*?<h3>(.*)?<\/h3>/sx;
-          $state      = ($p1 // "")." ".($p2 // "");          
-      }
-      
-      Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
-      
-      $errstate = 1;
-  }
-  
-return ($reread,$retry,$errstate,$state);
 }
 
 ################################################################
