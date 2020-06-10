@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22116 2020-06-04 20:36:08Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -135,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.2" => "10.06.2020  bug fixes get/switch consumers ",
   "2.10.1" => "08.06.2020  internal code changes, bug fixes ",
   "2.10.0" => "03.06.2020  refactored login process ",
   "2.9.0"  => "01.06.2020  add get today statistic data ",
@@ -833,7 +834,8 @@ sub GetSetData {                                                       ## no cri
       Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
       if($res eq "true") {
           $state = "ok - switched consumer $d to $op";
-          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "all", "none", "NULL", "NULL", "NULL"], 0);
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
       } else {
           $state = "Error - couldn't switch consumer $d to $op";
       }
@@ -851,11 +853,11 @@ sub GetSetData {                                                       ## no cri
       
       ### Live-Daten
       ################
-      my ($livedata,$livedata_content) = _getData ({ name => $name,
+      my ($livedata,$livedata_content)  = _getData ({ name => $name,
                                                      ua   => $ua,
                                                      call => 'https://www.sunnyportal.com/homemanager?t='.$time,
                                                      tag  => "liveData"
-                                                  });
+                                                   });
                               
       ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
                                                          errstate => $errstate,
@@ -879,7 +881,7 @@ sub GetSetData {                                                       ## no cri
               Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
               sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
               $exceed = 1;
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", "NULL", $hash->{HELPER}{RETRIES}], 1);
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
               return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
           }
           
@@ -914,11 +916,11 @@ sub GetSetData {                                                       ## no cri
                                                            tag  => "weatherData"
                                                         });
                               
-      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
-                                                         errstate => $errstate,
-                                                         state    => $state,
-                                                         data     => $weatherdata
-                                                      });
+      ($reread,$retry,$errstate,$state)      = analyzeData ({ hash     => $hash,
+                                                              errstate => $errstate,
+                                                              state    => $state,
+                                                              data     => $weatherdata
+                                                           });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -947,11 +949,11 @@ sub GetSetData {                                                       ## no cri
                                                                  tag     => "balanceDayData"
                                                               });
                                                               
-      ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
-                                                         errstate => $errstate,
-                                                         state    => $state,
-                                                         data     => $balancedataday
-                                                      });
+      ($reread,$retry,$errstate,$state)            = analyzeData ({ hash     => $hash,
+                                                                    errstate => $errstate,
+                                                                    state    => $state,
+                                                                    data     => $balancedataday
+                                                                 });
       
       if($errstate) {
           $st = encode_base64 ( $state,"");
@@ -973,11 +975,11 @@ sub GetSetData {                                                       ## no cri
                                                                  tag  => "forecastData"
                                                               });
                                   
-          ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
-                                                             errstate => $errstate,
-                                                             state    => $state,
-                                                             data     => $forecastdata
-                                                          });
+          ($reread,$retry,$errstate,$state)        = analyzeData ({ hash     => $hash,
+                                                                    errstate => $errstate,
+                                                                    state    => $state,
+                                                                    data     => $forecastdata
+                                                                 });
           
           if($errstate) {
               $st = encode_base64 ($state, "");
@@ -1003,11 +1005,11 @@ sub GetSetData {                                                       ## no cri
                                                                          tag  => "consumerLiveData"
                                                                       });
                                   
-          ($reread,$retry,$errstate,$state) = analyzeData ({ hash     => $hash,
-                                                             errstate => $errstate,
-                                                             state    => $state,
-                                                             data     => $consumerlivedata
-                                                          });
+          ($reread,$retry,$errstate,$state)                = analyzeData ({ hash     => $hash,
+                                                                            errstate => $errstate,
+                                                                            state    => $state,
+                                                                            data     => $consumerlivedata
+                                                                         });
           
           if($errstate) {
               $st = encode_base64 ( $state,"");
@@ -1027,9 +1029,9 @@ sub GetSetData {                                                       ## no cri
               my ($mds,$me,$ye,$mde,$yds,$yde);
               if($dds =~ /(.*)-(.*)-(.*)/x) {
                   $mds = "$1-$2-01";
-                  $me  = (($2+1)<=12)?$2+1:1;
+                  $me  = (($2+1)<=12) ? $2+1 : 1;
                   $me  = sprintf("%02d", $me);
-                  $ye  = ($2>$me)?$1+1:$1;
+                  $ye  = ($2>$me) ? $1+1 : $1;
                   $mde = "$ye-$me-01";
                   $yds = "$1-01-01";
                   $yde = ($1+1)."-01-01";
@@ -1162,7 +1164,7 @@ sub _checkLogin {
                   Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
-                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", (gettimeofday())[0], "NULL", "NULL"], 0);
+                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "L1_Login-Status:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
                   $errstate = 0;                             
               
               } else {
@@ -1457,9 +1459,9 @@ sub extractLiveData {
       }      
   }
   
-  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_ErrorMessages"], 1)   if(!$errMsg);
+  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_ErrorMessages"]  , 1) if(!$errMsg);
   BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_WarningMessages"], 1) if(!$warnMsg);
-  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_InfoMessages"], 1)    if(!$infoMsg);
+  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_InfoMessages"]   , 1) if(!$infoMsg);
 
 return;
 }
@@ -1694,7 +1696,8 @@ sub extractPlantData {
   my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
   if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
       Log3 ($name, 4, "$name - Plant ID: ".$plantOid);
-      $hash->{HELPER}{PLANTOID} = $plantOid;                                           
+      $hash->{HELPER}{PLANTOID} = $plantOid;
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "PLANTOID:$plantOid"], 1);      
   } else {
       Log3 ($name, 4, "$name - Plant ID  not set !");
   }
@@ -1801,7 +1804,7 @@ sub extractConsumerLiveData {
   my $clivedata = shift;
   my $name      = $hash->{NAME};
   my %consumers;
-  my ($key,$val,$i,$res);
+  my ($i,$res);
   
   Log3 ($name, 4, "$name - ##### extracting consumer live data #### ");
   
@@ -1858,6 +1861,16 @@ sub extractConsumerLiveData {
           push @$daref, "L3_${cn}_SwitchLastTime:$ltchange";
           
           $i++;
+      }
+  }
+  
+  if($hash->{HELPER}{CONSUMER}) {
+      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
+              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
+              next if(!defined $val);
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
+          }
       }
   }
   
@@ -1967,12 +1980,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22116 2020-06-04 20:36:08Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22116 2020-06-04 20:36:08Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2033,38 +2046,36 @@ sub handleCounter {
   }
   $count++;
   $cstring = "$rd:$day:$count";  
-  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "NULL", "NULL", $cstring, "NULL"], 1);
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, $cstring, "NULL"], 1);
 
 return;
 }
 
-################################################################
+###################################################################
 #        Werte aus BlockingCall heraus setzen
 #   Erwartete Liste:
-#   @setl = $name,$getp,$setp,$logintime,$setread,$retries
-################################################################
+#   @setl = $name,$setread,$retries,$helper
+###################################################################
 sub setFromBlocking {
-  my (@setl) = @_;
-  my $hash   = $defs{$setl[0]};
-
-  my $getp      = $setl[1]  // "NULL";
-  my $setp      = $setl[2]  // "NULL";
-  my $logintime = $setl[3]  // "NULL";
-  my $setread   = $setl[4]  // "NULL";
-  my $retries   = $setl[5]  // "NULL";
-
-  $hash->{HELPER}{GETTER}   = $getp     if($getp    ne "NULL");
-  $hash->{HELPER}{SETTER}   = $setp     if($setp    ne "NULL");
-  $hash->{HELPER}{RETRIES}  = $retries  if($retries ne "NULL");
-  
-  if($logintime ne "NULL") {
-      $hash->{HELPER}{oldlogintime} = $logintime;
-      readingsSingleUpdate($hash, "L1_Login-Status", "successful", 1);
-  }
+  my $name      = shift;
+  my $setread   = shift // "NULL";
+  my $helper    = shift // "NULL";
+  my $hash      = $defs{$name};
   
   if($setread ne "NULL") {
       my @cparts = split ":", $setread, 2;
       readingsSingleUpdate($hash, $cparts[0], $cparts[1], 1);
+  }
+  
+  if($helper ne "NULL") {
+      my ($hnam,$k1,$k2,$k3) = split ":", $helper, 4;
+      if(defined $k3) {
+          $hash->{HELPER}{"$hnam"}{"$k1"}{"$k2"} = $k3;
+      } elsif (defined $k2) {
+          $hash->{HELPER}{"$hnam"}{"$k1"} = $k2;
+      } else {
+          $hash->{HELPER}{"$hnam"} = $k1;
+      }
   }
 
 return 1;
