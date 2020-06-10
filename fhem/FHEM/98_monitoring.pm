@@ -1115,7 +1115,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; mointoring &lt;add-event&gt; [&lt;remove-event&gt;]
+        define &lt;name&gt; monitoring &lt;add-event&gt; [&lt;remove-event&gt;]
       </code>
       <br>
       Die Syntax f&uuml;r &lt;add-event&gt; und &lt;remove-event&gt; ist die
