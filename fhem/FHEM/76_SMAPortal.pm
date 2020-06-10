@@ -718,7 +718,7 @@ sub controlParams {
   my $name = shift;
 
   # Voreinstellungen
-  my $timeout      = 290;                    # Standard Timeout
+  my $timeoutdef   = 290;                    # Standard Timeout
   my $definterval  = 300;                    # Standard Interval
   my $buffer       = 5;                      # Sicherheitspuffer zum nächsten Intervall
 
@@ -732,14 +732,15 @@ sub controlParams {
   $ctime       = 7 if($ctime > 7);                                       # Ausreißer ignorieren
    
   if(!$interval) {                                                       # manueller Datenabruf 
-      return ($interval,$maxcycles,$timeout,$ctime);
+      return ($interval,$maxcycles,$timeoutdef,$ctime);
   }
 
   # max Anzahl Zyklen
   $maxcycles = int(($interval - $buffer) / $ctime) if($ctime); 
 
   # Timeout kalkulieren
-  $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
+  my $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
+  $timeout    = $timeoutdef if($timeout < 10);
 
 return ($interval,$maxcycles,$timeout,$ctime);
 }
@@ -1337,7 +1338,7 @@ sub ParseData {                                                    ## no critic 
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
           readingsBulkUpdate($hash, "L3_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "lastCycleTime", $ctime);
+      readingsBulkUpdate($hash, "lastCycleTime", $ctime) if($ctime > 0);
       readingsBulkUpdate($hash, "summary"      , "$sum W");
   
   } else {
