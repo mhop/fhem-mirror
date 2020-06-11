@@ -135,7 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.5" => "11.06.2020  add check login by /Templates/ ",
+  "2.10.5" => "11.06.2020  add check login by /Templates/, deeper verbose5Data ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
   "2.10.2" => "10.06.2020  bug fixes get/switch consumers ",
@@ -249,7 +249,7 @@ sub Initialize {
                           # "providerLevel:multiple-strict,".$v5d." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
-                           "verbose5Data:multiple-strict,HTML_request,HTML_resonse,loginData,".$v5d." ".
+                           "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -792,10 +792,8 @@ sub GetSetData {                                                       ## no cri
   
   my $ua = LWP::UserAgent->new;
   
-  if($verbose == 5 && $v5d =~ /HTML_request|HTML_resonse/) {
-      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
-      $ua->add_handler( response_done => sub { shift->dump; return } );
-  }
+  # $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+  # $ua->add_handler( response_done => sub { shift->dump; return } );
   
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
@@ -1102,10 +1100,16 @@ sub _checkLogin {
 
   my $hash     = $defs{$name};
   my $v5d      = AttrVal($name, "verbose5Data", "none");  
+  my $verbose  = AttrVal($name, "verbose", 3);
 
   my $loginp   = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx');
   my $retcode  = $loginp->code;
   my $location = $loginp->header('Location') // "";
+  
+  if($verbose == 5 && $v5d =~ /loginData/) {
+      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+      $ua->add_handler( response_done => sub { shift->dump; return } );
+  }
   
   if ($loginp->is_success) {
       if($v5d =~ /loginData/) {
@@ -1139,7 +1143,7 @@ sub _checkLogin {
               $retcode  = $loginp->code;
               $location = $loginp->header('Location') // "";
 
-              if($v5d eq "loginData") {
+              if($v5d =~ /loginData/) {
                   Log3 ($name, 5, "$name - Status Redirect Page : ".$retcode);
                   Log3 ($name, 5, "$name - Header Redirect Location: ".$location); 
                   # Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
@@ -1163,7 +1167,7 @@ sub _checkLogin {
   } elsif($loginp->is_redirect) {
       $retcode  = $loginp->code;
       $location = $loginp->header('Location') // "";
-      if($v5d eq "loginData") {
+      if($v5d =~ /loginData/) {
           Log3 ($name, 5, "$name - Redirect return code: ".$retcode);
           Log3 ($name, 5, "$name - Redirect Header Location: ".$location); 
       }      
@@ -1174,6 +1178,11 @@ sub _checkLogin {
       $state       = $loginp->status_line;
       Log3 ($name, 1, "$name - ERROR Login Page: ".$state);
   }
+  
+  my $ph_rs = "request_send";
+  my $ph_rd = "response_done";
+  $ua->remove_handler($ph_rs);
+  $ua->remove_handler($ph_rd);
   
 return ($state, $errstate); 
 }
@@ -1278,20 +1287,32 @@ sub _getData {
   my $call  = $paref->{call};
   my $tag   = $paref->{tag};
   
+  my $v5d     = AttrVal($name, "verbose5Data", "none");
+  my $verbose = AttrVal($name, "verbose", 3);
+  
   my $cont;   
 
-  Log3 ($name, 4, "$name - Getting $tag");
+  Log3 ($name, 4, "$name - Getting $tag"); 
   
-  my $v5d   = AttrVal($name, "verbose5Data", "none");
+  if($verbose == 5 && $v5d =~ /$tag/) {
+      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+      $ua->add_handler( response_done => sub { shift->dump; return } );
+  }
+  
   my $data  = $ua->get( $call );  
   my $dcont = $data->content;                                                  
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
-  if($v5d eq $tag) {
+  if($v5d =~ /$tag/) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
+  
+  my $ph_rs = "request_send";
+  my $ph_rd = "response_done";
+  $ua->remove_handler($ph_rs);
+  $ua->remove_handler($ph_rd);
   
 return ($data,$dcont); 
 }
@@ -1307,11 +1328,18 @@ sub _postData {
   my $fields  = $paref->{fields};
   my $content = $paref->{content};
   my $tag     = $paref->{tag};
+  
   my $v5d     = AttrVal($name, "verbose5Data", "none");
+  my $verbose = AttrVal($name, "verbose", 3);
   
   my $cont;   
 
   Log3 ($name, 4, "$name - Getting $tag");
+  
+  if($verbose == 5 && $v5d =~ /$tag/) {
+      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+      $ua->add_handler( response_done => sub { shift->dump; return } );
+  }
 
   my $data  = $ua->post( $call, %$fields, Content => $content );
                          
@@ -1319,10 +1347,15 @@ sub _postData {
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
-  if($v5d eq $tag) {
+  if($v5d =~ /$tag/) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
+  
+  my $ph_rs = "request_send";
+  my $ph_rd = "response_done";
+  $ua->remove_handler($ph_rs);
+  $ua->remove_handler($ph_rd);
   
 return ($data,$dcont); 
 }
