@@ -807,12 +807,12 @@ attr DEVICE setList \
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
 attr DEVICE devStateIcon {my $text = ' uptime: '.ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1")); my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<div><a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl).'</a> <a href="/fhem?cmd.dummy=set '.$name.' toggle&XHR=1">'.FW_makeImage($light)."</a>$text<b></b>"}
-attr DEVICE stateFormat { my $onl = ReadingsVal($name,"LWT","false"); my $state = ReadingsVal($name,"state","unknown"); my $en_line = sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1")); my $utime = ReadingsVal($name,"Uptime","unknown"); qq($onl\n$state\n uptime: $utime $en_line) }
+attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
-setreading DEVICE attrTemplateVersion 20200608
+setreading DEVICE attrTemplateVersion 20200611
 
 
 # sonoff 1 channel + USB device flashed with Tasmota.
@@ -1674,7 +1674,10 @@ par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}';; my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
 set DEVICE attrTemplate shelly1_w_energy_meassuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
-attr MQTT2_DEVNAME readingList shellies/DEVNAME/online:.* online\
+set DEVICE attrTemplate shelly1
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
+attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $light,\nP1: $cons1 W / Total P1: $total1 kWh\nP2: $cons2 W / Total P2: $total2 kWh\nP3: $cons3 W / Total P3: $total3 kWh) }
+attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
   shellies/DEVNAME/relay/0:.* relay_0\
@@ -1696,22 +1699,22 @@ attr MQTT2_DEVNAME readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/emeter/0/energy:.* emeter_0_energy\
   shellies/DEVNAME/emeter/0/returned_energy:.* emeter_0_returned_energy\
   shellies/DEVNAME/emeter/0/total:.* emeter_0_total\
-  shellies/DEVNAME/emeter/0/total:.* {'emeter_0_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
+  shellies/DEVNAME/emeter/0/total:.* {'emeter_0_kWh' => sprintf("%.2f",$EVENT/1000)}\
   shellies/DEVNAME/emeter/0/total_returned:.* emeter_0_total_returned\
   shellies/DEVNAME/emeter/1/energy:.* emeter_1_energy\
   shellies/DEVNAME/emeter/1/returned_energy:.* emeter_1_returned_energy\
   shellies/DEVNAME/emeter/1/total:.* emeter_1_total\
-  shellies/DEVNAME/emeter/1/total:.* {'emeter_1_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
+  shellies/DEVNAME/emeter/1/total:.* {'emeter_1_kWh' => sprintf("%.2f",$EVENT/1000)}\
   shellies/DEVNAME/emeter/1/total_returned:.* emeter_1_total_returned\
   shellies/DEVNAME/emeter/2/energy:.* emeter_2_energy\
   shellies/DEVNAME/emeter/2/returned_energy:.* emeter_2_returned_energy\
   shellies/DEVNAME/emeter/2/total:.* emeter_2_total\
-  shellies/DEVNAME/emeter/2/total:.* {'emeter_2_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
+  shellies/DEVNAME/emeter/2/total:.* {'emeter_2_kWh' => sprintf("%.2f",$EVENT/1000)}\
   shellies/DEVNAME/emeter/2/total_returned:.* emeter_2_total_returned
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
-set DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200609
+attr DEVICE model shelly3em
+setreading DEVICE attrTemplateVersion 20200611
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
