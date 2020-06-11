@@ -745,7 +745,7 @@ sub onStreamMsg {
     Log3($hash->{NAME}, 4, "$hash->{NAME}: received stream message for $client - Chan76-IODev");
     return MYSENSORS::DEVICE::onStreamMessage($client,$msg);
   } 
-  Log3($hash->{NAME},3,"MYSENSORS: ignoring stream-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".datastreamTypeToStr($msg->{subType}));
+  Log3($hash->{NAME},3,"MYSENSORS: ignoring stream-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".datastreamTypeToStr($msg->{subType}).". IO: $hash->{NAME}");
   return;
 }
 
