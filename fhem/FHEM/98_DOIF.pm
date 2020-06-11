@@ -2296,6 +2296,26 @@ sub CheckRegexpDoIf
   return undef;
 }
 
+sub DOIF_block 
+{
+  my ($hash,$i)= @_;
+  my $ret;
+  my $err;
+  my $blockname;
+  ($ret,$err)=DOIF_CheckCond($hash,$i);
+  if ($hash->{perlblock}{$i} =~ /^block_/) {
+    $blockname=$hash->{perlblock}{$i};
+  } else {
+    $blockname="block_".$hash->{perlblock}{$i};
+  }
+  if ($err) {
+    Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block: $hash->{perlblock}{$i}" if ($ret != -1);
+    readingsSingleUpdate ($hash, $blockname, $err,1);
+  } else {
+    readingsSingleUpdate ($hash, $blockname, "executed",0);
+  }
+}
+
 sub DOIF_Perl_Trigger 
 {
   my ($hash,$device)= @_;
@@ -2330,22 +2350,7 @@ sub DOIF_Perl_Trigger
       next if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState},1)));
       $event="$device";
     }
-    if (($ret,$err)=DOIF_CheckCond($hash,$i)) {
-      if ($err) {
-        Log3 $hash->{NAME},4,"$hash->{NAME}: $err in perl block ".($i+1) if ($ret != -1);
-        if ($hash->{perlblock}{$i}) {
-          readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", $err,1);
-        } else {
-          readingsSingleUpdate ($hash, sprintf("block_%02d",($i+1)), $err,1);
-        }
-      } else {
-        if ($hash->{perlblock}{$i}) {
-          readingsSingleUpdate ($hash, "block_$hash->{perlblock}{$i}", "executed",0);
-        } else {
-          readingsSingleUpdate ($hash, sprintf("block_%02d",($i+1)), "executed",0);
-        }
-      }
-    }
+    DOIF_block($hash,$i); 
   }
   return undef;
 }
@@ -3149,6 +3154,7 @@ CmdDoIfPerl($$)
   while ($tail ne "") {
     ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
     return ($perlblock,$err) if ($err);
+    next if (!$perlblock);
     if ($beginning =~ /(\w*)[\s]*$/) {
       my $blockname=$1;
       if ($blockname eq "subs") {
@@ -3163,7 +3169,7 @@ CmdDoIfPerl($$)
       ($perlblock,$err)=ReplaceAllReadingsDoIf($hash,$perlblock,$i,0);
       return ($perlblock,$err) if ($err);
       $hash->{condition}{$i}=$perlblock;
-      $hash->{perlblock}{$i}=$blockname;
+      $hash->{perlblock}{$i}=$blockname ? $blockname:sprintf("block_%02d",($i+1));
       if ($blockname eq "init") {
         $hash->{perlblock}{init}=$i;
       }
@@ -3552,48 +3558,61 @@ DOIF_Set($@)
       DOIF_cmd ($hash,$1-1,0,"set_cmd_".$1);
 	}
   } elsif ($arg eq "?") {
-      my $setList = AttrVal($pn, "setList", " ");
-      $setList =~ s/\n/ /g;
+    my $setList = AttrVal($pn, "setList", " ");
+    $setList =~ s/\n/ /g;
 	  my $cmdList="";
     my $checkall="";
     my $initialize="";
+    my $max_cond=keys %{$hash->{condition}};
     if ($hash->{MODEL} ne "Perl") {
       $checkall="checkall:noArg";
       $initialize="initialize:noArg";
-      my $max_cond=keys %{$hash->{condition}};
       $max_cond++ if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame",""))));
       for (my $i=0; $i <$max_cond;$i++) {
-       $cmdList.="cmd_".($i+1).":noArg ";
+        $cmdList.="cmd_".($i+1).":noArg ";
 	    }
+    } else {
+       for (my $i=0; $i <$max_cond;$i++) {
+         $cmdList.=$hash->{perlblock}{$i}.":noArg ";
+	     }
     }
 	  return "unknown argument ? for $pn, choose one of disable:noArg enable:noArg $initialize $checkall $cmdList $setList";
-   } else {
-      my @rl = split(" ", AttrVal($pn, "readingList", ""));
-      my $doRet;
-      eval {
-        if(@rl && grep /\b$arg\b/, @rl) {
-          my $v = shift @a;
-          $v = shift @a;
-          readingsSingleUpdate($hash, $v, join(" ",@a), 1);
-          $doRet = 1;
-        }
-      };
-      return if($doRet);
-	  if (ReadingsVal($pn,"mode","") ne "disabled") {
-      foreach my $i (keys %{$hash->{attr}{cmdState}}) {
-		    if ($arg eq EvalCmdStateDoIf($hash,$hash->{attr}{cmdState}{$i}[0])) {
-          if ($hash->{helper}{sleeptimer} != -1) {
-          RemoveInternalTimer($hash);
-          readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-          $hash->{helper}{sleeptimer}=-1;
+  } else {
+    my @rl = split(" ", AttrVal($pn, "readingList", ""));
+    my $doRet;
+    eval {
+      if(@rl && grep /\b$arg\b/, @rl) {
+        my $v = shift @a;
+        $v = shift @a;
+        readingsSingleUpdate($hash, $v, join(" ",@a), 1);
+        $doRet = 1;
+      }
+    };
+    return if($doRet);
+    if (ReadingsVal($pn,"mode","") ne "disabled") {
+      if ($hash->{MODEL} ne "Perl") {
+        foreach my $i (keys %{$hash->{attr}{cmdState}}) {
+          if ($arg eq EvalCmdStateDoIf($hash,$hash->{attr}{cmdState}{$i}[0])) {
+            if ($hash->{helper}{sleeptimer} != -1) {
+            RemoveInternalTimer($hash);
+            readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
+            $hash->{helper}{sleeptimer}=-1;
+            }
+            DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($i+1));
+            last;
           }
-          DOIF_cmd ($hash,$i,0,"set_".$arg."_cmd_".($i+1));
-          last;
         }
-		  }
-		}
+      } else {
+        for (my $i=0; $i < keys %{$hash->{condition}};$i++) { 
+          if ($arg eq $hash->{perlblock}{$i}) {
+            DOIF_block ($hash,$i);
+            last;
+          }
+        }
+      }
       #return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
     }
+  }
   return $ret;
 }
 
@@ -4009,14 +4028,33 @@ sub FW_makeImage {
    $hue = $m*$hum+$n;
    return (int($hue));  
  }
- 
+
+sub format_value {
+  my ($val,$min,$dec)=@_;
+  my $format;
+  my $value=$val;
+
+  if ($val eq "") {
+    $val="N/A";
+    $format='%s';
+    $value=$min;
+  } elsif ($val  !~ /(-?\d+(\.\d+)?)/) {
+    $format='%s';
+    $value=$min;
+  } else {
+    $format='%1.'.$dec.'f';
+  }
+  return($format,$value,$val);
+}
 
 sub bar
 {
-  my ($value,$min,$max,$header,$minColor,$maxColor,$unit,$bwidth,$bheight,$size,$func,$dec) = @_;
+  my ($val,$min,$max,$header,$minColor,$maxColor,$unit,$bwidth,$bheight,$size,$func,$dec) = @_;
   my $out;
   my $trans=0;
+  my ($format,$value);
   
+  $unit="" if (!defined $unit);
   $bheight=70 if (!defined $bheight);
   my $height=$bheight-10;
  
@@ -4032,9 +4070,9 @@ sub bar
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
   
-  my $format;
   $dec=1 if (!defined $dec);
-  $format='%1.'.$dec.'f';  
+
+  ($format,$value,$val)=format_value($val,$min,$dec);
 
   if (defined $func) {
     $minColor=&{$func}($min);
@@ -4093,7 +4131,7 @@ sub bar
   $out.= sprintf('<rect x="15" y="6" width="10" height="%d" rx="2" ry="2" fill="none" stroke="rgb(160, 160, 160)" stroke-width="0.5"/>',$height);
   $out.= sprintf('<line  x1="15.5"  y1="%d" x2="24.5" y2="%d" fill="none" stroke="rgb(192,192,192)" stroke-width="1"/>',$null,$null) if ($min < 0 and $max > 0);;
 
-  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:18px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6, $height/2+13,color($currColor),sprintf($format,$value),$unit);
+  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:18px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6, $height/2+13,color($currColor),sprintf($format,$val),$unit);
 
   $out.= '</g>';
  	$out.= '</svg>';
@@ -4182,14 +4220,16 @@ sub temp_temp_ring {
 
 sub ring
 {
-  my ($value,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec) = @_;
   my $out;
+  my ($format,$value);
+  
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
   
-  my $format;
   $dec=1 if (!defined $dec);
-  $format='%1.'.$dec.'f';  
+  
+  ($format,$value,$val)=format_value($val,$min,$dec);
 
   if (defined $func) {
     $minColor=&{$func}($min);
@@ -4247,9 +4287,7 @@ sub ring
   $out.=describeArc(40, 30, 26, 0, int($prop*280));
   $out.='</g>';
 
-  my $val_format=sprintf($format,$value);
-
-  $out.= sprintf('<text text-anchor="middle" x="40" y="35" style="fill:%s;font-size:18px;font-weight:bold;">%s</text>',color($currColor),$val_format);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="35" style="fill:%s;font-size:18px;font-weight:bold;">%s</text>',color($currColor),sprintf($format,$val));
   $out.= sprintf('<text text-anchor="middle" x="40" y="47" style="fill:%s;font-size:10px;">%s</text>',color($currColor),$unit) if (defined $unit);
   $out.= '</svg>';
   return ($out);
@@ -4257,13 +4295,16 @@ sub ring
 
 sub ring2
 {
-  my ($value,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$value2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2) = @_;
   my $out;
+  my ($format,$value);
+  my ($format2,$value2);
+  
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
-  my $format;
   $dec=1 if (!defined $dec);
-  $format='%1.'.$dec.'f';  
+
+  ($format,$value,$val)=format_value($val,$min,$dec);
 
   if (defined $func) {
     $minColor=&{$func}($min);
@@ -4293,9 +4334,9 @@ sub ring2
   
   $min2=0 if (!defined $min2);
   $max2=100 if (!defined $max2);
-  my $format2;
   $dec2=1 if (!defined $dec2);
-  $format2='%1.'.$dec2.'f';  
+  
+  ($format2,$value2,$val2)=format_value($val2,$min2,$dec2);
 
   if (defined $func2) {
     $minColor2=&{$func2}($min2);
@@ -4364,17 +4405,11 @@ sub ring2
   $out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor2));
   $out.=describeArc(40, 30, 23.5, 273, 280);
   $out.='</g>';
-
-
-
-  
-  my $val_format=sprintf($format,$value);
-  my $val_format2=sprintf($format2,$value2);
     
-  $out.= sprintf('<text text-anchor="middle" x="40" y="30" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor),$val_format);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="30" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor),sprintf($format,$val));
   $out.= sprintf('<text text-anchor="middle" x="40" y="17" style="fill:%s;font-size:8px;">%s</text>',color($currColor),$unit) if (defined $unit);
   
-  $out.= sprintf('<text text-anchor="middle" x="40" y="43.5" style="fill:%s;font-size:14px;font-weight:bold;">%s</text>',color($currColor2),$val_format2);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="43.5" style="fill:%s;font-size:14px;font-weight:bold;">%s</text>',color($currColor2),sprintf($format2,$val2));
   $out.= sprintf('<text text-anchor="middle" x="40" y="50" style="fill:%s;font-size:7px;">%s</text>',color($currColor2),$unit2) if (defined $unit2);
 
   $out.= '</svg>';
@@ -6083,14 +6118,15 @@ Beispiel:<br>
 <a name="disable"></a>
 Mit dem set-Befehl <code>disable</code> wird ein DOIF-Modul inaktiviert. Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerdings werden keine Befehle ausgeführt.
 Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut <code>disable</code> deaktiviert wird. Ein inaktiver Zustand bleibt nach dem Neustart erhalten.
-Ein inaktives Modul kann über set-Befehle <code>enable</code> bzw. <code>initialize</code> wieder aktiviert werden.<br>
+Ein inaktives Modul kann über set-Befehle <code>enable</code> bzw. <code>initialize</code> (im FHEM-Modus) wieder aktiviert werden.<br>
 <br>
 </li><li><a name="DOIF_setenable"></a>
 <b>Aktivieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
 <a name="enable"></a>
-Mit dem set-Befehl <code>enable</code> wird ein inaktives DOIF-Modul wieder aktiviert. Im Gegensatz zum set-Befehl <code>initialize</code> wird der letzte Zustand vor der Inaktivierung des Moduls wieder hergestellt.<br>
+Mit dem set-Befehl <code>enable</code> wird ein inaktives DOIF-Modul wieder aktiviert. Im FHEM-Modus: Im Gegensatz zum set-Befehl <code>initialize</code> wird der letzte Zustand vor der Inaktivierung des Moduls wieder hergestellt.<br>
 <br>
+</li><li><a name="DOIF_setinitialize"></a>
 <a name="DOIF_Initialisieren_des_Moduls"></a>
 <b>Initialisieren des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
@@ -6138,7 +6174,7 @@ Zusätzlich führt die Definition von <code>setList</code> zur Ausführung von <
 <br>
 Zweipunktregler a la THRESHOLD<br>
 <br>
-<code>define di_threshold DOIF ([sensor:temperature]<([$SELF:desired]-1))<br>
+<code>define di_threshold DOIF ([sensor:temperature] <  [$SELF:desired]-1)<br>
   (set heating on)<br>
 DOELSEIF ([sensor:temperature]>[$SELF:desired])<br>
   (set heating off)<br>
@@ -6668,6 +6704,7 @@ Bemerkung: Innerhalb eines Ereignisblocks muss mindestens ein Trigger definiert 
   <a href="#DOIF_Device-Variablen">Device-Variablen</a><br>
   <a href="#DOIF_Blockierende_Funktionsaufrufe">Blockierende Funktionsaufrufe</a><br>
   <a href="#DOIF_Attribute_Perl_Modus">Attribute im Perl-Modus</a><br>
+  <a href="#DOIF_set_Perl_Modus">set-Befehle im Perl-Modus</a><br>
   <a href="#DOIF_Anwendungsbeispiele_im_Perlmodus">Anwendungsbeispiele im Perl-Modus</a><br>
 </ul>
 <a name="DOIF_Eigene_Funktionen"></a><br>
@@ -6865,6 +6902,19 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
   <a href="#DOIF_weekdays">weekdays</a> &nbsp;
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
 </ul>
+<br>
+<a name="DOIF_set_Perl_Modus"></a><br>
+<u>set-Befehle im Perlmodus</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
+<dl>
+        <dt><code><b> set </b>&lt;name&gt;<b> disable</b></code></dt>
+                <dd>blockiert die Befehlsausf&uuml;hrung</dd>
+<br>
+        <dt><code><b> set </b>&lt;name&gt;<b> enable</b></code></dt>
+                <dd>aktiviert die Befehlsausf&uuml;hrung</dd>
+<br>
+        <dt><code><b> set </b>&lt;name&gt;<b> &lt;Blockname&gt;</b></code></dt>
+                <dd>führt den entsprechenden DOIF-Block aus</dd>
+</dl>
 <a name="DOIF_Anwendungsbeispiele_im_Perlmodus"></a><br>
 <b>Anwendungsbeispiele im Perlmodus:</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <a name="DOIF_Treppenhauslicht mit Bewegungsmelder"></a><br>
