@@ -2510,7 +2510,7 @@ sub PortalAsHtml {                                                              
   $di{0} = $pv{0} - $co{0}; 
   $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
   $we{0} = $hash->{HELPER}{L2_ThisHour_WeatherId} if($weather);              # für Wettericons 
-  $we{0} = $we{0} ? $we{0} : 999;
+  $we{0} = $we{0} // 999;
 
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
@@ -2583,7 +2583,7 @@ sub PortalAsHtml {                                                              
 
      $is{$i} = (ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
      $we{$i} = $hash->{HELPER}{"L4_NextHour".sprintf("%02d",$i)."_WeatherId"} if($weather);      # für Wettericons 
-     $we{$i} = $we{$i} ? $we{$i} : 999;
+     $we{$i} = $we{$i} // 999;
 
      if(AttrVal("global","language","EN") eq "DE") {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
