@@ -9931,49 +9931,53 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   my $mq = $modules{CUL_HM}{helper};
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
-      my $devN = ${$mq->{$q}}[0];
-      my $devH = $defs{$devN};
-      CUL_HM_assignIO($devH); 
-      next  if(!defined $devH->{IODev}{NAME});
-      my $ioName = $devH->{IODev}{NAME};   
-
-      if (   (   ReadingsVal($ioName,"cond","") =~ m/^(ok|Overload-released|Warning-HighLoad|init)$/
-              && $q eq "qReqStat")
-           ||(   CUL_HM_autoReadReady($ioName)
-              && !$devH->{cmdStack}
-              && $q eq "qReqConf")){
-        my $dq = $devH->{helper}{q};
-        my @chns = split(",",$dq->{$q});
-        my $nOpen = scalar @chns;
-        if (@chns > 1){$dq->{$q} = join ",",@chns[1..$nOpen-1];}
-        else{          $dq->{$q} = "";
-                       @{$mq->{$q}} = grep !/^$devN$/,@{$mq->{$q}};
+      my ($devN,$devH);
+      foreach my $devNtmp (@{$mq->{$q}}){ # search for next possible device
+        $devH = $defs{$devNtmp};
+        CUL_HM_assignIO($devH); 
+        if(   defined $devH->{IODev}{NAME}
+           && (  (   ReadingsVal($devH->{IODev}{NAME},"cond","") =~ m/^(ok|Overload-released|Warning-HighLoad|init)$/
+                  && $q eq "qReqStat")
+               ||(   CUL_HM_autoReadReady($devH->{IODev}{NAME})
+                  && !$devH->{cmdStack}
+                  && $q eq "qReqConf")
+              )
+            ){# got next device
+          $devN = $devNtmp;
+          last;
         }
-        my $dId = CUL_HM_name2Id($devN);
-        my $eN=($chns[0] && $chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
-        next if(!defined $defs{$eN});
-        if ($q eq "qReqConf"){
-          $mq->{autoRdActive} = $devN;
-          CUL_HM_Set($defs{$eN},$eN,"getConfig");
-        }
-        else{
-           CUL_HM_Set($defs{$eN},$eN,"statusRequest");
-           CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
-           InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
-        }
+      }
+      next  if(!defined $devN);# no device found
+  
+      my $dq = $devH->{helper}{q};
+      my @chns = split(",",$dq->{$q});
+      my $nOpen = scalar @chns;
+      if (@chns > 1){$dq->{$q} = join ",",@chns[1..$nOpen-1];}
+      else{          $dq->{$q} = "";
+                     @{$mq->{$q}} = grep !/^$devN$/,@{$mq->{$q}};
+      }
+      my $dId = CUL_HM_name2Id($devN);
+      my $eN=($chns[0] && $chns[0]ne "00") ? CUL_HM_id2Name($dId.$chns[0]) : $devN;
+      next if(!defined $defs{$eN});
+      if ($q eq "qReqConf"){
+        $mq->{autoRdActive} = $devN;
+        CUL_HM_Set($defs{$eN},$eN,"getConfig");
+      }
+      else{
+         CUL_HM_Set($defs{$eN},$eN,"statusRequest");
+         CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
+         InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
       }
       last; # execute only one!
     }
   }
 
-  delete $mq->{autoRdActive}
-        if ($mq->{autoRdActive} &&
-            $defs{$mq->{autoRdActive}}{helper}{prt}{sProc} != 1);
+  delete $mq->{autoRdActive}  if ($mq->{autoRdActive} &&
+                                  $defs{$mq->{autoRdActive}}{helper}{prt}{sProc} != 1);
   my $next;# how long to wait for next timer
   if    (@{$mq->{qReqStat}}){$next = 1}
   elsif (@{$mq->{qReqConf}}){$next = $modules{CUL_HM}{hmAutoReadScan}}
-  InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0)
-      if ($next);
+  InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0) if ($next);
 }
 sub CUL_HM_appFromQ($$){#stack commands if pend in WuQ
   my ($name,$reason) = @_;
