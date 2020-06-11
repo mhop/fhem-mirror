@@ -135,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.5" => "11.06.2020  add check login by /Templates/ ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
   "2.10.2" => "10.06.2020  bug fixes get/switch consumers ",
@@ -248,7 +249,7 @@ sub Initialize {
                           # "providerLevel:multiple-strict,".$v5d." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
-                           "verbose5Data:none,loginData,".$v5d." ".
+                           "verbose5Data:multiple-strict,HTML_request,HTML_resonse,loginData,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -306,7 +307,7 @@ return;
 ###############################################################
 #                          SMAPortal Set
 ###############################################################
-sub Set {                                                           ## no critic 'complexity'
+sub Set {                             ## no critic 'complexity'
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -772,6 +773,7 @@ sub GetSetData {                                                       ## no cri
   my $useragent            = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
   my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
+  my $verbose              = AttrVal($name, "verbose", 3);
   my $dl                   = AttrVal($name, "detailLevel", 1);                                          # selected Detail Level
   my $state                = "ok";
   my ($st,$lc)             = ("","");
@@ -790,8 +792,10 @@ sub GetSetData {                                                       ## no cri
   
   my $ua = LWP::UserAgent->new;
   
-  # $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
-  # $ua->add_handler( response_done => sub { shift->dump; return } );
+  if($verbose == 5 && $v5d =~ /HTML_request|HTML_resonse/) {
+      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+      $ua->add_handler( response_done => sub { shift->dump; return } );
+  }
   
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
@@ -1104,10 +1108,10 @@ sub _checkLogin {
   my $location = $loginp->header('Location') // "";
   
   if ($loginp->is_success) {
-      if($v5d eq "loginData") {
+      if($v5d =~ /loginData/) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
           Log3 ($name, 5, "$name - Header Location: ".$location);
-          Log3 ($name, 5, "$name - Login Page content: ".encode("utf8", $loginp->decoded_content));
+          # Log3 ($name, 5, "$name - Login Page content: ".encode("utf8", $loginp->decoded_content));
       }
   
       $retcode  = $loginp->code;
@@ -1138,10 +1142,10 @@ sub _checkLogin {
               if($v5d eq "loginData") {
                   Log3 ($name, 5, "$name - Status Redirect Page : ".$retcode);
                   Log3 ($name, 5, "$name - Header Redirect Location: ".$location); 
-                  Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
+                  # Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
               }
 
-              if($location =~ /\/FixedPages\//x && $retcode eq "302") {                     # Weiterleitung -> Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
+              if($location =~ /\/FixedPages\/|\/Templates\//x && $retcode eq "302") {       # Weiterleitung -> Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
@@ -1390,7 +1394,7 @@ sub _analyzeData {                                                          ## n
       }
   
   } else {
-      my $njdat = $ad->as_string;
+      my $njdat = $ad->as_string; 
       
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
@@ -1552,7 +1556,7 @@ return ($err);
 ################################################################
 ##         Auswertung Live Daten
 ################################################################
-sub extractLiveData {
+sub extractLiveData {                  ## no critic 'complexity'
   my $hash    = shift;
   my $daref   = shift;
   my $live    = shift;  
@@ -3300,8 +3304,9 @@ return;
 
        <a name="verbose5Data"></a>
        <li><b>verbose5Data </b><br>
-       If verbose 5 is set, huge data are generated. With this attribute only the interesting verbose 5 output
-       can be specified. (default: none).  
+       The attribute value verbose 5 is used to generate very large amounts of data. 
+       The verbose 5 outputs of interest can be selected specifically. <br>
+       (default: none)
        </li><br>       
    
      </ul>
@@ -3495,8 +3500,9 @@ return;
 
        <a name="verbose5Data"></a>
        <li><b>verbose5Data </b><br>
-       Mit dem Attributwert verbose 5 werden zu viele Daten generiert. Mit diesem Attribut können gezielt die interessierenden
-       verbose 5 Ausgaben selektiert werden. (default: none).  
+       Mit dem Attributwert verbose 5 werden sehr große Datenmengen generiert. 
+       Es können gezielt die interessierenden verbose 5 Ausgaben selektiert werden. <br>
+       (default: none)
        </li><br>       
    
      </ul>
