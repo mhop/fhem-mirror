@@ -135,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
   "2.10.2" => "10.06.2020  bug fixes get/switch consumers ",
   "2.10.1" => "08.06.2020  internal code changes, bug fixes ",
@@ -244,6 +245,7 @@ sub Initialize {
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
                            "interval ".
+                          # "providerLevel:multiple-strict,".$v5d." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "verbose5Data:none,loginData,".$v5d." ".
@@ -1566,17 +1568,26 @@ sub extractLiveData {
   my ($errMsg,$warnMsg,$infoMsg) = (0,0,0);
   
   if (ref $live eq "HASH") {
-      push @$daref, "L1_FeedIn:"                .($live->{FeedIn}               // 0)." W";
-      push @$daref, "L1_GridConsumption:"       .($live->{GridConsumption}      // 0)." W";
-      push @$daref, "L1_PV:"                    .($live->{PV}                   // 0)." W";
-      push @$daref, "L1_AutarkyQuote:"          .($live->{AutarkyQuote}         // 0)." %";
-      push @$daref, "L1_SelfConsumption:"       .($live->{SelfConsumption}      // 0)." W";
-      push @$daref, "L1_SelfConsumptionQuote:"  .($live->{SelfConsumptionQuote} // 0)." %";
-      push @$daref, "L1_SelfSupply:"            .($live->{SelfSupply}           // 0)." W";
-      push @$daref, "L1_TotalConsumption:"      .($live->{TotalConsumption}     // 0)." W";
+      push @$daref, "L1_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
+      push @$daref, "L1_GridConsumption:"         .($live->{GridConsumption}      // 0)." W";
+      push @$daref, "L1_PV:"                      .($live->{PV}                   // 0)." W";
+      push @$daref, "L1_AutarkyQuote:"            .($live->{AutarkyQuote}         // 0)." %";
+      push @$daref, "L1_SelfConsumption:"         .($live->{SelfConsumption}      // 0)." W";
+      push @$daref, "L1_SelfConsumptionQuote:"    .($live->{SelfConsumptionQuote} // 0)." %";
+      push @$daref, "L1_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
+      push @$daref, "L1_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
       
-      push @$daref, "L1_BatteryIn:"             .$live->{BatteryIn}. " W" if(defined $live->{BatteryIn});
-      push @$daref, "L1_BatteryOut:"            .$live->{BatteryOut}." W" if(defined $live->{BatteryOut});
+      push @$daref, "L1_BatteryIn:"               .$live->{BatteryIn}. " W"            if(defined $live->{BatteryIn});
+      push @$daref, "L1_BatteryOut:"              .$live->{BatteryOut}." W"            if(defined $live->{BatteryOut});
+      push @$daref, "L1_BatteryMode:"             .$live->{BatteryMode}.""             if(defined $live->{BatteryMode});
+      push @$daref, "L1_BatteryStateOfHealth:"    .$live->{BatteryStateOfHealth}.""    if(defined $live->{BatteryStateOfHealth});
+      push @$daref, "L1_BatteryChargeStatus:"     .$live->{BatteryChargeStatus}." %"   if(defined $live->{BatteryChargeStatus});
+      
+      push @$daref, "L1_ModuleTemperature:"       .$live->{ModuleTemperature}.""       if(defined $live->{ModuleTemperature});
+      push @$daref, "L1_OperationHealth:"         .$live->{OperationHealth}.""         if(defined $live->{OperationHealth});
+      push @$daref, "L1_Insolation:"              .$live->{Insolation}.""              if(defined $live->{Insolation});
+      push @$daref, "L1_WindSpeed:"               .$live->{WindSpeed}.""               if(defined $live->{WindSpeed});
+      push @$daref, "L1_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""  if(defined $live->{EnvironmentTemperature});
       
       if($live->{ErrorMessages}[0]) {
           my @em;
