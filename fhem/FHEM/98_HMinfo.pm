@@ -850,7 +850,8 @@ sub HMinfo_tempListTmplView() { ###############################################
   
   my @tNfound = ();    # templates found in files
   push @tNfound, @{$defs{$n}{helper}{weekplanList}} if (defined $defs{$n}{helper}{weekplanList} 
-                                                 && ref($defs{$n}{helper}{weekplanList}) eq 'ARRAY');
+                                                 && ref($defs{$n}{helper}{weekplanList}) eq 'ARRAY'
+                                                 && 0 < scalar(@{$defs{$n}{helper}{weekplanList}}));
 
   ####################################################
   my $ret = "";
