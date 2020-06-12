@@ -135,7 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.5" => "11.06.2020  add check login by /Templates/, deeper verbose5Data ",
+  "2.10.5" => "12.06.2020  add check login by /Templates/, deeper/mulitple choice verbose5Data ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
   "2.10.2" => "10.06.2020  bug fixes get/switch consumers ",
@@ -1179,10 +1179,8 @@ sub _checkLogin {
       Log3 ($name, 1, "$name - ERROR Login Page: ".$state);
   }
   
-  my $ph_rs = "request_send";
-  my $ph_rd = "response_done";
-  $ua->remove_handler($ph_rs);
-  $ua->remove_handler($ph_rd);
+  $ua->remove_handler('request_send');
+  $ua->remove_handler('response_done');
   
 return ($state, $errstate); 
 }
@@ -1309,10 +1307,8 @@ sub _getData {
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
   
-  my $ph_rs = "request_send";
-  my $ph_rd = "response_done";
-  $ua->remove_handler($ph_rs);
-  $ua->remove_handler($ph_rd);
+  $ua->remove_handler('request_send');
+  $ua->remove_handler('response_done');
   
 return ($data,$dcont); 
 }
@@ -1352,10 +1348,8 @@ sub _postData {
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
   
-  my $ph_rs = "request_send";
-  my $ph_rd = "response_done";
-  $ua->remove_handler($ph_rs);
-  $ua->remove_handler($ph_rd);
+  $ua->remove_handler('request_send');
+  $ua->remove_handler('response_done');
   
 return ($data,$dcont); 
 }

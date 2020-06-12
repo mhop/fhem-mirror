@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - changed: 76_SMAPortal: add check login Templates, multiple choice for attr
+                          verbose5Data
  - bugfix:  76_SMAPortal: internal code changes, bug fixes show weather_icon
  - changed: 76_SMAPortal: internal code changes, minor bug fixes
  - bugfix:  70_BRAVIA: fix register procedure
