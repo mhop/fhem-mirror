@@ -849,7 +849,7 @@ sub HMinfo_tempListTmplView() { ###############################################
   }
   
   my @tNfound = ();    # templates found in files
-  push @tNfound, @{$defs{hm}{helper}{weekplanList}} if (defined $defs{$n}{helper}{weekplanList} 
+  push @tNfound, @{$defs{$n}{helper}{weekplanList}} if (defined $defs{$n}{helper}{weekplanList} 
                                                  && ref($defs{$n}{helper}{weekplanList}) eq 'ARRAY');
 
   ####################################################
@@ -1648,11 +1648,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my %h;    
     if($action eq "ping"){
       foreach my $defN (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
-        next if(($defs{$defN}{helper}{rxType} & 0xe3) == 0);
-        next if (1 == CUL_HM_Set($defs{$defN},$defN,"sysTime"));
-        foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
-          last if(1== CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"));
-        }
+        CUL_HM_Ping($defN);
       }
     }
     else{
@@ -2798,6 +2794,7 @@ sub HMinfo_templateUsg(@){#####################################################
 
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
+  Log 1,"General tplCheck: ".join("  :",@_);
   # pset: 0                = template w/o peers
   #       peer / peer:both = template for peer, not extending Long/short
   #       peer:short|long  = template for peerlong or short
@@ -2809,8 +2806,11 @@ sub HMinfo_templateChk(@){#####################################################
   
   my $repl = "";
   my($pName,$pTyp) = split(":",$pSet);
-  if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,""))){
-    $repl = "  no peer:$pName\n";
+  
+  $pName = $1 if($pName =~ m/(.*)_chn-(..)$/);
+
+  if($pName && (0 == scalar grep /^$pName$/,split(",",ReadingsVal($aName,"peerList" ,"")))){
+    $repl = "  no peer:$pName - ".ReadingsVal($aName,"peerList" ,"")."\n";
   }
   else{
     my $pRnm = $pName ? $pName."-" : "";
