@@ -2895,13 +2895,14 @@ CommandAttr($$)
   my $a1 = $a[1];
   return "$a[0]: bad attribute name '$a1' (allowed chars: A-Za-z/\\d_\\.-)"
            if($featurelevel > 5.9 && !goodReadingName($a1) && $a1 ne "?");
+  return "attr $param: attribute value is missing" if($#a < 2);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0], $a1 && $a1 eq "?" ? undef : $cl)) {
 
     my $hash = $defs{$sdev};
     my $attrName = $a1;
-    my $attrVal = (defined($a[2]) ? $a[2] : 1);
+    my $attrVal = $a[2];
     if(!defined($hash)) {
       push @rets, "Please define $sdev first" if($init_done);#define -ignoreErr
       next;
