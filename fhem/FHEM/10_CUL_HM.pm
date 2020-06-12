@@ -8354,10 +8354,14 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
 sub CUL_HMTmplSetCmd($){
   my $name = shift;
   return "" if(not scalar devspec2array("TYPE=HMinfo"));
+  my $devId = substr($defs{$name}{DEF},0,6);
   my %a;
-  my @peerIds = map{CUL_HM_id2Name($_)} grep !/00000000/,split(",",AttrVal($name,"peerIDs",""));
-  foreach my $peer($peerIds[0],"0"){ 
+
+  my   @peers = map{CUL_HM_id2Name($_)}   grep !/^(00000000|$devId)/,split(",",AttrVal($name,"peerIDs",""));
+  push @peers,  map{"self".substr($_,-2)} grep /^$devId/            ,split(",",AttrVal($name,"peerIDs",""));
+  foreach my $peer($peers[0],"0"){ 
     next if (!defined $peer);
+    $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
     my $ps = $peer eq "0" ? "R-" : "R-$peer-";
     my %b = map { $_ => 1 }map {(my $foo = $_) =~ s/.?$ps//; $foo;} grep/.?$ps/,keys%{$defs{$name}{READINGS}};
@@ -8371,8 +8375,7 @@ sub CUL_HMTmplSetCmd($){
       }
       if($f == 0){
         if($typShLg){
-          foreach my $pAss (@peerIds){
-            $pAss = "self".substr($pAss,-2) if($pAss =~ m/^${name}_chn-..$/);
+          foreach my $pAss (@peers){
             $a{$pAss}{$t."_short"} = 1;
             $a{$pAss}{$t."_long"} = 1;
           }
@@ -8382,7 +8385,7 @@ sub CUL_HMTmplSetCmd($){
             $a{$peer}{$t} = 1;
           }
           else{
-            $a{$_}{$t} = 1  foreach(map{$_ =~ m/^${name}_chn-..$/ ? "self".substr($peer,-2) : $_}@peerIds);
+            $a{$_}{$t} = 1  foreach(map{$_ =~ m/^${name}_chn-..$/ ? "self".substr($peer,-2) : $_}@peers);
           }
         }
       }
