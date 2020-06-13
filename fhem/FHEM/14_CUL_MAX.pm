@@ -627,11 +627,11 @@ sub CUL_MAX_Parse
    }
   }
 
-  my $src_name = (exists($modules{MAX}{defptr}{$src}) && exists($modules{MAX}{defptr}{$src}->{NAME})) ? $modules{MAX}{defptr}{$src}->{NAME} : 'MAX_'.$src;
+  my $src_name = (exists($modules{MAX}{defptr}{$src}) && defined($modules{MAX}{defptr}{$src}->{NAME})) ? $modules{MAX}{defptr}{$src}->{NAME} : 'MAX_'.$src;
 
   return $shash->{NAME} if (exists($modules{MAX}{defptr}{$src}) && IsIgnored($src_name));
 
-  my $dst_name = (exists($modules{MAX}{defptr}{$dst}) && exists($modules{MAX}{defptr}{$dst}->{NAME})) ? $modules{MAX}{defptr}{$dst}->{NAME} : 'MAX_'.$dst;
+  my $dst_name = (exists($modules{MAX}{defptr}{$dst}) && defined($modules{MAX}{defptr}{$dst}->{NAME})) ? $modules{MAX}{defptr}{$dst}->{NAME} : 'MAX_'.$dst;
   $dst_name = 'Broadcast' if ($dst_name eq 'MAX_000000');
 
   my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
@@ -687,7 +687,8 @@ sub CUL_MAX_Parse
 
       if ($payload eq '00')
       {
-       Log3 $shash,1,$name.', 00 payload from '.$src.' for '.$dst_name;
+       Log3 $shash,4,$name.', 00 payload from '.$src.' for '.$dst_name;
+	return $shash->{NAME};
       }
       #else
       #{
