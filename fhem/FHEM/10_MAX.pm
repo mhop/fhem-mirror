@@ -1764,12 +1764,14 @@ sub MAX_Parse
     if(@args == 0) 
     {
       delete $shash->{ERROR} if(exists($shash->{ERROR}));
+      return $shash->{NAME};
     } 
      else 
     {
       $shash->{ERROR} = join(",",@args);
       readingsBulkUpdate($shash, "error",$shash->{ERROR});
       Log3 $shash , 3 ,"msg Type error : ". $shash->{ERROR};
+	return $shash->{NAME};
     }
   } 
   elsif($msgtype eq "AckWakeUp") 
@@ -1919,7 +1921,7 @@ sub MAX_Parse
   }
 
   # Build state READING
-  my $state = "waiting for data";
+  my $state = ReadingsVal($shash->{NAME}, 'state', 'waiting for data');
 
   $shash->{'.desiredTemperature'} = MAX_SerializeTemperature($shash->{'.desiredTemperature'}) if($shash->{'.desiredTemperature'});
   my $c = '';
