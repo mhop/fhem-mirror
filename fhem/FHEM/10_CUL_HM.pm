@@ -4152,7 +4152,7 @@ sub CUL_HM_TemplateModify(){
 sub CUL_HM_getTemplateModify(){
    return (defined $modules{CUL_HM}{helper}{tmplTimestamp} ? $modules{CUL_HM}{helper}{tmplTimestamp} : 'no');
 }
-sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++++++++++++++++
+sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
   my($name)=@_;
   my $hash = $defs{$name};
   my $roleC = $hash->{helper}{role}{chn} ? 1 : 0; #entity may act in multiple roles
@@ -8501,6 +8501,7 @@ sub CUL_HM_updtRegDisp($$$) {
               : "";
   $pReg =~ s/:/-/;
   $pReg = "R-".$pReg;
+#  $pReg =~ s/_chn-..//;
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
   my $st = $attr{$devName}{subType} ?$attr{$devName}{subType} :"";
   my $md = CUL_HM_getAliasModel($hash);
@@ -8554,7 +8555,6 @@ sub CUL_HM_rmOldRegs($){ # remove register i outdated
   my $name = shift;
   my $hash = $defs{$name};
   return if (!$hash->{peerList});# so far only peer-regs are removed
-  my @pList = split",",$hash->{peerList};
   my @rpList;
   foreach(grep /^R-(.*)-/,keys %{$hash->{READINGS}}){
     push @rpList,$1 if ($_ =~ m/^R-(.*)-/);
@@ -8562,8 +8562,10 @@ sub CUL_HM_rmOldRegs($){ # remove register i outdated
   @rpList = CUL_HM_noDup(@rpList);
   return if (!@rpList);
   foreach my $peer(@rpList){
+    $peer =~ s/_chn-..$//;
     next if($hash->{peerList} =~ m/\b$peer\b/);
-    delete $hash->{READINGS}{$_} foreach (grep /^R-$peer-/,keys %{$hash->{READINGS}})
+    delete $hash->{READINGS}{$_} foreach (grep /^R-${peer}-/,keys %{$hash->{READINGS}});
+    delete $hash->{READINGS}{$_} foreach (grep /^R-${peer}_chn-..-/,keys %{$hash->{READINGS}});
   }
 }
 sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
