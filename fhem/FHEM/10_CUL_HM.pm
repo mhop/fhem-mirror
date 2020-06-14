@@ -2148,7 +2148,7 @@ sub CUL_HM_Parse($$) {#########################################################
         my $vDim = $mh{cHash}->{helper}{vDim}; #shortcut
         if ($vDim->{idPhy} &&
             CUL_HM_id2Hash($vDim->{idPhy})){   #has virt chan
-          RemoveInternalTimer("sUpdt:".$mh{src}.$mh{chnM});
+          RemoveInternalTimer("sUpdt:".CUL_HM_id2Name($mh{src}.$mh{chnM}));
           if ($mh{mTp} eq "10"){               #valid PhysLevel
             foreach my $tmpKey ("idPhy","idV2","idV3",){#update all virtuals
               my $vh = ($vDim->{$tmpKey} ? CUL_HM_id2Hash($vDim->{$tmpKey}) : "");
@@ -9922,6 +9922,8 @@ sub CUL_HM_qEntity($$){  # add to queue
                               $modules{CUL_HM}{hmAutoReadScan};
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
+  Log 1,"General ##########\n       ".join("\n       ",sort map{sprintf("%8d",int($intAt{$_}{TRIGGERTIME}-gettimeofday())).":$intAt{$_}{FN}\t$intAt{$_}{ARG}"} (keys %intAt));
+
 }
 
 sub CUL_HM_readStateTo($){#staterequest not working
