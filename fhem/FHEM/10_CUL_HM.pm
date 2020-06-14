@@ -9922,8 +9922,6 @@ sub CUL_HM_qEntity($$){  # add to queue
                               $modules{CUL_HM}{hmAutoReadScan};
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
-  Log 1,"General ##########\n       ".join("\n       ",sort map{sprintf("%8d",int($intAt{$_}{TRIGGERTIME}-gettimeofday())).":$intAt{$_}{FN}\t$intAt{$_}{ARG}"} (keys %intAt));
-
 }
 
 sub CUL_HM_readStateTo($){#staterequest not working
