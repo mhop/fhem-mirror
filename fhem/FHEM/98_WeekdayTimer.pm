@@ -187,7 +187,7 @@ sub WeekdayTimer_Set {
     }
     return;
   } 
-  if ($v =~ /weekprofile ([^: ]+):([^:]+):([^: ]+)\b/x) {
+  if ($v =~ m/\Aweekprofile[ ]([^: ]+):([^:]+):([^: ]+)\b/x) {
     Log3( $hash, 3, "[$name] set $name $v" );
     return unless WeekdayTimer_UpdateWeekprofileReading($hash, $1, $2, $3);
     WeekdayTimer_DeleteTimer($hash);
@@ -1325,7 +1325,7 @@ sub WeekdayTimer_SetAllParms {            # {WeekdayTimer_SetAllParms()}
 sub WeekdayTimer_UpdateWeekprofileReading {
   my ($hash,$wp_name,$wp_topic,$wp_profile) = @_;
   my $name = $hash->{NAME};
-  unless (defined $defs{$wp_name} && InternalVal($wp_name,"TYPE","false") eq "weekprofile")  {
+  if (!defined $defs{$wp_name} || InternalVal($wp_name,"TYPE","false") ne "weekprofile")  {
     Log3( $hash, 3, "[$name] weekprofile $wp_name not accepted, device seems not to exist or not to be of TYPE weekprofile" );
     return;
   }
@@ -1339,7 +1339,7 @@ sub WeekdayTimer_UpdateWeekprofileReading {
   my $newtriplett = qq($wp_name:$wp_topic:$wp_profile);
   push @newt ,$newtriplett;
   for my $triplett (@t){
-    push @newt ,$triplett unless $triplett =~ m{$wp_name\b}xms;
+    push @newt ,$triplett unless $triplett =~ m{\A$wp_name\b}xms;
   }
   readingsSingleUpdate ($hash,  "weekprofiles", join(" ",@newt), 1);
   return 1;
