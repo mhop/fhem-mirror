@@ -312,7 +312,6 @@ sub Set($@) {
     $usage .= " requestReboot:noArg " if (ReadingsVal($name, "requestFormat", "") eq "json");
 
     my $cmd = '';
-    my $result;
 
     # statusRequest
     if ( lc( $a[1] ) eq "statusrequest" ) {
@@ -351,7 +350,7 @@ sub Set($@) {
                 ($presence eq "absent" ||
                  ReadingsVal($name, "generation", "") eq "1.0.5" ||
                  ReadingsVal($name, "generation", "") eq "2.5.0") ) {
-                $result = wake( $name, $macAddr );
+                wake( $name, $macAddr );
                 return "wake-up command sent";
             } else {
                 $cmd = "POWER";
@@ -378,27 +377,28 @@ sub Set($@) {
     }
 
     # volume
-    elsif ( $a[1] eq "volume" ) {
+    elsif ( $a[1] eq 'volume' ) {
         Log3($name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2]);
 
-        return "No argument given" if ( !defined( $a[2] ) );
+        return 'No argument given' if ( !defined( $a[2] ) );
 
         my $vol = $a[2];
-        if ( $presence eq "present" ) {
+        if ( $presence eq 'present' ) {
             if ( $vol =~ m/^\d+$/ && $vol >= 1 && $vol <= 100 ) {
-                $cmd = 'setVolume:' . $vol;
+                $cmd = $vol;
             }
             else {
                 return
-                  "Argument does not seem to be a valid integer between 1 and 100";
+                  'Argument does not seem to be a valid integer between 1 and 100';
             }
-            SendCommand( $hash, "upnp", $cmd );
+            SendCommand( $hash, 'setAudioVolume', $cmd );
 
-            readingsSingleUpdate( $hash, "volume", $a[2], 1 )
-              if ( ReadingsVal($name, "volume", "") ne $a[2] );
+            readingsBeginUpdate($hash);
+            readingsBulkUpdateIfChanged($hash, 'volume', $a[2]);
+            readingsEndUpdate($hash, 1);
         }
         else {
-            return "Device needs to be ON to adjust volume.";
+            return 'Device needs to be ON to adjust volume.';
         }
     }
 
@@ -421,7 +421,7 @@ sub Set($@) {
     }
 
     # mute
-    elsif ( $a[1] eq "mute" ) {
+    elsif ( $a[1] eq 'mute' ) {
         if ( defined( $a[2] ) ) {
             Log3($name, 2, "BRAVIA set $name " . $a[1] . " " . $a[2]);
         }
@@ -429,29 +429,23 @@ sub Set($@) {
             Log3($name, 2, "BRAVIA set $name " . $a[1]);
         }
 
-        if ( $presence eq "present" ) {
-            if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
-                $result = SendCommand( $hash, "ircc", "MUTE" );
-                readingsSingleUpdate( $hash, "mute", (ReadingsVal($name, "mute", "") eq "on" ? "off" : "on"), 1 );
+        if ( $presence eq 'present' ) {
+            if ( !defined( $a[2] ) || $a[2] eq 'toggle' ) {
+                SendCommand( $hash, 'ircc', 'MUTE' );
+                readingsSingleUpdate( $hash, 'mute', (ReadingsVal($name, 'mute', '') eq 'on' ? 'off' : 'on'), 1 );
             }
-            elsif ( $a[2] eq "off" ) {
-                #$result = SendCommand( $hash, "MuteOff" )
-                $result = SendCommand( $hash, "upnp", "setMute:0" );
-                readingsSingleUpdate( $hash, "mute", $a[2], 1 )
-                   if ( ReadingsVal($name, "mute", "") ne $a[2] );
-            }
-            elsif ( $a[2] eq "on" ) {
-                #$result = SendCommand( $hash, "MuteOn" )
-                $result = SendCommand( $hash, "upnp", "setMute:1" );
-                readingsSingleUpdate( $hash, "mute", $a[2], 1 )
-                   if ( ReadingsVal($name, "mute", "") ne $a[2] );
+            elsif ( $a[2] eq 'on' || $a[2] eq 'off' ) {
+                SendCommand( $hash, 'setAudioMute', ($a[2] eq 'on' ? 'true' : 'false') );
+                readingsBeginUpdate($hash);
+                readingsBulkUpdateIfChanged($hash, 'mute', $a[2]);
+                readingsEndUpdate($hash, 1);
             }
             else {
-                return "Unknown argument " . $a[2];
+                return 'Unknown argument ' . $a[2];
             }
         }
         else {
-            return "Device needs to be ON to mute/unmute audio.";
+            return 'Device needs to be ON to mute/unmute audio.';
         }
     }
 
@@ -795,12 +789,15 @@ sub SendCommand($$;$$@) {
     Log3($name, 5, "BRAVIA $name: called function SendCommand()");
 
     my $URL;
-    my $response;
     my $return;
     my $requestFormat = ReadingsVal($name, "requestFormat", "");
 
     if ($service ne "register" && $service ne "getStatus") {
       return if CheckRegistration($hash, $service, $cmd, $param, @successor);
+    }
+
+    if (!CheckServiceAvailable($hash, $service, $cmd, $param, @successor)) {
+      return;
     }
 
     if ( !defined($cmd) ) {
@@ -947,7 +944,31 @@ sub SendCommand($$;$$@) {
         $data .= ",\"data\":\"".$param."\"" if (defined($param));
         $data .= "}]}";
       }
-    } elsif ($service eq "text") {
+    } elsif ($service eq "getVolumeInformation") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/audio";
+        $data = "{\"id\":2,\"method\":\"getVolumeInformation\",\"version\":\"1.0\",\"params\":[]}";
+      }
+    } elsif ($service eq "setAudioVolume") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/audio";
+        $data = "{\"id\":2,\"method\":\"setAudioVolume\",\"version\":\"1.0\",\"params\":[{\"volume\":\"".$cmd."\",\"target\":\"speaker\"}]}";
+      }
+    } elsif ($service eq "setAudioMute") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/audio";
+        $data = "{\"id\":2,\"method\":\"setAudioMute\",\"version\":\"1.0\",\"params\":[{\"status\":".$cmd."}]}";
+      }
+    } elsif ($service eq "getSupportedApiInfo") {
+      $URL .= $port->{SERVICE};
+      if ($requestFormat eq "json") {
+        $URL .= "/sony/guide";
+        $data = "{\"id\":2,\"method\":\"getSupportedApiInfo\",\"version\":\"1.0\",\"params\":[{\"services\":[\"audio\"]}]}";
+      }
+   } elsif ($service eq "text") {
       $URL .= $port->{SERVICE};
       if ($requestFormat eq "json") {
         $URL .= "/sony/appControl";
@@ -1326,6 +1347,8 @@ sub ProcessCommandData ($$$) {
       # read system information if not existing
       push(@$successor, ["getSystemInformation"])
           if ( ReadingsVal($name, "name", "0") eq "0" || ReadingsVal($name, "model", "0") eq "0" );
+      push(@$successor, ["getSupportedApiInfo"])
+          if ( !defined($hash->{helper}{services}) || scalar($hash->{helper}{services}) == 0 );
     
       # read content information
       if ( ReadingsVal($name, "generation", "1.0") ne "1.0" ) {
@@ -1343,9 +1366,8 @@ sub ProcessCommandData ($$$) {
           $newstate = ( $return->{status}{name} eq "viewing" ? "on" : $return->{status}{name} );
         }
         # get current system settings
-        if ($newstate eq "on" && ReadingsVal($name, "upnp", "on") eq "on") {
-          push(@$successor, ["upnp", "getVolume"]);
-          push(@$successor, ["upnp", "getMute"]);
+        if ($newstate eq 'on') {
+          push(@$successor, ['getVolumeInformation']);
         }
       }
     }
@@ -1372,6 +1394,19 @@ sub ProcessCommandData ($$$) {
           readingsBulkUpdate( $hash, "model", $return->{modelName} );
         }
         readingsEndUpdate( $hash, 1 );
+      }
+    }
+    
+    # getSupportedApiInfo
+    elsif ( $service eq "getSupportedApiInfo" ) {
+      if ( ref($return) eq "HASH" && ref($return->{result}) eq "ARRAY") {
+        my $elements = $return->{result}[0];
+        if (ref($elements) eq "ARRAY") {
+          $hash->{helper}{services} = ();
+          foreach my $srvName (@$elements) {
+            push(@{$hash->{helper}{services}}, $srvName->{service});
+          }
+        }
       }
     }
     
@@ -1496,9 +1531,8 @@ sub ProcessCommandData ($$$) {
       }
     
       # get current system settings
-      if ($newstate eq "on" && ReadingsVal($name, "upnp", "on") eq "on") {
-        push(@$successor, ["upnp", "getVolume"]);
-        push(@$successor, ["upnp", "getMute"]);
+      if ($newstate eq 'on') {
+        push(@$successor, ['getVolumeInformation']);
       }
       
       FetchPresets($hash, $successor) if ($newstate eq "on");
@@ -1719,6 +1753,39 @@ sub ProcessCommandData ($$$) {
         }
       }
       readingsSingleUpdate( $hash, "application", $appName, 1 ) if ($appName);
+    }
+
+    # getVolumeInformation
+    elsif ( $service eq 'getVolumeInformation') {
+      if ( ref($return) eq 'HASH' && ref($return->{result}) eq 'ARRAY') {
+        my $elements = $return->{result}[0];
+        if (ref($elements) eq 'ARRAY') {
+          my %speaker = ();
+          foreach my $target (@$elements) {
+            if (ref($target) eq 'HASH') {
+              %speaker = %$target if ($target->{'target'} eq 'speaker');
+              last;
+            }
+          }
+          %speaker = @{$return->{result}}[0] if (!%speaker && ${$return->{result}} > 0);
+          if (%speaker) {
+            readingsBeginUpdate($hash);
+            readingsBulkUpdateIfChanged( $hash, 'volume', $speaker{volume} );
+            readingsBulkUpdateIfChanged( $hash, 'mute', ($speaker{mute} ? "on" : "off") );
+            readingsEndUpdate( $hash, 1 );
+          }
+        }
+      }
+    }
+
+    # setAudioVolume
+    elsif ( $service eq 'setAudioVolume') {
+      # nothing to do
+    }
+
+    # setAudioMute
+    elsif ( $service eq 'setAudioMute') {
+      # nothing to do
     }
 
     # text
@@ -2176,6 +2243,26 @@ sub CheckRegistration($$$$@) {
     }
   }
   return;
+}
+
+sub CheckServiceAvailable {
+  my ($hash, $service, $cmd, $param, @successor) = @_;
+  my $name = $hash->{NAME};
+
+  if (!defined($hash->{helper}{services}) || join(',', @{$hash->{helper}{services}}) !~ /audio/xms) {
+    if ($service eq 'getVolumeInformation' && ReadingsVal($name, 'upnp', 'on') eq 'on') {
+      unshift(@successor, ['upnp', 'getMute']);
+      SendCommand($hash, 'upnp', 'getVolume', undef, @successor);
+      return;
+    } elsif ($service eq 'setAudioVolume') {
+      SendCommand($hash, 'upnp', "setVolume:$cmd", undef, @successor);
+      return;
+    } elsif ($service eq 'setAudioMute') {
+      SendCommand($hash, 'upnp', 'setMute:'.($cmd eq 'false' ? '0' : '1'), undef, @successor);
+      return;
+    }
+  }
+  return 1;
 }
 
 sub GetNormalizedName($) {
