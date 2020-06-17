@@ -135,6 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.6" => "12.06.2020  add hash dataprovider ",
   "2.10.5" => "12.06.2020  add check login by /Templates/, deeper/mulitple choice verbose5Data ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
@@ -215,6 +216,16 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
+my %stpl = (                               # Ausgangstemplate Subfunktionen der Datenprovider
+    balanceDayData    => { doit => 0, level => 'L02', func => 'dummy' },
+    liveData          => { doit => 0, level => 'L00', func => '_getLiveData' },
+    weatherData       => { doit => 0, level => 'L01', func => 'dummy' },
+    forecastData      => { doit => 0, level => 'L03', func => 'dummy' },
+    consumerLiveData  => { doit => 0, level => 'L04', func => 'dummy' },
+    consumerDayData   => { doit => 0, level => 'L05', func => 'dummy' },
+    consumerMonthData => { doit => 0, level => 'L06', func => 'dummy' },
+    consumerYearData  => { doit => 0, level => 'L07', func => 'dummy' },
+);
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( balanceDayData
              liveData 
@@ -246,7 +257,7 @@ sub Initialize {
                            "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
                            "interval ".
-                          # "providerLevel:multiple-strict,".$v5d." ".
+                           "providerLevel:multiple-strict,".$v5d." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
@@ -792,9 +803,6 @@ sub GetSetData {                                                       ## no cri
   
   my $ua = LWP::UserAgent->new;
   
-  # $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
-  # $ua->add_handler( response_done => sub { shift->dump; return } );
-  
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
                       "Accept-Encoding"  => "gzip, deflate, br",
@@ -862,21 +870,9 @@ sub GetSetData {                                                       ## no cri
   #############################
   if($getp ne "none") {  
 
-      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-      my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-      my $offset   = fhemTzOffset($cts);
-      my $time     = int(($cts + $offset) * 1000);                                        # add Timestamp in Millisekunden and UTC 
-      
-      
-      ### Live-Daten
-      ################
-      ($errstate,$state,$reread,$retry) = _dispatchGet ({ name     => $name,
+      ($errstate,$state,$reread,$retry) = _getLiveData ({ name     => $name,
                                                           ua       => $ua,
-                                                          call     => 'https://www.sunnyportal.com/homemanager?t='.$time,
-                                                          tag      => "liveData",
                                                           state    => $state, 
-                                                          fnaref   => [ qw( extractLiveData ) ],
-                                                          addon    => "",
                                                           daref    => \@da
                                                        });
          
@@ -917,15 +913,15 @@ sub GetSetData {                                                       ## no cri
       
       ### Wetterdaten
       #####################    
-      ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                           ua       => $ua,
-                                           call     => 'https://www.sunnyportal.com/Dashboard/Weather',
-                                           tag      => "weatherData",
-                                           state    => $state, 
-                                           fnaref   => [ qw( extractWeatherData ) ],
-                                           addon    => "",
-                                           daref    => \@da
-                                        });
+      ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                            ua       => $ua,
+                                            call     => 'https://www.sunnyportal.com/Dashboard/Weather',
+                                            tag      => "weatherData",
+                                            state    => $state, 
+                                            fnaref   => [ qw( extractWeatherData ) ],
+                                            addon    => "",
+                                            daref    => \@da
+                                         });
       if($errstate) {
           $st = encode_base64 ( $state,"");
           return "$name|0|0|$errstate|$getp|$setp|$st";
@@ -935,23 +931,28 @@ sub GetSetData {                                                       ## no cri
       
       
       ### Statistic Data Tag (anchorTime beachten !)
-      ################################################                       
+      ################################################  
+      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+      my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+      my $offset   = fhemTzOffset($cts);
+      my $time     = int(($cts + $offset) * 1000);                                # add Timestamp in Millisekunden and UTC 
+       
       my $anchort = int ($time / 1000);                                           # anchorTime -> abzurufendes Datum
       my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
       my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
       my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
       
-      ($errstate,$state) = _dispatchPost ({ name     => $name,
-                                            ua       => $ua,
-                                            call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                            tag      => "balanceDayData",
-                                            state    => $state, 
-                                            fnaref   => [ qw( extractStatisticData ) ],
-                                            fields   => \%fields,
-                                            content  => $cont,
-                                            addon    => "Day",
-                                            daref    => \@da
-                                         });
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceDayData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => "Day",
+                                             daref    => \@da
+                                          });
       if($errstate) {
           $st = encode_base64 ( $state,"");
           return "$name|0|0|$errstate|$getp|$setp|$st";
@@ -962,7 +963,7 @@ sub GetSetData {                                                       ## no cri
       ### Forecast Daten abrufen
       ###########################
       if($dl > 1) {
-          ($errstate,$state) = _dispatchGet ({ name     => $name,
+          ($errstate,$state) = __dispatchGet ({ name     => $name,
                                                ua       => $ua,
                                                call     => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
                                                tag      => "forecastData",
@@ -983,7 +984,7 @@ sub GetSetData {                                                       ## no cri
       ### Consumer Livedaten und historische Energiedaten
       #####################################################
       if($dl > 2) {          
-          ($errstate,$state) = _dispatchGet ({ name     => $name,
+          ($errstate,$state) = __dispatchGet ({ name     => $name,
                                                ua       => $ua,
                                                call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
                                                tag      => "consumerLiveData",
@@ -1023,7 +1024,7 @@ sub GetSetData {                                                       ## no cri
               Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
               Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
               
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
+              ($errstate,$state) = __dispatchGet ({ name     => $name,
                                                    ua       => $ua,
                                                    call     => $ccdd,
                                                    tag      => "consumerDayData",
@@ -1042,7 +1043,7 @@ sub GetSetData {                                                       ## no cri
               Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
               Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
              
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
+              ($errstate,$state) = __dispatchGet ({ name     => $name,
                                                    ua       => $ua,
                                                    call     => $ccmd,
                                                    tag      => "consumerMonthData",
@@ -1061,7 +1062,7 @@ sub GetSetData {                                                       ## no cri
               Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
               Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
               
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
+              ($errstate,$state) = __dispatchGet ({ name     => $name,
                                                    ua       => $ua,
                                                    call     => $ccyd,
                                                    tag      => "consumerYearData",
@@ -1115,7 +1116,6 @@ sub _checkLogin {
       if($v5d =~ /loginData/) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
           Log3 ($name, 5, "$name - Header Location: ".$location);
-          # Log3 ($name, 5, "$name - Login Page content: ".encode("utf8", $loginp->decoded_content));
       }
   
       $retcode  = $loginp->code;
@@ -1146,11 +1146,14 @@ sub _checkLogin {
               if($v5d =~ /loginData/) {
                   Log3 ($name, 5, "$name - Status Redirect Page : ".$retcode);
                   Log3 ($name, 5, "$name - Header Redirect Location: ".$location); 
-                  # Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
               }
+              
+              my $sc        = $loginp->header('Set-Cookie') // "";   
+              my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
+              Log3 ($name, 5, "$name - Header Set-Cookie: ".$sc) if($v5d =~ /loginData/); 
 
-              if($location =~ /\/FixedPages\/|\/Templates\//x && $retcode eq "302") {       # Weiterleitung -> Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
-                  Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
+              if($logname && $logname eq $username) {                                       # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
+                  Log3 ($name, 3, "$name - Login into SMA-Portal successfully done with user: $logname");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "L1_Login-Status:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
@@ -1160,7 +1163,7 @@ sub _checkLogin {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
                   $state       = "login failed - check user and password";
                   $errstate = 1; 
-              }                         
+              }              
           }         
       }
   
@@ -1186,9 +1189,40 @@ return ($state, $errstate);
 }
 
 ################################################################
+#                    Abruf Live Daten
+################################################################
+sub _getLiveData {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $time     = int(($cts + $offset) * 1000);     # add Timestamp in Millisekunden and UTC 
+  
+  ($errstate,$state,$reread,$retry) = __dispatchGet ({ name     => $name,
+                                                       ua       => $ua,
+                                                       call     => 'https://www.sunnyportal.com/homemanager?t='.$time,
+                                                       tag      => "liveData",
+                                                       state    => $state, 
+                                                       fnaref   => [ qw( extractLiveData ) ],
+                                                       addon    => "",
+                                                       daref    => $daref
+                                                    });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
 #                    Dispatcher GET
 ################################################################
-sub _dispatchGet {
+sub __dispatchGet {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
@@ -1202,17 +1236,17 @@ sub _dispatchGet {
   
   my ($reread,$retry,$errstate)     = (0,0,0);
   
-  my ($data,$data_cont)             = _getData ({ name => $name,
-                                                  ua   => $ua,
-                                                  call => $call,
-                                                  tag  => $tag
-                                               });
+  my ($data,$data_cont)             = ___getData ({ name => $name,
+                                                    ua   => $ua,
+                                                    call => $call,
+                                                    tag  => $tag
+                                                 });
                           
-  ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
-                                                      errstate => $errstate,
-                                                      state    => $state,
-                                                      data     => $data
-                                                   });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state,$reread,$retry) if($errstate || $reread || $retry);
   
@@ -1231,7 +1265,7 @@ return ($errstate,$state,$reread,$retry);
 ################################################################
 #                    Dispatcher POST
 ################################################################
-sub _dispatchPost {
+sub __dispatchPost {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
@@ -1247,19 +1281,19 @@ sub _dispatchPost {
   
   my ($reread,$retry,$errstate)     = (0,0,0);
                                                    
-  my ($data,$data_cont)             = _postData ({ name    => $name,
-                                                   ua      => $ua,
-                                                   call    => $call,
-                                                   tag     => $tag,
-                                                   fields  => $fields,
-                                                   content => $cont,
-                                                });
+  my ($data,$data_cont)             = ___postData ({ name    => $name,
+                                                     ua      => $ua,
+                                                     call    => $call,
+                                                     tag     => $tag,
+                                                     fields  => $fields,
+                                                     content => $cont,
+                                                  });
                                                               
-  ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
-                                                      errstate => $errstate,
-                                                      state    => $state,
-                                                      data     => $data
-                                                   });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                       errstate => $errstate,
+                                                       state    => $state,
+                                                       data     => $data
+                                                    });
   
   return ($errstate,$state) if($errstate);
   
@@ -1278,7 +1312,7 @@ return ($errstate,$state,$reread,$retry);
 ################################################################
 #                      Standard Abruf Daten GET
 ################################################################
-sub _getData {
+sub ___getData {
   my $paref = shift;
   my $name  = $paref->{name};
   my $ua    = $paref->{ua};
@@ -1316,7 +1350,7 @@ return ($data,$dcont);
 ################################################################
 #                      Standard Abruf Daten POST
 ################################################################
-sub _postData {
+sub ___postData {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $ua      = $paref->{ua};
@@ -1357,7 +1391,7 @@ return ($data,$dcont);
 ################################################################
 #                 analysiere abgerufene Daten
 ################################################################
-sub _analyzeData {                                                          ## no critic 'complexity'
+sub ___analyzeData {                                                          ## no critic 'complexity'
   my $paref           = shift;
   my $name            = $paref->{name};
   my $errstate        = $paref->{errstate};
@@ -1608,17 +1642,19 @@ sub extractLiveData {                  ## no critic 'complexity'
       push @$daref, "L1_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
       push @$daref, "L1_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
       
-      push @$daref, "L1_BatteryIn:"               .$live->{BatteryIn}. " W"            if(defined $live->{BatteryIn});
-      push @$daref, "L1_BatteryOut:"              .$live->{BatteryOut}." W"            if(defined $live->{BatteryOut});
-      push @$daref, "L1_BatteryMode:"             .$live->{BatteryMode}.""             if(defined $live->{BatteryMode});
-      push @$daref, "L1_BatteryStateOfHealth:"    .$live->{BatteryStateOfHealth}.""    if(defined $live->{BatteryStateOfHealth});
-      push @$daref, "L1_BatteryChargeStatus:"     .$live->{BatteryChargeStatus}." %"   if(defined $live->{BatteryChargeStatus});
+      push @$daref, "L1_BatteryIn:"               .$live->{BatteryIn}. " W"             if(defined $live->{BatteryIn});
+      push @$daref, "L1_BatteryOut:"              .$live->{BatteryOut}." W"             if(defined $live->{BatteryOut});
+      push @$daref, "L1_BatteryMode:"             .$live->{BatteryMode}.""              if(defined $live->{BatteryMode});
+      push @$daref, "L1_BatteryStateOfHealth:"    .$live->{BatteryStateOfHealth}.""     if(defined $live->{BatteryStateOfHealth});
+      push @$daref, "L1_BatteryChargeStatus:"     .$live->{BatteryChargeStatus}." %"    if(defined $live->{BatteryChargeStatus});
+      push @$daref, "L1_DirectConsumption:"       .$live->{DirectConsumption}." W"      if(defined $live->{DirectConsumption});
+      push @$daref, "L1_DirectConsumptionQuote:"  .$live->{DirectConsumptionQuote}." %" if(defined $live->{DirectConsumptionQuote});
       
-      push @$daref, "L1_ModuleTemperature:"       .$live->{ModuleTemperature}.""       if(defined $live->{ModuleTemperature});
-      push @$daref, "L1_OperationHealth:"         .$live->{OperationHealth}.""         if(defined $live->{OperationHealth});
-      push @$daref, "L1_Insolation:"              .$live->{Insolation}.""              if(defined $live->{Insolation});
-      push @$daref, "L1_WindSpeed:"               .$live->{WindSpeed}.""               if(defined $live->{WindSpeed});
-      push @$daref, "L1_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""  if(defined $live->{EnvironmentTemperature});
+      push @$daref, "L1_ModuleTemperature:"       .$live->{ModuleTemperature}.""        if(defined $live->{ModuleTemperature});
+      push @$daref, "L1_OperationHealth:"         .$live->{OperationHealth}.""          if(defined $live->{OperationHealth});
+      push @$daref, "L1_Insolation:"              .$live->{Insolation}.""               if(defined $live->{Insolation});
+      push @$daref, "L1_WindSpeed:"               .$live->{WindSpeed}.""                if(defined $live->{WindSpeed});
+      push @$daref, "L1_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""   if(defined $live->{EnvironmentTemperature});
       
       if($live->{ErrorMessages}[0]) {
           my @em;
