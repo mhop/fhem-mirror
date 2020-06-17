@@ -56,6 +56,7 @@ sub Authenticate($$);
 sub CallFn(@);
 sub CallInstanceFn(@);
 sub CheckDuplicate($$@);
+sub CheckRegexp($$);
 sub Debug($);
 sub DoSet(@);
 sub Dispatch($$;$$);
@@ -6115,6 +6116,18 @@ execFhemTestFile()
   AnalyzeCommand(undef, "define .ftu FhemTestUtils")
     if(!grep { $defs{$_}{TYPE} eq "FhemTestUtils" } keys %defs);
   InternalTimer(1, sub { require $fhemTestFile }, 0 ) if($fhemTestFile);
+}
+
+# return undef if ok or error. Prameter: regexp, error context
+sub
+CheckRegexp($$)
+{
+  my ($re,$context) = @_;
+  return "Empty regexp in $context" if(!defined($re));
+  return "Bad regexp >$re< in $context" if($re =~ m/^[*+]/);
+  eval { "Hallo" =~ m/^$re$/ };
+  return "Bad regexp >$re< in $context: $@" if($@);
+  return undef;
 }
 
 1;

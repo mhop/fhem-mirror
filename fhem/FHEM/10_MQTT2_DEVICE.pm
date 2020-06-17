@@ -477,8 +477,8 @@ MQTT2_DEVICE_Attr($$)
       my ($par1, $par2) = split(" ", $el, 2);
       next if(!$par1);
       return "$dev attr $attrName: more parameters needed" if(!$par2);
-      eval { "Hallo" =~ m/^$par1$/ };
-      return "$dev $attrName regexp error: $@" if($@);
+      my $errMsg = CheckRegexp($par1, "bridgeRegexp attribute for $dev");
+      return $errMsg if($errMsg);
     }
     if($init_done) {
       my $name = $hash->{NAME};
@@ -588,10 +588,9 @@ MQTT2_DEVICE_addReading($$)
   my $cid = $defs{$name}{CID};
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
-    return "Bad line >$line< for $name" if(!defined($re) || !defined($code));
-    return "Bad regexp >$re< for $name: $@" if($re =~ m/^[*+]/);
-    eval { "Hallo" =~ m/^$re$/ };
-    return "Bad regexp >$re< for $name: $@" if($@);
+    return "Bad line >$line< for $name" if(!defined($code));
+    my $errMsg = CheckRegexp($re, "readingList attribute for $name");
+    return $errMsg if($errMsg);
     if($cid && $re =~ m/^$cid:/) {
       $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
     } else {
