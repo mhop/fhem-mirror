@@ -1784,7 +1784,10 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/power:.* power\
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
-  shellies/DEVNAME/overtemperature:.* overtemperature
+  shellies/DEVNAME/overtemperature:.* overtemperature\
+  shellies/DEVNAME/roller/0/power:.* roller_0_power\
+  shellies/DEVNAME/roller/0/energy:.* roller_0_energy\
+  shellies/DEVNAME/temperature_f:.* temperature_f
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","unknown");; $con = 100 - $con if $con =~ /\d+/;; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
@@ -1793,7 +1796,7 @@ attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shelly25_roller_invert_0
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200617
 
 name:shelly25_roller_invert_1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -1825,7 +1828,10 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/power:.* power\
   shellies/DEVNAME/relay/energy:.* energy\
   shellies/DEVNAME/temperature:.* temperature\
-  shellies/DEVNAME/overtemperature:.* overtemperature
+  shellies/DEVNAME/overtemperature:.* overtemperature\
+  shellies/DEVNAME/roller/0/power:.* roller_0_power\
+  shellies/DEVNAME/roller/0/energy:.* roller_0_energy\
+  shellies/DEVNAME/temperature_f:.* temperature_f
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $con = ReadingsVal($name,"state","unknown");; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
@@ -1834,7 +1840,7 @@ attr DEVICE setStateList open close half stop pct
 set DEVICE x_mqttcom announce
 #set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shelly25_roller_invert_1
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200617
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
@@ -1844,7 +1850,7 @@ desc:shelly2 using original firmware. <br>NOTE: a second device will be created 
 order:A_11a
 set DEVICE attrTemplate shellyplug
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-set DEVICE attrTemplate set_associatedWith \CHANNELS=2
+set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
@@ -1862,7 +1868,7 @@ order:A_11a1
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 set DEVICE attrTemplate shelly1_w_energy_meassuring \CALLSPEECHRECOGN=0
-set DEVICE attrTemplate set_associatedWith \CHANNELS=2
+set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/relay/1:.* relay1\
   shellies/DEVNAME/input/1:.* input1\
@@ -3239,7 +3245,8 @@ attr DEVICE setList mowerRainDelay:slider,0,30,1440 BASE_TOPIC/DEV_ID/commandIn 
   mowerTimeCorrection:slider,-100,1,100 BASE_TOPIC/DEV_ID/commandIn {"sc":{"p":$EVTPART1}}\
   startMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":1}\
   pauseMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":2}\
-  stopMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":3}
+  stopMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":3}\
+  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/commandIn $payload)}
 attr DEVICE userReadings mowerActive:mowerActiveIndex.* {ReadingsVal($name,"mowerActiveIndex","0") ? "true" : "false"},\
 mowerStatusTxt:mowerStatusIndex.* {my %stateCodes = (\
  0 => "Idle",\
