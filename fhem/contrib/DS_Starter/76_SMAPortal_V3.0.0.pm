@@ -477,16 +477,6 @@ sub Get {
      $hash->{HELPER}{GETTER} = "all";
      $hash->{HELPER}{SETTER} = "none";
      
-      for my $key (%stpl) {                                            # festlegen welche Daten geliefert werden sollen
-          $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
-          $subs{$name}{$key}{level} = $stpl{$key}{level};
-          $subs{$name}{$key}{func}  = $stpl{$key}{func};
-      }
-      my @pl = split ",", AttrVal($name, "providerLevel", "");
-      for my $p (@pl) {
-          $subs{$name}{$p}{doit} = 1;
-      }
-     
      CallInfo($hash);
  
  } elsif ($opt eq "storedCredentials") {
@@ -717,6 +707,16 @@ sub CallInfo {
 
       return if(IsDisabled($name));
       
+      for my $key (%stpl) {                                                    # festlegen welche Daten geliefert werden sollen
+          $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
+          $subs{$name}{$key}{level} = $stpl{$key}{level};
+          $subs{$name}{$key}{func}  = $stpl{$key}{func};
+      }
+      my @pl = split ",", AttrVal($name, "providerLevel", "");
+      for my $p (@pl) {
+          $subs{$name}{$p}{doit} = 1;
+      }
+      
       if ($hash->{HELPER}{RUNNING_PID}) {
           BlockingKill($hash->{HELPER}{RUNNING_PID});
           delete($hash->{HELPER}{RUNNING_PID});
@@ -738,9 +738,9 @@ sub CallInfo {
           $hash->{HELPER}{ACTCYCLE}   = 1;
           $hash->{HELPER}{CYCLEBTIME} = (gettimeofday())[0];
       }
-      $hash->{HELPER}{RETRIES}  = 1 if(!$nr);
+      $hash->{HELPER}{RETRIES} = 1 if(!$nr);
       
-      my $ac     = $hash->{HELPER}{ACTCYCLE};
+      my $ac = $hash->{HELPER}{ACTCYCLE};
       
       Log3 ($name, 3, "$name - Running data cycle: $ac of $maxcycles");
       
@@ -1699,8 +1699,8 @@ sub ParseData {                                                    ## no critic 
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
           readingsBulkUpdate($hash, "${cmlv}_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "lastCycleTime", $ctime) if($ctime > 0);
-      readingsBulkUpdate($hash, "summary"      , "$sum W");
+      readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
+      readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
   
   } else {
       readingsBulkUpdate($hash, "loginState", "failed");
@@ -2387,6 +2387,8 @@ sub delread {
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
+  my $bl     = "state|lastCycleTime|Counter|loginState";             # Blacklist
+   
   if($conspl) {
       # Readings löschen wenn nicht im providerLevel enthalten
       for my $key(@allrds) {
@@ -2395,12 +2397,13 @@ sub delread {
               for my $p (keys %{$subs{$name}}) {
                   delete($defs{$name}{READINGS}{$key}) if($subs{$name}{$p}{level} eq $lvl && !$subs{$name}{$p}{doit});
               }
-          }         
+          } else {
+              delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
+          }        
       }
       return;
   } 
 
-  my $bl = "state|lastCycleTime|Counter";                 # Blacklist
   for my $key(@allrds) {
       delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
   }
