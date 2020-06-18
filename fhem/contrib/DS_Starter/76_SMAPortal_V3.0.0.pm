@@ -219,18 +219,20 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 
 my %subs;                                                                                     # Arbeitskopie von %stpl
 my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},     # mandatory
-    plantData          => { doit => 1, level => 'L00', func => '_getPlantData'         },     # mandatory
-    liveData           => { doit => 0, level => 'L01', func => '_getLiveData'          },
-    weatherData        => { doit => 0, level => 'L02', func => '_getWeatherData'       },
-    balanceDayData     => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
-    forecastData       => { doit => 0, level => 'L04', func => '_getForecastData'      },
-    consumerDayData    => { doit => 0, level => 'L05', func => '_getConsumerDayData'   },
-    consumerMonthData  => { doit => 0, level => 'L06', func => '_getConsumerMonthData' },
-    consumerYearData   => { doit => 0, level => 'L07', func => '_getConsumerYearData'  },
+    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},     # mandatory
+    plantData           => { doit => 1, level => 'L00', func => '_getPlantData'         },     # mandatory
+    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
+    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
+    balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
+    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'      },
+    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'  },
+    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
+    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData' },
+    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'  },
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( balanceDayData
+             consumerCurrentdata
              consumerMasterdata 
              consumerDayData 
              consumerMonthData 
@@ -1148,6 +1150,31 @@ return ($errstate,$state,$reread,$retry);
 }
 
 ################################################################
+#                    Abruf Consumer current Data
+################################################################
+sub _getConsumerCurrData {               ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                        tag      => "consumerCurrentdata",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerCurrentdata ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
 #                    Abruf Consumer Tagesdaten
 ################################################################
 sub _getConsumerDayData {                ## no critic "not used"
@@ -1677,7 +1704,7 @@ sub ParseData {                                                    ## no critic 
   readingsEndUpdate($hash, 1);
   
   my $ldlv = $stpl{liveData}{level};
-  my $cmlv = $stpl{consumerMasterdata}{level};
+  my $cclv = $stpl{consumerCurrentdata}{level};
   my $lddo = $subs{$name}{liveData}{doit};
   
   my $pv   = ReadingsNum($name, "${ldlv}_PV"             , 0);
@@ -1697,7 +1724,7 @@ sub ParseData {                                                    ## no critic 
       if($setp ne "none") {
           my ($d,$op) = split(":",$setp);
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
-          readingsBulkUpdate($hash, "${cmlv}_${d}_Switch", $op);
+          readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
       }
       readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
       readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
@@ -2184,7 +2211,57 @@ sub extractConsumerMasterdata {
                                                    };
   my $lv = $stpl{consumerMasterdata}{level};
   
-  # allen Consumer Objekte die ID zuordnen
+  # allen Consumer Objekten die ID zuordnen
+  $i = 0;
+  for my $c (@{$clivedata->{'MeasurementData'}}) {
+      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
+      $consumers{"${i}_ConsumerLfd"}  = $i;
+      my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+      next if(!$cn);
+      $cn                             = replaceJunkSigns($cn);
+      
+      $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
+      $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
+      $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
+      $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
+      
+      $i++;
+  }
+  
+  if($hash->{HELPER}{CONSUMER}) {
+      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
+              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
+              next if(!defined $val);
+              Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
+          }
+      }
+  }
+  
+return;
+}
+
+################################################################
+##          Auswertung Consumer Current Data
+################################################################
+sub extractConsumerCurrentdata {
+  my $hash      = shift; 
+  my $daref     = shift;
+  my $clivedata = shift;
+  my $name      = $hash->{NAME};
+  my %consumers;
+  my ($i,$res);
+  
+  Log3 ($name, 4, "$name - ##### extracting consumer current data #### ");
+  
+  $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                     return;
+                                                   };
+  my $lv = $stpl{consumerCurrentdata}{level};
+  
+  # allen Consumer Objekten die ID zuordnen
   $i = 0;
   for my $c (@{$clivedata->{'MeasurementData'}}) {
       $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
@@ -2194,11 +2271,6 @@ sub extractConsumerMasterdata {
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
-      
-      $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
-      $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
-      $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
-      $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
  
       push @$daref, "${lv}_${cn}_Power:".$cpower." W" if(defined $cpower);  
       
@@ -2233,16 +2305,6 @@ sub extractConsumerMasterdata {
           push @$daref, "${lv}_${cn}_SwitchLastTime:$ltchange";
           
           $i++;
-      }
-  }
-  
-  if($hash->{HELPER}{CONSUMER}) {
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
-              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
-              next if(!defined $val);
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
-          }
       }
   }
   
@@ -3422,12 +3484,14 @@ return;
    <ul>
    <br>
      <ul>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     <a name="createPortalGraphic"></a>
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Creates graphical devices to show the SMA Sunny Portal forecast data in several layouts. 
      The attribute "providerLevel" must contain "forecastData". <br>
      With the <a href="#SMAPortalSPGattr">"attributes of the graphic device"</a> the appearance and coloration of the forecast 
      data in the created graphic device can be adjusted.     
      </ul>   
+     </li>
      <br>
      
      <ul>
@@ -3437,9 +3501,11 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> </li>  
+     <a name="consumer"></a>
+     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
      Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
-     that means the consumer are controlled by the Sunny Home Manager.     
+     that means the consumer are controlled by the Sunny Home Manager.    
+     </li>      
      </ul>
    
    </ul>
@@ -3449,16 +3515,21 @@ return;
    <b>Get</b>
    <ul>
     <br>
+    
     <ul>
-      <li><b> get &lt;name&gt; data </b> </li>  
+      <a name="data"></a>
+      <li><b> get &lt;name&gt; data </b> <br> 
       This command fetch the data from the SMA Sunny Portal manually. 
     </ul>
+    </li> 
     <br>
     
     <ul>
-      <li><b> get &lt;name&gt; storedCredentials </b> </li>  
+      <a name="storedCredentials"></a>
+      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
       The saved credentials are displayed in a popup window.
     </ul>
+    </li>
    </ul>  
    <br><br>
    
@@ -3502,13 +3573,14 @@ return;
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>liveData</b>          </td><td>- generates readings of the current generation and consumption data </td></tr>
-          <tr><td> <b>weatherData</b>       </td><td>- Weather data offered by SMA are retrieved </td></tr>
-          <tr><td> <b>balanceDayData</b>    </td><td>- Statistics data of the day are retrieved </td></tr>
-          <tr><td> <b>forecastData</b>      </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
-          <tr><td> <b>consumerDayData</b>   </td><td>- consumer data day are generated </td></tr>
-          <tr><td> <b>consumerMonthData</b> </td><td>- consumer data month are generated </td></tr>
-          <tr><td> <b>consumerYearData</b>  </td><td>- consumer data year are generated </td></tr>
+          <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
+          <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
+          <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
+          <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
+          <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
+          <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
        </table>
        </ul>     
        <br>       
@@ -3619,26 +3691,32 @@ return;
    <ul>
    <br>
      <ul>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     <a name="createPortalGraphic"></a>
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Erstellt Devices zur grafischen Anzeige der SMA Sunny Portal Prognosedaten in verschiedenen Layouts. 
      Das Attribut "providerLevel" muss auf den Level "forecastData" enthalten. <br>
      Mit den <a href="#SMAPortalSPGattr">"Attributen des Grafikdevices"</a> können Erscheinungsbild und 
      Farbgebung der Prognosedaten in den erstellten Grafik-Devices angepasst werden.     
      </ul>   
+     </li>
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     <a name="credentials"></a> 
+     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
+     </li>
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> </li>  
+     <a name="Verbrauchername"></a>
+     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
      Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
      Modul erkannt wurden.
      Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
-     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto).     
+     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto). 
+     </li>     
      </ul>
    
    </ul>
@@ -3649,15 +3727,21 @@ return;
    <ul>
     <br>
     <ul>
-      <li><b> get &lt;name&gt; data </b> </li>  
+    
+      <a name="data"></a>
+      <li><b> get &lt;name&gt; data </b> <br>  
       Mit diesem Befehl werden die Daten aus dem SMA Sunny Portal manuell abgerufen. 
     </ul>
+    </li>
     <br>
     
     <ul>
-      <li><b> get &lt;name&gt; storedCredentials </b> </li>  
+      <a name="storedCredentials"></a>
+      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
       Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
     </ul>
+    </li>
+
    </ul>  
    <br><br>
    
@@ -3701,13 +3785,14 @@ return;
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>liveData</b>          </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
-          <tr><td> <b>weatherData</b>       </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
-          <tr><td> <b>balanceDayData</b>    </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
-          <tr><td> <b>forecastData</b>      </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
-          <tr><td> <b>consumerDayData</b>   </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
-          <tr><td> <b>consumerMonthData</b> </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
-          <tr><td> <b>consumerYearData</b>  </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
+          <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
+          <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
+          <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
+          <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
+          <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
+          <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
        </table>
        </ul>     
        <br>       
