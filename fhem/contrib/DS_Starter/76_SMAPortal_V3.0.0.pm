@@ -2561,8 +2561,8 @@ sub PortalAsHtml {                                                              
   my $ldlv = $subs{$name}{liveData}{level};
   my $cmlv = $stpl{consumerMasterdata}{level};
   
-  my $pv0  = ReadingsNum($name, "${fmin}_ThisHour_PvMeanPower",   undef);
-  my $pv1  = ReadingsNum($name, "${fmaj}_NextHour01_PvMeanPower", undef);
+  my $pv0  = ReadingsNum($name, "${fmin}_ThisHour_PvMeanPower",   undef) if($fmin);
+  my $pv1  = ReadingsNum($name, "${fmaj}_NextHour01_PvMeanPower", undef) if($fmaj);
   
   if(!$hash || !defined($defs{$wlname}) || !$fdo || !defined $pv0 || !defined $pv1) {
       $height = AttrNum($wlname, 'beamHeight', 200);   
@@ -2574,7 +2574,7 @@ sub PortalAsHtml {                                                              
       } elsif (!defined($defs{$wlname})) {
           $ret .= "Graphic device \"$wlname\" doesn't exist !";
       } elsif (!$fdo) {
-          $ret .= qq{The attribute "providerLevel" of device "$name" must contain the level "forecastData" !};
+          $ret .= qq{The attribute "providerLevel" of device "$name" must contain the level "forecastData" and data must be retrieved !};
       } elsif (!defined $pv0) {
           $ret .= "Awaiting minor level forecast data ...";
       } elsif (!defined $pv1) {
