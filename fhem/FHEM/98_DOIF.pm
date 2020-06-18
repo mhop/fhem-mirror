@@ -521,9 +521,9 @@ sub DOIF_TPL {
             return "error: $err";
           } elsif ($currentBlock ne "") {
             my @param = SplitDoIf(',',$currentBlock);
-            for (my $j=0;$j<@param;$j++) {
-              my $p=$j+1;
-              $templ =~ s/\$$p/$param[$j]/g;
+            for (my $j=@param;$j>0;$j--) {
+              my $p=$j;
+              $templ =~ s/\$$p/$param[$j-1]/g;
             }
           }
           $output.=($begin.$templ);
@@ -2512,7 +2512,7 @@ DOIF_Notify($$)
   } elsif ($dev->{NAME} !~ /$hash->{helper}{DEVFILTER}/) {
     return "";
   }
-
+  
   $eventa = deviceEvents($dev, AttrVal($pn, "addStateEvent", 0));
   $eventas = deviceEvents($dev, 1);
   delete ($hash->{helper}{DOIF_eventas});
