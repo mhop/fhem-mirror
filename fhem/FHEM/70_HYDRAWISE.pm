@@ -777,6 +777,10 @@ sub HYDRAWISE_ReadingsBulkUpdateIfChanged {
       readingsBeginUpdate ($hash);
       readingsBulkUpdate( $hash, $reading, $value);
       readingsEndUpdate($hash, 1);
+    }else{
+      readingsBeginUpdate ($hash);
+      readingsDelete( $hash, $reading );
+      readingsEndUpdate($hash, 1);
     }
     return;
 }
