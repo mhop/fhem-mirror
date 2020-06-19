@@ -1001,9 +1001,9 @@ FW_answerCall($)
     return -1;
   }
 
-  if($FW_lastWebName ne $FW_wname || $FW_lastHashUpdate != $lastDefChange) {
+  if($FW_lastWebName ne $FW_cname || $FW_lastHashUpdate != $lastDefChange) {
     FW_updateHashes();
-    $FW_lastWebName = $FW_wname;
+    $FW_lastWebName = $FW_cname;
     $FW_lastHashUpdate = $lastDefChange;
   }
 

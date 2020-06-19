@@ -2896,7 +2896,7 @@ CommandAttr($$)
   my $a1 = $a[1];
   return "$a[0]: bad attribute name '$a1' (allowed chars: A-Za-z/\\d_\\.-)"
            if($featurelevel > 5.9 && !goodReadingName($a1) && $a1 ne "?");
-  return "attr $param: attribute value is missing" if($#a < 2);
+  return "attr $param: attribute value is missing" if($#a < 2 && $a1 ne "?");
 
   my @rets;
   foreach my $sdev (devspec2array($a[0], $a1 && $a1 eq "?" ? undef : $cl)) {
