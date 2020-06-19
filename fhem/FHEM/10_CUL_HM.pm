@@ -9934,6 +9934,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
   # --- verify send is possible
 
   my $mq = $modules{CUL_HM}{helper};
+  my $Qexec = "none";
   foreach my $q ("qReqStat","qReqConf"){
     if   (@{$mq->{$q}}){
       my ($devN,$devH);
@@ -9941,7 +9942,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         $devH = $defs{$devNtmp};
         CUL_HM_assignIO($devH); 
         if(   defined $devH->{IODev}{NAME}
-           && (  (   ReadingsVal($devH->{IODev}{NAME},"cond","") =~ m/^(ok|Overload-released|Warning-HighLoad|init)$/
+           && (  (   ReadingsVal($devH->{IODev}{NAME},"cond","ok") =~ m/^(ok|Overload-released|Warning-HighLoad|init)$/
                   && $q eq "qReqStat")
                ||(   CUL_HM_autoReadReady($devH->{IODev}{NAME})
                   && !$devH->{cmdStack}
@@ -9973,16 +9974,17 @@ sub CUL_HM_procQs($){#process non-wakeup queues
          CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
          InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
       }
+      $Qexec = $q;
       last; # execute only one!
     }
   }
-
+  my $delayAdd = $Qexec eq 'none' ? 10 : 0; # if no device was identified wait at least
   delete $mq->{autoRdActive}  if ($mq->{autoRdActive} &&
                                   $defs{$mq->{autoRdActive}}{helper}{prt}{sProc} != 1);
   my $next;# how long to wait for next timer
   if    (@{$mq->{qReqStat}}){$next = 1}
   elsif (@{$mq->{qReqConf}}){$next = $modules{CUL_HM}{hmAutoReadScan}}
-  InternalTimer(gettimeofday()+$next,"CUL_HM_procQs","CUL_HM_procQs",0) if ($next);
+  InternalTimer(gettimeofday()+$next+$delayAdd,"CUL_HM_procQs","CUL_HM_procQs",0) if ($next);
 }
 sub CUL_HM_appFromQ($$){#stack commands if pend in WuQ
   my ($name,$reason) = @_;
