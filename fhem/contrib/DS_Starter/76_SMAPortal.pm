@@ -421,8 +421,8 @@ sub Set {                             ## no critic 'complexity'
       
       $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}. 
            qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
-           qq{If you want see weather conditions, this attribute has to contain "weatherData" as well. }.
            qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
+      
       CommandAttr($hash->{CL},"$htmldev comment $c");     
 
       # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
@@ -657,7 +657,7 @@ sub Attr {
         $val = ($do == 1 ? "disabled" : "initialized");
         
         if($do) {
-            delread($hash);
+            deleteData($hash);
             delete $hash->{MODE};
             RemoveInternalTimer($hash);                      
         } else {
@@ -1777,7 +1777,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  delread($hash, 1);
+  deleteData($hash, 1);
   
   readingsBeginUpdate($hash);
   
@@ -2581,19 +2581,27 @@ return;
 }
 
 ################################################################
-#                 delete Readings
+#         delete Readings und Hash HELPER-Daten
 #   $conspl = providerLevel berücksichtigen
 ################################################################
-sub delread {
+sub deleteData {
   my $hash   = shift;
   my $conspl = shift;
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
   my $bl     = "state|lastCycleTime|Counter|loginState";             # Blacklist
+  
+  if(!$subs{$name}{forecastData}{doit}) {                            # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
+      my $fclvl = $stpl{forecastData}{level};
+      delete $hash->{HELPER}{"${fclvl}_ThisHour_WeatherId"};
+      for my $i (1..23) {
+          $i = sprintf("%02d",$i);
+          delete $hash->{HELPER}{"${fclvl}_NextHour${i}_WeatherId"};
+      }
+  }
    
-  if($conspl) {
-      # Readings löschen wenn nicht im providerLevel enthalten
+  if($conspl) {                                                      # Readings löschen wenn nicht im providerLevel enthalten
       for my $key(@allrds) {
           my ($lvl) = $key =~ m/^(L\d+)_/x;     
           if($lvl) {
