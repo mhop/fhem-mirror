@@ -50,6 +50,7 @@ use HTTP::Cookies;
 use JSON qw(decode_json);
 use MIME::Base64;
 use Encode;
+use utf8;
 
 # Run before module compilation
 BEGIN {
@@ -135,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.0.0"  => "17.06.2020  refactored readings and subroutines, detailLevel deleted, new attr providerLevel ",
+  "3.0.0"  => "18.06.2020  refactored readings and subroutines, detailLevel deleted, new attr providerLevel, integrate logbook data ",
   "2.10.6" => "12.06.2020  add hash dataprovider ",
   "2.10.5" => "12.06.2020  add check login by /Templates/, deeper/mulitple choice verbose5Data ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
@@ -219,8 +220,8 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 
 my %subs;                                                                                     # Arbeitskopie von %stpl
 my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},     # mandatory
-    plantData           => { doit => 1, level => 'L00', func => '_getPlantData'         },     # mandatory
+    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},    # mandatory
+    plantData           => { doit => 1, level => 'L00', func => '_getPlantData'         },    # mandatory
     liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
     weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
     balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
@@ -229,6 +230,7 @@ my %stpl = (                                                                    
     consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
     consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData' },
     consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'  },
+    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'      },
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( balanceDayData
@@ -241,6 +243,7 @@ my @pd = qw( balanceDayData
              liveData
              plantData
              weatherData
+             plantLogbook
            );
 
 
@@ -268,6 +271,8 @@ sub Initialize {
   $hash->{AttrList}      = "cookieLocation ".
                            "disable:0,1 ".
                            "interval ".
+                           "plantLogbookTypes:multiple-strict,Info,Warning,Disturbance,Error ".
+                           "plantLogbookApprovalState:Any,NotApproved ".
                            "providerLevel:multiple-strict,".$prov." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
@@ -412,8 +417,10 @@ sub Set {                             ## no critic 'complexity'
       
       CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
       
-      $c = "This device provides a praphical output of SMA Sunny Portal values.\n". 
-           "The device needs to contain level \"forecastData\" in attribute \"providerLevel\" of device \"$name\"";
+      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}. 
+           qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
+           qq{If you want see weather conditions, this attribute has to contain "weatherData" as well. }.
+           qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
       CommandAttr($hash->{CL},"$htmldev comment $c");     
 
       # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
@@ -826,7 +833,7 @@ sub GetSetData {                                                       ## no cri
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
                       "Accept-Encoding"  => "gzip, deflate, br",
-                      "Accept-Language"  => "en-US;q=0.7,en;q=0.3",
+                      "Accept-Language"  => "en-US;q=0.7,en;q=0.3",                    # deutsch: de,en-US;q=0.7,en;q=0.3 , englisch: en-US;q=0.7,en;q=0.3 
                       "Connection"       => "keep-alive",
                       "Cookie"           => "collapseNavi_state=shown",
                       "DNT"              => 1,
@@ -1286,7 +1293,7 @@ sub _getConsumerYearData {              ## no critic "not used"
                                      
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
-      $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
+      $state    = qq{The consumer data cannot be retrieved because of the plant ID isn't set.};      
       Log3 $name, 2, "$name - $state";
       return ($errstate,$state,$reread,$retry);
   }  
@@ -1384,6 +1391,47 @@ sub _getBalanceDayData {                 ## no critic "not used"
                                          addon    => "Day",
                                          daref    => $daref
                                       });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Anlagen Logbuch
+################################################################
+sub _getPlantLogbook {                   ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};  
+
+  my ($reread,$retry,$errstate) = (0,0,0); 
+  
+  if(!$hash->{HELPER}{PLANTOID}) {
+      $errstate = 1;
+      $state    = qq{The logbook cannot be retrieved because of the plant ID isn't set.};      
+      Log3 $name, 2, "$name - $state";
+      return ($errstate,$state,$reread,$retry);
+  }  
+  
+  my $PlantOid = $hash->{HELPER}{PLANTOID};
+  my $msgtypes = AttrVal($name, "plantLogbookTypes", "Warning,Disturbance,Error");      # möglich:  Warning,Info,Disturbance,Error  
+  my $appstate = AttrVal($name, "plantLogbookApprovalState", "Any");     
+  my $date     = (split(/\s+/x, TimeNow()))[0];
+  my $call     = 'https://www.sunnyportal.com/Plants/'.$PlantOid.'/Log/Get?MessageTypes='.$msgtypes.'&ApprovalState='.$appstate.'&Device=None&MaxDateTime='.$date.'&Ticks=0';
+  
+  Log3 ($name, 4, "$name - Retrieving the logbook data up to the date: $date");
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => $call,
+                                        tag      => "plantLogbook",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractPlantLogbook ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                    });
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1560,7 +1608,7 @@ return ($data,$dcont);
 ################################################################
 #                 analysiere abgerufene Daten
 ################################################################
-sub ___analyzeData {                                                          ## no critic 'complexity'
+sub ___analyzeData {                   ## no critic 'complexity'
   my $paref           = shift;
   my $name            = $paref->{name};
   my $errstate        = $paref->{errstate};
@@ -1569,12 +1617,20 @@ sub ___analyzeData {                                                          ##
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
-  my @da              = ();
     
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
   my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
   my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
+  
+  my $wm1e = qq{Updating of the live data was interrupted};
+  my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
+  my $wm2e = qq{The current consumption could not be determined. The current purchased electricity is unknown};
+  my $wm2d = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
+  my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
+  my $em1d = qq{Kommunikation mit dem Sunny Home Manager derzeit nicht m};
+  my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
+  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration};
 
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
@@ -1582,10 +1638,12 @@ sub ___analyzeData {                                                          ##
       for my $k (keys %{$data}) {
           my $val = $data->{$k};
           next if(!defined $val);
-
+          
+          my @da;
+          
           if(ref $val eq "ARRAY") {
-              for my $a (@{$val}) {                    
-                  push @da, $a;
+              for my $a (@{$val}) {              
+                  push @da, $a if(!ref $a);
               }
           }
           
@@ -1596,27 +1654,27 @@ sub ___analyzeData {                                                          ##
           }
           
           $val = join " ", @da if(@da);
-
+          
           if ($val && $k !~ /__type/ix) {
-              if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
+              if($k =~ m/WarningMessages/x && $val =~ /$wm1e|$wm1d/) {                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 ($name, 3, "$name - Updating of the live data was interrupted. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }
-              if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
+              if($k =~ m/WarningMessages/x && $val =~ /$wm2e|$wm2d/) {                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 ($name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }  
-              if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $val =~ /$em1e|$em1d/) {                                          ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
+                  Log3 ($name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }              
-              if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $val =~ /$em2e|$em2d/) {                                          ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
+                  Log3 ($name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }
@@ -1624,7 +1682,7 @@ sub ___analyzeData {                                                          ##
       }
   
   } else {
-      my $njdat = $ad->as_string; 
+      my $njdat = encode("utf8", $ad->as_string); 
       
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
@@ -2060,7 +2118,7 @@ sub extractStatisticData {
   my $lv = $stpl{balanceDayData}{level};
   
   if(ref $statistic eq "HASH") {
-      $sd = decode_json ($statistic->{d});
+      $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
   }
 
   if($sd && ref $sd eq "ARRAY") {
@@ -2115,6 +2173,54 @@ return;
 }
 
 ################################################################
+##                     Auswertung Anlagenlogbuch
+################################################################
+sub extractPlantLogbook {
+  my $hash     = shift;
+  my $daref    = shift;
+  my $logdata  = shift;
+  my $name     = $hash->{NAME};
+  
+  Log3 ($name, 4, "$name - ##### extracting plant logbook data #### ");
+  
+  $logdata = eval{decode_json($logdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                 return;
+                                               };
+  my $lv = $stpl{plantLogbook}{level};
+  
+  my %colors = (                                                # Farben Highlighting
+      "Info"        => qq{<span style="color: green;">},
+      "Warning"     => qq{<span style="color: orange;">},
+      "Warnung"     => qq{<span style="color: orange;">},
+      "Disturbance" => qq{<span style="color: red;">},
+      "Störung"     => qq{<span style="color: red;">},
+      "Error"       => qq{<span style="color: red;">},
+      "Fehler"      => qq{<span style="color: red;">},
+      "Unknown"     => qq{<span style="color: black;">},
+  );
+  my $eh = "</span>";                                           # Endestring Highlighting
+      
+  if(ref $logdata->{aaData} eq "ARRAY") {
+      my @ld = @{$logdata->{aaData}};
+      for my $ae (@ld) {                                        # jedes ARRAY-Element ist ein HASH
+          my $dn   = encode("utf8", $ae->{DeviceName} );
+          my $ts   = $ae->{Timestamp};                   
+          my $dc   = encode("utf8", $ae->{Description} );
+          my $id   = $ae->{MessageId};
+          my ($mt) = $ae->{MessageType} =~ /alt='(.*?)'/x;
+          $mt      = encode("utf8", $mt) // "Unknown";
+          
+          my $bh   = $colors{$mt};
+          my $v    = qq{<html><b>$bh $mt $eh</b><br>$dn : $ts <br>$dc</html>};
+
+          push @$daref, "${lv}_LogbookEntry_${id}:$v";
+      }
+  }
+
+return;
+}
+
+################################################################
 ##    Auswertung Consumer Plan Data (aus forecastData)
 ################################################################
 sub extractConsumerPlanData {
@@ -2136,7 +2242,7 @@ sub extractConsumerPlanData {
   # Schleife über alle Consumer Objekte
   my $i = 0;
   for my $c (@{$forecast->{'Consumers'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'ConsumerName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'ConsumerName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $i++;
   }
@@ -2214,7 +2320,7 @@ sub extractConsumerMasterdata {
   # allen Consumer Objekten die ID zuordnen
   $i = 0;
   for my $c (@{$clivedata->{'MeasurementData'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
@@ -2264,7 +2370,7 @@ sub extractConsumerCurrentdata {
   # allen Consumer Objekten die ID zuordnen
   $i = 0;
   for my $c (@{$clivedata->{'MeasurementData'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
@@ -2339,7 +2445,7 @@ sub extractConsumerHistData {                                                  #
   # allen Consumer Objekte die ID zuordnen
   $i = 0;
   for my $c (@{$chdata->{'Consumers'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh                                         
@@ -2458,6 +2564,7 @@ sub delread {
           if($lvl) {
               for my $p (keys %{$subs{$name}}) {
                   delete($defs{$name}{READINGS}{$key}) if($subs{$name}{$p}{level} eq $lvl && !$subs{$name}{$p}{doit});
+                  delete($defs{$name}{READINGS}{$key}) if($subs{$name}{plantLogbook}{level} eq $lvl);                  # Logbuchreadings immer löschen
               }
           } else {
               delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
@@ -2621,10 +2728,11 @@ sub PortalAsHtml {                                                              
   my $fmin = $subs{$name}{forecastData}{level};                                         # LXX Level
   my $fmaj = $subs{$name}{forecastData}{level};
   my $ldlv = $subs{$name}{liveData}{level};
-  my $cmlv = $stpl{consumerMasterdata}{level};
+  my $cclv = $subs{$name}{consumerCurrentdata}{level};
   
-  my $pv0  = ReadingsNum($name, "${fmin}_ThisHour_PvMeanPower",   undef) if($fmin);
-  my $pv1  = ReadingsNum($name, "${fmaj}_NextHour01_PvMeanPower", undef) if($fmaj);
+  my ($pv0,$pv1);
+  $pv0  = ReadingsNum($name, "${fmin}_ThisHour_PvMeanPower",   undef) if($fmin);
+  $pv1  = ReadingsNum($name, "${fmaj}_NextHour01_PvMeanPower", undef) if($fmaj);
   
   if(!$hash || !defined($defs{$wlname}) || !$fdo || !defined $pv0 || !defined $pv1) {
       $height = AttrNum($wlname, 'beamHeight', 200);   
@@ -2668,7 +2776,7 @@ sub PortalAsHtml {                                                              
               $cmdauto = "\"ftui.setFhemStatus('set $name $txt auto')\"";      
           }
           
-          my $swstate  = ReadingsVal($name,"${cmlv}_".$txt."_Switch", "undef");
+          my $swstate  = ReadingsVal($name,"${cclv}_".$txt."_Switch", "undef");
           my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
           if($swstate eq "off") {
               $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
@@ -2766,7 +2874,7 @@ sub PortalAsHtml {                                                              
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
           $lupt    = "Stand:"; 
-          $lblPv4h = "nächste 4h:";
+          $lblPv4h = encode("utf8", "nächste 4h:");
           $lblPvRe = "heute:";
           $lblPvTo = "morgen:";
           $lblPvCu = "aktuell";
@@ -2830,16 +2938,16 @@ sub PortalAsHtml {                                                              
       $_        =~ s/^\s+|\s+$//gx;                                           #trim it, if blanks were used
     
       #check if listed device is planned
-      if (ReadingsVal($name, "${cmlv}_".$itemName."_Planned", "no") eq "yes") {
+      if (ReadingsVal($name, "${cclv}_".$itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                   # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
           if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cmlv}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cmlv}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
           } else {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cmlv}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cmlv}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
 
           $start   = int($start);
@@ -3456,6 +3564,7 @@ return;
     HTTP::Cookies   <br>
     MIME::Base64    <br>
     Encode          <br>
+    utf8            <br>
     
     <br><br>  
    </ul>
@@ -3560,9 +3669,33 @@ return;
        if the interval is set to "0", no continuous data retrieval is executed and has to be triggered manually by the 
        "get &lt;name&gt; data" command.  <br><br>
        
-       <b>Note:</b> 
-       The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
-       120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       <ul>
+         <b>Note:</b> 
+         The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
+         120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       </ul>
+       </li><br>
+       
+       <a name="plantLogbookApprovalState"></a>
+       <li><b>plantLogbookApprovalState</b><br>
+       With this attribute the entries are filtered according to their status. <br>
+       (default: Any)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>Any</b>          </td><td>-  all messages </td></tr>
+          <tr><td> <b>NotApproved</b>  </td><td>-  unconfirmed messages </td></tr>
+       </table>
+       </ul>         
+       </li><br>
+       
+       <a name="plantLogbookTypes"></a>
+       <li><b>plantLogbookTypes</b><br>
+       This attribute defines the message types of the asset logbook to be selected. 
+       A maximum of the latest 25 logbook entries of all set types are displayed. <br>
+       (default: Warning,Disturbance,Error) 
        </li><br>
        
        <a name="providerLevel"></a>
@@ -3581,6 +3714,7 @@ return;
           <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
+          <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
        </table>
        </ul>     
        <br>       
@@ -3589,7 +3723,7 @@ return;
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
        If set, the used password will be displayed in Logfile output. 
-       (default = 0) </li><br>
+       (default: 0) </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;identifier&gt; </b><br>
@@ -3663,6 +3797,7 @@ return;
     HTTP::Cookies   <br>
     MIME::Base64    <br>
     Encode          <br>
+    utf8            <br>
     
     <br><br>  
    </ul>
@@ -3772,9 +3907,33 @@ return;
        Ist interval explizit auf "0" gesetzt, erfolgt kein automatischer Datenabruf und muss mit "get &lt;name&gt; data" manuell
        erfolgen. <br><br>
        
-       <b>Hinweis:</b> 
-       Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
-       Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       <ul>
+         <b>Hinweis:</b> 
+         Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
+         Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       </ul>
+       </li><br>
+       
+       <a name="plantLogbookApprovalState"></a>
+       <li><b>plantLogbookApprovalState</b><br>
+       Mit diesem Attribut werden die Einträge entsprechend ihres Status gefiltert. <br>
+       (default: Any)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>Any</b>          </td><td>-  alle Mitteilungen </td></tr>
+          <tr><td> <b>NotApproved</b>  </td><td>-  nicht bestätigte Mitteilungen </td></tr>
+       </table>
+       </ul>         
+       </li><br>
+       
+       <a name="plantLogbookTypes"></a>
+       <li><b>plantLogbookTypes</b><br>
+       Mit diesem Attribut werden die zu selektierenden Mitteilungstypen des Anlagenlogbuchs festgelegt. 
+       Es werden maximal die aktuellsten 25 Logbucheinträge aller eingestellten Typen angezeigt. <br>
+       (default: Warning,Disturbance,Error) 
        </li><br>
        
        <a name="providerLevel"></a>
@@ -3793,6 +3952,7 @@ return;
           <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
+          <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
        </table>
        </ul>     
        <br>       
@@ -3800,8 +3960,9 @@ return;
        
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
-       Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. 
-       (default = 0) </li><br>
+       Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. <br>
+       (default: 0) 
+       </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;Kennung&gt; </b><br>
@@ -3811,7 +3972,8 @@ return;
         <ul>
          <b>Beispiel:</b><br>
          attr &lt;name&gt; userAgent Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0 <br>    
-        </ul>           
+        </ul>   
+        
        </li><br> 
 
        <a name="verbose5Data"></a>
@@ -3873,7 +4035,8 @@ return;
         "Time::Local": 0,
         "LWP": 0,
         "HTTP::Cookies": 0,
-        "MIME::Base64": 0
+        "MIME::Base64": 0,
+        "utf8": 0
       },
       "recommends": {
         "FHEM::Meta": 0
