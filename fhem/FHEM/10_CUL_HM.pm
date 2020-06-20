@@ -570,8 +570,8 @@ sub CUL_HM_Define($$) {##############################
     $attr{$name}{model}        = AttrVal($devName, "model", undef);
     $hash->{helper}{role}{chn} = 1;
     if($chn eq "01"){
-      $attr{$name}{peerIDs}            = AttrVal($devName, "peerIDs", "");
-      $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","");
+      $attr{$name}{peerIDs}            = AttrVal($devName, "peerIDs", "peerUnread");
+      $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","peerUnread");
       $hash->{peerList}                = $devHash->{peerList} if($devHash->{peerList});
 
       delete $devHash->{helper}{role}{chn};#device no longer
@@ -795,6 +795,11 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "peerIDs"){
     if ($cmd eq "set"){
       return "$attrName not usable for devices" if(!$hash->{helper}{role}{chn});
+      my @peers = split(',',$attrVal);
+      foreach (split(',',$attrVal)){
+        return "$attrName val:$attrVal element $_ not a peerID. User (peerUnread|[0-9a-fA-Fx]{8})" if($_ !~ m/^(peerUnread|[0-9a-fA-Fx]{8})$/);
+      }
+      return "$attrName val:$attrVal invalid. peerUnread invalid if peers are assigned" if($attrVal =~ m/peerUnread/ && $attrVal ne "peerUnread");
       my $id = $hash->{DEF};
       if ($id ne $K_actDetID && $attrVal){# if not action detector
         my @ids = grep /......../,split(",",$attrVal);
@@ -1567,7 +1572,7 @@ sub CUL_HM_Parse($$) {#########################################################
   elsif($mh{md} =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ########################
     if($mh{mTp} eq "70") {
       my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$mh{p};
-      push @evtEt,[$mh{devH},1,"battery:". (($t & 0x8000)?"low"  :"ok"  )] if ($mh{md} eq "HM-WDS100-C6-O-2"); #has no battery
+    push @evtEt,[$mh{devH},1,"battery:". (($t & 0x8000)?"low"  :"ok"  )] if ($mh{md} =~ m/^HM-WDS100-C6-O-2/); #has no battery
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
@@ -1599,7 +1604,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"storm:$txt"];
       push @evtEt,[$mh{devH} ,1,"trig_$mh{chnHx}:$mh{dstN}"];
       my $err = $chn & 0x80;
-      push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )] if ($mh{md} eq "HM-WDS100-C6-O-2"); #has no battery
+      push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )] if ($mh{md} =~ m/^HM-WDS100-C6-O-2/); #has no battery
     }
     else {
       push @evtEt,[$mh{shash},1,"unknown:$mh{p}"];
@@ -2953,7 +2958,7 @@ sub CUL_HM_Parse($$) {#########################################################
         next if (!$modules{CUL_HM}{defptr}{$dChId});
         my $dChNo = substr($dChId,6,2);
         my $dChName = CUL_HM_id2Name($dChId);
-        if(($attr{$dChName}{peerIDs}?$attr{$dChName}{peerIDs}:"") =~ m/$recId/){
+        if(($attr{$dChName}{peerIDs} ? $attr{$dChName}{peerIDs} : "peerUnread") =~ m/$recId/){
           my $dChHash = $defs{$dChName};
           $sendAck = 1;
           $dChHash->{helper}{trgLgRpt} = 0
@@ -3382,7 +3387,7 @@ sub CUL_HM_parseCommon(@){#####################################################
               next if (!$l);
               my $listNo = "0".$l;
               foreach my $peer (grep (!/00000000/,@peerID)){
-                next if ($peer =~ m/0x$/);
+                next if ($peer =~ m/0x$/ || $peer eq "unread");
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
                   CUL_HM_PushCmdStack($mhp->{devH},sprintf("++%s01%s%s%s04%s%s",
@@ -7786,7 +7791,8 @@ sub CUL_HM_protState($$){
 ################### Peer Handling ################
 sub CUL_HM_ID2PeerList ($$$) {
   my($name,$peerID,$set) = @_;
-  my $peerIDs = AttrVal($name,"peerIDs","");
+  my $peerIDs = AttrVal($name,"peerIDs","peerUnread");
+  $peerIDs =~ s/peerUnread//;
   return if (!$peerID && !$peerIDs); # nothing to do
   my $hash = $defs{$name};
   $peerIDs =~ s/$peerID//g;          #avoid duplicate, support unset
@@ -7802,7 +7808,7 @@ sub CUL_HM_ID2PeerList ($$$) {
     next if ($pId eq "00000000");                   # and end detection
     $peerNames .= CUL_HM_peerChName($pId,$dId).",";
   }
-  $attr{$name}{peerIDs} = $peerIDs;                 # make it public
+  $attr{$name}{peerIDs} = $peerIDs ? $peerIDs : "peerUnread";                 # make it public
 
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $st = AttrVal($dHash->{NAME},"subType","");
@@ -8357,8 +8363,8 @@ sub CUL_HMTmplSetCmd($){
   my $devId = substr($defs{$name}{DEF},0,6);
   my %a;
 
-  my   @peers = map{CUL_HM_id2Name($_)}   grep !/^(00000000|$devId)/,split(",",AttrVal($name,"peerIDs",""));
-  push @peers,  map{"self".substr($_,-2)} grep /^$devId/            ,split(",",AttrVal($name,"peerIDs",""));
+  my   @peers = map{CUL_HM_id2Name($_)}   grep !/^(00000000|peerUnread|$devId)/,split(",",AttrVal($name,"peerIDs",""));
+  push @peers,  map{"self".substr($_,-2)} grep /^$devId/                       ,split(",",AttrVal($name,"peerIDs",""));
   foreach my $peer($peers[0],"0"){ 
     next if (!defined $peer);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
