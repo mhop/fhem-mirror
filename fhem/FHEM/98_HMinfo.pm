@@ -517,7 +517,7 @@ sub HMinfo_peerCheck(@) { #####################################################
         push @peeringStrange,$eName." not peered!! add SD to any team !!"
               if(!$peerIDs);
       }
-      foreach my $pId (split",",$peerIDs){
+      foreach my $pId (grep !/peerUnread/,split",",$peerIDs){
         next if ($pId =~m /$devId/);
         if (length($pId) != 8){
           push @peerIDnotDef,$eName." id:$pId  invalid format";
@@ -2795,7 +2795,6 @@ sub HMinfo_templateUsg(@){#####################################################
 
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
-  Log 1,"General tplCheck: ".join("  :",@_);
   # pset: 0                = template w/o peers
   #       peer / peer:both = template for peer, not extending Long/short
   #       peer:short|long  = template for peerlong or short
