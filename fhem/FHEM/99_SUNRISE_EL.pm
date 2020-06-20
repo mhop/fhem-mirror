@@ -35,6 +35,15 @@ sub
 SUNRISE_EL_Initialize($)
 {
   my ($hash) = @_;
+
+  InternalTimer(1, sub() {
+    my $long = AttrVal("global", "longitude", undef);
+    my $lat  = AttrVal("global", "latitude",  undef);
+    if(( defined($long) && !defined($lat)) ||
+       (!defined($long) &&  defined($lat))) {
+      Log 1, "SUNRISE: set both longitude and latitude or none of them";
+    }
+  }, undef);
 }
 
 

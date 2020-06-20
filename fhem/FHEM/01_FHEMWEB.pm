@@ -3214,11 +3214,11 @@ FW_devState($$@)
     $txt = $v if(defined($v));
 
   } elsif(!$dsi && $allSets =~ m/\bdesired-temp:/) {
-    $txt = "$1 &deg;C" if($txt =~ m/^measured-temp: (.*)/);      # FHT fix
+    $txt = "$1 &deg;C" if($txt =~ m/^measured-temp: (.*)/);
     $cmdList = "desired-temp" if(!$cmdList);
 
   } elsif(!$dsi && $allSets =~ m/\bdesiredTemperature:/) {
-    $txt = ReadingsVal($d, "temperature", "");  # ignores stateFormat!!!
+    $txt = ReadingsVal($d, "temperature", ""); 
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
     $cmdList = "desiredTemperature" if(!$cmdList);
