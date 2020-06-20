@@ -2304,7 +2304,7 @@ sub extractConsumerPlanData {
 
   if(%consumers) {
       for my $key (keys(%consumers)) {
-          Log3 $name, 4, "$name - Consumer data \"$key\": ".$consumers{$key};
+          Log3 $name, 4, "$name - Consumer data \"$key\": ".encode("utf8", $consumers{$key});
           if($key =~ /ConsumerName/x && $key =~ /^(\d+)_.*$/x) {
                my $lfn = $1; 
                my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
