@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_BOTVAC: tolerable read of schedule data, PBP issues
  - feature: 98_backup: add support for backupToStorage modul
  - changed: 70_BRAVIA: use audio service instead of upnp access
  - changed: 76_SMAPortal: add check login Templates, multiple choice for attr
@@ -60,7 +61,7 @@
  - change:  14_CUL_MAX: new Version, Forum #625108
  - change:  10_MAX: new Version, Forum #625108
  - bugfix:  74_GardenaSmartDevice: fix password setter
- - change:  70_BOTVAC: Optimze error message handling
+ - change:  70_BOTVAC: Optimize error message handling
                        Renew accessToken if necessary
                        PBP issues
  - change:  57_Calendar: reactivated random delay for calendar updates on start
