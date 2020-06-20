@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
+                           "executing retrieve master data firstly every time",
   "3.0.0"  => "18.06.2020  refactored readings and subroutines, detailLevel deleted, new attr providerLevel, integrate logbook data ",
   "2.10.6" => "12.06.2020  add hash dataprovider ",
   "2.10.5" => "12.06.2020  add check login by /Templates/, deeper/mulitple choice verbose5Data ",
@@ -186,7 +188,7 @@ my %vNotesIntern = (
   "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
   "1.5.0"  => "23.03.2019  add consumer data ",
-  "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings ",
+  "1.4.0"  => "22.03.2019  add function extractPlantMasterData, DbLog_split, change L2 Readings ",
   "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
@@ -221,7 +223,7 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 my %subs;                                                                                     # Arbeitskopie von %stpl
 my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
     consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},    # mandatory
-    plantData           => { doit => 1, level => 'L00', func => '_getPlantData'         },    # mandatory
+    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'   },    # mandatory
     liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
     weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
     balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
@@ -241,7 +243,7 @@ my @pd = qw( balanceDayData
              consumerYearData           
              forecastData
              liveData
-             plantData
+             plantMasterData
              weatherData
              plantLogbook
            );
@@ -717,6 +719,7 @@ sub CallInfo {
       return if(IsDisabled($name));
       
       for my $key (%stpl) {                                                    # festlegen welche Daten geliefert werden sollen
+          next if($stpl{$key}{doit});                                          # die default Provider nicht noch einmal ausführen
           $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
           $subs{$name}{$key}{level} = $stpl{$key}{level};
           $subs{$name}{$key}{func}  = $stpl{$key}{func};
@@ -813,11 +816,17 @@ sub GetSetData {                                                       ## no cri
   my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
   my $verbose              = AttrVal($name, "verbose", 3);
+  my $lang                 = AttrVal("global", "language", "EN");
   my $state                = "ok";
   my ($st,$lc)             = ("","");
   my @da                   = ();
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
+  
+  my %hal = (                                                          # Header Accept-Language sprachenabhängig
+      "DE" => "de,en-US;q=0.7,en;q=0.3",
+      "EN" => "en-US;q=0.7,en;q=0.3"
+  );
  
   my ($d,$op);  
   if($setp ne "none") {
@@ -833,7 +842,7 @@ sub GetSetData {                                                       ## no cri
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
                       "Accept-Encoding"  => "gzip, deflate, br",
-                      "Accept-Language"  => "en-US;q=0.7,en;q=0.3",                    # deutsch: de,en-US;q=0.7,en;q=0.3 , englisch: en-US;q=0.7,en;q=0.3 
+                      "Accept-Language"  => $hal{$lang},               # deutsch: de,en-US;q=0.7,en;q=0.3 , englisch: en-US;q=0.7,en;q=0.3 
                       "Connection"       => "keep-alive",
                       "Cookie"           => "collapseNavi_state=shown",
                       "DNT"              => 1,
@@ -860,6 +869,24 @@ sub GetSetData {                                                       ## no cri
   if($errstate) {
       $st = encode_base64 ( $state,"");
       return "$name|0|0|$errstate|$getp|$setp|$st";
+  } 
+
+  ### die Anlagen Asset Daten auslesen (Funktionen in Template %stpl default doit=1)
+  ##################################################################################
+  for my $k (keys %stpl) {
+      next if(!$stpl{$k}{doit});        
+      no strict "refs";                                  ## no critic 'NoStrict'  
+      ($errstate,$state,$reread,$retry) = &{$stpl{$k}{func}} ({ name     => $name,
+                                                                       ua       => $ua,
+                                                                       state    => $state, 
+                                                                       daref    => \@da
+                                                                    });
+      use strict "refs";                                                                
+      
+      if($errstate) {
+          $st = encode_base64 ( $state,"");
+          return "$name|0|0|$errstate|$getp|$setp|$st";
+      }   
   }  
   
   ### Verbraucher schalten
@@ -1109,7 +1136,7 @@ return ($errstate,$state,$reread,$retry);
 ################################################################
 #                    Abruf Anlagen Stammdaten
 ################################################################
-sub _getPlantData {                      ## no critic "not used"
+sub _getPlantMasterData {                      ## no critic "not used"
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
@@ -1121,9 +1148,9 @@ sub _getPlantData {                      ## no critic "not used"
   ($errstate,$state) = __dispatchGet ({ name     => $name,
                                         ua       => $ua,
                                         call     => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
-                                        tag      => "plantData",
+                                        tag      => "plantMasterData",
                                         state    => $state, 
-                                        fnaref   => [ qw( extractPlantData ) ],
+                                        fnaref   => [ qw( extractPlantMasterData ) ],
                                         addon    => "",
                                         daref    => $daref
                                     });
@@ -1813,12 +1840,14 @@ sub ParseAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
    
-  $cause = $cause?$cause:"Timeout: process terminated";
+  $cause = $cause // "Timeout >process terminated<";
   Log3 ($name, 1, "$name - BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
 
   delete($hash->{HELPER}{RUNNING_PID});
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
+  
+  readingsSingleUpdate($hash, "state", "broken: ".$cause, 1);
   
   delcookiefile ($hash);
   
@@ -1858,9 +1887,15 @@ sub extractLiveData {                  ## no critic 'complexity'
   $live = eval{decode_json($live)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                            return;
                                          };
-                                                 
+                                                                                             
   my ($errMsg,$warnMsg,$infoMsg) = (0,0,0);
   my $lv                         = $stpl{liveData}{level};
+  my $lang                       = AttrVal ("global", "language", "EN");
+  
+  my %hm = (                                          # Header Messages sprachenabhängig
+      "DE" => "Nachricht von SMA Sunny Portal erhalten:",
+      "EN" => "Message got from SMA Sunny Portal:"
+  );
   
   if (ref $live eq "HASH") {
       push @$daref, "${lv}_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
@@ -1890,17 +1925,17 @@ sub extractLiveData {                  ## no critic 'complexity'
           my @em;
           $errMsg = 1; 
           for my $a (@{$live->{ErrorMessages}}) {                    
-              push @em, $a;
+              push @em, encode ("utf8", $a);
           }
           $val = join " ", @em if(@em);
-          push @$daref, "${lv}_ErrorMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_ErrorMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }
       
       if($live->{WarningMessages}[0]) {
           my @wm;
           $warnMsg = 1; 
           for my $a (@{$live->{WarningMessages}}) {                    
-              push @wm, $a;
+              push @wm, encode ("utf8", $a);
           }
           $val = join " ", @wm if(@wm);
           push @$daref, "${lv}_WarningMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
@@ -1910,7 +1945,7 @@ sub extractLiveData {                  ## no critic 'complexity'
           my @im;
           $infoMsg = 1; 
           for my $a (@{$live->{InfoMessages}}) {                    
-              push @im, $a;
+              push @im, encode ("utf8", $a);
           }
           $val = join " ", @im if(@im);
           push @$daref, "${lv}_InfoMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
@@ -2135,19 +2170,19 @@ return;
 ################################################################
 ##                     Auswertung Anlagendaten
 ################################################################
-sub extractPlantData {
+sub extractPlantMasterData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
   my $name     = $hash->{NAME};
   my ($amount,$unit);
   
-  Log3 ($name, 4, "$name - ##### extracting plant data #### ");
+  Log3 ($name, 4, "$name - ##### extracting plant master data #### ");
   
   $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                    return;
                                                  };
-  my $lv       = $stpl{plantData}{level};
+  my $lv       = $stpl{plantMasterData}{level};
   my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
   
   if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
@@ -2165,8 +2200,8 @@ sub extractPlantData {
 
       push @$daref, "${lv}_PlantPeakPower:$amount $unit";             
       
-      Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Amount\": $amount";
-      Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Symbol\": $unit";
+      Log3 $name, 4, "$name - plantMasterData \"PlantPeakPower Amount\": $amount";
+      Log3 $name, 4, "$name - plantMasterData \"PlantPeakPower Symbol\": $unit";
   }
   
 return;
@@ -3576,15 +3611,21 @@ return;
     A SMAPortal device will be defined by: <br><br>
     
     <ul>
-      <b><code>define &lt;name&gt; SMAPortal</code></b> <br><br>
+      <b>define &lt;name&gt; SMAPortal</b>
     </ul>
+    <br>
    
     After the definition of the device the credentials for the SMA Sunny Portal must be saved with the 
     following command: <br><br>
    
     <ul> 
-     set &lt;name&gt; credentials &lt;Username&gt; &lt;Password&gt;
-    </ul>     
+     <b>set &lt;name&gt; credentials &lt;Username&gt; &lt;Password&gt; </b>
+    </ul> 
+    <br>
+
+    After a successful login, only the asset master data are retrieved. 
+    The attribute <a href="#providerLevel">providerLevel</a> is used to set the data suppliers its data 
+    the device should retrieve.   
    </ul>
    <br><br>   
     
@@ -3809,15 +3850,21 @@ return;
     Ein SMAPortal-Device wird definiert mit: <br><br>
     
     <ul>
-      <b><code>define &lt;Name&gt; SMAPortal</code></b> <br><br>
+      <b>define &lt;Name&gt; SMAPortal</b>
     </ul>
+    <br>
    
     Nach der Definition des Devices müssen die Zugangsparameter für das SMA Sunny Portal gespeichert werden 
     mit dem Befehl: <br><br>
    
     <ul> 
-     set &lt;Name&gt; credentials &lt;Username&gt; &lt;Passwort&gt;
-    </ul>     
+     <b>set &lt;Name&gt; credentials &lt;Username&gt; &lt;Passwort&gt; </b>
+    </ul>
+    <br>
+    
+    Nach einem erfolgreichen Login werden nur die Anlagenstammdaten abgerufen. 
+    Mit dem Attribut <a href="#providerLevel">providerLevel</a> werden die Datenlieferanten eingestellt, die durch das 
+    Device abgerufen werden sollen.
    </ul>
    <br><br>   
     
