@@ -665,7 +665,8 @@ sub Attr {
         }
         
         readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash, "state", $val);
+        readingsBulkUpdate ($hash, "state",           $val);
+        readingsBulkUpdate ($hash, "loginState", "unknown");
         readingsEndUpdate  ($hash, 1);
         
         InternalTimer(gettimeofday()+2.0, "FHEM::SMAPortal::SPGRefresh", "$name,0,1", 0);
@@ -1777,7 +1778,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  deleteData($hash, 1);
+  deleteData($hash, 1) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
   
   readingsBeginUpdate($hash);
   
