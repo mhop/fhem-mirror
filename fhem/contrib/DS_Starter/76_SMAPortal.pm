@@ -623,7 +623,7 @@ sub getcredentials {
             
             ($username, $passwd) = split(":",decode_base64($credstr));
             
-            my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
+            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
         
             Log3($name, 4, "$name - Credentials read from RAM: $username $logpw");
         
