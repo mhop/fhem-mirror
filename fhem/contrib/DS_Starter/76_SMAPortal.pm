@@ -718,7 +718,7 @@ sub CallInfo {
 
       return if(IsDisabled($name));
       
-      for my $key (%stpl) {                                                    # festlegen welche Daten geliefert werden sollen
+      for my $key (keys %stpl) {                                               # festlegen welche Daten geliefert werden sollen
           next if($stpl{$key}{doit});                                          # die default Provider nicht noch einmal ausführen
           $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
           $subs{$name}{$key}{level} = $stpl{$key}{level};
