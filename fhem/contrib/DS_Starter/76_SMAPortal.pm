@@ -2590,9 +2590,11 @@ sub deleteData {
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
-  my $bl     = "state|lastCycleTime|Counter|loginState";             # Blacklist
+  my $bl     = "state|lastCycleTime|Counter|loginState";                   # Blacklist
   
-  if(!$subs{$name}{forecastData}{doit}) {                            # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
+  my $pblvl  = $stpl{plantLogbook}{level};                                 # Logbuch Level
+  
+  if(!$subs{$name}{forecastData}{doit}) {                                  # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
       my $fclvl = $stpl{forecastData}{level};
       delete $hash->{HELPER}{"${fclvl}_ThisHour_WeatherId"};
       for my $i (1..23) {
@@ -2601,17 +2603,17 @@ sub deleteData {
       }
   }
    
-  if($conspl) {                                                      # Readings löschen wenn nicht im providerLevel enthalten
+  if($conspl) {                                                            # Readings löschen wenn nicht im providerLevel enthalten
       for my $key(@allrds) {
           my ($lvl) = $key =~ m/^(L\d+)_/x;     
           if($lvl) {
               for my $p (keys %{$subs{$name}}) {
                   delete($defs{$name}{READINGS}{$key}) if($subs{$name}{$p}{level} eq $lvl && !$subs{$name}{$p}{doit});
-                  delete($defs{$name}{READINGS}{$key}) if($subs{$name}{plantLogbook}{level} eq $lvl);                  # Logbuchreadings immer löschen
               }
           } else {
               delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
-          }        
+          }
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);      # Logbuchreadings immer löschen          
       }
       return;
   } 
