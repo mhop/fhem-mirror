@@ -1053,6 +1053,7 @@ sub _checkLogin {
               } else {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
                   $state       = "login failed - check user and password";
+                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
                   $errstate = 1; 
               }              
           }         
@@ -1070,6 +1071,7 @@ sub _checkLogin {
   } else {
       $errstate = 1;
       $state       = $loginp->status_line;
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
       Log3 ($name, 1, "$name - ERROR Login Page: ".$state);
   }
   
@@ -1815,8 +1817,6 @@ sub ParseData {                                                    ## no critic 
       readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
       readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
   
-  } else {
-      readingsBulkUpdate($hash, "loginState", "failed");
   }
   
   readingsBulkUpdate($hash, "state", $state);
