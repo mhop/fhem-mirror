@@ -1939,7 +1939,7 @@ sub extractLiveData {                  ## no critic 'complexity'
               push @wm, encode ("utf8", $a);
           }
           $val = join " ", @wm if(@wm);
-          push @$daref, "${lv}_WarningMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_WarningMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }
       
       if($live->{InfoMessages}[0]) {
@@ -1949,7 +1949,7 @@ sub extractLiveData {                  ## no critic 'complexity'
               push @im, encode ("utf8", $a);
           }
           $val = join " ", @im if(@im);
-          push @$daref, "${lv}_InfoMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_InfoMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }      
   }
   
