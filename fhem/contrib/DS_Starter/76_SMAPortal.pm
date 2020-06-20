@@ -2121,7 +2121,7 @@ sub extractWeatherData {
           my $day    = $k;
           my $symbol = encode("utf8",  $weather->{$k}{TemperatureSymbol});
           my $temp   = sprintf("%.1f", $weather->{$k}{Temperature});
-          my $wdesc  = $weather->{$k}{WeatherDescription};
+          my $wdesc  = encode ("utf8", $weather->{$k}{WeatherDescription});
           $wdesc     =~ s/t/T/x if($wdesc =~ /^t/x);
           $day       =~ s/t/T/x;
           
