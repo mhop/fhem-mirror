@@ -72,7 +72,7 @@ my %Trovis5576ParseInfo = (
 			},
 	'h105' => {	reading => 'RK1_Betriebsart',
 				name => 'BetriebsArtRk1',
-				map => '2:Standby, 4:Sonne, 5:Mond',
+				map => '1:Auto, 2:Standby, 4:Sonne, 5:Mond',
 				poll => 1,
 				set => 1
 			},
@@ -135,7 +135,7 @@ my %Trovis5576ParseInfo = (
 			},
 	'h107' => {	reading => 'RK2_Betriebsart',
 				name => 'BetriebsArtRk2',
-				map => '2:Standby, 4:Sonne, 5:Mond',
+				map => '1:Auto, 2:Standby, 4:Sonne, 5:Mond',
 				poll => 1,
 				set => 1
 			},
@@ -348,7 +348,7 @@ sub ModbusTrovis5576_Initialize($) {
     <a name="ModbusTrovis5576Define"></a>
     <b>Define</b>
     <ul>
-    <code>define &lt;name&gt; ModbusTrovis5576 &lt;ID&gt; &lt;Interval&gt;</code><br /><br />
+    <code>define &lt;name&gt; ModbusTrovis5576 &lt;ID&gt; &lt;Interval&gt; [&lt;IP-Address:Port&gt; &lt;TCP or RTU&gt;]</code><br /><br />
     The module connects to the Samson Trovis 5576 Heating Management with the Modbus Id &lt;ID&gt; through an already defined Modbus device and actively requests data from the system every &lt;Interval&gt; seconds.<br /><br />
     Example:<br>
     <code>define heizung ModbusTrovis5576 255 60</code>
@@ -471,7 +471,7 @@ sub ModbusTrovis5576_Initialize($) {
     <a name="ModbusTrovis5576Define"></a>
     <b>Define</b>
 	<ul>
-    <code>define &lt;name&gt; ModbusTrovis5576 &lt;ID&gt; &lt;Interval&gt;</code><br /><br />
+    <code>define &lt;name&gt; ModbusTrovis5576 &lt;ID&gt; &lt;Interval&gt; [&lt;IP Adresse:Port&gt; &lt;TCP oder RTU&gt;]</code><br /><br />
     Das Modul verbindet sich zur Samson Trovis 5576 Heizungssteuerung mit der angegebenen Modbus Id &lt;ID&gt; über ein bereits fertig definiertes Modbus-Device und fragt die gewünschten Werte im Abstand von &lt;Interval&gt; Sekunden ab.<br /><br />
     Beispiel:<br>
     <code>define heizung ModbusTrovis5576 255 60</code>
