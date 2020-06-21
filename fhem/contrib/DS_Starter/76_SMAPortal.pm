@@ -390,7 +390,7 @@ sub Set {                             ## no critic 'complexity'
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my ($htmldev,$ret,$c,$type,$color2);
       
-      if ($prop eq "Generation") {
+      if ($prop eq "Generation") {                                                      ## no critic "Cascading"
           $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
           $type    = 'pv';        
           $c       = "SMA Sunny Portal Graphics - Forecast Generation";
@@ -1823,11 +1823,7 @@ sub ParseData {                                                    ## no critic 
   
   readingsEndUpdate($hash, 1);  
   
-  delcookiefile ($hash); 
-  delete($hash->{HELPER}{RUNNING_PID});
-  
-  $hash->{HELPER}{GETTER} = "all";
-  $hash->{HELPER}{SETTER} = "none";
+  finalCleanup($hash);
   
   SPGRefresh($hash,0,1);
   
@@ -1843,12 +1839,24 @@ sub ParseAborted {
    
   $cause = $cause // "Timeout >process terminated<";
   Log3 ($name, 1, "$name - BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
-
-  delete($hash->{HELPER}{RUNNING_PID});
-  $hash->{HELPER}{GETTER} = "all";
-  $hash->{HELPER}{SETTER} = "none";
   
   readingsSingleUpdate($hash, "state", "broken: ".$cause, 1);
+  
+  finalCleanup($hash);
+  
+return;
+}
+
+################################################################
+##             Final cleanup of an execution
+################################################################
+sub finalCleanup {
+  my $hash = shift;
+
+  delete($hash->{HELPER}{RUNNING_PID});
+  
+  $hash->{HELPER}{GETTER} = "all";
+  $hash->{HELPER}{SETTER} = "none";
   
   delcookiefile ($hash);
   
@@ -1859,9 +1867,10 @@ return;
 #             Cookie-Datei löschen 
 ################################################################
 sub delcookiefile {
-   my ($hash,$source) = @_;
-   my $name = $hash->{NAME};
-   my $err  = "";
+   my $hash   = shift;
+   my $source = shift;;
+   my $name   = $hash->{NAME};
+   my $err    = "";
 
    my $cookieLocation = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
    my $delfile        = unlink ($cookieLocation) or $err = $!;
@@ -2785,7 +2794,7 @@ sub PortalAsHtml {                                                              
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
       $ret   .= "<td>";
-      if(!$hash) {
+      if(!$hash) {                                                                      ## no critic "Cascading"
           $ret .= "Device \"$name\" doesn't exist !";
       } elsif (!defined($defs{$wlname})) {
           $ret .= "Graphic device \"$wlname\" doesn't exist !";
@@ -3429,7 +3438,7 @@ sub formatVal6 {
   return ($n eq '-')?($v*-1):$v if defined($w);
 
   # Werte bleiben in Watt
-  if    (!$v)         { return '&nbsp;'; }                            # keine Anzeige bei Null
+  if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null 
   elsif ($v <    10)  { return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; } # z.B. 0
   elsif ($v <   100)  { return '&nbsp;'.$n.$v.'&nbsp;&nbsp;'; }
   elsif ($v <  1000)  { return '&nbsp;'.$n.$v.'&nbsp;'; }
