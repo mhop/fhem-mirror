@@ -21,14 +21,14 @@ name:MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
 order:000001
-par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
-par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
-par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
+#par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
+#par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
+#par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
+#par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
-defmod DEVCID MQTT2_\DEVICE DEVCID
-attr DEVCID bridgeRegexp \
+#defmod DEVCID MQTT2_\DEVICE DEVCID
+attr DEVICE bridgeRegexp \
   (tele|stat)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
   (zigbee2mqtt)[/].*:.* "$1"\
@@ -42,21 +42,22 @@ attr DEVCID bridgeRegexp \
   Advantech[/]([^/]+)[/].*:.* "$1"\
   sonos[/](RINCON_[A-Z0-9]+):.* "$1"\
   (sonos)[/][^/]+/.* "$1"\
-  (tvheadend)[/][^/:]+.* "$1"  
-attr DEVCID autocreate 1
-attr DEVCID comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
-attr DEVCID room NEWDEVROOM
-attr DEVICE icon mqtt_bridge_2
-attr DEVCID setStateList on off
-deleteattr DEVICE readingList
-deletereading -q DEVICE (?!associatedWith).*
-deleteattr DEVCID readingList
-deletereading -q DEVCID (?!associatedWith).*
-setreading DEVCID associatedWith DEVICE
-{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+  (tvheadend)[/][^/:]+.* "$1"\
+  homeassistant/.*/config:.* ""
+#attr DEVCID autocreate 1
+attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
+#attr DEVCID room NEWDEVROOM
+#attr DEVICE icon mqtt_bridge_2
+attr DEVICE setStateList on off
+#deleteattr DEVICE readingList
+#deletereading -q DEVICE (?!associatedWith).*
+#deleteattr DEVCID readingList
+#deletereading -q DEVCID (?!associatedWith).*
+#setreading DEVCID associatedWith DEVICE
+#{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVCID model MQTT2_CLIENT_general_bridge
-setreading DEVCID attrTemplateVersion 20200603
+setreading DEVCID attrTemplateVersion 20200619
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -3291,6 +3292,57 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
 attr DEVICE model worx_landroid_mover
 setreading DEVICE attrTemplateVersion 20200609
 
+###########################################
+# Instar 8015HD.
+# contributed by ToM_ToM
+#source post: https://forum.fhem.de/index.php/topic,94495.msg1065779.html#msg1065779
+
+name:InstarCam
+filter:TYPE=MQTT2_DEVICE
+desc:for Instar Camera, source post: 
+order:X_10
+par:DEVNAME;MAC address in the topic;{ AttrVal("DEVICE","readingList","") =~ m,instar/([^/]*)/, ? $1 : undef }
+attr DEVICE eventMap 0:off 1:on
+attr DEVICE jsonMap area1val:area1 area1sensitivityval:area1sensitivity area2val:area2 area2sensitivityval:area2sensitivity area3val:area3 area3sensitivityval:area3sensitivity area4val:area4 area4sensitivityval:area4sensitivity pirval:pir alarmserverval:alarmserver alarmserveraddressval:alarmserveraddress alarmserverportval:alarmserverport alarmserverpathval:alarmserverpath alarmsignalval:alarmsignal audioalarmval:audioalarm audioalarmsensitivityval:audioalarmsensitivity power_ledval:power_led wifi_ledval:wifi_led
+
+attr DEVICE readingList instar/DEVNAME/status/alarm/actions/pir/enable:.* { json2nameValue($EVENT, 'pir', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area1/enable:.* { json2nameValue($EVENT, 'area1', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area1/sensitivity:.* { json2nameValue($EVENT, 'area1sensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area2/enable:.* { json2nameValue($EVENT, 'area2', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area2/sensitivity:.* { json2nameValue($EVENT, 'area2sensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area3/enable:.* { json2nameValue($EVENT, 'area3', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area3/sensitivity:.* { json2nameValue($EVENT, 'area3sensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area4/enable:.* { json2nameValue($EVENT, 'area4', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/area4/sensitivity:.* { json2nameValue($EVENT, 'area4sensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/enable:.* { json2nameValue($EVENT, 'alarmserver', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/address:.* { json2nameValue($EVENT, 'alarmserveraddress', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/port:.* { json2nameValue($EVENT, 'alarmserverport', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/path:.* { json2nameValue($EVENT, 'alarmserverpath', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmsignal:.* { json2nameValue($EVENT, 'alarmsignal', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/audioalarm:.* { json2nameValue($EVENT, 'audioalarm', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/audioalarmsensitivity:.* { json2nameValue($EVENT, 'audioalarmsensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/features/indicator/power:.* { json2nameValue($EVENT, 'power_led', $JSONMAP) }\
+  instar/DEVNAME/status/features/indicator/wifi:.* { json2nameValue($EVENT, 'wifi_led', $JSONMAP) }
+attr DEVICE setList pir:on,off instar/DEVNAME/alarm/actions/pir/enable/raw $EVTPART1\
+  area1:on,off instar/DEVNAME/alarm/area1/enable/raw $EVTPART1\
+  area1sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area1/sensitivity/raw $EVTPART1\
+  area2:on,off instar/DEVNAME/alarm/area2/enable/raw $EVTPART1\
+  area2sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area2/sensitivity/raw $EVTPART1\
+  area3:on,off instar/DEVNAME/alarm/area3/enable/raw $EVTPART1\
+  area3sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area3/sensitivity/raw $EVTPART1\
+  area4:on,off instar/DEVNAME/alarm/area4/enable/raw $EVTPART1\
+  area4sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area4/sensitivity/raw $EVTPART1\
+  alarmserver:on,off instar/DEVNAME/alarm/alarmserver/enable/raw $EVTPART1\
+  alarmsignal:on,off instar/DEVNAME/alarm/actions/alarmsignal/raw $EVTPART1\
+  audioalarm:on,off instar/DEVNAME/alarm/actions/audioalarm/raw $EVTPART1\
+  audioalarmsensitivity:slider,10,10,100 instar/DEVNAME/alarm/actions/audioalarmsensitivity/raw $EVTPART1\
+  power_led:on,off instar/DEVNAME/features/indicator/power/raw $EVTPART1\
+  wifi_led:on,off instar/DEVNAME/features/indicator/wifi/raw $EVTPART1
+attr DEVICE model InstarCam
+setreading DEVICE attrTemplateVersion 20200619
+
+
+#################################
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
 name:wallpanel_app
 filter:TYPE=MQTT2_DEVICE
@@ -3410,7 +3462,7 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ A
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp\
-  BASE_TOPIC/(RINCON_[A-Z0-9]+):.* "$1"
+  BASE_TOPIC/(RINCON_[A-Z0-9]+)[:/].* "$1"
 attr DEVICE readingList\
   BASE_TOPIC/connected:.* connected\
   homeassistant/music_player/RINCON_([0-9A-Z]+)/sonos/config:.* { $TOPIC =~ m,(RINCON_[0-9A-Z]+),; { "config_$1"=>$EVENT }}\
@@ -3421,9 +3473,58 @@ setreading DEVICE attrTemplateVersion 20200603
 
   
 name:sonos2mqtt_speaker
-desc:A sonos2mqtt speaker device
+desc:A sonos2mqtt speaker device without input selector. Suitable e.g. for Sonos Play 1 and Sonos Play One
 filter:TYPE=MQTT2_DEVICE
 order:M_05a
+par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^\/:]+)[\/].+, ? $1 : undef }
+par:DEV_ID;techname of the device ;{ AttrVal("DEVICE","readingList","") =~ m,[^\/]+[\/](RINCON_[0-9A-Z]+):.*, ? $1 : undef }
+par:ALIAS;friendly name as set in sonos gadget itself;{ ReadingsVal("DEVICE","name","unknown") }
+par:DEVNAME;friendly name, used for topic in lowercase;{ lc(ReadingsVal("DEVICE","name","unknown")) }
+par:ICON;ICON as set, defaults to audio_volume_low;{ AttrVal("DEVICE","icon","audio_volume_low") }
+attr DEVICE icon ICON
+attr DEVICE alias ALIAS
+attr DEVICE jsonMap volume_Master:volume mute_Master:mute transportState:state
+attr DEVICE devStateIcon 0:10px-kreis-rot 1:10px-kreis-gelb 2:10px-kreis-gruen (0|1).(STOPPED|PAUSED_PLAYBACK):rc_BLANK 2.(STOPPED|PAUSED_PLAYBACK):rc_PLAY@green:play 2.(pause|stop):rc_STOP@red:play 2.PLAYING:rc_STOP@red:stop 2.(TRANSITIONING|play):rc_PLAY@yellow:stop 2.mute:audio_volume_mute@yellow:stop 2.volume:audio_volume_mid@yellow:stop 2.volumeDown:audio_volume_low@yellow:stop 2.volumeUp:audio_volume_high@yellow:stop 2.next:rc_NEXT@yellow:stop 2.previous:rc_PREVIOUS@yellow:stop (STOPPED|PAUSED_PLAYBACK).(false|previous|next|volumeDown|volumeUp|[0-9]+|CURRENT.*|NEXT.*|PAUSED_PLAYBACK):rc_BLANK \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.previous:rc_PREVIOUS:previous \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.next:rc_NEXT:next \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.volumeDown:rc_VOLDOWN:volumeDown \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.volumeUp:rc_VOLUP:volumeUp \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.false:rc_VOLUP:mute+true \b(?!(STOPPED|PAUSED_PLAYBACK)\b)\w+.true:rc_MUTE:mute+false
+attr DEVICE readingList\
+  BASE_TOPIC/status/DEVNAME/avtransport:.* { json2nameValue($EVENT,'AV_',$JSONMAP) }\
+  BASE_TOPIC/status/DEVNAME/renderingcontrol:.* { json2nameValue($EVENT,'REND_',$JSONMAP) }\
+  BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  BASE_TOPIC/connected:.* bridgeConnected\
+  BASE_TOPIC/DEV_ID/error:.* { json2nameValue($EVENT) }  
+attr DEVICE setList\
+  stop:noArg BASE_TOPIC/DEV_ID/control { "command": "stop" }\
+  play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
+  pause:noArg BASE_TOPIC/DEV_ID/control { "command": "pause" }\
+  toggle:noArg BASE_TOPIC/DEV_ID/control { "command": "toggle" }\
+  volumeUp:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
+  volumeDown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
+  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
+  mute:iconSwitch,false,rc_MUTE,true,rc_VOLUP { my $value = $EVTPART1 eq "true" ? "mute" : "unmute";; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
+  next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
+  previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }\
+  joinGroup:textField BASE_TOPIC/DEV_ID/control { "command": "joingroup",  "input": "$EVTPART1"}\
+  leaveGroup:noArg { my $value = ReadingsVal("DEV_ID","groupName","all"); qq(BASE_TOPIC/DEV_ID/control { "command": "leavegroup",  "input": "$value" } ) }\
+  setAVTUri:textField BASE_TOPIC/DEV_ID/control { "command": "setavtransporturi",  "input": "$EVTPART1"}\
+  notify:textField BASE_TOPIC/DEV_ID/control { "command":"notify","input":{"trackUri":"$EVTPART2","onlyWhenPlaying":false,"timeout":10,"volume":$EVTPART1,"delayMs":700}}\
+  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/control $payload)}
+attr DEVICE stateFormat [$name:bridgeConnected]\
+[$name:bridgeConnected].[$name:state]\
+[$name:state].previous\
+[$name:state].next\
+[$name:state].volumeDown\
+[$name:state].volumeUp\
+&nbsp;&nbsp;&nbsp;\
+[$name:state].[$name:mute]\
+<br>[$name:state] CURRENT: [$name:AV_CurrentTrackMetaData_Artist] - [$name:AV_CurrentTrackMetaData_Title] - ([$name:currentTrack_Duration])\
+<br>[$name:state] NEXT: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[$name:AV_NextTrackMetaData_Artist] - [$name:AV_NextTrackMetaData_Title] - ([$name:nextTrack_Duration])
+attr DEVICE model sonos2mqtt_speaker
+setreading DEVICE attrTemplateVersion 20200621
+
+
+name:sonos2mqtt_linein_speaker
+desc:A sonos2mqtt speaker device with input choice option like 
+filter:TYPE=MQTT2_DEVICE
+order:M_05b
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^\/:]+)[\/].+, ? $1 : undef }
 par:DEV_ID;techname of the device ;{ AttrVal("DEVICE","readingList","") =~ m,[^\/]+[\/](RINCON_[0-9A-Z]+):.*, ? $1 : undef }
 par:ALIAS;friendly name as set in sonos gadget itself;{ ReadingsVal("DEVICE","name","unknown") }
@@ -3442,9 +3543,7 @@ attr DEVICE setList\
   toggle:noArg BASE_TOPIC/DEV_ID/control { "command": "toggle" }\
   volumeUp:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
   volumeDown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
-  switchToQueue:noArg BASE_TOPIC/DEV_ID/control { "command": "switchtoqueue" }\
-  switchToTv:noArg BASE_TOPIC/DEV_ID/control { "command": "switchtotv" }\
-  switchToLine:noArg BASE_TOPIC/DEV_ID/control { "command": "switchtoline" }\
+  input:Queue,TV,Line_In { my $value = $EVTPART1 eq "Queue" ? "queue" : $EVTPART1 eq "TV" ? "tv" : "line";; qq(sonos/RINCON_7828CAF4289001400/control { "command": "switchto$value" } ) }\
   volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
   mute:on,off { my $value = $EVTPART1 eq "on" ? "mute" : "unmute"; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
   next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
@@ -3454,10 +3553,10 @@ attr DEVICE setList\
   leaveGroup:noArg { my $value = ReadingsVal("DEV_ID","groupName","all"); qq(BASE_TOPIC/DEV_ID/control { "command": "leavegroup",  "input": "$value" } ) }\
   setAVTUri:textField BASE_TOPIC/DEV_ID/control { "command": "setavtransporturi",  "input": "$EVTPART1"}\
   notify:textField BASE_TOPIC/DEV_ID/control { "command":"notify","input":{"trackUri":"$EVTPART2","onlyWhenPlaying":false,"timeout":10,"volume":$EVTPART1,"delayMs":700}}
-attr DEVICE model sonos2mqtt_speaker
+attr DEVICE model sonos2mqtt_linein_speaker
 attr DEVICE alias ALIAS
-setreading DEVICE attrTemplateVersion 20200609
-  
+setreading DEVICE attrTemplateVersion 20200621
+
 
 ###########################################
 #source post: https://forum.fhem.de/index.php/topic,109946.0.html
