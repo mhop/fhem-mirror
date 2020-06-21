@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  55_DWD_OpenData: warncellId, download (forum #83097 msg #1065333)
  - bugfix:  70_BOTVAC: tolerable read of schedule data, PBP issues
  - feature: 98_backup: add support for backupToStorage modul
  - changed: 70_BRAVIA: use audio service instead of upnp access
