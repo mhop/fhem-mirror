@@ -698,7 +698,6 @@ sub CUL_HM_Attr(@) {#################################
   my $chk = ($cmd eq "set") ? CUL_HM_AttrCheck($name, $attrName) : "";
   my $hash = CUL_HM_name2Hash($name);
   return $chk if ($chk);
-  
   my $updtReq = 0;
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
@@ -6841,7 +6840,8 @@ sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite 
       CommandDelete(undef,CUL_HM_id2Name($_));
       Log3 $name,3,"CUL_HM_update: $name delete channel name: $_";
     }
-    CUL_HM_ActAdd($hash->{DEF},AttrVal($name,"actCycle", $culHmModel->{$mId}{cyc}))if ($culHmModel->{$mId}{cyc});
+    my $CycTime = AttrVal($name,"actCycle", $culHmModel->{$mId}{cyc});
+    CUL_HM_ActAdd($hash->{DEF},$CycTime)if ($CycTime);
     CUL_HM_queueUpdtCfg($name);
   }
 }
