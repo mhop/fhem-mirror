@@ -1056,7 +1056,8 @@ FW_doUpdate(evt)
   if(typeof WebSocket == "function" && evt && evt.target instanceof WebSocket) {
     if(evt.type == 'close' && !FW_leaving) {
       FW_errmsg(errstr, retryTime-100);
-      FW_pollConn.close();
+      if(FW_pollConn) // Race-condition(?) # 112181
+        FW_pollConn.close();
       FW_pollConn = undefined;
       setTimeout(FW_longpoll, retryTime);
       return;
