@@ -542,7 +542,6 @@ sub CUL_HM_updateConfig($){##########################
         delete $attr{$name}{$_} if (defined $attr{$name}{$_});
       }
     }
-    
     CUL_HM_complConfig($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
@@ -4223,6 +4222,14 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
 
   return (@{$hash->{helper}{cmds}{cmdList}},@{$hash->{helper}{cmds}{TmplCmds}});
  }
+sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++++
+  my($name,$findCmd)=@_;
+  return 0 if(!defined $defs{$name}{helper}{cmds}{cmdList});
+  return scalar(grep/$findCmd:/,@{$defs{$name}{helper}{cmds}{cmdList}});
+ }
+ 
+ 
+
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
   return "no value specified" if(@a < 2);
@@ -9374,12 +9381,13 @@ sub CUL_HM_ActCheck($) {# perform supervision
               $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
                                                  ? ($actHash->{helper}{$devId}{try} + 1)
                                                  : 1;
-              my $cmds = CUL_HM_Set($defs{$devName},$devName,"help");
-              if ($cmds =~ m/(statusRequest|getSerial)/){
-                # send statusrequest if possible
-                CUL_HM_Set($defs{$devName},$devName,
-                           ($cmds =~ m/statusRequest/ ? "statusRequest"
-                                                       : "getSerial" ));
+              if (CUL_HM_SearchCmd($devName,"statusRequest")){
+                CUL_HM_Set($defs{$devName},$devName,"statusRequest");
+                $state = $oldState eq "unset" ? "unknown" 
+                                              : $oldState;
+              }
+              elsif (CUL_HM_SearchCmd($devName,"getSerial")){
+                CUL_HM_Set($defs{$devName},$devName,"getSerial");
                 $state = $oldState eq "unset" ? "unknown" 
                                               : $oldState;
               }
@@ -9866,7 +9874,7 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
   
   foreach my $chNm(CUL_HM_getAssChnNames($name)){
     next if (  !$defs{$chNm}                  #device unknown, ignore
-               || CUL_HM_Set($defs{$chNm},$chNm,"help") !~ m/statusRequest/);
+               || 0 == CUL_HM_SearchCmd($chNm,"statusRequest"));
     if ($force || ((CUL_HM_getAttrInt($chNm,"autoReadReg") & 0x0f) > 3)){
       CUL_HM_qEntity($chNm,"qReqStat") ;
     }
