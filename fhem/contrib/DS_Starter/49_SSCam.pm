@@ -957,7 +957,7 @@ sub SSCam_Set {
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
-                 "startZoom:uzsuSelectRadio,in,out ".
+                 "setZoom:uzsuSelectRadio,+,stop,- ".
                  "";
   } else {
       # setlist für SVS Devices
@@ -1004,7 +1004,7 @@ sub SSCam_Set {
   }
   
   if ($opt eq "on" && SSCam_IsModelCam($hash)) {            
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (defined($prop) && $prop =~ /^\d+$/) {
           $hash->{HELPER}{RECTIME_TEMP} = $prop;
       }
@@ -1055,7 +1055,7 @@ sub SSCam_Set {
       SSCam_camstartrec("$name!_!$emtxt!_!$teletxt!_!$chattxt");
  
   } elsif ($opt eq "off" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  
       my $spec = join(" ",@a);
       if($spec =~ /STRM:/) {
@@ -1066,7 +1066,7 @@ sub SSCam_Set {
       SSCam_camstoprec($hash);
         
   } elsif ($opt eq "snap" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       
       my ($num,$lag,$ncount) = (1,2,1);     
       if($prop && $prop =~ /^\d+$/) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
@@ -1125,7 +1125,7 @@ sub SSCam_Set {
       SSCam_camsnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt");
               
   } elsif ($opt eq "snapCams" && !SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       
       my ($num,$lag,$ncount) = (1,2,1);
       my $cams  = "all";
@@ -1192,21 +1192,22 @@ sub SSCam_Set {
       
               
   } elsif ($opt eq "startTracking" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
       SSCam_starttrack($hash);
         
   } elsif ($opt eq "stopTracking" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
       SSCam_stoptrack($hash);
         
-  } elsif ($opt eq "startZoom" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      SSCam_startZoom ("$name!_!$prop");
+  } elsif ($opt eq "setZoom" && SSCam_IsModelCam($hash)) {
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
+      $prop = $prop // "+";                         # "+" in Taste wird als undef geliefert 
+      SSCam_setZoom ("$name!_!$prop");
         
   } elsif ($opt eq "snapGallery" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       my $ret = SSCam_getclhash($hash);
       return $ret if($ret);
   
@@ -1238,7 +1239,7 @@ sub SSCam_Set {
 	  }
 	  
   } elsif ($opt eq "createSnapGallery" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       my ($ret,$sgdev);
       return "Before use \"$opt\" you have to set the attribute \"snapGalleryBoost\" first due to the technology of retrieving snapshots automatically is needed." 
 		       if(!AttrVal($name,"snapGalleryBoost",0));
@@ -1250,7 +1251,7 @@ sub SSCam_Set {
 	  return "Snapgallery device \"$sgdev\" created and assigned to room \"$room\".";
       
   } elsif ($opt eq "createPTZcontrol" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
       my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {SSCam_ptzpanel('$name','$ptzcdev','ptzcontrol')}");
 	  return $ret if($ret);
@@ -1260,7 +1261,7 @@ sub SSCam_Set {
 	  return "PTZ control device \"$ptzcdev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "createStreamDev" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  my ($livedev,$ret);
       
       if($prop =~ /mjpeg/) {
@@ -1300,7 +1301,7 @@ sub SSCam_Set {
 	  return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "createReadingsGroup") {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  my $rgdev = $prop?$prop:"RG.SSCam";
       
       my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
@@ -1383,15 +1384,15 @@ sub SSCam_Set {
       return "readingsGroup device \"$rgdev\" created and assigned to room \"$room\".";
   
   } elsif ($opt eq "enable" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       SSCam_camenable($hash);
         
   } elsif ($opt eq "disable" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       SSCam_camdisable($hash);
        
   } elsif ($opt eq "motdetsc" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
       $hash->{HELPER}{MOTDETSC} = $prop;
@@ -1414,26 +1415,26 @@ sub SSCam_Set {
       SSCam_cammotdetsc($hash);
         
   } elsif ($opt eq "expmode" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
             
       $hash->{HELPER}{EXPMODE} = $prop;
       SSCam_camexpmode($hash);
         
   } elsif ($opt eq "homeMode" && !SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       unless ($prop) { return " \"$opt\" needs one of those arguments: on, off !";}
             
       $hash->{HELPER}{HOMEMODE} = $prop;
       SSCam_sethomemode($hash);
         
   } elsif ($opt eq "autocreateCams" && !SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
             
       SSCam_setAutocreate($hash);
         
   } elsif ($opt eq "goPreset" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
       $hash->{HELPER}{GOPRESETNAME} = $prop;
@@ -1441,7 +1442,7 @@ sub SSCam_Set {
       SSCam_doptzaction($hash);
         
   } elsif ($opt eq "optimizeParams" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 		my %cpcl = (ntp => 1, mirror => 2, flip => 4, rotate => 8);
 		SSCam_extoptpar($hash,$prop,\%cpcl) if($prop);
         SSCam_extoptpar($hash,$prop1,\%cpcl) if($prop1);
@@ -1449,7 +1450,7 @@ sub SSCam_Set {
 		SSCam_setoptpar($hash);
                 
   } elsif ($opt eq "pirSensor" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if(ReadingsVal("$name", "CapPIR", "false") eq "false") {return "Function \"$opt\" not possible. Camera \"$name\" don't have a PIR sensor."}
       if(!$prop) {return "Function \"$opt\" needs an argument";}
       $hash->{HELPER}{PIRACT} = ($prop eq "activate")?0:($prop eq "deactivate")?-1:5;
@@ -1457,7 +1458,7 @@ sub SSCam_Set {
       SSCam_piract($hash);
         
   } elsif ($opt eq "runPatrol" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (!$prop) {return "Function \"$opt\" needs a \"Patrolname\" as an argument";}
             
       $hash->{HELPER}{GOPATROLNAME} = $prop;
@@ -1465,7 +1466,7 @@ sub SSCam_Set {
       SSCam_doptzaction($hash);
         
   } elsif ($opt eq "goAbsPTZ" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
           if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
           if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
@@ -1492,7 +1493,7 @@ sub SSCam_Set {
       return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
 
   } elsif ($opt eq "move" && SSCam_IsModelCam($hash)) {     
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{APIPTZMAXVER});
       
 	  if($hash->{HELPER}{APIPTZMAXVER} <= 4) {
@@ -1520,7 +1521,7 @@ sub SSCam_Set {
       SSCam_doptzaction($hash);
         
   } elsif ($opt eq "runView" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       
       my $spec = join(" ",@a);
       if($spec =~ /STRM:/) {
@@ -1594,12 +1595,12 @@ sub SSCam_Set {
             
   } elsif ($opt eq "hlsreactivate" && SSCam_IsModelCam($hash)) {
       # ohne SET-Menüeintrag
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       SSCam_hlsreactivate($hash);
         
   } elsif ($opt eq "hlsactivate" && SSCam_IsModelCam($hash)) {
       # ohne SET-Menüeintrag
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       
       my $spec = join(" ",@a);
       if($spec =~ /STRM:/) {
@@ -1618,12 +1619,12 @@ sub SSCam_Set {
       }
       
   } elsif ($opt eq "extevent" && !SSCam_IsModelCam($hash)) {                                   
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       $hash->{HELPER}{EVENTID} = $prop;
       SSCam_extevent($hash);
         
   } elsif ($opt eq "stopView" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 
       my $spec = join(" ",@a);
       if($spec =~ /STRM:/) {
@@ -1633,7 +1634,7 @@ sub SSCam_Set {
       SSCam_stopliveview($hash);            
         
   } elsif ($opt eq "setPreset" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
 	  if (!$prop) {return "Syntax of function \"$opt\" was wrong. Please use \"set $name setPreset <PresetNumber> <PresetName> [<Speed>]\" ";}
       $hash->{HELPER}{PNUMBER} = $prop;
       $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
@@ -1641,13 +1642,13 @@ sub SSCam_Set {
 	  SSCam_setPreset($hash);
                 
   } elsif ($opt eq "setHome" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
       $hash->{HELPER}{SETHOME} = $prop;
       SSCam_setHome($hash);
                 
   } elsif ($opt eq "delPreset" && SSCam_IsModelCam($hash)) {
-	  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
       $hash->{HELPER}{DELPRESETNAME} = $prop;
       SSCam_delPreset($hash);
@@ -2899,10 +2900,10 @@ sub SSCam_stoptrack {
 }
 
 ###############################################################################
-#                       Start Zoom In / Out
-#        $op = in / out
+#                       Zoom starten / stoppen
+#        $op = + / stop / -
 ###############################################################################
-sub SSCam_startZoom {
+sub SSCam_setZoom {
     my $str        = shift;
     my ($name,$op) = split("!_!",$str);
 	my $hash       = $defs{$name};
@@ -2910,7 +2911,7 @@ sub SSCam_startZoom {
     my $errorcode;
     my $error;
     
-    RemoveInternalTimer($hash, "SSCam_startZoom");
+    RemoveInternalTimer($hash, "SSCam_setZoom");
     return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
@@ -2934,63 +2935,24 @@ sub SSCam_startZoom {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{HELPER}{ZOOM}{DIR}    = $op;                             # Richtung (in / out)
-        $hash->{OPMODE}               = "startZoom";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
+        my %zd = (
+            "+"    => {dir => "in",  moveType => "Start" },
+            "stop" => {dir => undef, moveType => "Stop"  },
+            "-"    => {dir => "out", moveType => "Start" }
+        );
+
+        $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};         # Richtung (in / out)
+        $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                                  # Start / Stop
+        $hash->{OPMODE}                 = "setZoom";
+        $hash->{HELPER}{LOGINRETRIES}   = 0;
+        
+        return if(!$hash->{HELPER}{ZOOM}{DIR});                                                # es muss ! eine Richtung gesetzt sein
 	
         SSCam_setActiveToken($hash);
         SSCam_getapisites   ($hash);
 		
     } else {
-        InternalTimer(gettimeofday()+0.8, "SSCam_startZoom", $str, 0);
-    }    
-}
-
-###############################################################################
-#                       Stop Zoom In / Out
-#        $op = in / out
-###############################################################################
-sub SSCam_stopZoom {
-    my $str        = shift;
-    my ($name,$op) = split("!_!",$str);
-	my $hash       = $defs{$name};
-    my $camname    = $hash->{CAMNAME};
-    my $errorcode;
-    my $error;
-    
-    RemoveInternalTimer($hash, "SSCam_stopZoom");
-    return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = SSCam_experror($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Zoom $op of Camera $camname can't be stopped - $error");
-        
-        return;
-    }
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{HELPER}{ZOOM}{DIR}    = $op;                             # Richtung (in / out)
-        $hash->{OPMODE}               = "stopZoom";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-	
-        SSCam_setActiveToken($hash);
-        SSCam_getapisites   ($hash);
-		
-    } else {
-        InternalTimer(gettimeofday()+0.9, "SSCam_stopZoom", $str, 0);
+        InternalTimer(gettimeofday()+0.8, "SSCam_setZoom", $str, 0);
     }    
 }
 
@@ -4957,14 +4919,16 @@ sub SSCam_camop {
       # Object Tracking stoppen
 	  $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "startZoom") {
-      # Zoom in / out starten
-      my $dir = $hash->{HELPER}{ZOOM}{DIR}; 
-	  $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="Start"&_sid="$sid"};
-   
+   } elsif ($OpMode eq "setZoom") {
+      # Zoom in / stop / out
+      my $dir      = $hash->{HELPER}{ZOOM}{DIR};
+      my $moveType = $hash->{HELPER}{ZOOM}{MOVETYPE};
+           
+	  $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
+      
    } elsif ($OpMode eq "runpatrol") {
       # eine Überwachungstour starten
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"RunPatrol\"&patrolId=\"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="RunPatrol"&patrolId="$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}"&cameraId="$camid"&_sid="$sid"};
    
    } elsif ($OpMode eq "goabsptz") {
       $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
@@ -5332,7 +5296,7 @@ sub SSCam_camop_parse {
                        
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Start");
-                readingsBulkUpdate($hash,"state","on");
+                readingsBulkUpdate($hash,"state",    "on");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -5348,13 +5312,12 @@ sub SSCam_camop_parse {
                 SSCam_refresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
             
 			} elsif ($OpMode eq "Stop") {                
-			
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Record","Stop");
-                readingsBulkUpdate($hash,"state","off");
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
+                readingsBulkUpdate ($hash, "Record",    "Stop");
+                readingsBulkUpdate ($hash, "state",     "off" );
+                readingsBulkUpdate ($hash, "Errorcode", "none");
+                readingsBulkUpdate ($hash, "Error"    , "none");
+                readingsEndUpdate  ($hash, 1);
        
                 Log3($name, 3, "$name - Camera $camname Recording stopped");
                 
@@ -5363,29 +5326,26 @@ sub SSCam_camop_parse {
                 # Aktualisierung Eventlist der letzten Aufnahme
                 SSCam_geteventlist($hash);
             
-			} elsif ($OpMode eq "ExpMode") {              
-
+			} elsif ($OpMode eq "ExpMode") {
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
+                readingsBulkUpdate ($hash, "Errorcode", "none");
+                readingsBulkUpdate ($hash, "Error"    , "none");
+                readingsEndUpdate  ($hash, 1);
        
                 Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
             
-			} elsif ($OpMode eq "startZoom") {              
-                my $dir = delete $hash->{HELPER}{ZOOM}{DIR};
-                
+			} elsif ($OpMode eq "setZoom") { 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash,"Errorcode","none");
-                readingsBulkUpdate ($hash,"Error","none");
+                readingsBulkUpdate ($hash, "Errorcode", "none");
+                readingsBulkUpdate ($hash, "Error"    , "none");
                 readingsEndUpdate  ($hash, 1);
        
-                Log3($name, 1, "$name - Zoom $dir of Camera $camname started successfully");
+                Log3($name, 1, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
             
 			} elsif ($OpMode eq "GetRec") {              
-                my $recid            = ReadingsVal("$name", "CamLastRecId", "");
+                my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
                 my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
-                my $lrec             = ReadingsVal("$name", "CamLastRec", "");
+                my $lrec             = ReadingsVal("$name", "CamLastRec",     "");
                 my ($tdir,$fileName) = split("/",$lrec);
                 my $sn               = 0;
                 
