@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 our %DbLog_vNotesIntern = (
+  "4.10.1"  => "22.06.2020 configCheck changed for SQLite ",
   "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
   "4.9.13"  => "12.05.2020 commandRef changed, AutoInactiveDestroy => 1 for dbh ",
   "4.9.12"  => "28.04.2020 fix line breaks in set function, Forum: #110673 ",
@@ -1041,7 +1042,7 @@ sub DbLog_ParseEvent($$$$) {
   # - temperature
   # - humidity
   if   ($reading =~ m(^temperature)) { $unit = "°C"; }                   # wenn reading mit temperature beginnt
-  elsif($reading =~ m(^humidity))    { $unit = "%"; }
+  elsif($reading =~ m(^humidity))    { $unit = "%"; }                    # wenn reading mit humidity beginnt
 
   # the interpretation of the argument depends on the device type
   # EMEM, M232Counter, M232Voltage return plain numbers
@@ -4010,14 +4011,14 @@ sub DbLog_configcheck($) {
   }
   if($dbmodel =~ /SQLITE/) {
       my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
-      $cdat_dev = $dev?$dev:"no result";
+      $cdat_dev = $dev // "no result";
       $cdat_typ = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
-      $cdat_dev =~ s/.*DEVICE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_typ =~ s/.*TYPE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_evt =~ s/.*EVENT.varchar\(([\d]*)\).*/$1/e;
-      $cdat_rdg =~ s/.*READING.varchar\(([\d]*)\).*/$1/e;
-      $cdat_val =~ s/.*VALUE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_unt =~ s/.*UNIT.varchar\(([\d]*)\).*/$1/e;
+      ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
+      ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
+      ($cdat_evt) = $cdat_evt =~ /EVENT.varchar\(([\d]+)\)/x;
+      ($cdat_rdg) = $cdat_rdg =~ /READING.varchar\(([\d]+)\)/x;
+      ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
+      ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
   }
   if ($dbmodel !~ /SQLITE/)  {  
       $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
