@@ -5288,6 +5288,8 @@ sub SSCam_camop_parse {
        
                 Log3($name, 3, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
             
+                InternalTimer(gettimeofday()+1.0, "SSCam_setZoom", "$name!_!stop", 0) if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop");
+            
 			} elsif ($OpMode eq "GetRec") {              
                 my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
                 my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
@@ -7161,7 +7163,6 @@ return $cap;
 sub SSCam_IsCapZoom {                                                           # Zoomeigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
