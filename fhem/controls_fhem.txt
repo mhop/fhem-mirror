@@ -1,6 +1,6 @@
-REV 22224
+REV 22233
 DIR unused
-UPD 2020-06-22_07:45:03 343580 ./CHANGED
+UPD 2020-06-23_07:45:04 343769 ./CHANGED
 UPD 2020-05-25_07:45:06 42396 ./MAINTAINER.txt
 UPD 2020-05-08_07:45:03 39570 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -44,7 +44,7 @@ UPD 2020-05-18_07:45:03 52774 FHEM/02_RSS.pm
 UPD 2018-03-11_07:45:03 4860 FHEM/09_BS.pm
 UPD 2019-01-24_07:45:02 21854 FHEM/09_CUL_FHTTK.pm
 UPD 2018-03-11_07:45:03 6824 FHEM/09_USF1000.pm
-UPD 2020-06-21_07:45:02 617370 FHEM/10_CUL_HM.pm
+UPD 2020-06-23_07:45:04 617630 FHEM/10_CUL_HM.pm
 UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2017-04-24_07:45:02 16860 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
@@ -371,7 +371,7 @@ UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
 UPD 2020-06-07_07:45:04 195963 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2020-06-04_07:45:02 323866 FHEM/73_AutoShuttersControl.pm
+UPD 2020-06-23_07:45:04 97884 FHEM/73_AutoShuttersControl.pm
 UPD 2020-05-05_07:45:02 201709 FHEM/73_DoorBird.pm
 UPD 2020-03-10_07:45:03 96019 FHEM/73_ElectricityCalculator.pm
 UPD 2020-05-02_07:45:02 42673 FHEM/73_GardenaSmartBridge.pm
@@ -436,7 +436,7 @@ UPD 2019-12-22_07:45:03 10210 FHEM/91_sequence.pm
 UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2019-12-26_07:45:03 61757 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
-UPD 2020-05-25_07:45:06 442912 FHEM/93_DbLog.pm
+UPD 2020-06-23_07:45:04 443062 FHEM/93_DbLog.pm
 UPD 2020-05-19_07:45:03 887201 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2020-05-16_07:45:03 175783 FHEM/93_Log2Syslog.pm
@@ -734,17 +734,28 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-06-22_07:45:07 4319210 docs/commandref.html
-UPD 2020-06-22_07:45:09 2655085 docs/commandref_DE.html
+UPD 2020-06-23_07:45:08 4319263 docs/commandref.html
+UPD 2020-06-23_07:45:11 2675024 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-06-22_07:45:10 233612 docs/commandref_modular.html
-UPD 2020-06-22_07:45:11 244319 docs/commandref_modular_DE.html
+UPD 2020-06-23_07:45:12 233612 docs/commandref_modular.html
+UPD 2020-06-23_07:45:13 244319 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
+UPD 2020-06-23_07:45:04 187113 lib/FHEM/Automation/ShuttersControl.pm
+UPD 2020-06-23_07:45:04 2701 lib/FHEM/Automation/ShuttersControl/Dev.pm
+UPD 2020-06-23_07:45:04 11499 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
+UPD 2020-06-23_07:45:04 7300 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
+UPD 2020-06-23_07:45:04 2542 lib/FHEM/Automation/ShuttersControl/Roommate.pm
+UPD 2020-06-23_07:45:04 29882 lib/FHEM/Automation/ShuttersControl/Shutters.pm
+UPD 2020-06-23_07:45:04 52706 lib/FHEM/Automation/ShuttersControl/Shutters/Attr.pm
+UPD 2020-06-23_07:45:04 2952 lib/FHEM/Automation/ShuttersControl/Shutters/Readings.pm
+UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
+UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
+UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
@@ -2196,7 +2207,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2020-05-04_07:45:02 31081 www/pgm2/f18.js
 UPD 2020-05-04_07:45:02 10024 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2020-06-03_07:45:02 61553 www/pgm2/fhemweb.js
+UPD 2020-06-23_07:45:04 61607 www/pgm2/fhemweb.js
 UPD 2019-11-26_07:45:03 13796 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
