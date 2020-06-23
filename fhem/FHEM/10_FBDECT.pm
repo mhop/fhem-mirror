@@ -802,7 +802,7 @@ FBDECT_getDiscreteSat($$)
   my ($color, $saturation) = @_;
   my $satindex = 3;
   $color = "yellow" if(!$colordefaults{$color});
-  my @discreteSat = (@{$colordefaults{$color}{sat}}, 9999);
+  my @discreteSat = reverse (9999, @{$colordefaults{$color}{sat}});
   for(my $i=0; $i<3; $i++) {
     if($saturation <
        $discreteSat[$i] + ($discreteSat[$i+1]-$discreteSat[$i])/2 ) {
