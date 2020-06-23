@@ -3987,16 +3987,16 @@ sub SSCam_getptzlistpreset {
     RemoveInternalTimer($hash, "SSCam_getptzlistpreset");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
-    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | !SSCam_IsCapPTZPan($hash)) {
+    if(!SSCam_IsCapPTZTilt($hash) | !SSCam_IsCapPTZPan($hash)) {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname has no capability to tilt/pan");
         return;
     }
     
-	if ($hash->{HELPER}{ACTIVE} eq "off") {                       
+	if($hash->{HELPER}{ACTIVE} eq "off") {                       
         $hash->{OPMODE}               = "Getptzlistpreset";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
@@ -4019,16 +4019,16 @@ sub SSCam_getptzlistpatrol {
     RemoveInternalTimer($hash, "SSCam_getptzlistpatrol");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
-    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | !SSCam_IsCapPTZPan($hash)) {
+    if(!SSCam_IsCapPTZTilt($hash) | !SSCam_IsCapPTZPan($hash)) {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname has no capability to tilt/pan");
         return;
     }
 
-    if ($hash->{HELPER}{ACTIVE} ne "on") {                        
+    if($hash->{HELPER}{ACTIVE} ne "on") {                        
         $hash->{OPMODE}               = "Getptzlistpatrol";
 		$hash->{HELPER}{LOGINRETRIES} = 0;
         
@@ -7162,19 +7162,27 @@ sub SSCam_IsCapZoom {                                                           
   my $hash = shift;
   my $name = $hash->{NAME};
   return 1;
-  my $cap = ReadingsVal($name,"CapPTZZoom","false") ne "false" ? 1 : 0;
+  my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
 
-sub SSCam_IsCapPTZPan {                                                         # PTZ Eigenschaft
+sub SSCam_IsCapPTZPan {                                                         # PTZ Pan Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-  return 1;
-  my $cap = ReadingsVal($name,"CapPTZPan","false") ne "false" ? 1 : 0;
+  my $cap = ReadingsVal($name, "CapPTZPan", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
+
+sub SSCam_IsCapPTZTilt {                                                        # PTZ Tilt Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $cap = ReadingsVal($name, "CapPTZTilt", "false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
 
 ###############################################################################
 #                       JSON Boolean Test und Mapping
