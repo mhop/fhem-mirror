@@ -3398,7 +3398,7 @@ sub SSCam_doptzaction {
         return;
     }
     if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !ReadingsVal("$name", "CapPTZAbs", "false")) {
-        Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"");
+        Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with Reading \"CapPTZAbs\"");
         return;
     }
     if ( $hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
@@ -7161,7 +7161,7 @@ return $cap;
 sub SSCam_IsCapZoom {                                                           # Zoomeigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-  return 1;
+
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7452,13 +7452,17 @@ sub SSCam_ptzpanel(@) {
       ## Ausgabe
       $ptz_ret .= '<table class="rc_body defsize">';
       
-      $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
-      $ptz_ret .= "</tr>"; 
+      if($valPresets) {
+          $ptz_ret .= "<tr>";
+          $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
+          $ptz_ret .= "</tr>"; 
+      }
       
-      $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
-      $ptz_ret .= "</tr>";
+      if($valPatrols) {
+          $ptz_ret .= "<tr>";
+          $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
+          $ptz_ret .= "</tr>";
+      }
       
       if(SSCam_IsCapZoom($hash)) {
           $ptz_ret .= "<tr>";
@@ -7467,7 +7471,6 @@ sub SSCam_ptzpanel(@) {
       }
 
       $ptz_ret .= "</table>";     
-      
   }
   
   if ($rowisset) {
