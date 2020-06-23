@@ -138,59 +138,6 @@ my %SSCam_vNotesIntern = (
   "8.3.0"  => "02.01.2019  CAMLASTRECID replaced by Reading CamLastRecId, \"SYNO.SurveillanceStation.Recording\" added, ".
                            "new get command \"saveRecording\"",
   "8.2.0"  => "02.01.2019  store SMTP credentials with \"smtpcredentials\", SMTP Email integrated ",
-  "8.1.0"  => "19.12.2018  tooltipps in camera device for control buttons, commandref revised ",
-  "8.0.0"  => "13.12.2018  HLS with sscam_hls.js integrated for SSCamSTRM type hls, realize tooltipps in streaming devices, minor fixes",
-  "7.7.1"  => "12.12.2018  change autocreateCams: define new device only if ne device with Internal CAMNAME is defined, ".
-              "fix getsnapinfo function get wrong snapid or none if cam is new defined ",
-  "7.7.0"  => "10.12.2018  SVS-Device: autocreateCams command added, some other fixes and improvements, minor code rewrite, ".
-              "save Stream in \$streamHash->{HELPER}{STREAM} for popupStream in SSCamSTRM-Device ",
-  "7.6.0"  => "02.12.2018  sub SSCam_ptzpanel completed by Preset and Patrol, minor fixes ",
-  "7.5.0"  => "02.12.2018  sub SSCam_StreamDev and SSCam_composegallery changed to use popup window ",
-  "7.4.1"  => "26.11.2018  sub composegallery deleted, SSCam_composegallery changed to get information for SSCam_refresh ",
-  "7.4.0"  => "24.11.2018  new set command \"createReadingsGroup\", versionNotes can process lists like \"2,6\", changed compatibility check, use SnapId when get information after took snapshot and sscam state-event ",
-  "7.3.3"  => "18.11.2018  change rights decsption in commandRef ",
-  "7.3.2"  => "12.11.2018  fix Warning in line 4954, set COMPATIBILITY to 8.2.2 ",
-  "7.3.1"  => "31.10.2018  fix connection lost failure if several SSCamSTRM devices are defined and updated by longpoll from same parent device ",
-  "7.3.0"  => "28.10.2018  usage of attribute \"livestreamprefix\" changed, exec SSCam_getStmUrlPath on boot ",
-  "7.2.1"  => "23.10.2018  new routine SSCam_versionCheck, COMPATIBILITY changed to 8.2.1 ",
-  "7.2.0"  => "20.10.2018  direct help for attributes, new get versionNotes command, fix PERL WARNING: Use of uninitialized value \$small, get versionNotes ",
-  "7.1.1"  => "18.10.2018  Message of \"Your current/simulated SVS-version...\" changed, commandref corrected ",
-  "7.1.0"  => "02.09.2018  PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
-  "7.0.1"  => "27.08.2018  enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869) ",
-  "7.0.0"  => "27.07.2018  compatibility to API v2.8 ",
-  "6.0.1"  => "04.07.2018  Reading CamFirmware ",
-  "6.0.0"  => "03.07.2018  HTTPS Support, buttons for refresh SSCamSTRM-devices ",
-  "5.3.0"  => "29.06.2018  changes regarding to \"createStreamDev ... generic\", refresh reading parentState of all, SSCamSTRM devices with PARENT=SSCam-device, control elements for runView within fhemweb, new CamLive.*-Readings, minor fixes ",
-  "5.2.7"  => "26.06.2018  fix state turns to \"off\" even though cam is disabled ",
-  "5.2.6"  => "20.06.2018  running stream as human readable entry for SSCamSTRM-Device, goAbsPTZ fix set-entry für non-PTZ ",
-  "5.2.5"  => "18.06.2018  trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it. ",
-  "5.2.4"  => "17.06.2018  SSCam_composegallery added and write warning if old composegallery-weblink device is used  ",
-  "5.2.3"  => "16.06.2018  no SSCamSTRM refresh when snapgetinfo was running without taken a snap by SSCamSTRM-Device ",
-  "5.2.2"  => "16.06.2018  compatibility to SSCamSTRM V 1.1.0 ",
-  "5.2.1"  => "14.06.2018  design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars ",
-  "5.2.0"  => "14.06.2018  support longpoll refresh of SSCamSTRM-Devices ",
-  "5.1.0"  => "13.06.2018  more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev, control of detaillink is moved to SSCamSTRM-device ",
-  "5.0.1"  => "12.06.2018  control of page refresh improved (for e.g. Floorplan,Dashboard) ",
-  "5.0.0"  => "11.06.2018  HLS Streaming, Buttons for Streaming-Devices, use of module SSCamSTRM for Streaming-Devices, deletion of Streaming-devices if SSCam-device is deleted, some more improvements, minor bugfixes ",
-  "4.3.0"  => "27.05.2018  HLS preparation changed ",
-  "4.2.0"  => "22.05.2018  PTZ-Panel integrated to created StreamDevice ",
-  "4.1.0"  => "05.05.2018  use SYNO.SurveillanceStation.VideoStream instead of SYNO.SurveillanceStation.VideoStreaming, preparation for hls ",
-  "4.0.0"  => "01.05.2018  AudioStream possibility added ",
-  "3.10.0" => "24.04.2018  createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
-  "3.9.2"  => "21.04.2018  minor fixes ",
-  "3.9.1"  => "20.04.2018  Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
-  "3.9.0"  => "17.04.2018  control panel & PTZcontrol weblink device for PTZ cams ",
-  "3.8.4"  => "06.04.2018  Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
-  "3.8.3"  => "05.04.2018  bugfix V3.8.2, \$OpMode \"Start\" changed, composegallery changed ",
-  "3.8.2"  => "04.04.2018  \$attr replaced by AttrVal, SSCam_wdpollcaminfo redesigned ",
-  "3.8.1"  => "04.04.2018  some codereview like new sub SSCam_jboolmap ",
-  "3.8.0"  => "03.04.2018  new reading PresetHome, setHome command, minor fixes ",
-  "3.7.0"  => "26.03.2018  minor details of setPreset changed, new command delPreset ",
-  "3.6.0"  => "25.03.2018  setPreset command, changed SSCam_wdpollcaminfo, SSCam_getcaminfoall ",
-  "3.5.0"  => "22.03.2018  new get command listPresets ",
-  "3.4.0"  => "21.03.2018  new commands startTracking, stopTracking ",
-  "3.3.1"  => "20.03.2018  new readings CapPTZObjTracking, CapPTZPresetNumber ",
-  "3.3.0"  => "25.02.2018  code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
   "1.0.0"  => "12.12.2015  initial, changed completly to HttpUtils_NonblockingGet "
 );
 
@@ -320,9 +267,6 @@ my %SSCam_vNotesExtern = (
   "1.0.0"  => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
 );
 
-# getestete SVS-Version
-my $compstat = "8.2.7";
-
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
   100 => "Unknown error",
@@ -415,15 +359,17 @@ my %SSCAM_imc = (                                             # disbled String m
 );
 
 # Standardvariablen und Forward-Deklaration
-my $SSCam_slim  = 3;                                    # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $SSCAM_snum  = "1,2,3,4,5,6,7,8,9,10";               # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCam_slim     = 3;                                   # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCAM_snum     = "1,2,3,4,5,6,7,8,9,10";              # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $SSCam_compstat = "8.2.7";                             # getestete SVS-Version
+my $SSCam_valZoom  = "uzsuSelectRadio,+,stop,-";          # Inhalt des Setters "setZoom"
 
-use vars qw($FW_ME);                                    # webname (default is fhem), used by 97_GROUP/weblink
-use vars qw($FW_subdir);                                # Sub-path in URL, used by FLOORPLAN/weblink
-use vars qw($FW_room);                                  # currently selected room
-use vars qw($FW_detail);                                # currently selected device for detail view
-use vars qw($FW_wname);                                 # Web instance
-sub FW_pH(@);                                           # add href
+use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
+use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
+use vars qw($FW_room);                                    # currently selected room
+use vars qw($FW_detail);                                  # currently selected device for detail view
+use vars qw($FW_wname);                                   # Web instance
+sub FW_pH(@);                                             # add href
 use vars qw(%SSCam_vHintsExt_en);
 use vars qw(%SSCam_vHintsExt_de);
 
@@ -526,7 +472,7 @@ sub SSCam_Define {
   $hash->{CAMNAME}               = $camname;
   $hash->{MODEL}                 = ($camname =~ m/^SVS$/i)?"SVS":"CAM";          # initial, CAM wird später ersetzt durch CamModel
   $hash->{PROTOCOL}              = $proto;
-  $hash->{COMPATIBILITY}         = $compstat;                                    # getestete SVS-version Kompatibilität 
+  $hash->{COMPATIBILITY}         = $SSCam_compstat;                                    # getestete SVS-version Kompatibilität 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   
   # benötigte API's in $hash einfügen
@@ -927,28 +873,28 @@ sub SSCam_Set {
                  ;  
   } elsif(SSCam_IsModelCam($hash)) {
       # selist für Cams
-      my $hlslfw = SSCam_IsHLSCap($hash)?",live_fw_hls,":",";
+      my $hlslfw = SSCam_IsCapHLS($hash)?",live_fw_hls,":",";
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
                  "smtpcredentials ".
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "expmode:auto,day,night ".
                  "on ".
                  "off:noArg ".
                  "motdetsc:disable,camera,SVS ".
                  "snap ".
-	     		 (AttrVal($name, "snapGalleryBoost",0)?(AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
+	     		 (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))?"snapGallery:noArg ":"snapGallery:$SSCAM_snum ":" ").
 	     		 "createReadingsGroup ".
                  "createSnapGallery:noArg ".
                  "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg ": "").
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg " : "").
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 ((ReadingsVal("$name", "CapPIR", "false") ne "false") ? "pirSensor:activate,deactivate ": "").
+                 ((ReadingsVal("$name", "CapPIR", "false") ne "false") ? "pirSensor:activate,deactivate " : "").
                  "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
+                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
                  ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "startTracking:noArg " : "").
                  ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "stopTracking:noArg " : "").
@@ -957,7 +903,7 @@ sub SSCam_Set {
                  ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
-                 "setZoom:uzsuSelectRadio,+,stop,- ".
+                 ( SSCam_IsCapZoom($hash) ? "setZoom:$SSCam_valZoom " : "").
                  "";
   } else {
       # setlist für SVS Devices
@@ -1574,7 +1520,7 @@ sub SSCam_Set {
 		  $hash->{HELPER}{RUNVIEW}    = "live_fw";
 		  $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
       } elsif ($prop eq "live_fw_hls") {
-          return "API \"SYNO.SurveillanceStation.VideoStream\" is not available or Reading \"CamStreamFormat\" is not \"HLS\". May be your API version is 2.8 or higher." if(!SSCam_IsHLSCap($hash));
+          return "API \"SYNO.SurveillanceStation.VideoStream\" is not available or Reading \"CamStreamFormat\" is not \"HLS\". May be your API version is 2.8 or higher." if(!SSCam_IsCapHLS($hash));
           $hash->{HELPER}{OPENWINDOW} = 0;
           $hash->{HELPER}{WLTYPE}     = "hls"; 
 		  $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
@@ -1635,7 +1581,7 @@ sub SSCam_Set {
         
   } elsif ($opt eq "setPreset" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-	  if (!$prop) {return "Syntax of function \"$opt\" was wrong. Please use \"set $name setPreset <PresetNumber> <PresetName> [<Speed>]\" ";}
+	  if (!$prop)                {return qq{Syntax of function "$opt" was wrong. Please use "set $name setPreset <PresetNumber> <PresetName> [<Speed>]"};}
       $hash->{HELPER}{PNUMBER} = $prop;
       $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
       $hash->{HELPER}{PSPEED}  = $prop2 if($prop2);
@@ -1649,7 +1595,7 @@ sub SSCam_Set {
                 
   } elsif ($opt eq "delPreset" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
+      if (!$prop) {return qq{Function "$opt" needs a "Presetname" as argument};}      
       $hash->{HELPER}{DELPRESETNAME} = $prop;
       SSCam_delPreset($hash);
         
@@ -3026,9 +2972,9 @@ sub SSCam_setPreset {
         $error = SSCam_experror($hash,$errorcode);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
+        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate ($hash,"Error",$error);
+        readingsEndUpdate  ($hash, 1);
     
         Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be set - $error");
         
@@ -3036,12 +2982,11 @@ sub SSCam_setPreset {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "setPreset";
+        $hash->{OPMODE}               = "setPreset";
         $hash->{HELPER}{LOGINRETRIES} = 0;
 		
         SSCam_setActiveToken($hash);
-        
-        SSCam_getapisites($hash);
+        SSCam_getapisites   ($hash);
 		
     } else {
         InternalTimer(gettimeofday()+1.2, "SSCam_setPreset", $hash, 0);
@@ -4923,7 +4868,8 @@ sub SSCam_camop {
       # Zoom in / stop / out
       my $dir      = $hash->{HELPER}{ZOOM}{DIR};
       my $moveType = $hash->{HELPER}{ZOOM}{MOVETYPE};
-           
+      Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType"});
+      
 	  $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
       
    } elsif ($OpMode eq "runpatrol") {
@@ -5340,7 +5286,7 @@ sub SSCam_camop_parse {
                 readingsBulkUpdate ($hash, "Error"    , "none");
                 readingsEndUpdate  ($hash, 1);
        
-                Log3($name, 1, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
+                Log3($name, 3, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
             
 			} elsif ($OpMode eq "GetRec") {              
                 my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
@@ -7175,11 +7121,13 @@ sub SSCam_refresh($$$$) {
   foreach(@spgs) {   
       if($defs{$_}{PARENT} eq $name) {
           next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
+          
           readingsBeginUpdate($defs{$_});
-          readingsBulkUpdate($defs{$_},"parentState", $st);
-          readingsBulkUpdate($defs{$_},"state", "updated");
-          readingsEndUpdate($defs{$_}, 1);
-		  Log3($name, 4, "$name - SSCam_refresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
+          readingsBulkUpdate ($defs{$_},"parentState", $st);
+          readingsBulkUpdate ($defs{$_},"state", "updated");
+          readingsEndUpdate  ($defs{$_}, 1);
+		  
+          Log3($name, 4, "$name - SSCam_refresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
 		  delete $hash->{HELPER}{INFORM};
       }
   }
@@ -7188,14 +7136,35 @@ return;
 }
 
 ###############################################################################
-#               Test ob MODEL=SVS (sonst ist es eine Cam)
+#               Eigenschaften des Device liefern
 ###############################################################################
-sub SSCam_IsModelCam { 
+sub SSCam_IsModelCam {                                                           # Modelleigenschaft liefern Cam-> 1 , sonst 0
   my $hash = shift;
   
   my $m = ($hash->{MODEL} ne "SVS") ? 1 : 0;
   
 return $m;
+}
+
+sub SSCam_IsCapHLS {                                                            # HLS Lieferfähigkeit (existiert "SYNO.SurveillanceStation.VideoStream" & Reading)
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $cap    = 0;
+  my $api    = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+  my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
+  
+  $cap = 1 if($api && $csf);
+  
+return $cap;
+}
+
+sub SSCam_IsCapZoom {                                                           # Zoomeigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  return 1;
+  my $cap = ReadingsVal($name,"CapPTZZoom","false") eq "true" ? 1 : 0;
+  
+return $cap;
 }
 
 ###############################################################################
@@ -7289,23 +7258,6 @@ return;
 }
 
 ###############################################################################
-#  Helper für HLS Lieferfähigkeit
-#  HLS kann geliefert werden wenn "SYNO.SurveillanceStation.VideoStream" 
-#  existiert und Reading CamStreamFormat "HLS" ist   
-###############################################################################
-sub SSCam_IsHLSCap { 
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $ret    = 0;
-  my $api    = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-  my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
-  
-  $ret = 1 if($api && $csf);
-  
-return $ret;
-}
-
-###############################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 ###############################################################################
@@ -7363,10 +7315,10 @@ return ($ret);
 sub SSCam_ptzpanel(@) {
   my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
   my $hash        = $defs{$name};
-  my $iconpath    = AttrVal("$name","ptzPanel_iconPath","www/images/sscam");
-  my $iconprefix  = AttrVal("$name","ptzPanel_iconPrefix","black_btn_");
-  my $valPresets  = ReadingsVal("$name","Presets","");
-  my $valPatrols  = ReadingsVal("$name","Patrols","");
+  my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
+  my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
+  my $valPresets  = ReadingsVal("$name", "Presets",             ""                );
+  my $valPatrols  = ReadingsVal("$name", "Patrols",             ""                );
   my $rowisset    = 0;
   my ($pbs,$pbsf) = ("","");
   my ($row,$ptz_ret);
@@ -7378,10 +7330,11 @@ sub SSCam_ptzpanel(@) {
  
   $ptz_ret  = "";
   $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
+  $ptz_ret .= "<style>TD.pcenter {text-align: center;} </style>"; 
   $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
   $ptz_ret .= '<table class="rc_body defsize">';
 
-  foreach my $rownr (0..9) {
+  for my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
       $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
       next if (!$row);
@@ -7389,27 +7342,32 @@ sub SSCam_ptzpanel(@) {
       $ptz_ret .= "<tr>";
       my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
       
-      foreach my $btnnr (0..$#btn) {                 
-          $ptz_ret .= '<td class="ptzcontrol">';
+      for my $btnnr (0..$#btn) {                 
+          $ptz_ret .= "<td class='ptzcontrol'>";
           if ($btn[$btnnr] ne "") {
               my $cmd;
               my $img;
+              
               if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                                            # enthält Komando -> <command>:<image>
                   $cmd = $1;
                   $img = $2;
+              
               } else {                                                                                       # button has format <command> or is empty
                   $cmd = $btn[$btnnr];
                   $img = $btn[$btnnr];
               }
-		      if ($img =~ m/\.svg/) {                                                                        # Verwendung für SVG's
+		      
+              if ($img =~ m/\.svg/) {                                                                        # Verwendung für SVG's
 		          $img = FW_makeImage($img, $cmd, "rc-button");
-		      } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+		      
+              } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
                   if($ftui) {
                       $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
                   } else {
                       $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbs%\" width=\"$pbs%\">";  
                   }
               }
+              
               if ($cmd || $cmd eq "0") {
                   my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                         # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
                   $cmd1     = "ftui.setFhemStatus('set $name $cmd')" if($ftui); 
@@ -7425,14 +7383,16 @@ sub SSCam_ptzpanel(@) {
   }
   $ptz_ret .= "</table>";
   
-  ########################
-  # add Preset & Patrols
+  ###############################
+  # add Preset / Patrols / Zoom
   if(!$ftui) {
-      my ($Presets,$Patrols,$fn);
+      my ($Presets,$Patrols,$zoom,$fn);
       my $cmdPreset = "goPreset";
       my $cmdPatrol = "runPatrol";
+      my $cmdZoom   = "setZoom";
       
-      foreach $fn (sort keys %{$data{webCmdFn}}) {
+      ## Presets
+      for $fn (sort keys %{$data{webCmdFn}}) {
           no strict "refs";
           $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
           use strict "refs";
@@ -7444,7 +7404,8 @@ sub SSCam_ptzpanel(@) {
           $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
       }
 
-      foreach $fn (sort keys %{$data{webCmdFn}}) {
+      ## Patrols
+      for $fn (sort keys %{$data{webCmdFn}}) {
           no strict "refs";
           $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
           use strict "refs";
@@ -7457,17 +7418,39 @@ sub SSCam_ptzpanel(@) {
           $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
       }
       
+      ## Zoom
+      for $fn (sort keys %{$data{webCmdFn}}) {
+          no strict "refs";
+          $zoom = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdZoom,$SSCam_valZoom);
+          use strict "refs";
+          last if(defined($zoom));
+      }
+
+      if($zoom) {
+          $zoom =~ s,^<td[^>]*>(.*)</td>$,$1,;                 
+      } else {
+          $zoom = FW_pH "cmd.$name=set $name $cmdZoom", $cmdZoom, 0, "", 1, 1;
+      }
+           
+      ## Ausgabe
       $ptz_ret .= '<table class="rc_body defsize">';
       
       $ptz_ret .= "<tr>";
       $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
-      $ptz_ret .= "</tr>";
+      $ptz_ret .= "</tr>"; 
       
       $ptz_ret .= "<tr>";
       $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
       $ptz_ret .= "</tr>";
+      
+      if(SSCam_IsCapZoom($hash)) {
+          $ptz_ret .= "<tr>";
+          $ptz_ret .= "<td>Zoom: </td><td class='pcenter'>$zoom</td>";
+          $ptz_ret .= "</tr>";
+      }
 
-      $ptz_ret .= "</table>";
+      $ptz_ret .= "</table>";     
+      
   }
   
   if ($rowisset) {
@@ -7658,6 +7641,7 @@ sub SSCam_StreamDev($$$;$) {
   my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
   my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
+  
   if(AttrVal("global","language","EN") =~ /EN/) {
 	  $ttrefresh  = $SSCam_ttips_en{"ttrefresh"}; $ttrefresh =~ s/§NAME§/$calias/g;
       $ttrecstart = $SSCam_ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
@@ -8044,7 +8028,7 @@ sub SSCam_StreamDev($$$;$) {
           $cause = "Playback cam \"$cam\" switched off";
           $ret .= "<td> <br> <b> $cause </b> <br><br>";
           $ret .= "<a onClick=\"$cmdmjpegrun\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
-          $ret .= "<a onClick=\"$cmdhlsrun\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(SSCam_IsHLSCap($hash));  
+          $ret .= "<a onClick=\"$cmdhlsrun\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(SSCam_IsCapHLS($hash));  
           $ret .= "<a onClick=\"$cmdlrirun\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
           $ret .= "<a onClick=\"$cmdlh264run\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
           $ret .= "<a onClick=\"$cmdlmjpegrun\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
