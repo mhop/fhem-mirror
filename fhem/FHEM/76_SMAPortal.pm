@@ -50,6 +50,7 @@ use HTTP::Cookies;
 use JSON qw(decode_json);
 use MIME::Base64;
 use Encode;
+use utf8;
 
 # Run before module compilation
 BEGIN {
@@ -135,6 +136,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
+                           "executing retrieve master data firstly every time",
+  "3.0.0"  => "18.06.2020  refactored readings and subroutines, detailLevel deleted, new attr providerLevel, integrate logbook data ",
+  "2.10.6" => "12.06.2020  add hash dataprovider ",
   "2.10.5" => "12.06.2020  add check login by /Templates/, deeper/mulitple choice verbose5Data ",
   "2.10.4" => "11.06.2020  additional L1 Readings for Battery and more ",
   "2.10.3" => "11.06.2020  internal code changes, bug fixes show weather_icon ",
@@ -183,7 +188,7 @@ my %vNotesIntern = (
   "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
   "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
   "1.5.0"  => "23.03.2019  add consumer data ",
-  "1.4.0"  => "22.03.2019  add function extractPlantData, DbLog_split, change L2 Readings ",
+  "1.4.0"  => "22.03.2019  add function extractPlantMasterData, DbLog_split, change L2 Readings ",
   "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
   "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
   "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
@@ -215,15 +220,32 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
+my %subs;                                                                                     # Arbeitskopie von %stpl
+my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
+    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},    # mandatory
+    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'   },    # mandatory
+    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
+    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
+    balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
+    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'      },
+    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'  },
+    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
+    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData' },
+    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'  },
+    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'      },
+);
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( balanceDayData
-             liveData 
-             weatherData 
-             forecastData 
-             consumerLiveData 
+             consumerCurrentdata
+             consumerMasterdata 
              consumerDayData 
              consumerMonthData 
-             consumerYearData 
+             consumerYearData           
+             forecastData
+             liveData
+             plantMasterData
+             weatherData
+             plantLogbook
            );
 
 
@@ -234,7 +256,13 @@ my @pd = qw( balanceDayData
 sub Initialize {
   my ($hash) = @_;
   
-  my $v5d                = join ",", @pd;
+  my @pls;
+  for my $p (@pd) {
+      push @pls, $p if(!$stpl{$p}{doit});
+  }
+  my $prov               = join ",", @pls;   
+  my $v5d                = join ",", @pd;  
+  
   $hash->{DefFn}         = \&Define;
   $hash->{UndefFn}       = \&Undefine;
   $hash->{DeleteFn}      = \&Delete; 
@@ -243,10 +271,11 @@ sub Initialize {
   $hash->{GetFn}         = \&Get;
   $hash->{DbLog_splitFn} = \&DbLog_split;
   $hash->{AttrList}      = "cookieLocation ".
-                           "detailLevel:1,2,3,4 ".
                            "disable:0,1 ".
                            "interval ".
-                          # "providerLevel:multiple-strict,".$v5d." ".
+                           "plantLogbookTypes:multiple-strict,Info,Warning,Disturbance,Error ".
+                           "plantLogbookApprovalState:Any,NotApproved ".
+                           "providerLevel:multiple-strict,".$prov." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
@@ -361,7 +390,7 @@ sub Set {                             ## no critic 'complexity'
       if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
       my ($htmldev,$ret,$c,$type,$color2);
       
-      if ($prop eq "Generation") {
+      if ($prop eq "Generation") {                                                      ## no critic "Cascading"
           $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
           $type    = 'pv';        
           $c       = "SMA Sunny Portal Graphics - Forecast Generation";
@@ -390,8 +419,10 @@ sub Set {                             ## no critic 'complexity'
       
       CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
       
-      $c = "This device provides a praphical output of SMA Sunny Portal values.\n". 
-           "The device needs to set attribute \"detailLevel\" in device \"$name\" to level \"4\"";
+      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}. 
+           qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
+           qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
+      
       CommandAttr($hash->{CL},"$htmldev comment $c");     
 
       # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
@@ -422,7 +453,6 @@ sub Set {                             ## no critic 'complexity'
 
       my $room = AttrVal($name,"room","SMAPortal");
       CommandAttr($hash->{CL},"$htmldev room $room");
-      CommandAttr($hash->{CL},"$name detailLevel 4");
       
       return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
   
@@ -457,6 +487,7 @@ sub Get {
  if ($opt eq "data") {
      $hash->{HELPER}{GETTER} = "all";
      $hash->{HELPER}{SETTER} = "none";
+     
      CallInfo($hash);
  
  } elsif ($opt eq "storedCredentials") {
@@ -592,7 +623,7 @@ sub getcredentials {
             
             ($username, $passwd) = split(":",decode_base64($credstr));
             
-            my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
+            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
         
             Log3($name, 4, "$name - Credentials read from RAM: $username $logpw");
         
@@ -626,7 +657,7 @@ sub Attr {
         $val = ($do == 1 ? "disabled" : "initialized");
         
         if($do) {
-            delread($hash);
+            deleteData($hash);
             delete $hash->{MODE};
             RemoveInternalTimer($hash);                      
         } else {
@@ -634,7 +665,8 @@ sub Attr {
         }
         
         readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash, "state", $val);
+        readingsBulkUpdate ($hash, "state",           $val);
+        readingsBulkUpdate ($hash, "loginState", "unknown");
         readingsEndUpdate  ($hash, 1);
         
         InternalTimer(gettimeofday()+2.0, "FHEM::SMAPortal::SPGRefresh", "$name,0,1", 0);
@@ -687,6 +719,17 @@ sub CallInfo {
 
       return if(IsDisabled($name));
       
+      for my $key (keys %stpl) {                                               # festlegen welche Daten geliefert werden sollen
+          next if($stpl{$key}{doit});                                          # die default Provider nicht noch einmal ausführen
+          $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
+          $subs{$name}{$key}{level} = $stpl{$key}{level};
+          $subs{$name}{$key}{func}  = $stpl{$key}{func};
+      }
+      my @pl = split ",", AttrVal($name, "providerLevel", "");
+      for my $p (@pl) {
+          $subs{$name}{$p}{doit} = 1;
+      }
+      
       if ($hash->{HELPER}{RUNNING_PID}) {
           BlockingKill($hash->{HELPER}{RUNNING_PID});
           delete($hash->{HELPER}{RUNNING_PID});
@@ -708,9 +751,9 @@ sub CallInfo {
           $hash->{HELPER}{ACTCYCLE}   = 1;
           $hash->{HELPER}{CYCLEBTIME} = (gettimeofday())[0];
       }
-      $hash->{HELPER}{RETRIES}  = 1 if(!$nr);
+      $hash->{HELPER}{RETRIES} = 1 if(!$nr);
       
-      my $ac     = $hash->{HELPER}{ACTCYCLE};
+      my $ac = $hash->{HELPER}{ACTCYCLE};
       
       Log3 ($name, 3, "$name - Running data cycle: $ac of $maxcycles");
       
@@ -774,12 +817,17 @@ sub GetSetData {                                                       ## no cri
   my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
   my $verbose              = AttrVal($name, "verbose", 3);
-  my $dl                   = AttrVal($name, "detailLevel", 1);                                          # selected Detail Level
+  my $lang                 = AttrVal("global", "language", "EN");
   my $state                = "ok";
   my ($st,$lc)             = ("","");
   my @da                   = ();
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
+  
+  my %hal = (                                                          # Header Accept-Language sprachenabhängig
+      "DE" => "de,en-US;q=0.7,en;q=0.3",
+      "EN" => "en-US;q=0.7,en;q=0.3"
+  );
  
   my ($d,$op);  
   if($setp ne "none") {
@@ -792,13 +840,10 @@ sub GetSetData {                                                       ## no cri
   
   my $ua = LWP::UserAgent->new;
   
-  # $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
-  # $ua->add_handler( response_done => sub { shift->dump; return } );
-  
   # Default Header Daten
   $ua->default_header("Accept"           => "*/*",
                       "Accept-Encoding"  => "gzip, deflate, br",
-                      "Accept-Language"  => "en-US;q=0.7,en;q=0.3",
+                      "Accept-Language"  => $hal{$lang},               # deutsch: de,en-US;q=0.7,en;q=0.3 , englisch: en-US;q=0.7,en;q=0.3 
                       "Connection"       => "keep-alive",
                       "Cookie"           => "collapseNavi_state=shown",
                       "DNT"              => 1,
@@ -825,6 +870,24 @@ sub GetSetData {                                                       ## no cri
   if($errstate) {
       $st = encode_base64 ( $state,"");
       return "$name|0|0|$errstate|$getp|$setp|$st";
+  } 
+
+  ### die Anlagen Asset Daten auslesen (Funktionen in Template %stpl default doit=1)
+  ##################################################################################
+  for my $k (keys %stpl) {
+      next if(!$stpl{$k}{doit});        
+      no strict "refs";                                  ## no critic 'NoStrict'  
+      ($errstate,$state,$reread,$retry) = &{$stpl{$k}{func}} ({ name     => $name,
+                                                                       ua       => $ua,
+                                                                       state    => $state, 
+                                                                       daref    => \@da
+                                                                    });
+      use strict "refs";                                                                
+      
+      if($errstate) {
+          $st = encode_base64 ( $state,"");
+          return "$name|0|0|$errstate|$getp|$setp|$st";
+      }   
   }  
   
   ### Verbraucher schalten
@@ -860,221 +923,50 @@ sub GetSetData {                                                       ## no cri
   
   ### Daten abrufen 
   #############################
-  if($getp ne "none") {  
+  if($getp ne "none") {            
 
-      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-      my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-      my $offset   = fhemTzOffset($cts);
-      my $time     = int(($cts + $offset) * 1000);                                        # add Timestamp in Millisekunden and UTC 
-      
-      
-      ### Live-Daten
-      ################
-      ($errstate,$state,$reread,$retry) = _dispatchGet ({ name     => $name,
-                                                          ua       => $ua,
-                                                          call     => 'https://www.sunnyportal.com/homemanager?t='.$time,
-                                                          tag      => "liveData",
-                                                          state    => $state, 
-                                                          fnaref   => [ qw( extractLiveData ) ],
-                                                          addon    => "",
-                                                          daref    => \@da
-                                                       });
-         
-      if($errstate) {
-          $st = encode_base64 ( $state,"");
-          return "$name|0|0|$errstate|$getp|$setp|$st";
-      }
-      
-      goto &GetSetData if($reread);
-      
-      # Wiederholung Datenabruf innerhalb eines Cycle
-      my $retc  = $hash->{HELPER}{RETRIES};                                                    # aktuelle Retry-Zähler
-      
-      if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
-          $hash->{HELPER}{RETRIES}++;
-          if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
-              Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
-              sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
-              $exceed = 1;
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
-              return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
-          }
+      for my $k (keys %{$subs{$name}}) {
+          next if(!$subs{$name}{$k}{doit});        
+          no strict "refs";                                  ## no critic 'NoStrict'  
+          ($errstate,$state,$reread,$retry) = &{$subs{$name}{$k}{func}} ({ name     => $name,
+                                                                           ua       => $ua,
+                                                                           state    => $state, 
+                                                                           daref    => \@da
+                                                                        });
+          use strict "refs";                                                                
           
-          sleep $sleepretry;                                                     
-          goto &GetSetData;
-      }  
-
-      # Wiederholung Datenabruf in einem neuen Cycle
-      my $ac        = $hash->{HELPER}{ACTCYCLE};
-      my $maxcycles = (controlParams $name)[1];
-      if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
-          Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
-          $newcycle = 1;
-          return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
-      }   
-      
-      
-      
-      ### Wetterdaten
-      #####################    
-      ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                           ua       => $ua,
-                                           call     => 'https://www.sunnyportal.com/Dashboard/Weather',
-                                           tag      => "weatherData",
-                                           state    => $state, 
-                                           fnaref   => [ qw( extractWeatherData ) ],
-                                           addon    => "",
-                                           daref    => \@da
-                                        });
-      if($errstate) {
-          $st = encode_base64 ( $state,"");
-          return "$name|0|0|$errstate|$getp|$setp|$st";
-      } 
-      
-      
-      
-      
-      ### Statistic Data Tag (anchorTime beachten !)
-      ################################################                       
-      my $anchort = int ($time / 1000);                                           # anchorTime -> abzurufendes Datum
-      my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-      my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
-      
-      ($errstate,$state) = _dispatchPost ({ name     => $name,
-                                            ua       => $ua,
-                                            call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                            tag      => "balanceDayData",
-                                            state    => $state, 
-                                            fnaref   => [ qw( extractStatisticData ) ],
-                                            fields   => \%fields,
-                                            content  => $cont,
-                                            addon    => "Day",
-                                            daref    => \@da
-                                         });
-      if($errstate) {
-          $st = encode_base64 ( $state,"");
-          return "$name|0|0|$errstate|$getp|$setp|$st";
-      }
-  
-      
-      
-      ### Forecast Daten abrufen
-      ###########################
-      if($dl > 1) {
-          ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                               ua       => $ua,
-                                               call     => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
-                                               tag      => "forecastData",
-                                               state    => $state, 
-                                               fnaref   => [ qw( extractPlantData extractForecastData extractConsumerData ) ],
-                                               addon    => "",
-                                               daref    => \@da
-                                            });
-          if($errstate) {
-              $st = encode_base64 ( $state,"");
-              return "$name|0|0|$errstate|$getp|$setp|$st";
-          }
-      }
-      
-      
-      
-      
-      ### Consumer Livedaten und historische Energiedaten
-      #####################################################
-      if($dl > 2) {          
-          ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                               ua       => $ua,
-                                               call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
-                                               tag      => "consumerLiveData",
-                                               state    => $state, 
-                                               fnaref   => [ qw( extractConsumerLiveData ) ],
-                                               addon    => "",
-                                               daref    => \@da
-                                            });
           if($errstate) {
               $st = encode_base64 ( $state,"");
               return "$name|0|0|$errstate|$getp|$setp|$st";
           } 
           
+          goto &GetSetData if($reread);
           
-          if($hash->{HELPER}{PLANTOID}) {              
-              my $PlantOid = $hash->{HELPER}{PLANTOID};
-              my $dds      = (split(/\s+/x, TimeNow()))[0];
-              my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];
-              
-              my ($mds,$me,$ye,$mde,$yds,$yde);
-              if($dds =~ /(.*)-(.*)-(.*)/x) {
-                  $mds = "$1-$2-01";
-                  $me  = (($2+1)<=12) ? $2+1 : 1;
-                  $me  = sprintf("%02d", $me);
-                  $ye  = ($2>$me) ? $1+1 : $1;
-                  $mde = "$ye-$me-01";
-                  $yds = "$1-01-01";
-                  $yde = ($1+1)."-01-01";
+          # Wiederholung Datenabruf innerhalb eines Cycle
+          my $retc  = $hash->{HELPER}{RETRIES};                                                    # aktuelle Retry-Zähler
+          
+          if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
+              $hash->{HELPER}{RETRIES}++;
+              if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
+                  sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
+                  $exceed = 1;
+                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
+                  return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
               }
               
-              my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
-              my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
-              my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
-              
-              # Energiedaten aktueller Tag
-              Log3 ($name, 4, "$name - Getting consumer energy data of current day");
-              Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
-              Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
-              
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                                   ua       => $ua,
-                                                   call     => $ccdd,
-                                                   tag      => "consumerDayData",
-                                                   state    => $state, 
-                                                   fnaref   => [ qw( extractConsumerHistData ) ],
-                                                   addon    => "day",
-                                                   daref    => \@da
-                                                });
-              if($errstate) {
-                  $st = encode_base64 ( $state,"");
-                  return "$name|0|0|$errstate|$getp|$setp|$st";
-              }
+              sleep $sleepretry;                                                     
+              goto &GetSetData;
+          }  
 
-              # Energiedaten aktueller Monat
-              Log3 ($name, 4, "$name - Getting consumer energy data of current month");
-              Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
-              Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
-             
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                                   ua       => $ua,
-                                                   call     => $ccmd,
-                                                   tag      => "consumerMonthData",
-                                                   state    => $state, 
-                                                   fnaref   => [ qw( extractConsumerHistData ) ],
-                                                   addon    => "month",
-                                                   daref    => \@da
-                                                });
-              if($errstate) {
-                  $st = encode_base64 ( $state,"");
-                  return "$name|0|0|$errstate|$getp|$setp|$st";
-              }            
-
-              # Energiedaten aktuelles Jahr
-              Log3 ($name, 4, "$name - Getting consumer energy data of current year");
-              Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
-              Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
-              
-              ($errstate,$state) = _dispatchGet ({ name     => $name,
-                                                   ua       => $ua,
-                                                   call     => $ccyd,
-                                                   tag      => "consumerYearData",
-                                                   state    => $state, 
-                                                   fnaref   => [ qw( extractConsumerHistData ) ],
-                                                   addon    => "year",
-                                                   daref    => \@da
-                                                });
-              if($errstate) {
-                  $st = encode_base64 ( $state,"");
-                  return "$name|0|0|$errstate|$getp|$setp|$st";
-              }  
-          }
+          # Wiederholung Datenabruf in einem neuen Cycle
+          my $ac        = $hash->{HELPER}{ACTCYCLE};
+          my $maxcycles = (controlParams $name)[1];
+          if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
+              Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
+              $newcycle = 1;
+              return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
+          }    
       }
   }
 
@@ -1115,7 +1007,6 @@ sub _checkLogin {
       if($v5d =~ /loginData/) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
           Log3 ($name, 5, "$name - Header Location: ".$location);
-          # Log3 ($name, 5, "$name - Login Page content: ".encode("utf8", $loginp->decoded_content));
       }
   
       $retcode  = $loginp->code;
@@ -1146,21 +1037,25 @@ sub _checkLogin {
               if($v5d =~ /loginData/) {
                   Log3 ($name, 5, "$name - Status Redirect Page : ".$retcode);
                   Log3 ($name, 5, "$name - Header Redirect Location: ".$location); 
-                  # Log3 ($name, 5, "$name - Redirect Page content: ".encode("utf8", $loginp->decoded_content));
               }
+              
+              my $sc        = $loginp->header('Set-Cookie') // "";   
+              my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
+              Log3 ($name, 5, "$name - Header Set-Cookie: ".$sc) if($v5d =~ /loginData/); 
 
-              if($location =~ /\/FixedPages\/|\/Templates\//x && $retcode eq "302") {       # Weiterleitung -> Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
-                  Log3 ($name, 3, "$name - Login into SMA-Portal successfully done");
+              if($logname && $logname eq $username) {                                       # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
+                  Log3 ($name, 3, "$name - Login into SMA-Portal successfully done with user: $logname");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
-                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "L1_Login-Status:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
+                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
                   $errstate = 0;                             
               
               } else {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
                   $state       = "login failed - check user and password";
+                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
                   $errstate = 1; 
-              }                         
+              }              
           }         
       }
   
@@ -1176,6 +1071,7 @@ sub _checkLogin {
   } else {
       $errstate = 1;
       $state       = $loginp->status_line;
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
       Log3 ($name, 1, "$name - ERROR Login Page: ".$state);
   }
   
@@ -1186,9 +1082,394 @@ return ($state, $errstate);
 }
 
 ################################################################
+#                    Abruf Live Daten
+################################################################
+sub _getLiveData {                       ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $time     = int(($cts + $offset) * 1000);     # add Timestamp in Millisekunden and UTC 
+  
+  ($errstate,$state,$reread,$retry) = __dispatchGet ({ name     => $name,
+                                                       ua       => $ua,
+                                                       call     => 'https://www.sunnyportal.com/homemanager?t='.$time,
+                                                       tag      => "liveData",
+                                                       state    => $state, 
+                                                       fnaref   => [ qw( extractLiveData ) ],
+                                                       addon    => "",
+                                                       daref    => $daref
+                                                    });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Wetterdaten
+################################################################
+sub _getWeatherData {                    ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/Dashboard/Weather',
+                                        tag      => "weatherData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractWeatherData ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Anlagen Stammdaten
+################################################################
+sub _getPlantMasterData {                      ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
+                                        tag      => "plantMasterData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractPlantMasterData ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                    });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Consumer Stammdaten
+################################################################
+sub _getConsumerMasterdata {             ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                        tag      => "consumerMasterdata",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerMasterdata ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Consumer current Data
+################################################################
+sub _getConsumerCurrData {               ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                        tag      => "consumerCurrentdata",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerCurrentdata ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Consumer Tagesdaten
+################################################################
+sub _getConsumerDayData {                ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+                                     
+  if(!$hash->{HELPER}{PLANTOID}) {
+      $errstate = 1;
+      $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
+      Log3 $name, 2, "$name - $state";
+      return ($errstate,$state,$reread,$retry);
+  }  
+  
+  my $PlantOid = $hash->{HELPER}{PLANTOID};
+  my $dds      = (split(/\s+/x, TimeNow()))[0];
+  my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];
+  
+  my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
+  
+  # Energiedaten aktueller Tag
+  Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+  Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
+  Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => $ccdd,
+                                        tag      => "consumerDayData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerHistData ) ],
+                                        addon    => "day",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Consumer Monatsdaten
+################################################################
+sub _getConsumerMonthData {             ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+                                     
+  if(!$hash->{HELPER}{PLANTOID}) {
+      $errstate = 1;
+      $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
+      Log3 $name, 2, "$name - $state";
+      return ($errstate,$state,$reread,$retry);
+  }  
+  
+  my $PlantOid = $hash->{HELPER}{PLANTOID};
+  my $dds      = (split(/\s+/x, TimeNow()))[0];
+  my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];                                   
+                                     
+  my ($mds,$me,$ye,$mde);
+  if($dds =~ /(.*)-(.*)-(.*)/x) {
+      $mds = "$1-$2-01";
+      $me  = (($2+1)<=12) ? $2+1 : 1;
+      $me  = sprintf("%02d", $me);
+      $ye  = ($2>$me) ? $1+1 : $1;
+      $mde = "$ye-$me-01";
+  }
+  
+  my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
+
+  # Energiedaten aktueller Monat
+  Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+  Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
+  Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
+ 
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => $ccmd,
+                                        tag      => "consumerMonthData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerHistData ) ],
+                                        addon    => "month",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Consumer Jahresdaten
+################################################################
+sub _getConsumerYearData {              ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+                                     
+  if(!$hash->{HELPER}{PLANTOID}) {
+      $errstate = 1;
+      $state    = qq{The consumer data cannot be retrieved because of the plant ID isn't set.};      
+      Log3 $name, 2, "$name - $state";
+      return ($errstate,$state,$reread,$retry);
+  }  
+  
+  my $PlantOid = $hash->{HELPER}{PLANTOID};
+  my $dds      = (split(/\s+/x, TimeNow()))[0];
+  my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];                                   
+                                                                         
+  my ($mds,$me,$ye,$mde,$yds,$yde);
+  if($dds =~ /(.*)-(.*)-(.*)/x) {
+      $mds = "$1-$2-01";
+      $me  = (($2+1)<=12) ? $2+1 : 1;
+      $me  = sprintf("%02d", $me);
+      $ye  = ($2>$me) ? $1+1 : $1;
+      $mde = "$ye-$me-01";
+      $yds = "$1-01-01";
+      $yde = ($1+1)."-01-01";
+  }
+  
+  my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
+
+  # Energiedaten aktuelles Jahr
+  Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+  Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
+  Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => $ccyd,
+                                        tag      => "consumerYearData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerHistData ) ],
+                                        addon    => "year",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Vorhersage Daten
+################################################################
+sub _getForecastData {                   ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/HoMan/Forecast/LoadRecommendationData',
+                                        tag      => "forecastData",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractForecastData extractConsumerPlanData ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Day
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceDayData {                 ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceDayData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Day",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                    Abruf Anlagen Logbuch
+################################################################
+sub _getPlantLogbook {                   ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $hash     = $defs{$name};  
+
+  my ($reread,$retry,$errstate) = (0,0,0); 
+  
+  if(!$hash->{HELPER}{PLANTOID}) {
+      $errstate = 1;
+      $state    = qq{The logbook cannot be retrieved because of the plant ID isn't set.};      
+      Log3 $name, 2, "$name - $state";
+      return ($errstate,$state,$reread,$retry);
+  }  
+  
+  my $PlantOid = $hash->{HELPER}{PLANTOID};
+  my $msgtypes = AttrVal($name, "plantLogbookTypes", "Warning,Disturbance,Error");      # möglich:  Warning,Info,Disturbance,Error  
+  my $appstate = AttrVal($name, "plantLogbookApprovalState", "Any");     
+  my $date     = (split(/\s+/x, TimeNow()))[0];
+  my $call     = 'https://www.sunnyportal.com/Plants/'.$PlantOid.'/Log/Get?MessageTypes='.$msgtypes.'&ApprovalState='.$appstate.'&Device=None&MaxDateTime='.$date.'&Ticks=0';
+  
+  Log3 ($name, 4, "$name - Retrieving the logbook data up to the date: $date");
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => $call,
+                                        tag      => "plantLogbook",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractPlantLogbook ) ],
+                                        addon    => "",
+                                        daref    => $daref
+                                    });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
 #                    Dispatcher GET
 ################################################################
-sub _dispatchGet {
+sub __dispatchGet {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
@@ -1202,17 +1483,17 @@ sub _dispatchGet {
   
   my ($reread,$retry,$errstate)     = (0,0,0);
   
-  my ($data,$data_cont)             = _getData ({ name => $name,
-                                                  ua   => $ua,
-                                                  call => $call,
-                                                  tag  => $tag
-                                               });
+  my ($data,$data_cont)             = ___getData ({ name => $name,
+                                                    ua   => $ua,
+                                                    call => $call,
+                                                    tag  => $tag
+                                                 });
                           
-  ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
-                                                      errstate => $errstate,
-                                                      state    => $state,
-                                                      data     => $data
-                                                   });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state,$reread,$retry) if($errstate || $reread || $retry);
   
@@ -1231,7 +1512,7 @@ return ($errstate,$state,$reread,$retry);
 ################################################################
 #                    Dispatcher POST
 ################################################################
-sub _dispatchPost {
+sub __dispatchPost {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
@@ -1247,19 +1528,19 @@ sub _dispatchPost {
   
   my ($reread,$retry,$errstate)     = (0,0,0);
                                                    
-  my ($data,$data_cont)             = _postData ({ name    => $name,
-                                                   ua      => $ua,
-                                                   call    => $call,
-                                                   tag     => $tag,
-                                                   fields  => $fields,
-                                                   content => $cont,
-                                                });
+  my ($data,$data_cont)             = ___postData ({ name    => $name,
+                                                     ua      => $ua,
+                                                     call    => $call,
+                                                     tag     => $tag,
+                                                     fields  => $fields,
+                                                     content => $cont,
+                                                  });
                                                               
-  ($reread,$retry,$errstate,$state) = _analyzeData ({ name     => $name,
-                                                      errstate => $errstate,
-                                                      state    => $state,
-                                                      data     => $data
-                                                   });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                       errstate => $errstate,
+                                                       state    => $state,
+                                                       data     => $data
+                                                    });
   
   return ($errstate,$state) if($errstate);
   
@@ -1278,7 +1559,7 @@ return ($errstate,$state,$reread,$retry);
 ################################################################
 #                      Standard Abruf Daten GET
 ################################################################
-sub _getData {
+sub ___getData {
   my $paref = shift;
   my $name  = $paref->{name};
   my $ua    = $paref->{ua};
@@ -1292,7 +1573,7 @@ sub _getData {
 
   Log3 ($name, 4, "$name - Getting $tag"); 
   
-  if($verbose == 5 && $v5d =~ /$tag/) {
+  if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
@@ -1302,7 +1583,7 @@ sub _getData {
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
-  if($v5d =~ /$tag/) {
+  if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
@@ -1316,7 +1597,7 @@ return ($data,$dcont);
 ################################################################
 #                      Standard Abruf Daten POST
 ################################################################
-sub _postData {
+sub ___postData {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $ua      = $paref->{ua};
@@ -1332,7 +1613,7 @@ sub _postData {
 
   Log3 ($name, 4, "$name - Getting $tag");
   
-  if($verbose == 5 && $v5d =~ /$tag/) {
+  if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
@@ -1343,7 +1624,7 @@ sub _postData {
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
-  if($v5d =~ /$tag/) {
+  if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
       Log3 ($name, 5, "$name - $tag received:\n".Dumper $cont);
   }
@@ -1357,7 +1638,7 @@ return ($data,$dcont);
 ################################################################
 #                 analysiere abgerufene Daten
 ################################################################
-sub _analyzeData {                                                          ## no critic 'complexity'
+sub ___analyzeData {                   ## no critic 'complexity'
   my $paref           = shift;
   my $name            = $paref->{name};
   my $errstate        = $paref->{errstate};
@@ -1366,12 +1647,20 @@ sub _analyzeData {                                                          ## n
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
-  my @da              = ();
     
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
   my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
   my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
+  
+  my $wm1e = qq{Updating of the live data was interrupted};
+  my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
+  my $wm2e = qq{The current consumption could not be determined. The current purchased electricity is unknown};
+  my $wm2d = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
+  my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
+  my $em1d = qq{Kommunikation mit dem Sunny Home Manager derzeit nicht m};
+  my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
+  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration};
 
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
@@ -1379,10 +1668,12 @@ sub _analyzeData {                                                          ## n
       for my $k (keys %{$data}) {
           my $val = $data->{$k};
           next if(!defined $val);
-
+          
+          my @da;
+          
           if(ref $val eq "ARRAY") {
-              for my $a (@{$val}) {                    
-                  push @da, $a;
+              for my $a (@{$val}) {              
+                  push @da, $a if(!ref $a);
               }
           }
           
@@ -1393,27 +1684,27 @@ sub _analyzeData {                                                          ## n
           }
           
           $val = join " ", @da if(@da);
-
+          
           if ($val && $k !~ /__type/ix) {
-              if($k =~ m/WarningMessages/x && $val =~ /Updating of the live data was interrupted/) {                                                                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - Updating of the live data was interrupted. $attstr";
+              if($k =~ m/WarningMessages/x && $val =~ /$wm1e|$wm1d/) {                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 ($name, 3, "$name - Updating of the live data was interrupted. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }
-              if($k =~ m/WarningMessages/x && $val =~ /The current consumption could not be determined. The current purchased electricity is unknown/) {                                    ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
-                  Log3 $name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr";
+              if($k =~ m/WarningMessages/x && $val =~ /$wm2e|$wm2d/) {                                        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+                  Log3 ($name, 3, "$name - The current consumption could not be determined. The current purchased electricity is unknown. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }  
-              if($k =~ m/ErrorMessages/x && $val =~ /Communication with the Sunny Home Manager is currently not possible/) {                                                                ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $val =~ /$em1e|$em1d/) {                                          ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr";
+                  Log3 ($name, 3, "$name - Communication with the Sunny Home Manager currently impossible. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }              
-              if($k =~ m/ErrorMessages/x && $val =~ /The current data cannot be retrieved from the PV system. Check the cabling and configuration of the following energy meters/) {        ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+              if($k =~ m/ErrorMessages/x && $val =~ /$em2e|$em2d/) {                                          ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
                   # Energiedaten konnten nicht ermittelt werden, Daten neu lesen mit Zeitverzögerung
-                  Log3 $name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr";
+                  Log3 ($name, 3, "$name - The current data cannot be retrieved from the PV system. $attstr");
                   $retry = 1;
                   return ($reread,$retry,$errstate,$state);
               }
@@ -1421,7 +1712,7 @@ sub _analyzeData {                                                          ## n
       }
   
   } else {
-      my $njdat = $ad->as_string; 
+      my $njdat = encode("utf8", $ad->as_string); 
       
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
@@ -1489,9 +1780,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  
-  my $dl = AttrVal($name, "detailLevel", 1);
-  delread($hash, $dl+1);
+  deleteData($hash, 1) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
   
   readingsBeginUpdate($hash);
   
@@ -1502,12 +1791,16 @@ sub ParseData {                                                    ## no critic 
 
   readingsEndUpdate($hash, 1);
   
-  my $pv  = ReadingsNum($name, "L1_PV"             , 0);
-  my $fi  = ReadingsNum($name, "L1_FeedIn"         , 0);
-  my $gc  = ReadingsNum($name, "L1_GridConsumption", 0);
-  my $sum = $fi-$gc;
+  my $ldlv = $stpl{liveData}{level};
+  my $cclv = $stpl{consumerCurrentdata}{level};
+  my $lddo = $subs{$name}{liveData}{doit};
   
-  if(!$errstate && !$pv && !$fi && !$gc) {
+  my $pv   = ReadingsNum($name, "${ldlv}_PV"             , 0);
+  my $fi   = ReadingsNum($name, "${ldlv}_FeedIn"         , 0);
+  my $gc   = ReadingsNum($name, "${ldlv}_GridConsumption", 0);
+  my $sum  = $fi-$gc;
+  
+  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
       $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
       Log3 ($name, 2, "$name - $state");
@@ -1519,24 +1812,18 @@ sub ParseData {                                                    ## no critic 
       if($setp ne "none") {
           my ($d,$op) = split(":",$setp);
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
-          readingsBulkUpdate($hash, "L3_${d}_Switch", $op);
+          readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "lastCycleTime", $ctime) if($ctime > 0);
-      readingsBulkUpdate($hash, "summary"      , "$sum W");
+      readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
+      readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
   
-  } else {
-      readingsBulkUpdate($hash, "L1_Login-Status", "failed");
   }
   
   readingsBulkUpdate($hash, "state", $state);
   
   readingsEndUpdate($hash, 1);  
   
-  delcookiefile ($hash); 
-  delete($hash->{HELPER}{RUNNING_PID});
-  
-  $hash->{HELPER}{GETTER} = "all";
-  $hash->{HELPER}{SETTER} = "none";
+  finalCleanup($hash);
   
   SPGRefresh($hash,0,1);
   
@@ -1550,10 +1837,24 @@ sub ParseAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
    
-  $cause = $cause?$cause:"Timeout: process terminated";
+  $cause = $cause // "Timeout >process terminated<";
   Log3 ($name, 1, "$name - BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
+  
+  readingsSingleUpdate($hash, "state", "broken: ".$cause, 1);
+  
+  finalCleanup($hash);
+  
+return;
+}
+
+################################################################
+##             Final cleanup of an execution
+################################################################
+sub finalCleanup {
+  my $hash = shift;
 
   delete($hash->{HELPER}{RUNNING_PID});
+  
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
   
@@ -1566,9 +1867,10 @@ return;
 #             Cookie-Datei löschen 
 ################################################################
 sub delcookiefile {
-   my ($hash,$source) = @_;
-   my $name = $hash->{NAME};
-   my $err  = "";
+   my $hash   = shift;
+   my $source = shift;;
+   my $name   = $hash->{NAME};
+   my $err    = "";
 
    my $cookieLocation = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt"); 
    my $delfile        = unlink ($cookieLocation) or $err = $!;
@@ -1595,65 +1897,74 @@ sub extractLiveData {                  ## no critic 'complexity'
   $live = eval{decode_json($live)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                            return;
                                          };
-                                                 
+                                                                                             
   my ($errMsg,$warnMsg,$infoMsg) = (0,0,0);
+  my $lv                         = $stpl{liveData}{level};
+  my $lang                       = AttrVal ("global", "language", "EN");
+  
+  my %hm = (                                          # Header Messages sprachenabhängig
+      "DE" => "Nachricht von SMA Sunny Portal erhalten:",
+      "EN" => "Message got from SMA Sunny Portal:"
+  );
   
   if (ref $live eq "HASH") {
-      push @$daref, "L1_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
-      push @$daref, "L1_GridConsumption:"         .($live->{GridConsumption}      // 0)." W";
-      push @$daref, "L1_PV:"                      .($live->{PV}                   // 0)." W";
-      push @$daref, "L1_AutarkyQuote:"            .($live->{AutarkyQuote}         // 0)." %";
-      push @$daref, "L1_SelfConsumption:"         .($live->{SelfConsumption}      // 0)." W";
-      push @$daref, "L1_SelfConsumptionQuote:"    .($live->{SelfConsumptionQuote} // 0)." %";
-      push @$daref, "L1_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
-      push @$daref, "L1_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
+      push @$daref, "${lv}_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
+      push @$daref, "${lv}_GridConsumption:"         .($live->{GridConsumption}      // 0)." W";
+      push @$daref, "${lv}_PV:"                      .($live->{PV}                   // 0)." W";
+      push @$daref, "${lv}_AutarkyQuote:"            .($live->{AutarkyQuote}         // 0)." %";
+      push @$daref, "${lv}_SelfConsumption:"         .($live->{SelfConsumption}      // 0)." W";
+      push @$daref, "${lv}_SelfConsumptionQuote:"    .($live->{SelfConsumptionQuote} // 0)." %";
+      push @$daref, "${lv}_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
+      push @$daref, "${lv}_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
       
-      push @$daref, "L1_BatteryIn:"               .$live->{BatteryIn}. " W"            if(defined $live->{BatteryIn});
-      push @$daref, "L1_BatteryOut:"              .$live->{BatteryOut}." W"            if(defined $live->{BatteryOut});
-      push @$daref, "L1_BatteryMode:"             .$live->{BatteryMode}.""             if(defined $live->{BatteryMode});
-      push @$daref, "L1_BatteryStateOfHealth:"    .$live->{BatteryStateOfHealth}.""    if(defined $live->{BatteryStateOfHealth});
-      push @$daref, "L1_BatteryChargeStatus:"     .$live->{BatteryChargeStatus}." %"   if(defined $live->{BatteryChargeStatus});
+      push @$daref, "${lv}_BatteryIn:"               .$live->{BatteryIn}. " W"             if(defined $live->{BatteryIn});
+      push @$daref, "${lv}_BatteryOut:"              .$live->{BatteryOut}." W"             if(defined $live->{BatteryOut});
+      push @$daref, "${lv}_BatteryMode:"             .$live->{BatteryMode}.""              if(defined $live->{BatteryMode});
+      push @$daref, "${lv}_BatteryStateOfHealth:"    .$live->{BatteryStateOfHealth}.""     if(defined $live->{BatteryStateOfHealth});
+      push @$daref, "${lv}_BatteryChargeStatus:"     .$live->{BatteryChargeStatus}." %"    if(defined $live->{BatteryChargeStatus});
+      push @$daref, "${lv}_DirectConsumption:"       .$live->{DirectConsumption}." W"      if(defined $live->{DirectConsumption});
+      push @$daref, "${lv}_DirectConsumptionQuote:"  .$live->{DirectConsumptionQuote}." %" if(defined $live->{DirectConsumptionQuote});
       
-      push @$daref, "L1_ModuleTemperature:"       .$live->{ModuleTemperature}.""       if(defined $live->{ModuleTemperature});
-      push @$daref, "L1_OperationHealth:"         .$live->{OperationHealth}.""         if(defined $live->{OperationHealth});
-      push @$daref, "L1_Insolation:"              .$live->{Insolation}.""              if(defined $live->{Insolation});
-      push @$daref, "L1_WindSpeed:"               .$live->{WindSpeed}.""               if(defined $live->{WindSpeed});
-      push @$daref, "L1_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""  if(defined $live->{EnvironmentTemperature});
+      push @$daref, "${lv}_ModuleTemperature:"       .$live->{ModuleTemperature}.""        if(defined $live->{ModuleTemperature});
+      push @$daref, "${lv}_OperationHealth:"         .$live->{OperationHealth}.""          if(defined $live->{OperationHealth});
+      push @$daref, "${lv}_Insolation:"              .$live->{Insolation}.""               if(defined $live->{Insolation});
+      push @$daref, "${lv}_WindSpeed:"               .$live->{WindSpeed}.""                if(defined $live->{WindSpeed});
+      push @$daref, "${lv}_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""   if(defined $live->{EnvironmentTemperature});
       
       if($live->{ErrorMessages}[0]) {
           my @em;
           $errMsg = 1; 
           for my $a (@{$live->{ErrorMessages}}) {                    
-              push @em, $a;
+              push @em, encode ("utf8", $a);
           }
           $val = join " ", @em if(@em);
-          push @$daref, "L1_ErrorMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_ErrorMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }
       
       if($live->{WarningMessages}[0]) {
           my @wm;
           $warnMsg = 1; 
           for my $a (@{$live->{WarningMessages}}) {                    
-              push @wm, $a;
+              push @wm, encode ("utf8", $a);
           }
           $val = join " ", @wm if(@wm);
-          push @$daref, "L1_WarningMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_WarningMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }
       
       if($live->{InfoMessages}[0]) {
           my @im;
           $infoMsg = 1; 
           for my $a (@{$live->{InfoMessages}}) {                    
-              push @im, $a;
+              push @im, encode ("utf8", $a);
           }
           $val = join " ", @im if(@im);
-          push @$daref, "L1_InfoMessages:".qq{<html><b>Message got from SMA Sunny Portal:</b><br>$val</html>};
+          push @$daref, "${lv}_InfoMessages:".qq{<html><b>$hm{$lang}</b><br>$val</html>};
       }      
   }
   
-  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_ErrorMessages"]  , 1) if(!$errMsg);
-  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_WarningMessages"], 1) if(!$warnMsg);
-  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "L1_InfoMessages"]   , 1) if(!$infoMsg);
+  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "${lv}_ErrorMessages"]  , 1) if(!$errMsg);
+  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "${lv}_WarningMessages"], 1) if(!$warnMsg);
+  BlockingInformParent("FHEM::SMAPortal::delReadingFromBlocking", [$name, "${lv}_InfoMessages"]   , 1) if(!$infoMsg);
 
 return;
 }
@@ -1667,19 +1978,18 @@ sub extractForecastData {              ## no critic 'complexity'
   my $forecast = shift;
   my $name     = $hash->{NAME};
   
-  my $dl = AttrVal($name, "detailLevel", 1);
-  
   Log3 ($name, 4, "$name - ##### extracting forecast data #### ");
   
   $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                    return;
                                                  };
-   
+  
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   $year    += 1900;
   $mon     += 1;
   my $today = "$year-".sprintf("%02d", $mon)."-".sprintf("%02d", $mday)."T";
 
+  my $lv         = $stpl{forecastData}{level};
   my $PV_sum     = 0;
   my $consum_sum = 0;
   my $sum        = 0; 
@@ -1747,30 +2057,28 @@ sub extractForecastData {              ## no critic 'complexity'
       
       # Update values in Fhem if less than 24 hours in the future
       # TimeStamp Kind: "Unspecified"
-      if($dl >= 2) {
-          if ($obj_nr < 24) {
-              my $time_str = "ThisHour";
-              $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
-              if($time_str =~ /NextHour/x && $dl >= 4) {
-                  push @$daref, "L4_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                     
-                  push @$daref, "L4_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                        # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                    
-                  push @$daref, "L4_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                         # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
-                  push @$daref, "L4_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
-                  push @$daref, "L4_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
-                  
-                  # add WeatherId Helper to show weather icon
-                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "L4_".${time_str}."_WeatherId:".int($fc_obj->{'WeatherId'}) ], 1) if(defined $fc_obj->{'WeatherId'});
-              }
-              if($time_str =~ /ThisHour/x && $dl >= 2) {
-                  push @$daref, "L2_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                    
-                  push @$daref, "L2_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                       # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                 
-                  push @$daref, "L2_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                        # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
-                  push @$daref, "L2_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
-                  push @$daref, "L2_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
-                  
-                  # add WeatherId Helper to show weather icon
-                  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "L2_".${time_str}."_WeatherId:".int($fc_obj->{'WeatherId'}) ], 1) if(defined $fc_obj->{'WeatherId'});  
-              }
+      if ($obj_nr < 24) {
+          my $time_str = "ThisHour";
+          $time_str = "NextHour".sprintf("%02d", $obj_nr) if($fc_diff_hours>0);
+          if($time_str =~ /NextHour/x) {
+              push @$daref, "${lv}_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                     
+              push @$daref, "${lv}_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                        # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                    
+              push @$daref, "${lv}_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                         # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
+              push @$daref, "${lv}_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
+              push @$daref, "${lv}_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
+              
+              # add WeatherId Helper to show weather icon
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "${lv}_".${time_str}."_WeatherId:".int($fc_obj->{'WeatherId'}) ], 1) if(defined $fc_obj->{'WeatherId'});
+          }
+          if($time_str =~ /ThisHour/x) {
+              push @$daref, "${lv}_${time_str}_Time:".                     TimeAdjust($hash,$fc_obj->{'TimeStamp'}->{'DateTime'},$tkind);                                    
+              push @$daref, "${lv}_${time_str}_PvMeanPower:".              int( $fc_obj->{'PvMeanPower'}->{'Amount'} )." Wh";                                                       # in W als Durchschnitt geliefet, d.h. eine Stunde -> Wh                 
+              push @$daref, "${lv}_${time_str}_Consumption:".              int( $fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600 )." Wh";                                        # {'ConsumptionForecast'}->{'Amount'} wird als J = Ws geliefert
+              push @$daref, "${lv}_${time_str}_IsConsumptionRecommended:". ($fc_obj->{'IsConsumptionRecommended'} ? "yes" : "no");
+              push @$daref, "${lv}_${time_str}_Total:".                    (int($fc_obj->{'PvMeanPower'}->{'Amount'}) - int($fc_obj->{'ConsumptionForecast'}->{'Amount'} / 3600))." Wh";
+              
+              # add WeatherId Helper to show weather icon
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "${lv}_".${time_str}."_WeatherId:".int($fc_obj->{'WeatherId'}) ], 1) if(defined $fc_obj->{'WeatherId'});  
           }
       }
 
@@ -1778,22 +2086,20 @@ sub extractForecastData {              ## no critic 'complexity'
       $obj_nr++;
   }
   
-  if($dl >= 2) {
-      push @$daref, "L2_Next04Hours_Consumption:".                  int( $nextFewHoursSum{'Consumption'} )." Wh";
-      push @$daref, "L2_Next04Hours_PV:".                           int( $nextFewHoursSum{'PV'}          )." Wh";
-      push @$daref, "L2_Next04Hours_Total:".                        int( $nextFewHoursSum{'Total'}       )." Wh";
-      push @$daref, "L2_Next04Hours_IsConsumptionRecommended:".     int( $nextFewHoursSum{'ConsumpRcmd'} )." h";
-      push @$daref, "L2_ForecastToday_Consumption:".                $consum_sum." Wh";    
-      push @$daref, "L2_ForecastToday_PV:".                         $PV_sum." Wh";
-      push @$daref, "L2_RestOfDay_Consumption:".                    int( $restOfDaySum{'Consumption'}    )." Wh";
-      push @$daref, "L2_RestOfDay_PV:".                             int( $restOfDaySum{'PV'}             )." Wh";
-      push @$daref, "L2_RestOfDay_Total:".                          int( $restOfDaySum{'Total'}          )." Wh";
-      push @$daref, "L2_RestOfDay_IsConsumptionRecommended:".       int( $restOfDaySum{'ConsumpRcmd'}    )." h";
-      push @$daref, "L2_Tomorrow_Consumption:".                     int( $tomorrowSum{'Consumption'}     )." Wh";
-      push @$daref, "L2_Tomorrow_PV:".                              int( $tomorrowSum{'PV'}              )." Wh";
-      push @$daref, "L2_Tomorrow_Total:".                           int( $tomorrowSum{'Total'}           )." Wh";
-      push @$daref, "L2_Tomorrow_IsConsumptionRecommended:".        int( $tomorrowSum{'ConsumpRcmd'}     )." h";
-  }
+  push @$daref, "${lv}_Next04Hours_Consumption:".                  int( $nextFewHoursSum{'Consumption'} )." Wh";
+  push @$daref, "${lv}_Next04Hours_PV:".                           int( $nextFewHoursSum{'PV'}          )." Wh";
+  push @$daref, "${lv}_Next04Hours_Total:".                        int( $nextFewHoursSum{'Total'}       )." Wh";
+  push @$daref, "${lv}_Next04Hours_IsConsumptionRecommended:".     int( $nextFewHoursSum{'ConsumpRcmd'} )." h";
+  push @$daref, "${lv}_ForecastToday_Consumption:".                $consum_sum." Wh";    
+  push @$daref, "${lv}_ForecastToday_PV:".                         $PV_sum." Wh";
+  push @$daref, "${lv}_RestOfDay_Consumption:".                    int( $restOfDaySum{'Consumption'}    )." Wh";
+  push @$daref, "${lv}_RestOfDay_PV:".                             int( $restOfDaySum{'PV'}             )." Wh";
+  push @$daref, "${lv}_RestOfDay_Total:".                          int( $restOfDaySum{'Total'}          )." Wh";
+  push @$daref, "${lv}_RestOfDay_IsConsumptionRecommended:".       int( $restOfDaySum{'ConsumpRcmd'}    )." h";
+  push @$daref, "${lv}_Tomorrow_Consumption:".                     int( $tomorrowSum{'Consumption'}     )." Wh";
+  push @$daref, "${lv}_Tomorrow_PV:".                              int( $tomorrowSum{'PV'}              )." Wh";
+  push @$daref, "${lv}_Tomorrow_Total:".                           int( $tomorrowSum{'Total'}           )." Wh";
+  push @$daref, "${lv}_Tomorrow_IsConsumptionRecommended:".        int( $tomorrowSum{'ConsumpRcmd'}     )." h";
 
 return;
 }
@@ -1812,6 +2118,7 @@ sub extractWeatherData {
   $weather = eval{decode_json($weather)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                  return;
                                                };
+  my $lv = $stpl{weatherData}{level};
   
   for my $k (keys %$weather) {
       next if(!$k);
@@ -1824,12 +2131,12 @@ sub extractWeatherData {
           my $day    = $k;
           my $symbol = encode("utf8",  $weather->{$k}{TemperatureSymbol});
           my $temp   = sprintf("%.1f", $weather->{$k}{Temperature});
-          my $wdesc  = $weather->{$k}{WeatherDescription};
+          my $wdesc  = encode ("utf8", $weather->{$k}{WeatherDescription});
           $wdesc     =~ s/t/T/x if($wdesc =~ /^t/x);
           $day       =~ s/t/T/x;
           
-          push @$daref, "L1_${day}_Temperature:$temp $symbol"; 
-          push @$daref, "L1_${day}_WeatherDescription:$wdesc"; 
+          push @$daref, "${lv}_${day}_Temperature:$temp $symbol"; 
+          push @$daref, "${lv}_${day}_WeatherDescription:$wdesc"; 
       }
   } 
 
@@ -1848,21 +2155,22 @@ sub extractStatisticData {
   my $name      = $hash->{NAME};
   my $sd;
   
-  Log3 ($name, 4, "$name - ##### extracting statistic data #### ");
+  Log3 ($name, 4, "$name - ##### extracting balance data #### ");
   
   $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
+  my $lv = $stpl{balanceDayData}{level};
   
   if(ref $statistic eq "HASH") {
-      $sd = decode_json ($statistic->{d});
+      $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
   }
 
   if($sd && ref $sd eq "ARRAY") {
       for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
           my $k = $a->{Key};
           my $v = $a->{Value};
-          push @$daref, "L1_Today_${k}:$v" if(defined $statkeys{$k});                  
+          push @$daref, "${lv}_Today_${k}:$v" if(defined $statkeys{$k});                  
       }
   } 
   
@@ -1872,20 +2180,21 @@ return;
 ################################################################
 ##                     Auswertung Anlagendaten
 ################################################################
-sub extractPlantData {
+sub extractPlantMasterData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
   my $name     = $hash->{NAME};
   my ($amount,$unit);
   
-  Log3 ($name, 4, "$name - ##### extracting plant data #### ");
+  Log3 ($name, 4, "$name - ##### extracting plant master data #### ");
   
   $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                    return;
                                                  };
-  
+  my $lv       = $stpl{plantMasterData}{level};
   my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
+  
   if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
       Log3 ($name, 4, "$name - Plant ID: ".$plantOid);
       $hash->{HELPER}{PLANTOID} = $plantOid;
@@ -1899,19 +2208,67 @@ sub extractPlantData {
       $amount = $forecast->{'PlantPeakPower'}{'Amount'}; 
       $unit   = $forecast->{'PlantPeakPower'}{'StandardUnit'}{'Symbol'};
 
-      push @$daref, "L2_PlantPeakPower:$amount $unit";             
+      push @$daref, "${lv}_PlantPeakPower:$amount $unit";             
       
-      Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Amount\": $amount";
-      Log3 $name, 4, "$name - Plantdata \"PlantPeakPower Symbol\": $unit";
+      Log3 $name, 4, "$name - plantMasterData \"PlantPeakPower Amount\": $amount";
+      Log3 $name, 4, "$name - plantMasterData \"PlantPeakPower Symbol\": $unit";
   }
   
 return;
 }
 
 ################################################################
-##                     Auswertung Consumer Data
+##                     Auswertung Anlagenlogbuch
 ################################################################
-sub extractConsumerData {
+sub extractPlantLogbook {
+  my $hash     = shift;
+  my $daref    = shift;
+  my $logdata  = shift;
+  my $name     = $hash->{NAME};
+  
+  Log3 ($name, 4, "$name - ##### extracting plant logbook data #### ");
+  
+  $logdata = eval{decode_json($logdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                 return;
+                                               };
+  my $lv = $stpl{plantLogbook}{level};
+  
+  my %colors = (                                                # Farben Highlighting
+      "Info"        => qq{<span style="color: green;">},
+      "Warning"     => qq{<span style="color: orange;">},
+      "Warnung"     => qq{<span style="color: orange;">},
+      "Disturbance" => qq{<span style="color: red;">},
+      "Störung"     => qq{<span style="color: red;">},
+      "Error"       => qq{<span style="color: red;">},
+      "Fehler"      => qq{<span style="color: red;">},
+      "Unknown"     => qq{<span style="color: black;">},
+  );
+  my $eh = "</span>";                                           # Endestring Highlighting
+      
+  if(ref $logdata->{aaData} eq "ARRAY") {
+      my @ld = @{$logdata->{aaData}};
+      for my $ae (@ld) {                                        # jedes ARRAY-Element ist ein HASH
+          my $dn   = encode("utf8", $ae->{DeviceName} );
+          my $ts   = $ae->{Timestamp};                   
+          my $dc   = encode("utf8", $ae->{Description} );
+          my $id   = $ae->{MessageId};
+          my ($mt) = $ae->{MessageType} =~ /alt='(.*?)'/x;
+          $mt      = encode("utf8", $mt) // "Unknown";
+          
+          my $bh   = $colors{$mt};
+          my $v    = qq{<html><b>$bh $mt $eh</b><br>$dn : $ts <br>$dc</html>};
+
+          push @$daref, "${lv}_LogbookEntry_${id}:$v";
+      }
+  }
+
+return;
+}
+
+################################################################
+##    Auswertung Consumer Plan Data (aus forecastData)
+################################################################
+sub extractConsumerPlanData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
@@ -1919,18 +2276,18 @@ sub extractConsumerData {
   my %consumers;
   my ($key,$val);
   
-  my $dl = AttrVal($name, "detailLevel", 1);
-  
-  Log3 ($name, 4, "$name - ##### extracting consumer data #### ");
+  Log3 ($name, 4, "$name - ##### extracting consumer plan data #### ");
   
   $forecast = eval{decode_json($forecast)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                    return;
                                                  };
   
+  my $lv = $stpl{forecastData}{level};
+  
   # Schleife über alle Consumer Objekte
   my $i = 0;
   for my $c (@{$forecast->{'Consumers'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'ConsumerName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'ConsumerName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $i++;
   }
@@ -1957,17 +2314,17 @@ sub extractConsumerData {
 
   if(%consumers) {
       for my $key (keys(%consumers)) {
-          Log3 $name, 4, "$name - Consumer data \"$key\": ".$consumers{$key};
-          if($key =~ /ConsumerName/x && $key =~ /^(\d+)_.*$/x && $dl >= 3) {
+          Log3 $name, 4, "$name - Consumer data \"$key\": ".encode("utf8", $consumers{$key});
+          if($key =~ /ConsumerName/x && $key =~ /^(\d+)_.*$/x) {
                my $lfn = $1; 
                my $cn  = $consumers{"${lfn}_ConsumerName"};            # Verbrauchername
                next if(!$cn);
                $cn     = replaceJunkSigns($cn);                        # evtl. Umlaute/Leerzeichen im Verbrauchernamen ersetzen
                my $pos = $consumers{"${lfn}_PlannedOpTimeStart"};      # geplanter Start
                my $poe = $consumers{"${lfn}_PlannedOpTimeEnd"};        # geplantes Ende
-               my $rb  = "L3_${cn}_PlannedOpTimeBegin"; 
-               my $re  = "L3_${cn}_PlannedOpTimeEnd";
-               my $rp  = "L3_${cn}_Planned";
+               my $rb  = "${lv}_${cn}_PlannedOpTimeBegin"; 
+               my $re  = "${lv}_${cn}_PlannedOpTimeEnd";
+               my $rp  = "${lv}_${cn}_Planned";
                if($pos) {              
                    push @$daref, "$rb:$pos";
                    push @$daref, "$rp:yes";                   
@@ -1988,9 +2345,9 @@ return;
 } 
 
 ################################################################
-##          Auswertung Consumer Livedata
+##          Auswertung Consumer Stammdaten
 ################################################################
-sub extractConsumerLiveData {
+sub extractConsumerMasterdata {
   my $hash      = shift; 
   my $daref     = shift;
   my $clivedata = shift;
@@ -1998,19 +2355,19 @@ sub extractConsumerLiveData {
   my %consumers;
   my ($i,$res);
   
-  Log3 ($name, 4, "$name - ##### extracting consumer live data #### ");
+  Log3 ($name, 4, "$name - ##### extracting consumer master data #### ");
   
   $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
+  my $lv = $stpl{consumerMasterdata}{level};
   
-  # allen Consumer Objekte die ID zuordnen
+  # allen Consumer Objekten die ID zuordnen
   $i = 0;
   for my $c (@{$clivedata->{'MeasurementData'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
-      my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
@@ -2019,8 +2376,54 @@ sub extractConsumerLiveData {
       $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
       $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
       $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
+      
+      $i++;
+  }
+  
+  if($hash->{HELPER}{CONSUMER}) {
+      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
+              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
+              next if(!defined $val);
+              Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
+              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
+          }
+      }
+  }
+  
+return;
+}
+
+################################################################
+##          Auswertung Consumer Current Data
+################################################################
+sub extractConsumerCurrentdata {
+  my $hash      = shift; 
+  my $daref     = shift;
+  my $clivedata = shift;
+  my $name      = $hash->{NAME};
+  my %consumers;
+  my ($i,$res);
+  
+  Log3 ($name, 4, "$name - ##### extracting consumer current data #### ");
+  
+  $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                     return;
+                                                   };
+  my $lv = $stpl{consumerCurrentdata}{level};
+  
+  # allen Consumer Objekten die ID zuordnen
+  $i = 0;
+  for my $c (@{$clivedata->{'MeasurementData'}}) {
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
+      $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
+      $consumers{"${i}_ConsumerLfd"}  = $i;
+      my $cpower                      = $c->{'Consume'}{'Measurement'};           # aktueller Energieverbrauch in W
+      my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
+      next if(!$cn);
+      $cn                             = replaceJunkSigns($cn);
  
-      push @$daref, "L3_${cn}_Power:".$cpower." W" if(defined $cpower);  
+      push @$daref, "${lv}_${cn}_Power:".$cpower." W" if(defined $cpower);  
       
       $i++;
   }
@@ -2049,20 +2452,10 @@ sub extractConsumerLiveData {
               $res = "undefined";            
           }
           
-          push @$daref, "L3_${cn}_Switch:$res";
-          push @$daref, "L3_${cn}_SwitchLastTime:$ltchange";
+          push @$daref, "${lv}_${cn}_Switch:$res";
+          push @$daref, "${lv}_${cn}_SwitchLastTime:$ltchange";
           
           $i++;
-      }
-  }
-  
-  if($hash->{HELPER}{CONSUMER}) {
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
-              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
-              next if(!defined $val);
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
-          }
       }
   }
   
@@ -2087,13 +2480,17 @@ sub extractConsumerHistData {                                                  #
   $chdata = eval{decode_json($chdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                return;
                                              };
+  my $livelvl = $stpl{liveData}{level};
+  my $bataval = (defined(ReadingsNum($name,"${livelvl}_BatteryIn", undef)) || defined(ReadingsNum($name,"${livelvl}_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
   
-  my $bataval = (defined(ReadingsNum($name,"L1_BatteryIn", undef)) || defined(ReadingsNum($name,"L1_BatteryOut", undef)))?1:0;     # Identifikation ist Battery vorhanden ?
+  my $dlvl = $stpl{consumerDayData}{level};
+  my $mlvl = $stpl{consumerMonthData}{level};
+  my $ylvl = $stpl{consumerYearData}{level};
   
   # allen Consumer Objekte die ID zuordnen
   $i = 0;
   for my $c (@{$chdata->{'Consumers'}}) {
-      $consumers{"${i}_ConsumerName"} = encode("utf8", $c->{'DeviceName'} );
+      $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cpower                      = $c->{'TotalEnergy'}{'Measurement'};    # Energieverbrauch im Timeframe in Wh                                         
@@ -2111,21 +2508,23 @@ sub extractConsumerHistData {                                                  #
           $bct = $c->{'TotalEnergyMix'}{'BatteryConsumptionTotal'};            # Anteil der Batterie-Nutzung im Timeframe am Gesamtverbrauch in Wh
       }
       
-      push @$daref, "L3_${cn}_EnergyTotalDay:".           sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "day");  
-      push @$daref, "L3_${cn}_EnergyTotalMonth:".         sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "month");
-      push @$daref, "L3_${cn}_EnergyTotalYear:".          sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "year");             
-      push @$daref, "L3_${cn}_EnergyRelativeMonthGrid:".  sprintf("%.0f", $gcr).    " %"     if(defined($gcr)    && $tf eq "month");
-      push @$daref, "L3_${cn}_EnergyTotalMonthGrid:".     sprintf("%.0f", $gct).    " Wh"    if(defined($gct)    && $tf eq "month");                    
-      push @$daref, "L3_${cn}_EnergyRelativeMonthPV:".    sprintf("%.0f", $pcr).    " %"     if(defined($pcr)    && $tf eq "month");  
-      push @$daref, "L3_${cn}_EnergyTotalMonthPV:".       sprintf("%.0f", $pct).    " Wh"    if(defined($pct)    && $tf eq "month");       
-      push @$daref, "L3_${cn}_EnergyRelativeMonthBatt:".  sprintf("%.0f", $bcr).    " %"     if(defined($bcr)    && $bataval && $tf eq "month");         
-      push @$daref, "L3_${cn}_EnergyTotalMonthBatt:".     sprintf("%.0f", $bct).    " Wh"    if(defined($bct)    && $bataval && $tf eq "month");                 
-      push @$daref, "L3_${cn}_EnergyRelativeYearGrid:".   sprintf("%.0f", $gcr).    " %"     if(defined($gcr)    && $tf eq "year");   
-      push @$daref, "L3_${cn}_EnergyTotalYearGrid:".      sprintf("%.0f", $gct).    " Wh"    if(defined($gct)    && $tf eq "year");                      
-      push @$daref, "L3_${cn}_EnergyRelativeYearPV:".     sprintf("%.0f", $pcr).    " %"     if(defined($pcr)    && $tf eq "year");   
-      push @$daref, "L3_${cn}_EnergyTotalYearPV:".        sprintf("%.0f", $pct).    " Wh"    if(defined($pct)    && $tf eq "year");  
-      push @$daref, "L3_${cn}_EnergyRelativeYearBatt:".   sprintf("%.0f", $bcr).    " %"     if(defined($bcr)    && $bataval && $tf eq "year");        
-      push @$daref, "L3_${cn}_EnergyTotalYearBatt:".      sprintf("%.0f", $bct).    " Wh"    if(defined($bct)    && $bataval && $tf eq "year");
+      push @$daref, "${dlvl}_${cn}_EnergyTotalDay:".           sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "day");  
+      push @$daref, "${mlvl}_${cn}_EnergyTotalMonth:".         sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "month");
+      push @$daref, "${ylvl}_${cn}_EnergyTotalYear:".          sprintf("%.0f", $cpower). " Wh"    if(defined($cpower) && $tf eq "year");             
+      
+      push @$daref, "${mlvl}_${cn}_EnergyRelativeMonthGrid:".  sprintf("%.0f", $gcr).    " %"     if(defined($gcr)    && $tf eq "month");
+      push @$daref, "${mlvl}_${cn}_EnergyTotalMonthGrid:".     sprintf("%.0f", $gct).    " Wh"    if(defined($gct)    && $tf eq "month");                    
+      push @$daref, "${mlvl}_${cn}_EnergyRelativeMonthPV:".    sprintf("%.0f", $pcr).    " %"     if(defined($pcr)    && $tf eq "month");  
+      push @$daref, "${mlvl}_${cn}_EnergyTotalMonthPV:".       sprintf("%.0f", $pct).    " Wh"    if(defined($pct)    && $tf eq "month");       
+      push @$daref, "${mlvl}_${cn}_EnergyRelativeMonthBatt:".  sprintf("%.0f", $bcr).    " %"     if(defined($bcr)    && $bataval && $tf eq "month");         
+      push @$daref, "${mlvl}_${cn}_EnergyTotalMonthBatt:".     sprintf("%.0f", $bct).    " Wh"    if(defined($bct)    && $bataval && $tf eq "month");                 
+      
+      push @$daref, "${ylvl}_${cn}_EnergyRelativeYearGrid:".   sprintf("%.0f", $gcr).    " %"     if(defined($gcr)    && $tf eq "year");   
+      push @$daref, "${ylvl}_${cn}_EnergyTotalYearGrid:".      sprintf("%.0f", $gct).    " Wh"    if(defined($gct)    && $tf eq "year");                      
+      push @$daref, "${ylvl}_${cn}_EnergyRelativeYearPV:".     sprintf("%.0f", $pcr).    " %"     if(defined($pcr)    && $tf eq "year");   
+      push @$daref, "${ylvl}_${cn}_EnergyTotalYearPV:".        sprintf("%.0f", $pct).    " Wh"    if(defined($pct)    && $tf eq "year");  
+      push @$daref, "${ylvl}_${cn}_EnergyRelativeYearBatt:".   sprintf("%.0f", $bcr).    " %"     if(defined($bcr)    && $bataval && $tf eq "year");        
+      push @$daref, "${ylvl}_${cn}_EnergyTotalYearBatt:".      sprintf("%.0f", $bct).    " Wh"    if(defined($bct)    && $bataval && $tf eq "year");
       
       $i++;
   }
@@ -2192,27 +2591,45 @@ return;
 }
 
 ################################################################
-#                 delete Readings
-#   $dl = detailLevel ab dem das Reading gelöscht werden soll 
+#         delete Readings und Hash HELPER-Daten
+#   $conspl = providerLevel berücksichtigen
 ################################################################
-sub delread {
-  my ($hash,$dl) = @_;
+sub deleteData {
+  my $hash   = shift;
+  my $conspl = shift;
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
-  if($dl) {
-      # Readings ab dem angegebenen Detail-Level löschen
+  my $bl     = "state|lastCycleTime|Counter|loginState";                   # Blacklist
+  
+  my $pblvl  = $stpl{plantLogbook}{level};                                 # Logbuch Level
+  
+  if(!$subs{$name}{forecastData}{doit}) {                                  # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
+      my $fclvl = $stpl{forecastData}{level};
+      delete $hash->{HELPER}{"${fclvl}_ThisHour_WeatherId"};
+      for my $i (1..23) {
+          $i = sprintf("%02d",$i);
+          delete $hash->{HELPER}{"${fclvl}_NextHour${i}_WeatherId"};
+      }
+  }
+   
+  if($conspl) {                                                            # Readings löschen wenn nicht im providerLevel enthalten
       for my $key(@allrds) {
-          $key =~ m/^L(\d)_/x;     
-          if($1 && $1 >= $dl) {
-              delete($defs{$name}{READINGS}{$key});
-          }         
+          my ($lvl) = $key =~ m/^(L\d+)_/x;     
+          if($lvl) {
+              for my $p (keys %{$subs{$name}}) {
+                  delete($defs{$name}{READINGS}{$key}) if($subs{$name}{$p}{level} eq $lvl && !$subs{$name}{$p}{doit});
+              }
+          } else {
+              delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
+          }
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);      # Logbuchreadings immer löschen          
       }
       return;
   } 
 
   for my $key(@allrds) {
-      delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+      delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
   }
 
 return;
@@ -2362,25 +2779,31 @@ sub PortalAsHtml {                                                              
   $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                            # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                            # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
-  my $dl  = AttrVal    ($name, "detailLevel", 1);
-  my $pv0 = ReadingsNum($name, "L2_ThisHour_PvMeanPower",   undef);
-  my $pv1 = ReadingsNum($name, "L4_NextHour01_PvMeanPower", undef);
+  my $fdo  = $subs{$name}{forecastData}{doit};                                          
+  my $fmin = $subs{$name}{forecastData}{level};                                         # LXX Level
+  my $fmaj = $subs{$name}{forecastData}{level};
+  my $ldlv = $subs{$name}{liveData}{level};
+  my $cclv = $subs{$name}{consumerCurrentdata}{level};
   
-  if(!$hash || !defined($defs{$wlname}) || $dl != 4 || !defined $pv0 || !defined $pv1) {
+  my ($pv0,$pv1);
+  $pv0  = ReadingsNum($name, "${fmin}_ThisHour_PvMeanPower",   undef) if($fmin);
+  $pv1  = ReadingsNum($name, "${fmaj}_NextHour01_PvMeanPower", undef) if($fmaj);
+  
+  if(!$hash || !defined($defs{$wlname}) || !$fdo || !defined $pv0 || !defined $pv1) {
       $height = AttrNum($wlname, 'beamHeight', 200);   
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
       $ret   .= "<td>";
-      if(!$hash) {
+      if(!$hash) {                                                                      ## no critic "Cascading"
           $ret .= "Device \"$name\" doesn't exist !";
       } elsif (!defined($defs{$wlname})) {
           $ret .= "Graphic device \"$wlname\" doesn't exist !";
-      } elsif ($dl != 4) {
-          $ret .= "The attribute \"detailLevel\" of device \"$name\" has to be set to level \"4\" !";
+      } elsif (!$fdo) {
+          $ret .= qq{The attribute "providerLevel" of device "$name" must contain the level "forecastData" and data must be retrieved !};
       } elsif (!defined $pv0) {
-          $ret .= "Awaiting level 2 data ...";
+          $ret .= "Awaiting minor level forecast data ...";
       } elsif (!defined $pv1) {
-          $ret .= "Awaiting level 4 data ...";
+          $ret .= "Awaiting level major level forecast data ...";
       }
 
       $ret .= "</td>";
@@ -2408,7 +2831,7 @@ sub PortalAsHtml {                                                              
               $cmdauto = "\"ftui.setFhemStatus('set $name $txt auto')\"";      
           }
           
-          my $swstate  = ReadingsVal($name,"L3_".$txt."_Switch", "undef");
+          my $swstate  = ReadingsVal($name,"${cclv}_".$txt."_Switch", "undef");
           my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
           if($swstate eq "off") {
               $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
@@ -2460,15 +2883,15 @@ sub PortalAsHtml {                                                              
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
   $icon    = FW_makeImage($icon) if (defined($icon));
-  my $co4h = ReadingsNum ($name,"L2_Next04Hours_Consumption", 0);
-  my $coRe = ReadingsNum ($name,"L2_RestOfDay_Consumption", 0); 
-  my $coTo = ReadingsNum ($name,"L2_Tomorrow_Consumption", 0);
-  my $coCu = ReadingsNum ($name,"L1_GridConsumption", 0);
+  my $co4h = ReadingsNum ($name,"${fmin}_Next04Hours_Consumption", 0);
+  my $coRe = ReadingsNum ($name,"${fmin}_RestOfDay_Consumption", 0); 
+  my $coTo = ReadingsNum ($name,"${fmin}_Tomorrow_Consumption", 0);
+  my $coCu = ReadingsNum ($name,"${ldlv}_GridConsumption", 0);
 
-  my $pv4h = ReadingsNum($name,"L2_Next04Hours_PV", 0);
-  my $pvRe = ReadingsNum($name,"L2_RestOfDay_PV", 0); 
-  my $pvTo = ReadingsNum($name,"L2_Tomorrow_PV", 0);
-  my $pvCu = ReadingsNum($name,"L1_PV", 0);
+  my $pv4h = ReadingsNum($name,"${fmin}_Next04Hours_PV", 0);
+  my $pvRe = ReadingsNum($name,"${fmin}_RestOfDay_PV", 0); 
+  my $pvTo = ReadingsNum($name,"${fmin}_Tomorrow_PV", 0);
+  my $pvCu = ReadingsNum($name,"${ldlv}_PV", 0);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -2494,9 +2917,9 @@ sub PortalAsHtml {                                                              
   # Headerzeile generieren                                                                                                             
   if ($header) {
       my $lang    = AttrVal("global","language","EN");
-      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                                          # Linktext als Aliasname oder "SMA Sunny Portal"
+      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                                            # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = ReadingsTimestamp($name, "L2_ForecastToday_Consumption", "0000-00-00 00:00:00");      # letzter Forecast Update  
+      my $lup     = ReadingsTimestamp($name, "${fmin}_ForecastToday_Consumption", "0000-00-00 00:00:00");   # letzter Forecast Update  
       
       my $lupt    = "last update:";  
       my $lblPv4h = "next 4h:";
@@ -2506,7 +2929,7 @@ sub PortalAsHtml {                                                              
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
           $lupt    = "Stand:"; 
-          $lblPv4h = "nächste 4h:";
+          $lblPv4h = encode("utf8", "nächste 4h:");
           $lblPvRe = "heute:";
           $lblPvTo = "morgen:";
           $lblPvCu = "aktuell";
@@ -2547,17 +2970,17 @@ sub PortalAsHtml {                                                              
   }
 
   # Werte aktuelle Stunde
-  $pv{0} = ReadingsNum($name,"L2_ThisHour_PvMeanPower", 0);
-  $co{0} = ReadingsNum($name,"L2_ThisHour_Consumption", 0);
+  $pv{0} = ReadingsNum($name,"${fmin}_ThisHour_PvMeanPower", 0);
+  $co{0} = ReadingsNum($name,"${fmin}_ThisHour_Consumption", 0);
   $di{0} = $pv{0} - $co{0}; 
-  $is{0} = (ReadingsVal($name,"L2_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
-  $we{0} = $hash->{HELPER}{L2_ThisHour_WeatherId} if($weather);              # für Wettericons 
+  $is{0} = (ReadingsVal($name,"${fmin}_ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
+  $we{0} = $hash->{HELPER}{"${fmin}_ThisHour_WeatherId"} if($weather);              # für Wettericons 
   $we{0} = $we{0} // 999;
 
   if(AttrVal("global","language","EN") eq "DE") {
-      (undef,undef,undef,$t{0}) = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+      (undef,undef,undef,$t{0}) = ReadingsVal($name,"${fmin}_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
   } else {
-      (undef,undef,undef,$t{0}) = ReadingsVal($name,"L2_ThisHour_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+      (undef,undef,undef,$t{0}) = ReadingsVal($name,"${fmin}_ThisHour_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   }
   
   $t{0} = int($t{0});                                                        # zum Rechnen Integer ohne führende Null
@@ -2570,16 +2993,16 @@ sub PortalAsHtml {                                                              
       $_        =~ s/^\s+|\s+$//gx;                                           #trim it, if blanks were used
     
       #check if listed device is planned
-      if (ReadingsVal($name, "L3_".$itemName."_Planned", "no") eq "yes") {
+      if (ReadingsVal($name, "${cclv}_".$itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                   # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
           if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$start) = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
           } else {
-              (undef,undef,undef,$start) = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"L3_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
 
           $start   = int($start);
@@ -2614,8 +3037,8 @@ sub PortalAsHtml {                                                              
   $minDif = $di{0};                                         # für Typ diff
 
   for my $i (1..$maxhours-1) {
-     $pv{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_PvMeanPower",0);             # Erzeugung
-     $co{$i} = ReadingsNum($name,"L4_NextHour".sprintf("%02d",$i)."_Consumption",0);             # Verbrauch
+     $pv{$i} = ReadingsNum($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_PvMeanPower",0);             # Erzeugung
+     $co{$i} = ReadingsNum($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_Consumption",0);             # Verbrauch
      $di{$i} = $pv{$i} - $co{$i};
 
      $maxVal = $pv{$i} if ($pv{$i} > $maxVal); 
@@ -2623,14 +3046,14 @@ sub PortalAsHtml {                                                              
      $maxDif = $di{$i} if ($di{$i} > $maxDif);
      $minDif = $di{$i} if ($di{$i} < $minDif);
 
-     $is{$i} = (ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
-     $we{$i} = $hash->{HELPER}{"L4_NextHour".sprintf("%02d",$i)."_WeatherId"} if($weather);      # für Wettericons 
+     $is{$i} = (ReadingsVal($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
+     $we{$i} = $hash->{HELPER}{"${fmaj}_NextHour".sprintf("%02d",$i)."_WeatherId"} if($weather);      # für Wettericons 
      $we{$i} = $we{$i} // 999;
 
      if(AttrVal("global","language","EN") eq "DE") {
-        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
      } else {
-        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"L4_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
      }
 
      $t{$i} = int($t{$i});                                  # keine führende 0
@@ -3015,7 +3438,7 @@ sub formatVal6 {
   return ($n eq '-')?($v*-1):$v if defined($w);
 
   # Werte bleiben in Watt
-  if    (!$v)         { return '&nbsp;'; }                            # keine Anzeige bei Null
+  if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null 
   elsif ($v <    10)  { return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; } # z.B. 0
   elsif ($v <   100)  { return '&nbsp;'.$n.$v.'&nbsp;&nbsp;'; }
   elsif ($v <  1000)  { return '&nbsp;'.$n.$v.'&nbsp;'; }
@@ -3162,6 +3585,7 @@ return;
     <ul>
      <li>Live data (Consumption and PV-Generation) </li>
      <li>Battery data (In/Out) and usage data of consumers </li>
+     <li>Various balance data and statistical data (also of the consumers connected to the SMA Sunny Homemanager) </li>
      <li>Weather data delivered from SMA for the facility location </li>
      <li>Forecast data (Consumption and PV-Generation) inclusive suggestion times to switch comsumers on </li>
      <li>the planned times by the Sunny Home Manager to switch consumers on and the current state of consumers (if present) </li>
@@ -3195,6 +3619,7 @@ return;
     HTTP::Cookies   <br>
     MIME::Base64    <br>
     Encode          <br>
+    utf8            <br>
     
     <br><br>  
    </ul>
@@ -3206,15 +3631,21 @@ return;
     A SMAPortal device will be defined by: <br><br>
     
     <ul>
-      <b><code>define &lt;name&gt; SMAPortal</code></b> <br><br>
+      <b>define &lt;name&gt; SMAPortal</b>
     </ul>
+    <br>
    
     After the definition of the device the credentials for the SMA Sunny Portal must be saved with the 
     following command: <br><br>
    
     <ul> 
-     set &lt;name&gt; credentials &lt;Username&gt; &lt;Password&gt;
-    </ul>     
+     <b>set &lt;name&gt; credentials &lt;Username&gt; &lt;Password&gt; </b>
+    </ul> 
+    <br>
+
+    After a successful login, only the asset master data are retrieved. 
+    The attribute <a href="#providerLevel">providerLevel</a> is used to set the data suppliers its data 
+    the device should retrieve.   
    </ul>
    <br><br>   
     
@@ -3223,12 +3654,14 @@ return;
    <ul>
    <br>
      <ul>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     <a name="createPortalGraphic"></a>
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Creates graphical devices to show the SMA Sunny Portal forecast data in several layouts. 
-     The attribute "detailLevel" has to be set to level 4. The command set this attribut to the needed value automatically. <br>
+     The attribute "providerLevel" must contain "forecastData". <br>
      With the <a href="#SMAPortalSPGattr">"attributes of the graphic device"</a> the appearance and coloration of the forecast 
      data in the created graphic device can be adjusted.     
      </ul>   
+     </li>
      <br>
      
      <ul>
@@ -3238,10 +3671,11 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> </li>  
-     If the attribute "detailLevel" is set to 3 or higher, consumer data are fetched from the SMA Sunny Portal.
-     Once these data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
-     that means the consumer are controlled by the Sunny Home Manager.     
+     <a name="consumer"></a>
+     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
+     Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
+     that means the consumer are controlled by the Sunny Home Manager.    
+     </li>      
      </ul>
    
    </ul>
@@ -3251,16 +3685,21 @@ return;
    <b>Get</b>
    <ul>
     <br>
+    
     <ul>
-      <li><b> get &lt;name&gt; data </b> </li>  
+      <a name="data"></a>
+      <li><b> get &lt;name&gt; data </b> <br> 
       This command fetch the data from the SMA Sunny Portal manually. 
     </ul>
+    </li> 
     <br>
     
     <ul>
-      <li><b> get &lt;name&gt; storedCredentials </b> </li>  
+      <a name="storedCredentials"></a>
+      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
       The saved credentials are displayed in a popup window.
     </ul>
+    </li>
    </ul>  
    <br><br>
    
@@ -3281,23 +3720,6 @@ return;
         </ul>        
        </li><br>
        
-       <a name="detailLevel"></a>
-       <li><b>detailLevel </b><br>
-       Adjust the complexity of the generated data. 
-       <br><br>
-    
-       <ul>   
-       <table>  
-       <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>L1</b>  </td><td>- live data, statistic day data and weather data are generated. </td></tr>
-          <tr><td> <b>L2</b>  </td><td>- as L1 and additional forecast of the current data, the data of the next 4 hours as well as PV-Generation / Consumption the rest of day and the next day </td></tr>
-          <tr><td> <b>L3</b>  </td><td>- as L2 and additional forecast of the planned switch-on times of consumers, whose current state and energy data as well as their battery usage data </td></tr>
-          <tr><td> <b>L4</b>  </td><td>- as L3 and additional a detailed forecast of the next 24 hours </td></tr>
-       </table>
-       </ul>     
-       <br>       
-       </li><br>
-       
        <a name="disable"></a>
        <li><b>disable</b><br>
        Deactivate/activate the device. </li><br>
@@ -3308,15 +3730,61 @@ return;
        if the interval is set to "0", no continuous data retrieval is executed and has to be triggered manually by the 
        "get &lt;name&gt; data" command.  <br><br>
        
-       <b>Note:</b> 
-       The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
-       120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       <ul>
+         <b>Note:</b> 
+         The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
+         120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
+       </ul>
+       </li><br>
+       
+       <a name="plantLogbookApprovalState"></a>
+       <li><b>plantLogbookApprovalState</b><br>
+       With this attribute the entries are filtered according to their status. <br>
+       (default: Any)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>Any</b>          </td><td>-  all messages </td></tr>
+          <tr><td> <b>NotApproved</b>  </td><td>-  unconfirmed messages </td></tr>
+       </table>
+       </ul>         
+       </li><br>
+       
+       <a name="plantLogbookTypes"></a>
+       <li><b>plantLogbookTypes</b><br>
+       This attribute defines the message types of the asset logbook to be selected. 
+       A maximum of the latest 25 logbook entries of all set types are displayed. <br>
+       (default: Warning,Disturbance,Error) 
+       </li><br>
+       
+       <a name="providerLevel"></a>
+       <li><b>providerLevel </b><br>
+       The scope of the data to be generated is set. Asset and consumer master data is always retrieved. 
+       <br><br>
+    
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
+          <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
+          <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
+          <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
+          <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
+          <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
+          <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
+       </table>
+       </ul>     
+       <br>       
        </li><br>
        
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
        If set, the used password will be displayed in Logfile output. 
-       (default = 0) </li><br>
+       (default: 0) </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;identifier&gt; </b><br>
@@ -3355,7 +3823,7 @@ return;
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
-     <li>Tagesstatistiken </li>
+     <li>verschiedene Bilanzdaten und Statistikdaten (auch der an den SMA Sunny Homemanager angeschlossenen Verbraucher) </li>
      <li>Batteriedaten (In/Out) sowie Nutzungsdaten durch Verbraucher </li>
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
@@ -3390,6 +3858,7 @@ return;
     HTTP::Cookies   <br>
     MIME::Base64    <br>
     Encode          <br>
+    utf8            <br>
     
     <br><br>  
    </ul>
@@ -3401,15 +3870,21 @@ return;
     Ein SMAPortal-Device wird definiert mit: <br><br>
     
     <ul>
-      <b><code>define &lt;Name&gt; SMAPortal</code></b> <br><br>
+      <b>define &lt;Name&gt; SMAPortal</b>
     </ul>
+    <br>
    
     Nach der Definition des Devices müssen die Zugangsparameter für das SMA Sunny Portal gespeichert werden 
     mit dem Befehl: <br><br>
    
     <ul> 
-     set &lt;Name&gt; credentials &lt;Username&gt; &lt;Passwort&gt;
-    </ul>     
+     <b>set &lt;Name&gt; credentials &lt;Username&gt; &lt;Passwort&gt; </b>
+    </ul>
+    <br>
+    
+    Nach einem erfolgreichen Login werden nur die Anlagenstammdaten abgerufen. 
+    Mit dem Attribut <a href="#providerLevel">providerLevel</a> werden die Datenlieferanten eingestellt, die durch das 
+    Device abgerufen werden sollen.
    </ul>
    <br><br>   
     
@@ -3418,26 +3893,32 @@ return;
    <ul>
    <br>
      <ul>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> </li>  
+     <a name="createPortalGraphic"></a>
+     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Erstellt Devices zur grafischen Anzeige der SMA Sunny Portal Prognosedaten in verschiedenen Layouts. 
-     Das Attribut "detailLevel" muss auf den Level 4 gesetzt sein. Der Befehl setzt dieses Attribut automatisch auf 
-     den benötigten Wert.  <br>
+     Das Attribut "providerLevel" muss auf den Level "forecastData" enthalten. <br>
      Mit den <a href="#SMAPortalSPGattr">"Attributen des Grafikdevices"</a> können Erscheinungsbild und 
      Farbgebung der Prognosedaten in den erstellten Grafik-Devices angepasst werden.     
      </ul>   
+     </li>
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     <a name="credentials"></a> 
+     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
+     </li>
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> </li>  
-     Ist das Atttribut detailLevel auf 3 oder höher gesetzt, werden Verbraucherdaten aus dem SMA Sunny Portal abgerufen.
-     Sobald diese Werte vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
-     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto).     
+     <a name="Verbrauchername"></a>
+     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
+     Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
+     Modul erkannt wurden.
+     Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
+     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto). 
+     </li>     
      </ul>
    
    </ul>
@@ -3448,15 +3929,21 @@ return;
    <ul>
     <br>
     <ul>
-      <li><b> get &lt;name&gt; data </b> </li>  
+    
+      <a name="data"></a>
+      <li><b> get &lt;name&gt; data </b> <br>  
       Mit diesem Befehl werden die Daten aus dem SMA Sunny Portal manuell abgerufen. 
     </ul>
+    </li>
     <br>
     
     <ul>
-      <li><b> get &lt;name&gt; storedCredentials </b> </li>  
+      <a name="storedCredentials"></a>
+      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
       Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
     </ul>
+    </li>
+
    </ul>  
    <br><br>
    
@@ -3477,23 +3964,6 @@ return;
         </ul>        
        </li><br>
        
-       <a name="detailLevel"></a>
-       <li><b>detailLevel </b><br>
-       Es wird der Umfang der zu generierenden Daten eingestellt. 
-       <br><br>
-    
-       <ul>   
-       <table>  
-       <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>L1</b>  </td><td>- Live-Daten, Tagesstatistiken und Wetter-Daten werden generiert. </td></tr>
-          <tr><td> <b>L2</b>  </td><td>- wie L1 und zusätzlich Prognose der aktuellen und nächsten 4 Stunden sowie PV-Erzeugung / Verbrauch des Resttages und des Folgetages </td></tr>
-          <tr><td> <b>L3</b>  </td><td>- wie L2 und zusätzlich Prognosedaten der geplanten Einschaltzeiten von Verbrauchern, deren aktueller Status und Energiedaten sowie Batterie-Nutzungsdaten</td></tr>
-          <tr><td> <b>L4</b>  </td><td>- wie L3 und zusätzlich die detaillierte Prognose der nächsten 24 Stunden </td></tr>
-       </table>
-       </ul>     
-       <br>       
-       </li><br>
-       
        <a name="disable"></a>
        <li><b>disable</b><br>
        Deaktiviert das Device. </li><br>
@@ -3504,15 +3974,62 @@ return;
        Ist interval explizit auf "0" gesetzt, erfolgt kein automatischer Datenabruf und muss mit "get &lt;name&gt; data" manuell
        erfolgen. <br><br>
        
-       <b>Hinweis:</b> 
-       Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
-       Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       <ul>
+         <b>Hinweis:</b> 
+         Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
+         Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+       </ul>
+       </li><br>
+       
+       <a name="plantLogbookApprovalState"></a>
+       <li><b>plantLogbookApprovalState</b><br>
+       Mit diesem Attribut werden die Einträge entsprechend ihres Status gefiltert. <br>
+       (default: Any)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>Any</b>          </td><td>-  alle Mitteilungen </td></tr>
+          <tr><td> <b>NotApproved</b>  </td><td>-  nicht bestätigte Mitteilungen </td></tr>
+       </table>
+       </ul>         
+       </li><br>
+       
+       <a name="plantLogbookTypes"></a>
+       <li><b>plantLogbookTypes</b><br>
+       Mit diesem Attribut werden die zu selektierenden Mitteilungstypen des Anlagenlogbuchs festgelegt. 
+       Es werden maximal die aktuellsten 25 Logbucheinträge aller eingestellten Typen angezeigt. <br>
+       (default: Warning,Disturbance,Error) 
+       </li><br>
+       
+       <a name="providerLevel"></a>
+       <li><b>providerLevel </b><br>
+       Es wird der Umfang der zu generierenden Daten eingestellt. Anlagen- und Verbraucherstammdaten werden immer abgerufen.
+       <br><br>
+    
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
+          <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
+          <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
+          <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
+          <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
+          <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
+          <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
+       </table>
+       </ul>     
+       <br>       
        </li><br>
        
        <a name="showPassInLog"></a>
        <li><b>showPassInLog</b><br>
-       Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. 
-       (default = 0) </li><br>
+       Wenn gesetzt, wird das verwendete Passwort im Logfile angezeigt. <br>
+       (default: 0) 
+       </li><br>
        
        <a name="userAgent"></a>
        <li><b>userAgent &lt;Kennung&gt; </b><br>
@@ -3522,7 +4039,8 @@ return;
         <ul>
          <b>Beispiel:</b><br>
          attr &lt;name&gt; userAgent Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0 <br>    
-        </ul>           
+        </ul>   
+        
        </li><br> 
 
        <a name="verbose5Data"></a>
@@ -3584,7 +4102,8 @@ return;
         "Time::Local": 0,
         "LWP": 0,
         "HTTP::Cookies": 0,
-        "MIME::Base64": 0
+        "MIME::Base64": 0,
+        "utf8": 0
       },
       "recommends": {
         "FHEM::Meta": 0
