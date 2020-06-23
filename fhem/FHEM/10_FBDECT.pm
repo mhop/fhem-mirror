@@ -78,6 +78,7 @@ FBDECT_Define($$)
   }
   $hash->{id} = $id;
   $hash->{props} = shift @a;
+  $hash->{webCmd} = "desired-temp" if($hash->{props} =~ m/actuator/);
 
   $modules{FBDECT}{defptr}{$ioNameAndId} = $hash;
   AssignIoPort($hash, $ioName);
@@ -508,6 +509,7 @@ FBDECT_ParseHttp($$$)
   }
 
   $hash->{props} = $fbprop; # replace values from define
+  $hash->{webCmd} = "desired-temp" if($hash->{props} =~ m/actuator/);
   readingsBeginUpdate($hash);
   Log3 $hash, 5, $hash->{NAME};
   foreach my $n (keys %h) {

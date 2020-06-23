@@ -1462,7 +1462,7 @@ FW_doDetail($)
   FW_addContent();
 
   if($FW_ss) {
-    my $webCmd = AttrVal($d, "webCmd", undef);
+    my $webCmd = AttrVal($d, "webCmd", $h->{webCmd});
     if($webCmd) {
       FW_pO "<table class=\"webcmd\">";
       foreach my $cmd (split(":", $webCmd)) {
@@ -1811,7 +1811,8 @@ FW_makeDeviceLine($$$$$)
 
   FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
   my $devName = FW_alias($d,$nameDisplay);
-  my $icon = AttrVal($d, "icon", "");
+  my $icon = AttrVal($d, "icon", $defs{$d}{icon});
+  $icon = "" if(!defined($icon));
   $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
 
   $devName="" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName}); # Forum 88667
@@ -1837,14 +1838,16 @@ FW_makeDeviceLine($$$$$)
   # Commands, slider, dropdown
   my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
   if((!$FW_ss || $smallscreenCommands) && $cmdlist) {
-    my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
+    my @a = split("[: ]", AttrVal($d, "cmdIcon", 
+                                $defs{$d}{cmdIcon} ? $defs{$d}{cmdIcon} : ""));
     Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);
     my %cmdIcon = @a;
 
     my @cl = split(":", $cmdlist);
-    my @wcl = split(":", AttrVal($d, "webCmdLabel", ""));
+    my $wclDefault = $defs{$d}{webCmdLabel} ? $defs{$d}{webCmdLabel} : "";
+    my @wcl = split(":", AttrVal($d, "webCmdLabel", $wclDefault));
     my $nRows;
-    $nRows = split("\n", AttrVal($d, "webCmdLabel", "")) if(@wcl);
+    $nRows = split("\n", AttrVal($d, "webCmdLabel", $wclDefault)) if(@wcl);
     @wcl = () if(@wcl != @cl);  # some safety
 
     for(my $i1=0; $i1<@cl; $i1++) {
@@ -2893,7 +2896,7 @@ FW_dev2image($;$)
   my ($name, $state) = @_;
   my $d = $defs{$name};
   return "" if(!$name || !$d);
-  my $devStateIcon = AttrVal($name, "devStateIcon", undef);
+  my $devStateIcon = AttrVal($name, "devStateIcon", $d->{devStateIcon});
   return "" if(defined($devStateIcon) && lc($devStateIcon)  eq 'none');
 
   my $type = $d->{TYPE};
@@ -3199,18 +3202,21 @@ FW_devState($$@)
   my ($hasOnOff, $link);
   return ("","","") if(!$FW_wname);
 
-  my $cmdList = AttrVal($d, "webCmd", "");
+  my $cmdList = AttrVal($d, "webCmd", $defs{$d}{webCmd});
+  $cmdList = "" if(!defined($cmdList));
   my $allSets = FW_widgetOverride($d, getAllSets($d, $FW_chash));
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
   my $txt = $state;
-  my $dsi = ($attr{$d} && ($attr{$d}{stateFormat} || $attr{$d}{devStateIcon}));
+  my ($ad,$hash) = ($attr{$d}, $defs{$d});
+  my $dsi = ($ad && ($ad->{stateFormat}||$ad->{webCmd}||$ad->{devStateIcon})) ||
+             $hash->{webCmd} || $hash->{devStateIcon};
 
   $hasOnOff = ($allSets =~ m/(^| )on(:[^ ]*)?( |$)/i &&
                $allSets =~ m/(^| )off(:[^ ]*)?( |$)/i);
   if(AttrVal($d, "showtime", undef)) {
-    my $v = $defs{$d}{READINGS}{state}{TIME};
+    my $v = $hash->{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
   } elsif(!$dsi && $allSets =~ m/\bdesired-temp:/) {
@@ -3290,19 +3296,17 @@ FW_devState($$@)
     $txt = $html;
   }
 
-  my $style = AttrVal($d, "devStateStyle", "");
+  my $style = AttrVal($d, "devStateStyle", $hash->{devStateStyle});
+  $style = "" if(!defined($style));
 
   $state =~ s/"//g;
   $state =~ s/<.*?>/ /g; # remove HTML tags for the title
   $txt = "<div id=\"$d\" $style title=\"$state\" class=\"col2\">$txt</div>";
 
-  my $type = $defs{$d}{TYPE};
+  my $type = $hash->{TYPE};
   my $sfn = $modules{$type}{FW_summaryFn};
   if($sfn) {
-    if(!defined($extPage)) {
-       my %hash;
-       $extPage = \%hash;
-    }
+    $extPage = {} if(!defined($extPage));
     no strict "refs";
     my $newtxt = &{$sfn}($FW_wname, $d, $rf ? $FW_room : "", $extPage);
     use strict "refs";

@@ -372,6 +372,7 @@ FHT_Define($$)
      }
   }
 
+  $hash->{webCmd} = "desired-temp"; # Hint for FHEMWEB
   $modules{FHT}{defptr}{$a[2]} = $hash;
 
   #Log3 $a[0], 2, "Asking the FHT device $a[0]/$a[2] to send its data";
@@ -572,7 +573,7 @@ FHT_Parse($$)
 
   readingsBulkUpdate($def, $cmd, $val);
   if($cmd eq "measured-temp") {
-    readingsBulkUpdate($def, "state", "measured-temp: $val", 0);
+    readingsBulkUpdate($def, "state", "$val C", 0);
     readingsBulkUpdate($def, "temperature", $val); # For dewpoint
   }    
 

@@ -639,6 +639,7 @@ my %zwave_cmdArgs = (
     indicatorDim => "slider,0,1,99",
     rgb          => "colorpicker,RGB",
     configRGBLedColorForTesting => "colorpicker,RGB", # Aeon SmartSwitch 6
+    "desired-temp" => "slider,7,1,28,1",
   },
   get => {
   },
@@ -2303,6 +2304,8 @@ ZWave_SetClasses($$$$)
   $attr{$name}{classes} = join(" ", @classes)
         if(@classes && !$attr{$name}{classes});
   $def->{DEF} = "$homeId ".hex($id);
+  $def->{webCmd} = "desired-temp"
+        if($attr{$name}{classes} =~ m/\bTHERMOSTAT_SETPOINT\b/);
   return "";
 }
 
@@ -5361,6 +5364,10 @@ ZWave_Attr(@)
     }
     return undef;
 
+  } elsif($attrName eq "classes" && $type eq "set") {
+    $hash->{webCmd} = "desired-temp"
+          if($param =~ m/\bTHERMOSTAT_SETPOINT\b/);
+
   } elsif($attrName eq "vclasses") {
     if($type eq "del") {
       $hash->{".vclasses"} = {};
@@ -6569,7 +6576,7 @@ ZWave_firmwareUpdateParse($$$)
       </ul>
     </li>
   <li>desired-temp value<br>
-    same as thermostatSetpoint, used to make life easier for helper-modules
+    same as thermostatSetpointSet, used to make life easier for helper-modules
     </li>
 
   <br><br><b>Class TIME, V2</b>
