@@ -29,7 +29,8 @@ use HttpUtils;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch'; 
 
 # Version History intern by DS_Starter:
-our %DbLog_vNotesIntern = (
+my %DbLog_vNotesIntern = (
+  "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
   "4.10.1"  => "22.06.2020 configCheck changed for SQLite ",
   "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
   "4.9.13"  => "12.05.2020 commandRef changed, AutoInactiveDestroy => 1 for dbh ",
@@ -3970,7 +3971,7 @@ sub DbLog_configcheck($) {
                     "<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
       } else {
           $check .= $wall;
-          $rec = "settings o.k.";
+          $rec    = "settings o.k.";
       }          
       $check .= "<br>";
       $check .= "<b>Recommendation:</b> $rec <br><br>"; 
@@ -4010,9 +4011,9 @@ sub DbLog_configcheck($) {
       }
   }
   if($dbmodel =~ /SQLITE/) {
-      my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
-      $cdat_dev = $dev // "no result";
-      $cdat_typ = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
+      my $dev     = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$history'"))[0];
+      $cdat_dev   = $dev // "no result";
+      $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
       ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
       ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
       ($cdat_evt) = $cdat_evt =~ /EVENT.varchar\(([\d]+)\)/x;
@@ -4101,15 +4102,15 @@ sub DbLog_configcheck($) {
       }
   }
   if($dbmodel =~ /SQLITE/) {
-      my $dev = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$current'"))[0];
-      $cdat_dev = $dev?$dev:"no result";
-      $cdat_typ = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
-      $cdat_dev =~ s/.*DEVICE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_typ =~ s/.*TYPE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_evt =~ s/.*EVENT.varchar\(([\d]*)\).*/$1/e;
-      $cdat_rdg =~ s/.*READING.varchar\(([\d]*)\).*/$1/e;
-      $cdat_val =~ s/.*VALUE.varchar\(([\d]*)\).*/$1/e;
-      $cdat_unt =~ s/.*UNIT.varchar\(([\d]*)\).*/$1/e;
+      my $dev     = (DbLog_sqlget($hash,"SELECT sql FROM sqlite_master WHERE name = '$current'"))[0];
+      $cdat_dev   = $dev // "no result";
+      $cdat_typ   = $cdat_evt = $cdat_rdg = $cdat_val = $cdat_unt = $cdat_dev;
+      ($cdat_dev) = $cdat_dev =~ /DEVICE.varchar\(([\d]+)\)/x;
+      ($cdat_typ) = $cdat_typ =~ /TYPE.varchar\(([\d]+)\)/x;
+      ($cdat_evt) = $cdat_evt =~ /EVENT.varchar\(([\d]+)\)/x;
+      ($cdat_rdg) = $cdat_rdg =~ /READING.varchar\(([\d]+)\)/x;
+      ($cdat_val) = $cdat_val =~ /VALUE.varchar\(([\d]+)\)/x;
+      ($cdat_unt) = $cdat_unt =~ /UNIT.varchar\(([\d]+)\)/x;
   }
   if ($dbmodel !~ /SQLITE/)  { 
       $cdat_dev = @sr_dev?($sr_dev[1]):"no result";
@@ -4256,7 +4257,7 @@ sub DbLog_configcheck($) {
   my (@dix,@dix_rdg,@dix_tsp,$irep_rdg,$irep_tsp);
   my $isused = 0;
   my @repdvs = devspec2array("TYPE=DbRep");
-  $check .= "<u><b>Result of check 'Report_Idx' availability for DbRep-devices</u></b><br><br>";
+  $check    .= "<u><b>Result of check 'Report_Idx' availability for DbRep-devices</u></b><br><br>";
   
   foreach (@repdvs) {
       $dbrp = $_;
@@ -4347,6 +4348,7 @@ sub DbLog_configcheck($) {
               }
           }
       }
+      
   } else {
       $check .= "No DbRep-device assigned to $name is used. Hence an index for DbRep isn't needed. <br>";
       $rec    = "settings o.k.";
