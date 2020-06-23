@@ -456,7 +456,7 @@ DevIo_OpenDev($$$;$)
   } elsif($dev =~ m,^(ws:|wss:)?([^/:]+):([0-9]+)(.*?)$,) {# TCP or websocket
    
     my ($proto, $host, $port, $path) = ($1 ? $1 : "", $2, $3, $4);
-    $dev = "$host:$port";
+    my $hp = "$host:$port";
     if($proto eq "wss:")  {
       $hash->{SSL} = 1;
       $proto = "ws:";
@@ -521,7 +521,7 @@ DevIo_OpenDev($$$;$)
 
       my $err = HttpUtils_Connect({     # Nonblocking
         timeout => $timeout,
-        url     => $hash->{SSL} ? "https://$dev$path" : "http://$dev$path",
+        url     => $hash->{SSL} ? "https://$hp$path" : "http://$hp$path",
         NAME    => $hash->{NAME},
         sslargs => $hash->{sslargs} ? $hash->{sslargs} : {},
         noConn2 => $proto eq "ws:" ? 0 : 1,
@@ -542,8 +542,8 @@ DevIo_OpenDev($$$;$)
 
     } else {    # blocking connect
       my $conn = $haveInet6 ? 
-          IO::Socket::INET6->new(PeerAddr => $dev, Timeout => $timeout) :
-          IO::Socket::INET ->new(PeerAddr => $dev, Timeout => $timeout);
+          IO::Socket::INET6->new(PeerAddr => $hp, Timeout => $timeout) :
+          IO::Socket::INET ->new(PeerAddr => $hp, Timeout => $timeout);
       return "" if(!&$doTcpTail($conn)); # no callback: no doCb
     }
 
