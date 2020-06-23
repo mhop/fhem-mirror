@@ -362,7 +362,7 @@ my %SSCAM_imc = (                                             # disbled String m
 my $SSCam_slim     = 3;                                   # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum     = "1,2,3,4,5,6,7,8,9,10";              # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCam_compstat = "8.2.7";                             # getestete SVS-Version
-my $SSCam_valZoom  = "uzsuSelectRadio,+,stop,-";          # Inhalt des Setters "setZoom"
+my $SSCam_valZoom  = "uzsuSelectRadio,.++,+,-,--.";     # Inhalt des Setters "setZoom"
 
 use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -1149,7 +1149,8 @@ sub SSCam_Set {
         
   } elsif ($opt eq "setZoom" && SSCam_IsModelCam($hash)) {
 	  if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      $prop = $prop // "+";                         # "+" in Taste wird als undef geliefert 
+      $prop = $prop // "+";                         # Korrektur -> "+" in Taste wird als undef geliefert 
+      $prop = ".++" if($prop eq ".");               # Korrektur -> ".++" in Taste wird als "." geliefert       
       SSCam_setZoom ("$name!_!$prop");
         
   } elsif ($opt eq "snapGallery" && SSCam_IsModelCam($hash)) {
@@ -2882,18 +2883,23 @@ sub SSCam_setZoom {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         my %zd = (
-            "+"    => {dir => "in",  moveType => "Start" },
-            "stop" => {dir => undef, moveType => "Stop"  },
-            "-"    => {dir => "out", moveType => "Start" }
+            "+"    => {dir => "in",  sttime => 1,     moveType => "Start" },
+            ".++"  => {dir => "in",  sttime => 3,     moveType => "Start" },
+            "stop" => {dir => undef, sttime => undef, moveType => "Stop"  },
+            "-"    => {dir => "out", sttime => 1,     moveType => "Start" },
+            "--."  => {dir => "out", sttime => 3,     moveType => "Start" }
         );
 
         $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};         # Richtung (in / out)
         $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                                  # Start / Stop
+        $hash->{HELPER}{ZOOM}{STOPTIME} = $zd{$op}{sttime};                                    # Stopzeit -> Verzögerungszeit für Stop nach Start
         $hash->{OPMODE}                 = "setZoom";
         $hash->{HELPER}{LOGINRETRIES}   = 0;
         
         return if(!$hash->{HELPER}{ZOOM}{DIR});                                                # es muss ! eine Richtung gesetzt sein
 	
+        InternalTimer(gettimeofday()+$zd{$op}{sttime}, "SSCam_setZoom", "$name!_!stop", 0) if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop");
+        
         SSCam_setActiveToken($hash);
         SSCam_getapisites   ($hash);
 		
@@ -4868,7 +4874,8 @@ sub SSCam_camop {
       # Zoom in / stop / out
       my $dir      = $hash->{HELPER}{ZOOM}{DIR};
       my $moveType = $hash->{HELPER}{ZOOM}{MOVETYPE};
-      Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType"});
+      my $sttime   = $hash->{HELPER}{ZOOM}{STOPTIME} // "";
+      Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType:$sttime"});
       
 	  $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
       
@@ -5287,8 +5294,6 @@ sub SSCam_camop_parse {
                 readingsEndUpdate  ($hash, 1);
        
                 Log3($name, 3, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
-            
-                InternalTimer(gettimeofday()+1.0, "SSCam_setZoom", "$name!_!stop", 0) if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop");
             
 			} elsif ($OpMode eq "GetRec") {              
                 my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
@@ -7160,9 +7165,10 @@ sub SSCam_IsCapHLS {                                                            
 return $cap;
 }
 
-sub SSCam_IsCapZoom {                                                           # Zoomeigenschaft
+sub SSCam_IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
+
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7171,6 +7177,7 @@ return $cap;
 sub SSCam_IsCapPTZPan {                                                         # PTZ Pan Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
+  
   my $cap = ReadingsVal($name, "CapPTZPan", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7179,6 +7186,7 @@ return $cap;
 sub SSCam_IsCapPTZTilt {                                                        # PTZ Tilt Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
+  
   my $cap = ReadingsVal($name, "CapPTZTilt", "false") ne "false" ? 1 : 0;
   
 return $cap;
