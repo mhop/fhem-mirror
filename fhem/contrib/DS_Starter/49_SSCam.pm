@@ -886,24 +886,24 @@ sub SSCam_Set {
 	     		 "createReadingsGroup ".
                  "createSnapGallery:noArg ".
                  "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "createPTZcontrol:noArg " : "").
+                 (SSCam_IsCapPTZPan($hash) ? "createPTZcontrol:noArg " : "").
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
                  ((ReadingsVal("$name", "CapPIR", "false") ne "false") ? "pirSensor:activate,deactivate " : "").
                  "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setPreset ": "").
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
+                 (SSCam_IsCapPTZPan($hash) ? "setPreset ": "").
+                 (SSCam_IsCapPTZPan($hash) ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
+                 (SSCam_IsCapPTZPan($hash) ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
                  ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "startTracking:noArg " : "").
                  ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "stopTracking:noArg " : "").
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                 ((ReadingsVal("$name", "CapPTZPan", "false") ne "false") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                 (SSCam_IsCapPTZPan($hash) ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                 (SSCam_IsCapPTZPan($hash) ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                  ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
                  ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
-                 ( SSCam_IsCapZoom($hash) ? "setZoom:$SSCam_valZoom " : "").
+                 (SSCam_IsCapZoom($hash) ? "setZoom:$SSCam_valZoom " : "").
                  "";
   } else {
       # setlist für SVS Devices
@@ -3991,7 +3991,7 @@ sub SSCam_getptzlistpreset {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
-    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | ReadingsVal("$name", "CapPTZPan", "") eq "false") {
+    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | !SSCam_IsCapPTZPan($hash)) {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname has no capability to tilt/pan");
         return;
     }
@@ -4023,7 +4023,7 @@ sub SSCam_getptzlistpatrol {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
-    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | ReadingsVal("$name", "CapPTZPan", "") eq "false") {
+    if (ReadingsVal("$name", "CapPTZTilt", "") eq "false" | !SSCam_IsCapPTZPan($hash)) {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname has no capability to tilt/pan");
         return;
     }
@@ -6619,21 +6619,21 @@ sub SSCam_camop_parse {
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"CapPTZAutoFocus",$data->{'data'}{'ptzAutoFocus'});
-                readingsBulkUpdate($hash,"CapAudioOut",$data->{'data'}{'audioOut'});
-                readingsBulkUpdate($hash,"CapChangeSpeed",$data->{'data'}{'ptzSpeed'});
-                readingsBulkUpdate($hash,"CapPTZHome",$data->{'data'}{'ptzHome'});
-                readingsBulkUpdate($hash,"CapPTZAbs",$data->{'data'}{'ptzAbs'});
-                readingsBulkUpdate($hash,"CapPTZDirections",$data->{'data'}{'ptzDirection'});
-                readingsBulkUpdate($hash,"CapPTZFocus",$ptzfocus);
-                readingsBulkUpdate($hash,"CapPTZIris",$ptziris);
-                readingsBulkUpdate($hash,"CapPTZObjTracking",$data->{'data'}{'ptzHasObjTracking'});
-                readingsBulkUpdate($hash,"CapPTZPan",$ptzpan);
-                readingsBulkUpdate($hash,"CapPTZPresetNumber",$data->{'data'}{'ptzPresetNumber'});
-                readingsBulkUpdate($hash,"CapPTZTilt",$ptztilt);
-                readingsBulkUpdate($hash,"CapPTZZoom",$ptzzoom);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdate($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
+                readingsBulkUpdate($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
+                readingsBulkUpdate($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
+                readingsBulkUpdate($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
+                readingsBulkUpdate($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
+                readingsBulkUpdate($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
+                readingsBulkUpdate($hash,"CapPTZFocus",        $ptzfocus                            );
+                readingsBulkUpdate($hash,"CapPTZIris",         $ptziris                             );
+                readingsBulkUpdate($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
+                readingsBulkUpdate($hash,"CapPTZPan",          $ptzpan                              );
+                readingsBulkUpdate($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
+                readingsBulkUpdate($hash,"CapPTZTilt",         $ptztilt                             );
+                readingsBulkUpdate($hash,"CapPTZZoom",         $ptzzoom                             );
+                readingsBulkUpdate($hash,"Errorcode",          "none"                               );
+                readingsBulkUpdate($hash,"Error",              "none"                               );
                 readingsEndUpdate($hash, 1);
                   
                 Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
@@ -7162,7 +7162,16 @@ sub SSCam_IsCapZoom {                                                           
   my $hash = shift;
   my $name = $hash->{NAME};
   return 1;
-  my $cap = ReadingsVal($name,"CapPTZZoom","false") eq "true" ? 1 : 0;
+  my $cap = ReadingsVal($name,"CapPTZZoom","false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
+sub SSCam_IsCapPTZPan {                                                         # PTZ Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  return 1;
+  my $cap = ReadingsVal($name,"CapPTZPan","false") ne "false" ? 1 : 0;
   
 return $cap;
 }
