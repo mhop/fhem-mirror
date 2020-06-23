@@ -10,9 +10,12 @@ use SetExtensions;
 sub FBDECT_Parse($$@);
 sub FBDECT_Set($@);
 sub FBDECT_Get($@);
-sub FBDECT_Cmd($$@);
 
 sub FBDECT_decodePayload($$$);
+sub FBDECT_adjustHueSat($$);
+sub FBDECT_colName($);
+sub FBDECT_colVal($$$);
+sub FBDECT_getDiscreteSat($$);
 
 my @fbdect_models = qw(Powerline546E Dect200 CometDECT HAN-FUN);
 
@@ -106,6 +109,16 @@ FBDECT_SetHttp($@)
   if($p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
     $cmd{open} = $cmd{closed} = $cmd{stop} = "noArg";
   }
+  if($p =~ m/HANFUNUnit/ && $unittype eq "DIMMABLE_COLOR_BULB") {
+    $cmd{"color"} = "select,red,orange,yellow,lawngreen,green,turquoise,".
+                        "cyan,azure,blue,violet,magenta,pink";
+    $cmd{"satindex"}         = "slider,1,1,3,1";
+    $cmd{"colortemperature"} = "colorpicker,CT,2700,100,6500";
+    $cmd{"hue"}              = "colorpicker,HUE,0,1,359";
+    $cmd{"saturation"}       = "slider,0,1,255";
+    $cmd{off} = $cmd{on} = $cmd{toggle} = "noArg";
+  }
+
   if(!$cmd{$a[1]}) {
     my $cmdList = join(" ", map { "$_:$cmd{$_}" } sort keys %cmd);
     return SetExtensions($hash, $cmdList, @a)
@@ -156,6 +169,113 @@ FBDECT_SetHttp($@)
     return undef;
   }
 
+  if($cmd eq "color") {
+    return "Usage: set $name color [colorname]"
+        if(int(@a) != 2 && int(@a) != 3);
+    my $color = defined($a[2]) ? $a[2] : FBDECT_colVal($hash,"color","yellow");
+    my $satindex = FBDECT_colVal($hash, "satindex", 1);
+    my ($hue, $saturation) = FBDECT_adjustHueSat($color, $satindex);
+    $hash->{hue}        = $hue;
+    $hash->{saturation} = $saturation;
+    $hash->{color}      = $color;
+    Log3 $name,5,
+        "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
+    IOWrite($hash, ReadingsVal($name,"AIN",0),
+        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    return undef;
+  }
+  
+  if($cmd eq "satindex") {
+    return "Usage: set $name satindex [saturation-index]"
+        if(int(@a) != 2 && int(@a) != 3);
+    my $satindex = defined($a[2]) ? $a[2] : FBDECT_colVal($hash, "satindex", 1);
+    my $color = FBDECT_colVal($hash, "color", "yellow");
+    my ($hue, $saturation) = FBDECT_adjustHueSat($color,$satindex);
+    $hash->{saturation} = $saturation;
+    $hash->{satindex}   = $satindex;
+    Log3 $name,5,
+        "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
+    IOWrite($hash, ReadingsVal($name,"AIN",0),
+        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    return undef;
+  }
+
+  if($cmd eq "saturation") {
+    return "Usage: set $name saturation value"
+        if(int(@a) != 3 || $a[2] !~ m/^\d+$/ || !($a[2]>=0 && $a[2]<=255));
+    my $color = FBDECT_colVal($hash, "color", "yellow");
+    my $hue   = FBDECT_colVal($hash, "hue", 52);
+    my $saturation = $a[2];
+    my $satindex;
+    ($satindex, $saturation) = FBDECT_getDiscreteSat($color, $saturation);
+    $hash->{saturation} = $saturation;
+    $hash->{satindex} = $satindex;
+    Log3 $name,5,
+        "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
+    IOWrite($hash, ReadingsVal($name,"AIN",0),
+        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    return undef;
+  }
+    
+    
+    
+  if($cmd eq "colortemperature") {
+    return "Usage: set $name colortemperature [temperature]"
+        if(int(@a) != 2 && int(@a) != 3);
+    my $initialTemperature = FBDECT_colVal($hash, "colortemperature", 4200);
+    my $setTemperature = defined($a[2]) ? $a[2] : $initialTemperature;
+    my $tempunit = "kelvin";
+    my $colortemperature = $setTemperature;
+    if($setTemperature < 2000) { # get temp in Kelvin if given in mireds
+      $tempunit = "mired";
+      $colortemperature = int(1000000 / $setTemperature + 0.5);
+    }
+    my @discreteTemp = (2700,3000,3400,3800,4200,4700,5300,5900,6500,99999);
+    for(my $i = 0; $i < int(@discreteTemp)-1; $i++) {
+      if($colortemperature <
+         $discreteTemp[$i] + ($discreteTemp[$i+1]-$discreteTemp[$i])/2 ) {
+           $colortemperature = $discreteTemp[$i];
+           last;
+      }
+    }
+    # sending setcolortemperature will switch the mode to white. Homebridge
+    # sends ct (mireds) along with hue when in color mode => only
+    # setcolortemperature if kelvin or if temp changed
+    if($colortemperature != $initialTemperature || $tempunit eq "kelvin") {
+      $hash->{colortemperature} = $colortemperature;
+      Log3 $name,5, "$name: raw setcolortemperature&".
+                        "temperature=$colortemperature&duration=0";
+      IOWrite($hash, ReadingsVal($name,"AIN",0),
+                "setcolortemperature&temperature=$colortemperature&duration=0");
+    }
+    return undef;
+  }
+
+  if($cmd eq "hue") {
+    return "Usage: set $name hue huevalue"
+        if(int(@a) != 3 || $a[2] !~ m/^\d+$/ || !($a[2]>=0 && $a[2]<=359));
+    my $satindex = FBDECT_colVal($hash, "satindex", 1);
+    my $hue = $a[2];
+    my $saturation;
+    my @discreteHue = (35,52,92,120,160,195,212,225,266,296,335,358,9999);
+    for(my $i = 0; $i < int(@discreteHue)-1; $i++) {
+      if($hue < $discreteHue[$i] + ($discreteHue[$i+1]-$discreteHue[$i])/2 ) {
+        $hue = $discreteHue[$i];
+        last;
+      }
+    }
+    my $color = FBDECT_colName($hue);
+    ($hue, $saturation) = FBDECT_adjustHueSat($color,$satindex);
+    $hash->{color} = $color;
+    $hash->{hue} = $hue;
+    $hash->{saturation} = $saturation;
+    Log3 $name,5,
+        "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
+    IOWrite($hash, ReadingsVal($name,"AIN",0),
+        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    return undef;
+  }
+  
   return "Internal Error, unknown command $cmd";
 }
 
@@ -283,6 +403,10 @@ my %fbhttp_readings = (
    lastpressedtimestamp => '"lastpressedtimestamp:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
    lastpressedtimestamp_kurz => '"lastpressedtimestamp_kurz:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
    lastpressedtimestamp_lang => '"lastpressedtimestamp_lang:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   hue             => '"hue:$val"',
+   current_mode    => '"current_mode:$val"',
+   saturation      => '"saturation:$val"',
+   temperature     => '"colortemperature:$val"',
 );
 
 sub
@@ -296,7 +420,7 @@ FBDECT_ParseHttp($$$)
   $omsg = $msg;
   $omsg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
   $omsg = $msg;
-  $omsg =~ s, ([a-z]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+  $omsg =~ s, ([a-z_]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
 
   if($h{lastpressedtimestamp}) { # Dect400/#94700
     sub dp($$$);
@@ -401,6 +525,27 @@ FBDECT_ParseHttp($$$)
         if($ptyp eq "batterylow");
     readingsBulkUpdate($hash, "batteryPercent", $val) # 87575/96302
         if($ptyp eq "battery");
+    if($val && $ptyp eq "colortemperature") {
+      readingsBulkUpdate($hash, "colortemperaturemireds",
+                $val>0 ? int(1000000/$val+0.5) : "");
+      readingsBulkUpdate($hash, $ptyp, $val);
+      $hash->{$ptyp} = $val;
+    }
+    if($val && $ptyp eq "hue") {
+      readingsBulkUpdate($hash, "color", FBDECT_colName($val));
+      $hash->{color} = FBDECT_colName($val);
+      $hash->{hue} = $val;
+    }
+    if ($val && $ptyp eq "saturation") {
+      my $color = FBDECT_colVal($hash, "color", "yellow");
+      my ($satindex, $sat) = FBDECT_getDiscreteSat($color, $val);
+      readingsBulkUpdate($hash, "satindex", $satindex);
+      $hash->{saturation} = $val;
+      $hash->{satindex} = $satindex;
+    }
+    readingsBulkUpdate($hash, "colormode", $val eq "1" ? "color" : "white")
+        if($ptyp eq "current_mode");
+
   }
   readingsEndUpdate($hash, 1);
 
@@ -590,7 +735,8 @@ FBDECT_decodePayload($$$)
   my $ptyp = hex(substr($d, 0, 8));
   my $plen = hex(substr($d, 8, 4));
   if(length($d) < 16+$plen*2) {
-    Log3 $hash, 4, "FBDECT ignoring payload: data shorter than given length($plen)";
+    Log3 $hash, 4,
+        "FBDECT ignoring payload: data shorter than given length($plen)";
     return ("", "", "");
   }
   my $pyld = substr($d, 16, $plen*2);
@@ -603,6 +749,69 @@ FBDECT_decodePayload($$$)
     $ptyp = ($pyld ? $fbdect_payload{$ptyp}{n} : "");
   }
   return ($ptyp, $plen, $pyld);
+}
+
+###################################
+# Color helpers
+my %colordefaults = (
+  red       => { hue=>358, sat=>[180, 112, 54] },
+  orange    => { hue=> 35, sat=>[214, 140, 72] },
+  yellow    => { hue=> 52, sat=>[153, 102, 51] },
+  lawngreen => { hue=> 92, sat=>[123,  79, 38] },
+  green     => { hue=>120, sat=>[160,  82, 38] },
+  turquoise => { hue=>160, sat=>[145,  84, 41] },
+  cyan      => { hue=>195, sat=>[179, 118, 59] },
+  azure     => { hue=>212, sat=>[169, 110, 56] },
+  blue      => { hue=>225, sat=>[204, 135, 67] },
+  violet    => { hue=>266, sat=>[169, 110, 54] },
+  magenta   => { hue=>296, sat=>[140,  92, 46] },
+  pink      => { hue=>335, sat=>[180, 107, 51] }
+);
+
+sub
+FBDECT_adjustHueSat($$)
+{
+  my ($color, $satindex) = @_;
+  return FBDECT_adjustHueSat("yellow", $satindex) if(!$colordefaults{$color});
+  return FBDECT_adjustHueSat($color, 1) if($satindex < 1 || $satindex > 3);
+  return ($colordefaults{$color}{hue},$colordefaults{$color}{sat}[$satindex-1]);
+}
+
+sub
+FBDECT_colName($)
+{
+  my ($hue) = @_;
+  foreach my $k (keys %colordefaults) {
+    return $k if($hue eq $colordefaults{$k}{hue});
+  }
+  return "yellow";
+}
+
+sub
+FBDECT_colVal($$$)
+{
+  my ($hash,$cname,$default) = @_;
+  return $hash->{$cname} if($hash->{$cname});
+  return ReadingsVal($hash->{NAME}, $cname, $default);
+}
+
+
+sub
+FBDECT_getDiscreteSat($$)
+{
+  my ($color, $saturation) = @_;
+  my $satindex = 3;
+  $color = "yellow" if(!$colordefaults{$color});
+  my @discreteSat = (@{$colordefaults{$color}{sat}}, 9999);
+  for(my $i=0; $i<3; $i++) {
+    if($saturation <
+       $discreteSat[$i] + ($discreteSat[$i+1]-$discreteSat[$i])/2 ) {
+      $saturation = $discreteSat[$i];
+      $satindex = 3 - $i;
+      last;
+    }
+  }
+  return ($satindex, $saturation);
 }
 
 #####################################
@@ -676,10 +885,48 @@ FBDECT_Undef($$)
     Number of seconds between the sensor messages (FBAHA IODev only).
     </li>
 
+  <li>color &lt;colorname&gt;<br>
+    Color name for color bulbs: red, orange, yellow, lawngreen, green, 
+    turquoise, cyan, azure, blue, violet, magenta, pink.
+    If the bulb was in "white" mode, it will change to "color" mode.
+    </li>
+
+  <li>colortemperature &lt;temperature&gt;<br>
+    Color temperature in Kelvin (&gt; 2000) otherwise micro-reciprocal degrees
+    (mired).  If temperature is not given, it will only change from "color" to
+    "white" mode.  As the Fritzbox only accepts pre-defined values, it will be
+    set back to the nearest authorized value in Kelvin (run <i>set
+    &lt;devicename&gt; raw getcolordefaults</i> to know the accepted values).
+    If the bulb was in "color" mode, it will change to "white" mode, except if
+    temperature given in mireds leads to no change of temperature in Kelvin.
+    </li>
+
+  <li>sat_index &lt;index&gt;<br>
+    Index from 1 to 3 of accepted saturation levels. Sets the bulb to the 
+    corresponding saturation for the set color.
+    If the bulb was in "white" mode, it will change to "color" mode.
+    </li>
+
+  <li>hue &lt;huevalue&gt;<br>
+    Hue value from 0 to 359. As the Fritzbox only accepts pre-defined values,
+    it will be set back to the nearest authorized value.  (run <i>set
+    &lt;devicename&gt; raw getcolordefaults</i> to know the accepted values).
+    The saturation will change to the accepted saturation for the color and
+    sat_index set.  If the bulb was in "white" mode, it will change to "color"
+    mode.  </li>
+
+  <li>saturation &lt;value&gt;<br>
+    Color saturation from 0 to 255. As the Fritzbox only accepts pre-defined
+    values, it will be set back to the nearest authorized value for the set
+    color (run <i>set &lt;devicename&gt; raw getcolordefaults</i> to know the
+    accepted values for each color).  If the bulb was in "white" mode, it will
+    change to "color" mode.  </li>
+
   <li>raw ...<br>
     Used for debugging.<br>
     Sends switchcmd=..., further parameters are joined with &amp;.
     </li>
+
   </ul>
   <br>
 
@@ -784,6 +1031,45 @@ FBDECT_Undef($$)
   <li>msgInterval &lt;sec&gt;<br>
     Anzahl der Sekunden zwischen den Sensornachrichten (nur mit FBAHA als
     IODev).
+    </li>
+    
+  <li>color &lt;colorname&gt;<br>
+    Farbname f&uuml;r Farbbirnen: rot, orange, gelb, grassgr&uuml;n, gr&uuml;n,
+    t&uuml;rkis, cyan, himmelblau, blau, violett, magenta, rosa .  Wenn die
+    Gl&uuml;hbirne im "white" Modus war, wechselt sie in den Modus "color"
+    </li>
+
+  <li>colortemperature &lt;Temperatur&gt;<br>
+    Farbtemperatur in Kelvin wenn &gt; 2000 sonst mireds. Da die Fritzbox nur
+    vordefinierte Werte unterst&uuml;tzt, wird sie auf den n&auml;chstliegenden
+    unterst&uuml;tzten Wert in Kelvin zur&uuml;ckgesetzt (um die
+    unterst&uuml;tzte Werte zu kennen, <i>set &lt;devicename&gt; raw
+    getcolordefaults</i> ausführen).  Wenn die Gl&uuml;hbirne im "color" Modus
+    war, wechselt sie in den Modus "white", ausser wenn die in mireds
+    eingegebene Temperatur zu keine Aenderung der Temperatur in Kelvin
+    f&uuml;hrt.  </li>
+
+  <li>sat_index &lt;index&gt;<br>
+    Index von 1 bis 3 der akzeptierten S&auml;ttigungsstufen. Setzt die
+    Gl&uuml;hbirne auf die entsprechende S&auml;ttigung f&uuml;r die
+    eingestellte Farbe.  Wenn die Gl&uuml;hbirne im "white" Modus war, wechselt
+    sie in den Modus "color" </li>
+
+  <li>hue &lt;huevalue&gt;<br>
+    Hue Wert von 0 bis 359. Da die Fritzbox nur vordefinierte Werte
+    unterst&uuml;tzt, wird sie auf den n&auml;chstliegenden unterst&uuml;tzten
+    Wert zur&uuml;ckgesetzt (um die unterst&uuml;tzte Werte zu kennen, <i>set
+    &lt;devicename&gt; raw getcolordefaults</i> ausführen).  Die
+    S&auml;ttigung wird auf die f&uuml;r die Farbe und sat_index akzeptierte
+    S&auml;ttigung ge&auml;ndert.  Wenn die Gl&uuml;hbirne im "white" Modus
+    war, wechselt sie in den Modus "color" </li>
+
+  <li>saturation &lt;Wert&gt;<br>
+    Farbs&auml;ttigung von 0 bis 255. Da die Fritzbox nur vordefinierte Werte
+    unterst&uuml;tzt, wird sie auf den n&auml;chstliegenden unterst&uuml;tzten
+    Wert zur&uuml;ckgesetzt (um die unterst&uuml;tzte Werte zu kennen, <i>set
+    &lt;devicename&gt; raw getcolordefaults</i> ausf&uuml;hren).  Wenn die
+    Gl&uuml;hbirne im "white" Modus war, wechselt sie in den Modus "color"
     </li>
 
   <li>raw ...<br>
