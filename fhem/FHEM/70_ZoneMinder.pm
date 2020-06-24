@@ -99,7 +99,12 @@ sub ZoneMinder_Define {
   my $triggerPortState = $hash->{STATE};
   ZoneMinder_updateState( $hash, $triggerPortState, 'n/a' );
 
-  ZoneMinder_afterInitialized($hash);
+  if (!$init_done) {
+    InternalTimer(gettimeofday()+5, "ZoneMinder_afterInitialized", $hash, 0);
+  }
+  else {
+    ZoneMinder_afterInitialized($hash);
+  }
 
   return undef;
 }
