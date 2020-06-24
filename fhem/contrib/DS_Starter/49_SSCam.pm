@@ -2883,11 +2883,11 @@ sub SSCam_setZoom {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         my %zd = (
-            "+"    => {dir => "in",  sttime => 0.5,     moveType => "Start" },
-            ".++"  => {dir => "in",  sttime => 3,     moveType => "Start" },
+            "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start" },
+            ".++"  => {dir => "in",  sttime => 6,     moveType => "Start" },
             "stop" => {dir => undef, sttime => undef, moveType => "Stop"  },
-            "-"    => {dir => "out", sttime => 0.5,     moveType => "Start" },
-            "--."  => {dir => "out", sttime => 3,     moveType => "Start" }
+            "-"    => {dir => "out", sttime => 0.5,   moveType => "Start" },
+            "--."  => {dir => "out", sttime => 6,     moveType => "Start" }
         );
 
         $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};         # Richtung (in / out)
