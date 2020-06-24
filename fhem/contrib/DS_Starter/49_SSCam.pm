@@ -143,91 +143,91 @@ my %SSCam_vNotesIntern = (
 
 # Versions History extern
 my %SSCam_vNotesExtern = (
-  "9.1.0"  => "10.12.2019 With the new attribute \"snapChatTxt\" it is possible to send snapshots by the Synology Chat server. ".
-                          "Please read more information about the possibilities in the ".
-                          "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Versand_von_Aufnahmen_und_Schnappsch.C3.BCssen_mit_Synology_Chat_.28SSChatBot.29\">Wiki</a>. ",
-  "9.0.0"  => "06.10.2019 To store image and recording data used by streaming devices or for transmission by email and telegram, ".
-                          "several cache types can be used now. So in-memory caches are available or file- and Redis-cache support ".
-                          "is intergated. In both latter cases the FHEM-process RAM is released. All transmission processes ".
-                          "(send image/recording data by email and telegram) are optimized for less memory footprint. ".
-                          "Please see also the new cache-attributes \"cacheType\", \"cacheServerParam\" and \"debugCachetime\". ",
-  "8.19.0" => "21.09.2019 A new attribute \"hideAudio\" in Streaming devices is supportet. Use this attribute to hide the ".
-                          "audio control panel in Streaming device. ",
-  "8.18.2" => "19.09.2019 SSCam supports the new attribute \"noLink\" in streaming devices ",
-  "8.15.0" => "09.07.2019 support of integrating Streaming-Devices in a SSCam FTUI widget ",
-  "8.14.0" => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
-  "8.12.0" => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
-  "8.11.0" => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
-              "support for \"genericStrmHtmlTag\" in streaming devices ",
-  "8.10.0" => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
-  "8.9.0"  => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
-                          "This streaming device shows the newest snapshot which was taken. ",
-  "8.8.0"  => "01.02.2019 Snapshots can now be sent by telegramBot ",
-  "8.7.0"  => "27.01.2019 SMTP Email delivery of recordings implemented. You can send a recording after it was created subsequentely ".
-                          "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
-  "8.6.2"  => "25.01.2019 fix version numbering ",
-  "8.6.1"  => "21.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
-              "time format in readings and galleries depends from global language attribute ",
-  "8.5.0"  => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
-              "optionally send them alltogether by Email.",
-  "8.4.0"  => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
-              "&lt;Mitteilung-Text&gt;\"]\". Now you are able to trigger several number of ".
-              "snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
-  "8.3.0"  => "02.01.2019 new get command \"saveRecording\"",
-  "8.2.0"  => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it was created subsequentely ".
-                          "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
-  "8.1.0"  => "19.12.2018 Tooltipps added to camera device control buttons.",
-  "8.0.0"  => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
-              "for all common used browser types. Tooltipps are added to streaming devices and snapgallery.",
-  "7.7.0"  => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
-              "defined automatically. <br>".
-              "In SSCamSTRM devices the \"set &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
-              "active streaming content. ",
-  "7.6.0"  => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
-  "7.5.0"  => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
-               "The popup size can be adjusted by attribute \"popupWindowSize\". ",
-  "7.4.0"  => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ".
-              "Procedure changes of taking snapshots avoid inaccuracies if camera names in SVS very similar. ",
-  "7.3.2"  => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
-  "7.3.0"  => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
-  "7.2.1"  => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
-  "7.2.0"  => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
-  "7.1.1"  => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
-  "7.1.0"  => "02.09.2018 PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
-  "7.0.1"  => "27.08.2018 enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869) ",
-  "7.0.0"  => "27.07.2018 compatibility to API v2.8 ",
-  "6.0.1"  => "04.07.2018 Reading CamFirmware ",
-  "6.0.0"  => "03.07.2018 HTTPS Support, buttons for refresh SSCamSTRM-devices ",
-  "5.2.7"  => "26.06.2018 fix state turns to \"off\" even though cam is disabled ",
-  "5.2.5"  => "18.06.2018 trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it. ",
-  "5.2.4"  => "17.06.2018 SSCam_composegallery added and write warning if old composegallery-weblink device is used  ",
-  "5.2.2"  => "16.06.2018 compatibility to SSCamSTRM V 1.1.0 ",
-  "5.2.1"  => "14.06.2018 design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars ",
-  "5.2.0"  => "14.06.2018 support longpoll refresh of SSCamSTRM-Devices ",
-  "5.1.0"  => "13.06.2018 more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev, control of detaillink is moved to SSCamSTRM-device ",
-  "5.0.1"  => "12.06.2018 control of page refresh improved (for e.g. Floorplan,Dashboard) ",
-  "4.2.0"  => "22.05.2018 PTZ-Panel integrated to created StreamDevice ",
-  "4.0.0"  => "01.05.2018 AudioStream possibility added ",
-  "3.10.0" => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
-  "3.9.1"  => "20.04.2018 Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
-  "3.9.0"  => "17.04.2018 control panel & PTZcontrol weblink device for PTZ cams ",
-  "3.8.4"  => "06.04.2018 Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
-  "3.8.3"  => "05.04.2018 bugfix V3.8.2, \$OpMode \"Start\" changed, composegallery changed ",
-  "3.6.0"  => "25.03.2018 setPreset command ",
-  "3.5.0"  => "22.03.2018 new get command listPresets ",
-  "3.4.0"  => "21.03.2018 new commands startTracking, stopTracking ",
-  "3.3.1"  => "20.03.2018 new readings CapPTZObjTracking, CapPTZPresetNumber ",
-  "3.3.0"  => "25.02.2018 code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
-  "3.2.4"  => "18.11.2017 fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled ",
-  "3.2.3"  => "08.10.2017 set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
-  "3.2.0"  => "27.09.2017 new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
-  "3.1.0"  => "26.09.2017 move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
-  "3.0.0"  => "23.09.2017 Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices new comand get storedCredentials, commandref revised ",
-  "2.9.0"  => "20.09.2017 new function get homeModeState, minor fixes at simu_SVSversion, commandref revised ",
-  "2.6.0"  => "06.08.2017 new command createSnapGallery ",
-  "2.5.4"  => "05.08.2017 analyze \$hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set, some snapGallery improvements and fixes ",
-  "2.5.3"  => "02.08.2017 implement snapGallery as set-command ",
-  "2.2.2"  => "11.06.2017 bugfix SSCam_login, SSCam_login_return, Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701 ",
+  "9.1.0"   => "10.12.2019 With the new attribute \"snapChatTxt\" it is possible to send snapshots by the Synology Chat server. ".
+                           "Please read more information about the possibilities in the ".
+                           "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Versand_von_Aufnahmen_und_Schnappsch.C3.BCssen_mit_Synology_Chat_.28SSChatBot.29\">Wiki</a>. ",
+  "9.0.0"   => "06.10.2019 To store image and recording data used by streaming devices or for transmission by email and telegram, ".
+                           "several cache types can be used now. So in-memory caches are available or file- and Redis-cache support ".
+                           "is intergated. In both latter cases the FHEM-process RAM is released. All transmission processes ".
+                           "(send image/recording data by email and telegram) are optimized for less memory footprint. ".
+                           "Please see also the new cache-attributes \"cacheType\", \"cacheServerParam\" and \"debugCachetime\". ",
+  "8.19.0"  => "21.09.2019 A new attribute \"hideAudio\" in Streaming devices is supportet. Use this attribute to hide the ".
+                           "audio control panel in Streaming device. ",
+  "8.18.2"  => "19.09.2019 SSCam supports the new attribute \"noLink\" in streaming devices ",
+  "8.15.0"  => "09.07.2019 support of integrating Streaming-Devices in a SSCam FTUI widget ",
+  "8.14.0"  => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
+  "8.12.0"  => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
+  "8.11.0"  => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
+               "support for \"genericStrmHtmlTag\" in streaming devices ",
+  "8.10.0"  => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
+  "8.9.0"   => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
+                           "This streaming device shows the newest snapshot which was taken. ",
+  "8.8.0"   => "01.02.2019 Snapshots can now be sent by telegramBot ",
+  "8.7.0"   => "27.01.2019 SMTP Email delivery of recordings implemented. You can send a recording after it was created subsequentely ".
+                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
+  "8.6.2"   => "25.01.2019 fix version numbering ",
+  "8.6.1"   => "21.01.2019 new attribute \"snapReadingRotate\" to activate versioning of snap data, ".
+               "time format in readings and galleries depends from global language attribute ",
+  "8.5.0"   => "17.01.2019 SVS device has \"snapCams\" command. Now are able to take snapshots of all defined cameras and may ".
+               "optionally send them alltogether by Email.",
+  "8.4.0"   => "07.01.2019 Command snap is extended to syntax \"snap [number] [lag] [snapEmailTxt:\"subject => &lt;Betreff-Text&gt;, body => ".
+               "&lt;Mitteilung-Text&gt;\"]\". Now you are able to trigger several number of ".
+               "snapshots by only one snap-command. The triggered snapshots can be shipped alltogether with the internal email client. ",
+  "8.3.0"   => "02.01.2019 new get command \"saveRecording\"",
+  "8.2.0"   => "02.01.2019 SMTP Email delivery of snapshots implemented. You can send snapshots after it was created subsequentely ".
+                           "with the integrated Email client. You have to store SMTP credentials with \"smtpcredentials\" before. ",
+  "8.1.0"   => "19.12.2018 Tooltipps added to camera device control buttons.",
+  "8.0.0"   => "18.12.2018 HLS is integrated using sscam_hls.js in Streaming device types \"hls\". HLS streaming is now available ".
+               "for all common used browser types. Tooltipps are added to streaming devices and snapgallery.",
+  "7.7.0"   => "10.12.2018 autocreateCams command added to SVS device. By this command all cameras installed in SVS can be ".
+               "defined automatically. <br>".
+               "In SSCamSTRM devices the \"set &lt;name&gt; popupStream\" command is implemented which may open a popup window with the ".
+               "active streaming content. ",
+  "7.6.0"   => "02.12.2018 The PTZ panel is completed by \"Preset\" and \"Patrol\" (only for PTZ cameras) ",
+  "7.5.0"   => "02.12.2018 A click on suitable content in a stream- or snapgallery device opens a popup window. ".
+                "The popup size can be adjusted by attribute \"popupWindowSize\". ",
+  "7.4.0"   => "20.11.2018 new command \"createReadingsGroup\". By this command a ReadingsGroup with a name of your choice (or use the default name) can be created. ".
+               "Procedure changes of taking snapshots avoid inaccuracies if camera names in SVS very similar. ",
+  "7.3.2"   => "12.11.2018 fix Warning if 'livestreamprefix' is set to DEF, COMPATIBILITY set to 8.2.2 ",
+  "7.3.0"   => "28.10.2018 In attribute \"livestreamprefix\" can now \"DEF\" be specified to overwrite livestream address by specification from device definition ",
+  "7.2.1"   => "23.10.2018 COMPATIBILITY changed to 8.2.1 ",
+  "7.2.0"   => "20.10.2018 direct help for attributes, new get versionNotes command, please see commandref for details ",
+  "7.1.1"   => "18.10.2018 Message of \"current/simulated SVS-version...\" changed, commandref corrected ",
+  "7.1.0"   => "02.09.2018 PIR Sensor enable/disable, SSCam_Set/SSCam_Get optimized ",
+  "7.0.1"   => "27.08.2018 enable/disable issue (https://forum.fhem.de/index.php/topic,45671.msg830869.html#msg830869) ",
+  "7.0.0"   => "27.07.2018 compatibility to API v2.8 ",
+  "6.0.1"   => "04.07.2018 Reading CamFirmware ",
+  "6.0.0"   => "03.07.2018 HTTPS Support, buttons for refresh SSCamSTRM-devices ",
+  "5.2.7"   => "26.06.2018 fix state turns to \"off\" even though cam is disabled ",
+  "5.2.5"   => "18.06.2018 trigger lastsnap_fw to SSCamSTRM-Device only if snap was done by it. ",
+  "5.2.4"   => "17.06.2018 SSCam_composegallery added and write warning if old composegallery-weblink device is used  ",
+  "5.2.2"   => "16.06.2018 compatibility to SSCamSTRM V 1.1.0 ",
+  "5.2.1"   => "14.06.2018 design change of SSCam_StreamDev, change in event generation for SSCam_StreamDev, fix global vars ",
+  "5.2.0"   => "14.06.2018 support longpoll refresh of SSCamSTRM-Devices ",
+  "5.1.0"   => "13.06.2018 more control elements (Start/Stop Recording, Take Snapshot) in func SSCam_StreamDev, control of detaillink is moved to SSCamSTRM-device ",
+  "5.0.1"   => "12.06.2018 control of page refresh improved (for e.g. Floorplan,Dashboard) ",
+  "4.2.0"   => "22.05.2018 PTZ-Panel integrated to created StreamDevice ",
+  "4.0.0"   => "01.05.2018 AudioStream possibility added ",
+  "3.10.0"  => "24.04.2018 createStreamDev added, new features lastrec_fw_MJPEG, lastrec_fw_MPEG4/H.264 added to playback MPEG4/H.264 videos ",
+  "3.9.1"   => "20.04.2018 Attribute ptzPanel_use, initial webcommands in DeviceOverview changed, minor fixes ptzPanel ",
+  "3.9.0"   => "17.04.2018 control panel & PTZcontrol weblink device for PTZ cams ",
+  "3.8.4"   => "06.04.2018 Internal MODEL changed to SVS or \"CamVendor - CamModel\" for Cams ",
+  "3.8.3"   => "05.04.2018 bugfix V3.8.2, \$OpMode \"Start\" changed, composegallery changed ",
+  "3.6.0"   => "25.03.2018 setPreset command ",
+  "3.5.0"   => "22.03.2018 new get command listPresets ",
+  "3.4.0"   => "21.03.2018 new commands startTracking, stopTracking ",
+  "3.3.1"   => "20.03.2018 new readings CapPTZObjTracking, CapPTZPresetNumber ",
+  "3.3.0"   => "25.02.2018 code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
+  "3.2.4"   => "18.11.2017 fix bug don't retrieve SSCam_getptzlistpreset if cam is disabled ",
+  "3.2.3"   => "08.10.2017 set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
+  "3.2.0"   => "27.09.2017 new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
+  "3.1.0"   => "26.09.2017 move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
+  "3.0.0"   => "23.09.2017 Internal MODEL SVS or CAM -> distinguish/support Cams and SVS in different devices new comand get storedCredentials, commandref revised ",
+  "2.9.0"   => "20.09.2017 new function get homeModeState, minor fixes at simu_SVSversion, commandref revised ",
+  "2.6.0"   => "06.08.2017 new command createSnapGallery ",
+  "2.5.4"   => "05.08.2017 analyze \$hash->{CL} in SetFn bzw. GetFn, set snapGallery only if snapGalleryBoost=1 is set, some snapGallery improvements and fixes ",
+  "2.5.3"   => "02.08.2017 implement snapGallery as set-command ",
+  "2.2.2"   => "11.06.2017 bugfix SSCam_login, SSCam_login_return, Forum: https://forum.fhem.de/index.php/topic,45671.msg646701.html#msg646701 ",
   "1.39.0"  => "20.01.2017 compatibility to SVS 8.0.0, Version in Internals, execute SSCam_getsvsinfo after set credentials ",
   "1.37.0"  => "10.10.2016 bugfix Experimental keys on scalar is now forbidden (Perl >= 5.23) (Forum: #msg501709) ",
   "1.34.0"  => "15.09.2016 simu_SVSversion changed, added 407 errorcode message, external recording changed for SVS 7.2 ",
@@ -258,13 +258,13 @@ my %SSCam_vNotesExtern = (
   "1.12.0"  => "08.02.2016 added function \"move\" for continuous PTZ action ",
   "1.11.0"  => "05.02.2016 added function \"goPreset\" and \"goAbsPTZ\" to control the move of PTZ lense to absolute positions (http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275), (http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892) ",
   "1.10.0"  => "02.02.2016 added function \"svsinfo\" to get informations about installed SVS-package, if Availability = \"disconnected\" then \"state\"-value will be \"disconnected\" too, saved Credentials were deleted from file if a device will be deleted ",
-  "1.7.0"  => "18.01.2016 Attribute \"httptimeout\" added ",
-  "1.6.0"  => "16.01.2016 Change the define-string related to rectime. (http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664)   ",                
-  "1.5.1"  => "11.01.2016 Vars \"USERNAME\" and \"RECTIME\" removed from internals, Var (Internals) \"SERVERNAME\" changed to \"SERVERADDR\" ",
-  "1.5.0"  => "04.01.2016 Function \"Get\" for creating Camera-Readings integrated, Attributs pollcaminfoall, pollnologging added, Function for Polling Cam-Infos added. ",
-  "1.4.0"  => "23.12.2015 function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
-  "1.3.0"  => "19.12.2015 function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
-  "1.0.0"  => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
+  "1.7.0"   => "18.01.2016 Attribute \"httptimeout\" added ",
+  "1.6.0"   => "16.01.2016 Change the define-string related to rectime. (http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664)   ",                
+  "1.5.1"   => "11.01.2016 Vars \"USERNAME\" and \"RECTIME\" removed from internals, Var (Internals) \"SERVERNAME\" changed to \"SERVERADDR\" ",
+  "1.5.0"   => "04.01.2016 Function \"Get\" for creating Camera-Readings integrated, Attributs pollcaminfoall, pollnologging added, Function for Polling Cam-Infos added. ",
+  "1.4.0"   => "23.12.2015 function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
+  "1.3.0"   => "19.12.2015 function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
+  "1.0.0"   => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
 );
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
@@ -353,9 +353,17 @@ my %SSCam_ttips_de = (
     helpsvs     => "Die Onlinehilfe der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
 );
 
-my %SSCAM_imc = (                                             # disbled String modellabhängig (SVS / CAM)
+my %SSCAM_imc = (                                                           # disbled String modellabhängig (SVS / CAM)
     0 => { 0 => "initialized", 1 => "inactive" },
     1 => { 0 => "off",         1 => "inactive" },              
+);
+
+my %zd = (                                                                  # Hash der Zoomsteuerung 
+    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "CAMLEFTFAST.png",  },
+    "+"    => {dir => "in",  sttime => 0.1,   moveType => "Start", panimg => "CAMLEFT.png",      },
+    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,              },
+    "-"    => {dir => "out", sttime => 0.1,   moveType => "Start", panimg => "CAMRIGHT.png",     },
+    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "CAMRIGHTFAST.png", }
 );
 
 # Standardvariablen und Forward-Deklaration
@@ -2882,14 +2890,6 @@ sub SSCam_setZoom {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        my %zd = (
-            "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start" },
-            ".++"  => {dir => "in",  sttime => 6,     moveType => "Start" },
-            "stop" => {dir => undef, sttime => undef, moveType => "Stop"  },
-            "-"    => {dir => "out", sttime => 0.5,   moveType => "Start" },
-            "--."  => {dir => "out", sttime => 6,     moveType => "Start" }
-        );
-
         $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};         # Richtung (in / out)
         $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                                  # Start / Stop
         $hash->{HELPER}{ZOOM}{STOPTIME} = $zd{$op}{sttime};                                    # Stopzeit -> Verzögerungszeit für Stop nach Start
@@ -7377,13 +7377,16 @@ sub SSCam_ptzpanel {
   
   return "" if(SSCam_myVersion($hash) <= 71);
   
-  $pbs      = AttrVal($ptzcdev,"ptzButtonSize", 100);                                                     # Größe der Druckbuttons in %
+  $pbs      = AttrVal($ptzcdev,"ptzButtonSize",     100);                                                 # Größe der Druckbuttons in %
   $pbsf     = AttrVal($ptzcdev,"ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
  
   $ptz_ret  = "";
   $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
   $ptz_ret .= "<style>TD.pcenter {text-align: center;} </style>"; 
   $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
+  
+  ### PTZ-Elemente
+  #########################
   $ptz_ret .= '<table class="rc_body defsize">';
 
   for my $rownr (0..9) {
@@ -7397,8 +7400,7 @@ sub SSCam_ptzpanel {
       for my $btnnr (0..$#btn) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
           if ($btn[$btnnr] ne "") {
-              my $cmd;
-              my $img;
+              my ($cmd,$img);
               
               if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                                            # enthält Komando -> <command>:<image>
                   $cmd = $1;
@@ -7431,12 +7433,61 @@ sub SSCam_ptzpanel {
           $ptz_ret .= "</td>";
           $ptz_ret .= "\n";    
       }
-      $ptz_ret .= "</tr>\n";
+      $ptz_ret .= "</tr>\n";  
   }
   $ptz_ret .= "</table>";
   
+  ### Zoom
   ###############################
-  # add Preset / Patrols / Zoom
+  if(SSCam_IsCapZoom($hash)) {                                                                            # wenn Zoom Eigenschaft
+      
+      $ptz_ret .= '<table class="rc_body defsize">';
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td class='ptzcontrol pcenter'; colspan=4>";
+      $ptz_ret .= 'Zoom: ';
+      $ptz_ret .= "</td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "<tr>";
+      
+      my @za  = qw(.++ + - --.);
+      
+      for my $cmd (@za) {                 
+          $ptz_ret .= "<td class='ptzcontrol'>";
+          
+          my $img = $zd{$cmd}{panimg};                                                      
+          if(!$img) {
+              $ptz_ret .= $cmd;
+              $ptz_ret .= "</td>"; 
+              $ptz_ret .= "</tr>"; 
+              $ptz_ret .= "<tr>"; 
+              next;
+          }
+          
+          if ($img =~ m/\.svg/x) {                                                                    # Verwendung für SVG's
+              $img = FW_makeImage($img, $cmd, "rc-button");
+          
+          } else {                                                                                    # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+              if($ftui) {
+                  $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
+              } else {
+                  $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbs%\" width=\"$pbs%\">";  
+              }
+          }
+          
+          my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name setZoom $cmd')";                  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+          $cmd1     = "ftui.setFhemStatus('set $name setZoom $cmd')" if($ftui); 
+          
+          $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
+
+          $ptz_ret .= "</td>";  
+      }
+      
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "</table>";
+  }
+  
+  ###  add Preset / Patrols
+  ###############################
   if(!$ftui) {
       my ($Presets,$Patrols,$zoom,$fn);
       my $cmdPreset = "goPreset";
@@ -7469,20 +7520,6 @@ sub SSCam_ptzpanel {
       } else {
           $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
       }
-      
-      ## Zoom
-      for $fn (sort keys %{$data{webCmdFn}}) {
-          no strict "refs";
-          $zoom = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdZoom,$SSCam_valZoom);
-          use strict "refs";
-          last if(defined($zoom));
-      }
-
-      if($zoom) {
-          $zoom =~ s,^<td[^>]*>(.*)</td>$,$1,;                 
-      } else {
-          $zoom = FW_pH "cmd.$name=set $name $cmdZoom", $cmdZoom, 0, "", 1, 1;
-      }
            
       ## Ausgabe
       $ptz_ret .= '<table class="rc_body defsize">';
@@ -7496,12 +7533,6 @@ sub SSCam_ptzpanel {
       if($valPatrols) {
           $ptz_ret .= "<tr>";
           $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
-          $ptz_ret .= "</tr>";
-      }
-      
-      if(SSCam_IsCapZoom($hash)) {
-          $ptz_ret .= "<tr>";
-          $ptz_ret .= "<td>Zoom: </td><td class='pcenter'>$zoom</td>";
           $ptz_ret .= "</tr>";
       }
 
