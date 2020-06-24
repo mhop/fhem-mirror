@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22243 2020-06-23 19:00:43Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
   "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
                            "executing retrieve master data firstly every time",
   "3.0.0"  => "18.06.2020  refactored readings and subroutines, detailLevel deleted, new attr providerLevel, integrate logbook data ",
@@ -1501,7 +1502,7 @@ sub __dispatchGet {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$fnaddon);
+          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$data);
       }
       use strict "refs";
   }
@@ -1658,7 +1659,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $wm2e = qq{The current consumption could not be determined. The current purchased electricity is unknown};
   my $wm2d = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
   my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
-  my $em1d = qq{Kommunikation mit dem Sunny Home Manager derzeit nicht m};
+  my $em1d = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
   my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
   my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration};
 
@@ -2184,6 +2185,8 @@ sub extractPlantMasterData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
+  my $addon    = shift;
+  my $data     = shift;                       # gelieferte Rohdaten
   my $name     = $hash->{NAME};
   my ($amount,$unit);
   
@@ -2193,7 +2196,13 @@ sub extractPlantMasterData {
                                                    return;
                                                  };
   my $lv       = $stpl{plantMasterData}{level};
-  my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};
+  my $plantOid = $forecast->{'ForecastTimeframes'}->{'PlantOid'};                 # Plant ID aus JSON filtern
+  
+  if(!$plantOid) {                                                                # Plant ID aus Cookie Header extrhieren wenn nicht mi JSON geliefert (kommt vor)
+      Log3 ($name, 4, "$name - Plant ID  not set in data, get it from cookie ...");
+      my $sc = $data->header('Set-Cookie') // "";
+      ($plantOid) = $sc =~ /plantOid=([0-9a-z-]*);/x;
+  }
   
   if ($plantOid) {                                                                # wichtig für erweiterte Selektionen
       Log3 ($name, 4, "$name - Plant ID: ".$plantOid);
@@ -2571,12 +2580,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22243 2020-06-23 19:00:43Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22149 2020-06-09 20:41:58Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22243 2020-06-23 19:00:43Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
