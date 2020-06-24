@@ -2608,9 +2608,10 @@ sub ShadingProcessing {
         && (
                $shutters->getModeUp eq 'always'
             || $shutters->getModeUp eq $homemode
+            || $shutters->getModeUp eq 'off'
+            || $shutters->getModeUp eq 'absent'
             || (   $shutters->getModeUp eq 'home'
                 && $homemode ne 'asleep' )
-            || $shutters->getModeUp eq 'off'
         )
         && (
             (
