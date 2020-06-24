@@ -362,7 +362,7 @@ my %SSCAM_imc = (                                             # disbled String m
 my $SSCam_slim     = 3;                                   # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum     = "1,2,3,4,5,6,7,8,9,10";              # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCam_compstat = "8.2.7";                             # getestete SVS-Version
-my $SSCam_valZoom  = "uzsuSelectRadio,.++,+,-,--.";     # Inhalt des Setters "setZoom"
+my $SSCam_valZoom  = "uzsuSelectRadio,.++,+,stop,-,--.";  # Inhalt des Setters "setZoom"
 
 use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -896,13 +896,13 @@ sub SSCam_Set {
                  (SSCam_IsCapPTZPan($hash) ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
                  (SSCam_IsCapPTZPan($hash) ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
-                 ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "startTracking:noArg " : "").
-                 ((ReadingsVal("$name", "CapPTZObjTracking", "false") ne "false") ? "stopTracking:noArg " : "").
-                 ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
+                 (SSCam_IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
+                 (SSCam_IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
+                 (SSCam_IsCapPTZDir($hash) ? "move"." " : "").
                  (SSCam_IsCapPTZPan($hash) ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  (SSCam_IsCapPTZPan($hash) ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 ((ReadingsVal("$name", "CapPTZAbs", "false") ne "false") ? "goAbsPTZ"." " : ""). 
-                 ((ReadingsVal("$name", "CapPTZDirections", 0) > 0) ? "move"." " : "").
+                 (SSCam_IsCapPTZAbs($hash) ? "goAbsPTZ"." " : ""). 
+                 (SSCam_IsCapPTZDir($hash) ? "move"." " : "").
                  (SSCam_IsCapZoom($hash) ? "setZoom:$SSCam_valZoom " : "").
                  "";
   } else {
@@ -2883,10 +2883,10 @@ sub SSCam_setZoom {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         my %zd = (
-            "+"    => {dir => "in",  sttime => 1,     moveType => "Start" },
+            "+"    => {dir => "in",  sttime => 0.5,     moveType => "Start" },
             ".++"  => {dir => "in",  sttime => 3,     moveType => "Start" },
             "stop" => {dir => undef, sttime => undef, moveType => "Stop"  },
-            "-"    => {dir => "out", sttime => 1,     moveType => "Start" },
+            "-"    => {dir => "out", sttime => 0.5,     moveType => "Start" },
             "--."  => {dir => "out", sttime => 3,     moveType => "Start" }
         );
 
@@ -7192,6 +7192,32 @@ sub SSCam_IsCapPTZTilt {                                                        
 return $cap;
 }
 
+sub SSCam_IsCapPTZObjTrack {                                                    # PTZ Objekt Tracking Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my $cap = ReadingsVal($name, "CapPTZObjTracking", "false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
+sub SSCam_IsCapPTZAbs {                                                        # PTZ go to absolute Position Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my $cap = ReadingsVal($name, "CapPTZAbs", "false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
+sub SSCam_IsCapPTZDir {                                                        # PTZ Directions möglich Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my $cap = ReadingsVal($name, "CapPTZDirections", 0) > 0 ? 1 : 0;
+  
+return $cap;
+}
 
 ###############################################################################
 #                       JSON Boolean Test und Mapping
@@ -7287,7 +7313,7 @@ return;
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 ###############################################################################
-sub SSCam_getclhash ($;$$) {      
+sub SSCam_getclhash {      
   my ($hash,$nobgd)= @_;
   my $name  = $hash->{NAME};
   my $ret;
@@ -7338,7 +7364,7 @@ return ($ret);
 #     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
 #     das generierte Widget und das weblink-Device ptzpanel_$name
 ###############################################################################
-sub SSCam_ptzpanel(@) {
+sub SSCam_ptzpanel {
   my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
   my $hash        = $defs{$name};
   my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
@@ -7571,7 +7597,7 @@ return;
 #      $fmt     = Streaming Format
 #
 ######################################################################################
-sub SSCam_StreamDev($$$;$) {
+sub SSCam_StreamDev {
   my ($camname,$strmdev,$fmt,$ftui) = @_; 
   my $hash               = $defs{$camname};
   my $wltype             = $hash->{HELPER}{WLTYPE}; 
