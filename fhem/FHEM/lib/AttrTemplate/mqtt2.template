@@ -56,8 +56,8 @@ attr DEVICE setStateList on off
 #setreading DEVCID associatedWith DEVICE
 #{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
-attr DEVCID model MQTT2_CLIENT_general_bridge
-setreading DEVCID attrTemplateVersion 20200619
+attr DEVICE model MQTT2_CLIENT_general_bridge
+setreading DEVICE attrTemplateVersion 20200624
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -3299,8 +3299,8 @@ setreading DEVICE attrTemplateVersion 20200609
 
 name:InstarCam
 filter:TYPE=MQTT2_DEVICE
-desc:for Instar Camera, source post: 
-order:X_10
+desc:for Instar Camera, source post: https://forum.fhem.de/index.php/topic,94495.msg1065779.html#msg1065779.<br>NOTE: This is an early version, developed for Instar 8015 HD. Other models may need different settings.
+order:M_10
 par:DEVNAME;MAC address in the topic;{ AttrVal("DEVICE","readingList","") =~ m,instar/([^/]*)/, ? $1 : undef }
 attr DEVICE eventMap 0:off 1:on
 attr DEVICE jsonMap area1val:area1 area1sensitivityval:area1sensitivity area2val:area2 area2sensitivityval:area2sensitivity area3val:area3 area3sensitivityval:area3sensitivity area4val:area4 area4sensitivityval:area4sensitivity pirval:pir alarmserverval:alarmserver alarmserveraddressval:alarmserveraddress alarmserverportval:alarmserverport alarmserverpathval:alarmserverpath alarmsignalval:alarmsignal audioalarmval:audioalarm audioalarmsensitivityval:audioalarmsensitivity power_ledval:power_led wifi_ledval:wifi_led
