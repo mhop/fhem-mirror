@@ -1272,7 +1272,7 @@ sub Initialize {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.10",
+  "version": "v0.10.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

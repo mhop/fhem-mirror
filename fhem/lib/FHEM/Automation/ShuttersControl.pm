@@ -4963,18 +4963,19 @@ sub _CheckShuttersConditionsForShadingFn {
     my $warnMessage;
     my $infoMessage;
 
-    $infoMessage .= (
-        $shutters->getShadingMode eq 'off'
-          && $ascDev->getAutoShuttersControlShading eq 'on'
-        ? ' global shading active but ASC_Shading_Mode attribut is not set or off'
-        : ''
-    );
 
     $infoMessage .= (
         $shutters->getShadingMode ne 'off'
           && $ascDev->getAutoShuttersControlShading eq 'on'
           && $shutters->getOutTemp == -100
         ? ' shading active, global temp sensor is set, but shutters temperature sensor is not set'
+        : ''
+    );
+
+    $warnMessage .= (
+        $shutters->getShadingMode eq 'off'
+          && $ascDev->getAutoShuttersControlShading eq 'on'
+        ? ' global shading active but ASC_Shading_Mode attribut is not set or off'
         : ''
     );
 
