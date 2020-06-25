@@ -170,9 +170,8 @@ sub Define {
     return "Usage: define <name> SSCamSTRM <arg>";
   }
 
-  my $arg = (split("[()]",$link))[1];
-  $arg   =~ s/'//g;
-  ($hash->{PARENT},$hash->{MODEL}) = ((split(",",$arg))[0],(split(",",$arg))[2]); 
+  explodeDEF ($hash,$link);
+  
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   $hash->{LINK}                    = $link;
   
@@ -321,9 +320,11 @@ sub Attr {
 return undef;
 }
 
-################################################################
+#############################################################################################
+#                                 FHEMWEB Summary  
+#############################################################################################
 sub FwFn {
-  my ($FW_wname, $name, $room, $pageHash) = @_;                      # pageHash is set for summaryFn.
+  my ($FW_wname, $name, $room, $pageHash) = @_;               # pageHash is set for summaryFn.
   my $hash   = $defs{$name};
   my $link   = $hash->{LINK};
   
@@ -343,8 +344,7 @@ sub FwFn {
       $ret .= $link;  
   }
   
-  # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal($name, "autoRefresh", 0);
+  my $al = AttrVal($name, "autoRefresh", 0);                           # Autorefresh nur des aufrufenden FHEMWEB-Devices
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
@@ -355,12 +355,29 @@ sub FwFn {
 return $ret;
 }
 
-################################################################
-sub webRefresh { 
-  my ($hash) = @_;
-  my $d      = $hash->{NAME};
+#############################################################################################
+#                          Bestandteile des DEF auflösen  
+#############################################################################################
+sub explodeDEF {                    
+  my $hash = shift;
+  my $link = shift;
+  my $d    = $hash->{NAME};
   
-  # Seitenrefresh festgelegt durch SSCamSTRM-Attribut "autoRefresh" und "autoRefreshFW"
+  my $arg = (split("[()]",$link))[1];
+  $arg   =~ s/'//g;
+  ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
+  
+return;
+}
+
+#############################################################################################
+#                                     Seitenrefresh 
+#        festgelegt durch SSCamSTRM-Attribut "autoRefresh" und "autoRefreshFW"
+#############################################################################################
+sub webRefresh { 
+  my $hash = shift;
+  my $d    = $hash->{NAME};
+  
   my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
   { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }
   
@@ -418,8 +435,7 @@ sub streamAsHtml {
   my $name         = $hash->{NAME};
   my $link         = $hash->{LINK};
   
-  if ($ftui && $ftui eq "ftui") {
-      # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
+  if ($ftui && $ftui eq "ftui") {                 # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
       my $s = substr($link,0,length($link)-2);
       $link = $s.",'$ftui')}";
   }
