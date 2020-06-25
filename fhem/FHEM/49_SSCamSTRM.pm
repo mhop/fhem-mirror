@@ -185,27 +185,28 @@ sub Define {
 return undef;
 }
 
-################################################################
+###############################################################
+#                  SSCamSTRM Copy & Rename
+#  passt die Deviceparameter bei kopierten / umbenennen an
+###############################################################
 sub Rename {
-	my ($new_name,$old_name) = @_;
-    my $hash = $defs{$new_name};
+	my $new_name = shift;
+    my $old_name = shift;
+    my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/$old_name/$new_name/g;
-    $hash->{LINK} =~ s/$old_name/$new_name/g;
+    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
 
 return;
 }
 
-###############################################################
-#                  SSCamSTRM Copy
-#  passt die Deviceparameter bei kopierten Device an
-###############################################################
 sub Copy {
-	my ($old_name,$new_name) = @_;
-    my $hash = $defs{$new_name};
+	my $old_name = shift;
+    my $new_name = shift;
+    my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/$old_name/$new_name/g;
-    $hash->{LINK} =~ s/$old_name/$new_name/g;
+    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
 
 return;
 }
