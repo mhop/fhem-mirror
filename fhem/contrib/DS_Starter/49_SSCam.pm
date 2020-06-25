@@ -360,9 +360,9 @@ my %SSCAM_imc = (                                                           # di
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
     ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "CAMLEFTFAST.png",  },
-    "+"    => {dir => "in",  sttime => 0.1,   moveType => "Start", panimg => "CAMLEFT.png",      },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "CAMLEFT.png",      },
     "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,              },
-    "-"    => {dir => "out", sttime => 0.1,   moveType => "Start", panimg => "CAMRIGHT.png",     },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "CAMRIGHT.png",     },
     "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "CAMRIGHTFAST.png", }
 );
 
@@ -370,7 +370,7 @@ my %zd = (                                                                  # Ha
 my $SSCam_slim     = 3;                                   # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCAM_snum     = "1,2,3,4,5,6,7,8,9,10";              # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $SSCam_compstat = "8.2.7";                             # getestete SVS-Version
-my $SSCam_valZoom  = "uzsuSelectRadio,.++,+,stop,-,--.";  # Inhalt des Setters "setZoom"
+my $SSCam_valZoom  = ".++,+,stop,-,--.";                  # Inhalt des Setters "setZoom"
 
 use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -881,7 +881,7 @@ sub SSCam_Set {
                  ;  
   } elsif(SSCam_IsModelCam($hash)) {
       # selist für Cams
-      my $hlslfw = SSCam_IsCapHLS($hash)?",live_fw_hls,":",";
+      my $hlslfw = SSCam_IsCapHLS($hash) ? ",live_fw_hls," : ",";
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
                  "smtpcredentials ".
@@ -894,24 +894,23 @@ sub SSCam_Set {
 	     		 "createReadingsGroup ".
                  "createSnapGallery:noArg ".
                  "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                 (SSCam_IsCapPTZPan($hash) ? "createPTZcontrol:noArg " : "").
                  "enable:noArg ".
                  "disable:noArg ".
 				 "optimizeParams ".
-                 ((ReadingsVal("$name", "CapPIR", "false") ne "false") ? "pirSensor:activate,deactivate " : "").
                  "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
-                 (SSCam_IsCapPTZPan($hash) ? "setPreset ": "").
-                 (SSCam_IsCapPTZPan($hash) ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
-                 (SSCam_IsCapPTZPan($hash) ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  "stopView:noArg ".
                  (SSCam_IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
                  (SSCam_IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
-                 (SSCam_IsCapPTZDir($hash) ? "move"." " : "").
-                 (SSCam_IsCapPTZPan($hash) ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                 (SSCam_IsCapPTZPan($hash) ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 (SSCam_IsCapPTZAbs($hash) ? "goAbsPTZ"." " : ""). 
-                 (SSCam_IsCapPTZDir($hash) ? "move"." " : "").
-                 (SSCam_IsCapZoom($hash) ? "setZoom:$SSCam_valZoom " : "").
+                 (SSCam_IsCapPTZPan($hash)      ? "setPreset ": "").
+                 (SSCam_IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
+                 (SSCam_IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
+                 (SSCam_IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                 (SSCam_IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                 (SSCam_IsCapPTZPan($hash)      ? "createPTZcontrol:noArg " : "").
+                 (SSCam_IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
+                 (SSCam_IsCapPTZDir($hash)      ? "move"." " : "").
+                 (SSCam_IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
+                 (SSCam_IsCapZoom($hash)        ? "setZoom:$SSCam_valZoom " : "").
                  "";
   } else {
       # setlist für SVS Devices
@@ -1893,7 +1892,7 @@ sub SSCam_FWsummaryFn {
   return if(!$hash->{HELPER}{LINK} || ReadingsVal($d, "state", "") =~ /^dis.*/ || IsDisabled($name));
   
   # Definition Tasten
-  my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";                   # nicht sichtbare Leertaste
+  my $imgblank      = "<img src=\"$FW_ME/www/images/sscam/black_btn_CAMBLANK.png\">";             # nicht sichtbare Leertaste
   my $cmdstop       = "cmd=set $d stopView";                                                      # Stream deaktivieren
   my $imgstop       = "<img src=\"$FW_ME/www/images/default/remotecontrol/black_btn_POWEROFF3.png\">";
   my $cmdhlsreact   = "cmd=set $d hlsreactivate";                                                 # HLS Stream reaktivieren
@@ -1926,15 +1925,15 @@ sub SSCam_FWsummaryFn {
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
   if(AttrVal("global","language","EN") =~ /EN/) {
       $ttrecstart = $SSCam_ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
-      $ttrecstop  = $SSCam_ttips_en{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
-      $ttsnap     = $SSCam_ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
-      $ttcmdstop  = $SSCam_ttips_en{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_en{"ttrecstop"};  $ttrecstop  =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_en{"ttsnap"};     $ttsnap     =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_en{"ttcmdstop"};  $ttcmdstop  =~ s/§NAME§/$calias/g;
       $tthlsreact = $SSCam_ttips_en{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
   } else {
       $ttrecstart = $SSCam_ttips_de{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/g;
-      $ttrecstop  = $SSCam_ttips_de{"ttrecstop"}; $ttrecstop =~ s/§NAME§/$calias/g;
-      $ttsnap     = $SSCam_ttips_de{"ttsnap"}; $ttsnap =~ s/§NAME§/$calias/g;
-      $ttcmdstop  = $SSCam_ttips_de{"ttcmdstop"}; $ttcmdstop =~ s/§NAME§/$calias/g;
+      $ttrecstop  = $SSCam_ttips_de{"ttrecstop"};  $ttrecstop  =~ s/§NAME§/$calias/g;
+      $ttsnap     = $SSCam_ttips_de{"ttsnap"};     $ttsnap     =~ s/§NAME§/$calias/g;
+      $ttcmdstop  = $SSCam_ttips_de{"ttcmdstop"};  $ttcmdstop  =~ s/§NAME§/$calias/g;
       $tthlsreact = $SSCam_ttips_de{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/g;
   }
   
@@ -2037,21 +2036,23 @@ return $ret;
 }
 
 ######################################################################################
-#                 PTZ-Steuerpanel in Detailanzeige darstellen 
+#                       Detailanzeige
 ######################################################################################
 sub SSCam_FWdetailFn {
-  my ($FW_wname, $d, $room, $pageHash) = @_;           # pageHash is set for summaryFn.
-  my $hash = $defs{$d};
+  my ($FW_wname, $name, $room, $pageHash) = @_;           # pageHash is set for summaryFn.
+  my $hash = $defs{$name};
   my $ret = "";
   
-  $hash->{".setup"} = SSCam_FWconfCam($d,$room);
+  SSCam_checkIconpath ($name, $FW_wname);
+  
+  $hash->{".setup"} = SSCam_FWconfCam($name,$room);
   if($hash->{".setup"} ne "") {
       $ret .= $hash->{".setup"};
   }
   
-  $hash->{".ptzhtml"} = SSCam_ptzpanel($d,$d) if($hash->{".ptzhtml"} eq "");
+  $hash->{".ptzhtml"} = SSCam_ptzpanel($name,$name) if($hash->{".ptzhtml"} eq "");
 
-  if($hash->{".ptzhtml"} ne "" && AttrVal($d,"ptzPanel_use",1)) {
+  if($hash->{".ptzhtml"} ne "" && AttrVal($name,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
   } 
 
@@ -7219,6 +7220,15 @@ sub SSCam_IsCapPTZDir {                                                        #
 return $cap;
 }
 
+sub SSCam_IsCapPIR {                                                           # hat Kamera einen PIR
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my $cap = ReadingsVal($name, "CapPIR", "false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
 ###############################################################################
 #                       JSON Boolean Test und Mapping
 ###############################################################################
@@ -10236,6 +10246,21 @@ return ($str);
 }
 
 #############################################################################################
+#        Check ob "sscam" im iconpath des FHEMWEB Devices enthalten ist
+#############################################################################################
+sub SSCam_checkIconpath {
+  my $name     = shift;
+  my $FW_wname = shift // return;
+  
+  my $icpa = AttrVal($FW_wname, "iconPath", "");
+  if ($icpa !~ /sscam/x) {
+      Log3 ($name, 2, qq{$name - WARNING - add "sscam" to attribute "iconpath" of FHEMWEB device "$FW_wname" to get the SSCam control icons} );
+  }
+  
+return;
+}
+
+#############################################################################################
 #             Cache Handling  
 #             SSCam_cache ($name, <opcode> [, <Key>, <data>])
 #             return 1 = ok , return 0 = nok
@@ -10935,7 +10960,7 @@ return;
   They can be selected in the drop-down-menu of the particular device. <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b> autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   If a SVS device is defined, all in SVS integrated cameras are able to be created automatically in FHEM by this command. If the camera is already defined, 
   it is overleaped. 
@@ -10945,7 +10970,7 @@ return;
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
-  <li><b> set &lt;name&gt; createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A separate Streaming-Device (type SSCamSTRM) will be created. This device can be used as a discrete device in a dashboard 
   for example.
@@ -11020,7 +11045,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>   
   
   <ul>
-  <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  <li><b> createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   A separate PTZ control panel will be created (type SSCamSTRM). The current room of the parent camera device is 
   assigned if it is set there (default "SSCam").  
@@ -11030,7 +11055,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createReadingsGroup [&lt;name of readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b> createReadingsGroup [&lt;name of readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   This command creates a readingsGroup device to display an overview of all defined SSCam devices. 
   A name for the new readingsGroup device can be specified. Is no own name specified, the readingsGroup device will be 
@@ -11040,7 +11065,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A snapshot gallery will be created as a separate device (type SSCamSTRM). The device will be provided in 
   room "SSCam".
@@ -11055,7 +11080,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b> credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   set username / password combination for access the Synology Surveillance Station. 
   See <a href="#SSCam_Credentials">Credentials</a><br> for further informations.
@@ -11064,7 +11089,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  <li><b> delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Deletes a preset "&lt;PresetName&gt;". In FHEMWEB a drop-down list with current available presets is provieded.
 
@@ -11072,7 +11097,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> enable | disable </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   For <b>deactivating / activating</b> a list of cameras or all cameras by Regex-expression, subsequent two 
   examples using "at":
@@ -11102,7 +11127,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
   Thereby, for example, the behavior of camera LED's will be suitable controlled. 
@@ -11115,7 +11140,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b> extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   This command triggers an external event (1-10) in SVS. 
   The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
@@ -11126,7 +11151,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
   The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
@@ -11161,7 +11186,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   Using this command you can move PTZ-cameras to a predefined position. <br>
   The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
@@ -11197,7 +11222,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b> homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   Switch the HomeMode of the Surveillance Station on or off. 
   Further informations about HomeMode you can find in the <a href="https://www.synology.com/en-global/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehelp</a>.
@@ -11205,7 +11230,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be done by camera / SVS without any parameters, the original camera motion detection settings are kept.
@@ -11254,8 +11279,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
     
   <ul>
-  <li><b> set &lt;name&gt; move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM up to SVS version 7.1)</li>
-      <b> set &lt;name&gt; move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM and SVS Version 7.2 and above) <br><br>
+  <li><b> move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM up to SVS version 7.1)</li>
+      <b> move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM and SVS Version 7.2 and above) <br><br>
   
   With this command a continuous move of a PTZ-camera will be started. In addition to the four basic directions up/down/left/right is it possible to use angular dimensions 
   "dir_X". The grain size of graduation depends on properties of the camera and can be identified by the Reading "CapPTZDirections". <br><br>
@@ -11278,7 +11303,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br>
   
   <ul>
-  <li><b> set &lt;name&gt; off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li><br>
+  <li><b> off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li><br>
 
   Stops the current recording. 
   </ul>
@@ -11357,7 +11382,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Set one or several properties of the camera. The video can be mirrored (mirror), turned upside down (flip) or 
   rotated (rotate). Specified properties must be supported by the camera type. With "ntp" you can set a time server the camera 
@@ -11382,14 +11407,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; pirSensor [activate | deactivate] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> pirSensor [activate | deactivate] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   Activates / deactivates the infrared sensor of the camera (only posible if the camera has got a PIR sensor).  
   </ul>
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
   At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
@@ -11401,7 +11426,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> runView [live_fw | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   <ul>
   <table>
@@ -11486,7 +11511,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  <li><b> setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Set the Home-preset to a predefined preset name "&lt;PresetName&gt;" or the current position of the camera.
 
@@ -11494,7 +11519,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; setPreset &lt;PresetNumber&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  <li><b> setPreset &lt;PresetNumber&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Sets a Preset with name "&lt;PresetName&gt;" to the current postion of the camera. The speed can be defined 
   optionally (&lt;Speed&gt;). If no PresetName is specified, the PresetNummer is used as name.
@@ -11504,7 +11529,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;number&gt;] [&lt;time difference&gt;] <br>
+  <li><b> setZoom &lt; .++ | + | stop | - | --. &gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  
+  Provides controls for zoom functions if the camera supports this feature.
+
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> snap [&lt;number&gt;] [&lt;time difference&gt;] <br>
   
                                 [snapEmailTxt:"subject => &lt;subject text&gt;, body => &lt;message text&gt;"] <br>
                                 [snapTelegramTxt:"tbot => &lt;TelegramBot device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;subject text&gt;]"] <br>
@@ -11554,7 +11587,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapCams [&lt;number&gt;] [&lt;time difference&gt;] [CAM:"&lt;camera&gt;, &lt;camera&gt, ..."]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b> snapCams [&lt;number&gt;] [&lt;time difference&gt;] [CAM:"&lt;camera&gt;, &lt;camera&gt, ..."]</b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   One or multiple snapshots of denoted cameras are triggered. If no cameras are denoted, the snapshots are triggered in all 
   of the defined cameras in FHEM.
@@ -11579,7 +11612,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b> snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The command is only available if the attribute "snapGalleryBoost=1" is set. <br>
   It creates an output of the last [x] snapshots as well as "get ... snapGallery".  But differing from "get" with
@@ -11597,7 +11630,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
+  <li><b> startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
   
   Starts object tracking of camera.
   The command is only available if surveillance station has recognised the object tracking capability of camera
@@ -11606,7 +11639,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
+  <li><b> stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM with tracking capability)</li> <br>
   
   Stops object tracking of camera.
   The command is only available if surveillance station has recognised the object tracking capability of camera
@@ -11627,8 +11660,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   They can be selected in the drop-down-menu of the particular device. <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> 
-      <b> get &lt;name&gt; caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM) <br><br>
+  <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> 
+      <b>  caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM) <br><br>
 	  
   Dependend of the type of camera (e.g. Fix- or PTZ-Camera) the available properties are retrieved and provided as Readings.<br>
   For example the Reading "Availability" will be set to "disconnected" if the camera would be disconnected from Synology 
@@ -11638,7 +11671,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>  
   
   <ul>
-  <li><b> get &lt;name&gt; eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number 
   of in SVS registered camera events and the path/name of the last recording. 
@@ -11649,14 +11682,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b>  homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   HomeMode-state of the Surveillance Station will be retrieved.  
   </ul>
   <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+  <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
   
   Fetches the Surveillance Station Log from Synology server. Without any further options the whole log will be retrieved. <br>
   You can specify all or any of the following options: <br><br>
@@ -11687,14 +11720,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>  
 
   <ul>
-  <li><b> get &lt;name&gt; listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
+  <li><b>  listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
   
   Get a popup with a lists of presets saved for the camera.
   </ul>
   <br><br>
 
   <ul>
-  <li><b> get &lt;name&gt; saveRecording [&lt;path&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  saveRecording [&lt;path&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The current recording present in Reading "CamLastRec" is saved lcally as a MP4 file. Optionally you can specify the path 
   for the file to save (default: modpath in global device). <br>
@@ -11709,7 +11742,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>   
   
   <ul>
-  <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b>  scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   This command is similar to get caminfoall, informations relating to SVS and the camera will be retrieved. 
   In difference to caminfoall in either case a new session ID will be generated (do a new login), the camera ID will be
@@ -11718,7 +11751,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   A popup with the last [x] snapshots will be created. If the <a href="#SSCamattr">attribute</a> "snapGalleryBoost" is set, 
   the last snapshots (default 3) are requested by polling and they will be stored in the FHEM-servers main memory. 
@@ -11748,7 +11781,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		<br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   The filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> 
   automatically.
@@ -11756,7 +11789,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>  
   
   <ul>
-  <li><b> get &lt;name&gt; snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   Informations about snapshots will be retrieved. Heplful if snapshots are not triggerd by SSCam, but by motion detection of the camera or surveillance
   station instead.
@@ -11764,7 +11797,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
+  <li><b>  stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM)</li> <br>
   
   This command is to fetch the streamkey information and streamurl using that streamkey. The reading "StmKey" will be filled when this command will be executed and can be used 
   to send it and run by your own application like a browser (see example).
@@ -11776,7 +11809,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Example to create an http-call to a livestream using StmKey: <br>
   
   <pre>
-http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
+    http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceStation.VideoStreaming&version=1&method=Stream&format=mjpeg&cameraId=5&StmKey="31fd87279976d89bb98409728cced890"
   </pre>
   
   cameraId (Internal CAMID) and StmKey has to be replaced by valid values. <br><br>
@@ -11789,21 +11822,21 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b>  storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   Shows the stored login credentials in a popup as plain text.
   </ul>
   <br><br>  
   
   <ul>
-  <li><b> get &lt;name&gt; svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b>  svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   Determines common informations about the installed SVS-version and other properties. <br>
   </ul>
   <br><br> 
 
   <ul>
-  <li><b> get &lt;name&gt; versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
+  <li><b>  versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> <br>
   
   Shows realease informations and/or hints about the module. It contains only main release informations for module users. <br>
   If no options are specified, both release informations and hints will be shown. "rel" shows only release informations and
@@ -12856,7 +12889,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b> autocreateCams </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Ist ein SVS-Device definiert, können mit diesem Befehl alle in der SVS integrierten Kameras automatisiert angelegt werden. Bereits definierte 
   Kameradevices werden übersprungen. 
@@ -12867,7 +12900,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <a name="SSCamcreateStreamDev"></a>
-  <li><b> set &lt;name&gt; createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> createStreamDev [generic | hls | lastsnap | mjpeg | switched] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
 
   Es wird ein separates Streaming-Device (Typ SSCamSTRM) erstellt. Dieses Device kann z.B. als separates Device 
   in einem Dashboard genutzt werden.
@@ -12941,7 +12974,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  <li><b> createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Es wird ein separates PTZ-Steuerungspaneel (Type SSCamSTRM) erstellt. Es wird der aktuelle Raum des Kameradevice 
   zugewiesen sofern dort gesetzt (default "SSCam").  
@@ -12951,7 +12984,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; createReadingsGroup [&lt;Name der readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b> createReadingsGroup [&lt;Name der readingsGroup&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Es wird ein readingsGroup-Device zur Übersicht aller vorhandenen SSCam-Devices erstellt. Es kann ein eigener Name angegeben 
   werden. Ist kein Name angegeben, wird eine readingsGroup mit dem Namen "RG.SSCam" erzeugt.
@@ -12960,7 +12993,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
     
   <ul>
-  <li><b> set &lt;name&gt; createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> createSnapGallery </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird eine Schnappschußgallerie als separates Device (Type SSCamSTRM) erzeugt. Das Device wird im Raum 
   "SSCam" erstellt.
@@ -12977,7 +13010,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b> credentials &lt;username&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Setzt Username / Passwort für den Zugriff auf die Synology Surveillance Station. 
   Siehe <a href="#SSCam_Credentials">Credentials</a><br>
@@ -12986,7 +13019,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  <li><b> delPreset &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Löscht einen Preset "&lt;PresetName&gt;". Im FHEMWEB wird eine Drop-Down Liste der aktuell vorhandenen 
   Presets angeboten.
@@ -12995,7 +13028,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; [enable|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> enable | disable </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Aktviviert / deaktiviert eine Kamera. <br>
   Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
@@ -13024,7 +13057,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br>
   
   <ul>
-  <li><b> set &lt;name&gt; expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> expmode [day|night|auto] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
   Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
@@ -13037,7 +13070,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
 
   <ul>
-  <li><b> set &lt;name&gt; extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b> extevent [ 1-10 ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
   Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 
@@ -13050,7 +13083,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
   Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
@@ -13085,7 +13118,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> goPreset &lt;Preset&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
   Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
@@ -13120,7 +13153,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b> homeMode [on|off] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Schaltet den HomeMode der Surveillance Station ein bzw. aus. 
   Informationen zum HomeMode sind in der <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/home_mode">Synology Onlinehilfe</a> 
@@ -13129,7 +13162,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
@@ -13177,8 +13210,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM bis SVS Version 7.1)</li> 
-      <b> set &lt;name&gt; move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM ab SVS Version 7.2) <br><br>
+  <li><b> move [ right | up | down | left | dir_X ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM bis SVS Version 7.1)</li> 
+      <b> move [ right | upright | up | upleft | left | downleft | down | downright ] [Sekunden] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM ab SVS Version 7.2) <br><br>
   
   Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
   Zwischenwinkelmaße "dir_X" zur Verfügung. Die Feinheit dieser Graduierung ist von der Kamera abhängig und kann dem Reading "CapPTZDirections" entnommen werden. <br><br>
@@ -13201,14 +13234,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br>
   
   <ul>
-  <li><b> set &lt;name&gt; off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
+  <li><b> off  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li><br>
 
   Stoppt eine laufende Aufnahme. 
   </ul>
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; on [&lt;rectime&gt;] <br>
+  <li><b> on [&lt;rectime&gt;] <br>
                               [recEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
                               [recTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
                               [recChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br> </b>
@@ -13282,7 +13315,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> optimizeParams [mirror:&lt;value&gt;] [flip:&lt;value&gt;] [rotate:&lt;value&gt;] [ntp:&lt;value&gt;]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Setzt eine oder mehrere Eigenschaften für die Kamera. Das Video kann gespiegelt (mirror), auf den Kopf gestellt (flip) oder 
   gedreht (rotate) werden. Die jeweiligen Eigenschaften müssen von der Kamera unterstützt werden. Mit "ntp" wird der Zeitserver 
@@ -13307,14 +13340,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> set &lt;name&gt; pirSensor [activate | deactivate] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> pirSensor [activate | deactivate] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Aktiviert / deaktiviert den Infrarot-Sensor der Kamera (sofern die Kamera einen PIR-Sensor enthält).  
   </ul>
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> runPatrol &lt;Patrolname&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
   Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
@@ -13327,7 +13360,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; runView [live_fw | live_fw_hls | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> runView [live_fw | live_fw_hls | live_link | live_open [&lt;room&gt;] | lastrec_fw | lastrec_fw_MJPEG | lastrec_fw_MPEG4/H.264 | lastrec_open [&lt;room&gt;] | lastsnap_fw]  </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   <ul>
   <table>
@@ -13415,7 +13448,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   
   <ul>
-  <li><b> set &lt;name&gt; setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  <li><b> setHome &lt;PresetName&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Setzt die Home-Position der Kamera auf einen vordefinierten Preset "&lt;PresetName&gt;" oder auf die aktuell angefahrene 
   Position.
@@ -13424,7 +13457,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; setPreset &lt;PresetNummer&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  <li><b> setPreset &lt;PresetNummer&gt; [&lt;PresetName&gt;] [&lt;Speed&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Setzt einen Preset mit dem Namen "&lt;PresetName&gt;" auf die aktuell angefahrene Position der Kamera. Optional kann die
   Geschwindigkeit angegeben werden (&lt;Speed&gt;). Ist kein PresetName angegeben, wird die PresetNummer als Name verwendet.
@@ -13434,7 +13467,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; smtpcredentials &lt;user&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> setZoom &lt; .++ | + | stop | - | --. &gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  
+  Stellt Bedienelemte für Zoomfunktionen zur Verfügung sofern die Kamera dieses Merkmal unterstützt.
+
+  </ul>
+  <br><br>
+  
+  <ul>
+  <li><b> smtpcredentials &lt;user&gt; &lt;password&gt; </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Setzt die Credentials für den Zugang zum Postausgangsserver wenn Email-Versand genutzt wird.
 
@@ -13442,7 +13483,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] <br>
+  <li><b> snap [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] <br>
                                 [snapEmailTxt:"subject => &lt;Betreff-Text&gt;, body => &lt;Mitteilung-Text&gt;"] <br>
                                 [snapTelegramTxt:"tbot => &lt;TelegramBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"] <br>
                                 [snapChatTxt:"chatbot => &lt;SSChatBot-Device&gt;, peers => [&lt;peer1 peer2 ...&gt;], subject => [&lt;Betreff-Text&gt;]"]    <br>
@@ -13491,7 +13532,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapCams [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [CAM:"&lt;Kamera&gt;, &lt;Kamera&gt, ..."]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b> snapCams [&lt;Anzahl&gt;] [&lt;Zeitabstand&gt;] [CAM:"&lt;Kamera&gt;, &lt;Kamera&gt, ..."]</b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Ein oder mehrere Schnappschüsse der angegebenen Kamera-Devices werden ausgelöst. Sind keine Kamera-Devices angegeben, 
   werden die Schnappschüsse bei allen in FHEM definierten Kamera-Devices getriggert.  
@@ -13517,7 +13558,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b> snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Der Befehl ist nur vorhanden wenn das Attribut "snapGalleryBoost=1" gesetzt wurde.
   Er erzeugt eine Ausgabe der letzten [x] Schnappschüsse ebenso wie <a href="#SSCamget">"get &lt;name&gt; snapGallery"</a>.  Abweichend von "get" wird mit Attribut
@@ -13535,7 +13576,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
+  <li><b> startTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
   
   Startet Objekt Tracking der Kamera.
   Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
@@ -13544,7 +13585,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> set &lt;name&gt; stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
+  <li><b> stopTracking </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM mit Tracking Fähigkeit)</li> <br>
   
   Stoppt Objekt Tracking der Kamera.
   Der Befehl ist nur vorhanden wenn die Surveillance Station die Fähigkeit der Kamera zum Objekt Tracking erkannt hat
@@ -13564,8 +13605,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li>
-      <b> get &lt;name&gt; caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br><br>
+  <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li>
+      <b>  caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br><br>
   
   Es werden SVS-Parameter und abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Kamera-Eigenschaften 
   ermittelt und als Readings zur Verfügung gestellt. <br>
@@ -13576,7 +13617,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  eventlist </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" und "CamLastRec" 
   aktualisiert, welches die Gesamtanzahl der registrierten Kameraevents und den Pfad / Namen der letzten Aufnahme enthält.
@@ -13594,14 +13635,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> get &lt;name&gt; homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b>  homeModeState </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   HomeMode-Status der Surveillance Station wird abgerufen.  
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+  <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
   
   Ruft das Surveillance Station Log vom Synology Server ab. Ohne Angabe der optionalen Zusätze wird das gesamte Log abgerufen. <br>
   Es können alle oder eine Auswahl der folgenden Optionen angegeben werden: <br><br>
@@ -13632,14 +13673,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
+  <li><b>  listPresets </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für PTZ-CAM)</li> <br>
   
   Die für die Kamera gespeicherten Presets werden in einem Popup ausgegeben.
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; saveRecording [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  saveRecording [&lt;Pfad&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Die aktuell im Reading "CamLastRec" angegebene Aufnahme wird lokal als MP4-File gespeichert. Optional kann der Pfad zur 
   Speicherung des Files im Befehl angegeben werden (default: modpath im global Device). <br>
@@ -13654,7 +13695,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
 
   <ul>
-  <li><b> get &lt;name&gt; scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b>  scanVirgin </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Wie mit get caminfoall werden alle Informationen der SVS und Kamera abgerufen. Allerdings wird in jedem Fall eine 
   neue Session ID generiert (neues Login), die Kamera-ID neu ermittelt und es werden alle notwendigen API-Parameter neu 
@@ -13663,7 +13704,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  snapGallery [1-10] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird ein Popup mit den letzten [x] Schnapschüssen erzeugt. Ist das <a href="#SSCamattr">Attribut</a> "snapGalleryBoost" gesetzt, 
   werden die letzten Schnappschüsse (default 3) über Polling abgefragt und im Speicher gehalten. Das Verfahren hilft die Ausgabe zu beschleunigen,
@@ -13692,7 +13733,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 		<br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  snapfileinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> 
   ausgeführt.
@@ -13700,7 +13741,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  snapinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Es werden Schnappschussinformationen gelesen. Hilfreich wenn Schnappschüsse nicht durch SSCam, sondern durch die Bewegungserkennung der Kamera 
   oder Surveillance Station erzeugt werden.
@@ -13708,7 +13749,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <li><b>  stmUrlPath </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
   
   Mit diesem Kommando wird der aktuelle Streamkey der Kamera abgerufen und das Reading mit dem Key-Wert gefüllt. 
   Dieser Streamkey kann verwendet werden um eigene Aufrufe eines Livestreams aufzubauen (siehe Beispiel).
@@ -13736,21 +13777,21 @@ http(s)://&lt;hostname&gt;&lt;port&gt;/webapi/entry.cgi?api=SYNO.SurveillanceSta
   <br><br>
   
   <ul>
-  <li><b> get &lt;name&gt; storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b>  storedCredentials </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b>  svsinfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Ermittelt allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
   </ul>
   <br><br> 
   
   <ul>
-  <li><b> get &lt;name&gt; versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
+  <li><b>  versionNotes [hints | rel | &lt;key&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li> <br>
   
   Zeigt Release Informationen und/oder Hinweise zum Modul an. Es sind nur Release Informationen mit Bedeutung für den 
   Modulnutzer enthalten. <br>
