@@ -3978,7 +3978,7 @@ Dispatch($$;$$)
 
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
-    next if(!$modules{$m} || $dmsg !~ m/$modules{$m}{Match}/i);
+    next if(!$modules{$m} || $dmsg !~ m/$modules{$m}{Match}/is);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
       ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
@@ -4005,7 +4005,7 @@ Dispatch($$;$$)
     $h = $module->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
-        if($dmsg =~ m/$h->{$m}/) {
+        if($dmsg =~ m/$h->{$m}/is) {
           my ($order, $mname) = split(":", $m);
 
           if(AttrVal("global", "autoload_undefined_devices", 1)) {
