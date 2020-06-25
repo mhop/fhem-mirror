@@ -129,9 +129,10 @@ FBDECT_SetHttp($@)
   my $cmd = $a[1];
   return "" if(IsDisabled($name));
   Log3 $name, 3, "FBDECT set $name $cmd";
+  my $ain = ReadingsVal($name,"AIN",0);
 
   if($cmd =~ m/^(on|off|toggle)$/) {
-    IOWrite($hash, ReadingsVal($name,"AIN",0), "setswitch$cmd");
+    IOWrite($hash, $ain, "setswitch$cmd");
     my $state = ($cmd eq "toggle" ? ($hash->{STATE} eq "on" ? "off":"on"):$cmd);
     readingsSingleUpdate($hash, "state", $state, 1);
     return undef;
@@ -146,27 +147,45 @@ FBDECT_SetHttp($@)
     my $a2 = ($a[2] ? $a[2] : 0);
     my $val = ($cmd eq "open"  || $a2==28.5) ? 254 :
               ($cmd eq "closed"|| $a2== 7.5) ? 253: int(2*$a2);
-    IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
+    IOWrite($hash, $ain,"sethkrtsoll&param=$val");
+    return undef;
+  }
+
+  if($cmd =~ m/^(boost|windowopen)$/ && $p =~ m/actuator/) {
+    return "Usage: set $name $cmd duration" if(int(@a) != 3);
+    return "duration must be between 0 (deactivate) and 86400 (+24h)"
+      if($a[2] !~ m/^\d+$/ || $a[2] > 86400);
+    my $endtimestamp = ($a[2] == 0 ? 0 : (time() + $a[2]));
+
+    if($cmd eq "boost") {
+      Log3 $name,5, "$name: raw sethkrboost&endtimestamp=$endtimestamp";
+      IOWrite($hash, $ain, "sethkrboost&endtimestamp=$endtimestamp");
+
+    } elsif ($cmd eq "windowopen") {
+      Log3 $name,5, "$name: raw sethkrwindowopen&endtimestamp=$endtimestamp";
+      IOWrite($hash, $ain, "sethkrwindowopen&endtimestamp=$endtimestamp");
+
+    } 
     return undef;
   }
 
   if($cmd eq "dim") {
     return "Usage: set $name dim value"
         if(int(@a) != 3 || $a[2] !~ m/^\d+$/ || !($a[2]>=0 && $a[2]<=100));
-    IOWrite($hash, ReadingsVal($name,"AIN",0),"setlevelpercentage&level=$a[2]");
+    IOWrite($hash, $ain,"setlevelpercentage&level=$a[2]");
     return undef;
   }
 
   if($cmd =~ m/^(open|closed|stop)$/ &&
     $p =~ m/HANFUNUnit/ && $unittype eq "BLIND") {
-    IOWrite($hash, ReadingsVal($name,"AIN",0),"setblind&target=$cmd");
+    IOWrite($hash, $ain,"setblind&target=$cmd");
     return undef;
   }
 
   if($cmd eq "raw") {
     shift @a; shift @a;
     return "Usage set $name raw <arguments>" if(!@a);
-    IOWrite($hash, ReadingsVal($name,"AIN",0),join("&", @a));
+    IOWrite($hash, $ain, join("&", @a));
     return undef;
   }
 
@@ -181,8 +200,7 @@ FBDECT_SetHttp($@)
     $hash->{color}      = $color;
     Log3 $name,5,
         "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
-    IOWrite($hash, ReadingsVal($name,"AIN",0),
-        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    IOWrite($hash, $ain, "setcolor&hue=$hue&saturation=$saturation&duration=0");
     return undef;
   }
   
@@ -196,8 +214,7 @@ FBDECT_SetHttp($@)
     $hash->{satindex}   = $satindex;
     Log3 $name,5,
         "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
-    IOWrite($hash, ReadingsVal($name,"AIN",0),
-        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    IOWrite($hash, $ain, "setcolor&hue=$hue&saturation=$saturation&duration=0");
     return undef;
   }
 
@@ -213,12 +230,9 @@ FBDECT_SetHttp($@)
     $hash->{satindex} = $satindex;
     Log3 $name,5,
         "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
-    IOWrite($hash, ReadingsVal($name,"AIN",0),
-        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    IOWrite($hash, $ain, "setcolor&hue=$hue&saturation=$saturation&duration=0");
     return undef;
   }
-    
-    
     
   if($cmd eq "colortemperature") {
     return "Usage: set $name colortemperature [temperature]"
@@ -246,7 +260,7 @@ FBDECT_SetHttp($@)
       $hash->{colortemperature} = $colortemperature;
       Log3 $name,5, "$name: raw setcolortemperature&".
                         "temperature=$colortemperature&duration=0";
-      IOWrite($hash, ReadingsVal($name,"AIN",0),
+      IOWrite($hash, $ain,
                 "setcolortemperature&temperature=$colortemperature&duration=0");
     }
     return undef;
@@ -272,8 +286,7 @@ FBDECT_SetHttp($@)
     $hash->{saturation} = $saturation;
     Log3 $name,5,
         "$name: raw setcolor&hue=$hue&saturation=$saturation&duration=0";
-    IOWrite($hash, ReadingsVal($name,"AIN",0),
-        "setcolor&hue=$hue&saturation=$saturation&duration=0");
+    IOWrite($hash, $ain, "setcolor&hue=$hue&saturation=$saturation&duration=0");
     return undef;
   }
   
@@ -408,6 +421,11 @@ my %fbhttp_readings = (
    current_mode    => '"current_mode:$val"',
    saturation      => '"saturation:$val"',
    temperature     => '"colortemperature:$val"',
+   windowopenactiveendtime => '"windowopenactiveendtime:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   boostactive     => '"boostactive:".($val ? "yes":"no")',
+   boostactiveendtime => '"boostactiveendtime:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   masterdeviceid  => '"groupmasterid:$val"',
+   lastalertchgtimestamp => '"lastalertchgtimestamp:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
 );
 
 sub
@@ -880,6 +898,18 @@ FBDECT_Undef($$)
     corresponds to off, and 28.5 to on.
     </li>
 
+  <li>boost &lt;duration&gt;<br>
+    set the boost mode on a Comet/Fritz DECT 301 (FBAHAHTTP IOdev only) for 
+    duration in seconds.
+    The value 0 means deactivate previously set boost mode.
+    </li>
+
+  <li>boost &lt;duration&gt;<br>
+    set the boost mode on a Comet/Fritz DECT (FBAHAHTTP IOdev only) for 
+    duration in seconds.
+    The value 0 means deactivate previously set windowopen mode.
+    </li>
+
   <li><a href="#setExtensions">set extensions</a> are supported.
    </li>
 
@@ -1016,6 +1046,16 @@ FBDECT_Undef($$)
   <li>desired-temp &lt;value&gt;<br>
     Gew&uuml;nschte Temperatur beim Comet DECT setzen. 7.5 entspricht aus, 28.5
     bedeutet an.
+    </li>
+
+  <li>boost &lt;Dauer&gt;<br>
+    Versetzt den Comet/Fritz DECT 301 in boost Modus f&uuml;" Dauer in Sekunden. 
+    0 bedeutet boost Modus canceln. 
+    </li>
+
+  <li>windowopen &lt;Dauer&gt;<br>
+    Versetzt den Comet/Fritz DECT in windowopen Modus f&uuml;" Dauer in Sekunden. 
+    0 bedeutet windowopen Modus canceln. 
     </li>
 
   <li>dim &lt;value&gt;<br>
