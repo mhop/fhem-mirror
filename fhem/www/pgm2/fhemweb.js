@@ -1692,7 +1692,7 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   sh.ontouchstart = function(e) { touchFn(e, mouseDown); }
 
   newEl.setValueFn = function(arg) {
-    var res = arg.match(/[\d.\-]+/); // extract first number
+    var res = arg.match(/-?[\d.]+/); // extract first number
     currVal = (res ? parseFloat(res[0]) : min);
     if(currVal < min || currVal > max)
       currVal = min;
