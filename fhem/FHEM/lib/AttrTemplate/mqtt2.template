@@ -21,17 +21,13 @@ name:MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
 order:000001
-#par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-#par:DEVTYPE;TYPE of the device; { InternalVal("DEVICE","TYPE",undef)}
 #par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
-#par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVCID","room","MQTT2_\DEVICE" )} 
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
-#defmod DEVCID MQTT2_\DEVICE DEVCID
 attr DEVICE bridgeRegexp \
   (tele|stat)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
-  (zigbee2mqtt)[/].*:.* "$1"\
+  (zigbee2mqtt)/bridge/.*:.* "$1"\
   (ESPClient_[^/]+)[/].*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
   [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
@@ -41,23 +37,15 @@ attr DEVICE bridgeRegexp \
   (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"\
   Advantech[/]([^/]+)[/].*:.* "$1"\
   sonos[/](RINCON_[A-Z0-9]+):.* "$1"\
-  (sonos)[/][^/]+/.* "$1"\
+  (sonos)/connected.* "$1"\
   (tvheadend)[/][^/:]+.* "$1"\
   homeassistant/.*/config:.* ""
-#attr DEVCID autocreate 1
+attr DEVICE autocreate 1
 attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
-#attr DEVCID room NEWDEVROOM
-#attr DEVICE icon mqtt_bridge_2
 attr DEVICE setStateList on off
-#deleteattr DEVICE readingList
-#deletereading -q DEVICE (?!associatedWith).*
-#deleteattr DEVCID readingList
-#deletereading -q DEVCID (?!associatedWith).*
-#setreading DEVCID associatedWith DEVICE
-#{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVCID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20200624
+setreading DEVICE attrTemplateVersion 20200625
 
 ###############
 #MQTT2 IO ignoreRegexp
