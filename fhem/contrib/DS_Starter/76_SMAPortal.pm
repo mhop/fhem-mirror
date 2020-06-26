@@ -1048,7 +1048,7 @@ sub _doLogin {
               my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
               Log3 ($name, 5, "$name - Header Set-Cookie: ".$sc) if($v5d =~ /loginData/); 
 
-              if(__isLoggedIn ($username,$loginp,$name)) {                                  # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
+              if(__isLoggedIn ($name,$username,$loginp)) {                                  # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
                   $errstate = 0;                             
@@ -1094,7 +1094,7 @@ return ($state, $errstate);
 sub __isLoggedIn {
   my $name     = shift;
   my $username = shift;
-  my $loginp   = shift // return;
+  my $loginp   = shift;
 
   my $sc        = $loginp->header('Set-Cookie') // "";   
   my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
@@ -1104,7 +1104,7 @@ sub __isLoggedIn {
       return 1;
   }
   
-return; 
+return 0; 
 }
 
 ################################################################
