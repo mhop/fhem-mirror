@@ -1094,7 +1094,7 @@ return ($state, $errstate);
 sub __isLoggedIn {
   my $name     = shift;
   my $username = shift;
-  my $loginp   = shift;
+  my $loginp   = shift // return;
 
   my $sc        = $loginp->header('Set-Cookie') // "";   
   my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
@@ -1104,7 +1104,7 @@ sub __isLoggedIn {
       return 1;
   }
   
-return 0; 
+return; 
 }
 
 ################################################################
