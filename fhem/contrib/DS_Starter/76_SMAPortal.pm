@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval ",
+  "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
   "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
   "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
                            "executing retrieve master data firstly every time",
@@ -201,8 +201,8 @@ my %vNotesIntern = (
 );
 
 # Voreinstellungen
-my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
-my $thold        = int($maxretries+1);     # (deaktiviert) Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
+my $maxretries   = 8;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
+my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
 my $sleepretry   = 0.5;                    # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
 my $sleepexc     = 2;                      # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
 my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
