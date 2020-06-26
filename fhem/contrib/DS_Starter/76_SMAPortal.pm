@@ -202,7 +202,7 @@ my %vNotesIntern = (
 
 # Voreinstellungen
 my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
-my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie
+my $thold        = int($maxretries+1);     # (deaktiviert) Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
 my $sleepretry   = 0.5;                    # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
 my $sleepexc     = 2;                      # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
 my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
@@ -382,6 +382,7 @@ sub Set {                             ## no critic 'complexity'
       ($success) = setcredentials($hash,$prop,$prop1); 
       
       if($success) {
+          delcookiefile ($hash);
           CallInfo($hash);
           return "Username and Password saved successfully";
       } else {
@@ -659,7 +660,8 @@ sub Attr {
         $val = ($do == 1 ? "disabled" : "initialized");
         
         if($do) {
-            deleteData($hash);
+            deleteData    ($hash);
+            delcookiefile ($hash); 
             delete $hash->{MODE};
             RemoveInternalTimer($hash);                      
         } else {
@@ -813,16 +815,16 @@ return ($interval,$maxcycles,$timeout,$ctime);
 ################################################################
 sub GetSetData {                                                       ## no critic 'complexity'
   my ($string) = @_;
-  my ($name,$getp,$setp)   = split("\\|",$string);
-  my $hash                 = $defs{$name}; 
-  my $useragent            = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
-  my $cookieLocation       = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
-  my $v5d                  = AttrVal($name, "verbose5Data", "none"); 
-  my $verbose              = AttrVal($name, "verbose", 3);
-  my $lang                 = AttrVal("global", "language", "EN");
-  my $state                = "ok";
-  my ($st,$lc)             = ("","");
-  my @da                   = ();
+  my ($name,$getp,$setp) = split("\\|",$string);
+  my $hash               = $defs{$name}; 
+  my $useragent          = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
+  my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
+  my $v5d                = AttrVal($name, "verbose5Data", "none"); 
+  my $verbose            = AttrVal($name, "verbose", 3);
+  my $lang               = AttrVal("global", "language", "EN");
+  my $state              = "ok";
+  my ($st,$lc)           = ("","");
+  my @da                 = ();
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
   
@@ -867,7 +869,7 @@ sub GetSetData {                                                       ## no cri
   ### Login 
   ##############
   my $paref = [ $name, $ua, $state, $errstate ];
-  ($state, $errstate) = _checkLogin ($paref);
+  ($state, $errstate) = _doLogin ($paref);
 
   if($errstate) {
       $st = encode_base64 ( $state,"");
@@ -945,7 +947,7 @@ sub GetSetData {                                                       ## no cri
           goto &GetSetData if($reread);
           
           # Wiederholung Datenabruf innerhalb eines Cycle
-          my $retc  = $hash->{HELPER}{RETRIES};                                                    # aktuelle Retry-Zähler
+          my $retc = $hash->{HELPER}{RETRIES};                                                     # aktuelle Retry-Zähler
           
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
@@ -965,7 +967,7 @@ sub GetSetData {                                                       ## no cri
           my $ac        = $hash->{HELPER}{ACTCYCLE};
           my $maxcycles = (controlParams $name)[1];
           if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
-              Log3 ($name, 3, qq{$name - Maximum retries reached, delete cookie and start new cycle ...}); 
+              Log3 ($name, 3, qq{$name - Maximum retries reached, start new data get cycle ...}); 
               $newcycle = 1;
               return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
           }    
@@ -985,7 +987,7 @@ return "$name|$exceed|$newcycle|$errstate|$getp|$setp|$st|$lc";
 ################################################################
 #       Login Status checken und ggf. einloggen
 ################################################################
-sub _checkLogin {
+sub _doLogin {
   my $paref       = shift;
   my $name        = $paref->[0];
   my $ua          = $paref->[1];
@@ -995,30 +997,31 @@ sub _checkLogin {
   my $hash     = $defs{$name};
   my $v5d      = AttrVal($name, "verbose5Data", "none");  
   my $verbose  = AttrVal($name, "verbose", 3);
-
-  my $loginp   = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx');
-  my $retcode  = $loginp->code;
-  my $location = $loginp->header('Location') // "";
   
   if($verbose == 5 && $v5d =~ /loginData/) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
   
+  my ($success, $username, $password) = getcredentials($hash,0);                # gespeicherte Credentials abrufen
+  
+  my $loginp   = $ua->post('https://www.sunnyportal.com/Templates/Start.aspx');
+  my $retcode  = $loginp->code;
+  my $location = $loginp->header('Location')   // "";
+  my $cookie   = $loginp->header('Set-Cookie') // "";
+  
   if ($loginp->is_success) {
       if($v5d =~ /loginData/) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
-          Log3 ($name, 5, "$name - Header Location: ".$location);
+          Log3 ($name, 5, "$name - Header Location: ".  $location);
+          Log3 ($name, 5, "$name - Header Set-Cookie: ".$cookie);
       }
   
       $retcode  = $loginp->code;
       $location = $loginp->header('Location') // "";
       
-      if($location ne "/FixedPages/HoManLive.aspx" || $retcode ne "302") {            # keine aktive Session -> neuer Login
+      if(!__isLoggedIn ($username,$loginp)) {                                                # keine aktive Session -> neuer Login
           Log3 ($name, 4, "$name - User not logged in. Try login with credentials ...");
-          
-          # Credentials abrufen
-          my ($success, $username, $password) = getcredentials($hash,0);
       
           if(!$success) {
               Log3($name, 1, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});   
@@ -1045,7 +1048,7 @@ sub _checkLogin {
               my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
               Log3 ($name, 5, "$name - Header Set-Cookie: ".$sc) if($v5d =~ /loginData/); 
 
-              if($logname && $logname eq $username) {                                       # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
+              if(__isLoggedIn ($username,$loginp)) {                                        # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   Log3 ($name, 3, "$name - Login into SMA-Portal successfully done with user: $logname");
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   
@@ -1068,6 +1071,7 @@ sub _checkLogin {
           Log3 ($name, 5, "$name - Redirect return code: ".$retcode);
           Log3 ($name, 5, "$name - Redirect Header Location: ".$location); 
       }      
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "NULL" ], 1);
       $errstate = 0;
   
   } else {
@@ -1084,14 +1088,31 @@ return ($state, $errstate);
 }
 
 ################################################################
+#                  Login Status testen
+################################################################
+sub __isLoggedIn {
+  my $username = shift;
+  my $loginp   = shift;
+
+  my $sc        = $loginp->header('Set-Cookie') // "";   
+  my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
+  
+  if($logname && $logname eq $username) { 
+      return 1;
+  }
+  
+return 0; 
+}
+
+################################################################
 #                    Abruf Live Daten
 ################################################################
 sub _getLiveData {                       ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                     # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                  # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0);
   
@@ -1762,6 +1783,7 @@ sub ParseData {                                                    ## no critic 
   
   if($newcycle && $ac < $maxcycles) {                  
       delete($hash->{HELPER}{RUNNING_PID});     
+      delcookiefile ($hash); 
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;
       $hash->{HELPER}{ACTCYCLE}++;    
