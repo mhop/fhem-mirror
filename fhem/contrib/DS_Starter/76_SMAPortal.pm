@@ -1020,7 +1020,7 @@ sub _doLogin {
       $retcode  = $loginp->code;
       $location = $loginp->header('Location') // "";
       
-      if(!__isLoggedIn ($username,$loginp)) {                                                # keine aktive Session -> neuer Login
+      if(!__isLoggedIn ($name,$username,$loginp)) {                                                # keine aktive Session -> neuer Login
           Log3 ($name, 4, "$name - User not logged in. Try login with credentials ...");
       
           if(!$success) {
@@ -1048,10 +1048,8 @@ sub _doLogin {
               my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
               Log3 ($name, 5, "$name - Header Set-Cookie: ".$sc) if($v5d =~ /loginData/); 
 
-              if(__isLoggedIn ($username,$loginp)) {                                        # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
-                  Log3 ($name, 3, "$name - Login into SMA-Portal successfully done with user: $logname");
+              if(__isLoggedIn ($username,$loginp,$name)) {                                  # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
-                  
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
                   $errstate = 0;                             
               
@@ -1064,13 +1062,16 @@ sub _doLogin {
           }         
       }
   
-  } elsif($loginp->is_redirect) {
+  } elsif ($loginp->is_redirect) {
       $retcode  = $loginp->code;
       $location = $loginp->header('Location') // "";
+      Log3 ($name, 3, "$name - User is already logged in.");      
+      
       if($v5d =~ /loginData/) {
-          Log3 ($name, 5, "$name - Redirect return code: ".$retcode);
+          Log3 ($name, 5, "$name - Redirect return code: ".    $retcode );
           Log3 ($name, 5, "$name - Redirect Header Location: ".$location); 
       }      
+      
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "NULL" ], 1);
       $errstate = 0;
   
@@ -1091,13 +1092,15 @@ return ($state, $errstate);
 #                  Login Status testen
 ################################################################
 sub __isLoggedIn {
+  my $name     = shift;
   my $username = shift;
   my $loginp   = shift;
 
   my $sc        = $loginp->header('Set-Cookie') // "";   
   my ($logname) = $sc =~ /SunnyPortalLoginInfo=Username=(.*?)&/sx;
-  
-  if($logname && $logname eq $username) { 
+   
+  if($logname && $logname eq $username) {
+      Log3 ($name, 3, "$name - Login into SMA-Portal successfully done with user: $logname");      
       return 1;
   }
   
