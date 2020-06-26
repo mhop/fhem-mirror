@@ -28,24 +28,28 @@ attr DEVICE bridgeRegexp \
   (tele|stat)[/]([^/]+)[/].*:.* "$2"\
   shellies[/]([^/]+)[/].*:.* "$1"\
   (zigbee2mqtt)/bridge/.*:.* "$1"\
-  (ESPClient_[^/]+)[/].*:.* "$1"\
+  (ESPClient_[^/]+)/.*:.* "$1"\
+  (ebusd)/global/.*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
-  [^/]+[/](ems-esp[^/]+)[/].*:.* "$1"\
-  wallpanel[/]([^/]+)[/].*:.* "$1"\
+  [^/]+[/](ems-esp[^/]+)/start:.* "$1"\
+  wallpanel[/]([^/]+)[/].*:.* "wallpanel_$1"\
   (wled)[/]([^/]+)[/].*:.* "$1_$2"\
   (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
   (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"\
   Advantech[/]([^/]+)[/].*:.* "$1"\
-  sonos[/](RINCON_[A-Z0-9]+):.* "$1"\
   (sonos)/connected.* "$1"\
   (tvheadend)[/][^/:]+.* "$1"\
+  (mygateway[\d]+)-(in|out)/.* "$1"\
+  (milight)/LWT:.* "$1"\
+  home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
   homeassistant/.*/config:.* ""
+attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith).*");return undef}
 attr DEVICE autocreate 1
-attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results...
+attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results... Especially make sure to not have two regexpes that may both match!
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20200625
+setreading DEVICE attrTemplateVersion 20200625_2
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -55,7 +59,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: experimental first version...
 order:000002
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-attr IODEVNAME irgnoreRegexp cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
+attr IODEVNAME ignoreRegexp cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
 setreading IODEVNAME attrTemplateVersion 20200523
 
@@ -65,9 +69,21 @@ desc:experimental first version...
 order:000002a
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : $old =~ m,homeassistant/.*/config, ? $old : $old.'|homeassistant/.*/config'  }
-attr IODEVNAME irgnoreRegexp NEWIGNOREREGEXP
+attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Check further extending the ignoreRegexp by yourself!
+
+name:do_general_mqtt_cleanup
+filter:NAME=speechrecognTesting
+order:000002b
+desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}/.*/[0-8].
+par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
+par:ADD_TO_IO_IGNOREREGEXP;add ignoreRegexp to be attached to the current one, defaults to "";{ "" }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? ADD_TO_IO_IGNOREREGEXP : ADD_TO_IO_IGNOREREGEXP =~ m,$old, ? $old : $old."|ADD_TO_IO_IGNOREREGEXP" }
+deletereading -q TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge (?!associatedWith).*
+deleteattr TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge readingList
+option:{return 1 if ADD_TO_IO_IGNOREREGEXP ne "";;return 0}
+attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 ###########################################
 # zigbee2mqtt
@@ -79,7 +95,7 @@ order:L_01
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
-  BASE_TOPIC/([A-Za-z0-9._]*)[/]?.*:.* "zigbee_$1"
+  BASE_TOPIC/([A-Za-z0-9._]+)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
   devicelist:noArg log $\DEVICETOPIC/bridge/config/devices\
   networkmap_raw:noArg raw $\DEVICETOPIC/bridge/networkmap raw\
@@ -118,8 +134,9 @@ attr DEVICE setList\
   z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200626
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 #A pure router device, e.g. a CC2531 flashed with router firmware
@@ -2726,8 +2743,9 @@ status\
 </a>Version: \
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]
 attr DEVICE model esp_milight_hub_bridge
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200626
 { AttrTemplate_Initialize() }
 
 
