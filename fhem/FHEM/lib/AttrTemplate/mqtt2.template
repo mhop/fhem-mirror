@@ -56,19 +56,20 @@ setreading DEVICE attrTemplateVersion 20200625_2
 #
 name:MQTT2_IO_ignoreRegexp_basic
 filter:TYPE=MQTT2_DEVICE
-desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: experimental first version...
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: early experimental version...
 order:000002
-par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-attr IODEVNAME ignoreRegexp cmnd[/]([^/]+)[/]|shellies/([^/]+)/command
+par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'cmnd/[^/]+/|shellies/[^/]+/command');; $old = $old.'|cmnd/[^/]+/' if $old !~ m,cmnd/[^/]+/, ;; $old = $old.'|shellies/[^/]+/command' if $old !~ m,shellies/[^/]+/command, ;; return $old }
+attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
-setreading IODEVNAME attrTemplateVersion 20200523
+setreading IODEVNAME attrTemplateVersion 20200627
 
 name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
-desc:experimental first version...
+desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages meant for homeassistant for auto-discovery of devices. You are strongly encouraged to not use homeassistant autodiscovery at all, but in case you need it for some reason, adding this ignoreRegexp-expression might help to avoid confusion!<br>NOTE: early experimental version...
 order:000002a
-par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) } 
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : $old =~ m,homeassistant/.*/config, ? $old : $old.'|homeassistant/.*/config'  }
+par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : homeassistant/.*/config =~ m,$old, ? $old : $old.'|homeassistant/.*/config'  }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Check further extending the ignoreRegexp by yourself!
@@ -77,12 +78,12 @@ name:do_general_mqtt_cleanup
 filter:NAME=speechrecognTesting
 order:000002b
 desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}/.*/[0-8].
-par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
+par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
 par:ADD_TO_IO_IGNOREREGEXP;add ignoreRegexp to be attached to the current one, defaults to "";{ "" }
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? ADD_TO_IO_IGNOREREGEXP : ADD_TO_IO_IGNOREREGEXP =~ m,$old, ? $old : $old."|ADD_TO_IO_IGNOREREGEXP" }
 deletereading -q TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge (?!associatedWith).*
 deleteattr TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge readingList
-option:{return 1 if ADD_TO_IO_IGNOREREGEXP ne "";;return 0}
+option:{return 1 if 'ADD_TO_IO_IGNOREREGEXP' ne "";;return 0}
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 ###########################################
