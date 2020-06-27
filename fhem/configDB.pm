@@ -537,7 +537,7 @@ sub cfgDB_SaveState {
 				$val =~ s/\n/\\\n/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
 				if (length($out) > 65530) {
-				  Log3(undef, 1, "Device $d Reading $c: value exceeds length of 64k and will be ignored");
+				  Log3(undef, 1, "WriteStatefile $d $c: value exceeds length of 64k and will be ignored");
 				} else {
 				  push @rowList, $out; 
 				}
