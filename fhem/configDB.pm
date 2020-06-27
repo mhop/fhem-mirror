@@ -536,7 +536,11 @@ sub cfgDB_SaveState {
 				$val =~ s/;/;;/g;
 				$val =~ s/\n/\\\n/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
-				push @rowList, $out;
+				if (length($out) > 65530) {
+				  Debug "setstate $d $c: value too long!";
+				} else {
+				  push @rowList, $out; 
+				}
 			}
 		}
 	}
