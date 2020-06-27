@@ -258,6 +258,7 @@ MQTT2_CLIENT_Attr(@)
       return "qosMaxQueueLength must be an integer" if($param[0] !~ m/^\d+$/);
       $hash->{qosMaxQueueLength} = $param[0];
       $hash->{qosQueue} = [];
+      $hash->{qosCnt} = 0;
     } else {
       delete $hash->{qosQueue};
       delete $hash->{qosMaxQueueLength};
@@ -424,6 +425,7 @@ MQTT2_CLIENT_Read($@)
 
 ######################################
 # send topic to client if its subscriptions matches the topic
+
 sub
 MQTT2_CLIENT_doPublish($@)
 {
@@ -439,7 +441,7 @@ MQTT2_CLIENT_doPublish($@)
      @{$hash->{qosQueue}} < $hash->{qosMaxQueueLength}) {
     $hdr += 2; # QoS:1
     push(@{$hash->{qosQueue}}, [$topic,$val,$retain]);
-    $pi = "FM"; # Packet Identifier, if QoS > 0
+    $pi = pack("n",1+($hash->{qosCnt}++%65535)); # Packet Identifier, if QoS > 0
   }
   my $msg = pack("C", $hdr).
             MQTT2_CLIENT_calcRemainingLength(2+length($topic)+length($val)+
@@ -468,7 +470,7 @@ MQTT2_CLIENT_send($$;$$)
   if($immediate) {
     DevIo_SimpleWrite($hash, $msg, 0);
   } else {
-    addToWritebuffer($hash, $msg);
+    addToWritebuffer($hash, $msg, undef, 1); # nolimit
   }
 }
 
