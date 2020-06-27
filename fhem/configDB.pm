@@ -362,16 +362,17 @@ sub cfgDB_AttrRead {
 
 # generic file functions called from fhem.pl
 sub cfgDB_FileRead {
-	my ($filename) = @_;
+	my ($filename,$fhem_dbh) = @_;
+    my $internal_call = 1 if $fhem_dbh;
 
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
-	my $fhem_dbh = _cfgDB_Connect;
+	$fhem_dbh = _cfgDB_Connect unless $fhem_dbh;
 	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename LIKE '$filename'" );
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
 	$sth->finish();
-	$fhem_dbh->disconnect();
+	$fhem_dbh->disconnect() unless $internal_call;
 	$blobContent = decode_base64($blobContent) if ($blobContent);
 	$counter = length($blobContent);
 	if($counter) {
@@ -537,10 +538,12 @@ sub cfgDB_SaveState {
 				$val =~ s/\n/\\\n/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
 				if (length($out) > 65530) {
-				  Log3(undef, 1, "WriteStatefile $d $c: value exceeds length of 64k and will be ignored");
-				} else {
-				  push @rowList, $out; 
+#                if ($out =~ m/externalTest/) {
+                  my $uid = _cfgDB_Uuid();
+				  FileWrite($uid,$val);
+				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
 				}
+                push @rowList, $out; 
 			}
 		}
 	}
@@ -773,11 +776,17 @@ sub _cfgDB_ReadCfg {
 sub _cfgDB_ReadState {
 	my (@dbconfig) = @_;
 	my $fhem_dbh = _cfgDB_Connect;
-	my ($sth, $row);
+	my ($sth, $row,$f);
 
 	$sth = $fhem_dbh->prepare( "SELECT * FROM fhemstate" );  
 	$sth->execute();
 	while ($row = $sth->fetchrow_array()) {
+	    if($row =~ m/(cfgDBkey:)(.{32})/) {
+          my $f = $2;
+	       my (undef, $content) = cfgDB_FileRead($f,$fhem_dbh);
+	       $row =~ s/cfgDB:................................$/$content/;
+	       _cfgDB_Filedelete($f,$fhem_dbh);
+        }
 		push @dbconfig, $row;
 	}
 	$fhem_dbh->disconnect();
@@ -1175,11 +1184,12 @@ sub _cfgDB_dump {
 
 # delete file from database
 sub _cfgDB_Filedelete {
-	my ($filename) = @_;
-	my $fhem_dbh = _cfgDB_Connect;
+	my ($filename,$fhem_dbh) = @_;
+	my $internal_call = 1 if $fhem_dbh;
+	$fhem_dbh = _cfgDB_Connect unless $fhem_dbh;
 	my $ret = $fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
 	$fhem_dbh->commit();
-	$fhem_dbh->disconnect();
+	$fhem_dbh->disconnect() unless $fhem_dbh;
 	$ret = ($ret > 0) ? 1 : undef;
 	return $ret;
 }
