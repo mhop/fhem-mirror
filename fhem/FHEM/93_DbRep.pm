@@ -127,72 +127,6 @@ our %DbRep_vNotesIntern = (
   "8.10.0"  => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10"  => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"   => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
-  "8.9.8"   => "27.11.2018  minor fix in deviceRename, commandref revised ",
-  "8.9.7"   => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
-  "8.9.6"   => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
-  "8.9.5"   => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
-  "8.9.0"   => "07.11.2018  command delDoublets added ",
-  "8.8.0"   => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
-  "8.7.0"   => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
-  "8.6.0"   => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"   => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
-  "8.4.0"   => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
-                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
-  "8.3.0"   => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
-  "8.2.3"   => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"   => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
-  "8.2.1"   => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
-  "8.2.0"   => "05.10.2018  direct help for attributes ",
-  "8.1.0"   => "02.10.2018  new get versionNotes command ",
-  "8.0.1"   => "20.09.2018  DbRep_getInitData improved",
-  "8.0.0"   => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
-  "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
-  "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
-  "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
-  "7.18.1"  => "03.06.2018  commandref revised ",
-  "7.18.0"  => "02.06.2018  possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
-  "7.17.3"  => "30.04.2018  writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
-  "7.17.2"  => "22.04.2018  fix don't writeToDB if device name contain '.' only, minor fix in DbReadingsVal ",
-  "7.17.1"  => "20.04.2018  fix '§' is deleted by carfilter ",
-  "7.17.0"  => "17.04.2018  new function DbReadingsVal ",
-  "7.16.0"  => "13.04.2018  new function dbValue (blocking) ",
-  "7.15.2"  => "12.04.2018  fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
-  "7.15.1"  => "11.04.2018  sqlCmd accept widget textField-long, Internal MODEL is set ",
-  "7.15.0"  => "24.03.2018  new command sqlSpecial ",
-  "7.14.8"  => "21.03.2018  fix no save into database if value=0 (DbRep_OutputWriteToDB) ",
-  "7.14.7"  => "21.03.2018  exportToFile,importFromFile can use file as an argument and executeBeforeDump, executeAfterDump is considered ",
-  "7.14.6"  => "18.03.2018  attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile adapted) ",
-  "7.14.5"  => "17.03.2018  perl warnings of DbLog \$dn,\$dt,\$evt,\$rd in changeval_Push & complex ",
-  "7.14.4"  => "11.03.2018  increased timeout of BlockingCall in DbRep_firstconnect ",
-  "7.14.3"  => "07.03.2018  DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted ",
-  "7.14.2"  => "04.03.2018  fix perl warning ",
-  "7.14.1"  => "01.03.2018  currentfillup_Push bugfix for PostgreSQL ",
-  "7.14.0"  => "26.02.2018  syncStandby ",
-  "7.13.3"  => "25.02.2018  commandref revised (forum:#84953) ",
-  "7.13.2"  => "24.02.2018  DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month ",
-  "7.13.1"  => "20.02.2018  commandref revised ",
-  "7.13.0"  => "17.02.2018  changeValue can handle perl code {} as 'new string' ",
-  "7.12.0"  => "16.02.2018  compression of dumpfile, restore of compressed files possible ",
-  "7.11.0"  => "12.02.2018  new command 'repairSQLite' to repair a corrupted SQLite database ",
-  "7.10.0"  => "10.02.2018  bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"   => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"   => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"   => "04.02.2018  new command 'eraseReadings' ", 
-  "7.7.1"   => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"   => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"   => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.6.0"   => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
-  "7.5.5"   => "25.01.2018  minor change in delSeqDoublets ",
-  "7.5.4"   => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
-  "7.5.3"   => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.5.2"   => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
-  "7.5.1"   => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
-  "7.5.0"   => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
-  "7.4.1"   => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"   => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"   => "08.01.2018  fix syntax error for perl < 5.20 ",
-  "7.3.0"   => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
-  "7.2.1"   => "04.01.2018  bugfix month out of range that causes fhem crash ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -358,6 +292,7 @@ our %DbRep_vHintsExt_en = (
          "  <li>If more than 3 hourly values are missing -> calculation from the 4 main dates (00, 06, 12, 18 UTC) </li> ".
          "  <li>reference time for a day usually 23:51 UTC of the previous day until 23:50 UTC </li> ".
          "</ul>".
+         "If the requirements are not met, the message <b>insufficient values</b> appears in the evaluation. <br>".
          "See also the information on <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>regulations</a> of the German weather service for the calculation of average temperatures. ",
   "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries."
 );
@@ -376,6 +311,7 @@ our %DbRep_vHintsExt_de = (
          "  <li>Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC) </li> ".
          "  <li>Bezugszeit für einen Tag i.d.R. 23:51 UTC des Vortages bis 23:50 UTC </li> ".
          "</ul>".
+         "Werden die Voraussetzungen nicht erfüllt, erscheint die Nachricht <b>insufficient values</b> in der Auswertung. <br>".
          "Siehe dazu auch die Informationen zu <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
