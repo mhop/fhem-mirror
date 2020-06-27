@@ -2867,7 +2867,7 @@ sub averval_DoParse($) {
          } elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
              $sum = ($t01+$t07+$t13+$t19)/4;
          } else {
-             $sum = "insufficient values";
+             $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
          }
 
          if(AttrVal($name, "aggregation", "") eq "hour") {
