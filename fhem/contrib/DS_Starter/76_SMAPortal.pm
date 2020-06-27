@@ -933,8 +933,12 @@ sub GetSetData {                                                       ## no cri
   if($getp ne "none") {            
 
       for my $k (keys %{$subs{$name}}) {
-          next if(!$subs{$name}{$k}{doit});        
-          no strict "refs";                                  ## no critic 'NoStrict'  
+          next if(!$subs{$name}{$k}{doit}); 
+          if(!$subs{$name}{$k}{func}) {
+              Log3 ($name, 2, qq{$name - WARNING - function $k -> ".$subs{$name}{$k}{func}." doesn't exist and is ignored }); 
+              next;
+          }            
+          no strict "refs";                                  ## no critic 'NoStrict'           
           ($errstate,$state,$reread,$retry) = &{$subs{$name}{$k}{func}} ({ name     => $name,
                                                                            ua       => $ua,
                                                                            state    => $state, 
