@@ -56,19 +56,36 @@ setreading DEVICE attrTemplateVersion 20200625_2
 #
 name:MQTT2_IO_ignoreRegexp_basic
 filter:TYPE=MQTT2_DEVICE
-desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. NOTE: early experimental version...
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. <br>NOTE: early experimental version...
 order:000002
-par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'cmnd/[^/]+/|shellies/[^/]+/command');; $old = $old.'|cmnd/[^/]+/' if $old !~ m,cmnd/[^/]+/, ;; $old = $old.'|shellies/[^/]+/command' if $old !~ m,shellies/[^/]+/command, ;; return $old }
-attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
+par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_tasmota
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
-setreading IODEVNAME attrTemplateVersion 20200627
+setreading IODEVNAME attrTemplateVersion 20200627_1
+
+name:MQTT2_IO_ignoreRegexp_tasmota
+filter:TYPE=MQTT2_DEVICE
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota. <br>NOTE: early experimental version...
+order:0000021
+par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'cmnd/[^/]+/');; $old = $old.'|cmnd/[^/]+/' if $old !~ m,cmnd/[^/]+/, ;; return $old }
+attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
+
+name:MQTT2_IO_ignoreRegexp_shelly
+filter:TYPE=MQTT2_DEVICE
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "command" for shelly. <br>NOTE: early experimental version...
+order:0000022
+par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'shellies/[^/]+/command');; $old = $old.'|shellies/[^/]+/command' if $old !~ m,shellies/[^/]+/command, ;; return $old }
+attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
+
 
 name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
 desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages meant for homeassistant for auto-discovery of devices. You are strongly encouraged to not use homeassistant autodiscovery at all, but in case you need it for some reason, adding this ignoreRegexp-expression might help to avoid confusion!<br>NOTE: early experimental version...
 order:000002a
-par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : homeassistant/.*/config =~ m,$old, ? $old : $old.'|homeassistant/.*/config'  }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
@@ -78,7 +95,7 @@ name:do_general_mqtt_cleanup
 filter:NAME=speechrecognTesting
 order:000002b
 desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}/.*/[0-8].
-par:IODEVNAME;Name of the IO-Device; { { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
 par:ADD_TO_IO_IGNOREREGEXP;add ignoreRegexp to be attached to the current one, defaults to "";{ "" }
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? ADD_TO_IO_IGNOREREGEXP : ADD_TO_IO_IGNOREREGEXP =~ m,$old, ? $old : $old."|ADD_TO_IO_IGNOREREGEXP" }
 deletereading -q TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge (?!associatedWith).*
@@ -2735,7 +2752,7 @@ name:esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>Recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 order:X_01
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
 attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x[0-9a-fA-F]{1,4})/.*/([0-8])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
 attr DEVICE setStateList on off
@@ -2756,10 +2773,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
 order:X_011
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
@@ -2793,9 +2810,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Defines a new device based on the one the template is applied to. <br>Only basic elements to control a group of rgbw bulbs will be available. 
 order:X_01a
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 copy DEVICE milight_REMOTE_ID_0
 deletereading -q milight_REMOTE_ID_0 .*_.*
 attr milight_REMOTE_ID_0 icon light_control
@@ -2824,10 +2842,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br><a href="https://forum.fhem.de/index.php/topic,86932.msg877986.html#msg877986">Source: Forum</a>
 order:X_01a1
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
@@ -2868,10 +2886,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>NOTE: Development state is experimental! <br>simple CCT device
 order:X_01b
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
@@ -2905,10 +2923,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Device could contain more options than your physical device might be able to handle. Just delete, what you don't need...<br>NOTE: Development state is experimental! <br>NOTE: regex not working to extract remote channel... Topic is something like milight/updates/0xABCD/rgbw/0
 order:X_01x
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
 attr DEVICE icon ICON
 deletereading -q DEVICE .*_.*
@@ -2949,10 +2967,10 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE
 desc:For use with X_01_esp_milight_hub_bridge <br>See <a href="https://forum.fhem.de/index.php/topic,103493.0.html">Forum Thread</a> for examples how to control a MPD, HUEDevice bulbs or shutters by a MiLight remote.
 order:X_01y
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/][^/]*at[^/]+[/].*:, ? $1 : undef }
-par:GROUP_ID;number from 0 to 4 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([0-4]):, ? $1 : undef }
-par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)[/](0x[0-9a-fA-F]{1\,4})[/].*:, ? $2 : undef }
-par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+[/][^/]+[/][^/]+[/]([^/]+)[/].*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
+par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
+par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
 deletereading -q DEVICE .*_.*
 attr DEVICE readingList \
   BASE_ID/states/REMOTE_ID/BULB_TYPE/GROUP_ID:.* { }\
