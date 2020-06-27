@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.2.0"  => "27.06.2020  add data provider balanceCurrentData (experimental) ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
   "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
   "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
@@ -229,6 +230,7 @@ my %stpl = (                                                                    
     liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
     weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
     balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
+    balanceCurrentData  => { doit => 0, level => 'L10', func => '_getBalanceCurrentData'},
     forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'      },
     consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'  },
     consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
@@ -238,6 +240,7 @@ my %stpl = (                                                                    
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( balanceDayData
+             balanceCurrentData
              consumerCurrentdata
              consumerMasterdata 
              consumerDayData 
@@ -979,6 +982,7 @@ sub GetSetData {                                                       ## no cri
   if(@da) {
       $lc = join "###", @da;
       $lc = encode_base64 ( $lc, ""); 
+      Log3 ($name, 3, "$name - data retrieved successfully.");
   }
 
 return "$name|$exceed|$newcycle|$errstate|$getp|$setp|$st|$lc";
@@ -1055,7 +1059,7 @@ sub _doLogin {
               
               } else {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
-                  $state       = "login failed - check user and password";
+                  $state       = "login failed";
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
                   $errstate = 1; 
               }              
@@ -1418,6 +1422,43 @@ return ($errstate,$state,$reread,$retry);
 #           Abruf Statistik Daten Day
 #            (anchorTime beachten !)
 ################################################################
+sub _getBalanceCurrentData {                       ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 0;                                                            # Tab 0 -> Current, Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',                                       
+                                         tag      => "balanceCurrentData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Current",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Day
+#            (anchorTime beachten !)
+################################################################
 sub _getBalanceDayData {                 ## no critic "not used"
   my $paref    = shift;
   my $name     = $paref->{name};
@@ -1574,7 +1615,7 @@ sub __dispatchPost {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$fnaddon);
+          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag);
       }
       use strict "refs";
   }
@@ -2172,13 +2213,14 @@ return;
 
 ################################################################
 #          Auswertung Statistic Daten
-#          $period = Day | Month | Year
+#          $period = Current | Day | Month | Year
 ################################################################
 sub extractStatisticData {
   my $hash      = shift;
   my $daref     = shift;
   my $statistic = shift;
   my $period    = shift;
+  my $tag       = shift;
   my $name      = $hash->{NAME};
   my $sd;
   
@@ -2187,7 +2229,7 @@ sub extractStatisticData {
   $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
-  my $lv = $stpl{balanceDayData}{level};
+  my $lv = $stpl{$tag}{level};
   
   if(ref $statistic eq "HASH") {
       $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
@@ -2197,7 +2239,7 @@ sub extractStatisticData {
       for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
           my $k = $a->{Key};
           my $v = $a->{Value};
-          push @$daref, "${lv}_Today_${k}:$v" if(defined $statkeys{$k});                  
+          push @$daref, "${lv}_${period}_${k}:$v" if(defined $statkeys{$k});                  
       }
   } 
   
