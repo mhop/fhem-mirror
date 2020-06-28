@@ -597,6 +597,8 @@ FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
+lib/FHEM/Core/Timer/Helper.pm sidey79             FHEM Development
+
 contrib/sacha_gloor/*        jeschkec             Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
 contrib/DS_Starter/*         DS_Starter           Sonstiges
