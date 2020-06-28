@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 20478 2019-11-08 20:53:30Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
@@ -62,9 +62,10 @@ BEGIN {
           FW_cmd
           FW_directNotify                                                              
           FW_wname    
-          SSCam_ptzpanel  
-          SSCam_StreamDev
-          SSCam_getclhash
+          FHEM::SSCam::ptzPanel 
+          FHEM::SSCam::streamDev
+          FHEM::SSCam::composeGallery
+          FHEM::SSCam::getClHash
         )
   );
   
@@ -86,6 +87,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
   "2.11.0" => "24.06.2020  switch to packages, changes according to PBP ",
   "2.10.2" => "08.11.2019  undef \$link in FwFn / streamAsHtml to save memory ",
   "2.10.1" => "18.10.2019  set parentState initial in Define, Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136 ",
@@ -119,6 +121,16 @@ my %vNotesIntern = (
   "0.1.0"  => "10.06.2018  initial Version "
 );
 
+my %fupgrade = (                                                           # Funktionsupgrade in SSCamSTRM devices definiert vor SSCam Version 9.4.0
+    1 => { of => "SSCam_ptzpanel",       nf => "FHEM::SSCam::ptzPanel"       },
+    2 => { of => "SSCam_composegallery", nf => "FHEM::SSCam::composeGallery" },  
+    3 => { of => "SSCam_StreamDev",      nf => "FHEM::SSCam::streamDev"      },      
+);
+
+my %SSCAM_imc = (                                                           # disbled String modellabhängig (SVS / CAM)
+    0 => { 0 => "initialized", 1 => "inactive" },
+    1 => { 0 => "off",         1 => "inactive" },              
+);
 
 ################################################################
 sub Initialize {
@@ -162,6 +174,8 @@ return;
 }
 
 ################################################################
+#                             Define
+################################################################
 sub Define {
   my ($hash, $def) = @_;
   my ($name, $type, $link) = split("[ \t]+", $def, 3);
@@ -170,9 +184,10 @@ sub Define {
     return "Usage: define <name> SSCamSTRM <arg>";
   }
 
-  my $arg = (split("[()]",$link))[1];
-  $arg   =~ s/'//g;
-  ($hash->{PARENT},$hash->{MODEL}) = ((split(",",$arg))[0],(split(",",$arg))[2]); 
+  $link = upgradeFunc($hash,$link);
+  
+  explodeDEF ($hash,$link);
+  
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   $hash->{LINK}                    = $link;
   
@@ -182,30 +197,46 @@ sub Define {
   readingsSingleUpdate($hash,"state",       "initialized", 1);                     # Init für "state" 
   readingsSingleUpdate($hash,"parentState", "initialized", 1);                     # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   
-return undef;
+return;
 }
 
 ################################################################
+#  im DEF hinterlegte Funktionen vor SSCam V9.4.0 upgraden
+################################################################
+sub upgradeFunc {   
+  my $hash = shift;
+  my $link = shift;
+  
+  for my $k (keys %fupgrade) {
+      $hash->{DEF} =~ s/$fupgrade{$k}{of}/$fupgrade{$k}{nf}/gx;
+      $link        =~ s/$fupgrade{$k}{of}/$fupgrade{$k}{nf}/gx;
+  }
+  
+return $link;
+}
+
+###############################################################
+#                  SSCamSTRM Copy & Rename
+#  passt die Deviceparameter bei kopierten / umbenennen an
+###############################################################
 sub Rename {
-	my ($new_name,$old_name) = @_;
-    my $hash = $defs{$new_name};
+	my $new_name = shift;
+    my $old_name = shift;
+    my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/$old_name/$new_name/g;
-    $hash->{LINK} =~ s/$old_name/$new_name/g;
+    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
 
 return;
 }
 
-###############################################################
-#                  SSCamSTRM Copy
-#  passt die Deviceparameter bei kopierten Device an
-###############################################################
 sub Copy {
-	my ($old_name,$new_name) = @_;
-    my $hash = $defs{$new_name};
+	my $old_name = shift;
+    my $new_name = shift;
+    my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/$old_name/$new_name/g;
-    $hash->{LINK} =~ s/$old_name/$new_name/g;
+    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
 
 return;
 }
@@ -225,7 +256,7 @@ sub Set {
                  ;
   
   if ($opt eq "popupStream") {
-  	  my $txt = SSCam_getclhash($hash);
+  	  my $txt = FHEM::SSCam::getClHash($hash);
       return $txt if($txt);
       
       my $link = AnalyzePerlCommand(undef, $hash->{LINK});
@@ -320,9 +351,11 @@ sub Attr {
 return undef;
 }
 
-################################################################
+#############################################################################################
+#                                 FHEMWEB Summary  
+#############################################################################################
 sub FwFn {
-  my ($FW_wname, $name, $room, $pageHash) = @_;                      # pageHash is set for summaryFn.
+  my ($FW_wname, $name, $room, $pageHash) = @_;               # pageHash is set for summaryFn.
   my $hash   = $defs{$name};
   my $link   = $hash->{LINK};
   
@@ -342,8 +375,7 @@ sub FwFn {
       $ret .= $link;  
   }
   
-  # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal($name, "autoRefresh", 0);
+  my $al = AttrVal($name, "autoRefresh", 0);                           # Autorefresh nur des aufrufenden FHEMWEB-Devices
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
@@ -354,12 +386,29 @@ sub FwFn {
 return $ret;
 }
 
-################################################################
-sub webRefresh { 
-  my ($hash) = @_;
-  my $d      = $hash->{NAME};
+#############################################################################################
+#                          Bestandteile des DEF auflösen  
+#############################################################################################
+sub explodeDEF {                    
+  my $hash = shift;
+  my $link = shift;
+  my $d    = $hash->{NAME};
   
-  # Seitenrefresh festgelegt durch SSCamSTRM-Attribut "autoRefresh" und "autoRefreshFW"
+  my $arg = (split("[()]",$link))[1];
+  $arg   =~ s/'//g;
+  ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
+  
+return;
+}
+
+#############################################################################################
+#                                     Seitenrefresh 
+#        festgelegt durch SSCamSTRM-Attribut "autoRefresh" und "autoRefreshFW"
+#############################################################################################
+sub webRefresh { 
+  my $hash = shift;
+  my $d    = $hash->{NAME};
+  
   my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
   { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }
   
@@ -390,12 +439,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 20478 2019-11-08 20:53:30Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 20478 2019-11-08 20:53:30Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -417,8 +466,7 @@ sub streamAsHtml {
   my $name         = $hash->{NAME};
   my $link         = $hash->{LINK};
   
-  if ($ftui && $ftui eq "ftui") {
-      # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
+  if ($ftui && $ftui eq "ftui") {                 # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
       my $s = substr($link,0,length($link)-2);
       $link = $s.",'$ftui')}";
   }
