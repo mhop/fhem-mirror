@@ -1,13 +1,13 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.40
+#  89_FULLY.pm 1.41
 #
 #  $Id$
 #
 #  Control Fully browser on Android tablets from FHEM.
 #  Requires Fully App Plus license!
 #
-#  (c) 2019 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2020 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 
@@ -37,7 +37,7 @@ sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
 sub FULLY_Ping ($$);
 
-my $FULLY_VERSION = "1.40";
+my $FULLY_VERSION = '1.41';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -99,6 +99,7 @@ sub FULLY_Define ($$)
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
 	my $rc = 0;
+	my $host = '';
 	
 	return "Usage: define devname [http|https]://IP_or_Hostname password [poll-interval]"
 		if (@$a < 4);
@@ -108,14 +109,22 @@ sub FULLY_Define ($$)
 
 	if ($$a[2] =~ /^(https?):\/\/(.+)/) {
 		$hash->{prot} = $1;
-		$hash->{host} = $2;
+		$host = $2;
 	}
 	else {
 		$hash->{prot} = $FULLY_DEFAULT_PROT;
-		$hash->{host} = $$a[2];
+		$host = $$a[2];
 	}
 
-	$hash->{port} = $FULLY_DEFAULT_PORT;
+	if ($host =~ /^([^:]+):([0-9]+)$/) {
+		$hash->{host} = $1;
+		$hash->{port} = $2;
+	}
+	else {
+		$hash->{host} = $host;
+		$hash->{port} = $FULLY_DEFAULT_PORT;
+	}
+
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
 	$hash->{fully}{password} = $$a[3];
@@ -266,8 +275,7 @@ sub FULLY_Set ($@)
 		push (@c, $cmds{$opt});
 	}
 	elsif ($opt eq 'on-for-timer') {
-		my $par = shift @$a;
-		$par = "forever" if (!defined ($par));
+		my $par = shift @$a // "forever";
 
 		if ($par eq 'forever') {
 			push (@c, "setBooleanSetting", "screenOn");
@@ -292,8 +300,7 @@ sub FULLY_Set ($@)
 		$hash->{onForTimer} = $par;
 	}
 	elsif ($opt eq 'screenOffTimer') {
-		my $value = shift @$a;
-		return "Usage: set $name $opt {seconds}" if (!defined ($value));
+		my $value = shift @$a // return "Usage: set $name $opt {seconds}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "timeToScreenOffV2", "value" => "$value" });
 	}
@@ -303,40 +310,34 @@ sub FULLY_Set ($@)
 		push (@c, ($state eq 'start') ? "startScreensaver" : "stopScreensaver");
 	}
 	elsif ($opt eq 'screenSaverTimer') {
-		my $value = shift @$a;
-		return "Usage: set $name $opt {seconds}" if (!defined ($value));
+		my $value = shift @$a // return "Usage: set $name $opt {seconds}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "timeToScreensaverV2", "value" => "$value" });
 	}
 	elsif ($opt eq 'screenSaverURL') {
-		my $value = shift @$a;
-		return "Usage: set $name $opt {URL}" if (!defined ($value));
+		my $value = shift @$a // return "Usage: set $name $opt {URL}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "screensaverURL", "value" => "$value" });
 	}
 	elsif ($opt eq 'startURL') {
-		my $value = shift @$a;
-		return "Usage: set $name $opt {URL}" if (!defined ($value));
+		my $value = shift @$a // return "Usage: set $name $opt {URL}";
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "startURL", "value" => "$value" });
 	}
 	elsif ($opt eq 'brightness') {
-		my $value = shift @$a;
-		return "Usage: set $name brightness 0-255" if (!defined ($value));
+		my $value = shift @$a // return "Usage: set $name brightness 0-255";
 		$value = 255 if ($value > 255);
 		push (@c, "setStringSetting");
 		push (@p, { "key" => "screenBrightness", "value" => "$value" });
 	}
 	elsif ($opt eq 'motionDetection') {
-		my $state = shift @$a;
-		return "Usage: set $name motionDetection { on | off }" if (!defined ($state));
+		my $state = shift @$a // return "Usage: set $name motionDetection { on | off }";
 		my $value = $state eq 'on' ? 'true' : 'false';
 		push (@c, "setBooleanSetting");
 		push (@p, { "key" => "motionDetection", "value" => "$value" });
 	}
 	elsif ($opt eq 'speak') {
-		my $text = shift @$a;
-		return 'Usage: set $name speak "{Text}"' if (!defined ($text));
+		my $text = shift @$a // return 'Usage: set $name speak "{Text}"';
 		while ($text =~ /\[(.+):(.+)\]/) {
 			my ($device, $reading) = ($1, $2);
 			my $value = ReadingsVal ($device, $reading, '');
@@ -347,10 +348,9 @@ sub FULLY_Set ($@)
 		push (@p, { "text" => "$enctext" });
 	}
 	elsif ($opt eq 'playSound') {
-		my $url = shift @$a;
+		my $url = shift @$a // return "Usage: set $name playSound {url} [loop]";
 		my $loop = shift @$a;
 		$loop = defined ($loop) ? 'true' : 'false';
-		return "Usage: set $name playSound {url} [loop]" if (!defined ($url));
 		push (@c, "playSound");
 		push (@p, { "url" => "$url", "loop" => "$loop"});
 	}
@@ -455,8 +455,8 @@ sub FULLY_Execute ($$$$)
 
 	# Get attributes
 	my $timeout = AttrVal ($name, 'requestTimeout', $FULLY_TIMEOUT);
-	my $repeatCommand = min (AttrVal ($name, 'repeatCommand', 0), 2);
-	my $ping = min (AttrVal ($name, 'pingBeforeCmd', 0), 2);
+	my $repeatCommand = minNum (AttrVal ($name, 'repeatCommand', 0), 2);
+	my $ping = minNum (AttrVal ($name, 'pingBeforeCmd', 0), 2);
 	
 	my $response = '';
 	my $url = $hash->{prot}.'://'.$hash->{host}.':'.$hash->{port}."/?cmd=$command";
@@ -493,8 +493,8 @@ sub FULLY_ExecuteNB ($$$$)
 
 	# Get attributes
 	my $timeout = AttrVal ($name, 'requestTimeout', $FULLY_TIMEOUT);
-	my $repeatCommand = min (AttrVal ($name, 'repeatCommand', 0), 2);
-	my $ping = min (AttrVal ($name, 'pingBeforeCmd', 0), 2);
+	my $repeatCommand = minNum (AttrVal ($name, 'repeatCommand', 0), 2);
+	my $ping = minNum (AttrVal ($name, 'pingBeforeCmd', 0), 2);
 
 	my @urllist;
 	my $nc = scalar (@$command);	
@@ -767,7 +767,7 @@ sub FULLY_Ping ($$)
 	my $host = $hash->{host};
 	my $temp;
 
-	my $waitAfterPing = min (AttrVal ($name, 'waitAfterPing', 0), 2);
+	my $waitAfterPing = minNum (AttrVal ($name, 'waitAfterPing', 0), 2);
 	
 	my $os = $^O;
 	Log3 $name, 4, "FULLY: [$name] Sending $count ping request(s) to tablet $host. OS=$os";
@@ -809,10 +809,11 @@ sub FULLY_Ping ($$)
    <a name="HMCCUdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
-      <code>define &lt;name&gt; FULLY [&lt;Protocol&gt;://]&lt;HostOrIP&gt; &lt;password&gt; [&lt;poll-interval&gt;]</code>
+      <code>define &lt;name&gt; FULLY [&lt;Protocol&gt;://]&lt;HostOrIP&gt;[:&lt;Port&gt;] &lt;password&gt; [&lt;poll-interval&gt;]</code>
       <br/><br/>
 	  The parameter <i>password</i> is the password set in Fully browser. Parameter <i>Protocol</i> is
 	  optional. Valid protocols are 'http' and 'https'. Default protocol is 'http'. 
+	  Default <i>Port</i> is 2323.
    </ul>
    <br/>
    

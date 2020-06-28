@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  89_FULLY: Accepts port number in device definition
  - change:  93_DbRep: improve get <> versionNotes 2
  - change:  76_SMAPortal: imptove cookie/login management
  - feature: 49_SSCam / 49_SSCamSTRM: new capability operate PTZ Zoom cameras
