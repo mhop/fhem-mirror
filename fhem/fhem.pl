@@ -3937,7 +3937,7 @@ HandleArchiving($;$)
   $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
   my @files = sort grep {/^$file$/} readdir(DH);
-  @files = sort { (stat("$dir/$a"))[9] cmp (stat("$dir/$b"))[9] } @files
+  @files = sort { (stat("$dir/$a"))[9] <=> (stat("$dir/$b"))[9] } @files
         if(AttrVal("global", "archivesort", "alphanum") eq "timestamp");
   closedir(DH);
 
