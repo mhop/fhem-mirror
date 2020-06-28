@@ -152,7 +152,7 @@ attr DEVICE setList\
   z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP='BASE_TOPIC/[A-Za-z0-9._]+/set'
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 attr DEVICE model zigbee2mqtt_bridge
 setreading DEVICE attrTemplateVersion 20200628
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
@@ -2752,16 +2752,17 @@ name:esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>Recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 order:X_01
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)/LWT:, ? $1 : undef }
 attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x[0-9a-fA-F]{1,4})/.*/([0-8])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
+attr DEVICE readingList BASE_ID/LWT:.* { json2nameValue($EVENT) }
 attr DEVICE setStateList on off
 attr DEVICE stateFormat <a href="http://ip_address" target="_blank">\
 status\
 </a>Version: \
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP='BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]'
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]
 attr DEVICE model esp_milight_hub_bridge
 setreading DEVICE attrTemplateVersion 20200628
 { AttrTemplate_Initialize() }
