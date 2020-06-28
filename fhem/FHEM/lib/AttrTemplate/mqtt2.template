@@ -62,14 +62,14 @@ par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrV
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_tasmota
 set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
-setreading IODEVNAME attrTemplateVersion 20200627_1
+setreading IODEVNAME attrTemplateVersion 20200628
 
 name:MQTT2_IO_ignoreRegexp_tasmota
 filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota. <br>NOTE: early experimental version...
 order:0000021
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'cmnd/[^/]+/');; $old = $old.'|cmnd/[^/]+/' if $old !~ m,cmnd/[^/]+/, ;; return $old }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'cmnd/[^/]+/');; 'cmnd/[^/]+/' =~ m{($old)} ? $old : $old.'|cmnd/[^/]+/' }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 name:MQTT2_IO_ignoreRegexp_shelly
@@ -77,7 +77,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "command" for shelly. <br>NOTE: early experimental version...
 order:0000022
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",'shellies/[^/]+/command');; $old = $old.'|shellies/[^/]+/command' if $old !~ m,shellies/[^/]+/command, ;; return $old }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'shellies/[^/]+/command');; 'shellies/[^/]+/command' =~ m{($old)} ? $old : $old.'|shellies/[^/]+/command' }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 
@@ -86,7 +86,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages meant for homeassistant for auto-discovery of devices. You are strongly encouraged to not use homeassistant autodiscovery at all, but in case you need it for some reason, adding this ignoreRegexp-expression might help to avoid confusion!<br>NOTE: early experimental version...
 order:000002a
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? 'homeassistant/.*/config:.*' : homeassistant/.*/config =~ m,$old, ? $old : $old.'|homeassistant/.*/config'  }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'homeassistant/.*/config');; 'homeassistant/.*/config' =~ m{($old)} ? $old : $old.'|homeassistant/.*/config' }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 farewell:template has been applied successfully. Check further extending the ignoreRegexp by yourself!
@@ -94,10 +94,10 @@ farewell:template has been applied successfully. Check further extending the ign
 name:do_general_mqtt_cleanup
 filter:NAME=speechrecognTesting
 order:000002b
-desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}/.*/[0-8].
+desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}[/].*/[0-8].
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
 par:ADD_TO_IO_IGNOREREGEXP;add ignoreRegexp to be attached to the current one, defaults to "";{ "" }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old =  AttrVal("IODEVNAME","ignoreRegexp",undef);; !defined $old ? ADD_TO_IO_IGNOREREGEXP : ADD_TO_IO_IGNOREREGEXP =~ m,$old, ? $old : $old."|ADD_TO_IO_IGNOREREGEXP" }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'ADD_TO_IO_IGNOREREGEXP');; 'ADD_TO_IO_IGNOREREGEXP' =~ m{($old)} ? $old : $old.'|ADD_TO_IO_IGNOREREGEXP' }
 deletereading -q TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge (?!associatedWith).*
 deleteattr TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge readingList
 option:{return 1 if 'ADD_TO_IO_IGNOREREGEXP' ne "";;return 0}
@@ -152,9 +152,9 @@ attr DEVICE setList\
   z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP='BASE_TOPIC/[A-Za-z0-9._]+/set'
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20200626
+setreading DEVICE attrTemplateVersion 20200628
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 #A pure router device, e.g. a CC2531 flashed with router firmware
@@ -2761,9 +2761,9 @@ status\
 </a>Version: \
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]
+set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP='BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]'
 attr DEVICE model esp_milight_hub_bridge
-setreading DEVICE attrTemplateVersion 20200626
+setreading DEVICE attrTemplateVersion 20200628
 { AttrTemplate_Initialize() }
 
 
@@ -3317,6 +3317,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
 attr DEVICE model worx_landroid_mover
 setreading DEVICE attrTemplateVersion 20200609
 
+
 ###########################################
 # Instar 8015HD.
 # contributed by ToM_ToM
@@ -3327,9 +3328,7 @@ filter:TYPE=MQTT2_DEVICE
 desc:for Instar Camera, source post: https://forum.fhem.de/index.php/topic,94495.msg1065779.html#msg1065779.<br>NOTE: This is an early version, developed for Instar 8015 HD. Other models may need different settings.
 order:M_10
 par:DEVNAME;MAC address in the topic;{ AttrVal("DEVICE","readingList","") =~ m,instar/([^/]*)/, ? $1 : undef }
-attr DEVICE eventMap 0:off 1:on
-attr DEVICE jsonMap area1val:area1 area1sensitivityval:area1sensitivity area2val:area2 area2sensitivityval:area2sensitivity area3val:area3 area3sensitivityval:area3sensitivity area4val:area4 area4sensitivityval:area4sensitivity pirval:pir alarmserverval:alarmserver alarmserveraddressval:alarmserveraddress alarmserverportval:alarmserverport alarmserverpathval:alarmserverpath alarmsignalval:alarmsignal audioalarmval:audioalarm audioalarmsensitivityval:audioalarmsensitivity power_ledval:power_led wifi_ledval:wifi_led
-
+attr DEVICE jsonMap area1val:area1 area1sensitivityval:area1sensitivity area2val:area2 area2sensitivityval:area2sensitivity area3val:area3 area3sensitivityval:area3sensitivity area4val:area4 area4sensitivityval:area4sensitivity pirval:pir alarmserverval:alarmserver alarmserver_ipval:alarmserver_ip alarmserver_portval:alarmserver_port alarmserver_pathval:alarmserver_path camera_ipval:camera_ip alarmsignalval:alarmsignal audioalarmval:audioalarm audioalarmsensitivityval:audioalarmsensitivity power_ledval:power_led wifi_ledval:wifi_led alarminval:alarmin alarminmodeval:alarminmode alarmoutval:alarmout emailval:email snapshot2sdval:snapshot2sd snapshot2ftpval:snapshot2ftp alarmsnapshots2emailval:alarmsnapshots2email alarmsnapshots2email_qtyval:alarmsnapshots2email_qty snapshot2sdval:snapshot2sd alarmsnapshots2sd_qtyval:alarmsnapshots2sd_qty snapshot2ftpval:snapshot2ftp alarmsnapshots2ftp_qtyval:alarmsnapshots2ftp_qty video2sdval:video2sd video2ftpval:video2ftp videolengthval:videolength
 attr DEVICE readingList instar/DEVNAME/status/alarm/actions/pir/enable:.* { json2nameValue($EVENT, 'pir', $JSONMAP) }\
   instar/DEVNAME/status/alarm/area1/enable:.* { json2nameValue($EVENT, 'area1', $JSONMAP) }\
   instar/DEVNAME/status/alarm/area1/sensitivity:.* { json2nameValue($EVENT, 'area1sensitivity', $JSONMAP) }\
@@ -3340,31 +3339,55 @@ attr DEVICE readingList instar/DEVNAME/status/alarm/actions/pir/enable:.* { json
   instar/DEVNAME/status/alarm/area4/enable:.* { json2nameValue($EVENT, 'area4', $JSONMAP) }\
   instar/DEVNAME/status/alarm/area4/sensitivity:.* { json2nameValue($EVENT, 'area4sensitivity', $JSONMAP) }\
   instar/DEVNAME/status/alarm/alarmserver/enable:.* { json2nameValue($EVENT, 'alarmserver', $JSONMAP) }\
-  instar/DEVNAME/status/alarm/alarmserver/address:.* { json2nameValue($EVENT, 'alarmserveraddress', $JSONMAP) }\
-  instar/DEVNAME/status/alarm/alarmserver/port:.* { json2nameValue($EVENT, 'alarmserverport', $JSONMAP) }\
-  instar/DEVNAME/status/alarm/alarmserver/path:.* { json2nameValue($EVENT, 'alarmserverpath', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/address:.* { json2nameValue($EVENT, 'alarmserver_ip', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/port:.* { json2nameValue($EVENT, 'alarmserver_port', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/alarmserver/path:.* { json2nameValue($EVENT, 'alarmserver_path', $JSONMAP) }\
+  instar/DEVNAME/status/network/config/ipaddr:.* { json2nameValue($EVENT, 'camera_ip', $JSONMAP) }\
   instar/DEVNAME/status/alarm/actions/alarmsignal:.* { json2nameValue($EVENT, 'alarmsignal', $JSONMAP) }\
   instar/DEVNAME/status/alarm/actions/audioalarm:.* { json2nameValue($EVENT, 'audioalarm', $JSONMAP) }\
   instar/DEVNAME/status/alarm/actions/audioalarmsensitivity:.* { json2nameValue($EVENT, 'audioalarmsensitivity', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmin:.* { json2nameValue($EVENT, 'alarmin', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarminmode:.* { json2nameValue($EVENT, 'alarmin', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmout:.* { json2nameValue($EVENT, 'alarmout', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/email:.* { json2nameValue($EVENT, 'alarmsnapshots2email', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmsnapshots/email:.* { json2nameValue($EVENT, 'alarmsnapshots2email_qty', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/snapshot2sd:.* { json2nameValue($EVENT, 'snapshot2sd', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmsnapshots/sd:.* { json2nameValue($EVENT, 'alarmsnapshots2sd_qty', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/snapshot2ftp:.* { json2nameValue($EVENT, 'snapshot2ftp', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarmsnapshots/ftp:.* { json2nameValue($EVENT, 'alarmsnapshots2ftp_qty', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/video2sd:.* { json2nameValue($EVENT, 'video2sd', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/alarm/actions/video2ftp:.* { json2nameValue($EVENT, 'video2ftp', $JSONMAP) }\
+  instar/DEVNAME/status/alarm/actions/videolength:.* { json2nameValue($EVENT, 'videolength', $JSONMAP) }\
   instar/DEVNAME/status/features/indicator/power:.* { json2nameValue($EVENT, 'power_led', $JSONMAP) }\
   instar/DEVNAME/status/features/indicator/wifi:.* { json2nameValue($EVENT, 'wifi_led', $JSONMAP) }
-attr DEVICE setList pir:on,off instar/DEVNAME/alarm/actions/pir/enable/raw $EVTPART1\
-  area1:on,off instar/DEVNAME/alarm/area1/enable/raw $EVTPART1\
+attr DEVICE setList pir:0,1 instar/DEVNAME/alarm/actions/pir/enable/raw $EVTPART1\
+  area1:0,1 instar/DEVNAME/alarm/area1/enable/raw $EVTPART1\
   area1sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area1/sensitivity/raw $EVTPART1\
-  area2:on,off instar/DEVNAME/alarm/area2/enable/raw $EVTPART1\
+  area2:0,1 instar/DEVNAME/alarm/area2/enable/raw $EVTPART1\
   area2sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area2/sensitivity/raw $EVTPART1\
-  area3:on,off instar/DEVNAME/alarm/area3/enable/raw $EVTPART1\
+  area3:0,1 instar/DEVNAME/alarm/area3/enable/raw $EVTPART1\
   area3sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area3/sensitivity/raw $EVTPART1\
-  area4:on,off instar/DEVNAME/alarm/area4/enable/raw $EVTPART1\
+  area4:0,1 instar/DEVNAME/alarm/area4/enable/raw $EVTPART1\
   area4sensitivity:slider,1,1,100 instar/DEVNAME/alarm/area4/sensitivity/raw $EVTPART1\
   alarmserver:on,off instar/DEVNAME/alarm/alarmserver/enable/raw $EVTPART1\
   alarmsignal:on,off instar/DEVNAME/alarm/actions/alarmsignal/raw $EVTPART1\
-  audioalarm:on,off instar/DEVNAME/alarm/actions/audioalarm/raw $EVTPART1\
+  audioalarm:0,1 instar/DEVNAME/alarm/actions/audioalarm/raw $EVTPART1\
   audioalarmsensitivity:slider,10,10,100 instar/DEVNAME/alarm/actions/audioalarmsensitivity/raw $EVTPART1\
+  alarmin:0,1 instar/DEVNAME/alarm/actions/alarmin/raw $EVTPART1\
+  alarminmode:0,1 instar/DEVNAME/alarm/actions/alarminmode/raw $EVTPART1\
+  alarmout:on,off instar/DEVNAME/alarm/actions/alarmout/raw $EVTPART1\
+  email:on,off instar/DEVNAME/alarm/actions/email/raw $EVTPART1\
+  alarmsnapshots2email_qty:slider,0,1,15 instar/DEVNAME/alarm/actions/alarmsnapshots/email/raw $EVTPART1\
+  snapshot2sd:on,off instar/DEVNAME/alarm/actions/snapshot2sd/raw $EVTPART1\
+  alarmsnapshots2sd_qty:slider,0,1,15 instar/DEVNAME/alarm/actions/alarmsnapshots/sd/raw $EVTPART1\
+  snapshot2ftp:on,off instar/DEVNAME/alarm/actions/snapshot2ftp/raw $EVTPART1\
+  alarmsnapshots2ftp_qty:slider,0,1,15 instar/DEVNAME/alarm/actions/alarmsnapshots/ftp/raw $EVTPART1\
+  video2sd:on,off instar/DEVNAME/alarm/actions/video2sd/raw $EVTPART1\
+  videolength:slider,15,15,60 instar/DEVNAME/alarm/actions/videolength/raw $EVTPART1\
   power_led:on,off instar/DEVNAME/features/indicator/power/raw $EVTPART1\
   wifi_led:on,off instar/DEVNAME/features/indicator/wifi/raw $EVTPART1
 attr DEVICE model InstarCam
-setreading DEVICE attrTemplateVersion 20200619
+setreading DEVICE attrTemplateVersion 20200628
 
 
 #################################
