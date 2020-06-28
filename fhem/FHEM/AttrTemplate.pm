@@ -156,6 +156,14 @@ AttrTemplate_Help($)
   my $ret = "";
   $ret = $templates{$n}{desc} if($templates{$n}{desc});
   $ret .= "<br><pre>".join("\n",@{$templates{$n}{cmds}})."</pre>";
+
+  if(AttrVal("global", "showInternalValues", undef)) {
+     my @atList = grep /set\s.*\sattrTemplate\s/,@{$templates{$n}{cmds}};
+     foreach my $at (@atList) {
+       next if($at !~ m/set\s.*\sattrTemplate\s(.*?) /);
+       $ret .= "<br><b>attrTemplate $1:</b><br>".AttrTemplate_Help($1);
+     }
+  }
   return $ret;
 }
 
