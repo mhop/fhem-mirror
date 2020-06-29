@@ -228,6 +228,7 @@ AttrTemplate_Set($$@)
         nex if(!$perl_code);
         $perl_code =~ s/(?<!\\)DEVICE/bla/g;
         $perl_code =~ s/\\DEVICE/DEVICE/g;
+        $cmdFromAnalyze = $perl_code;
         my $ret = eval $perl_code;
         push @ret,"$entry:$parname:$@" if($@);
       }
