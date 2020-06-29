@@ -4139,6 +4139,18 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         $ret .= "\n   "     .$defs{$devName}{$_}."\t state:".InternalVal($defs{$devName}{$_},"STATE","unknown");
       }
     }
+
+    my $cfgState = ReadingsVal($name,"cfgState","unknown");
+    $ret .= "\n configuration check: $cfgState";
+    if ($cfgState =~ m/(unknown|ok)/){
+    }
+    else{
+      foreach(sort keys %{$hash->{helper}{cfgChk}}){
+        my( $Fkt,$shtxt,$txt) = HMinfo_getTxt2Check($_);
+        $ret .= "\n   $shtxt: $txt"
+               ."\n      =>$hash->{helper}{cfgChk}{$_}";
+      }
+    }
     return $ret;
   }
  
@@ -6603,7 +6615,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "no HMinfo defined" if (!defined $defs{$hm});
 
     my @par =  map{$params{$_}} sort keys%params;
-    my $ret = HMinfo_SetFn($defs{hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
+    my $ret = HMinfo_SetFn($defs{$hm},$hm,"templateSet",$name,$tpl,"$tPeer$tTyp",@par);
     return $ret;
   }
   elsif($cmd =~ m/tplPara(..)(.)_.*/) { #######################################
@@ -9890,8 +9902,12 @@ sub CUL_HM_qAutoRead($$){
 sub CUL_HM_unQEntity($$){# remove entity from q
   my ($name,$q) = @_;
   my $devN = CUL_HM_getDeviceName($name);
-
+  
   return if (AttrVal($devN,"subType","") eq "virtual");
+
+  my ($hm) = devspec2array("TYPE=HMinfo");
+  HMinfo_SetFn($defs{$hm},$hm,"configCheck -f ",$devN) if(defined $hm && $q eq "qReqConf");
+
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
   return if ($dq->{$q} eq "");
@@ -9919,6 +9935,10 @@ sub CUL_HM_qEntity($$){  # add to queue
 
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
+
+  my ($hm) = devspec2array("TYPE=HMinfo");
+  HMinfo_SetFn($defs{$hm},$hm,"configCheck -f ",$devN) if(defined $hm && $q eq "qReqConf");
+
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
     $defs{$devN}{helper}{q}{$q}="00";
@@ -10305,7 +10325,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  ,"R_6_tempListFri"){      
           my $nv = ReadingsVal($eN,$_,"empty");
           $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$_." mismatch $val ne $nv ##" if ($val ne $nv);
+          push @entryFail,$eN.": ".$_." mismatch $val ne $nv ##" if ($val ne $nv);
         }
         $dlf{1}{Sat} = 1;
         $dlf{1}{Sun} = 1;
@@ -10380,7 +10400,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             $val = join(" ",map{(my $foo = $_) =~ s/^(.\.)/0$1/;$foo} split(" ",$val));
             my $nv = ReadingsVal($eN,$tln,"empty");
             $nv = join(" ",map{(my $foo = $_) =~ s/^(.\.)/0$1/;$foo} split(" ",$nv));
-            push @entryFail,$eN." :".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
+            push @entryFail,$eN.": ".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
           }
           elsif($action eq "restore"){
             $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
