@@ -1,10 +1,10 @@
-REV 22291
+REV 22299
 DIR unused
-UPD 2020-06-28_07:45:02 344364 ./CHANGED
-UPD 2020-05-25_07:45:06 42396 ./MAINTAINER.txt
+UPD 2020-06-29_07:45:03 344427 ./CHANGED
+UPD 2020-06-29_07:45:03 42464 ./MAINTAINER.txt
 UPD 2020-06-28_07:45:02 40208 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2020-06-28_07:45:11 163727 ./fhem.pl
+UPD 2020-06-29_07:45:12 163727 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2020-04-14_07:45:03 57876 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -424,7 +424,7 @@ UPD 2020-03-26_07:45:03 58824 FHEM/88_Timer.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
 UPD 2020-03-26_07:45:03 109173 FHEM/89_ESPEInk.pm
-UPD 2019-10-21_07:45:02 27844 FHEM/89_FULLY.pm
+UPD 2020-06-29_07:45:03 27820 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -551,7 +551,7 @@ UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
 UPD 2020-03-08_07:45:03 66390 FHEM/98_weekprofile.pm
 UPD 2020-06-21_07:45:02 21356 FHEM/99_SUNRISE_EL.pm
 UPD 2020-04-25_07:45:03 11617 FHEM/99_Utils.pm
-UPD 2020-03-12_07:45:02 11150 FHEM/AttrTemplate.pm
+UPD 2020-06-29_07:45:03 11452 FHEM/AttrTemplate.pm
 UPD 2018-10-18_07:45:03 8469 FHEM/Blocking.pm
 UPD 2019-01-27_07:45:03 9757 FHEM/CoProcess.pm
 UPD 2019-12-23_07:45:02 12997 FHEM/Color.pm
@@ -637,7 +637,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-05-23_07:45:02 60312 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-06-28_07:45:02 249139 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-06-29_07:45:03 252092 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -734,12 +734,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-06-26_07:45:07 4323215 docs/commandref.html
+UPD 2020-06-29_07:45:07 4323262 docs/commandref.html
 UPD 2020-06-26_07:45:09 2678987 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-06-28_07:45:10 233767 docs/commandref_modular.html
-UPD 2020-06-28_07:45:11 244474 docs/commandref_modular_DE.html
+UPD 2020-06-29_07:45:10 233767 docs/commandref_modular.html
+UPD 2020-06-29_07:45:12 244474 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -756,6 +756,7 @@ UPD 2020-06-23_07:45:04 2952 lib/FHEM/Automation/ShuttersControl/Shutters/Readin
 UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
 UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
+UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
