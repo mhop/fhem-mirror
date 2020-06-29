@@ -334,8 +334,8 @@ AttrTemplate_Set($$@)
 
   my $cmdlist = join("\n",@{$h->{cmds}});
   $repl{DEVICE} = $name;
-  map { $cmdlist =~ s/(?<!\\)$_/$repl{$_}/g; } keys %repl;
-  map { $cmdlist =~ s/\\$_/$_/g; } keys %repl;
+  map { $cmdlist =~ s/(?<!\\)$_/$repl{$_}/g; } sort keys %repl;
+  map { $cmdlist =~ s/\\$_/$_/g; } sort keys %repl;
   my $cl = $hash->{CL};
   my $cmd = "";
   my @ret;
