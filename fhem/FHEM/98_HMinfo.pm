@@ -22,6 +22,31 @@ my $doAli = 0;#display alias names as well (filter option 2)
 my $tmplDefChange = 0;
 my $tmplUsgChange = 0;
 
+my %chkIds=(
+    "idCl00" => {Fkt=> "configChk" ,shtxt=> "clear"       ,txt=> "clear"                                                   ,long=>"" }
+   ,"idBc01" => {Fkt=> "burstCheck",shtxt=> "BurstUnknwn" ,txt=> "peerNeedsBurst cannot be determined"                     ,long=>"register-set of sender device likely not read complete" }
+   ,"idBc02" => {Fkt=> "burstCheck",shtxt=> "BurstNotSet" ,txt=> "peerNeedsBurst not set"                                  ,long=>"register peerNeedsBurst is required but not set in sender device" }
+   ,"idBc03" => {Fkt=> "burstCheck",shtxt=> "CBurstNotSet",txt=> "conditionalBurst not set"                                ,long=>"register peerNeedsBurst is required but not set in sender device" }
+   ,"idPc00" => {Fkt=> "paramCheck",shtxt=> "NoIO"        ,txt=> "no IO device assigned"                                   ,long=>"attribut IODev should be set" }
+   ,"idPc01" => {Fkt=> "paramCheck",shtxt=> "PairMiss"    ,txt=> "PairedTo missing/unknown"                                ,long=>"register-set not read completely. Register pairedTo cannot be verifid" }
+   ,"idPc02" => {Fkt=> "paramCheck",shtxt=> "PairMism"    ,txt=> "PairedTo mismatch to IODev"                              ,long=>"Register PairedTo is not set according to IODev setting" }
+   ,"idPc03" => {Fkt=> "paramCheck",shtxt=> "IOgrp"       ,txt=> "IOgrp: CCU not found"                                    ,long=>"vccu as defined in attr IOgrp cannot be found" }
+   ,"idPc04" => {Fkt=> "paramCheck",shtxt=> "IOGrpPref"   ,txt=> "IOgrp: prefered IO undefined"                            ,long=>"prefered IO as defined in attr IOgrp cannot be found" }
+   ,"idPz00" => {Fkt=> "peerCheck" ,shtxt=> "PeerIncom"   ,txt=> "peer list incomplete. Use getConfig to read it."         ,long=>"peerlist not completely read. getConfig should do" }
+   ,"idPz01" => {Fkt=> "peerCheck" ,shtxt=> "PeerUndef"   ,txt=> "peer not defined"                                        ,long=>"a peer in the peerlist cannot be found" }
+   ,"idPz02" => {Fkt=> "peerCheck" ,shtxt=> "PeerVerf"    ,txt=> "peer not verified. Check that peer is set on both sides" ,long=>"peer is only set on one side. Check that peering exist on actor and sensor" }
+   ,"idPz03" => {Fkt=> "peerCheck" ,shtxt=> "PeerStrange" ,txt=> "peering strange - likely not suitable"                   ,long=>"a peering does not seem to be operational" }
+   ,"idPz04" => {Fkt=> "peerCheck" ,shtxt=> "TrigUnkn"    ,txt=> "trigger sent to unpeered device"                         ,long=>"the sensor sent a trigger to an unknown address" }
+   ,"idPz05" => {Fkt=> "peerCheck" ,shtxt=> "TrigUndef"   ,txt=> "trigger sent to undefined device"                        ,long=>"the sensor sent a trigger to an undefined address" }
+   ,"idPz06" => {Fkt=> "peerCheck" ,shtxt=> "AES"         ,txt=> "aesComReq set but virtual peer is not vccu - won't work" ,long=>"Attr aesComReq wont work" }
+   ,"idPz07" => {Fkt=> "peerCheck" ,shtxt=> "Team"        ,txt=> "boost or template differ in team"                        ,long=>"boost time defined is different in team. Check boost time setting for all team members" }
+   ,"idRc01" => {Fkt=> "regCheck"  ,shtxt=> "RegMiss"     ,txt=> "missing register list"                                   ,long=>"the registerlist is not complerely read. Try getConfig and wait for completion" }
+   ,"idRc02" => {Fkt=> "regCheck"  ,shtxt=> "RegIncom"    ,txt=> "incomplete register list"                                ,long=>"registerlist is incomplete. Try getConfig and wait for completion" }
+   ,"idRc03" => {Fkt=> "regCheck"  ,shtxt=> "RegPend"     ,txt=> "Register changes pending"                                ,long=>"issued regiser changes are ongoing" }
+   ,"idTp00" => {Fkt=> "template"  ,shtxt=> "TempChk"     ,txt=> "templist mismatch"                                       ,long=>"register settings dont macht template settings" }
+   ,"idTp01" => {Fkt=> "template"  ,shtxt=> "TmplChk"     ,txt=> "template mismatch"                                       ,long=>"register settings dont macht template settings" }
+);
+
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
 
@@ -471,9 +496,9 @@ sub HMinfo_regCheck(@) { ######################################################
     push @regIncompl,$eName.":\t".join(",",@iReg) if (scalar @iReg);
   }
   my $ret = "";
-  $ret .="\n\n missing register list\n    "   .(join "\n    ",sort @regMissing) if(@regMissing);
-  $ret .="\n\n incomplete register list\n    ".(join "\n    ",sort @regIncompl) if(@regIncompl);
-  $ret .="\n\n Register changes pending\n    ".(join "\n    ",sort @regChPend)  if(@regChPend);
+  $ret .="\n\n idRc01\n    ".(join "\n    ",sort @regMissing) if(@regMissing);
+  $ret .="\n\n idRc02\n    ".(join "\n    ",sort @regIncompl) if(@regIncompl);
+  $ret .="\n\n idRc03\n    ".(join "\n    ",sort @regChPend)  if(@regChPend);
   return  $ret;
 }
 sub HMinfo_peerCheck(@) { #####################################################
@@ -496,15 +521,15 @@ sub HMinfo_peerCheck(@) { #####################################################
     foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                            grep /^trigDst_/,
                                            keys %{$defs{$eName}{READINGS}})){
-      push @peerIDsTrigUnp,"triggerUnpeered: ".$eName.":".$_ 
+      push @peerIDsTrigUnp,"triggerUnpeered: $eName:\t".$_ 
             if(  ($peerIDs &&  $peerIDs !~ m/$_/)
                &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
-      push @peerIDsTrigUnd,"triggerUndefined: ".$eName.":".$_ 
+      push @peerIDsTrigUnd,"triggerUndefined: $eName:\t".$_ 
             if(!$modules{CUL_HM}{defptr}{$_});
     }
     
     if($peersUsed == 2){#peerList incomplete
-      push @peerIDsFail,"incomplete: ".$eName.":".$peerIDs;
+      push @peerIDsFail,"incomplete: $eName:\t".$peerIDs;
     }
     else{# work on a valid list
       my $id = $defs{$eName}{DEF};
@@ -514,20 +539,20 @@ sub HMinfo_peerCheck(@) { #####################################################
       my $md = AttrVal($devN,"model","");
       next if ($st eq "repeater");
       if ($st eq 'smokeDetector'){
-        push @peeringStrange,$eName." not peered!! add SD to any team !!"
+        push @peeringStrange,"$eName:\t not peered!! add SD to any team !!"
               if(!$peerIDs);
       }
       foreach my $pId (grep !/peerUnread/,split",",$peerIDs){
         next if ($pId =~m /$devId/);
         if (length($pId) != 8){
-          push @peerIDnotDef,$eName." id:$pId  invalid format";
+          push @peerIDnotDef,"$eName:\t id:$pId  invalid format";
           next;
         }
         my ($pDid,$pChn) = unpack'A6A2',$pId;
         if (!$modules{CUL_HM}{defptr}{$pId} && 
             (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
           next if($pDid && CUL_HM_id2IoId($id) eq $pDid);
-          push @peerIDnotDef,"$eName id:$pId";
+          push @peerIDnotDef,"$eName:\t id:$pId";
           next;
         }
         my $pName = CUL_HM_id2Name($pId);
@@ -545,23 +570,23 @@ sub HMinfo_peerCheck(@) { #####################################################
             }
           }
         }
-        push @peerIDsNoPeer,"$eName p:$pName"
+        push @peerIDsNoPeer,"$eName:\t p:$pName"
               if (  (!$pPlist || $pPlist !~ m/$devId/) 
                   && $st ne 'smokeDetector'
                   && $pChn !~ m/0[x0]/
                   );
         if ($pSt eq "virtual"){
           if (AttrVal($devN,"aesCommReq",0) != 0){
-            push @peerIDsAES,$eName." p:".$pName     
+            push @peerIDsAES,"$eName:\t p:".$pName     
                   if ($pMd ne "CCU-FHEM");
           }
         }
         elsif ($md eq "HM-CC-RT-DN"){
           if ($chn =~ m/(0[45])$/){ # special RT climate
             my $c = $1 eq "04"?"05":"04";
-            push @peerIDsNoPeer,$eName." pID:".$pId if ($pId !~ m/$c$/);
+            push @peerIDsNoPeer,"$eName:\t pID:".$pId if ($pId !~ m/$c$/);
             if ($pMd !~ m/HM-CC-RT-DN/ ||$pChn !~ m/(0[45])$/ ){
-              push @peeringStrange,$eName." pID: Model $pMd should be HM-CC-RT-DN ClimatTeam Channel";
+              push @peeringStrange,"$eName:\t pID: Model $pMd should be HM-CC-RT-DN ClimatTeam Channel";
             }
             elsif($chn eq "04"){
               # compare templist template are identical and boost is same
@@ -570,20 +595,20 @@ sub HMinfo_peerCheck(@) { #####################################################
               my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod",0,0);
               my $ot = AttrVal($eName,"tempListTmpl","--");
               my $pt = AttrVal($rtCn ,"tempListTmpl","--");
-              push @peerIDsTeamRT,$eName." team:$rtCn  boost differ  $ob / $pb"        if ($ob ne $pb);
-              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ  $ot / $pt" if ($ot ne $pt);
+              push @peerIDsTeamRT,"$eName:\t team:$rtCn  boost differ  $ob / $pb"        if ($ob ne $pb);
+              push @peerIDsTeamRT,"$eName:\t team:$rtCn  tempListTmpl differ  $ot / $pt" if ($ot ne $pt);
             }
           }
           elsif($chn eq "02"){
             if($pChn ne "02" ||$pMd ne "HM-TC-IT-WM-W-EU" ){
-              push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+              push @peeringStrange,"$eName:\t pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
             }
           }
         }
         elsif ($md eq "HM-TC-IT-WM-W-EU"){
           if($chn eq "02"){
             if($pChn ne "02" ||$pMd ne "HM-CC-RT-DN" ){
-              push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+              push @peeringStrange,"$eName:\t pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
             }
             else{
               # compare templist template are identical and boost is same
@@ -592,9 +617,9 @@ sub HMinfo_peerCheck(@) { #####################################################
               my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod",0,0);
               my $ot = AttrVal($eName,"tempListTmpl","--");
               my $pt = AttrVal($rtCn ,"tempListTmpl","--");
-              push @peerIDsTeamRT,$eName." team:$rtCn  boost differ $ob / $pb" if ($ob ne $pb);
+              push @peerIDsTeamRT,"$eName:\t team:$rtCn  boost differ $ob / $pb" if ($ob ne $pb);
               # if templates differ AND RT template is not static then notify a difference
-              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ $ot / $pt" if ($ot ne $pt && $pt ne "defaultWeekplan");
+              push @peerIDsTeamRT,"$eName:\t team:$rtCn  tempListTmpl differ $ot / $pt" if ($ot ne $pt && $pt ne "defaultWeekplan");
             }
           }
         }
@@ -602,14 +627,14 @@ sub HMinfo_peerCheck(@) { #####################################################
     }
   }
   my $ret = "";
-  $ret .="\n\n peer list incomplete. Use getConfig to read it."        ."\n    ".(join "\n    ",sort @peerIDsFail   )if(@peerIDsFail);
-  $ret .="\n\n peer not defined"                                       ."\n    ".(join "\n    ",sort @peerIDnotDef  )if(@peerIDnotDef);
-  $ret .="\n\n peer not verified. Check that peer is set on both sides"."\n    ".(join "\n    ",sort @peerIDsNoPeer )if(@peerIDsNoPeer);
-  $ret .="\n\n peering strange - likely not suitable"                  ."\n    ".(join "\n    ",sort @peeringStrange)if(@peeringStrange);
-  $ret .="\n\n trigger sent to unpeered device"                        ."\n    ".(join "\n    ",sort @peerIDsTrigUnp)if(@peerIDsTrigUnp);
-  $ret .="\n\n trigger sent to undefined device"                       ."\n    ".(join "\n    ",sort @peerIDsTrigUnd)if(@peerIDsTrigUnd);
-  $ret .="\n\n aesComReq set but virtual peer is not vccu - won't work"."\n    ".(join "\n    ",sort @peerIDsAES    )if(@peerIDsAES);
-  $ret .="\n\n boost or template differ in team"                       ."\n    ".(join "\n    ",sort @peerIDsTeamRT )if(@peerIDsTeamRT);
+  $ret .="\n\n idPz00\n    ".(join "\n    ",sort @peerIDsFail   )if(@peerIDsFail);
+  $ret .="\n\n idPz01\n    ".(join "\n    ",sort @peerIDnotDef  )if(@peerIDnotDef);
+  $ret .="\n\n idPz02\n    ".(join "\n    ",sort @peerIDsNoPeer )if(@peerIDsNoPeer);
+  $ret .="\n\n idPz03\n    ".(join "\n    ",sort @peeringStrange)if(@peeringStrange);
+  $ret .="\n\n idPz04\n    ".(join "\n    ",sort @peerIDsTrigUnp)if(@peerIDsTrigUnp);
+  $ret .="\n\n idPz05\n    ".(join "\n    ",sort @peerIDsTrigUnd)if(@peerIDsTrigUnd);
+  $ret .="\n\n idPz06\n    ".(join "\n    ",sort @peerIDsAES    )if(@peerIDsAES);
+  $ret .="\n\n idPz07\n    ".(join "\n    ",sort @peerIDsTeamRT )if(@peerIDsTeamRT);
   
   return  $ret;
 }
@@ -636,19 +661,19 @@ sub HMinfo_burstCheck(@) { ####################################################
       
       next if (!($prxt & 0x82)); # not a burst peer
       my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst"   ,ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
-      if (!$pnb)           {push @needBurstMiss, "$eName:$pn";}
-      elsif($pnb !~ m /on/){push @needBurstFail, "$eName:$pn";}
+      if (!$pnb)           {push @needBurstMiss, "$eName:\t$pn";}
+      elsif($pnb !~ m /on/){push @needBurstFail, "$eName:\t$pn";}
 
       if ($prxt & 0x80){# conditional burst - is it on?
         my $pDevN = CUL_HM_getDeviceName($pn);
-        push @peerIDsCond," $pDevN for remote $eName" if (ReadingsVal($pDevN,"R-burstRx",ReadingsVal($pDevN,".R-burstRx","")) !~ m /on/);
+        push @peerIDsCond," $pDevN:\t for remote $eName" if (ReadingsVal($pDevN,"R-burstRx",ReadingsVal($pDevN,".R-burstRx","")) !~ m /on/);
       }
     }
   }
   my $ret = "";
-  $ret .="\n\n peerNeedsBurst cannot be determined"  ."\n    ".(join "\n    ",sort @needBurstMiss) if(@needBurstMiss);
-  $ret .="\n\n peerNeedsBurst not set"               ."\n    ".(join "\n    ",sort @needBurstFail) if(@needBurstFail);
-  $ret .="\n\n conditionalBurst not set"             ."\n    ".(join "\n    ",sort @peerIDsCond)   if(@peerIDsCond);
+  $ret .="\n\n idBc01\n    ".(join "\n    ",sort @needBurstMiss) if(@needBurstMiss);
+  $ret .="\n\n idBc02\n    ".(join "\n    ",sort @needBurstFail) if(@needBurstFail);
+  $ret .="\n\n idBc03\n    ".(join "\n    ",sort @peerIDsCond)   if(@peerIDsCond);
   return  $ret;
 }
 sub HMinfo_paramCheck(@) { ####################################################
@@ -663,42 +688,61 @@ sub HMinfo_paramCheck(@) { ####################################################
       my $ehash = $defs{$eName};
       my $pairId =  ReadingsVal($eName,"R-pairCentral", ReadingsVal($eName,".R-pairCentral","undefined"));
       my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
-      if (!$IoDev->{NAME}){push @noIoDev,$eName;next;}
+      if (!$IoDev->{NAME}){push @noIoDev,"$eName:\t";next;}
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
       if ($ioCCU){
         if(   !$defs{$ioCCU}
            || AttrVal($ioCCU,"model","") ne "CCU-FHEM"
            || !$defs{$ioCCU}{helper}{role}{dev}){
-          push @ccuUndef,"$eName ->$ioCCU";
+          push @ccuUndef,"$eName:\t ->$ioCCU";
         }
         else{
           $ioHmId = $defs{$ioCCU}{DEF};
           if ($prefIO){
             my @pIOa = split(",",$prefIO);
-            push @perfIoUndef,"$eName ->$_"  foreach ( grep {!$defs{$_}} @pIOa);
+            push @perfIoUndef,"$eName:\t ->$_"  foreach ( grep {!$defs{$_}} @pIOa);
           }            
         }
       }
-      if (!$IoDev)                  { push @noIoDev,$eName;}
+      if (!$IoDev)                  { push @noIoDev,"$eName:\t";}
                                     
       if (   !$defs{$eName}{helper}{role}{vrt} 
           && AttrVal($eName,"model","") ne "CCU-FHEM"){
-        if ($pairId eq "undefined") { push @noID,$eName;}
+        if ($pairId eq "undefined") { push @noID,"$eName:\t";}
         elsif ($pairId !~ m /$ioHmId/
-             && $IoDev )            { push @idMismatch,"$eName paired:$pairId IO attr: ${ioHmId}.";}
+             && $IoDev )            { push @idMismatch,"$eName:\t paired:$pairId IO attr: ${ioHmId}.";}
       }
     }
   }
 
   my $ret = "";
-  $ret .="\n\n no IO device assigned"             ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
-  $ret .="\n\n PairedTo missing/unknown"          ."\n    ".(join "\n    ",sort @noID)       if (@noID);
-  $ret .="\n\n PairedTo mismatch to IODev"        ."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
-  $ret .="\n\n IOgrp: CCU not found"              ."\n    ".(join "\n    ",sort @ccuUndef)   if (@ccuUndef);
-  $ret .="\n\n IOgrp: prefered IO undefined"      ."\n    ".(join "\n    ",sort @perfIoUndef)if (@perfIoUndef);
+  $ret .="\n\n idPc00\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
+  $ret .="\n\n idPc01\n    ".(join "\n    ",sort @noID)       if (@noID);
+  $ret .="\n\n idPc02\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
+  $ret .="\n\n idPc03\n    ".(join "\n    ",sort @ccuUndef)   if (@ccuUndef);
+  $ret .="\n\n idPc04\n    ".(join "\n    ",sort @perfIoUndef)if (@perfIoUndef);
  return  $ret;
 }
+sub HMinfo_applTxt2Check($) { #################################################
+  my $ret = shift;
+  $ret =~ s/-ret--ret- idCl00-ret-.*?-ret-/-ret-/;
+  $ret =~ s/$_/$chkIds{$_}{txt}/g foreach(keys %chkIds); 
+  return $ret;
+}
+sub HMinfo_getTxt2Check($) { #################################################
+  my $id = shift;
+  if(defined $chkIds{$id}){
+    return ($chkIds{$id}{Fkt}
+           ,$chkIds{$id}{shtxt}
+           ,$chkIds{$id}{txt}
+           );  
+  }
+  else{
+    return ("unknown");
+  }
+}
+
 
 sub HMinfo_tempList(@) { ######################################################
   my ($hiN,$filter,$action,$fName)=@_;
@@ -1548,6 +1592,13 @@ sub HMinfo_GetFn($@) {#########################################################
 #    return HMI_overview(\@entities,\@a);
 #  }                                
   
+  elsif($cmd eq "configInfo") {
+    $ret = ""  ;
+    foreach(sort keys %chkIds){
+      my $sh = substr($chkIds{$_}{shtxt}."             ",0,15);
+      $ret .= "\n$sh long: $chkIds{$_}{txt}  \n                $chkIds{$_}{long} "; 
+    }  
+  }
   elsif($cmd eq "help")       {
     $ret = HMInfo_help();
   }
@@ -1555,6 +1606,7 @@ sub HMinfo_GetFn($@) {#########################################################
   else{
     my @cmdLst =     
            ( "help:noArg"
+            ,"configInfo:noArg"
             ,"configCheck"
             ,"configChkResult:noArg"
             ,"param"
@@ -1831,6 +1883,8 @@ sub HMInfo_help(){ ############################################################
            ."\n                 compare whether register match the template values"
            ."\n get templateList [-templateName-]         # gives a list of templates or a description of the named template"
            ."\n                  list all currently defined templates or the structure of a given template"
+           ."\n get configInfo  # information to getConfig status"
+           ."\n                 "
            ."\n ======= typeFilter options: supress class of devices  ===="
            ."\n set -name- -cmd- [-dcasev] [-f -filter-] [params]"
            ."\n      entities according to list will be processed"
@@ -2427,12 +2481,22 @@ sub HMinfo_deviceReplace($$$){
 sub HMinfo_configCheck ($){ ###################################################
   my ($param) = shift;
   my ($id,$opt,$filter) = split ",",$param;
-  
+  foreach($id,$opt,$filter){ 
+    $_ = "" if(!defined $_);
+  }
   my @entities = HMinfo_getEntities($opt,$filter);
-  my $ret = "configCheck done:" .HMinfo_regCheck  (@entities)
-                                .HMinfo_peerCheck (@entities)
-                                .HMinfo_burstCheck(@entities)
-                                .HMinfo_paramCheck(@entities);
+  my $ret = "configCheck done:";
+  $ret .="\n\n idCl00\n".(join ",",@entities)  if(@entities);
+  my @checkFct = (
+                   "HMinfo_regCheck"
+                  ,"HMinfo_peerCheck"
+                  ,"HMinfo_burstCheck"
+                  ,"HMinfo_paramCheck"
+  );
+  my %configRes;
+  no strict "refs";
+    $ret .=  &{$_}(@entities)foreach (@checkFct);
+  use strict "refs";
 
   my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04"),
             devspec2array("model=HM.*-TC.*:FILTER=chanNo=02"));
@@ -2444,8 +2508,9 @@ sub HMinfo_configCheck ($){ ###################################################
                                                        
     next if ($tr eq "unused");
     push @tlr,"$e: $tr" if($tr);
+    $configRes{$e}{templist} = $tr if($tr);
   }
-  $ret .= "\n\n templist mismatch \n    ".join("\n    ",sort @tlr) if (@tlr);
+  $ret .="\n\n idTp00\n    ".(join "\n    ",sort @tlr)  if(@tlr);
 
   @tlr = ();
   foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
@@ -2455,12 +2520,15 @@ sub HMinfo_configCheck ($){ ###################################################
       $p = 0 if ($p eq "none");
       my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
       push @tlr,$tck if ($tck);
+      $configRes{$dName}{template} = $tck if($tck);
     }
   }
-  $ret .= "\n\n template mismatch \n    ".join("\n    ",sort @tlr) if (@tlr);
+  $ret .="\n\n idTp01\n    ".(join "\n    ",sort @tlr)  if(@tlr);
 
   $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
-  return "$id;$ret";
+
+  if(!$id){$ret = HMinfo_applTxt2Check($ret);}# add readable text
+  return "$id;$ret";#;$ret2";
 }
 sub HMinfo_register ($){ ######################################################
   my ($param) = shift;
@@ -2521,6 +2589,52 @@ sub HMinfo_register ($){ ######################################################
 sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
   my ($name,$id,$cl,$ret) = split(";",$rep,4);
+
+  my @entityChk;
+  my ($test,$testId,$ent,$issue) = ("","","","");
+  foreach my $eLine (split("-ret-",$ret)){
+    next if($eLine eq "");
+    if($eLine =~m/^ (id....)$/){
+      $testId = $1; 
+      $test = $chkIds{$testId}{txt};
+      next;
+    }
+    if($test eq "clear"){
+      @entityChk = split(",",$eLine);
+      foreach(@entityChk){
+        delete $defs{$_}{helper}{cfgChk};# pre-clear all entries  
+      }
+    }
+    if($eLine =~m/^\s*(.*?):\s*(.*)$/){
+      ($ent,$issue) = ($1,$2);
+      next if (!defined $defs{$ent});
+      $issue =~ s/\+newline\+/\n/g;
+      if(defined $defs{$ent}{helper}{cfgChk}{$testId}){
+        $defs{$ent}{helper}{cfgChk}{$testId} .= "\n".($issue ? $issue : "fail");
+      }
+      else{
+        $defs{$ent}{helper}{cfgChk}{$testId} = ($issue ? $issue : "fail");
+      }
+      
+    }  
+  }
+
+  foreach my $e(@entityChk){
+    my $state;
+    my $chn = InternalVal($e,"chanNo","00");
+    if(0 < scalar(grep/(00|$chn)/,split(",",$defs{CUL_HM_getDeviceName($e)}{helper}{q}{qReqConf}))){
+      $state = "updating";
+    }
+    elsif(!defined $defs{$e}{helper}{cfgChk}){
+      $state = "ok";
+    }
+    else{
+      $state = join(",",map{$chkIds{$_}{shtxt}} keys%{$defs{$e}{helper}{cfgChk}});
+    }
+    CUL_HM_UpdtReadSingle($defs{$e},"cfgState",$state,1);  
+  }
+  
+  $ret = HMinfo_applTxt2Check($ret);
   if ($ret && defined $defs{$cl}){
     $ret =~s/-ret-/\n/g; # re-insert new-line
     asyncOutput($defs{$cl},$ret);
@@ -2799,9 +2913,9 @@ sub HMinfo_templateChk(@){#####################################################
   #       peer / peer:both = template for peer, not extending Long/short
   #       peer:short|long  = template for peerlong or short
 
-  return "aktor $aName - $tmpl:template undefined\n"                       if(!$HMConfig::culHmTpl{$tmpl});
-  return "aktor $aName unknown\n"                                          if(!$defs{$aName});
-  return "aktor $aName - $tmpl:give <peer>:[short|long|both] wrong:$pSet\n"if($pSet && $pSet !~ m/:(short|long|both)$/);
+  return "$aName: - $tmpl:template undefined\n"                       if(!$HMConfig::culHmTpl{$tmpl});
+  return "$aName: unknown\n"                                          if(!$defs{$aName});
+  return "$aName: - $tmpl:give <peer>:[short|long|both] wrong:$pSet\n"if($pSet && $pSet !~ m/:(short|long|both)$/);
   $pSet = "0:0" if (!$pSet);
   
   my $repl = "";
@@ -2840,7 +2954,7 @@ sub HMinfo_templateChk(@){#####################################################
       }
     }
   }
-  $repl = "$aName $pSet-> failed\n$repl" if($repl);
+  $repl = "$aName: $pSet-> failed\n$repl" if($repl);
 
   return $repl;
 }
@@ -3097,6 +3211,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
+      </li>
+      <li><a name="#HMinfoconfigInfo">configInfo [&lt;name&gt;]</a><br>
+          information to getConfig results<br>
       </li>
       <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; [sortPeer|sortTemplate]<br>
           templare usage<br>
@@ -3565,6 +3682,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       </li>
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           zeigt eine Liste von Vorlagen. Ist kein Name angegeben, werden alle Vorlagen angezeigt<br>
+      </li>
+      <li><a name="#HMinfoconfigInfo">configInfo [&lt;name&gt;]</a><br>
+          Informationen zu getConfig einträgen<br>
       </li>
       <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; [sortPeer|sortTemplate]<br>
           Liste der genutzten templates.<br>
