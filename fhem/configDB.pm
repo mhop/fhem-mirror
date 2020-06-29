@@ -1146,8 +1146,9 @@ sub _cfgDB_dump {
       (undef,$dbname)     = split (/=/,$dbname);
       (undef,$dbhostname) = split (/=/,$dbhostname);
       (undef,$dbport)     = split (/=/,$dbport);
+      my $xparam = defined($configDB{attr}{mysqldump}) ? $configDB{attr}{mysqldump} : '';
       my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
-      my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
+      my $dumpcmd = "mysqldump $xparam --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
       Log 4,"configDB: $dumpcmd";
       $ret        = qx($dumpcmd);
       return $ret if $ret;
