@@ -3268,7 +3268,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           status: for all channels that suport statusRequest<br>
           Ping will generate a message to the device. If not answered the device is unaccessible. Check protState for errors in case.
       </li>
-            ,"cmdRequestG:ping,status"
       <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|readings|msgStat|register|rssi]<br>
           executes a set clear ...  on all HM entities<br>
           <ul>
