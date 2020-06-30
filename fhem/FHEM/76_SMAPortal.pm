@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
   "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
   "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
@@ -224,28 +225,35 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 
 my %subs;                                                                                     # Arbeitskopie von %stpl
 my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},    # mandatory
-    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'   },    # mandatory
-    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
-    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
-    balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
-    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'      },
-    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'  },
-    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
-    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData' },
-    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'  },
-    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'      },
+    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory
+    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory
+    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'            },
+    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'         },
+    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'        },
+    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'    },
+    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'     },
+    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData'   },
+    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'    },
+    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'        },
+    balanceCurrentData  => { doit => 0, level => 'L10', func => '_getBalanceCurrentData'  },
+    balanceDayData      => { doit => 0, level => 'L11', func => '_getBalanceDayData'      },
+    balanceMonthData    => { doit => 0, level => 'L12', func => '_getBalanceMonthData'    },
+    balanceYearData     => { doit => 0, level => 'L13', func => '_getBalanceYearData'     },
+    balanceTotalData    => { doit => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
                                            # Tags der verfügbaren Datenquellen
-my @pd = qw( balanceDayData
-             consumerCurrentdata
-             consumerMasterdata 
+my @pd = qw( plantMasterData
+             consumerMasterdata
+             balanceDayData
+             balanceMonthData
+             balanceYearData
+             balanceTotalData
+             consumerCurrentdata             
              consumerDayData 
              consumerMonthData 
              consumerYearData           
              forecastData
              liveData
-             plantMasterData
              weatherData
              plantLogbook
            );
@@ -930,8 +938,12 @@ sub GetSetData {                                                       ## no cri
   if($getp ne "none") {            
 
       for my $k (keys %{$subs{$name}}) {
-          next if(!$subs{$name}{$k}{doit});        
+          next if(!$subs{$name}{$k}{doit});           
           no strict "refs";                                  ## no critic 'NoStrict'  
+          if(!defined &{$subs{$name}{$k}{func}}) {
+              Log3 ($name, 2, qq{$name - WARNING - data provider '$k' call function '$subs{$name}{$k}{func}' doesn't exist and is ignored }); 
+              next;
+          }            
           ($errstate,$state,$reread,$retry) = &{$subs{$name}{$k}{func}} ({ name     => $name,
                                                                            ua       => $ua,
                                                                            state    => $state, 
@@ -1419,6 +1431,43 @@ return ($errstate,$state,$reread,$retry);
 #           Abruf Statistik Daten Day
 #            (anchorTime beachten !)
 ################################################################
+sub _getBalanceCurrentData {                       ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 0;                                                            # Tab 0 -> Current, Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',                                       
+                                         tag      => "balanceCurrentData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Current",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Day
+#            (anchorTime beachten !)
+################################################################
 sub _getBalanceDayData {                 ## no critic "not used"
   my $paref    = shift;
   my $name     = $paref->{name};
@@ -1435,7 +1484,7 @@ sub _getBalanceDayData {                 ## no critic "not used"
    
   my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
   my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
   
   ($errstate,$state) = __dispatchPost ({ name     => $name,
                                          ua       => $ua,
@@ -1446,6 +1495,117 @@ sub _getBalanceDayData {                 ## no critic "not used"
                                          fields   => \%fields,
                                          content  => $cont,
                                          addon    => "Day",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Month
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceMonthData {                 ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceMonthData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Month",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Year
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceYearData {                 ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceYearData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Year",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Year
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceTotalData {               ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 4;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceTotalData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Total",
                                          daref    => $daref
                                       });                                     
   
@@ -1575,7 +1735,7 @@ sub __dispatchPost {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$fnaddon);
+          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag);
       }
       use strict "refs";
   }
@@ -2173,13 +2333,14 @@ return;
 
 ################################################################
 #          Auswertung Statistic Daten
-#          $period = Day | Month | Year
+#          $period = Current | Day | Month | Year
 ################################################################
 sub extractStatisticData {
   my $hash      = shift;
   my $daref     = shift;
   my $statistic = shift;
   my $period    = shift;
+  my $tag       = shift;
   my $name      = $hash->{NAME};
   my $sd;
   
@@ -2188,7 +2349,7 @@ sub extractStatisticData {
   $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
-  my $lv = $stpl{balanceDayData}{level};
+  my $lv = $stpl{$tag}{level};
   
   if(ref $statistic eq "HASH") {
       $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
@@ -2198,7 +2359,7 @@ sub extractStatisticData {
       for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
           my $k = $a->{Key};
           my $v = $a->{Value};
-          push @$daref, "${lv}_Today_${k}:$v" if(defined $statkeys{$k});                  
+          push @$daref, "${lv}_${period}_${k}:$v" if(defined $statkeys{$k});                  
       }
   } 
   
@@ -3805,13 +3966,16 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
           <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved </td></tr>
+          <tr><td> <b>balanceTotalData</b>    </td><td>- Total statistics data are retrieved </td></tr>
        </table>
        </ul>     
        <br>       
@@ -4049,13 +4213,16 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
           <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen </td></tr>
+          <tr><td> <b>balanceTotalData</b>    </td><td>-  Statistikdaten Gesamt werden abgerufen </td></tr>
        </table>
        </ul>     
        <br>       
