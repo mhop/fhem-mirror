@@ -1442,7 +1442,7 @@ sub _getBalanceCurrentData {                       ## no critic "not used"
    
   my $tab     = 0;                                                            # Tab 0 -> Current, Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
   my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
   
   ($errstate,$state) = __dispatchPost ({ name     => $name,
                                          ua       => $ua,
@@ -1479,7 +1479,7 @@ sub _getBalanceDayData {                 ## no critic "not used"
    
   my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
   my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{ {"tabNumber":$tab,"anchorTime":$anchort} };
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
   
   ($errstate,$state) = __dispatchPost ({ name     => $name,
                                          ua       => $ua,
