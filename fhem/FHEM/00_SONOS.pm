@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, March 2018
+# SONOS.pm (c) by Reiner Leins, June 2020
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -51,6 +51,24 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 30.06.2020
+#	Sonos Playbase und Beam (S11 und S14) zu den Playern mit Optischer Eingangswahl hinzugefügt.
+#	Bei "setCurrentTrackPosition" kann man nun auch Sekunden angeben (auch mit Vorzeichen-Prefix und/oder Prozent-Suffix).
+#	Beim Aktualisieren von "DailyIndexRefreshTime" wurde ein bestehender Bulk-Update unterbrochen.
+#	In der ControlPoint.pm wurde eine Anpassung für den Standardmäßigen Namespace-Prefix eingebaut. Dieser kann nun beim Initialisieren des ControlPoint-Proxy über den Parameter 'EnvNamespace' definiert werden. Wenn der Parameter nicht mit angegeben wird, dann wird wie bisher 'u' verwendet, wird '<undef>' (als Text) angegeben, dann wird der ganze Namespace weggelassen. (nicht für das Sonos-Modul relevant).
+#	Beim Verbindungsverlust wird nun wirklich versucht einen SubProzess neuzustarten. Das konnte schiefgehen, wenn der Port vom Betriebssystem noch nicht wieder freigegeben wurde.
+#	Bei der Auswertung der MusicServiceList gibt es jetzt Manifest-Verweise, die gesondert bearbeitet werden müssen (z.B. fehlten die Spotify-Informationen)
+#	Bei der Auswertung der MusicServiceList wurden SSL-Dokumente nicht korrekt nachgeladen.
+#	Beim Abbau von Sockets wird nun immer SO_LINGER gesetzt, sodass alle Port sofort freigegeben werden sollten
+#	Der Timeout von Renew-Anforderungen und Befehlsübergaben in der ControlPoint an die Player wurde von 20s auf 5s heruntergesetzt.
+#	Der PingType "SYN" wurde korrigiert, und sollte nun korrekte Ergebnisse liefern.
+#	In der ControlPoint wurde nun konsequent ReusePort eingebaut (sofern gesetzt).
+#	Fehler aus den ControlPoint-Methoden werden nun sauber gefangen und ausgewertet.
+#	Das Erneuern der Subscriptions am Player wurde nicht zu FHEM durchgemeldet, und zu selten versucht.
+#	Es gibt ein neues Attribut "allowedWebAccess", mit dem man den Zugriff auf Nachladeadressen beschränken kann.
+#	Commandref angepasst, sodass nun bei der Auswahl eines Attributes/Getter/Setter in FHEMWEB der passende Teil der Commandref daneben angezeigt wird.
+#	Der fork()-Befehl wurde durch den von FHEM bereitgestellten fhemFork()-Befehl ersetzt. Dort werden noch offene Filehandles und Sockets behandelt.
+#	Wenn man Player von der Erkennung ausgeschlossen hatte, dann gab es Fehlermeldungen bzgl. unbekannter Player bei der Gruppierungsübermittlung (da Sonos davon ja nichts weiß)
 # 25.04.2018
 #	"Deep Recursion"-Warnung beim loggen wird nun verhindert
 #	Beim Erzeugen der Gruppen-ReadingsGroup ist bei der Verwendung eines Boosts ab und zu ein Fehler aufgetreten
@@ -63,13 +81,6 @@
 #	Bei einigen Positionsabfragen an die Player wurden Sonderfälle (wie NOT_IMPLEMENTED) nicht berücksichtigt.
 #	Slider-Wertebereich für Bass und Treble auf den Bereich -10..10 korrigiert.
 #	Es gibt jetzt ein Reading "IsZoneBridge", das 0 oder 1 sein kann. Danach wird jetzt auch entschieden, ob eine Playersteuerung dargestellt wird, oder nicht.
-# 10.03.2018
-#	Die PlayBase kann nun auch den SPDIF-Eingang aktivieren (wie die PlayBar)
-#	Wenn man über Alexa Musik hört, wird das aktuelle Cover nun auch angezeigt.
-#	Wenn ein Player nach einem Neustart disabled war, und während des Betriebs enabled wird, wird nun versucht ihn wiederzufinden.
-#	Wenn ein Player disabled oder disappeared ist, wird ein Proxy-Cover-Zugriffsversuch auf diesen Player unterbunden.
-#	Ein Modify-Befehlsaufruf wird nun am Vorhandensein von $hash->{OLDDEF} erkannt.
-#	Bei einigen PERL-Installationen stand im Reading 'currentTrackPositionSimulatedSec' eine Kommazahl (da sie von time() aus berechnet wird). Diese Zahl wird nun gerundet.
 #
 ########################################################################################
 #
@@ -116,7 +127,6 @@ use feature 'unicode_strings';
 use Digest::MD5 qw(md5_hex);
 use File::Temp;
 use File::Copy;
-# use Encode::Guess;
 
 use Data::Dumper;
 $Data::Dumper::Terse = 1;
@@ -174,19 +184,11 @@ if (lc(substr($0, -7)) eq 'fhem.pl') {
 	$gPath = $attr{global}{modpath}.'/FHEM'; 
 }
 use lib ($gPath.'/lib', $gPath.'/FHEM/lib', './FHEM/lib', './lib', './FHEM', './', '/usr/local/FHEM/share/fhem/FHEM/lib');
-# print 'Current: "'.$0.'", gPath: "'.$gPath."\"\n";
 
 if (lc(substr($0, -7)) eq 'fhem.pl') {
 	require 'DevIo.pm';
 } else {
 	use UPnP::ControlPoint;
-	
-	########################################################
-	# Change all carp-calls in the UPnP-Module to croak-calls
-	# This will ensure you can "catch" carp with an enclosing
-	# "eval{}"-Block
-	########################################################
-	#*UPnP::ControlPoint::carp = \&UPnP::ControlPoint::croak;
 }
 
 my $startedbyfhem = SONOS_isInList('startedbyfhem', @ARGV);
@@ -217,13 +219,14 @@ my %sets = (
 );
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
-my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout getListsDirectlyToReadings getFavouritesListAtNewVersion getPlaylistsListAtNewVersion getRadiosListAtNewVersion getQueueListAtNewVersion getTitleInfoFromMaster stopSleeptimerInAction saveSleeptimerInAction webname SubProcessLogfileName);
+my @SONOS_PossibleAttributes = qw(verbose targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout getListsDirectlyToReadings getFavouritesListAtNewVersion getPlaylistsListAtNewVersion getRadiosListAtNewVersion getQueueListAtNewVersion getTitleInfoFromMaster stopSleeptimerInAction saveSleeptimerInAction webname SubProcessLogfileName allowedWebAccess);
 my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble TruePlay SurroundEnable SurroundLevel SubEnable SubGain SubPolarity AudioDelay AudioDelayLeftRear AudioDelayRightRear NightMode DialogLevel AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupState ZoneGroupID fieldType IsBonded ZoneGroupName roomName roomNameAlias roomIcon currentTransportState transportState TransportState LineInConnected presence currentAlbum currentArtist currentTitle currentStreamAudio GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash GroupMasterPlayer ShareIndexInProgress DirectControlClientID DirectControlIsSuspended DirectControlAccountID IsMaster MasterPlayer SlavePlayer ButtonState ButtonLockState AllPlayer LineInName LineInIcon MusicServicesListVersion MusicServicesList WifiEnabled WirelessMode Orientation);
 
-# Communication between the two "levels" of threads
+# Communication between the different "levels" of threads
 my $SONOS_Client_ReceiveQueue = Thread::Queue->new();
 
 my %SONOS_PlayerRestoreRunningUDN :shared = ();
+my $SONOS_PlayerRestoreRunningQueue = Thread::Queue->new();
 my $SONOS_PlayerRestoreQueue = Thread::Queue->new();
 
 my $SONOS_LongJobsQueue = Thread::Queue->new();
@@ -355,7 +358,7 @@ sub SONOS_Initialize ($) {
 	eval {
 		no strict;
 		no warnings;
-		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 getListsDirectlyToReadings:1,0 getFavouritesListAtNewVersion:1,0 getPlaylistsListAtNewVersion:1,0 getRadiosListAtNewVersion:1,0 getQueueListAtNewVersion:1,0 deviceRoomView:Both,DeviceLineOnly reusePort:1,0 webname SubProcessLogfileName getLocalCoverArt '.$readingFnAttributes;
+		$hash->{AttrList}= 'disable:1,0 pingType:'.join(',', @SONOS_PINGTYPELIST).' usedonlyIPs ignoredIPs targetSpeakDir targetSpeakURL targetSpeakFileTimestamp:1,0 targetSpeakFileHashCache:1,0 targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover generateProxyAlbumArtURLs:1,0 proxyCacheTime proxyCacheDir bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition coverLoadTimeout:1,2,3,4,5,6,7,8,9,10,15,20,25,30 getListsDirectlyToReadings:1,0 getFavouritesListAtNewVersion:1,0 getPlaylistsListAtNewVersion:1,0 getRadiosListAtNewVersion:1,0 getQueueListAtNewVersion:1,0 deviceRoomView:Both,DeviceLineOnly reusePort:1,0 webname SubProcessLogfileName getLocalCoverArt allowedWebAccess '.$readingFnAttributes;
 		use strict;
 		use warnings;
 	};
@@ -774,7 +777,7 @@ sub SONOS_FhemWebCallback($) {
 		}
 		
 		# Bild vom Player holen...
-		my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT);
+		my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT, timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT);
 		my $response = $ua->get($albumurl);
 		if ($response->is_success) {
 			SONOS_Log undef, 5, 'Cover wurde neu geladen: '.$albumurl;
@@ -861,7 +864,6 @@ sub SONOS_FhemWebCallback($) {
 			FW_serveSpecial('sonos_playbar_round', 'png', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
 			return (undef, undef);
 		}
-
 		
 		if ($URL =~ m/^\/empty.jpg/i) {
 			FW_serveSpecial('sonos_empty', 'jpg', $attr{global}{modpath}.'/FHEM/lib/UPnP', 1);
@@ -1083,6 +1085,7 @@ sub SONOS_StopSubProcess($) {
 	} else {
 		DevIo_SimpleWrite($hash, "disconnect\n", 2);
 	}
+	$hash->{TCPDev}->sockopt(SO_LINGER, pack("ii", 1, 0)) if (defined($hash->{TCPDev}));
 	DevIo_CloseDev($hash);
 	
 	setReadingsVal($hash, "state", 'disabled', TimeNow());
@@ -1165,6 +1168,8 @@ sub SONOS_Read($) {
 		# Checker aktivieren...
 		InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
 		
+		SONOS_Log undef, 1, "ReadFn-Aufruf durch FHEM, aber keine Daten bekommen...";
+		
 		select(undef, undef, undef, 0.001);
 		return undef;
 	}
@@ -1177,6 +1182,8 @@ sub SONOS_Read($) {
 		if (!defined($newRead) || ($newRead eq '')) {
 			# Checker aktivieren...
 			InternalTimer(gettimeofday() + $hash->{INTERVAL}, 'SONOS_IsSubprocessAliveChecker', $hash, 0);
+			
+			SONOS_Log undef, 1, "ReadFn-Aufruf durch FHEM, aber keine weiteren Daten bekommen. Buffer bisher (kein abschließendes Newline): '$buf'";
 			
 			return undef;
 		}
@@ -1641,12 +1648,11 @@ sub SONOS_Read($) {
 						}
 					} elsif ($tempURI =~ m/getaa.*?x-sonosapi-stream%3a(.+?)%3f/i) {
 						$srcURI = SONOS_GetRadioMediaMetadata($hash->{UDN}, $1);
-						eval {
-							my $result = SONOS_ReadURL($srcURI);
-							if (!defined($result) || ($result =~ m/<Error>.*<\/Error>/i)) {
-								$srcURI = $groundURL.$tempURI;
-							}
-						};
+						
+						my $result = SONOS_ReadURL($srcURI);
+						if (!defined($result) || ($result =~ m/<Error>.*<\/Error>/i)) {
+							$srcURI = $groundURL.$tempURI;
+						}
 						
 						if ($getLocalCoverArt) {
 							$currentValue = $attr{global}{modpath}.'/www/images/default/SONOSPLAYER/'.$name.'_'.$nextName.'AlbumArt.png';
@@ -1698,8 +1704,10 @@ sub SONOS_Read($) {
 				
 				if ($nextReading eq 'next') {
 					$current{nextAlbumArtURL} = $URL;
+					SONOS_Log undef, 5, 'ProcessCover: SetCurrent:nextAlbumArtURL: '.$current{nextAlbumArtURL};
 				} else {
 					$current{AlbumArtURL} = $URL;
+					SONOS_Log undef, 5, 'ProcessCover: SetCurrent:AlbumArtURL: '.$current{AlbumArtURL};
 				}
 				
 				# This URI change rarely, but the File itself change nearly with every song, so trigger it everytime the content was different to the old one
@@ -1740,7 +1748,7 @@ sub SONOS_Read($) {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von DoWorkAnswer: $1:$2:$3";
 			}
 		} elsif ($line =~ m/rePing:/) {
-			# Zunächst mal nichts weiter tun, hier geht es nur um die Aktualisierung der letzten Prozessantwort...
+			# Zunächst mal nichts weiter tun, hier geht es nur um die Aktualisierung der letzten Prozessantwort (die ja bei jeder Nachricht vom SubProcess aktualisiert wird)...
 		} else {
 			SONOS_DoTriggerInternal('Main', $line);
 		}
@@ -1819,36 +1827,55 @@ sub SONOS_StartClientProcessIfNeccessary($) {
 	my ($upnplistener) = @_;
 	my ($host, $port) = split(/:/, $upnplistener);
 	
-	my $socket = new IO::Socket::INET(PeerAddr => $upnplistener, Proto => 'tcp');
+	# Sonos-Device ermitteln...
+	my $hash = SONOS_getSonosPlayerByName();
+	
+	my $socket = new IO::Socket::INET(PeerAddr => $upnplistener, Proto => 'tcp', Timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT);
 	if (!$socket) {
-		# Sonos-Device ermitteln...
-		my $hash = SONOS_getSonosPlayerByName();
-		
 		SONOS_Log undef, 1, 'Kein UPnP-Server gefunden... Starte selber einen und warte '.$hash->{WAITTIME}.' Sekunde(n) darauf...';
 		$SONOS_StartedOwnUPnPServer = 1;
 		
-		if (fork() == 0) {
+		if (main::fhemFork() == 0) {
 			# Zuständigen Verbose-Level ermitteln...
-			# Allerdings sind die Attribute (momentan) zu diesem Zeitpunkt noch nicht gesetzt, sodass nur das globale Attribut verwendet werden kann...
-			my $verboselevel = AttrVal(SONOS_getSonosPlayerByName()->{NAME}, 'verbose', $attr{global}{verbose});
+			# Allerdings sind die Attribute u.U. (momentan) zu diesem Zeitpunkt noch nicht gesetzt, sodass nur das globale Attribut verwendet werden kann...
+			my $verboselevel = AttrVal($hash->{NAME}, 'verbose', $attr{global}{verbose});
 			
 			# Prozess anstarten...
 			exec("$^X $attr{global}{modpath}/FHEM/00_SONOS.pm $port $verboselevel ".(($attr{global}{mseclog}) ? '1' : '0').' startedbyfhem');
 			exit(0);
 		}
 	} else {
-		$socket->sockopt(SO_LINGER, pack("ii", 1, 0));
+		SONOS_Log undef, 1, 'UPnP-Server gefunden... versuche zu verbinden...';
 		
-		# Antwort vom Client weglesen...
-		my $answer;
-		$socket->recv($answer, 5000);
-		$socket->send("Test\r\n", 0);
-		
-		# Hiermit wird eine etwaig bestehende Thread-Struktur beendet und diese Verbindung selbst geschlossen...
-		eval{
-			$socket->shutdown(2);
-			$socket->close();
+		# Timeout über Alarm festlegen...
+		eval {
+			local $SIG{ALRM} = sub { die 'Timed Out'; }; 
+			alarm $SONOS_DEFAULTCOVERLOADTIMEOUT;
+			
+			# Antwort vom Client weglesen...
+			my $answer;
+			$socket->recv($answer, 5000);
+			SONOS_Log $hash, 5, 'Antwort vom SubProzess: '.$answer;
+			if ($answer eq 'This is UPnP-Server listening for commands\r\n') {
+				$socket->send("Test\r\n", 0);
+				
+				# Hiermit wird eine etwaig bestehende Thread-Struktur beendet und diese Verbindung selbst geschlossen...
+				eval{
+					$socket->sockopt(SO_LINGER, pack("ii", 1, 0));
+					$socket->shutdown(2);
+					$socket->close();
+				};
+			} else {
+				# Wenn keine ordentliche Antwort kam...
+				SONOS_Log undef, 1, 'Es wurde ein Server gefunden, der aber nicht als UPnP-Server antwortet... Anderes System? Falsche IP angegeben? Falschen Port angegeben? Zieladresse: '.$upnplistener;
+			}
+			
+			alarm 0;
 		};
+		alarm 0; # race condition protection
+		if ($@) {
+			SONOS_Log undef, 1, 'Es wurde ein Server gefunden. Dieser hat aber nicht geantwortet. Zieladresse: '.$upnplistener.', Fehler: '.$@;
+		}
 	}
 	
 	return undef;
@@ -1947,6 +1974,7 @@ sub SONOS_InitClientProcess($) {
 		}
 	}
 	
+	
 	# Alle Informationen sind drüben, dann Threads dort drüben starten
 	DevIo_SimpleWrite($hash, "StartThread\n", 2);
 	
@@ -1969,11 +1997,15 @@ sub SONOS_IsSubprocessAliveChecker() {
 	
 	my $lastProcessAnswer = ReadingsVal(SONOS_getSonosPlayerByName()->{NAME}, 'LastProcessAnswer', '0');
 	
-	# Wenn länger nichts passiert ist, dann eine Aktualisierung anfordern...
-	SONOS_DoWork('undef', 'refreshProcessAnswer') if ($lastProcessAnswer < time() - $hash->{INTERVAL});
+	# Wenn länger nichts passiert ist, dann erstmal eine Aktualisierung anfordern...
+	if ($lastProcessAnswer < time() - $hash->{INTERVAL}) {
+		# Loggen und anfordern...
+		SONOS_Log $hash->{UDN}, 5, 'Long time, no hear from SubProcess... sending ping-request';
+		SONOS_DoWork('undef', 'refreshProcessAnswer');
+	}
 	
 	# Wenn die letzte Antwort zu lange her ist, dann den SubProzess neustarten...
-	if (($lastProcessAnswer != 0) && ($lastProcessAnswer < time() - (4 * $hash->{INTERVAL}))) {
+	if (($lastProcessAnswer != 0) && ($lastProcessAnswer < time() - 5 - (4 * $hash->{INTERVAL}))) {
 		# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
 		SONOS_Log $hash->{UDN}, 2, 'LastProcessAnswer way too old (Lastanswer: '.$lastProcessAnswer.' ~ '.SONOS_GetTimeString($lastProcessAnswer).')... try to restart the process and connection...';
 		
@@ -1987,7 +2019,7 @@ sub SONOS_IsSubprocessAliveChecker() {
 		SONOS_readingsEndUpdate($sHash, 1);
 		
 		# Stoppen...
-		InternalTimer(gettimeofday() + 1, 'SONOS_StopSubProcess', $hash, 0);
+		SONOS_StopSubProcess($hash);
 		
 		# Starten...
 		InternalTimer(gettimeofday() + 30, 'SONOS_DelayStart', $hash, 0);
@@ -2091,12 +2123,23 @@ sub SONOS_ConvertZoneGroupState($) {
 	
 	my @groups = ();
 	while ($zoneGroupState =~ m/<ZoneGroup.*?Coordinator="(.*?)".*?>(.*?)<\/ZoneGroup>/gi) {
+		# Wenn der Coordinator-Player in Fhem unbekannt ist (weil er z.B. bei der Erkennung ausgeschlossen wurde) dann übergehen...
+		if (!SONOS_getSonosPlayerByUDN($1.'_MR')) {
+			next;
+		}
+		
 		my @group = ($1.'_MR');
 		my $groupMember = $2;
-
+		
 		while ($groupMember =~ m/<ZoneGroupMember.*?UUID="(.*?)"(.*?)\/>/gi) {
+			# Wenn der Member-Player in Fhem unbekannt ist (weil er z.B. bei der Erkennung ausgeschlossen wurde) dann übergehen...
+			if (!SONOS_getSonosPlayerByUDN($1.'_MR')) {
+				next;
+			}
+			
 			my $udn = $1;
 			my $string = $2;
+			
 			push @group, $udn.'_MR' if (!($string =~ m/IsZoneBridge="."/) && !SONOS_isInList($udn.'_MR', @group));
 			
 			# Etwaig von vorher enthaltene Bridges wieder entfernen (wenn sie bereits als Koordinator eingesetzt wurde)
@@ -2370,7 +2413,7 @@ sub SONOS_DoWork($$;@) {
 	eval {
 		my $hash = SONOS_getSonosPlayerByName();
 		if (defined($hash->{TCPDev}) && ($hash->{TCPDev}->connected())) {
-			DevIo_SimpleWrite($hash, 'DoWork:'.$udn.':'.$method.':'.encode_utf8(join('--#--', @params))."\r\n", 2);
+			DevIo_SimpleWrite($hash, 'DoWork:'.$udn.':'.$method.':'.encode_utf8(join('--#--', @params))."\n", 2);
 		}
 	};
 	if ($@) {
@@ -2463,7 +2506,7 @@ sub SONOS_Discover() {
 
 ########################################################################################
 #
-#  SONOS_Discover_DoQueue - Do the working job (command from Fhem -> Sonosplayer)
+#  SONOS_Discover_DoQueue - Do the working job (command from Fhem -> SubProcess (e.g. Sonosplayer))
 #
 ########################################################################################
 sub SONOS_Discover_DoQueue($) {
@@ -2568,30 +2611,36 @@ sub SONOS_Discover_DoQueue($) {
 		} elsif ($workType eq 'setCurrentTrackPosition') {
 			my $value1 = $params[0];
 			
-			# Wenn eine Sekundenangabe gemacht wurde, dann in einen Zeitstring umwandeln, damit der Rest so bleiben kann
-			$value1 = $1.SONOS_ConvertSecondsToTime($2).$3 if ($value1 =~ m/^([+-]{0,1})(\d+)(\%{0,1})$/);
-			
 			if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
-				if ($value1 =~ m/([+-])(\d+:\d+:\d+|\d+:\d+|\d+)(\%{0,1})/) {
-					# Relative-(Prozent)-Angabe
+				if ($value1 =~ m/([+-]{0,1})(\d+:\d+:\d+|\d+:\d+|\d+)(\%{0,1})/) {
+					my $sign = $1;
 					my $value1Sec = SONOS_GetTimeSeconds(SONOS_ExpandTimeString($2));
+					my $percent = $3;
+					
+					$sign = '' if (!defined($sign));
+					$percent = '' if (!defined($percent));
 					
 					# Positionswerte abfragen...
 					my $result = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0);
-					my $pos = SONOS_GetTimeSeconds($result->getValue('RelTime'));
+					my $pos = $result->getValue('RelTime');
 					if ($pos !~ /\d+:\d+:\d+/i) { # e.g. NOT_IMPLEMENTED
 						$pos = '0:00:00';
 					}
+					$pos = SONOS_GetTimeSeconds($pos);
 					my $duration = SONOS_GetTimeSeconds($result->getValue('TrackDuration'));
 					
 					# Neue Position berechnen...
 					my $newPos = 0;
-					if ($3 eq '') {
-						$newPos = ($pos + $value1Sec) if ($1 eq '+');
-						$newPos = ($pos - $value1Sec) if ($1 eq '-');
+					if ($sign =~ m/[+-]/) {
+						if ($percent eq '') {
+							$newPos = ($pos + $value1Sec) if ($sign eq '+');
+							$newPos = ($pos - $value1Sec) if ($sign eq '-');
+						} else {
+							$newPos = ($pos + ($value1Sec * $duration / 100)) if ($sign eq '+');
+							$newPos = ($pos - ($value1Sec * $duration / 100)) if ($sign eq '-');
+						}
 					} else {
-						$newPos = ($pos + ($value1Sec * $duration / 100)) if ($1 eq '+');
-						$newPos = ($pos - ($value1Sec * $duration / 100)) if ($1 eq '-');
+						$newPos = $value1Sec;
 					}
 					
 					# Sicherstellen, dass wir im Bereich des Titels bleiben...
@@ -2600,8 +2649,6 @@ sub SONOS_Discover_DoQueue($) {
 					
 					# Neue Position setzen
 					$SONOS_AVTransportControlProxy{$udn}->Seek(0, 'REL_TIME', SONOS_ConvertSecondsToTime($newPos));
-				} else {
-					$SONOS_AVTransportControlProxy{$udn}->Seek(0, 'REL_TIME', $value1);
 				}
 				
 				my $trackPosition = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('RelTime');
@@ -4164,7 +4211,7 @@ sub SONOS_Discover_DoQueue($) {
 
 ########################################################################################
 #
-#  SONOS_ProcessRenew - Process the renewal of sbscriptions
+#  SONOS_ProcessRenew - Process the renewal of subscriptions
 #
 ########################################################################################
 sub SONOS_ProcessRenew($$$) {
@@ -4172,13 +4219,18 @@ sub SONOS_ProcessRenew($$$) {
 	
 	if (defined($subscriptionHash->{$udn}) && (Time::HiRes::time() - $subscriptionHash->{$udn}->{_startTime} > $SONOS_SUBSCRIPTIONSRENEWAL)) {
 		eval {
-			$SIG{__WARN__} = sub { $_ = shift; };
+			local $SIG{__WARN__} = sub { die $_[0] };
 			
 			$subscriptionHash->{$udn}->renew();
+			SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'LastSubscriptionsRenew', $subscriptionName.': '.SONOS_TimeNow());
+			
 			SONOS_Log $udn, 3, $subscriptionName.'-Subscription for ZonePlayer "'.$udn.'" has expired and is now renewed.';
 		};
 		if ($@) {
-			SONOS_Log $udn, 3, 'Error! '.$subscriptionName.'-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
+			# Den 412er Fehler ignorieren, angeblich regeneriert sich der Player irgendwann selbst...
+			if ($@ !~ m/412 Precondition Failed/i) {
+				SONOS_Log $udn, 1, 'Error! '.$subscriptionName.'-Subscription for ZonePlayer "'.$udn.'" has expired and could not be renewed: '.$@;
+			}
 			
 			# Wenn der Player nicht erreichbar war, dann entsprechend entfernen...
 			# Hier aber nur eine kleine Lösung, da es nur ein Notbehelf sein soll...
@@ -4222,10 +4274,27 @@ sub SONOS_GetBrowseStructuredResult($$@) {
 		my $result = $SONOS_ContentDirectoryControlProxy{$udn}->Browse($searchValue, 'BrowseDirectChildren', '', 0, 0, '');
 		my $tmp = $result->getValue('Result');
 		
-		while ($tmp =~ m/<$container id="(.+?)".*?><dc:title>(.*?)<\/dc:title>.*?<res.*?>(.*?)<\/res>.*?<\/$container>/ig) {
-			$resultHash{$1}->{Title} = $2;
-			$resultHash{$1}->{Cover} = SONOS_MakeCoverURL($udn, $3);
-			$resultHash{$1}->{Ressource} = decode_entities($3);
+		while ($tmp =~ m/(<$container id="(.+?)".*?><dc:title>(.*?)<\/dc:title>.*?<res.*?>(.*?)<\/res>.*?<\/$container>)/ig) {
+			my $itemElem = $1;
+			my $id = $2;
+			$resultHash{$id}->{Title} = $3;
+			$resultHash{$id}->{Cover} = SONOS_MakeCoverURL($udn, $4);
+			$resultHash{$id}->{Ressource} = decode_entities($4);
+			
+			# Typ
+			if ($itemElem =~ m/<r:resMD>.*?&lt;upnp:class&gt;(.+)&lt;\/upnp:class&gt;.*?<\/r:resMD>/i) {
+				$resultHash{$id}->{Typ} = $1 if ($1 =~ m/\.([^.]*)$/);
+			}
+			
+			# Reihenfolge
+			if ($itemElem =~ m/<r:ordinal>(\d+)<\/r:ordinal>/i) {
+				$resultHash{$id}->{Position} = $1;
+			}
+			
+			# Beschreibung
+			if ($itemElem =~ m/<r:description>(.+)<\/r:description>/i) {
+				$resultHash{$id}->{Description} = $1;
+			}
 		}
 	}
 	
@@ -4309,7 +4378,7 @@ sub SONOS_GetQueueStructuredResult($$$) {
 #  SONOS_StartMetadata - Starts any kind of Metadata
 #
 ########################################################################################
-sub SONOS_StartMetadata($$$$) {
+sub SONOS_StartMetadata($$$$$) {
 	my ($workType, $udn, $res, $meta, $nostart) = @_;
 
 	if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
@@ -4578,12 +4647,19 @@ sub SONOS_MakeCoverURL($$) {
 		$resURL = SONOS_getSpotifyCoverURL($1);
 	} elsif ($resURL =~ m/^x-sonosapi-stream:(.+?)\?/i) {
 		my $resURLtemp = SONOS_GetRadioMediaMetadata($udn, $1);
+		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 1 erfolgreich: '.$resURLtemp;
+		
 		eval {
 			my $result = SONOS_ReadURL($resURLtemp);
 			if (!defined($result) || ($result =~ m/<Error>.*<\/Error>/i)) {
 				$resURLtemp = $1.'/getaa?s=1&u='.SONOS_URI_Escape($resURL) if (SONOS_Client_Data_Retreive($udn, 'reading', 'location', '') =~ m/^(http:\/\/.*?:.*?)\//i);
 			}
 		};
+		if ($@) {
+			SONOS_Log $udn, 2, 'Beim Laden der Ressourcen vom Player ist ein Fehler aufgetreten: '.$@;
+		}
+		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 2 erfolgreich: '.$resURLtemp;
+		
 		$resURL = $resURLtemp;
 	} elsif (($resURL =~ m/x-rincon-playlist:.*?#(.*)/i) || ($resURL =~ m/savedqueues.rsq(#\d+)/i)) {
 		my $search = $1;
@@ -4661,10 +4737,10 @@ sub SONOS_getSpotifyCoverURL($;$) {
 	
 	my $infos = '';
 	if ($oldStyle) {
-		my $result = get('https://embed.spotify.com/oembed/?url='.$trackID);
+		my $result = SONOS_ReadURL('https://embed.spotify.com/oembed/?url='.$trackID);
 		$infos = $1 if ($result && ($result =~ m/"thumbnail_url":"(.*?)"/i));
 	} else {
-		my $result = get('https://api.spotify.com/v1/tracks/'.$trackID);
+		my $result = SONOS_ReadURL('https://api.spotify.com/v1/tracks/'.$trackID);
 		$infos = $1 if ($result && ($result =~ m/"images".*?:.*?\[.*?{.*?"height".*?:.*?\d{3},.*?"url".*?:.*?"(.*?)",.*?"width"/is));
 	}
 	
@@ -4775,7 +4851,7 @@ sub SONOS_GetSpeakFile($$$$$) {
 		
 			SONOS_Log $udn, 3, 'Load Google generated MP3 ('.$counter.'. Element) from "'.$url.'" to "'.$destFileName.$counter.'"';
 			
-			my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT);
+			my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT, timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT);
 			my $response = $ua->get($url, ':content_file' => $destFileName.$counter);
 			if (!$response->is_success) {
 				SONOS_Log $udn, 1, 'MP3 Download-Error: '.$response->status_line;
@@ -5744,6 +5820,8 @@ sub SONOS_Discover_Callback($$$) {
 	if ($action eq 'deviceAdded') {
 		my $descriptionDocument;
 		eval {
+			local $SIG{__WARN__} = sub { die $_[0] };
+			
 			$descriptionDocument = $device->descriptionDocument();
 		};
 		if ($@) {
@@ -5900,6 +5978,8 @@ sub SONOS_Discover_Callback($$$) {
 		if (!$isZoneBridge) {
 			if ($SONOS_RenderingControlProxy{$udn}) {
 				eval {
+					local $SIG{__WARN__} = sub { die $_[0] };
+					
 					$currentVolume = $SONOS_RenderingControlProxy{$udn}->GetVolume(0, 'Master')->getValue('CurrentVolume');
 					
 					# Balance ermitteln
@@ -6029,6 +6109,8 @@ sub SONOS_Discover_Callback($$$) {
 		if (!$isZoneBridge) {
 			if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 				eval {
+					local $SIG{__WARN__} = sub { die $_[0] };
+					
 					my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportInfo(0);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'transportState', $result->getValue('CurrentTransportState'));
 					
@@ -6066,7 +6148,7 @@ sub SONOS_Discover_Callback($$$) {
 			}
 		}
 		
-		SONOS_Client_Data_Refresh('', $udn, 'LastSubscriptionsRenew', SONOS_TimeNow());
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'LastSubscriptionsRenew', SONOS_TimeNow());
 		SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 		
 		SONOS_Client_Notifier('CommandAttrWithUDN:'.$udn.':model Sonos_'.$modelNumber);
@@ -6095,6 +6177,8 @@ sub SONOS_Discover_Callback($$$) {
 								|| SONOS_Client_Data_Retreive($udn, 'attr', 'minVolumeHeadphone', -1) != -1 
 								|| SONOS_Client_Data_Retreive($udn, 'attr', 'maxVolumeHeadphone', -1) != -1)) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_RenderingSubscriptions{$udn} = $renderingService->subscribe(\&SONOS_RenderingCallback);
 			};
 			$SONOS_ButtonPressQueue{$udn} = Thread::Queue->new();
@@ -6122,6 +6206,8 @@ sub SONOS_Discover_Callback($$$) {
 		# ContentDirectory-Subscription
 		if ($contentDirectoryService) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_ContentDirectorySubscriptions{$udn} = $contentDirectoryService->subscribe(\&SONOS_ContentDirectoryCallback);
 				if (defined($SONOS_ContentDirectorySubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'ContentDirectory-Service-subscribing successful with SID='.$SONOS_ContentDirectorySubscriptions{$udn}->SID;
@@ -6139,6 +6225,8 @@ sub SONOS_Discover_Callback($$$) {
 		# Alarm-Subscription
 		if ($alarmService && (SONOS_Client_Data_Retreive($udn, 'attr', 'getAlarms', 0) != 0)) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_AlarmSubscriptions{$udn} = $alarmService->subscribe(\&SONOS_AlarmCallback);
 				if (defined($SONOS_AlarmSubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'Alarm-Service-subscribing successful with SID='.$SONOS_AlarmSubscriptions{$udn}->SID;
@@ -6156,6 +6244,8 @@ sub SONOS_Discover_Callback($$$) {
 		# ZoneGroupTopology-Subscription
 		if ($zoneGroupTopologyService) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_ZoneGroupTopologySubscriptions{$udn} = $zoneGroupTopologyService->subscribe(\&SONOS_ZoneGroupTopologyCallback);
 				if (defined($SONOS_ZoneGroupTopologySubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'ZoneGroupTopology-Service-subscribing successful with SID='.$SONOS_ZoneGroupTopologySubscriptions{$udn}->SID;
@@ -6173,6 +6263,8 @@ sub SONOS_Discover_Callback($$$) {
 		# DeviceProperties-Subscription
 		if ($devicePropertiesService) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_DevicePropertiesSubscriptions{$udn} = $devicePropertiesService->subscribe(\&SONOS_DevicePropertiesCallback);
 				if (defined($SONOS_DevicePropertiesSubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'DeviceProperties-Service-subscribing successful with SID='.$SONOS_DevicePropertiesSubscriptions{$udn}->SID;
@@ -6190,6 +6282,8 @@ sub SONOS_Discover_Callback($$$) {
 		# AudioIn-Subscription
 		if ($audioInService) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_AudioInSubscriptions{$udn} = $audioInService->subscribe(\&SONOS_AudioInCallback);
 				if (defined($SONOS_AudioInSubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'AudioIn-Service-subscribing successful with SID='.$SONOS_AudioInSubscriptions{$udn}->SID;
@@ -6208,6 +6302,8 @@ sub SONOS_Discover_Callback($$$) {
 		# MusicServices-Subscription
 		if ($musicServicesService) {
 			eval {
+				local $SIG{__WARN__} = sub { die $_[0] };
+				
 				$SONOS_MusicServicesSubscriptions{$udn} = $musicServicesService->subscribe(\&SONOS_MusicServicesCallback);
 				if (defined($SONOS_MusicServicesSubscriptions{$udn})) {
 					SONOS_Log undef, 2, 'MusicServices-Service-subscribing successful with SID='.$SONOS_MusicServicesSubscriptions{$udn}->SID;
@@ -6273,6 +6369,7 @@ sub SONOS_GetDefineStringlist($$$$$$$$$$) {
 			push(@defs, 'CommandAttr:'.$name.' simulateCurrentTrackPosition 1');
 			
 			push(@defs, 'CommandAttr:'.$name.' webCmd Volume');
+			push(@defs, 'CommandAttr:'.$name.' verbose '.SONOS_Client_Data_Retreive('undef', 'attr', 'verbose', 0)) if (SONOS_Client_Data_Retreive('undef', 'attr', 'verbose', undef));
 			#push(@defs, 'CommandAttr:'.$name.' webCmd Play:Pause:Previous:Next:VolumeD:VolumeU:MuteT');
 		} else {
 			push(@defs, 'CommandAttr:'.$name.' stateFormat presence');
@@ -6422,8 +6519,11 @@ sub SONOS_IsAlive($) {
 	
 		my $ping = Net::Ping->new($pingType, 1);
 		$ping->source_verify(0); # Es ist egal, von welcher Schnittstelle des Zielsystems die Antwort kommt
-		$ping->port_number($port) if (lc($pingType) eq 'tcp'); # Wenn TCP verwendet werden soll, dann auf HTTP-Port des Location-Documents (Standard: 1400) des Player verbinden
-		if ($ping->ping($host)) {
+		$ping->port_number($port) if ((lc($pingType) eq 'tcp') || (lc($pingType) eq 'syn')); # Wenn TCP oder SYN verwendet werden soll, dann auf HTTP-Port des Location-Documents (Standard: 1400) des Player verbinden
+		$ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT) if (lc($pingType) eq 'syn');
+		
+		if (((lc($pingType) eq 'syn') && $ping->ack($host)) || 
+			((lc($pingType) ne 'syn') && $ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT))) {
 			# Alive
 			SONOS_Log $udn, 4, "$host is alive";
 			$result = 1;
@@ -8150,7 +8250,7 @@ sub SONOS_AlarmCallback($$) {
 	}
 	
 	if (defined($properties{DailyIndexRefreshTime})) {
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'DailyIndexRefreshTime', $properties{DailyIndexRefreshTime});
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'DailyIndexRefreshTime', $properties{DailyIndexRefreshTime});
 	}
 	
 	SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
@@ -8826,23 +8926,54 @@ sub SONOS_MusicServicesCallback($$) {
 				
 				my $serviceType = $serviceTypes[$servicepos++];
 				
-				if ($content =~ m/.*?SecureUri="(.+?)".*?Capabilities="(\d+)".*?>.*?(<Strings.*?Uri="(.+?)".*?\/>|).*?<PresentationMap.*?Uri="(.+?)".*?\/>.*?/si) {
-					my $smapi = $1;
-					my $capabilities = $2;
-					my $stringsURL = $4;
+				my $smapi = '';
+				my $capabilities = '';
+				if ($content =~ m/.*?SecureUri="(.+?)".*?Capabilities="(\d+)".*?>/si) {
+					$smapi = $1;
+					$capabilities = $2;
+				}
+				
+				my $stringsURL = '';
+				my $presentationMap = '';
+				if ($content =~ m/.*?(<Strings.*?Uri="(.+?)".*?\/>|).*?<PresentationMap.*?Uri="(.+?)".*?\/>.*?/si) {
+					$stringsURL = $2;
+					$presentationMap = $3;
 					
-					my $presentationMap = $5;
+					SONOS_Log undef, 5, 'ID('.$id.') - XML-System for Strings('.(defined($stringsURL) ? $stringsURL : '').') and PresentationMap('.(defined($presentationMap) ? $presentationMap : '').').';
+				} elsif ($content =~ m/<Manifest.*?Uri="(.*?)".*?\/>/si) {
+					my $manifestURL = $1;
 					
+					SONOS_Log undef, 5, 'ID('.$id.') - Manifest-System('.$manifestURL.')';
+					my $manifestData = encode('UTF-8', SONOS_ReadURL($manifestURL));
+					
+					if (defined($manifestData)) {
+						SONOS_Log undef, 5, 'ID('.$id.') - Manifest-Data: '.$manifestData;
+						
+						if ($manifestData =~ m/"presentationMap".*?"uri":.*?"(.+?)"/si) {
+							$presentationMap = $1;
+						}
+						
+						if ($manifestData =~ m/"strings":.*?"uri":.*?"(.+?)"/si) {
+							$stringsURL = $1;
+						}
+						
+						SONOS_Log undef, 5, 'ID('.$id.') - Manifest-System: Strings('.(defined($stringsURL) ? $stringsURL : '').') and PresentationMap('.(defined($presentationMap) ? $presentationMap : '').').';
+					}
+				}
+				
+				if ($stringsURL || $presentationMap) {
 					my $promoString = '';
 					if (defined($stringsURL) && ($stringsURL ne '')) {
-						my $strings = encode('UTF-8', get($stringsURL));
+						my $strings = encode('UTF-8', SONOS_ReadURL($stringsURL));
+						SONOS_Log undef, 5, 'ID('.$id.') - Strings: '.$strings;
+						
 						if (defined($strings) && ($strings ne '')) {
 							$promoString = $1 if ($strings =~ m/<stringtable.*?xml:lang="de-DE">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si);
 							$promoString = $1 if (($promoString eq '') && ($strings =~ m/<stringtable.*?xml:lang="en-US">.*?<string.*?stringId="ServicePromo">(.*?)<\/string>.*?<\/stringtable>/si));
 						}
 					}
 					
-					my $presentationMapData = encode('UTF-8', get($presentationMap));
+					my $presentationMapData = encode('UTF-8', SONOS_ReadURL($presentationMap));
 					if (defined($presentationMapData)) {
 						SONOS_Log undef, 5, 'PresentationMap('.$id.' ~ '.$name.' ~ ServiceType: "'.$serviceType.'"): '.$presentationMapData;
 					} else {
@@ -8853,8 +8984,7 @@ sub SONOS_MusicServicesCallback($$) {
 					if (!defined($resolution)) {
 						($resolution, $resolutionSubst) = SONOS_ExtractMaxResolution($presentationMapData, 'BrowseIconSizeMap');
 					}
-					
-					#SONOS_GetMediaMetadata($udn, $id, 
+					SONOS_Log undef, 5, 'ID('.$id.') - ArtWork, Resolution('.(defined($resolution) ? $resolution : '').'), ResolutionSubst('.(defined($resolutionSubst) ? $resolutionSubst : '').').';
 					
 					$musicServices{$id}{Name} = $name;
 					$musicServices{$id}{ServiceType} = $serviceType;
@@ -8905,7 +9035,7 @@ sub SONOS_ExtractMaxResolution($$) {
 	return (undef, undef) if (!defined($map));
 	
 	
-	my $artworkSizeMap = $1 if ($map =~ m/<PresentationMap type="$area">.*?<Match>.*?<imageSizeMap>(.*?)<\/imageSizeMap>.*?<\/Match>.*?<\/PresentationMap>/is);
+	my $artworkSizeMap = $2 if ($map =~ m/<PresentationMap type="$area">.*?<Match>.*?<(imageSizeMap|browseIconSizeMap)>(.*?)<\/\1>.*?<\/Match>.*?<\/PresentationMap>/is);
 	return (undef, undef) if (!defined($artworkSizeMap));
 	
 	my @resolutions = ();
@@ -9245,7 +9375,7 @@ sub SONOS_GetRadioMediaMetadata($$) {
 	
 	return '' if (!defined($udnKey));
 	
-	my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT);
+	my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT, timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT);
 	my $response = $ua->request(POST 'http://legato.radiotime.com/Radio.asmx', 'content-type' => 'text/xml; charset="utf-8"', 
 		Content => "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 			<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
@@ -9263,12 +9393,13 @@ sub SONOS_GetRadioMediaMetadata($$) {
 			</s:Envelope>");
 	SONOS_Log $udn, 5, 'Radioservice-Metadata: '.$response->content;
 	
-	my $title = $1 if ($response->content =~ m/<title>(.*?)<\/title>/i);
-	my $genreId = $1 if ($response->content =~ m/<genreId>(.*?)<\/genreId>/i);
-	my $genre = $1 if ($response->content =~ m/<genre>(.*?)<\/genre>/i);
-	my $bitrate = $1 if ($response->content =~ m/<bitrate>(.*?)<\/bitrate>/i);
-	my $logo = $1 if ($response->content =~ m/<logo>(.*?)<\/logo>/i); $logo =~ s/(.*?)q(\..*)/$1g$2/;
-	my $subtitle = $1 if ($response->content =~ m/<subtitle>(.*?)<\/subtitle>/i);
+#	my $title = $1 if ($response->content =~ m/<title>(.*?)<\/title>/i);
+#	my $genreId = $1 if ($response->content =~ m/<genreId>(.*?)<\/genreId>/i);
+#	my $genre = $1 if ($response->content =~ m/<genre>(.*?)<\/genre>/i);
+#	my $bitrate = $1 if ($response->content =~ m/<bitrate>(.*?)<\/bitrate>/i);
+#	my $subtitle = $1 if ($response->content =~ m/<subtitle>(.*?)<\/subtitle>/i);
+	my $logo = $1 if ($response->content =~ m/<logo>(.*?)<\/logo>/i);
+	$logo =~ s/(.*?)q(\..*)/$1g$2/ if (defined($logo)); # Logo mit größerer Auflösung verwenden...
 	
 	return $logo;
 }
@@ -9294,7 +9425,7 @@ sub SONOS_GetMediaMetadata($$$) {
 	
 	my $url = $musicService{SMAPI};
 	if ($url) {
-		my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT);
+		my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT, timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT);
 		my $response = $ua->request(POST $url, 'content-type' => 'text/xml; charset="utf-8"', 
 			Content => "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 				<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\">
@@ -9310,19 +9441,18 @@ sub SONOS_GetMediaMetadata($$$) {
 						</getMediaMetadata>
 					</s:Body>
 				</s:Envelope>");
-		SONOS_Log $udn, 0, 'MediaMetadata: '.$response->content;
+		SONOS_Log $udn, 5, 'MediaMetadata: '.$response->content;
 		
-		my $title = $1 if ($response->content =~ m/<title>(.*?)<\/title>/i);
-		my $genreId = $1 if ($response->content =~ m/<genreId>(.*?)<\/genreId>/i);
-		my $genre = $1 if ($response->content =~ m/<genre>(.*?)<\/genre>/i);
-		my $bitrate = $1 if ($response->content =~ m/<bitrate>(.*?)<\/bitrate>/i);
+#		my $title = $1 if ($response->content =~ m/<title>(.*?)<\/title>/i);
+#		my $genreId = $1 if ($response->content =~ m/<genreId>(.*?)<\/genreId>/i);
+#		my $genre = $1 if ($response->content =~ m/<genre>(.*?)<\/genre>/i);
+#		my $bitrate = $1 if ($response->content =~ m/<bitrate>(.*?)<\/bitrate>/i);
+#		my $subtitle = $1 if ($response->content =~ m/<subtitle>(.*?)<\/subtitle>/i);
 		
 		my $logo = $1 if ($response->content =~ m/<logo>(.*?)<\/logo>/i);
 		if ($musicService{ResolutionSubstitution}) {
 			$logo =~ s//$musicService{ResolutionSubstitution}/;
 		}
-		
-		my $subtitle = $1 if ($response->content =~ m/<subtitle>(.*?)<\/subtitle>/i);
 		
 		return $logo;
 	} else {
@@ -9340,13 +9470,40 @@ sub SONOS_GetMediaMetadata($$$) {
 sub SONOS_ReadURL($) {
 	my ($url) = @_;
 	
-	my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT);
-	my $response = $ua->get($url);
-	if ($response->is_success) {
-		return $response->content;
+	# Wenn keine URL angegeben wurde, dann still übergehen...
+	if (!defined($url) || $url eq '') {
+		SONOS_Log undef, 6, 'Es wurde versucht ein Webzugriff zu machen, aber keine URL angegeben.';
+		return undef;
 	}
 	
-	return undef;
+	# Prüfen, ob dieses ein erlaubter Zufriff ist
+	my $allowedWebAccess = SONOS_Client_Data_Retreive('undef', 'attr', 'allowedWebAccess', '.*');
+	if ($url !~ m/$allowedWebAccess/i) {
+		SONOS_Log undef, 3, 'Es wurde versucht ein Webzugriff zu machen, der aber nicht erlaubt ist. Erlaubte Adressen: '.$allowedWebAccess;
+		return undef;
+	}
+	
+	my $result = eval {
+		my $ua = LWP::UserAgent->new(agent => $SONOS_USERAGENT, 
+										timeout => $SONOS_DEFAULTCOVERLOADTIMEOUT, 
+										ssl_opts => { verify_hostname => 0,
+														SSL_VERIFY_NONE => 1, 
+														SSL_cipher_list => '' });
+		my $response = $ua->get($url);
+		if ($response->is_success) {
+			SONOS_Log undef, 5, 'URL('.$url.') wurde erfolgreich geladen.';
+			return $response->content;
+		} else {
+			SONOS_Log undef, 1, 'Couldn\'t load data from URL('.$url.') 1: '.$response->status_line;
+			return undef;
+		}
+	};
+	if ($@) {
+		SONOS_Log undef, 1, 'Couldn\'t load data from URL('.$url.') 2: '.$@;
+		return undef;
+	}
+	
+	return $result;
 }
 
 ########################################################################################
@@ -9639,6 +9796,7 @@ sub SONOS_Shutdown ($$) {
 	} else {
 		DevIo_SimpleWrite($hash, "disconnect\n", 2);
 	}
+	$hash->{TCPDev}->sockopt(SO_LINGER, pack("ii", 1, 0));
 	DevIo_CloseDev($hash);
 	
 	select(undef, undef, undef, 2);
@@ -9868,12 +10026,12 @@ if (defined($SONOS_ListenPort)) {
 		eval {
 			socket($sock, AF_INET, SOCK_STREAM, getprotobyname('tcp')) or die "Could not create socket: $!";
 			bind($sock, sockaddr_in($SONOS_ListenPort, INADDR_ANY)) or die "Bind failed: $!";
-			setsockopt($sock, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0)) or die "Setsockopt failed: $!";
+			setsockopt($sock, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0));
 			listen($sock, 10);
 		};
 		if ($@) {
-			SONOS_Log undef, 0, "Can't bind Port $SONOS_ListenPort: $@";
-			SONOS_Log undef, 0, 'Retries left (wait 30s): '.--$retryCounter;
+			SONOS_Log undef, 1, "Can't bind Port $SONOS_ListenPort: $@";
+			SONOS_Log undef, 1, 'Retries left (wait 30s): '.--$retryCounter;
 			
 			if (!$retryCounter) {
 				die 'Bind failed...';
@@ -9888,9 +10046,9 @@ if (defined($SONOS_ListenPort)) {
 	$SONOS_Client_Selector = IO::Select->new($sock);
 	
 	while ($runEndlessLoop) {
-		# Nachschauen, ob Subscriptions erneuert werden müssen
-		if (time() - $lastRenewSubscriptionCheckTime > 1800) {
-			$lastRenewSubscriptionCheckTime = time ();
+		# Alle 5 Minuten nachschauen, ob Subscriptions erneuert werden müssen
+		if (time() - $lastRenewSubscriptionCheckTime > 300) {
+			$lastRenewSubscriptionCheckTime = time();
 			
 			foreach my $udn (@{$SONOS_Client_Data{PlayerUDNs}}) {
 				my %data;
@@ -9989,6 +10147,7 @@ if (defined($SONOS_ListenPort)) {
 	# Alle Handles entfernen und schliessen...
 	for my $cl ($SONOS_Client_Selector->handles()) {
 		$SONOS_Client_Selector->remove($cl);
+		setsockopt($cl, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0));
 		shutdown($cl, 2);
 		close($cl);
 	}
@@ -10140,6 +10299,7 @@ sub SONOS_Client_ConsumeMessage($$) {
 			}
 		}
 		
+		setsockopt($client, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0));
 		shutdown($client, 2);
 		close($client);
 		
@@ -10148,6 +10308,7 @@ sub SONOS_Client_ConsumeMessage($$) {
 		send($client, "OK\r\n", 0);
 	} elsif (lc($msg) eq 'goaway') {
 		$SONOS_Client_Selector->remove($client);
+		setsockopt($client, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0));
 		shutdown($client, 2);
 		close($client);
 	} elsif ($msg =~ m/SetData:(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*?):(.*)/i) {
@@ -10413,22 +10574,6 @@ sub SONOS_AddToLongJobsQueue($$;$) {
 }
 
 ########################################################################################
-# SONOS_LongJobsAnswer: Adds an answer from Longjobs
-########################################################################################
-#sub SONOS_LongJobsAnswer() {
-#	my ($udn, $workType, $params) = @_;
-#	
-#	my %data;
-#	$data{WorkType} = $workType;
-#	$data{UDN} = $udn;
-#	my @params = ();
-#	@params = split(/--#--/, decode_utf8($3));
-#	$data{Params} = \@params;
-#	
-#	$SONOS_Client_ReceiveQueue->enqueue(\%data);
-#}
-
-########################################################################################
 # SONOS_Client_LongJobs_DoQueue: Do Longjobs
 ########################################################################################
 sub SONOS_Client_LongJobs_DoQueue($) {
@@ -10588,6 +10733,7 @@ sub SONOS_Client_IsAlive() {
 
 
 =pod
+=item device
 =item summary    Module to commmunicate with a Sonos-System via UPnP
 =item summary_DE Modul für die Kommunikation mit einem Sonos-System mittels UPnP
 =begin html
@@ -10644,46 +10790,46 @@ Example with control over the used port and the isalive-checker-interval:<br />
 <h4>Set</h4>
 <ul>
 <li><b>Common Tasks</b><ul>
-<li><a name="SONOS_setter_RefreshShareIndex">
+<li><a name="SONOSRefreshShareIndex">
 <b><code>RefreshShareIndex</code></b></a>
 <br />Starts the refreshing of the library.</li>
-<li><a name="SONOS_setter_RescanNetwork">
+<li><a name="SONOSRescanNetwork">
 <b><code>RescanNetwork</code></b></a>
 <br />Restarts the player discovery.</li>
 </ul></li>
 <li><b>Control-Commands</b><ul>
-<li><a name="SONOS_setter_Mute">
+<li><a name="SONOSMute">
 <b><code>Mute &lt;state&gt;</code></b></a>
 <br />Sets the mute-state on all players.</li>
-<li><a name="SONOS_setter_PauseAll">
+<li><a name="SONOSPauseAll">
 <b><code>PauseAll</code></b></a>
 <br />Pause all Zoneplayer.</li>
-<li><a name="SONOS_setter_Pause">
+<li><a name="SONOSPause">
 <b><code>Pause</code></b></a>
 <br />Alias for PauseAll.</li>
-<li><a name="SONOS_setter_StopAll">
+<li><a name="SONOSStopAll">
 <b><code>StopAll</code></b></a>
 <br />Stops all Zoneplayer.</li>
-<li><a name="SONOS_setter_Stop">
+<li><a name="SONOSStop">
 <b><code>Stop</code></b></a>
 <br />Alias for StopAll.</li>
 </ul></li>
 <li><b>Bookmark-Commands</b><ul>
-<li><a name="SONOS_setter_DisableBookmark">
+<li><a name="SONOSDisableBookmark">
 <b><code>DisableBookmark &lt;Groupname&gt;</code></b></a>
 <br />Disables the group with the given name.</li>
-<li><a name="SONOS_setter_EnableBookmark">
+<li><a name="SONOSEnableBookmark">
 <b><code>EnableBookmark &lt;Groupname&gt;</code></b></a>
 <br />Enables the group with the given name.</li>
-<li><a name="SONOS_setter_LoadBookmarks">
+<li><a name="SONOSLoadBookmarks">
 <b><code>LoadBookmarks [Groupname]</code></b></a>
 <br />Loads the given group (or all if parameter not set) from the filesystem.</li>
-<li><a name="SONOS_setter_SaveBookmarks">
+<li><a name="SONOSSaveBookmarks">
 <b><code>SaveBookmarks [Groupname]</code></b></a>
 <br />Saves the given group (or all if parameter not set) to the filesystem.</li>
 </ul></li>
 <li><b>Group-Commands</b><ul>
-<li><a name="SONOS_setter_Groups">
+<li><a name="SONOSGroups">
 <b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
 <br />Sets the current groups on the whole Sonos-System. The format is the same as retreived by getter 'Groups'.<br >A reserved word is <i>Reset</i>. It can be used to directly extract all players out of their groups.</li>
 </ul></li>
@@ -10692,7 +10838,7 @@ Example with control over the used port and the isalive-checker-interval:<br />
 <h4>Get</h4>
 <ul>
 <li><b>Group-Commands</b><ul>
-<li><a name="SONOS_getter_Groups">
+<li><a name="SONOSGroups">
 <b><code>Groups</code></b></a>
 <br />Retreives the current group-configuration of the Sonos-System. The format is a comma-separated List of Lists with devicenames e.g. <code>[Sonos_Kueche], [Sonos_Wohnzimmer, Sonos_Schlafzimmer]</code>. In this example there are two groups: the first consists of one player and the second consists of two players.<br />
 The order in the sublists are important, because the first entry defines the so-called group-coordinator (in this case <code>Sonos_Wohnzimmer</code>), from which the current playlist and the current title playing transferred to the other member(s).</li>
@@ -10703,85 +10849,87 @@ The order in the sublists are important, because the first entry defines the so-
 '''Attention'''<br />The most of the attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
 <ul>
 <li><b>Common</b><ul>
-<li><a name="SONOS_attribut_coverLoadTimeout"><b><code>coverLoadTimeout &lt;value&gt;</code></b>
+<li><a name="SONOSallowedWebAccess"><b><code>allowedWebAccess &lt;value&gt;</code></b>
+</a><br />Defines a regular Expression for allowed addresses for loading data. If not set, every access is allowed. e.g. <b>^http:\/\/192\.168\.0\.\d+.*$</b> for restricting access to local IP-addresses.</li>
+<li><a name="SONOScoverLoadTimeout"><b><code>coverLoadTimeout &lt;value&gt;</code></b>
 </a><br />One of (0..10,15,20,25,30). Defines the timeout for waiting of the Sonosplayer for Cover-Downloads. Defaults to 5.</li>
-<li><a name="SONOS_attribut_deviceRoomView"><b><code>deviceRoomView &lt;Both|DeviceLineOnly&gt;</code></b>
+<li><a name="SONOSdeviceRoomView"><b><code>deviceRoomView &lt;Both|DeviceLineOnly&gt;</code></b>
 </a><br /> Defines the style of the Device in the room overview. <code>Both</code> means "normal" Deviceline incl. Cover-/Titleview and maybe the control area, <code>DeviceLineOnly</code> means only the "normal" Deviceline-view.</li>
-<li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
+<li><a name="SONOSdisable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this value you can disable the whole module. Works immediatly. If set to 1 the subprocess will be terminated and no message will be transmitted. If set to 0 the subprocess is again started.<br />It is useful when you install new Sonos-Components and don't want any disgusting devices during the Sonos setup.</li>
-<li><a name="SONOS_attribut_getFavouritesListAtNewVersion"><b><code>getFavouritesListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetFavouritesListAtNewVersion"><b><code>getFavouritesListAtNewVersion &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute set, the module will refresh the Favourites-List automatically upon changes (if the Attribute <code>getListsDirectlyToReadings</code> is set).</li>
-<li><a name="SONOS_attribut_getPlaylistsListAtNewVersion"><b><code>getPlaylistsListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetPlaylistsListAtNewVersion"><b><code>getPlaylistsListAtNewVersion &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute set, the module will refresh the Playlists-List automatically upon changes (if the Attribute <code>getListsDirectlyToReadings</code> is set).</li>
-<li><a name="SONOS_attribut_getQueueListAtNewVersion"><b><code>getQueueListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetQueueListAtNewVersion"><b><code>getQueueListAtNewVersion &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute set, the module will refresh the current Queue-List automatically upon changes (if the Attribute <code>getListsDirectlyToReadings</code> is set).</li>
-<li><a name="SONOS_attribut_getRadiosListAtNewVersion"><b><code>getRadiosListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetRadiosListAtNewVersion"><b><code>getRadiosListAtNewVersion &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute set, the module will refresh the Radios-List automatically upon changes (if the Attribute <code>getListsDirectlyToReadings</code> is set).</li>
-<li><a name="SONOS_attribut_getListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
+<li><a name="SONOSgetListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute you can define that the module fills the readings for the lists of Favourites, Playlists, Radios and the Queue directly without the need of userReadings.</li>
-<li><a name="SONOS_attribut_getLocalCoverArt"><b><code>getLocalCoverArt &lt;value&gt;</code></b>
+<li><a name="SONOSgetLocalCoverArt"><b><code>getLocalCoverArt &lt;value&gt;</code></b>
 </a><br />One of (0,1). With this attribute the loads and saves the Coverart locally (default till now).</li>
-<li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Address&gt;[,IP-Address]</code></b>
+<li><a name="SONOSignoredIPs"><b><code>ignoredIPs &lt;IP-Address&gt;[,IP-Address]</code></b>
 </a><br />With this attribute you can define IP-addresses, which has to be ignored by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
-<li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
+<li><a name="SONOSpingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> One of (none,tcp,udp,icmp,syn). Defines which pingType for alive-Checking has to be used. If set to 'none' no checks will be done.</li>
-<li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
+<li><a name="SONOSreusePort"><b><code>reusePort &lt;int&gt;</code></b>
 </a><br /> One of (0,1). If defined the socket-Attribute 'reuseport' will be used for SSDP Discovery-Port. Can solve restart-problems. If you don't have such problems don't use this attribute.</li>
-<li><a name="SONOS_attribut_SubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Path&gt;</code></b>
+<li><a name="SONOSSubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Path&gt;</code></b>
 </a><br /> If given, the subprocess logs into its own logfile. Under Windows this is a recommended way for logging, because the two Loggings (Fehm and the SubProcess) overwrite each other. If "-" is given, the logging goes to STDOUT (and therefor in the Fhem-log) as usual. The main purpose of this attribute is the short-use of separated logging. No variables are substituted. The value is used as configured.</li>
-<li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
+<li><a name="SONOSusedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />With this attribute you can define IP-addresses, which has to be exclusively used by the UPnP-System of this module. e.g. "192.168.0.11,192.168.0.37"</li>
 </ul></li>
 <li><b>Bookmark Configuration</b><ul>
-<li><a name="SONOS_attribut_bookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
+<li><a name="SONOSbookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
 </a><br /> Defines a directory where the saved bookmarks can be placed. If not defined, "." will be used.</li>
-<li><a name="SONOS_attribut_bookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt;</code></b>
+<li><a name="SONOSbookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt;</code></b>
 </a><br /> Definition of Bookmarks for titles.</li>
-<li><a name="SONOS_attribut_bookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt;</code></b>
+<li><a name="SONOSbookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt;</code></b>
 </a><br /> Definition of bookmarks for playlists.</li>
 </ul></li>
 <li><b>Proxy Configuration</b><ul>
-<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
+<li><a name="SONOSgenerateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
 </a><br />One of (0, 1). If defined, all Cover-Links (the readings "currentAlbumArtURL" and "nextAlbumArtURL") are generated as links to the internal Sonos-Module-Proxy. It can be useful if you access Fhem over an external proxy and therefore have no access to the local network (the URLs are direct URLs to the Sonosplayer instead).</li>
-<li><a name="SONOS_attribut_proxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
+<li><a name="SONOSproxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
 </a><br />Defines a directory where the cached Coverfiles can be placed. If not defined "/tmp" will be used.</li>
-<li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
+<li><a name="SONOSproxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br />A time in seconds. With a definition other than "0" the caching mechanism of the internal Sonos-Module-Proxy will be activated. If the filetime of the chached cover is older than this time, it will be reloaded from the Sonosplayer.</li>
-<li><a name="SONOS_attribut_webname"><b><code>webname &lt;String&gt;</code></b>
+<li><a name="SONOSwebname"><b><code>webname &lt;String&gt;</code></b>
 </a><br /> With the attribute you can define the used webname for coverlinks. Defaults to 'fhem' if not given.</li>
 </ul></li>
 <li><b>Speak Configuration</b><ul>
-<li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Defines, which Directory has to be used for the Speakfiles</li>
-<li><a name="SONOS_attribut_targetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
 </a><br /> Defines an MP3-File converter, which properly converts the resulting speaking-file. With this option you can avoid timedisplay problems. Please note that the waittime before the speaking starts can increase with this option be set.</li>
-<li><a name="SONOS_attribut_targetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
 </a><br /> The directory which should be used as a default for text-embedded MP3-Files.</li>
-<li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Defines, which URL has to be used for accessing former stored Speakfiles as seen from the SonosPlayer</li>
-<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
+<li><a name="SONOStargetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Defines, if the Speakfile should have a timestamp in his name. That makes it possible to store all historical Speakfiles.</li>
-<li><a name="SONOS_attribut_targetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
+<li><a name="SONOStargetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Defines, if the Speakfile should have a hash-value in his name. If this value is set to one an already generated file with the same hash is re-used and not newly generated.</li>
-<li><a name="SONOS_attribut_Speak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Defines a systemcall commandline for generating a speaking file out of the given text. If such an attribute is defined, an associated setter at the Sonosplayer-Device is available. The following placeholders are available:<br />'''%language%''': Will be replaced by the given language-parameter<br />'''%filename%''': Will be replaced by the complete target-filename (incl. fileextension).<br />'''%text%''': Will be replaced with the given text.<br />'''%textescaped%''': Will be replaced with the given url-encoded text.</li>
-<li><a name="SONOS_attribut_Speak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_Speak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_Speak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />See Speak1</li>
-<li><a name="SONOS_attribut_SpeakCover"><b><code>SpeakCover &lt;Filename&gt;</code></b>
+<li><a name="SONOSSpeakCover"><b><code>SpeakCover &lt;Filename&gt;</code></b>
 </a><br />Defines a Cover for use by the speak generation process. If not defined the Fhem-logo will be used.</li>
-<li><a name="SONOS_attribut_Speak1Cover"><b><code>Speak1Cover &lt;Filename&gt;</code></b>
+<li><a name="SONOSSpeak1Cover"><b><code>Speak1Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak2Cover"><b><code>Speak2Cover &lt;Filename&gt;</code></b>
+<li><a name="SONOSSpeak2Cover"><b><code>Speak2Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Filename&gt;</code></b>
+<li><a name="SONOSSpeak3Cover"><b><code>Speak3Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_Speak4Cover"><b><code>Speak4Cover &lt;Filename&gt;</code></b>
+<li><a name="SONOSSpeak4Cover"><b><code>Speak4Cover &lt;Filename&gt;</code></b>
 </a><br />See SpeakCover</li>
-<li><a name="SONOS_attribut_SpeakGoogleURL"><b><code>SpeakGoogleURL &lt;GoogleURL&gt;</code></b>
+<li><a name="SONOSSpeakGoogleURL"><b><code>SpeakGoogleURL &lt;GoogleURL&gt;</code></b>
 </a><br />The google-speak-url that has to be used. If empty a default will be used. You have to define placeholders for replacing the language- and text-value: %1$s -> Language, %2$s -> Text<br />The Default-URL is currently: <code>http://translate.google.com/translate_tts?tl=%1$s&client=tw-ob&q=%2$s</code></li>
 </ul></li>
 </ul>
@@ -10842,46 +10990,46 @@ Definition mit Kontrolle über den verwendeten Port und das Intervall der IsAliv
 <h4>Set</h4>
 <ul>
 <li><b>Grundsätzliches</b><ul>
-<li><a name="SONOS_setter_RefreshShareIndex">
+<li><a name="SONOSRefreshShareIndex">
 <b><code>RefreshShareIndex</code></b></a>
 <br />Startet die Aktualisierung der Bibliothek.</li>
-<li><a name="SONOS_setter_RescanNetwork">
+<li><a name="SONOSRescanNetwork">
 <b><code>RescanNetwork</code></b></a>
 <br />Startet die Erkennung der im Netzwerk vorhandenen Player erneut.</li>
 </ul></li>
 <li><b>Steuerbefehle</b><ul>
-<li><a name="SONOS_setter_Mute">
+<li><a name="SONOSMute">
 <b><code>Mute &lt;state&gt;</code></b></a>
 <br />Setzt den Mute-Zustand bei allen Playern.</li>
-<li><a name="SONOS_setter_PauseAll">
+<li><a name="SONOSPauseAll">
 <b><code>PauseAll</code></b></a>
 <br />Pausiert die Wiedergabe in allen Zonen.</li>
-<li><a name="SONOS_setter_Pause">
+<li><a name="SONOSPause">
 <b><code>Pause</code></b></a>
 <br />Synonym für PauseAll.</li>
-<li><a name="SONOS_setter_StopAll">
+<li><a name="SONOSStopAll">
 <b><code>StopAll</code></b></a>
 <br />Stoppt die Wiedergabe in allen Zonen.</li>
-<li><a name="SONOS_setter_Stop">
+<li><a name="SONOSStop">
 <b><code>Stop</code></b></a>
 <br />Synonym für StopAll.</li>
 </ul></li>
 <li><b>Bookmark-Befehle</b><ul>
-<li><a name="SONOS_setter_DisableBookmark">
+<li><a name="SONOSDisableBookmark">
 <b><code>DisableBookmark &lt;Groupname&gt;</code></b></a>
 <br />Deaktiviert die angegebene Gruppe.</li>
-<li><a name="SONOS_setter_EnableBookmark">
+<li><a name="SONOSEnableBookmark">
 <b><code>EnableBookmark &lt;Groupname&gt;</code></b></a>
 <br />Aktiviert die angegebene Gruppe.</li>
-<li><a name="SONOS_setter_LoadBookmarks">
+<li><a name="SONOSLoadBookmarks">
 <b><code>LoadBookmarks [Groupname]</code></b></a>
 <br />Lädt die angegebene Gruppe (oder alle Gruppen, wenn nicht angegeben) aus den entsprechenden Dateien.</li>
-<li><a name="SONOS_setter_SaveBookmarks">
+<li><a name="SONOSSaveBookmarks">
 <b><code>SaveBookmarks [Groupname]</code></b></a>
 <br />Speichert die angegebene Gruppe (oder alle Gruppen, wenn nicht angegeben) in die entsprechenden Dateien.</li>
 </ul></li>
 <li><b>Gruppenbefehle</b><ul>
-<li><a name="SONOS_setter_Groups">
+<li><a name="SONOSGroups">
 <b><code>Groups &lt;GroupDefinition&gt;</code></b></a>
 <br />Setzt die aktuelle Gruppierungskonfiguration der Sonos-Systemlandschaft. Das Format ist jenes, welches auch von dem Get-Befehl 'Groups' geliefert wird.<br >Hier kann als GroupDefinition das Wort <i>Reset</i> verwendet werden, um alle Player aus ihren Gruppen zu entfernen.</li>
 </ul></li>
@@ -10890,7 +11038,7 @@ Definition mit Kontrolle über den verwendeten Port und das Intervall der IsAliv
 <h4>Get</h4>
 <ul>
 <li><b>Gruppenbefehle</b><ul>
-<li><a name="SONOS_getter_Groups">
+<li><a name="SONOSGroups">
 <b><code>Groups</code></b></a>
 <br />Liefert die aktuelle Gruppierungskonfiguration der Sonos Systemlandschaft zurück. Das Format ist eine Kommagetrennte Liste von Listen mit Devicenamen, also z.B. <code>[Sonos_Kueche], [Sonos_Wohnzimmer, Sonos_Schlafzimmer]</code>. In diesem Beispiel sind also zwei Gruppen definiert, von denen die erste aus einem Player und die zweite aus Zwei Playern besteht.<br />
 Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintrag der sogenannte Gruppenkoordinator ist (in diesem Fall also <code>Sonos_Wohnzimmer</code>), von dem die aktuelle Abspielliste un der aktuelle Titel auf die anderen Gruppenmitglieder übernommen wird.</li>
@@ -10901,87 +11049,89 @@ Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintra
 '''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
 <ul>
 <li><b>Grundsätzliches</b><ul>
-<li><a name="SONOS_attribut_coverLoadTimeout"><b><code>coverLoadTimeout &lt;value&gt;</code></b>
+<li><a name="SONOSallowedWebAccess"><b><code>allowedWebAccess &lt;value&gt;</code></b>
+</a><br />Definiert einen regulären Ausdruck für die erlaubten Adressen für Nachladedaten wie Musikdienste, Cover o.ä. Wenn nicht angegeben, dann wird alles zugelassen.<br />'''z.B. Mit <b>^http:\/\/192\.168\.0\.\d+.*$</b> wird der Zugriff auf das lokale Netz (z.B. beim Laden von Daten vom Sonosplayer selbst) beschränkt.<br />Alles Sperren geht über eine <i>unmögliche</i> Adresse wie <b>^xyz</b></li>
+<li><a name="SONOScoverLoadTimeout"><b><code>coverLoadTimeout &lt;value&gt;</code></b>
 </a><br />Eines von (0..10,15,20,25,30). Definiert den Timeout der für die Abfrage des Covers beim Sonosplayer verwendet wird. Wenn nicht angegeben, dann wird 5 verwendet.</li>
-<li><a name="SONOS_attribut_deviceRoomView"><b><code>deviceRoomView &lt;Both|DeviceLineOnly&gt;</code></b>
+<li><a name="SONOSdeviceRoomView"><b><code>deviceRoomView &lt;Both|DeviceLineOnly&gt;</code></b>
 </a><br /> Gibt an, was in der Raumansicht zum Sonosplayer-Device angezeigt werden soll. <code>Both</code> bedeutet "normale" Devicezeile zzgl. Cover-/Titelanzeige und u.U. Steuerbereich, <code>DeviceLineOnly</code> bedeutet nur die Anzeige der "normalen" Devicezeile.</li>
-<li><a name="SONOS_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
+<li><a name="SONOSdisable"><b><code>disable &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Hiermit kann das Modul abgeschaltet werden. Wirkt sofort. Bei 1 wird der SubProzess beendet, und somit keine weitere Verarbeitung durchgeführt. Bei 0 wird der Prozess wieder gestartet.<br />Damit kann das Modul temporär abgeschaltet werden, um bei der Neueinrichtung von Sonos-Komponenten keine halben Zustände mitzubekommen.</li>
-<li><a name="SONOS_attribut_getFavouritesListAtNewVersion"><b><code>getFavouritesListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetFavouritesListAtNewVersion"><b><code>getFavouritesListAtNewVersion &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Favoriten (bei definiertem Attribut <code>getListsDirectlyToReadings</code>) bei Aktualisierung automatisch herunterzuladen.</li>
-<li><a name="SONOS_attribut_getPlaylistsListAtNewVersion"><b><code>getPlaylistsListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetPlaylistsListAtNewVersion"><b><code>getPlaylistsListAtNewVersion &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Playlisten (bei definiertem Attribut <code>getListsDirectlyToReadings</code>) bei Aktualisierung automatisch herunterzuladen.</li>
-<li><a name="SONOS_attribut_getQueueListAtNewVersion"><b><code>getQueueListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetQueueListAtNewVersion"><b><code>getQueueListAtNewVersion &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die aktuelle Abspielliste (bei definiertem Attribut <code>getListsDirectlyToReadings</code>) bei Aktualisierung automatisch herunterzuladen.</li>
-<li><a name="SONOS_attribut_getRadiosListAtNewVersion"><b><code>getRadiosListAtNewVersion &lt;value&gt;</code></b>
+<li><a name="SONOSgetRadiosListAtNewVersion"><b><code>getRadiosListAtNewVersion &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Radioliste (bei definiertem Attribut <code>getListsDirectlyToReadings</code>) bei Aktualisierung automatisch herunterzuladen.</li>
-<li><a name="SONOS_attribut_getListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
+<li><a name="SONOSgetListsDirectlyToReadings"><b><code>getListsDirectlyToReadings &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Listen für Favoriten, Playlists, Radios und Queue direkt in die entsprechenden Readings zu schreiben. Dafür sind dann keine Userreadings mehr notwendig.</li>
-<li><a name="SONOS_attribut_getLocalCoverArt"><b><code>getLocalCoverArt &lt;value&gt;</code></b>
+<li><a name="SONOSgetLocalCoverArt"><b><code>getLocalCoverArt &lt;value&gt;</code></b>
 </a><br />Eines von (0,1). Mit diesem Attribut kann das Modul aufgefordert werden, die Cover lokal herunterzuladen (bisheriges Standardverhalten).</li>
-<li><a name="SONOS_attribut_ignoredIPs"><b><code>ignoredIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
+<li><a name="SONOSignoredIPs"><b><code>ignoredIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die vom UPnP-System ignoriert werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
-<li><a name="SONOS_attribut_pingType"><b><code>pingType &lt;string&gt;</code></b>
+<li><a name="SONOSpingType"><b><code>pingType &lt;string&gt;</code></b>
 </a><br /> Eines von (none,tcp,udp,icmp,syn). Gibt an, welche Methode für die Ping-Überprüfung verwendet werden soll. Wenn 'none' angegeben wird, dann wird keine Überprüfung gestartet.</li>
-<li><a name="SONOS_attribut_reusePort"><b><code>reusePort &lt;int&gt;</code></b>
+<li><a name="SONOSreusePort"><b><code>reusePort &lt;int&gt;</code></b>
 </a><br /> Eines von (0,1). Gibt an, ob die Portwiederwendung für SSDP aktiviert werden soll, oder nicht. Kann Restart-Probleme lösen. Wenn man diese Probleme nicht hat, sollte man das Attribut nicht setzen.</li>
-<li><a name="SONOS_attribut_SubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Pfad&gt;</code></b>
+<li><a name="SONOSSubProcessLogfileName"><b><code>SubProcessLogfileName &lt;Pfad&gt;</code></b>
 </a><br /> Hiermit kann für den SubProzess eine eigene Logdatei angegeben werden. Unter Windows z.B. überschreiben sich die beiden Logausgaben (von Fhem und SubProzess) sonst gegenseitig. Wenn "-" angegeben wird, wird wie bisher auf STDOUT (und damit im Fhem-Log) geloggt. Der Hauptanwendungsfall ist die mehr oder weniger kurzfristige Fehlersuche. Es werden keinerlei Variablenwerte ersetzt, und der Wert direkt als Dateiname verwendet.</li>
-<li><a name="SONOS_attribut_usedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
+<li><a name="SONOSusedonlyIPs"><b><code>usedonlyIPs &lt;IP-Adresse&gt;[,IP-Adresse]</code></b>
 </a><br />Mit diesem Attribut können IP-Adressen angegeben werden, die ausschließlich vom UPnP-System berücksichtigt werden sollen. Z.B.: "192.168.0.11,192.168.0.37"</li>
 </ul></li>
 <li><b>Bookmark-Einstellungen</b><ul>
-<li><a name="SONOS_attribut_bookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
+<li><a name="SONOSbookmarkSaveDir"><b><code>bookmarkSaveDir &lt;path&gt;</code></b>
 </a><br /> Das Verzeichnis, in dem die Dateien für die gespeicherten Bookmarks abgelegt werden sollen. Wenn nicht festgelegt, dann wird "." verwendet.</li>
-<li><a name="SONOS_attribut_bookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt; [...]</code></b>
+<li><a name="SONOSbookmarkTitleDefinition"><b><code>bookmarkTitleDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;TrackURIRegEx&gt;:&lt;MinTitleLength&gt;:&lt;RemainingLength&gt;:&lt;MaxAge&gt;:&lt;ReadOnly&gt; [...]</code></b>
 </a><br /> Die Definition für die Verwendung von Bookmarks für Titel.</li>
-<li><a name="SONOS_attribut_bookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt; [...]</code></b>
+<li><a name="SONOSbookmarkPlaylistDefinition"><b><code>bookmarkPlaylistDefinition &lt;Groupname&gt;:&lt;PlayerdeviceRegEx&gt;:&lt;MinListLength&gt;:&lt;MaxListLength&gt;:&lt;MaxAge&gt; [...]</code></b>
 </a><br /> Die Definition für die Verwendung von Bookmarks für aktuelle Abspiellisten/Playlisten.</li>
 </ul></li>
 <li><b>Proxy-Einstellungen</b><ul>
-<li><a name="SONOS_attribut_generateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
+<li><a name="SONOSgenerateProxyAlbumArtURLs"><b><code>generateProxyAlbumArtURLs &lt;int&gt;</code></b>
 </a><br /> Aus (0, 1). Wenn aktiviert, werden alle Cober-Links als Proxy-Aufrufe an Fhem generiert. Dieser Proxy-Server wird vom Sonos-Modul bereitgestellt. In der Grundeinstellung erfolgt kein Caching der Cover, sondern nur eine Durchreichung der Cover von den Sonosplayern (Damit ist der Zugriff durch einen externen Proxyserver auf Fhem möglich).</li>
-<li><a name="SONOS_attribut_proxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
+<li><a name="SONOSproxyCacheDir"><b><code>proxyCacheDir &lt;Path&gt;</code></b>
 </a><br /> Hiermit wird das Verzeichnis festgelegt, in dem die Cober zwischengespeichert werden. Wenn nicht festegelegt, so wird "/tmp" verwendet.</li>
-<li><a name="SONOS_attribut_proxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
+<li><a name="SONOSproxyCacheTime"><b><code>proxyCacheTime &lt;int&gt;</code></b>
 </a><br /> Mit einer Angabe ungleich 0 wird der Caching-Mechanismus des Sonos-Modul-Proxy-Servers aktiviert. Dabei werden Cover, die im Cache älter sind als diese Zeitangabe in Sekunden, neu vom Sonosplayer geladen, alle anderen direkt ausgeliefert, ohne den Player zu fragen.</li>
-<li><a name="SONOS_attribut_webname"><b><code>webname &lt;String&gt;</code></b>
+<li><a name="SONOSwebname"><b><code>webname &lt;String&gt;</code></b>
 </a><br /> Hiermit kann der zu verwendende Webname für die Cover-Link-Erzeugung angegeben werden. Da vom Modul Links zu Cover u.ä. erzeugt werden, ohne dass es einen FhemWeb-Aufruf dazu gibt, kann das Modul diesen Pfad nicht selber herausfinden. Wenn das Attribut nicht angegeben wird, dann wird 'fhem' angenommen.</li>
 </ul></li>
 <li><b>Sprachoptionen</b><ul>
-<li><a name="SONOS_attribut_targetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakDir"><b><code>targetSpeakDir &lt;string&gt;</code></b>
 </a><br /> Gibt an, welches Verzeichnis für die Ablage des MP3-Files der Textausgabe verwendet werden soll</li>
-<li><a name="SONOS_attribut_targetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakMP3FileConverter"><b><code>targetSpeakMP3FileConverter &lt;string&gt;</code></b>
 </a><br /> Hiermit kann ein MP3-Konverter angegeben werden, da am Ende der Verkettung der Speak-Ansage das resultierende MP3-File nochmal sauber durchkodiert. Damit können Restzeitanzeigeprobleme behoben werden. Dadurch vegrößert sich allerdings u.U. die Ansageverzögerung.</li>
-<li><a name="SONOS_attribut_targetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakMP3FileDir"><b><code>targetSpeakMP3FileDir &lt;string&gt;</code></b>
 </a><br /> Das Verzeichnis, welches als Standard für MP3-Fileangaben in Speak-Texten verwendet werden soll. Wird dieses Attribut definiert, können die Angaben bei Speak ohne Verzeichnis erfolgen.</li>
-<li><a name="SONOS_attribut_targetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
+<li><a name="SONOStargetSpeakURL"><b><code>targetSpeakURL &lt;string&gt;</code></b>
 </a><br /> Gibt an, unter welcher Adresse der ZonePlayer das unter targetSpeakDir angegebene Verzeichnis erreichen kann.</li>
-<li><a name="SONOS_attribut_targetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
+<li><a name="SONOStargetSpeakFileTimestamp"><b><code>targetSpeakFileTimestamp &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gibt an, ob die erzeugte MP3-Sprachausgabedatei einen Zeitstempel erhalten soll (1) oder nicht (0).</li>
-<li><a name="SONOS_attribut_targetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
+<li><a name="SONOStargetSpeakFileHashCache"><b><code>targetSpeakFileHashCache &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gibt an, ob die erzeugte Sprachausgabedatei einen Hashwert erhalten soll (1) oder nicht (0). Wenn dieser Wert gesetzt wird, dann wird eine bereits bestehende Datei wiederverwendet, und nicht neu erzeugt.</li>
-<li><a name="SONOS_attribut_Speak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak1"><b><code>Speak1 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Hiermit kann ein Systemaufruf definiert werden, der zu Erzeugung einer Sprachausgabe verwendet werden kann. Sobald dieses Attribut definiert wurde, ist ein entsprechender Setter am Sonosplayer verfügbar.<br />Es dürfen folgende Platzhalter verwendet werden:<br />'''%language%''': Wird durch die eingegebene Sprache ersetzt<br />'''%filename%''': Wird durch den kompletten Dateinamen (inkl. Dateiendung) ersetzt.<br />'''%text%''': Wird durch den zu übersetzenden Text ersetzt.<br />'''%textescaped%''': Wird durch den URL-Enkodierten zu übersetzenden Text ersetzt.</li>
-<li><a name="SONOS_attribut_Speak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak2"><b><code>Speak2 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_Speak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak3"><b><code>Speak3 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_Speak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
+<li><a name="SONOSSpeak4"><b><code>Speak4 &lt;Fileextension&gt;:&lt;Commandline&gt;</code></b>
 </a><br />Siehe Speak1</li>
-<li><a name="SONOS_attribut_SpeakCover"><b><code>SpeakCover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeakCover"><b><code>SpeakCover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Hiermit kann ein JPG- oder PNG-Bild als Cover für die Sprachdurchsagen definiert werden.</li>
-<li><a name="SONOS_attribut_Speak1Cover"><b><code>Speak1Cover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeak1Cover"><b><code>Speak1Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak1.</li>
-<li><a name="SONOS_attribut_Speak2Cover"><b><code>Speak2Cover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeak2Cover"><b><code>Speak2Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak2.</li>
-<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak3.</li>
-<li><a name="SONOS_attribut_Speak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeak3Cover"><b><code>Speak3Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak3.</li>
-<li><a name="SONOS_attribut_Speak4Cover"><b><code>Speak4Cover &lt;Absolute-Imagepath&gt;</code></b>
+<li><a name="SONOSSpeak4Cover"><b><code>Speak4Cover &lt;Absolute-Imagepath&gt;</code></b>
 </a><br />Analog zu SpeakCover für Speak4.</li>
-<li><a name="SONOS_attribut_SpeakGoogleURL"><b><code>SpeakGoogleURL &lt;GoogleURL&gt;</code></b>
+<li><a name="SONOSSpeakGoogleURL"><b><code>SpeakGoogleURL &lt;GoogleURL&gt;</code></b>
 </a><br />Die zu verwendende Google-URL. Wenn dieser Parameter nicht angegeben wird, dann wird ein Standard verwendet. Hier müssen Platzhalter für die Ersetzung durch das Modul eingetragen werden: %1$s -> Sprache, %2$s -> Text<br />Die Standard-URL lautet momentan: <code>http://translate.google.com/translate_tts?tl=%1$s&client=tw-ob&q=%2$s</code></li>
 </ul></li>
 </ul>

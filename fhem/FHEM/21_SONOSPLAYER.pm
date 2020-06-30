@@ -69,6 +69,7 @@ use vars qw{%modules %defs};
 # Variable Definitions
 ########################################################################################
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
+my @SONOSPLAYER_opticalInputDeviceTypes = qw(S9 S11 S14);
 
 my %gets = (
 	'CurrentTrackPosition' => '',
@@ -271,7 +272,7 @@ sub SONOSPLAYER_Detail($$$;$) {
 	
 	# Control-Buttons
 	if (!AttrVal($d, 'suppressControlButtons', 0) && ($withRC)) {
-		$html.= '<div class="rc_body" style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';
+		$html .= '<div class="rc_body" style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';
 		$html .= '<table style="text-align: center;"><tr>';
 		$html .= '<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Previous\')">'.FW_makeImage('rc_PREVIOUS.svg', 'Previous', 'rc-button').'</a></td> 
 			<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Play\')">'.FW_makeImage('rc_PLAY.svg', 'Play', 'rc-button').'</a></td> 
@@ -338,7 +339,7 @@ sub SONOSPLAYER_State($$$$) {
 	}
 	
 	# Die folgenden Readings werden nicht mehr benötigt, und werden hiermit entfernt...
-	return 'Reading '.$hash->{NAME}."->$name is now unused and is ignored for the future for all Zoneplayer-Types." if ($name eq 'LastGetActionName') || ($name eq 'LastGetActionResult') || ($name eq 'LastSetActionName') || ($name eq 'LastSetActionResult') || ($name eq 'LastSubscriptionsRenew') || ($name eq 'LastSubscriptionsResult') || ($name eq 'SetMakeStandaloneGroup') || ($name eq 'CurrentTempPlaying') || ($name eq 'SetWRONG');
+	return 'Reading '.$hash->{NAME}."->$name is now unused and is ignored for the future for all Zoneplayer-Types." if ($name eq 'LastGetActionName') || ($name eq 'LastGetActionResult') || ($name eq 'LastSetActionName') || ($name eq 'LastSetActionResult') || ($name eq 'LastSubscriptionsResult') || ($name eq 'SetMakeStandaloneGroup') || ($name eq 'CurrentTempPlaying') || ($name eq 'SetWRONG');
 	
 	return undef;
 }
@@ -408,7 +409,7 @@ sub SONOSPLAYER_TriggerCoverTitleLater($) {
 #  SONOSPLAYER_SimulateCurrentTrackPosition - Implements the Simulation for the currentTrackPosition
 #
 ########################################################################################
-sub SONOSPLAYER_SimulateCurrentTrackPosition() {
+sub SONOSPLAYER_SimulateCurrentTrackPosition($) {
 	my ($hash) = @_;
 	
 	return undef if (AttrVal($hash->{NAME}, 'disable', 0));
@@ -911,7 +912,7 @@ sub SONOSPLAYER_Set($@) {
 				my $udnShort = $1 if ($dHash->{UDN} =~ m/(.*)_MR/); 
 				
 				# Wenn dieses Quell-Device eine Playbar ist, dann den optischen Eingang als Quelle wählen...
-				if ((ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S9') || (ReadingsVal($dHash->{NAME}, 'playerType', '') eq 'S11')) {
+				if (SONOS_isInList(ReadingsVal($dHash->{NAME}, 'playerType', ''), @SONOSPLAYER_opticalInputDeviceTypes)) {
 					# Das ganze geht nur bei dem eigenen Eingang, ansonsten eine Gruppenwiedergabe starten
 					if ($dHash->{NAME} eq $hash->{NAME}) {
 						$value = 'x-sonos-htastream:'.$udnShort.':spdif';
@@ -1311,240 +1312,240 @@ sub SONOSPLAYER_Log($$$) {
 <h4>Set</h4>
 <ul>
 <li><b>Common Tasks</b><ul>
-<li><a name="SONOSPLAYER_setter_Alarm">
+<li><a name="SONOSPLAYERAlarm">
 <b><code>Alarm (Create|Update|Delete|Enable|Disable) &lt;ID[,ID]|All&gt; &lt;Datahash&gt;</code></b></a>
 <br />Can be used for working on alarms:<ul><li><b>Create:</b> Creates an alarm-entry with the given datahash.</li><li><b>Update:</b> Updates the alarm-entry with the given id(s) and datahash.</li><li><b>Delete:</b> Deletes the alarm-entry with the given id(s).</li><li><b>Enable:</b> Enables the alarm-entry with the given id(s).</li><li><b>Disable:</b> Disables the alarm-entry with the gven id(s).</li></ul>If the Word 'All' is given as ID, all alarms of this player are changed.<br /><b>The Datahash:</b><br />The Format is a perl-hash and is interpreted with the eval-function.<br />e.g.: { Repeat =&gt; 1 }<br /><br />The following entries are allowed/neccessary:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />e.g.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
-<li><a name="SONOSPLAYER_setter_AudioDelay">
+<li><a name="SONOSPLAYERAudioDelay">
 <b><code>AudioDelay &lt;Level&gt;</code></b></a>
 <br /> Sets the audiodelay of the player to the given value. The value can range from 0 to 5.</li>
-<li><a name="SONOSPLAYER_setter_AudioDelayLeftRear">
+<li><a name="SONOSPLAYERAudioDelayLeftRear">
 <b><code>AudioDelayLeftRear &lt;Level&gt;</code></b></a>
 <br /> Sets the audiodelayleftrear of the player to the given value. The value can range from 0 to 2. The values has the following meanings: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
-<li><a name="SONOSPLAYER_setter_AudioDelayRightRear">
+<li><a name="SONOSPLAYERAudioDelayRightRear">
 <b><code>AudioDelayRightRear &lt;Level&gt;</code></b></a>
 <br /> Sets the audiodelayrightrear of the player to the given value. The value can range from 0 to 2. The values has the following meanings: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
-<li><a name="SONOSPLAYER_setter_ButtonLockState">
+<li><a name="SONOSPLAYERButtonLockState">
 <b><code>ButtonLockState &lt;int&gt;</code></b></a>
 <br />One of (0, 1) Sets the current state of the ButtonLockState.</li>
-<li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
+<li><a name="SONOSPLAYERDailyIndexRefreshTime">
 <b><code>DailyIndexRefreshTime &lt;Timestring&gt;</code></b></a>
 <br />Sets the current DailyIndexRefreshTime for the whole bunch of Zoneplayers.</li>
-<li><a name="SONOSPLAYER_setter_DialogLevel">
+<li><a name="SONOSPLAYERDialogLevel">
 <b><code>DialogLevel &lt;State&gt;</code></b></a>
 <br /> Sets the dialoglevel for playbar-systems.</li>
-<li><a name="SONOSPLAYER_setter_ExportSonosBibliothek">
+<li><a name="SONOSPLAYERExportSonosBibliothek">
 <b><code>ExportSonosBibliothek &lt;filename&gt;</code></b></a>
 <br />Exports a file with a textual representation of a structure- and titlehash of the complete Sonos-Bibliothek. Warning: Will use a large amount of CPU-Time and RAM!</li>
-<li><a name="SONOSPLAYER_setter_Name">
+<li><a name="SONOSPLAYERName">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Sets the Name for this Zone</li>
-<li><a name="SONOSPLAYER_setter_NightMode">
+<li><a name="SONOSPLAYERNightMode">
 <b><code>NightMode &lt;State&gt;</code></b></a>
 <br /> Sets the nightmode for playbar-systems.</li>
-<li><a name="SONOSPLAYER_setter_OutputFixed">
+<li><a name="SONOSPLAYEROutputFixed">
 <b><code>OutputFixed &lt;State&gt;</code></b></a>
 <br /> Sets the outputfixed-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_Reboot">
+<li><a name="SONOSPLAYERReboot">
 <b><code>Reboot</code></b></a>
 <br />Initiates a reboot on the Zoneplayer.</li>
-<li><a name="SONOSPLAYER_setter_ResetAttributesToDefault">
+<li><a name="SONOSPLAYERResetAttributesToDefault">
 <b><code>ResetAttributesToDefault &lt;DeleteAllOtherAttributes&gt;</code></b></a>
 <br />Sets the attributes to the inital state. If the parameter "DeleteAllOtherAttributes" is set to "1" or "on", all attributes will be deleted before the defaults will be newly retrieved from the player and set.</li>
-<li><a name="SONOSPLAYER_setter_RoomIcon">
+<li><a name="SONOSPLAYERRoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Sets the Icon for this Zone</li>
-<li><a name="SONOSPLAYER_setter_SnoozeAlarm">
+<li><a name="SONOSPLAYERSnoozeAlarm">
 <b><code>SnoozeAlarm &lt;Timestring|Seconds&gt;</code></b></a>
 <br />Snoozes a currently playing alarm for the given time</li>
-<li><a name="SONOSPLAYER_setter_SubEnable">
+<li><a name="SONOSPLAYERSubEnable">
 <b><code>SubEnable &lt;State&gt;</code></b></a>
 <br /> Sets the substate for sub-systems.</li>
-<li><a name="SONOSPLAYER_setter_SubGain">
+<li><a name="SONOSPLAYERSubGain">
 <b><code>SubGain &lt;Level&gt;</code></b></a>
 <br /> Sets the sub-gain for sub-systems. The value can range from -15 to 15.</li>
-<li><a name="SONOSPLAYER_setter_SubPolarity">
+<li><a name="SONOSPLAYERSubPolarity">
 <b><code>SubPolarity &lt;Level&gt;</code></b></a>
 <br /> Sets the sub-polarity for sub-systems. The value can range from 0 to 2.</li>
-<li><a name="SONOSPLAYER_setter_SurroundEnable">
+<li><a name="SONOSPLAYERSurroundEnable">
 <b><code>SurroundEnable &lt;State&gt;</code></b></a>
 <br /> Sets the surround-state for surround-systems (like playbars).</li>
-<li><a name="SONOSPLAYER_setter_SurroundLevel">
+<li><a name="SONOSPLAYERSurroundLevel">
 <b><code>SurroundLevel &lt;Level&gt;</code></b></a>
 <br /> Sets the surround-level for surround-systems (like playbars). The value can range from -15 to 15.</li>
-<li><a name="SONOSPLAYER_setter_TruePlay">
+<li><a name="SONOSPLAYERTruePlay">
 <b><code>TruePlay &lt;State&gt;</code></b></a>
 <br />Sets the TruePlay-State of the given player.</li>
-<li><a name="SONOSPLAYER_setter_Wifi">
+<li><a name="SONOSPLAYERWifi">
 <b><code>Wifi &lt;State&gt;</code></b></a>
 <br />Sets the WiFi-State of the given Player. Can be 'off', 'persist-off' or 'on'.</li>
 </ul></li>
 <li><b>Playing Control-Commands</b><ul>
-<li><a name="SONOSPLAYER_setter_CurrentTrackPosition">
+<li><a name="SONOSPLAYERCurrentTrackPosition">
 <b><code>CurrentTrackPosition &lt;TimePosition&gt;</code></b></a>
 <br /> Sets the current timeposition inside the title to the given timevalue (e.g. 0:01:15) or seconds (e.g. 81). You can make relative jumps like '+0:00:10' or just '+10'. Additionally you can make a call with a percentage value like '+10%'. This relative value can be negative.</li>
-<li><a name="SONOSPLAYER_setter_Pause">
+<li><a name="SONOSPLAYERPause">
 <b><code>Pause</code></b></a>
 <br /> Pause the playing</li>
-<li><a name="SONOSPLAYER_setter_Previous">
+<li><a name="SONOSPLAYERPrevious">
 <b><code>Previous</code></b></a>
 <br /> Jumps to the beginning of the previous title.</li>
-<li><a name="SONOSPLAYER_setter_Play">
+<li><a name="SONOSPLAYERPlay">
 <b><code>Play</code></b></a>
 <br /> Starts playing</li>
-<li><a name="SONOSPLAYER_setter_PlayURI">
+<li><a name="SONOSPLAYERPlayURI">
 <b><code>PlayURI &lt;songURI&gt; [Volume]</code></b></a>
 <br />Plays the given MP3-File with the optional given volume.</li>
-<li><a name="SONOSPLAYER_setter_PlayURITemp">
+<li><a name="SONOSPLAYERPlayURITemp">
 <b><code>PlayURITemp &lt;songURI&gt; [Volume]</code></b></a>
 <br />Plays the given MP3-File with the optional given volume as a temporary file. After playing it, the whole state is reconstructed and continues playing at the former saved position and volume and so on. If the file given is a stream (exactly: a file where the running time could not be determined), the call would be identical to <code>,PlayURI</code>, e.g. nothing is restored after playing.</li>
-<li><a name="SONOSPLAYER_setter_Next">
+<li><a name="SONOSPLAYERNext">
 <b><code>Next</code></b></a>
 <br /> Jumps to the beginning of the next title</li>
-<li><a name="SONOSPLAYER_setter_Speak">
+<li><a name="SONOSPLAYERSpeak">
 <b><code>Speak &lt;Volume&gt; &lt;Language&gt; &lt;Text&gt;</code></b></a>
 <br />Uses the Google Text-To-Speech-Engine for generating MP3-Files of the given text and plays it on the SonosPlayer. Possible languages can be obtained from Google. e.g. "de", "en", "fr", "es"...</li>
-<li><a name="SONOSPLAYER_setter_StartFavourite">
+<li><a name="SONOSPLAYERStartFavourite">
 <b><code>StartFavourite &lt;Favouritename&gt; [NoStart]</code></b></a>
 <br /> Starts the named sonos-favorite. The parameter should be URL-encoded for proper naming of lists with special characters. If the Word 'NoStart' is given as second parameter, than the Loading will be done, but the playing-state is leaving untouched e.g. not started.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/meine.hits/</code>.</li>
-<li><a name="SONOSPLAYER_setter_StartPlaylist">
+<li><a name="SONOSPLAYERStartPlaylist">
 <b><code>StartPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Loads the given Playlist and starts playing immediately. For all Options have a look at "LoadPlaylist".</li>
-<li><a name="SONOSPLAYER_setter_StartRadio">
+<li><a name="SONOSPLAYERStartRadio">
 <b><code>StartRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite) and starts playing immediately. For all Options have a look at "LoadRadio".</li>
-<li><a name="SONOSPLAYER_setter_StartSearchlist">
+<li><a name="SONOSPLAYERStartSearchlist">
 <b><code>StartSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
 <br /> Loads the searchlist and starts playing immediately. For all Options have a look at "LoadSearchlist".</li>
-<li><a name="SONOSPLAYER_setter_Stop">
+<li><a name="SONOSPLAYERStop">
 <b><code>Stop</code></b></a>
 <br /> Stops the playing</li>
-<li><a name="SONOSPLAYER_setter_Track">
+<li><a name="SONOSPLAYERTrack">
 <b><code>Track &lt;TrackNumber|Random&gt;</code></b></a>
 <br /> Sets the track with the given tracknumber as the current title. If the tracknumber is the word <code>Random</code> a random track will be selected.</li>
 </ul></li>
 <li><b>Playing Settings</b><ul>
-<li><a name="SONOSPLAYER_setter_Balance">
+<li><a name="SONOSPLAYERBalance">
 <b><code>Balance &lt;BalanceValue&gt;</code></b></a>
 <br /> Sets the balance to the given value. The value can range from -100 (full left) to 100 (full right). Retrieves the new balancevalue as the result.</li>
-<li><a name="SONOSPLAYER_setter_Bass">
+<li><a name="SONOSPLAYERBass">
 <b><code>Bass &lt;BassValue&gt;</code></b></a>
 <br /> Sets the bass to the given value. The value can range from -10 to 10. Retrieves the new bassvalue as the result.</li>
-<li><a name="SONOSPLAYER_setter_CrossfadeMode">
+<li><a name="SONOSPLAYERCrossfadeMode">
 <b><code>CrossfadeMode &lt;State&gt;</code></b></a>
 <br /> Sets the crossfade-mode. Retrieves the new mode as the result.</li>
-<li><a name="SONOSPLAYER_setter_LEDState">
+<li><a name="SONOSPLAYERLEDState">
 <b><code>LEDState &lt;State&gt;</code></b></a>
 <br /> Sets the LED state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_Loudness">
+<li><a name="SONOSPLAYERLoudness">
 <b><code>Loudness &lt;State&gt;</code></b></a>
 <br /> Sets the loudness-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_Mute">
+<li><a name="SONOSPLAYERMute">
 <b><code>Mute &lt;State&gt;</code></b></a>
 <br /> Sets the mute-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_MuteT">
+<li><a name="SONOSPLAYERMuteT">
 <b><code>MuteT</code></b></a>
 <br /> Toggles the mute state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_Repeat">
+<li><a name="SONOSPLAYERRepeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Sets the repeat-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_RepeatOne">
+<li><a name="SONOSPLAYERRepeatOne">
 <b><code>RepeatOne &lt;State&gt;</code></b></a>
 <br /> Sets the repeatOne-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_RepeatOneT">
+<li><a name="SONOSPLAYERRepeatOneT">
 <b><code>RepeatOneT</code></b></a>
 <br /> Toggles the repeatOne-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_RepeatT">
+<li><a name="SONOSPLAYERRepeatT">
 <b><code>RepeatT</code></b></a>
 <br /> Toggles the repeat-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_Shuffle">
+<li><a name="SONOSPLAYERShuffle">
 <b><code>Shuffle &lt;State&gt;</code></b></a>
 <br /> Sets the shuffle-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_ShuffleT">
+<li><a name="SONOSPLAYERShuffleT">
 <b><code>ShuffleT</code></b></a>
 <br /> Toggles the shuffle-state. Retrieves the new state as the result.</li>
-<li><a name="SONOSPLAYER_setter_SleepTimer">
+<li><a name="SONOSPLAYERSleepTimer">
 <b><code>SleepTimer &lt;Timestring|Seconds&gt;</code></b></a>
 <br /> Sets the Sleeptimer to the given Time. It must be in the full format of "HH:MM:SS". Deactivate with "00:00:00" or "off".</li>
-<li><a name="SONOSPLAYER_setter_Treble">
+<li><a name="SONOSPLAYERTreble">
 <b><code>Treble &lt;TrebleValue&gt;</code></b></a>
 <br /> Sets the treble to the given value. The value can range from -10 to 10. Retrieves the new treblevalue as the result.</li>
-<li><a name="SONOSPLAYER_setter_Volume">
+<li><a name="SONOSPLAYERVolume">
 <b><code>Volume &lt;VolumeLevel&gt; [RampType]</code></b></a>
 <br /> Sets the volume to the given value. The value could be a relative value with + or - sign. In this case the volume will be increased or decreased according to this value. Retrieves the new volume as the result.<br />Optional can be a RampType defined  with a value between 1 and 3 which describes different templates defined by the Sonos-System.</li>
-<li><a name="SONOSPLAYER_setter_VolumeD">
+<li><a name="SONOSPLAYERVolumeD">
 <b><code>VolumeD</code></b></a>
 <br /> Turns the volume by volumeStep-ticks down.</li>
-<li><a name="SONOSPLAYER_setter_VolumeRestore">
+<li><a name="SONOSPLAYERVolumeRestore">
 <b><code>VolumeRestore</code></b></a>
 <br /> Restores the volume of a formerly saved volume.</li>
-<li><a name="SONOSPLAYER_setter_VolumeSave">
+<li><a name="SONOSPLAYERVolumeSave">
 <b><code>VolumeSave &lt;VolumeLevel&gt;</code></b></a>
 <br /> Sets the volume to the given value. The value could be a relative value with + or - sign. In this case the volume will be increased or decreased according to this value. Retrieves the new volume as the result. Additionally it saves the old volume to a reading for restoreing.</li>
-<li><a name="SONOSPLAYER_setter_VolumeU">
+<li><a name="SONOSPLAYERVolumeU">
 <b><code>VolumeU</code></b></a>
 <br /> Turns the volume by volumeStep-ticks up.</li>
 </ul></li>
 <li><b>Control the current Playlist</b><ul>
-<li><a name="SONOSPLAYER_setter_AddURIToQueue">
+<li><a name="SONOSPLAYERAddURIToQueue">
 <b><code>AddURIToQueue &lt;songURI&gt;</code></b></a>
 <br />Adds the given MP3-File at the current position into the queue.</li>
-<li><a name="SONOSPLAYER_setter_CurrentPlaylist">
+<li><a name="SONOSPLAYERCurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Sets the current playing to the current queue, but doesn't start playing (e.g. after hearing of a radiostream, where the current playlist still exists but is currently "not in use")</li>
-<li><a name="SONOSPLAYER_setter_DeleteFromQueue">
+<li><a name="SONOSPLAYERDeleteFromQueue">
 <b><code>DeleteFromQueue <index_of_elems></code></b></a>
 <br /> Deletes the elements from the current queue with the given indices. You can use the ususal perl-array-formats like "1..12,17,20..22". The indices reference to the position in the current view of the list (this usually differs between the normal playmode and the shuffleplaymode).</li>
-<li><a name="SONOSPLAYER_setter_DeletePlaylist">
+<li><a name="SONOSPLAYERDeletePlaylist">
 <b><code>DeletePlaylist</code></b></a>
 <br /> Deletes the Sonos-Playlist with the given name. According to the possibilities of the playlistname have a close look at LoadPlaylist.</li>
-<li><a name="SONOSPLAYER_setter_EmptyPlaylist">
+<li><a name="SONOSPLAYEREmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Clears the current queue</li>
-<li><a name="SONOSPLAYER_setter_LoadFavourite">
+<li><a name="SONOSPLAYERLoadFavourite">
 <b><code>LoadFavourite &lt;Favouritename&gt;</code></b></a>
 <br /> Loads the named sonos-favorite. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/meine.hits/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadPlaylist">
+<li><a name="SONOSPLAYERLoadPlaylist">
 <b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistnamen can be an Fhem-Devicename, then the current playlist of this referenced player will be copied. The Playlistname can also be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/hits.2014/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadRadio">
+<li><a name="SONOSPLAYERLoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/radio/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadSearchlist">
+<li><a name="SONOSPLAYERLoadSearchlist">
 <b><code>LoadSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [[*]maxElem[+|-]]]</code></b></a>
 <br /> Loads titles from the Sonos-Bibliothek into the current playlist according to the given category and filtervalues. Please consult the (german) Wiki for detailed informations.</li>
-<li><a name="SONOSPLAYER_setter_SavePlaylist">
+<li><a name="SONOSPLAYERSavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
 <br /> Saves the current queue as a playlist with the given name. An existing playlist with the same name will be overwritten. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistname can be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')</li>
 </ul></li>
 <li><b>Groupcontrol</b><ul>
-<li><a name="SONOSPLAYER_setter_AddMember">
+<li><a name="SONOSPLAYERAddMember">
 <b><code>AddMember &lt;devicename&gt;</code></b></a>
 <br />Adds the given devicename to the current device as a groupmember. The current playing of the current device goes on and will be transfered to the given device (the new member).</li>
-<li><a name="SONOSPLAYER_setter_CreateStereoPair">
+<li><a name="SONOSPLAYERCreateStereoPair">
 <b><code>CreateStereoPair &lt;rightPlayerDevicename&gt;</code></b></a>
 <br />Adds the given devicename to the current device as the right speaker of a stereopair. The current playing of the current device goes on (as left-side speaker) and will be transfered to the given device (as right-side speaker).</li>
-<li><a name="SONOSPLAYER_setter_GroupMute">
+<li><a name="SONOSPLAYERGroupMute">
 <b><code>GroupMute &lt;State&gt;</code></b></a>
 <br />Sets the mute state of the complete group in one step. The value can be on or off.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolume">
+<li><a name="SONOSPLAYERGroupVolume">
 <b><code>GroupVolume &lt;VolumeLevel&gt;</code></b></a>
 <br />Sets the group-volume in the way the original controller does. This means, that the relative volumelevel between the different players will be saved during change.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolumeD">
+<li><a name="SONOSPLAYERGroupVolumeD">
 <b><code>GroupVolumeD</code></b></a>
 <br /> Turns the group volume by volumeStep-ticks down.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolumeU">
+<li><a name="SONOSPLAYERGroupVolumeU">
 <b><code>GroupVolumeU</code></b></a>
 <br /> Turns the group volume by volumeStep-ticks up.</li>
-<li><a name="SONOSPLAYER_setter_MakeStandaloneGroup">
+<li><a name="SONOSPLAYERMakeStandaloneGroup">
 <b><code>MakeStandaloneGroup</code></b></a>
 <br />Makes this Player a standalone group.</li>
-<li><a name="SONOSPLAYER_setter_RemoveMember">
+<li><a name="SONOSPLAYERRemoveMember">
 <b><code>RemoveMember &lt;devicename&gt;</code></b></a>
 <br />Removes the given device, so that they both are not longer a group. The current playing of the current device goes on normally. The cutted device stops his playing and has no current playlist anymore (since Sonos Version 4.2 the old playlist will be restored).</li>
-<li><a name="SONOSPLAYER_setter_SeparateStereoPair">
+<li><a name="SONOSPLAYERSeparateStereoPair">
 <b><code>SeparateStereoPair</code></b></a>
 <br />Divides the stereo-pair into two independant devices.</li>
-<li><a name="SONOSPLAYER_setter_SnapshotGroupVolume">
+<li><a name="SONOSPLAYERSnapshotGroupVolume">
 <b><code>SnapshotGroupVolume</code></b></a>
 <br /> Save the current volume-relation of all players of the same group. It's neccessary for the use of "GroupVolume" and is stored until the next call of "SnapshotGroupVolume".</li>
 </ul></li>
@@ -1553,53 +1554,53 @@ sub SONOSPLAYER_Log($$$) {
 <h4>Get</h4>
 <ul>
 <li><b>Common</b><ul>
-<li><a name="SONOSPLAYER_getter_Alarm">
+<li><a name="SONOSPLAYERAlarm">
 <b><code>Alarm &lt;ID&gt;</code></b></a>
 <br /> It's an exception to the normal getter semantics. Returns directly a Perl-Hash with the Alarm-Informations to the given id. It's just a shorthand for <code>eval(ReadingsVal(&lt;Devicename&gt;, 'Alarmlist', ()))->{&lt;ID&gt;};</code>.</li>
-<li><a name="SONOSPLAYER_getter_EthernetPortStatus">
+<li><a name="SONOSPLAYEREthernetPortStatus">
 <b><code>EthernetPortStatus &lt;PortNumber&gt;</code></b></a>
 <br /> Gets the Ethernet-Portstatus of the given Port. Can be 'Active' or 'Inactive'.</li>
-<li><a name="SONOSPLAYER_getter_PossibleRoomIcons">
+<li><a name="SONOSPLAYERPossibleRoomIcons">
 <b><code>PossibleRoomIcons</code></b></a>
 <br /> Retreives a list of all possible Roomiconnames for the use with "set RoomIcon".</li>
-<li><a name="SONOSPLAYER_getter_SupportLinks">
+<li><a name="SONOSPLAYERSupportLinks">
 <b><code>SupportLinks</code></b></a>
 <br /> Shows a list with direct links to the player-support-sites.</li>
-<li><a name="SONOSPLAYER_getter_WifiPortStatus">
+<li><a name="SONOSPLAYERWifiPortStatus">
 <b><code>WifiPortStatus</code></b></a>
 <br /> Gets the Wifi-Portstatus. Can be 'Active' or 'Inactive'.</li>
 </ul></li>
 <li><b>Lists</b><ul>
-<li><a name="SONOSPLAYER_getter_Favourites">
+<li><a name="SONOSPLAYERFavourites">
 <b><code>Favourites</code></b></a>
 <br /> Retrieves a list with the names of all sonos favourites. This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of favourites. e.g. "Liste 1","Entry 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_FavouritesWithCovers">
+<li><a name="SONOSPLAYERFavouritesWithCovers">
 <b><code>FavouritesWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the favourites stored in Sonos e.g. {'FV:2/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Favorit'}}</li>
-<li><a name="SONOSPLAYER_getter_Playlists">
+<li><a name="SONOSPLAYERPlaylists">
 <b><code>Playlists</code></b></a>
 <br /> Retrieves a list with the names of all saved queues (aka playlists). This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of playlists. e.g. "Liste 1","Liste 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_PlaylistsWithCovers">
+<li><a name="SONOSPLAYERPlaylistsWithCovers">
 <b><code>PlaylistsWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the playlists stored in Sonos e.g. {'SQ:14' => {'Cover' => 'urlzumcover', 'Title' => '1. Playlist'}}</li>
-<li><a name="SONOSPLAYER_getter_Queue">
+<li><a name="SONOSPLAYERQueue">
 <b><code>Queue</code></b></a>
 <br /> Retrieves a list with the names of all titles in the current queue. This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of the titles. e.g. "1. Liste 1 [0:02:14]","2. Eintrag 2 [k.A.]","3. Test [0:14:00]"</li>
-<li><a name="SONOSPLAYER_getter_QueueWithCovers">
+<li><a name="SONOSPLAYERQueueWithCovers">
 <b><code>QueueWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the titles in the current queue. e.g.: {'Q:0/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Titel'}}.</li>
-<li><a name="SONOSPLAYER_getter_Radios">
+<li><a name="SONOSPLAYERRadios">
 <b><code>Radios</code></b></a>
 <br /> Retrieves a list with the names of all saved radiostations (favorites). This getter retrieves the same list on all Zoneplayer. The format is a comma-separated list with quoted names of radiostations. e.g. "Sender 1","Sender 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_RadiosWithCovers">
+<li><a name="SONOSPLAYERRadiosWithCovers">
 <b><code>RadiosWithCovers</code></b></a>
 <br /> Retrieves a list with the stringrepresentation of a perl-hash which can easily be converted with "eval". It consists of the names and coverlinks of all of the radiofavourites stored in Sonos e.g. {'R:0/0/2' => {'Cover' => 'urlzumcover', 'Title' => '1. Radiosender'}}</li>
-<li><a name="SONOSPLAYER_getter_SearchlistCategories">
+<li><a name="SONOSPLAYERSearchlistCategories">
 <b><code>SearchlistCategories</code></b></a>
 <br /> Retrieves a list with the possible categories for the setter "LoadSearchlist". The Format is a comma-separated list with quoted names of categories.</li>
 </ul></li>
 <li><b>Informations on the current Title</b><ul>
-<li><a name="SONOSPLAYER_getter_CurrentTrackPosition">
+<li><a name="SONOSPLAYERCurrentTrackPosition">
 <b><code>CurrentTrackPosition</code></b></a>
 <br /> Retrieves the current timeposition inside a title</li>
 </ul></li>
@@ -1609,58 +1610,58 @@ sub SONOSPLAYER_Log($$$) {
 '''Attention'''<br />The attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
 <ul>
 <li><b>Common</b><ul>
-<li><a name="SONOSPLAYER_attribut_disable"><b><code>disable &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERdisable"><b><code>disable &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Disables the event-worker for this Sonosplayer.</li>
-<li><a name="SONOSPLAYER_attribut_generateSomethingChangedEvent"><b><code>generateSomethingChangedEvent &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateSomethingChangedEvent"><b><code>generateSomethingChangedEvent &lt;int&gt;</code></b>
 </a><br /> One of (0,1). 1 if a 'SomethingChanged'-Event should be generated. This event is thrown every time an event is generated. This is useful if you wants to be notified on every change with a single event.</li>
-<li><a name="SONOSPLAYER_attribut_generateVolumeEvent"><b><code>generateVolumeEvent &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateVolumeEvent"><b><code>generateVolumeEvent &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Enables an event generated at volumechanges if minVolume or maxVolume is set.</li>
-<li><a name="SONOSPLAYER_attribut_generateVolumeSlider"><b><code>generateVolumeSlider &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateVolumeSlider"><b><code>generateVolumeSlider &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Enables a slider for volumecontrol in detail view.</li>
-<li><a name="SONOSPLAYER_attribut_getAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgetAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Initializes a callback-method for Alarms. This included the information of the DailyIndexRefreshTime.</li>
-<li><a name="SONOSPLAYER_attribut_suppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsuppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Enables the control-section shown under the Cover-/Titleview.</li>
-<li><a name="SONOSPLAYER_attribut_volumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERvolumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Defines the stepwidth for subsequent calls of <code>VolumeU</code> and <code>VolumeD</code>.</li>
 </ul></li>
 <li><b>Information Generation</b><ul>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize1"><b><code>generateInfoSummarize1 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize1"><b><code>generateInfoSummarize1 &lt;string&gt;</code></b>
 </a><br /> Generates the reading 'InfoSummarize1' with the given format. More Information on this in the examples-section.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize2"><b><code>generateInfoSummarize2 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize2"><b><code>generateInfoSummarize2 &lt;string&gt;</code></b>
 </a><br /> Generates the reading 'InfoSummarize2' with the given format. More Information on this in the examples-section.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize3"><b><code>generateInfoSummarize3 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize3"><b><code>generateInfoSummarize3 &lt;string&gt;</code></b>
 </a><br /> Generates the reading 'InfoSummarize3' with the given format. More Information on this in the examples-section.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
 </a><br /> Generates the reading 'InfoSummarize4' with the given format. More Information on this in the examples-section.</li>
-<li><a name="SONOSPLAYER_attribut_getTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgetTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
 </a><br /> One of (0, 1). Gets the current Playing-Informations from the Masterplayer (if one is present).</li>
-<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsimulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
 </a><br /> One of (0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,45,60). Starts an internal Timer which refreshs the current trackposition into the Readings <code>currentTrackPositionSimulated</code> and <code>currentTrackPositionSimulatedSec</code>. At the same time the Reading <code>currentTrackPositionSimulatedPercent</code> (between 0.0 and 100.0) will also be refreshed.</li>
-<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
+<li><a name="SONOSPLAYERsimulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
 </a><br /> Defines the format of the percentformat in the Reading <code>currentTrackPositionSimulatedPercent</code>.</li>
-<li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERstateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
 </a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,<br />InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
 </ul></li>
 <li><b>Controloptions</b><ul>
-<li><a name="SONOSPLAYER_attribut_maxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERmaxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Define a maximal volume for this Zoneplayer</li>
-<li><a name="SONOSPLAYER_attribut_minVolume"><b><code>minVolume &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERminVolume"><b><code>minVolume &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Define a minimal volume for this Zoneplayer</li>
-<li><a name="SONOSPLAYER_attribut_maxVolumeHeadphone"><b><code>maxVolumeHeadphone &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERmaxVolumeHeadphone"><b><code>maxVolumeHeadphone &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Define a maximal volume for this Zoneplayer for use with headphones</li>
-<li><a name="SONOSPLAYER_attribut_minVolumeHeadphone"><b><code>minVolumeHeadphone &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERminVolumeHeadphone"><b><code>minVolumeHeadphone &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Define a minimal volume for this Zoneplayer for use with headphones</li>
-<li><a name="SONOSPLAYER_attribut_buttonEvents"><b><code>buttonEvents &lt;Time:Pattern&gt;[ &lt;Time:Pattern&gt; ...]</code></b>
+<li><a name="SONOSPLAYERbuttonEvents"><b><code>buttonEvents &lt;Time:Pattern&gt;[ &lt;Time:Pattern&gt; ...]</code></b>
 </a><br /> Defines that after pressing a specified sequence of buttons at the player an event has to be thrown. The definition itself is a tupel: the first part (before the colon) is the time in seconds, the second part (after the colon) is the button sequence of this event.<br />
 The following button-shortcuts are possible: <ul><li><b>M</b>: The Mute-Button</li><li><b>H</b>: The Headphone-Connector</li><li><b>U</b>: Up-Button (Volume Up)</li><li><b>D</b>: Down-Button (Volume Down)</li></ul><br />
 The event thrown is named <code>ButtonEvent</code>, the value is the defined button-sequence.<br />
 E.G.: <code>2:MM</code><br />
 Here an event is defined, where in time of 2 seconds the Mute-Button has to be pressed 2 times. The created event is named <code>ButtonEvent</code> and has the value <code>MM</code>.</li>
 </ul></li>
-<li><a name="SONOSPLAYER_attribut_saveSleeptimerInAction"><b><code>saveSleeptimerInAction &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsaveSleeptimerInAction"><b><code>saveSleeptimerInAction &lt;int&gt;</code></b>
 </a><br /> One of (0..1). If set, a possibly set Attribute "stopSleeptimerInAction" will be ignored.</li>
-<li><a name="SONOSPLAYER_attribut_stopSleeptimerInAction"><b><code>stopSleeptimerInAction &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERstopSleeptimerInAction"><b><code>stopSleeptimerInAction &lt;int&gt;</code></b>
 </a><br /> One of (0..1). If set, a change of the current transportState to "PAUSED_PLAYBACK" or "STOPPED" will cause a stopping of an eventually running SleepTimer.</li>
 </ul>
 <a name="SONOSPLAYERexamples"></a>
@@ -1695,240 +1696,240 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <h4>Set</h4>
 <ul>
 <li><b>Grundsätzliche Einstellungen</b><ul>
-<li><a name="SONOSPLAYER_setter_Alarm">
+<li><a name="SONOSPLAYERAlarm">
 <b><code>Alarm (Create|Update|Delete|Enable|Disable) &lt;ID[,ID]|All&gt; &lt;Datahash&gt;</code></b></a>
 <br />Diese Anweisung wird für die Bearbeitung der Alarme verwendet:<ul><li><b>Create:</b> Erzeugt einen neuen Alarm-Eintrag mit den übergebenen Hash-Daten.</li><li><b>Update:</b> Aktualisiert die Alarme mit den übergebenen IDs und den angegebenen Hash-Daten.</li><li><b>Delete:</b> Löscht die Alarm-Einträge mit den übergebenen IDs.</li><li><b>Enable:</b> Aktiviert die Alarm-Einträge mit den übergebenen IDs.</li><li><b>Disable:</b> Deaktiviert die Alarm-Einträge mit den übergebenen IDs.</li></ul>Bei Angabe des Wortes 'All' als ID, werden alle Alarme dieses Players bearbeitet.<br /><b>Die Hash-Daten:</b><br />Das Format ist ein Perl-Hash und wird mittels der eval-Funktion interpretiert.<br />e.g.: { Repeat =&gt; 1 }<br /><br />Die folgenden Schlüssel sind zulässig/notwendig:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />z.B.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
-<li><a name="SONOSPLAYER_setter_AudioDelay">
+<li><a name="SONOSPLAYERAudioDelay">
 <b><code>AudioDelay &lt;Level&gt;</code></b></a>
 <br /> Setzt den AudioDelay der Playbar auf den angegebenen Wert. Der Wert kann zwischen 0 und 5 liegen.</li>
-<li><a name="SONOSPLAYER_setter_AudioDelayLeftRear">
+<li><a name="SONOSPLAYERAudioDelayLeftRear">
 <b><code>AudioDelayLeftRear &lt;Level&gt;</code></b></a>
 <br /> Setzt den AudioDelayLeftRear des Players auf den angegebenen Wert. Der Wert kann zwischen 0 und 2 liegen. Wobei die Werte folgende Bedeutung haben: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
-<li><a name="SONOSPLAYER_setter_AudioDelayRightRear">
+<li><a name="SONOSPLAYERAudioDelayRightRear">
 <b><code>AudioDelayRightRear &lt;Level&gt;</code></b></a>
 <br /> Setzt den AudioDelayRightRear des Players auf den angegebenen Wert. Der Wert kann zwischen 0 und 2 liegen. Wobei die Werte folgende Bedeutung haben: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
-<li><a name="SONOSPLAYER_setter_ButtonLockState">
+<li><a name="SONOSPLAYERButtonLockState">
 <b><code>ButtonLockState &lt;int&gt;</code></b></a>
 <br />One of (0, 1). Setzt den aktuellen Button-Sperr-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
+<li><a name="SONOSPLAYERDailyIndexRefreshTime">
 <b><code>DailyIndexRefreshTime &lt;Timestring&gt;</code></b></a>
 <br />Setzt die aktuell gültige DailyIndexRefreshTime für alle Zoneplayer.</li>
-<li><a name="SONOSPLAYER_setter_DialogLevel">
+<li><a name="SONOSPLAYERDialogLevel">
 <b><code>DialogLevel &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand der Sprachverbesserung der Playbar fest.</li>
-<li><a name="SONOSPLAYER_setter_ExportSonosBibliothek">
+<li><a name="SONOSPLAYERExportSonosBibliothek">
 <b><code>ExportSonosBibliothek &lt;filename&gt;</code></b></a>
 <br />Exportiert eine Datei mit der textuellen Darstellung eines Struktur- und Titelhashs, das die komplette Navigationsstruktur aus der Sonos-Bibliothek abbildet. Achtung: Benötigt eine große Menge CPU-Zeit und Arbeitsspeicher für die Ausführung!</li>
-<li><a name="SONOSPLAYER_setter_Name">
+<li><a name="SONOSPLAYERName">
 <b><code>Name &lt;Zonename&gt;</code></b></a>
 <br />Legt den Namen der Zone fest.</li>
-<li><a name="SONOSPLAYER_setter_NightMode">
+<li><a name="SONOSPLAYERNightMode">
 <b><code>NightMode &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Nachtsounds der Playbar fest.</li>
-<li><a name="SONOSPLAYER_setter_OutputFixed">
+<li><a name="SONOSPLAYEROutputFixed">
 <b><code>OutputFixed &lt;State&gt;</code></b></a>
 <br /> Setzt den angegebenen OutputFixed-Zustand. Liefert den aktuell gültigen OutputFixed-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Reboot">
+<li><a name="SONOSPLAYERReboot">
 <b><code>Reboot</code></b></a>
 <br />Führt für den Zoneplayer einen Neustart durch.</li>
-<li><a name="SONOSPLAYER_setter_ResetAttributesToDefault">
+<li><a name="SONOSPLAYERResetAttributesToDefault">
 <b><code>ResetAttributesToDefault &lt;DeleteAllOtherAttributes&gt;</code></b></a>
 <br />Setzt die Attribute eines Players auf die Voreinstellung zurück, wie sie beim Anlegen des Players gesetzt waren. Wenn der Parameter "DeleteAllOtherAttributes" mit "1" oder "on" angegeben wurde, werden vor dem Setzen alle Attribute gelöscht.</li>
-<li><a name="SONOSPLAYER_setter_RoomIcon">
+<li><a name="SONOSPLAYERRoomIcon">
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Legt das Icon für die Zone fest</li>
-<li><a name="SONOSPLAYER_setter_SnoozeAlarm">
+<li><a name="SONOSPLAYERSnoozeAlarm">
 <b><code>SnoozeAlarm &lt;Timestring|Seconds&gt;</code></b></a>
 <br />Unterbricht eine laufende Alarmwiedergabe für den übergebenen Zeitraum.</li>
-<li><a name="SONOSPLAYER_setter_SubEnable">
+<li><a name="SONOSPLAYERSubEnable">
 <b><code>SubEnable &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Sub-Zustands fest.</li>
-<li><a name="SONOSPLAYER_setter_SubGain">
+<li><a name="SONOSPLAYERSubGain">
 <b><code>SubGain &lt;Level&gt;</code></b></a>
 <br /> Setzt den SubGain auf den angegebenen Wert. Der Wert kann zwischen -15 und 15 liegen.</li>
-<li><a name="SONOSPLAYER_setter_SubPolarity">
+<li><a name="SONOSPLAYERSubPolarity">
 <b><code>SubPolarity &lt;Level&gt;</code></b></a>
 <br /> Setzt den SubPolarity auf den angegebenen Wert. Der Wert kann zwischen 0 und 2 liegen.</li>
-<li><a name="SONOSPLAYER_setter_SurroundEnable">
+<li><a name="SONOSPLAYERSurroundEnable">
 <b><code>SurroundEnable &lt;State&gt;</code></b></a>
 <br />Setzt den SurroundEnable-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_SurroundLevel">
+<li><a name="SONOSPLAYERSurroundLevel">
 <b><code>SurroundLevel &lt;Level&gt;</code></b></a>
 <br /> Setzt den Surroundlevel auf den angegebenen Wert. Der Wert kann zwischen -15 und 15 liegen.</li>
-<li><a name="SONOSPLAYER_setter_TruePlay">
+<li><a name="SONOSPLAYERTruePlay">
 <b><code>TruePlay &lt;State&gt;</code></b></a>
 <br />Setzt den TruePlay-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Wifi">
+<li><a name="SONOSPLAYERWifi">
 <b><code>Wifi &lt;State&gt;</code></b></a>
 <br />Setzt den WiFi-Zustand des Players. Kann 'off', 'persist-off' oder 'on' sein.</li>
 </ul></li>
 <li><b>Abspiel-Steuerbefehle</b><ul>
-<li><a name="SONOSPLAYER_setter_CurrentTrackPosition">
+<li><a name="SONOSPLAYERCurrentTrackPosition">
 <b><code>CurrentTrackPosition &lt;TimePosition&gt;</code></b></a>
 <br /> Setzt die Abspielposition innerhalb des Liedes auf den angegebenen Zeitwert (z.B. 0:01:15) oder eine Sekundenangabe (z.B. 81). Man kann hier auch relative Angaben machen wie '+0:00:10' oder nur '+10'. Zusätzlich kann man auch Prozentwerte angeben wie z.B. '+10%'. Natürlich können diese Angaben auch negativ sein.</li>
-<li><a name="SONOSPLAYER_setter_Pause">
+<li><a name="SONOSPLAYERPause">
 <b><code>Pause</code></b></a>
 <br /> Pausiert die Wiedergabe</li>
-<li><a name="SONOSPLAYER_setter_Previous">
+<li><a name="SONOSPLAYERPrevious">
 <b><code>Previous</code></b></a>
 <br /> Springt an den Anfang des vorherigen Titels.</li>
-<li><a name="SONOSPLAYER_setter_Play">
+<li><a name="SONOSPLAYERPlay">
 <b><code>Play</code></b></a>
 <br /> Startet die Wiedergabe</li>
-<li><a name="SONOSPLAYER_setter_PlayURI">
+<li><a name="SONOSPLAYERPlayURI">
 <b><code>PlayURI &lt;songURI&gt; [Volume]</code></b></a>
 <br /> Spielt die angegebene MP3-Datei ab. Dabei kann eine Lautstärke optional mit angegeben werden.</li>
-<li><a name="SONOSPLAYER_setter_PlayURITemp">
+<li><a name="SONOSPLAYERPlayURITemp">
 <b><code>PlayURITemp &lt;songURI&gt; [Volume]</code></b></a>
 <br /> Spielt die angegebene MP3-Datei mit der optionalen Lautstärke als temporäre Wiedergabe ab. Nach dem Abspielen wird der vorhergehende Zustand wiederhergestellt, und läuft an der unterbrochenen Stelle weiter. Wenn die Länge der Datei nicht ermittelt werden kann (z.B. bei Streams), läuft die Wiedergabe genauso wie bei <code>PlayURI</code> ab, es wird also nichts am Ende (wenn es eines geben sollte) wiederhergestellt.</li>
-<li><a name="SONOSPLAYER_setter_Next">
+<li><a name="SONOSPLAYERNext">
 <b><code>Next</code></b></a>
 <br /> Springt an den Anfang des nächsten Titels</li>
-<li><a name="SONOSPLAYER_setter_Speak">
+<li><a name="SONOSPLAYERSpeak">
 <b><code>Speak &lt;Volume&gt; &lt;Language&gt; &lt;Text&gt;</code></b></a>
 <br /> Verwendet die Google Text-To-Speech-Engine um den angegebenen Text in eine MP3-Datei umzuwandeln und anschließend mittels <code>PlayURITemp</code> als Durchsage abzuspielen. Mögliche Sprachen können auf der Google-Seite nachgesehen werden. Möglich sind z.B. "de", "en", "fr", "es"...</li>
-<li><a name="SONOSPLAYER_setter_StartFavourite">
+<li><a name="SONOSPLAYERStartFavourite">
 <b><code>StartFavourite &lt;FavouriteName&gt; [NoStart]</code></b></a>
 <br /> Startet den angegebenen Favoriten. Der Name bezeichnet einen Eintrag in der Sonos-Favoritenliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Wenn das Wort 'NoStart' als zweiter Parameter angegeben wurde, dann wird der Favorit geladen und fertig vorbereitet, aber nicht explizit gestartet.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/meine.hits/</code>.</li>
-<li><a name="SONOSPLAYER_setter_StartPlaylist">
+<li><a name="SONOSPLAYERStartPlaylist">
 <b><code>StartPlaylist &lt;Playlistname&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Lädt die benannte Playlist und startet sofort die Wiedergabe. Zu den Parametern und Bemerkungen bitte unter "LoadPlaylist" nachsehen.</li>
-<li><a name="SONOSPLAYER_setter_StartRadio">
+<li><a name="SONOSPLAYERStartRadio">
 <b><code>StartRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Lädt den benannten Radiosender, genauer gesagt, den benannten Radiofavoriten und startet sofort die Wiedergabe. Dabei wird die bestehende Abspielliste beibehalten, aber deaktiviert. Der Parameter kann/muss URL-Encoded sein, um auch Leer- und Sonderzeichen angeben zu können.</li>
-<li><a name="SONOSPLAYER_setter_StartSearchlist">
+<li><a name="SONOSPLAYERStartSearchlist">
 <b><code>StartSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
 <br /> Lädt die Searchlist und startet sofort die Wiedergabe. Für nähere Informationen bitte unter "LoadSearchlist" nachschlagen.</li>
-<li><a name="SONOSPLAYER_setter_Stop">
+<li><a name="SONOSPLAYERStop">
 <b><code>Stop</code></b></a>
 <br /> Stoppt die Wiedergabe</li>
-<li><a name="SONOSPLAYER_setter_Track">
+<li><a name="SONOSPLAYERTrack">
 <b><code>Track &lt;TrackNumber|Random&gt;</code></b></a>
 <br /> Aktiviert den angebenen Titel der aktuellen Abspielliste. Wenn als Tracknummer der Wert <code>Random</code> angegeben wird, dann wird eine zufällige Trackposition ausgewählt.</li>
 </ul></li>
 <li><b>Einstellungen zum Abspielen</b><ul>
-<li><a name="SONOSPLAYER_setter_Balance">
+<li><a name="SONOSPLAYERBalance">
 <b><code>Balance &lt;BalanceValue&gt;</code></b></a>
 <br /> Setzt die Balance auf den angegebenen Wert. Der Wert kann zwischen -100 (voll links) bis 100 (voll rechts) sein. Gibt die wirklich eingestellte Balance als Ergebnis zurück.</li>
-<li><a name="SONOSPLAYER_setter_Bass">
+<li><a name="SONOSPLAYERBass">
 <b><code>Bass &lt;BassValue&gt;</code></b></a>
 <br /> Setzt den Basslevel auf den angegebenen Wert. Der Wert kann zwischen -10 bis 10 sein. Gibt den wirklich eingestellten Basslevel als Ergebnis zurück.</li>
-<li><a name="SONOSPLAYER_setter_CrossfadeMode">
+<li><a name="SONOSPLAYERCrossfadeMode">
 <b><code>CrossfadeMode &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Crossfade-Mode fest. Liefert den aktuell gültigen Crossfade-Mode.</li>
-<li><a name="SONOSPLAYER_setter_LEDState">
+<li><a name="SONOSPLAYERLEDState">
 <b><code>LEDState &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand der LED fest. Liefert den aktuell gültigen Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Loudness">
+<li><a name="SONOSPLAYERLoudness">
 <b><code>Loudness &lt;State&gt;</code></b></a>
 <br /> Setzt den angegebenen Loudness-Zustand. Liefert den aktuell gültigen Loudness-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Mute">
+<li><a name="SONOSPLAYERMute">
 <b><code>Mute &lt;State&gt;</code></b></a>
 <br /> Setzt den angegebenen Mute-Zustand. Liefert den aktuell gültigen Mute-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_MuteT">
+<li><a name="SONOSPLAYERMuteT">
 <b><code>MuteT</code></b></a>
 <br /> Schaltet den Zustand des Mute-Zustands um. Liefert den aktuell gültigen Mute-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Repeat">
+<li><a name="SONOSPLAYERRepeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Repeat-Zustands fest. Liefert den aktuell gültigen Repeat-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_RepeatOne">
+<li><a name="SONOSPLAYERRepeatOne">
 <b><code>RepeatOne &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des RepeatOne-Zustands fest. Liefert den aktuell gültigen RepeatOne-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_RepeatOneT">
+<li><a name="SONOSPLAYERRepeatOneT">
 <b><code>RepeatOneT</code></b></a>
 <br /> Schaltet den Zustand des RepeatOne-Zustands um. Liefert den aktuell gültigen RepeatOne-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_RepeatT">
+<li><a name="SONOSPLAYERRepeatT">
 <b><code>RepeatT</code></b></a>
 <br /> Schaltet den Zustand des Repeat-Zustands um. Liefert den aktuell gültigen Repeat-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_Shuffle">
+<li><a name="SONOSPLAYERShuffle">
 <b><code>Shuffle &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Shuffle-Zustands fest. Liefert den aktuell gültigen Shuffle-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_ShuffleT">
+<li><a name="SONOSPLAYERShuffleT">
 <b><code>ShuffleT</code></b></a>
 <br /> Schaltet den Zustand des Shuffle-Zustands um. Liefert den aktuell gültigen Shuffle-Zustand.</li>
-<li><a name="SONOSPLAYER_setter_SleepTimer">
+<li><a name="SONOSPLAYERSleepTimer">
 <b><code>SleepTimer &lt;Timestring|Seconds&gt;</code></b></a>
 <br /> Legt den aktuellen SleepTimer fest. Der Wert muss ein kompletter Zeitstempel sein (HH:MM:SS). Zum Deaktivieren darf der Zeitstempel nur Nullen enthalten oder das Wort 'off'.</li>
-<li><a name="SONOSPLAYER_setter_Treble">
+<li><a name="SONOSPLAYERTreble">
 <b><code>Treble &lt;TrebleValue&gt;</code></b></a>
 <br /> Setzt den Treblelevel auf den angegebenen Wert. Der Wert kann zwischen -10 bis 10 sein. Gibt den wirklich eingestellten Treblelevel als Ergebnis zurück.</li>
-<li><a name="SONOSPLAYER_setter_Volume">
+<li><a name="SONOSPLAYERVolume">
 <b><code>Volume &lt;VolumeLevel&gt; [RampType]</code></b></a>
 <br /> Setzt die aktuelle Lautstärke auf den angegebenen Wert. Der Wert kann ein relativer Wert mittels + oder - Zeichen sein. Liefert den aktuell gültigen Lautstärkewert zurück.<br />Optional kann ein RampType übergeben werden, der einen Wert zwischen 1 und 3 annehmen kann, und verschiedene von Sonos festgelegte Muster beschreibt.</li>
-<li><a name="SONOSPLAYER_setter_VolumeD">
+<li><a name="SONOSPLAYERVolumeD">
 <b><code>VolumeD</code></b></a>
 <br /> Verringert die aktuelle Lautstärke um volumeStep-Einheiten.</li>
-<li><a name="SONOSPLAYER_setter_VolumeRestore">
+<li><a name="SONOSPLAYERVolumeRestore">
 <b><code>VolumeRestore</code></b></a>
 <br /> Stellt die mittels <code>VolumeSave</code> gespeicherte Lautstärke wieder her.</li>
-<li><a name="SONOSPLAYER_setter_VolumeSave">
+<li><a name="SONOSPLAYERVolumeSave">
 <b><code>VolumeSave &lt;VolumeLevel&gt;</code></b></a>
 <br /> Setzt die aktuelle Lautstärke auf den angegebenen Wert. Der Wert kann ein relativer Wert mittels + oder - Zeichen sein. Liefert den aktuell gültigen Lautstärkewert zurück. Zusätzlich wird der alte Lautstärkewert gespeichert und kann mittels <code>VolumeRestore</code> wiederhergestellt werden.</li>
-<li><a name="SONOSPLAYER_setter_VolumeU">
+<li><a name="SONOSPLAYERVolumeU">
 <b><code>VolumeU</code></b></a>
 <br /> Erhöht die aktuelle Lautstärke um volumeStep-Einheiten.</li>
 </ul></li>
 <li><b>Steuerung der aktuellen Abspielliste</b><ul>
-<li><a name="SONOSPLAYER_setter_AddURIToQueue">
+<li><a name="SONOSPLAYERAddURIToQueue">
 <b><code>AddURIToQueue &lt;songURI&gt;</code></b></a>
 <br /> Fügt die angegebene MP3-Datei an der aktuellen Stelle in die Abspielliste ein.</li>
-<li><a name="SONOSPLAYER_setter_CurrentPlaylist">
+<li><a name="SONOSPLAYERCurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Setzt den Abspielmodus auf die aktuelle Abspielliste, startet aber keine Wiedergabe (z.B. nach dem Hören eines Radiostreams, wo die aktuelle Abspielliste noch existiert, aber gerade "nicht verwendet" wird)</li>
-<li><a name="SONOSPLAYER_setter_DeleteFromQueue">
+<li><a name="SONOSPLAYERDeleteFromQueue">
 <b><code>DeleteFromQueue <index_of_elems></code></b></a>
 <br /> Löscht die angegebenen Elemente aus der aktuellen Abspielliste. Die Angabe erfolgt über die Indizies der Titel. Es können die bei Perl-Array-üblichen Formate verwendet werden: "1..12,17,20..22". Die Indizies beziehen sich auf die aktuell angezeigte Reihenfolge (diese unterscheidet sich zwischen der normalen Abspielweise und dem Shufflemodus).</li>
-<li><a name="SONOSPLAYER_setter_DeletePlaylist">
+<li><a name="SONOSPLAYERDeletePlaylist">
 <b><code>DeletePlaylist</code></b></a>
 <br /> Löscht die bezeichnete Playliste. Zum möglichen Format des Playlistenamen unter LoadPlaylist nachsehen.</li>
-<li><a name="SONOSPLAYER_setter_EmptyPlaylist">
+<li><a name="SONOSPLAYEREmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Leert die aktuelle Abspielliste</li>
-<li><a name="SONOSPLAYER_setter_LoadFavourite">
+<li><a name="SONOSPLAYERLoadFavourite">
 <b><code>LoadFavourite &lt;FavouriteName&gt;</code></b></a>
 <br /> Lädt den angegebenen Favoriten. Der Name bezeichnet einen Eintrag in der Sonos-Favoritenliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/meine.hits/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadPlaylist">
+<li><a name="SONOSPLAYERLoadPlaylist">
 <b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann ein Fhem-Sonosplayer-Devicename sein, dann wird dessen aktuelle Abpielliste kopiert. Der Playlistname kann aber auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/hits.2014/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadRadio">
+<li><a name="SONOSPLAYERLoadRadio">
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/radio/</code>.</li>
-<li><a name="SONOSPLAYER_setter_LoadSearchlist">
+<li><a name="SONOSPLAYERLoadSearchlist">
 <b><code>LoadSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [[*]maxElem[+|-]]]</code></b></a>
 <br /> Lädt Titel nach diversen Kriterien in die aktuelle Abspielliste. Nähere Beschreibung bitte im Wiki nachlesen.</li>
-<li><a name="SONOSPLAYER_setter_SavePlaylist">
+<li><a name="SONOSPLAYERSavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
 <br /> Speichert die aktuelle Abspielliste unter dem angegebenen Namen. Eine bestehende Playlist mit diesem Namen wird überschrieben. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).</li>
 </ul></li>
 <li><b>Gruppenbefehle</b><ul>
-<li><a name="SONOSPLAYER_setter_AddMember">
+<li><a name="SONOSPLAYERAddMember">
 <b><code>AddMember &lt;devicename&gt;</code></b></a>
 <br />Fügt dem Device das übergebene Device als Gruppenmitglied hinzu. Die Wiedergabe des aktuellen Devices bleibt erhalten, und wird auf das angegebene Device mit übertragen.</li>
-<li><a name="SONOSPLAYER_setter_CreateStereoPair">
+<li><a name="SONOSPLAYERCreateStereoPair">
 <b><code>CreateStereoPair &lt;rightPlayerDevicename&gt;</code></b></a>
 <br />Fügt dem Device das übergebene Device als rechtes Stereopaar-Element hinzu. Die Wiedergabe des aktuellen Devices bleibt erhalten (als linker Lautsprecher), und wird auf das angegebene Device mit übertragen (als rechter Lautsprecher).</li>
-<li><a name="SONOSPLAYER_setter_GroupMute">
+<li><a name="SONOSPLAYERGroupMute">
 <b><code>GroupMute &lt;State&gt;</code></b></a>
 <br />Setzt den Mute-Zustand für die komplette Gruppe in einem Schritt. Der Wert kann on oder off sein.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolume">
+<li><a name="SONOSPLAYERGroupVolume">
 <b><code>GroupVolume &lt;VolumeLevel&gt;</code></b></a>
 <br />Setzt die Gruppenlautstärke in der Art des Original-Controllers. Das bedeutet, dass das Lautstärkeverhältnis der Player zueinander beim Anpassen erhalten bleibt.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolumeD">
+<li><a name="SONOSPLAYERGroupVolumeD">
 <b><code>GroupVolumeD</code></b></a>
 <br /> Verringert die aktuelle Gruppenlautstärke um volumeStep-Einheiten.</li>
-<li><a name="SONOSPLAYER_setter_GroupVolumeU">
+<li><a name="SONOSPLAYERGroupVolumeU">
 <b><code>GroupVolumeU</code></b></a>
 <br /> Erhöht die aktuelle Gruppenlautstärke um volumeStep-Einheiten.</li>
-<li><a name="SONOSPLAYER_setter_MakeStandaloneGroup">
+<li><a name="SONOSPLAYERMakeStandaloneGroup">
 <b><code>MakeStandaloneGroup</code></b></a>
 <br />Macht diesen Player zu seiner eigenen Gruppe.</li>
-<li><a name="SONOSPLAYER_setter_RemoveMember">
+<li><a name="SONOSPLAYERRemoveMember">
 <b><code>RemoveMember &lt;devicename&gt;</code></b></a>
 <br />Entfernt dem Device das übergebene Device, sodass die beiden keine Gruppe mehr bilden. Die Wiedergabe des aktuellen Devices läuft normal weiter. Das abgetrennte Device stoppt seine Wiedergabe, und hat keine aktuelle Abspielliste mehr (seit Sonos Version 4.2 hat der Player wieder die Playliste von vorher aktiv).</li>
-<li><a name="SONOSPLAYER_setter_SeparateStereoPair">
+<li><a name="SONOSPLAYERSeparateStereoPair">
 <b><code>SeparateStereoPair</code></b></a>
 <br />Trennt das Stereopaar wieder auf.</li>
-<li><a name="SONOSPLAYER_setter_SnapshotGroupVolume">
+<li><a name="SONOSPLAYERSnapshotGroupVolume">
 <b><code>SnapshotGroupVolume</code></b></a>
 <br /> Legt das Lautstärkeverhältnis der aktuellen Player der Gruppe für folgende '''GroupVolume'''-Aufrufe fest. Dieses festgelegte Verhältnis wird bis zum nächsten Aufruf von '''SnapshotGroupVolume''' beibehalten.</li>
 </ul></li>
@@ -1937,53 +1938,53 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <h4>Get</h4>
 <ul>
 <li><b>Grundsätzliches</b><ul>
-<li><a name="SONOSPLAYER_getter_Alarm">
+<li><a name="SONOSPLAYERAlarm">
 <b><code>Alarm &lt;ID&gt;</code></b></a>
 <br /> Ausnahmefall. Diese Get-Anweisung liefert direkt ein Hash zurück, in welchem die Informationen des Alarms mit der gegebenen ID enthalten sind. Es ist die Kurzform für <code>eval(ReadingsVal(&lt;Devicename&gt;, 'Alarmlist', ()))->{&lt;ID&gt;};</code>, damit sich nicht jeder ausdenken muss, wie er jetzt am einfachsten an die Alarm-Informationen rankommen kann.</li>
-<li><a name="SONOSPLAYER_getter_EthernetPortStatus">
+<li><a name="SONOSPLAYEREthernetPortStatus">
 <b><code>EthernetPortStatus &lt;PortNumber&gt;</code></b></a>
 <br /> Liefert den Ethernet-Portstatus des gegebenen Ports. Kann 'Active' oder 'Inactive' liefern.</li>
-<li><a name="SONOSPLAYER_getter_PossibleRoomIcons">
+<li><a name="SONOSPLAYERPossibleRoomIcons">
 <b><code>PossibleRoomIcons</code></b></a>
 <br /> Liefert eine Liste aller möglichen RoomIcon-Bezeichnungen zurück.</li>
-<li><a name="SONOSPLAYER_getter_SupportLinks">
+<li><a name="SONOSPLAYERSupportLinks">
 <b><code>SupportLinks</code></b></a>
 <br /> Ausnahmefall. Diese Get-Anweisung liefert eine Liste mit passenden Links zu den Supportseiten des Player.</li>
-<li><a name="SONOSPLAYER_getter_WifiPortStatus">
+<li><a name="SONOSPLAYERWifiPortStatus">
 <b><code>WifiPortStatus</code></b></a>
 <br /> Liefert den Wifi-Portstatus. Kann 'Active' oder 'Inactive' liefern.</li>
 </ul></li>
 <li><b>Listen</b><ul>
-<li><a name="SONOSPLAYER_getter_Favourites">
+<li><a name="SONOSPLAYERFavourites">
 <b><code>Favourites</code></b></a>
 <br /> Liefert eine Liste mit den Namen aller gespeicherten Sonos-Favoriten. Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "Liste 1","Eintrag 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_FavouritesWithCovers">
+<li><a name="SONOSPLAYERFavouritesWithCovers">
 <b><code>FavouritesWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller gespeicherten Sonos-Favoriten. Z.B.: {'FV:2/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Favorit'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
-<li><a name="SONOSPLAYER_getter_Playlists">
+<li><a name="SONOSPLAYERPlaylists">
 <b><code>Playlists</code></b></a>
 <br /> Liefert eine Liste mit den Namen aller gespeicherten Playlists. Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "Liste 1","Liste 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_PlaylistsWithCovers">
+<li><a name="SONOSPLAYERPlaylistsWithCovers">
 <b><code>PlaylistsWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller gespeicherten Sonos-Playlisten. Z.B.: {'SQ:14' => {'Cover' => 'urlzumcover', 'Title' => '1. Playlist'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
-<li><a name="SONOSPLAYER_getter_Queue">
+<li><a name="SONOSPLAYERQueue">
 <b><code>Queue</code></b></a>
 <br /> Liefert eine Liste mit den Namen aller Titel in der aktuellen Abspielliste. Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "1. Liste 1 [0:02:14]","2. Eintrag 2 [k.A.]","3. Test [0:14:00]"</li>
-<li><a name="SONOSPLAYER_getter_QueueWithCovers">
+<li><a name="SONOSPLAYERQueueWithCovers">
 <b><code>QueueWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller Titel der aktuellen Abspielliste. Z.B.: {'Q:0/22' => {'Cover' => 'urlzumcover', 'Title' => '1. Titel'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
-<li><a name="SONOSPLAYER_getter_Radios">
+<li><a name="SONOSPLAYERRadios">
 <b><code>Radios</code></b></a>
 <br /> Liefert eine Liste mit den Namen aller gespeicherten Radiostationen (Favoriten). Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen. z.B. "Sender 1","Sender 2","Test"</li>
-<li><a name="SONOSPLAYER_getter_RadiosWithCovers">
+<li><a name="SONOSPLAYERRadiosWithCovers">
 <b><code>RadiosWithCovers</code></b></a>
 <br /> Liefert die Stringrepräsentation eines Hash mit den Namen und Covern aller gespeicherten Sonos-Radiofavoriten. Z.B.: {'R:0/0/2' => {'Cover' => 'urlzumcover', 'Title' => '1. Radiosender'}}. Dieser String kann einfach mit '''eval''' in eine Perl-Datenstruktur umgewandelt werden.</li>
-<li><a name="SONOSPLAYER_getter_SearchlistCategories">
+<li><a name="SONOSPLAYERSearchlistCategories">
 <b><code>SearchlistCategories</code></b></a>
 <br /> Liefert eine Liste mit den Namen alle möglichen Kategorien für den Aufruf von "LoadSearchlist". Das Format der Liste ist eine Komma-Separierte Liste, bei der die Namen in doppelten Anführungsstrichen stehen.</li>
 </ul></li>
 <li><b>Informationen zum aktuellen Titel</b><ul>
-<li><a name="SONOSPLAYER_getter_CurrentTrackPosition">
+<li><a name="SONOSPLAYERCurrentTrackPosition">
 <b><code>CurrentTrackPosition</code></b></a>
 <br /> Liefert die aktuelle Position innerhalb des Titels.</li>
 </ul></li>
@@ -1993,61 +1994,60 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 '''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
 <ul>
 <li><b>Grundsätzliches</b><ul>
-<li><a name="SONOSPLAYER_attribut_disable"><b><code>disable &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERdisable"><b><code>disable &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Deaktiviert die Event-Verarbeitung für diesen Zoneplayer.</li>
-<li><a name="SONOSPLAYER_attribut_generateSomethingChangedEvent"><b><code>generateSomethingChangedEvent &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateSomethingChangedEvent"><b><code>generateSomethingChangedEvent &lt;int&gt;</code></b>
 </a><br /> One of (0,1). 1 wenn ein 'SomethingChanged'-Event erzeugt werden soll. Dieses Event wird immer dann erzeugt, wenn sich irgendein Wert ändert. Dies ist nützlich, wenn man immer informiert werden möchte, egal, was sich geändert hat.</li>
-<li><a name="SONOSPLAYER_attribut_generateVolumeEvent"><b><code>generateVolumeEvent &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateVolumeEvent"><b><code>generateVolumeEvent &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Aktiviert die Generierung eines Events bei Lautstärkeänderungen, wenn minVolume oder maxVolume definiert sind.</li>
-<li><a name="SONOSPLAYER_attribut_generateVolumeSlider"><b><code>generateVolumeSlider &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateVolumeSlider"><b><code>generateVolumeSlider &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Aktiviert einen Slider für die Lautstärkekontrolle in der Detailansicht.</li>
-<li><a name="SONOSPLAYER_attribut_getAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgetAlarms"><b><code>getAlarms &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Richtet eine Callback-Methode für Alarme ein. Damit wird auch die DailyIndexRefreshTime automatisch aktualisiert.</li>
-<li><a name="SONOSPLAYER_attribut_suppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsuppressControlButtons"><b><code>suppressControlButtons &lt;int&gt;</code></b>
 </a><br /> One of (0,1). Gibt an, ob die Steuerbuttons unter der Cover-/Titelanzeige angezeigt werden sollen (=1) oder nicht (=0).</li>
-</ul></li>
-<li><a name="SONOSPLAYER_attribut_volumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERvolumeStep"><b><code>volumeStep &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die Schrittweite für die Aufrufe von <code>VolumeU</code> und <code>VolumeD</code>.</li>
-</ul>
+</ul></li>
 <li><b>Informationen generieren</b><ul>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize1"><b><code>generateInfoSummarize1 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize1"><b><code>generateInfoSummarize1 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize1' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize2"><b><code>generateInfoSummarize2 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize2"><b><code>generateInfoSummarize2 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize2' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize3"><b><code>generateInfoSummarize3 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize3"><b><code>generateInfoSummarize3 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize3' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
-<li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERgenerateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize4' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
-<li><a name="SONOSPLAYER_attribut_getTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERgetTitleInfoFromMaster"><b><code>getTitleInfoFromMaster &lt;int&gt;</code></b>
 </a><br /> Eins aus (0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,45,60). Bringt das Device dazu, seine aktuellen Abspielinformationen vom aktuellen Gruppenmaster zu holen, wenn es einen solchen gibt.</li>
-<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsimulateCurrentTrackPosition"><b><code>simulateCurrentTrackPosition &lt;int&gt;</code></b>
 </a><br /> Eins aus (0, 1). Bringt das Device dazu, seine aktuelle Abspielposition simuliert weiterlaufen zu lassen. Dazu werden die Readings <code>currentTrackPositionSimulated</code> und <code>currentTrackPositionSimulatedSec</code> gesetzt. Gleichzeitig wird auch das Reading <code>currentTrackPositionSimulatedPercent</code> (zwischen 0.0 und 100.0) gesetzt.</li>
-<li><a name="SONOSPLAYER_attribut_simulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
+<li><a name="SONOSPLAYERsimulateCurrentTrackPositionPercentFormat"><b><code>simulateCurrentTrackPositionPercentFormat &lt;Format&gt;</code></b>
 </a><br /> Definiert das Format für die sprintf-Prozentausgabe im Reading <code>currentTrackPositionSimulatedPercent</code>.</li>
-<li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
+<li><a name="SONOSPLAYERstateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
 </a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,I<br />nfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
 </ul></li>
 <li><b>Steueroptionen</b><ul>
-<li><a name="SONOSPLAYER_attribut_maxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERmaxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die maximale Lautstärke dieses Zoneplayer.</li>
-<li><a name="SONOSPLAYER_attribut_minVolume"><b><code>minVolume &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERminVolume"><b><code>minVolume &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die minimale Lautstärke dieses Zoneplayer.</li>
-<li><a name="SONOSPLAYER_attribut_maxVolumeHeadphone"><b><code>maxVolumeHeadphone &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERmaxVolumeHeadphone"><b><code>maxVolumeHeadphone &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die maximale Lautstärke dieses Zoneplayer im Kopfhörerbetrieb.</li>
-<li><a name="SONOSPLAYER_attribut_minVolumeHeadphone"><b><code>minVolumeHeadphone &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERminVolumeHeadphone"><b><code>minVolumeHeadphone &lt;int&gt;</code></b>
 </a><br /> One of (0..100). Definiert die minimale Lautstärke dieses Zoneplayer im Kopfhörerbetrieb.</li>
-<li><a name="SONOSPLAYER_attribut_buttonEvents"><b><code>buttonEvents &lt;Time:Pattern&gt;[ &lt;Time:Pattern&gt; ...]</code></b>
+<li><a name="SONOSPLAYERbuttonEvents"><b><code>buttonEvents &lt;Time:Pattern&gt;[ &lt;Time:Pattern&gt; ...]</code></b>
 </a><br /> Definiert, dass bei einer bestimten Tastenfolge am Player ein Event erzeugt werden soll. Die Definition der Events erfolgt als Tupel: Der erste Teil vor dem Doppelpunkt ist die Zeit in Sekunden, die berücksichtigt werden soll, der zweite Teil hinter dem Doppelpunkt definiert die Abfolge der Buttons, die für dieses Event notwendig sind.<br />
 Folgende Button-Kürzel sind zulässig: <ul><li><b>M</b>: Der Mute-Button</li><li><b>H</b>: Die Headphone-Buchse</li><li><b>U</b>: Up-Button (Lautstärke Hoch)</li><li><b>D</b>: Down-Button (Lautstärke Runter)</li></ul><br />
 Das Event, das geworfen wird, heißt <code>ButtonEvent</code>, der Wert ist die definierte Tastenfolge<br />
 Z.B.: <code>2:MM</code><br />
 Hier wird definiert, dass ein Event erzeugt werden soll, wenn innerhalb von 2 Sekunden zweimal die Mute-Taste gedrückt wurde. Das damit erzeugte Event hat dann den Namen <code>ButtonEvent</code>, und den Wert <code>MM</code>.</li>
 </ul></li>
-<li><a name="SONOSPLAYER_attribut_saveSleeptimerInAction"><b><code>saveSleeptimerInAction &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERsaveSleeptimerInAction"><b><code>saveSleeptimerInAction &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Wenn gesetzt, wird ein etwaig gesetztes Attribut "stopSleeptimerInAction" ignoriert.</li>
-<li><a name="SONOSPLAYER_attribut_stopSleeptimerInAction"><b><code>stopSleeptimerInAction &lt;int&gt;</code></b>
+<li><a name="SONOSPLAYERstopSleeptimerInAction"><b><code>stopSleeptimerInAction &lt;int&gt;</code></b>
 </a><br /> One of (0..1). Wenn gesetzt, wird bei einem Wechsel des transportState auf "PAUSED_PLAYBACK" oder "STOPPED" ein etwaig definierter SleepTimer deaktiviert.</li>
-
+</ul>
 <a name="SONOSPLAYERexamples"></a>
 <h4>Beispiele / Hinweise</h4>
 <ul>
