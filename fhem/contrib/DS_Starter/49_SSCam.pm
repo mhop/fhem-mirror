@@ -7369,7 +7369,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-return 1;
+
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -9387,10 +9387,10 @@ sub sendTelegram {
        return;   
    } 
                                     
-  no strict "refs";
+  # no strict "refs";
   my ($msg,$subject,$MediaStream,$fname,@as,%seen,@unique);
   
-  $cache = cache($name, "c_init");                                                     # Cache initialisieren        
+  $cache = cache($name, "c_init");                                                           # Cache initialisieren        
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);
   
   if(!$cache || $cache eq "internal" ) {
@@ -9418,7 +9418,7 @@ sub sendTelegram {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           # Muster: {SENDSNAPS}{2222}{0}{imageData}
-          for(cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+          for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
               next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
               next if $1 != $tac;
@@ -9453,7 +9453,7 @@ sub sendTelegram {
       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
   }
   
-  use strict "refs";
+  #use strict "refs";
   undef %teleparams;
   undef %{$extparamref};
   undef $msg;
@@ -10005,7 +10005,7 @@ sub sendEmailblocking {
       );
   }
   
-  no strict "refs";
+  # no strict "refs";
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my ($ct,$img,$decoded);
@@ -10220,7 +10220,7 @@ sub sendEmailblocking {
   my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
   
-  use strict "refs";
+  # use strict "refs";
   
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
