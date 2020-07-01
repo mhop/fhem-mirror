@@ -59,25 +59,26 @@ filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota and "command" for shelly. <br>Additionally homeassistat discovery branch will be deactivated. <br>NOTE: early experimental version...
 order:000002
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly
-set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_tasmota
-set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant
-setreading IODEVNAME attrTemplateVersion 20200628
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_shelly \IODEVNAME=IODEVNAME
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_tasmota \IODEVNAME=IODEVNAME
+set DEVICE attrTemplate MQTT2_IO_ignoreRegexp_homeassistant \IODEVNAME=IODEVNAME
+setreading IODEVNAME attrTemplateVersion 20200701
 
 name:MQTT2_IO_ignoreRegexp_tasmota
 filter:TYPE=MQTT2_DEVICE
 desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "cmnd" tasmota. <br>NOTE: early experimental version...
 order:0000021
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'cmnd/[^/]+/');; 'cmnd/[^/]+/' =~ m{($old)} ? $old : $old.'|cmnd/[^/]+/' }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'cmnd/[^/]+/'); 'cmnd/[^/]+/' =~ m/$old/ ? $old : $old.'|cmnd/[^/]+/' }
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 name:MQTT2_IO_ignoreRegexp_shelly
 filter:TYPE=MQTT2_DEVICE
-desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "command" for shelly. <br>NOTE: early experimental version...
+desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages typically meant to go towards the hardware including branches with "command" for shelly. <br>NOTE: early experimental version!!! <b>This is known for some strange effects, so make sure to have a copy of the existing one, of it's already sophisticated...</b>
 order:0000022
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'shellies/[^/]+/command');; 'shellies/[^/]+/command' =~ m{($old)} ? $old : $old.'|shellies/[^/]+/command' }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if shelly is included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),'ignoreRegexp','shellies/[^/]+/command'); 'shellies/[^/]+/command' =~ m{$old} ? $old : $old.'|shellies/[^/]+/command' }
+option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),'ignoreRegexp','not_set');return 0}
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 
@@ -85,23 +86,27 @@ name:MQTT2_IO_ignoreRegexp_homeassistant
 filter:TYPE=MQTT2_DEVICE
 desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device it is applied to. This will prevent evaluation of incoming messages meant for homeassistant for auto-discovery of devices. You are strongly encouraged to not use homeassistant autodiscovery at all, but in case you need it for some reason, adding this ignoreRegexp-expression might help to avoid confusion!<br>NOTE: early experimental version...
 order:000002a
+farewell:template has been applied successfully. If you will not be redirected to IODev detail page, no changes have been made.<br>Check further extending the ignoreRegexp by yourself!
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'homeassistant/.*/config');; 'homeassistant/.*/config' =~ m{($old)} ? $old : $old.'|homeassistant/.*/config' }
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'homeassistant/.*/config'); 'homeassistant/.*/config' =~ m/$old/ ? $old : $old.'|homeassistant/.*/config' }
+option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),'ignoreRegexp','not_set');return 0}
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
-farewell:template has been applied successfully. Check further extending the ignoreRegexp by yourself!
 
 name:do_general_mqtt_cleanup
 filter:NAME=speechrecognTesting
 order:000002b
-desc:template to do some cleanup and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}[/].*/[0-8].
+desc:template to do some cleanup especially to a MQTT2_CLIENT_general_bridge device (if  existant)...
+#and set ignoreRegexp that may help in case MQTT commands may be issued from not within this FHEM server; call e.g. with ADD_TO_IO_IGNOREREGEXP=milight/0x[0-9a-fA-F]{1,4}[/].*/[0-8].
 par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
 par:ADD_TO_IO_IGNOREREGEXP;add ignoreRegexp to be attached to the current one, defaults to "";{ "" }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if expression is already included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),"ignoreRegexp",'ADD_TO_IO_IGNOREREGEXP');; 'ADD_TO_IO_IGNOREREGEXP' =~ m{($old)} ? $old : $old.'|ADD_TO_IO_IGNOREREGEXP' }
 deletereading -q TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge (?!associatedWith).*
 deleteattr TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge readingList
-option:{return 1 if 'ADD_TO_IO_IGNOREREGEXP' ne "";;return 0}
-attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
+#par:IODEVNAME;Name of the IO-Device; { InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+#par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if regex part is included, otherwise it will be added;{ my $old = AttrVal('IODEVNAME','ignoreRegexp','ADD_TO_IO_IGNOREREGEXP'); 'ADD_TO_IO_IGNOREREGEXP' =~ m/$old/ ? $old : $old.'|ADD_TO_IO_IGNOREREGEXP' }
+#option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal('IODEVNAME','ignoreRegexp','not_set');;return 0}
+#attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
+
 
 ###########################################
 # zigbee2mqtt
@@ -110,7 +115,10 @@ name:zigbee2mqtt_bridge
 desc:The zigbee2mqtt bridge device
 filter:TYPE=MQTT2_DEVICE
 order:L_01 
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+farewell:template has been applied successfully. <br>Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|zigbee2mqtt/[A-Za-z0-9._]+/set</i>.
+par:BASE_TOPIC;base topic as set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic","") =~ m,[\b]?([^/:]+)(/.+)?, ? $1 : AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)/bridge/.+, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
   BASE_TOPIC/([A-Za-z0-9._]+)[/]?.*:.* "zigbee_$1"
@@ -152,10 +160,13 @@ attr DEVICE setList\
   z_reset_CC:noArg $\DEVICETOPIC/bridge/config/reset
 attr DEVICE setStateList on off
 attr DEVICE comment To check for new updates of the deamon software, you might want to use a separate HTTPMOD device. See HTTPMOD template zigbee2mqtt_daemon_updates for further details.
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
+#set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
+set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20200628
+setreading DEVICE attrTemplateVersion 20200701
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
+
+
 
 #A pure router device, e.g. a CC2531 flashed with router firmware
 #Contributed by aperoap, https://forum.fhem.de/index.php/topic,94494.msg992467.html#msg992467
@@ -2752,7 +2763,10 @@ name:esp_milight_hub_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:use this with Chris Mullins ESP-Milight-Hub. for further details visit https://github.com/sidoh/esp8266_milight_hub <br>Recommended structure of the topic pattern milight/:device_id/:device_type/:group_id as set in the settings section in the bridge's web interface.
 order:X_01
+farewell:template has been applied successfully. <br>Note: In case you not exclusively use FHEM to send MQTT commands to your devices, it's highly recommended to extend the ignoreRegexp of your IO device! Could be something like <i>|milight/0x[0-9a-fA-F]{1,4}/.*/[0-8]</i>.
 par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)/LWT:, ? $1 : undef }
+par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","mqtt") }
+attr DEVICE icon ICON
 attr DEVICE bridgeRegexp BASE_ID/[^/]*at[^/]+/(0x[0-9a-fA-F]{1,4})/.*/([0-8])?.*:.* "milight_$1_$2"
 attr DEVICE autocreate 1
 attr DEVICE readingList BASE_ID/LWT:.* { json2nameValue($EVENT) }
@@ -2762,9 +2776,9 @@ status\
 </a>Version: \
 version
 attr DEVICE devStateIcon connected:10px-kreis-gruen disconnected.*:10px-kreis-rot
-set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_ID/0x[0-9a-fA-F]{1,4}/.*/[0-8]
+set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model esp_milight_hub_bridge
-setreading DEVICE attrTemplateVersion 20200628
+setreading DEVICE attrTemplateVersion 20200701
 { AttrTemplate_Initialize() }
 
 
@@ -2774,7 +2788,7 @@ prereq:{my @devices=devspec2array("model=esp_milight_hub_bridge");;return 1 if $
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~milight.*
 desc:For use with X_01_esp_milight_hub_bridge <br>Basic elements to control a rgbw bulb. If you own a different type of bulb, this template could contain more options than your physical device might be able to handle. Just delete, what you don't need or use the full featured version to get extended options and then delete what you don't need...
 order:X_011
-par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/[^/]*at[^/]+/.*:, ? $1 : undef }
+par:BASE_ID;BASE_ID typically is milight;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)/LWT/.*:, ? $1 : undef }
 par:GROUP_ID;number from 0 to 8 representing one of the channels of an original bridge or remote;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([0-8]):, ? $1 : undef }
 par:REMOTE_ID;HEX number representing a specific remote or bridge;{ AttrVal("DEVICE","readingList","") =~ m,([^/]+)/(0x[0-9a-fA-F]{1\,4})/.*:, ? $2 : undef }
 par:BULB_TYPE;rgbw, cct, rgb_cct, rgb, fut089, ;{ AttrVal("DEVICE","readingList","") =~ m,[^/]+/[^/]+/[^/]+/([^/]+)/.*:, ? $1 : undef }
@@ -3254,7 +3268,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
-desc:a Worx Landroid mower
+desc:Template for a Worx Landroid mower.<br>The complete setup is described in this <a href="https://forum.fhem.de/index.php/topic,111959.0.html">Forum Thread</a><br>Not all features may be available on all models and firmwares!
 filter:TYPE=MQTT2_DEVICE
 order:X_05
 par:BASE_TOPIC;base topic: the Mower BoardID (2019: PRM100);{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^\/:]+)[\/].+, ? $1 : undef }
@@ -3270,6 +3284,9 @@ dat_st_b:bladeTimeCounter dat_st_d:totalDistance dat_st_wt:totalTime\
 dat_dmp_1:directionPitch dat_dmp_2:directionRoll dat_dmp_3:directionYaw
 attr DEVICE setList mowerRainDelay:slider,0,30,1440 BASE_TOPIC/DEV_ID/commandIn {"rd":$EVTPART1}\
   mowerTimeCorrection:slider,-100,1,100 BASE_TOPIC/DEV_ID/commandIn {"sc":{"p":$EVTPART1}}\
+  startBorderCut:noArg BASE_TOPIC/DEV_ID/commandIn {"sc":{"ots":{"bc":1,"wtm":0}}}\
+  startOneTime:slider,10,10,720 BASE_TOPIC/DEV_ID/commandIn {"sc":{"ots":{"bc":0,"wtm":$EVTPART1}}}\
+  startParty:slider,60,60,2880 BASE_TOPIC/DEV_ID/commandIn {"sc":{"distm":$EVTPART1}}\
   startMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":1}\
   pauseMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":2}\
   stopMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":3}\
@@ -3294,7 +3311,7 @@ mowerStatusTxt:mowerStatusIndex.* {my %stateCodes = (\
  32 => "Edge cutting",\
  33 => "Searching zone",\
  34 => "Pause"\
- ); $stateCodes{ReadingsVal($name,"mowerStatusIndex","0")}},\
+); $stateCodes{ReadingsVal($name,"mowerStatusIndex","0")}},\
 mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  0 => "No error",\
  1 => "Trapped",\
@@ -3314,9 +3331,9 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  15 => "Timeout finding home",\
  16 => "Mower locked",\
  17 => "Battery temp out of range"\
- ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
+); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
 attr DEVICE model worx_landroid_mover
-setreading DEVICE attrTemplateVersion 20200609
+setreading DEVICE attrTemplateVersion 20200701
 
 
 ###########################################
