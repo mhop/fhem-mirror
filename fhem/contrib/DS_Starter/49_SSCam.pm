@@ -465,9 +465,9 @@ my %imc = (                                                                 # di
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
     ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide.png",  },
-    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in.png",       },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom-in.png",       },
     "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,               },
-    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out.png",      },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom-out.png",      },
     "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide.png", }
 );
 
@@ -7277,7 +7277,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
+return 1;
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
