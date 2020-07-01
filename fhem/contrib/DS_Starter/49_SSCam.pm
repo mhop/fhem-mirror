@@ -7277,7 +7277,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-return 1;
+
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
