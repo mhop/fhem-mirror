@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.4.0"  => "26.06.2020  change to packages, changes for PBP ",  
+  "9.4.0"  => "01.07.2020  switch to packages, much more changes according PBP ",  
   "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
   "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
   "9.2.2"  => "14.04.2020  increase read timeout of Redis server cache, fix autocreate bug with https ",
@@ -2551,7 +2551,7 @@ sub camStartRec {
         return;
     }
         
-    if (ReadingsVal("$name", "Record", undef) eq "Start" and !AttrVal($name, "recextend", undef)) {
+    if (ReadingsVal("$name", "Record", "") eq "Start" && !AttrVal($name, "recextend", "")) {
         Log3($name, 3, "$name - another recording is already running - new start-command will be ignored");
         return;
     } 
@@ -2576,6 +2576,8 @@ sub camStartRec {
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camStartRec",  "$name!_!$emtxt!_!$teletxt!_!$chattxt", 0);
     }
+    
+return;
 }
 
 ###############################################################################
@@ -2626,6 +2628,8 @@ sub camStopRec {
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camStopRec", $hash, 0);
     }
+    
+return;
 }
 
 ###############################################################################
@@ -2671,6 +2675,8 @@ sub camExpmode {
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camExpmode", $hash, 0);
     }
+    
+return;
 }
 
 ###############################################################################
@@ -2716,6 +2722,8 @@ sub amMotDetSc {
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::amMotDetSc", $hash, 0);
     }
+   
+return;
 }
 
 ###############################################################################
@@ -2777,7 +2785,9 @@ sub camSnap {
     } else {
         $tac = (defined $tac)?$tac:"";
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -2823,7 +2833,9 @@ sub getRec {
         
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::getRec", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -2869,7 +2881,9 @@ sub getRecAndSave {
         
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::getRecAndSave", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -2914,7 +2928,9 @@ sub startTrack {
         
     } else {
         InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::startTrack", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -2959,7 +2975,9 @@ sub stopTrack {
         
     } else {
         InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::stopTrack", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3013,7 +3031,9 @@ sub setZoom {
         
     } else {
         InternalTimer(gettimeofday()+0.8, "FHEM::SSCam::setZoom", $str, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3059,7 +3079,9 @@ sub getPresets {
         
     } else {
         InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::getPresets", $hash, 0);
-    }    
+    }  
+
+return;    
 }
 
 ###############################################################################
@@ -3104,7 +3126,9 @@ sub setPreset {
         
     } else {
         InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::setPreset", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3150,7 +3174,9 @@ sub delPreset {
         
     } else {
         InternalTimer(gettimeofday()+1.4, "FHEM::SSCam::delPreset", $hash, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3196,7 +3222,9 @@ sub setHome {
         
     } else {
         InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::setHome", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3242,7 +3270,9 @@ sub managePir {
         
     } else {
         InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::managePir", $hash, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3290,7 +3320,9 @@ sub runLiveview {
     
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::runLiveview", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3335,7 +3367,9 @@ sub activateHls {
     
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::activateHls", $hash, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3379,7 +3413,9 @@ sub camAutocreate {
     
     } else {
         InternalTimer(gettimeofday()+2.1, "FHEM::SSCam::camAutocreate", $hash, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3423,7 +3459,9 @@ sub reactivateHls {
     
     } else {
         InternalTimer(gettimeofday()+0.4, "FHEM::SSCam::reactivateHls", $hash, 0);
-    }    
+    }  
+
+return;    
 }
 
 ###############################################################################
@@ -3469,7 +3507,9 @@ sub stopLiveview {
     
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::stopLiveview", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3491,18 +3531,19 @@ sub extEvent {
         
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::extEvent", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
 #                      PTZ-Kamera auf Position fahren
 ###############################################################################
 sub doPtzAaction {
-    my ($hash)       = @_;
-    my $camname      = $hash->{CAMNAME};
-    my $name         = $hash->{NAME};
-    my $errorcode;
-    my $error;
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    my ($errorcode,$error);
     
     RemoveInternalTimer($hash, "FHEM::SSCam::doPtzAaction");
     return if(IsDisabled($name));
@@ -3595,7 +3636,9 @@ sub doPtzAaction {
  
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::doPtzAaction", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3618,7 +3661,9 @@ sub moveStop {
    
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::moveStop", $hash, 0);
-    }    
+    }
+
+return;    
 }
 
 ###############################################################################
@@ -3644,7 +3689,9 @@ sub camEnable {
     
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camEnable", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3670,7 +3717,9 @@ sub camDisable {
         
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camDisable", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###############################################################################
@@ -3745,6 +3794,7 @@ sub getCaminfoAll {
         readingsSingleUpdate($hash, "state",     "initialized",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
         Log3($name, 3, "$name - Polling of $camname is deactivated");
     }
+    
 return;
 }
 
@@ -3782,6 +3832,8 @@ sub getSnapInfo {
         $tac = (defined $tac)?$tac:"";
         InternalTimer(gettimeofday()+1.7, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
     }
+    
+return;
 }
 
 ###############################################################################
@@ -3803,7 +3855,9 @@ sub getSnapFilename {
     
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::getSnapFilename", $hash, 0);
-    }    
+    } 
+
+return;    
 }
 
 ###########################################################################
@@ -3827,6 +3881,8 @@ sub getSvsInfo {
     } else {
         InternalTimer(gettimeofday()+1, "FHEM::SSCam::getSvsInfo", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3850,6 +3906,8 @@ sub setHomeMode {
     } else {
         InternalTimer(gettimeofday()+0.6, "FHEM::SSCam::setHomeMode", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3873,6 +3931,8 @@ sub setOptParams {
     } else {
         InternalTimer(gettimeofday()+0.6, "FHEM::SSCam::setOptParams", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3896,6 +3956,8 @@ sub getHomeModeState {
     } else {
         InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::getHomeModeState", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3919,6 +3981,8 @@ sub getSvsLog {
     } else {
         InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::getSvsLog", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3941,6 +4005,8 @@ sub sessionOff {
     } else {
         InternalTimer(gettimeofday()+1.1, "FHEM::SSCam::sessionOff", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -3964,6 +4030,8 @@ sub getCamInfo {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getCamInfo", $hash, 0);
     } 
+    
+return;
 }
 
 ###########################################################################
@@ -3994,6 +4062,8 @@ sub getStreamFormat {
     } else {
         InternalTimer(gettimeofday()+1.4, "FHEM::SSCam::getStreamFormat", $hash, 0);
     } 
+    
+return;
 }
 
 ################################################################################
@@ -4018,6 +4088,8 @@ sub getStmUrlPath {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getStmUrlPath", $hash, 0);
     }
+    
+return;
 }
 
 ###########################################################################
@@ -4040,7 +4112,9 @@ sub getEventList {
         
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getEventList", $hash, 0);
-    } 
+    }
+
+return;    
 }
 
 ###########################################################################
@@ -4064,7 +4138,8 @@ sub getMotionEnum {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getMotionEnum", $hash, 0);
     }
-    
+   
+return;   
 }
 
 ##########################################################################
@@ -4088,6 +4163,8 @@ sub getCapabilities {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getCapabilities", $hash, 0);
     }
+    
+return;
 }
 
 ##########################################################################
@@ -4120,6 +4197,8 @@ sub getPtzPresetList {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getPtzPresetList", $hash, 0);
     }
+    
+return;
 }
 
 ##########################################################################
@@ -4152,6 +4231,8 @@ sub getPtzPatrolList {
     } else {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
     }
+    
+return;
 }
 
 #############################################################################################################################
@@ -4213,6 +4294,8 @@ sub getApiSites {
                callback => \&getApiSites_Parse
             };
    HttpUtils_NonblockingGet ($param);  
+   
+return;
 } 
 
 ####################################################################################  
@@ -4447,21 +4530,19 @@ sub getApiSites_Parse {
             Log3($name, 4, "$name - $logstr");
         
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
-            no warnings 'uninitialized'; 
-            my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
-            my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
-            my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
-            my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
+            my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
+            my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // "";
+            my $small = $hash->{HELPER}{SVSVERSION}{SMALL} // "";
+            my $build = $hash->{HELPER}{SVSVERSION}{BUILD} // "";
             my $actvs = $major.$minor.$small.$build;
             my $avsc  = $major.$minor.$small;                                # Variable zum Version Kompatibilitätscheck
-            Log3($name, 4, "$name - installed SVS version is: $actvs");
-            use warnings; 
+            Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
             if(AttrVal($name,"simu_SVSversion",0)) {
-                my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
-                $actvs = $vl[0];
+                my @vl  = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
+                $actvs  = $vl[0];
                 $actvs .= $vl[1];
-                $actvs .= ($vl[2] =~ /\d/)?$vl[2]."xxxx":$vl[2];
+                $actvs .= ($vl[2] =~ /\d/) ? $vl[2]."xxxx" : $vl[2];
                 $actvs .= "-simu";
             }
             
@@ -4594,6 +4675,7 @@ sub getApiSites_Parse {
             return;
         }
     }
+    
 return checkSid($hash);
 }
 
@@ -4629,6 +4711,7 @@ sub checkSid {
        return camOp($hash);
    }
 
+return;
 }
 
 #############################################################################################
@@ -4676,6 +4759,8 @@ sub getCamId {
                };
    
    HttpUtils_NonblockingGet($param);
+   
+return;
 }  
 
 #############################################################################################
@@ -4809,6 +4894,7 @@ sub getCamId_Parse {
            }
       }
   }
+  
 return camOp($hash);
 }
 
@@ -5022,16 +5108,15 @@ sub camOp {
       $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "getsvslog") {
-      my $sev = $hash->{HELPER}{LISTLOGSEVERITY}?$hash->{HELPER}{LISTLOGSEVERITY}:"";
-      my $lim = $hash->{HELPER}{LISTLOGLIMIT}?$hash->{HELPER}{LISTLOGLIMIT}:0;
-      my $mco = $hash->{HELPER}{LISTLOGMATCH}?$hash->{HELPER}{LISTLOGMATCH}:"";
-      $mco = IsModelCam($hash)?$hash->{CAMNAME}:$mco;
-      $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
-      $sev = (lc($sev) =~ /error/)?3:(lc($sev) =~ /warning/)?2:(lc($sev) =~ /info/)?1:"";
+      my $sev = $hash->{HELPER}{LISTLOGSEVERITY} // "";
+      my $lim = $hash->{HELPER}{LISTLOGLIMIT}    // 0;
+      my $mco = $hash->{HELPER}{LISTLOGMATCH}    // "";
       
-      no warnings 'uninitialized'; 
-      Log3($name,4, "$name - get logList with params: severity => $hash->{HELPER}{LISTLOGSEVERITY}, limit => $lim, matchcode => $hash->{HELPER}{LISTLOGMATCH}");
-      use warnings;
+      Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
+      
+      $mco = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
+      $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
+      $sev = (lc($sev) =~ /error/) ? 3 :(lc($sev) =~ /warning/) ? 2 :(lc($sev) =~ /info/) ? 1 : "";
       
       $url = "$proto://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
 
@@ -5252,7 +5337,9 @@ sub camOp {
             callback => \&camOp_Parse
             };
    
-   HttpUtils_NonblockingGet ($param);   
+   HttpUtils_NonblockingGet ($param); 
+
+return;   
 } 
   
 ###################################################################################  
@@ -6922,6 +7009,8 @@ sub login {
                callback => \&loginReturn
            };
    HttpUtils_NonblockingGet ($param);
+   
+return;
 }
 
 sub loginReturn {
@@ -6993,6 +7082,7 @@ sub loginReturn {
             return login($hash,$fret);
        }
    }
+   
 return login($hash,$fret);
 }
 
@@ -7036,7 +7126,9 @@ sub logout {
             callback => \&logoutReturn
             };
    
-HttpUtils_NonblockingGet ($param);
+   HttpUtils_NonblockingGet ($param);
+
+return;
 }
 
 sub logoutReturn {  
@@ -7177,7 +7269,7 @@ sub evaljson {
       }
   };
   
-return($hash,$success,$myjson);
+return ($hash,$success,$myjson);
 }
 
 ######################################################################################################
@@ -7277,7 +7369,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
+return 1;
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7561,12 +7653,7 @@ sub ptzPanel {
       
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
-      #$ptz_ret .= "<td class='ptzcontrol pcenter'; colspan=4>";
-      #$ptz_ret .= 'Zoom: ';
-      #$ptz_ret .= "</td>";
-      #$ptz_ret .= "</tr>";
-      #$ptz_ret .= "<tr>";
-      
+
       my @za  = qw(.++ + &nbsp;&nbsp;Zoom&nbsp;&nbsp; - --.);
       
       for my $cmd (@za) {                 
@@ -7586,7 +7673,8 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
+                  my $zbs = $pbsf+100;
+                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
               }
@@ -7614,6 +7702,7 @@ sub ptzPanel {
       
       ## Presets
       for my $fn (sort keys %{$data{webCmdFn}}) {
+          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
           no strict "refs";                                                                    ## no critic 'NoStrict'  
           $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
           use strict "refs";
@@ -7627,6 +7716,7 @@ sub ptzPanel {
 
       ## Patrols
       for my $fn (sort keys %{$data{webCmdFn}}) {
+          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
           no strict "refs";                                                                    ## no critic 'NoStrict'                     
           $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
           use strict "refs";
@@ -8966,7 +9056,7 @@ sub sendChat {
    my ($ret,$cache);
    
    Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###      start send snapshot by SSChatBot           "); 
+   Log3($name, 4, "$name - ###      start send Snap or Video by SSChatBot      "); 
    Log3($name, 4, "$name - ####################################################");
    
    my %chatparams = (
@@ -8989,10 +9079,9 @@ sub sendChat {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $chatparams{$key}->{default} if (!$extparamref->{$key} && !$chatparams{$key}->{attr});    
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
        }
-       no warnings 'uninitialized'; 
-       Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /[sv]dat/);
-       Log3($name, 4, "$name - param $key is set") if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
-       use warnings;
+
+       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/);
+       Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
@@ -9218,7 +9307,7 @@ sub sendTelegram {
    my ($ret,$cache);
    
    Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###      start send snapshot by TelegramBot         "); 
+   Log3($name, 4, "$name - ###     start send Snap or Video by TelegramBot     "); 
    Log3($name, 4, "$name - ####################################################");
    
    my %teleparams = (
@@ -9245,11 +9334,11 @@ sub sendTelegram {
                                                    if(exists $teleparams{$key}->{attr}); 
        if($teleparams{$key}->{set}) {     
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $teleparams{$key}->{default} if (!$extparamref->{$key} && !$teleparams{$key}->{attr});    
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
        no warnings 'uninitialized'; 
-       Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /[sv]dat/);
-       Log3($name, 4, "$name - param $key is set") if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
+       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/);
+       Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
        use warnings;
    }
    
@@ -14746,8 +14835,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         "GPUtils": 0,
         "HttpUtils": 0,
         "Blocking": 0,
-        "Encode": 0,
-        "utf8":0        
+        "Encode": 0      
       },
       "recommends": {
         "FHEM::Meta": 0,
