@@ -7369,7 +7369,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
+return 1;
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7673,7 +7673,7 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  my $zbs = $pbsf+100;
+                  my $zbs = $pbsf*1.55;
                   $img    = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
@@ -9336,10 +9336,9 @@ sub sendTelegram {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $teleparams{$key}->{default} if (!$extparamref->{$key} && !$teleparams{$key}->{attr});    
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
-       no warnings 'uninitialized'; 
+ 
        Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/);
        Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/ && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
-       use warnings;
    }
    
    $data{SSCam}{$name}{PARAMS}{$tac}{name} = $name;
