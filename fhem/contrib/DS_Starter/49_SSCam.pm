@@ -7673,7 +7673,7 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  my $zbs = $pbsf*2;
+                  my $zbs = $pbsf+100;
                   $img    = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
@@ -9135,7 +9135,7 @@ sub sendChat {
        return;   
    } 
                                     
-  no strict "refs";
+  #no strict "refs";
   my ($subject,$fileUrl,$uid,$fname,@as,%seen,@unique);
   
   $cache = cache($name, "c_init");                                                           # Cache initialisieren        
@@ -9188,7 +9188,7 @@ sub sendChat {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           # Muster: {SENDSNAPS}{2222}{0}{imageData}
-          for(cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+          for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
               next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
               next if $1 != $tac;
@@ -9199,7 +9199,7 @@ sub sendChat {
           
       } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           # Muster: {SENDRECS}{305}{0}{imageData} 
-          for(cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
+          for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
               next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
               $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
               next if $1 != $tac;
@@ -9235,7 +9235,7 @@ sub sendChat {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 2, "$name - ERROR: $ret");
                } else {
-                   $ret = $ret = "Chat message [$key] of transaction \"$tac\" for \"$_\" added to \"$chatbot\" sendqueue";
+                   $ret = "Chat message [$key] of transaction \"$tac\" for \"$_\" added to \"$chatbot\" sendqueue";
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 3, "$name - $ret");
                }
@@ -9248,7 +9248,7 @@ sub sendChat {
   
   SSChatBot_getapisites($chatbot);                                    # Übertragung Sendqueue starten
   
-  use strict "refs";
+  # use strict "refs";
   undef %chatparams;
   undef %{$extparamref};
   
