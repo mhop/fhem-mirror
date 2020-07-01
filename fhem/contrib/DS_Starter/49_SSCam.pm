@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.4.0"  => "26.06.2020  change to packages ",  
+  "9.4.0"  => "26.06.2020  change to packages, changes for PBP ",  
   "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
   "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
   "9.2.2"  => "14.04.2020  increase read timeout of Redis server cache, fix autocreate bug with https ",
@@ -465,9 +465,9 @@ my %imc = (                                                                 # di
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
     ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide.png",  },
-    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in.png",      },
-    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,                        },
-    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out.png",     },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in.png",       },
+    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,               },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out.png",      },
     "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide.png", }
 );
 
@@ -7561,13 +7561,13 @@ sub ptzPanel {
       
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td class='ptzcontrol pcenter'; colspan=4>";
-      $ptz_ret .= 'Zoom: ';
-      $ptz_ret .= "</td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "<tr>";
+      #$ptz_ret .= "<td class='ptzcontrol pcenter'; colspan=4>";
+      #$ptz_ret .= 'Zoom: ';
+      #$ptz_ret .= "</td>";
+      #$ptz_ret .= "</tr>";
+      #$ptz_ret .= "<tr>";
       
-      my @za  = qw(.++ + - --.);
+      my @za  = qw(.++ + &nbsp;&nbsp;Zoom&nbsp;&nbsp; - --.);
       
       for my $cmd (@za) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
@@ -7576,8 +7576,6 @@ sub ptzPanel {
           if(!$img) {
               $ptz_ret .= $cmd;
               $ptz_ret .= "</td>"; 
-              $ptz_ret .= "</tr>"; 
-              $ptz_ret .= "<tr>"; 
               next;
           }
           
@@ -7586,7 +7584,7 @@ sub ptzPanel {
           
           } else {                                                                                    # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
               my $iPath = FW_iconPath($img);
-              Log3($name, 2, "$name - IconPath $img: $iPath");
+
               if($ftui) {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
               } else {
