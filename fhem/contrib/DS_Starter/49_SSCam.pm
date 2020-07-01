@@ -583,7 +583,7 @@ sub Define {
   $hash->{SERVERADDR}             = $serveraddr;
   $hash->{SERVERPORT}             = $serverport;
   $hash->{CAMNAME}                = $camname;
-  $hash->{MODEL}                  = ($camname =~ m/^SVS$/i) ? "SVS" : "CAM";     # initial, CAM wird später ersetzt durch CamModel
+  $hash->{MODEL}                  = ($camname =~ m/^SVS$/xi) ? "SVS" : "CAM";    # initial, CAM wird später ersetzt durch CamModel
   $hash->{PROTOCOL}               = $proto;
   $hash->{COMPATIBILITY}          = $compstat;                                   # getestete SVS-version Kompatibilität 
   $hash->{HELPER}{MODMETAABSENT}  = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
@@ -734,16 +734,16 @@ sub Attr {
         delete $hash->{HELPER}{SID};
     }
     
-    if ($aName =~ /hlsNetScript/ && IsModelCam($hash)) {            
+    if ($aName =~ /hlsNetScript/x && IsModelCam($hash)) {            
         return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
     }
     
-    if ($aName =~ /snapReadingRotate/ && !IsModelCam($hash)) {            
+    if ($aName =~ /snapReadingRotate/x && !IsModelCam($hash)) {            
         return " The attribute \"$aName\" is not valid for devices of type \"SVS\"!.";
     }
     
     # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
-    if ($cmd eq "set" && ($aName =~ m/ptzPanel_.*/)) {
+    if ($cmd eq "set" && ($aName =~ m/ptzPanel_/x)) {
         for my $n (0..9) { 
             $n = sprintf("%2.2d",$n);
             addToDevAttrList($name, "ptzPanel_row$n");
@@ -752,7 +752,7 @@ sub Attr {
         addToDevAttrList($name, "ptzPanel_iconPath");
     }
     
-    if($aName =~ m/ptzPanel_row.*|ptzPanel_Home|ptzPanel_use/) {
+    if($aName =~ m/ptzPanel_row|ptzPanel_Home|ptzPanel_use/x) {
         InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::addptzattr", "$name", 0);
     } 
        
