@@ -1348,7 +1348,8 @@ sub ProcessCommandData ($$$) {
       push(@$successor, ["getSystemInformation"])
           if ( ReadingsVal($name, "name", "0") eq "0" || ReadingsVal($name, "model", "0") eq "0" );
       push(@$successor, ["getSupportedApiInfo"])
-          if ( !defined($hash->{helper}{services}) || scalar($hash->{helper}{services}) == 0 );
+          if ( ReadingsVal( $name, "requestFormat", "" ) eq "json" &&
+              (!defined($hash->{helper}{services}) || scalar($hash->{helper}{services}) == 0) );
     
       # read content information
       if ( ReadingsVal($name, "generation", "1.0") ne "1.0" ) {
