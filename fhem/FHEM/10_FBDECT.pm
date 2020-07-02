@@ -103,6 +103,7 @@ FBDECT_SetHttp($@)
   if($p =~ m/actuator/) {
     $cmd{"desired-temp"} = "slider,7.5,0.5,28.5,1";
     $cmd{open} = $cmd{closed} = "noArg";
+    $cmd{windowopen} = $cmd{boost} = "textField";
   }
   if($p =~ m/dimmer/) {
     $cmd{"dim"} = "slider,0,1,100,1";
