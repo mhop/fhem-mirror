@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22255 2020-06-24 17:12:14Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.2.0"  => "27.06.2020  add data provider balanceCurrentData (experimental) ",
+  "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
+  "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
   "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
   "3.1.0"  => "20.06.2020  language of SMA Portal messages depend on global language attribute, avoid order problems by ".
@@ -223,32 +224,38 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
-my %subs;                                                                                     # Arbeitskopie von %stpl
-my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'},    # mandatory
-    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'   },    # mandatory
-    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'          },
-    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'       },
-    balanceDayData      => { doit => 0, level => 'L03', func => '_getBalanceDayData'    },
-    balanceCurrentData  => { doit => 0, level => 'L10', func => '_getBalanceCurrentData'},
-    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'      },
-    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'  },
-    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'   },
-    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData' },
-    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'  },
-    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'      },
+my %mandatory;                                                                                           # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
+my %subs;                                                                                                # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
+my %stpl = (                                                                                             # Ausgangstemplate Subfunktionen der Datenprovider
+    consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+    plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+    liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
+    weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
+    forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
+    consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
+    consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
+    consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
+    consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
+    plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
+    balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
+    balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
+    balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
+    balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
+    balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
                                            # Tags der verfügbaren Datenquellen
-my @pd = qw( balanceDayData
-             balanceCurrentData
-             consumerCurrentdata
-             consumerMasterdata 
+my @pd = qw( plantMasterData
+             consumerMasterdata
+             balanceDayData
+             balanceMonthData
+             balanceYearData
+             balanceTotalData
+             consumerCurrentdata             
              consumerDayData 
              consumerMonthData 
              consumerYearData           
              forecastData
              liveData
-             plantMasterData
              weatherData
              plantLogbook
            );
@@ -278,6 +285,7 @@ sub Initialize {
   $hash->{AttrList}      = "cookieLocation ".
                            "disable:0,1 ".
                            "interval ".
+                           "noHomeManager:1,0 ".
                            "plantLogbookTypes:multiple-strict,Info,Warning,Disturbance,Error ".
                            "plantLogbookApprovalState:Any,NotApproved ".
                            "providerLevel:multiple-strict,".$prov." ".
@@ -727,11 +735,17 @@ sub CallInfo {
       return if(IsDisabled($name));
       
       for my $key (keys %stpl) {                                               # festlegen welche Daten geliefert werden sollen
-          next if($stpl{$key}{doit});                                          # die default Provider nicht noch einmal ausführen
+          if($stpl{$key}{doit}) {                                              # Datenprovider nach Login ausführen (mandatories)
+              $mandatory{$name}{$key}{doit}  = $stpl{$key}{doit};        
+              $mandatory{$name}{$key}{level} = $stpl{$key}{level};
+              $mandatory{$name}{$key}{func}  = $stpl{$key}{func}; 
+              next;
+          }                                       
           $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
           $subs{$name}{$key}{level} = $stpl{$key}{level};
           $subs{$name}{$key}{func}  = $stpl{$key}{func};
       }
+      
       my @pl = split ",", AttrVal($name, "providerLevel", "");
       for my $p (@pl) {
           $subs{$name}{$p}{doit} = 1;
@@ -752,6 +766,16 @@ sub CallInfo {
           Log3 ($name, 4, "$name - calculated cycles summary time: $ctime");
           Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:             $timeout");
+      }
+      
+      if(AttrVal($name, "noHomeManager", 0)) {                                 # wenn kein Home Manager installiert ist keine mandatories ausführen
+          %mandatory = ();
+          for my $k (keys %stpl) {
+              if($stpl{$k}{nohm}) {
+                  $subs{$name}{$k}{doit} = 0; 
+                  Log3 ($name, 3, qq{$name - ignore provider "$k" - SMA Home Manager is not installed}) if(!$nc && !$nr);
+              }
+          }
       }
       
       if(!$nc) {
@@ -871,7 +895,7 @@ sub GetSetData {                                                       ## no cri
 
   ### Login 
   ##############
-  my $paref = [ $name, $ua, $state, $errstate ];
+  my $paref           = [ $name, $ua, $state, $errstate ];
   ($state, $errstate) = _doLogin ($paref);
 
   if($errstate) {
@@ -879,16 +903,17 @@ sub GetSetData {                                                       ## no cri
       return "$name|0|0|$errstate|$getp|$setp|$st";
   } 
 
-  ### die Anlagen Asset Daten auslesen (Funktionen in Template %stpl default doit=1)
+  ### die Anlagen Asset Daten auslesen (Funktionen aus %mandatory mit doit=1)
+  ### (Hash %mandatory ist leer wenn kein SMA Home Manager eingesetzt)
   ##################################################################################
-  for my $k (keys %stpl) {
-      next if(!$stpl{$k}{doit});        
-      no strict "refs";                                  ## no critic 'NoStrict'  
-      ($errstate,$state,$reread,$retry) = &{$stpl{$k}{func}} ({ name     => $name,
-                                                                       ua       => $ua,
-                                                                       state    => $state, 
-                                                                       daref    => \@da
-                                                                    });
+  for my $k (keys %{$mandatory{$name}}) { 
+      next if(!$mandatory{$name}{$k}{doit});        
+      no strict "refs";                                      ## no critic 'NoStrict'  
+      ($errstate,$state,$reread,$retry) = &{$mandatory{$name}{$k}{func}} ({ name  => $name,
+                                                                            ua    => $ua,
+                                                                            state => $state, 
+                                                                            daref => \@da
+                                                                         });
       use strict "refs";                                                                
       
       if($errstate) {
@@ -1490,6 +1515,117 @@ sub _getBalanceDayData {                 ## no critic "not used"
                                          fields   => \%fields,
                                          content  => $cont,
                                          addon    => "Day",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Month
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceMonthData {                 ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceMonthData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Month",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Year
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceYearData {                 ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceYearData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Year",
+                                         daref    => $daref
+                                      });                                     
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#           Abruf Statistik Daten Year
+#            (anchorTime beachten !)
+################################################################
+sub _getBalanceTotalData {               ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0);                                 
+ 
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset   = fhemTzOffset($cts);
+  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+   
+  my $tab     = 4;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                         tag      => "balanceTotalData",
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractStatisticData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "Total",
                                          daref    => $daref
                                       });                                     
   
@@ -2652,12 +2788,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22255 2020-06-24 17:12:14Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22255 2020-06-24 17:12:14Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2884,7 +3020,7 @@ sub PortalAsHtml {                                                              
       } elsif (!defined $pv0) {
           $ret .= "Awaiting minor level forecast data ...";
       } elsif (!defined $pv1) {
-          $ret .= "Awaiting level major level forecast data ...";
+          $ret .= "Awaiting major level forecast data ...";
       }
 
       $ret .= "</td>";
@@ -3850,13 +3986,16 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
           <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved </td></tr>
+          <tr><td> <b>balanceTotalData</b>    </td><td>- Total statistics data are retrieved </td></tr>
        </table>
        </ul>     
        <br>       
@@ -4094,13 +4233,16 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
           <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen </td></tr>
+          <tr><td> <b>balanceTotalData</b>    </td><td>-  Statistikdaten Gesamt werden abgerufen </td></tr>
        </table>
        </ul>     
        <br>       
