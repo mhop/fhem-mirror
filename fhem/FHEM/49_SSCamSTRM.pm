@@ -33,7 +33,7 @@ use strict;
 use warnings;
 use GPUtils qw(GP_Import GP_Export);                   # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday);
-eval "use FHEM::Meta;1" or my $modMetaAbsent = 1; 
+eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;      ## no critic 'eval'
 
 # Run before module compilation
 BEGIN {
@@ -62,9 +62,10 @@ BEGIN {
           FW_cmd
           FW_directNotify                                                              
           FW_wname    
-          SSCam_ptzpanel  
-          SSCam_StreamDev
-          SSCam_getclhash
+          FHEM::SSCam::ptzPanel 
+          FHEM::SSCam::streamDev
+          FHEM::SSCam::composeGallery
+          FHEM::SSCam::getClHash
         )
   );
   
@@ -86,6 +87,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
   "2.11.0" => "24.06.2020  switch to packages, changes according to PBP ",
   "2.10.2" => "08.11.2019  undef \$link in FwFn / streamAsHtml to save memory ",
   "2.10.1" => "18.10.2019  set parentState initial in Define, Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136 ",
@@ -119,6 +121,18 @@ my %vNotesIntern = (
   "0.1.0"  => "10.06.2018  initial Version "
 );
 
+my %fupgrade = (                                                           # Funktionsupgrade in SSCamSTRM devices definiert vor SSCam Version 9.4.0
+    1 => { of => "SSCam_ptzpanel",       nf => "FHEM::SSCam::ptzPanel"       },
+    2 => { of => "SSCam_composegallery", nf => "FHEM::SSCam::composeGallery" },  
+    3 => { of => "SSCam_StreamDev",      nf => "FHEM::SSCam::streamDev"      },      
+);
+
+my %SSCAM_imc = (                                                           # disbled String modellabhängig (SVS / CAM)
+    0 => { 0 => "initialized", 1 => "inactive" },
+    1 => { 0 => "off",         1 => "inactive" },              
+);
+
+my $todef = 5;                                                              # Default Popup Zeit für set <> popupStream
 
 ################################################################
 sub Initialize {
@@ -156,11 +170,13 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
  
 return; 
 }
 
+################################################################
+#                             Define
 ################################################################
 sub Define {
   my ($hash, $def) = @_;
@@ -170,6 +186,8 @@ sub Define {
     return "Usage: define <name> SSCamSTRM <arg>";
   }
 
+  $link = migrateFunc($hash,$link);
+  
   explodeDEF ($hash,$link);
   
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
@@ -181,7 +199,22 @@ sub Define {
   readingsSingleUpdate($hash,"state",       "initialized", 1);                     # Init für "state" 
   readingsSingleUpdate($hash,"parentState", "initialized", 1);                     # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   
-return undef;
+return;
+}
+
+################################################################
+#  im DEF hinterlegte Funktionen vor SSCam V9.4.0 migrieren
+################################################################
+sub migrateFunc {   
+  my $hash = shift;
+  my $link = shift;
+  
+  for my $k (keys %fupgrade) {
+      $hash->{DEF} =~ s/$fupgrade{$k}{of}/$fupgrade{$k}{nf}/gx;
+      $link        =~ s/$fupgrade{$k}{of}/$fupgrade{$k}{nf}/gx;
+  }
+  
+return $link;
 }
 
 ###############################################################
@@ -189,7 +222,7 @@ return undef;
 #  passt die Deviceparameter bei kopierten / umbenennen an
 ###############################################################
 sub Rename {
-	my $new_name = shift;
+    my $new_name = shift;
     my $old_name = shift;
     my $hash     = $defs{$new_name} // return;
     
@@ -200,7 +233,7 @@ return;
 }
 
 sub Copy {
-	my $old_name = shift;
+    my $old_name = shift;
     my $new_name = shift;
     my $hash     = $defs{$new_name} // return;
     
@@ -218,31 +251,28 @@ sub Set {
   my $opt     = $a[1];
   my $prop    = $a[2];    
   
-  return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/);
+  return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/x);
   
   my $setlist = "Unknown argument $opt, choose one of ".
-	             "popupStream "
+                 "popupStream "
                  ;
   
   if ($opt eq "popupStream") {
-  	  my $txt = SSCam_getclhash($hash);
+      my $txt = FHEM::SSCam::getClHash($hash);
       return $txt if($txt);
       
       my $link = AnalyzePerlCommand(undef, $hash->{LINK});
       
       # OK-Dialogbox oder Autoclose
-      my $todef = 5;
-      my $temp  = AttrVal($name, "popupStreamTo", $todef);
-      my $to    = $prop?$prop:$temp;
-      unless ($to =~ /^\d+$/ || lc($to) eq "ok") { $to = $todef; }
-      $to       = ($to =~ /\d+/)?(1000 * $to):$to;
+      my $temp    = AttrVal($name, "popupStreamTo", $todef);
+      my $to      = $prop // $temp;
+      unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
+      $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
       
-      my $pd = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
-      
-      my $parent = $hash->{PARENT};
+      my $pd         = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+      my $parent     = $hash->{PARENT};
       my $parentHash = $defs{$parent};
-      
-      my $htmlCode = $hash->{HELPER}{STREAM};
+      my $htmlCode   = $hash->{HELPER}{STREAM};
       
       if ($hash->{HELPER}{STREAMACTIVE}) {
           my $out = "<html>";
@@ -251,12 +281,12 @@ sub Set {
           
           Log3($name, 4, "$name - Stream to display: $htmlCode");
           Log3($name, 4, "$name - Stream display to webdevice: $pd");
-		  
-          if($to =~ /\d+/) {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd"); 
+          
+          if($to =~ /\d+/x) {
+              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd");  ## no critic 'void context';
           } else {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");
-          }	
+              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");     ## no critic 'void context';
+          } 
       }
   
   } else {
@@ -283,8 +313,7 @@ sub Get {
      return streamAsHtml($hash,"ftui");
  }
  
-return undef;
-return "Unknown argument $cmd, choose one of html:noArg";
+return;
 }
 
 ################################################################
@@ -302,7 +331,7 @@ sub Attr {
             $do = ($aVal) ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-		$val = ($do == 1 ? "disabled" : "initialized");
+        $val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
     }
@@ -312,12 +341,12 @@ sub Attr {
     }
     
     if ($cmd eq "set") {
-        if ($aName =~ m/popupStreamTo/) {
-            unless ($aVal =~ /^\d+$/ || $aVal eq "OK") { $_[3] = 5; }
+        if ($aName =~ m/popupStreamTo/x) {
+            unless ($aVal =~ /^\d+$/x || $aVal eq "OK") { return qq{The Value for $aName is not valid. Use only figures 0-9 or "OK" !}; }
         }        
     }
 
-return undef;
+return;
 }
 
 #############################################################################################
@@ -331,7 +360,7 @@ sub FwFn {
   RemoveInternalTimer($hash);
   $hash->{HELPER}{FW} = $FW_wname;
        
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s); 
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
   
   my $ret = "";
   if(IsDisabled($name)) {
@@ -361,10 +390,9 @@ return $ret;
 sub explodeDEF {                    
   my $hash = shift;
   my $link = shift;
-  my $d    = $hash->{NAME};
   
   my $arg = (split("[()]",$link))[1];
-  $arg   =~ s/'//g;
+  $arg   =~ s/'//xg;
   ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
   
 return;
@@ -376,15 +404,15 @@ return;
 #############################################################################################
 sub webRefresh { 
   my $hash = shift;
-  my $d    = $hash->{NAME};
+  my $name = $hash->{NAME};
   
-  my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
-  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }
+  my $rd = AttrVal($name, "autoRefreshFW", $hash->{HELPER}{FW});
+  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }   ## no critic 'void context';
   
-  my $al = AttrVal($d, "autoRefresh", 0);
+  my $al = AttrVal($name, "autoRefresh", 0);
   if($al) {      
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
-      Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   } else {
       RemoveInternalTimer($hash);
   }
@@ -406,22 +434,22 @@ sub setVersionInfo {
   $hash->{HELPER}{VERSION} = $v;
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-	  # META-Daten sind vorhanden
-	  $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
+      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-	  } else {
-		  $modules{$type}{META}{x_version} = $v; 
-	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+      } else {
+          $modules{$type}{META}{x_version} = $v; 
+      }
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
+          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
+          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
           use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                    ## no critic 'VERSION'                                         
       }
   } else {
-	  # herkömmliche Modulstruktur
-	  $hash->{VERSION} = $v;
+      # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;
   }
   
 return;
@@ -440,7 +468,7 @@ sub streamAsHtml {
       $link = $s.",'$ftui')}";
   }
   
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s); 
+  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
   
   my $ret = "<html>";
   if(IsDisabled($name)) {  
@@ -451,7 +479,7 @@ sub streamAsHtml {
       }
 
   } else {
-	  $ret .= $link;  
+      $ret .= $link;  
   }
   
   $ret .= "</html>";
@@ -587,7 +615,7 @@ return $ret;
   <br><br> 
   
     <ul>
-	  <b>Examples:</b>
+      <b>Examples:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
@@ -736,7 +764,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
    
     <b>Integration in FHEM TabletUI: </b> <br><br>
     Zur Integration von SSCam Streaming Devices (Typ SSCamSTRM) wird ein Widget bereitgestellt. 
-	Für weitere Information dazu bitte den Artikel im Wiki durchlesen: <br>
+    Für weitere Information dazu bitte den Artikel im Wiki durchlesen: <br>
     <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_SSCam_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
     <br><br><br>
 </ul>
@@ -830,7 +858,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
     <ul>
-	  <b>Beispiele:</b>
+      <b>Beispiele:</b>
       <pre>
 attr &lt;name&gt; genericStrmHtmlTag &lt;video $HTMLATTR controls autoplay&gt;
                                  &lt;source src='http://192.168.2.10:32000/$NAME.m3u8' type='application/x-mpegURL'&gt;
