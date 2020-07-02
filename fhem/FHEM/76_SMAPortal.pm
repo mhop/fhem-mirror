@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
   "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
   "3.1.1"  => "24.06.2020  change german Error regex, get plantOid from cookie if not in JSON ",
@@ -223,23 +224,24 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
-my %subs;                                                                                     # Arbeitskopie von %stpl
-my %stpl = (                                                                                  # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory
-    plantMasterData     => { doit => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory
-    liveData            => { doit => 0, level => 'L01', func => '_getLiveData'            },
-    weatherData         => { doit => 0, level => 'L02', func => '_getWeatherData'         },
-    forecastData        => { doit => 0, level => 'L04', func => '_getForecastData'        },
-    consumerCurrentdata => { doit => 0, level => 'L05', func => '_getConsumerCurrData'    },
-    consumerDayData     => { doit => 0, level => 'L06', func => '_getConsumerDayData'     },
-    consumerMonthData   => { doit => 0, level => 'L07', func => '_getConsumerMonthData'   },
-    consumerYearData    => { doit => 0, level => 'L08', func => '_getConsumerYearData'    },
-    plantLogbook        => { doit => 0, level => 'L09', func => '_getPlantLogbook'        },
-    balanceCurrentData  => { doit => 0, level => 'L10', func => '_getBalanceCurrentData'  },
-    balanceDayData      => { doit => 0, level => 'L11', func => '_getBalanceDayData'      },
-    balanceMonthData    => { doit => 0, level => 'L12', func => '_getBalanceMonthData'    },
-    balanceYearData     => { doit => 0, level => 'L13', func => '_getBalanceYearData'     },
-    balanceTotalData    => { doit => 0, level => 'L14', func => '_getBalanceTotalData'    },
+my %mandatory;                                                                                           # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
+my %subs;                                                                                                # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
+my %stpl = (                                                                                             # Ausgangstemplate Subfunktionen der Datenprovider
+    consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+    plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+    liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
+    weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
+    forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
+    consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
+    consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
+    consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
+    consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
+    plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
+    balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
+    balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
+    balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
+    balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
+    balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
@@ -283,6 +285,7 @@ sub Initialize {
   $hash->{AttrList}      = "cookieLocation ".
                            "disable:0,1 ".
                            "interval ".
+                           "noHomeManager:1,0 ".
                            "plantLogbookTypes:multiple-strict,Info,Warning,Disturbance,Error ".
                            "plantLogbookApprovalState:Any,NotApproved ".
                            "providerLevel:multiple-strict,".$prov." ".
@@ -732,11 +735,17 @@ sub CallInfo {
       return if(IsDisabled($name));
       
       for my $key (keys %stpl) {                                               # festlegen welche Daten geliefert werden sollen
-          next if($stpl{$key}{doit});                                          # die default Provider nicht noch einmal ausführen
+          if($stpl{$key}{doit}) {                                              # Datenprovider nach Login ausführen (mandatories)
+              $mandatory{$name}{$key}{doit}  = $stpl{$key}{doit};        
+              $mandatory{$name}{$key}{level} = $stpl{$key}{level};
+              $mandatory{$name}{$key}{func}  = $stpl{$key}{func}; 
+              next;
+          }                                       
           $subs{$name}{$key}{doit}  = $stpl{$key}{doit};
           $subs{$name}{$key}{level} = $stpl{$key}{level};
           $subs{$name}{$key}{func}  = $stpl{$key}{func};
       }
+      
       my @pl = split ",", AttrVal($name, "providerLevel", "");
       for my $p (@pl) {
           $subs{$name}{$p}{doit} = 1;
@@ -757,6 +766,16 @@ sub CallInfo {
           Log3 ($name, 4, "$name - calculated cycles summary time: $ctime");
           Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:             $timeout");
+      }
+      
+      if(AttrVal($name, "noHomeManager", 0)) {                                 # wenn kein Home Manager installiert ist keine mandatories ausführen
+          %mandatory = ();
+          for my $k (keys %stpl) {
+              if($stpl{$k}{nohm}) {
+                  $subs{$name}{$k}{doit} = 0; 
+                  Log3 ($name, 3, qq{$name - ignore provider "$k" - SMA Home Manager is not installed}) if(!$nc && !$nr);
+              }
+          }
       }
       
       if(!$nc) {
@@ -876,7 +895,7 @@ sub GetSetData {                                                       ## no cri
 
   ### Login 
   ##############
-  my $paref = [ $name, $ua, $state, $errstate ];
+  my $paref           = [ $name, $ua, $state, $errstate ];
   ($state, $errstate) = _doLogin ($paref);
 
   if($errstate) {
@@ -884,16 +903,17 @@ sub GetSetData {                                                       ## no cri
       return "$name|0|0|$errstate|$getp|$setp|$st";
   } 
 
-  ### die Anlagen Asset Daten auslesen (Funktionen in Template %stpl default doit=1)
+  ### die Anlagen Asset Daten auslesen (Funktionen aus %mandatory mit doit=1)
+  ### (Hash %mandatory ist leer wenn kein SMA Home Manager eingesetzt)
   ##################################################################################
-  for my $k (keys %stpl) {
-      next if(!$stpl{$k}{doit});        
-      no strict "refs";                                  ## no critic 'NoStrict'  
-      ($errstate,$state,$reread,$retry) = &{$stpl{$k}{func}} ({ name     => $name,
-                                                                       ua       => $ua,
-                                                                       state    => $state, 
-                                                                       daref    => \@da
-                                                                    });
+  for my $k (keys %{$mandatory{$name}}) { 
+      next if(!$mandatory{$name}{$k}{doit});        
+      no strict "refs";                                      ## no critic 'NoStrict'  
+      ($errstate,$state,$reread,$retry) = &{$mandatory{$name}{$k}{func}} ({ name  => $name,
+                                                                            ua    => $ua,
+                                                                            state => $state, 
+                                                                            daref => \@da
+                                                                         });
       use strict "refs";                                                                
       
       if($errstate) {
@@ -3000,7 +3020,7 @@ sub PortalAsHtml {                                                              
       } elsif (!defined $pv0) {
           $ret .= "Awaiting minor level forecast data ...";
       } elsif (!defined $pv1) {
-          $ret .= "Awaiting level major level forecast data ...";
+          $ret .= "Awaiting major level forecast data ...";
       }
 
       $ret .= "</td>";
@@ -3842,7 +3862,8 @@ return;
 
     After a successful login, only the asset master data are retrieved. 
     The attribute <a href="#providerLevel">providerLevel</a> is used to set the data suppliers its data 
-    the device should retrieve.   
+    the device should retrieve. If no Sunny Home Manager is installed, the attribute
+    <a href="#noHomeManager">noHomeManager</a> must be set. 
    </ul>
    <br><br>   
     
@@ -3926,12 +3947,17 @@ return;
        Time interval for continuous data retrieval from the aus dem SMA Sunny Portal (default: 300 seconds). <br>
        if the interval is set to "0", no continuous data retrieval is executed and has to be triggered manually by the 
        "get &lt;name&gt; data" command.  <br><br>
-       
+              
        <ul>
          <b>Note:</b> 
          The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
          120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
        </ul>
+       </li><br>
+       
+       <a name="noHomeManager"></a>
+       <li><b>noHomeManager</b><br>
+       Must be set if no Sunny Home Manager is installed. 
        </li><br>
        
        <a name="plantLogbookApprovalState"></a>
@@ -4084,7 +4110,8 @@ return;
     
     Nach einem erfolgreichen Login werden nur die Anlagenstammdaten abgerufen. 
     Mit dem Attribut <a href="#providerLevel">providerLevel</a> werden die Datenlieferanten eingestellt, die durch das 
-    Device abgerufen werden sollen.
+    Device abgerufen werden sollen. Ist kein Sunny Home Manager installiert, muss das Attribut 
+    <a href="#noHomeManager">noHomeManager</a> gesetzt werden.
    </ul>
    <br><br>   
     
@@ -4166,7 +4193,8 @@ return;
        
        <a name="disable"></a>
        <li><b>disable</b><br>
-       Deaktiviert das Device. </li><br>
+       Deaktiviert das Device. 
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
@@ -4179,6 +4207,11 @@ return;
          Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
          Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
        </ul>
+       </li><br>
+       
+       <a name="noHomeManager"></a>
+       <li><b>noHomeManager</b><br>
+       Muss gesetzt werden wenn kein Sunny Home Manager installiert ist. 
        </li><br>
        
        <a name="plantLogbookApprovalState"></a>
