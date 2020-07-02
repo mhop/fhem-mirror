@@ -98,7 +98,7 @@ if ($@) {
         # JSON preference order
         local $ENV{PERL_JSON_BACKEND} =
           'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-          unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
+          if ( !defined( $ENV{PERL_JSON_BACKEND} ) );
 
         require JSON;
         import JSON qw( decode_json encode_json );
@@ -317,8 +317,7 @@ sub ascAPIset {
 
     if (   defined($shutterDev)
         && $shutterDev
-        && defined($value)
-        && $value )
+        && defined($value) )
     {
         $shutters->setShuttersDev($shutterDev);
         $shutters->$setter($value);
@@ -331,7 +330,7 @@ sub Define {
     my $hash = shift // return;
     my $aArg = shift // return;
 
-    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    return $@ if ( !FHEM::Meta::SetInternals($hash) );
     use version 0.60; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
 
     return 'only one AutoShuttersControl instance allowed'
@@ -434,32 +433,30 @@ sub Notify {
           if ( $ascDev->getASCenable eq 'none' );
         CommandAttr( undef,
             $name . ' devStateIcon { ShuttersControl_DevStateIcon($name) }' )
-          unless (
+          if (
             AttrVal(
                 $name, 'devStateIcon',
                 '{ ShuttersControl_DevStateIcon($name) }'
-            ) eq '{ ShuttersControl_DevStateIcon($name) }'
+            ) ne '{ ShuttersControl_DevStateIcon($name) }'
           );
         CommandDeleteAttr( undef, $name . ' event-on-change-reading' )
-          unless (
-            AttrVal( $name, 'event-on-change-reading', 'none' ) eq 'none' );
+          if ( AttrVal( $name, 'event-on-change-reading', 'none' ) ne 'none' );
         CommandDeleteAttr( undef, $name . ' event-on-update-reading' )
-          unless (
-            AttrVal( $name, 'event-on-update-reading', 'none' ) eq 'none' );
+          if ( AttrVal( $name, 'event-on-update-reading', 'none' ) ne 'none' );
 
 # Ist der Event ein globaler und passt zum Rest der Abfrage oben wird nach neuen Rolläden Devices gescannt und eine Liste im Rolladenmodul sortiert nach Raum generiert
         ShuttersDeviceScan($hash)
-          unless ( ReadingsVal( $name, 'userAttrList', 'none' ) eq 'none' );
+          if ( ReadingsVal( $name, 'userAttrList', 'none' ) ne 'none' );
     }
     return
-      unless ( ref( $hash->{helper}{shuttersList} ) eq 'ARRAY'
-        && scalar( @{ $hash->{helper}{shuttersList} } ) > 0 );
+      if ( ref( $hash->{helper}{shuttersList} ) ne 'ARRAY'
+        || scalar( @{ $hash->{helper}{shuttersList} } ) == 0 );
 
     my $posReading = $shutters->getPosCmd;
 
     if ( $devname eq $name ) {
         if ( grep m{^userAttrList:.rolled.out$}xms, @{$events} ) {
-            unless ( scalar( @{ $hash->{helper}{shuttersList} } ) == 0 ) {
+            if ( scalar( @{ $hash->{helper}{shuttersList} } ) > 0 ) {
                 WriteReadingsShuttersList($hash);
                 UserAttributs_Readings_ForShutters( $hash, 'add' );
                 InternalTimer(
@@ -771,7 +768,7 @@ sub ShuttersDeviceScan {
 
     CommandDeleteReading( undef, $name . ' .*_nextAstroTimeEvent' );
 
-    unless ( scalar(@list) > 0 ) {
+    if ( scalar(@list) == 0 ) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, 'userAttrList', 'none' );
         readingsBulkUpdate( $hash, 'state',        'no shutters found' );
@@ -1229,7 +1226,7 @@ sub EventProcessingWindowRec {
         elsif ($match =~ m{[Oo]pen|false}xms
             && $shutters->getSubTyp eq 'threestate' )
         {
-            my $posValue        = $shutters->getStatus;
+            my $posValue = $shutters->getStatus;
             my $setLastDrive;
             if (    $ascDev->getAutoShuttersControlComfort eq 'on'
                 and
@@ -1273,12 +1270,12 @@ sub EventProcessingRoommate {
 "AutoShuttersControl ($name) - EventProcessingRoommate: $shuttersDev und Events $events"
         );
 
-        my $getModeUp               = $shutters->getModeUp;
-        my $getModeDown             = $shutters->getModeDown;
-        my $getRoommatesStatus      = $shutters->getRoommatesStatus;
-        my $getRoommatesLastStatus  = $shutters->getRoommatesLastStatus;
-        my $event                   = $1;
-        my $posValue                = $shutters->getStatus;
+        my $getModeUp              = $shutters->getModeUp;
+        my $getModeDown            = $shutters->getModeDown;
+        my $getRoommatesStatus     = $shutters->getRoommatesStatus;
+        my $getRoommatesLastStatus = $shutters->getRoommatesLastStatus;
+        my $event                  = $1;
+        my $posValue               = $shutters->getStatus;
 
         if (
             ( $event eq 'home' || $event eq 'awoken' )
@@ -1902,49 +1899,108 @@ sub EventProcessingBrightness {
     );
 
     return EventProcessingShadingBrightness( $hash, $shuttersDev, $events )
-      unless (
+      if (
         (
-               $shutters->getDown eq 'brightness'
-            || $shutters->getUp eq 'brightness'
+               $shutters->getDown ne 'brightness'
+            && $shutters->getUp ne 'brightness'
         )
         || (
             (
+                   $shutters->getDown eq 'brightness'
+                || $shutters->getUp eq 'brightness'
+            )
+            && (
                 (
                     (
-                        int( gettimeofday() / 86400 ) != int(
-                            computeAlignTime( '24:00',
-                                $shutters->getTimeUpEarly ) / 86400
+                        (
+                            int( gettimeofday() / 86400 ) == int(
+                                computeAlignTime( '24:00',
+                                    $shutters->getTimeUpEarly ) / 86400
+                            )
+                            && (
+                                !IsWe()
+                                || (
+                                    IsWe()
+                                    && $ascDev->getSunriseTimeWeHoliday eq 'off'
+                                    || (
+                                        $ascDev->getSunriseTimeWeHoliday eq 'on'
+                                        && $shutters->getTimeUpWeHoliday eq
+                                        '01:25' )
+                                )
+                            )
                         )
-                        && (
-                            !IsWe()
-                            || ( IsWe()
-                                && $ascDev->getSunriseTimeWeHoliday eq 'off' )
+                        || (
+                            int( gettimeofday() / 86400 ) == int(
+                                computeAlignTime( '24:00',
+                                    $shutters->getTimeUpWeHoliday ) / 86400
+                            )
+                            && IsWe()
+                            && $ascDev->getSunriseTimeWeHoliday eq 'on'
+                            && $shutters->getTimeUpWeHoliday ne '01:25'
                         )
                     )
+                    && int( gettimeofday() / 86400 ) == int(
+                        computeAlignTime( '24:00', $shutters->getTimeUpLate ) /
+                          86400
+                    )
+
                     || (
-                        int( gettimeofday() / 86400 ) != int(
-                            computeAlignTime( '24:00',
-                                $shutters->getTimeUpWeHoliday ) / 86400
+                        (
+                            int( gettimeofday() / 86400 ) != int(
+                                computeAlignTime( '24:00',
+                                    $shutters->getTimeUpEarly ) / 86400
+                            )
+                            && (
+                                !IsWe()
+                                || (
+                                    IsWe()
+                                    && $ascDev->getSunriseTimeWeHoliday eq 'off'
+                                    || (
+                                        $ascDev->getSunriseTimeWeHoliday eq 'on'
+                                        && $shutters->getTimeUpWeHoliday eq
+                                        '01:25' )
+                                )
+                            )
                         )
-                        && IsWe()
-                        && $ascDev->getSunriseTimeWeHoliday eq 'on'
-                        && $shutters->getTimeUpWeHoliday eq '01:25'
+                        || (
+                            int( gettimeofday() / 86400 ) != int(
+                                computeAlignTime( '24:00',
+                                    $shutters->getTimeUpWeHoliday ) / 86400
+                            )
+                            && IsWe()
+                            && $ascDev->getSunriseTimeWeHoliday eq 'on'
+                            && $shutters->getTimeUpWeHoliday ne '01:25'
+                        )
+                    )
+                    && int( gettimeofday() / 86400 ) != int(
+                        computeAlignTime( '24:00', $shutters->getTimeUpLate ) /
+                          86400
                     )
                 )
-                && int( gettimeofday() / 86400 ) == int(
-                    computeAlignTime( '24:00', $shutters->getTimeUpLate ) /
-                      86400
+                && (
+                   (
+                    int( gettimeofday() / 86400 ) == int(
+                        computeAlignTime(
+                            '24:00', $shutters->getTimeDownEarly
+                        ) / 86400
+                    )
+                    && int( gettimeofday() / 86400 ) == int(
+                        computeAlignTime( '24:00', $shutters->getTimeDownLate
+                        ) / 86400
+                    )
                 )
-            )
-            || (
-                int( gettimeofday() / 86400 ) != int(
-                    computeAlignTime( '24:00', $shutters->getTimeDownEarly ) /
-                      86400
+                || (
+                    int( gettimeofday() / 86400 ) != int(
+                        computeAlignTime(
+                            '24:00', $shutters->getTimeDownEarly
+                        ) / 86400
+                    )
+                    && int( gettimeofday() / 86400 ) != int(
+                        computeAlignTime( '24:00', $shutters->getTimeDownLate
+                        ) / 86400
+                    )
                 )
-                && int( gettimeofday() / 86400 ) == int(
-                    computeAlignTime( '24:00', $shutters->getTimeDownLate ) /
-                      86400
-                )
+              )
             )
         )
       );
@@ -2089,8 +2145,8 @@ sub EventProcessingBrightness {
                         $shutters->setLastDrive('brightness privacy day open');
                         ShuttersCommandSet( $hash, $shuttersDev,
                             $shutters->getPrivacyUpPos )
-                          unless (
-                            !$shutters->getQueryShuttersPos(
+                          if (
+                            $shutters->getQueryShuttersPos(
                                 $shutters->getPrivacyUpPos
                             )
                           );
@@ -2166,7 +2222,7 @@ sub EventProcessingBrightness {
                 || $shutters->getModeDown eq 'always'
               )
             {
-                my $posValue    = $shutters->getStatus;
+                my $posValue = $shutters->getStatus;
                 my $lastDrive;
 
                 ## Setzt den PrivacyDown Modus für die Sichtschutzfahrt auf den Status 0
@@ -2224,8 +2280,8 @@ sub EventProcessingBrightness {
 
                 if (
                     $shutters->getPrivacyDownStatus != 2
-                    && (   $posValue != $shutters->getStatus
-                        || $shutters->getSelfDefenseState )
+#                     && (   $posValue != $shutters->getStatus
+#                         || $shutters->getSelfDefenseState )
                   )
                 {
                     $shutters->setSunrise(0);
@@ -2243,7 +2299,7 @@ sub EventProcessingBrightness {
             }
             else {
                 EventProcessingShadingBrightness( $hash, $shuttersDev, $events )
-                  unless ( $shutters->getPrivacyDownStatus == 2 );
+                  if ( $shutters->getPrivacyDownStatus != 2 );
 
                 ASC_Debug( 'EventProcessingBrightness: '
                       . $shutters->getShuttersDev
@@ -2253,7 +2309,7 @@ sub EventProcessingBrightness {
         }
         else {
             EventProcessingShadingBrightness( $hash, $shuttersDev, $events )
-              unless ( $shutters->getPrivacyDownStatus == 2 );
+              if ( $shutters->getPrivacyDownStatus != 2 );
 
             ASC_Debug( 'EventProcessingBrightness: '
                   . $shutters->getShuttersDev
@@ -2909,13 +2965,13 @@ sub EventProcessingExternalTriggerDevice {
         if ( $1 eq $triggerValActive2 ) {
             $shutters->setLastDrive('external trigger2 device active');
             $shutters->setNoDelay(1);
-            $shutters->setExternalTriggerState(1);
+            $shutters->setExternalTriggerStatus(1);
             ShuttersCommandSet( $hash, $shuttersDev, $triggerPosActive2 );
         }
         else {
             $shutters->setLastDrive('external trigger device active');
             $shutters->setNoDelay(1);
-            $shutters->setExternalTriggerState(1);
+            $shutters->setExternalTriggerStatus(1);
             ShuttersCommandSet( $hash, $shuttersDev, $triggerPosActive );
         }
     }
@@ -2933,7 +2989,7 @@ sub EventProcessingExternalTriggerDevice {
 
         $shutters->setLastDrive('external trigger device inactive');
         $shutters->setNoDelay(1);
-        $shutters->setExternalTriggerState(1);
+        $shutters->setExternalTriggerStatus(1);
         ShuttersCommandSet(
             $hash,
             $shuttersDev,
@@ -2960,7 +3016,6 @@ sub ShuttersCommandSet {
 
     if (
         (
-            #                $posValue == $shutters->getShadingPos &&
             CheckIfShuttersWindowRecOpen($shuttersDev) == 2
             && $shutters->getShuttersPlace eq 'terrace'
             && (   $shutters->getLockOut eq 'soft'
@@ -2968,8 +3023,6 @@ sub ShuttersCommandSet {
             && !$shutters->getQueryShuttersPos($posValue)
         )
         || (
-            #             $posValue != $shutters->getShadingPos
-            #             && (
             (
                    $shutters->getPartyMode eq 'on'
                 && $ascDev->getPartyMode eq 'on'
@@ -2999,9 +3052,7 @@ sub ShuttersCommandSet {
                 && $shutters->getShuttersPlace eq 'terrace'
                 && !$shutters->getQueryShuttersPos($posValue) )
             || (   $shutters->getRainProtectionStatus eq 'protected'
-                && $shutters->getWindProtectionStatus eq 'protected' )
-
-            #             )
+                || $shutters->getWindProtectionStatus eq 'protected' )
         )
       )
     {
@@ -3034,9 +3085,10 @@ sub ShuttersCommandSet {
 
 ## Sub welche die InternalTimer nach entsprechenden Sunset oder Sunrise zusammen stellt
 sub CreateSunRiseSetShuttersTimer {
-    my $hash        = shift;
+    my $hash = shift;
     my $shuttersDev = shift // return Log3( $hash->{NAME}, 1,
-"AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDev given");
+"AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDev given"
+    );
 
     my $name            = $hash->{NAME};
     my $shuttersDevHash = $defs{$shuttersDev};
@@ -3102,7 +3154,7 @@ sub CreateSunRiseSetShuttersTimer {
       if ( defined( $shutters->getInTimerFuncHash ) );
 
     ## Setzt den Privacy Modus für die Sichtschutzfahrt auf den Status 0
-    ##  1 bedeutet das PrivacyDown Timer aktiviert wurde, 2 beudet das er im privacyDown ist
+    ##  1 bedeutet das Privacy Timer aktiviert wurde, 2 beudet das er im privacy ist
     ##  also das Rollo in privacy Position steht und VOR der endgültigen Nacht oder Tagfahrt
     $shutters->setPrivacyUpStatus(0)
       if ( !defined( $shutters->getPrivacyUpStatus ) );
@@ -3355,8 +3407,8 @@ sub SunSetShuttersAfterTimerFn {
             $shutters->setLastDrive('timer privacy night close');
             ShuttersCommandSet( $hash, $shuttersDev,
                 $shutters->getPrivacyDownPos )
-              unless (
-                $shutters->getQueryShuttersPos( $shutters->getPrivacyDownPos )
+              if (
+                !$shutters->getQueryShuttersPos( $shutters->getPrivacyDownPos )
               );
         }
         else {
@@ -3378,7 +3430,7 @@ sub SunSetShuttersAfterTimerFn {
         }
     }
 
-    unless ( $shutters->getPrivacyDownStatus == 2 ) {
+    if ( $shutters->getPrivacyDownStatus != 2 ) {
         $shutters->setSunrise(0);
         $shutters->setSunset(1);
     }
@@ -3456,8 +3508,8 @@ sub SunRiseShuttersAfterTimerFn {
                     $shutters->setLastDrive('timer privacy day open');
                     ShuttersCommandSet( $hash, $shuttersDev,
                         $shutters->getPrivacyUpPos )
-                      unless (
-                        !$shutters->getQueryShuttersPos(
+                      if (
+                        $shutters->getQueryShuttersPos(
                             $shutters->getPrivacyUpPos
                         )
                       );
@@ -3482,7 +3534,7 @@ sub SunRiseShuttersAfterTimerFn {
         }
     }
 
-    unless ( $shutters->getPrivacyUpStatus == 2 ) {
+    if ( $shutters->getPrivacyUpStatus != 2 ) {
         $shutters->setSunrise(1);
         $shutters->setSunset(0);
     }
@@ -4559,11 +4611,11 @@ sub _SetCmdFn {
     my $idleDetection      = $shutters->getIdleDetection;
 
     return
-      unless (
-           $shutters->getASCenable eq 'on'
-        && $ascDev->getASCenable eq 'on'
-        && (   $idleDetection =~ m{^$idleDetectionValue$}xms
-            || $idleDetection eq 'none' )
+      if (
+           $shutters->getASCenable eq 'off'
+        && $ascDev->getASCenable eq 'off'
+        && (   $idleDetection !~ m{^$idleDetectionValue$}xms
+            || $idleDetection ne 'none' )
       );
 
     if ( $shutters->getStatus != $posValue ) {
@@ -4642,63 +4694,32 @@ sub _SetCmdFn {
         }
     }
 
-    if (   $ascDev->getSlatDriveCmdInverse
-        && $slatPos > -1
-        && $shutters->getSlatPosCmd ne 'none' )
-    {
-        CommandSet(
-            undef,
-            (
-                  $shutters->getSlatDevice ne 'none'
-                ? $shutters->getSlatDevice
-                : $shuttersDev
-              )
-              . ' '
-              . $shutters->getSlatPosCmd . ' '
-              . $slatPos
-        );
-
-        InternalTimer(
-            gettimeofday() + 3,
-            sub() {
-                CommandSet( undef,
-                        $shuttersDev
-                      . ':FILTER='
-                      . $shutters->getPosCmd . '!='
-                      . $posValue . ' '
-                      . $driveCommand );
-            },
+    CommandSet( undef,
             $shuttersDev
-        );
-    }
-    else {
-        CommandSet( undef,
-                $shuttersDev
-              . ':FILTER='
-              . $shutters->getPosCmd . '!='
-              . $posValue . ' '
-              . $driveCommand );
+            . ':FILTER='
+            . $shutters->getPosCmd . '!='
+            . $posValue . ' '
+            . $driveCommand );
 
-        InternalTimer(
-            gettimeofday() + 3,
-            sub() {
-                CommandSet(
-                    undef,
-                    (
-                          $shutters->getSlatDevice ne 'none'
-                        ? $shutters->getSlatDevice
-                        : $shuttersDev
-                      )
-                      . ' '
-                      . $shutters->getSlatPosCmd . ' '
-                      . $slatPos
-                );
-            },
-            $shuttersDev
-          )
-          if ( $slatPos > -1
-            && $shutters->getSlatPosCmd ne 'none' );
-    }
+    InternalTimer(
+        gettimeofday() + 3,
+        sub() {
+            CommandSet(
+                undef,
+                (
+                        $shutters->getSlatDevice ne 'none'
+                    ? $shutters->getSlatDevice
+                    : $shuttersDev
+                    )
+                    . ' '
+                    . $shutters->getSlatPosCmd . ' '
+                    . $slatPos
+            );
+        },
+        $shuttersDev
+        )
+        if ( $slatPos > -1
+        && $shutters->getSlatPosCmd ne 'none' );
 
     $shutters->setSelfDefenseAbsent( 0, 0 )
       if (!$shutters->getSelfDefenseAbsent
@@ -4721,7 +4742,7 @@ sub _setShuttersLastDriveDelayed {
 
 sub ASC_Debug {
     return
-      unless ( AttrVal( $ascDev->getName, 'ASC_debug', 0 ) );
+      if ( !AttrVal( $ascDev->getName, 'ASC_debug', 0 ) );
 
     my $debugMsg = shift;
     my $debugTimestamp = strftime( "%Y.%m.%e %T", localtime(time) );
@@ -4773,7 +4794,7 @@ sub PrivacyUpTime {
             strftime( "%e.%m.%Y - %H:%M", localtime($privacyUpUnixtime) ), 1 );
         ## Setzt den PrivacyUp Modus für die Sichtschutzfahrt auf den Status 1
         ## und gibt die Unixtime für die nächste Fahrt korrekt zurück
-        unless ( $shutters->getPrivacyUpStatus == 2 ) {
+        if ( $shutters->getPrivacyUpStatus != 2 ) {
             $shutters->setPrivacyUpStatus(1);
             $shuttersSunriseUnixtime = $privacyUpUnixtime;
         }
@@ -4817,7 +4838,7 @@ sub PrivacyDownTime {
             1 );
         ## Setzt den PrivacyDown Modus für die Sichtschutzfahrt auf den Status 1
         ## und gibt die Unixtime für die nächste Fahrt korrekt zurück
-        unless ( $shutters->getPrivacyDownStatus == 2 ) {
+        if ( $shutters->getPrivacyDownStatus != 2 ) {
             $shutters->setPrivacyDownStatus(1);
             $shuttersSunsetUnixtime = $privacyDownUnixtime;
         }
@@ -4963,7 +4984,6 @@ sub _CheckShuttersConditionsForShadingFn {
     my $errorMessage;
     my $warnMessage;
     my $infoMessage;
-
 
     $infoMessage .= (
         $shutters->getShadingMode ne 'off'

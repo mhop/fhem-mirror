@@ -168,7 +168,7 @@ sub setDriveCmd {
                 $posValue)
             && !$FHEM::Automation::ShuttersControl::shutters->getAdvDelay
             && !$FHEM::Automation::ShuttersControl::shutters
-            ->getExternalTriggerState
+            ->getExternalTriggerStatus
             && !$FHEM::Automation::ShuttersControl::shutters
             ->getSelfDefenseState
         )
@@ -177,9 +177,9 @@ sub setDriveCmd {
         $FHEM::Automation::ShuttersControl::shutters->setDelayCmd($posValue);
         $FHEM::Automation::ShuttersControl::ascDev->setDelayCmdReading;
         $FHEM::Automation::ShuttersControl::shutters->setNoDelay(0);
-        $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerState(0)
+        $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(0)
           if ( $FHEM::Automation::ShuttersControl::shutters
-            ->getExternalTriggerState );
+            ->getExternalTriggerStatus );
 
         FHEM::Automation::ShuttersControl::ASC_Debug( 'setDriveCmd: '
               . $FHEM::Automation::ShuttersControl::shutters->getShuttersDev
@@ -193,9 +193,9 @@ sub setDriveCmd {
           if ( $FHEM::Automation::ShuttersControl::shutters->getDelayCmd ne
             'none' )
           ; # setzt den Wert auf none da der Rolladen nun gesteuert werden kann.
-        $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerState(0)
+        $FHEM::Automation::ShuttersControl::shutters->setExternalTriggerStatus(0)
           if ( $FHEM::Automation::ShuttersControl::shutters
-            ->getExternalTriggerState );
+            ->getExternalTriggerStatus );
 
         ### antifreeze Routine
         if ( $FHEM::Automation::ShuttersControl::shutters->getAntiFreezeStatus >
@@ -451,6 +451,20 @@ sub setAdvDelay {
 
     $self->{ $self->{shuttersDev} }->{AdvDelay} = $advDelay;
     return;
+}
+
+sub getExternalTriggerStatus {
+    my $self = shift;
+
+    return (
+        (
+            defined(
+                $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
+              )
+              and
+              $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
+        ) ? 1 : 0
+    );
 }
 
 sub getHomemode {
@@ -872,7 +886,7 @@ sub setRainProtectionStatus {    # Werte protected, unprotected
     return;
 }
 
-sub setExternalTriggerState {
+sub setExternalTriggerStatus {
     my $self  = shift;
     my $value = shift;
 

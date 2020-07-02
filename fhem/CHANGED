@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix commandref and bug in shading function
+                          change code
  - feature: 76_SMAPortal: statistics data provider of Month, Year and Total 
  - change:  89_FULLY: Accepts port number in device definition
  - change:  93_DbRep: improve get <> versionNotes 2

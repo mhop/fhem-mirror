@@ -97,7 +97,6 @@ sub Initialize {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
-      . 'ASC_slatDriveCmdInverse:0,1 '
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
     $hash->{FW_detailFn} =
@@ -895,7 +894,6 @@ sub Initialize {
             <li><strong>ASC_twilightDevice</strong> - das Device, welches die Informationen zum Sonnenstand liefert. Wird unter anderem f&uuml;r die Beschattung verwendet.</li>
             <a name="ASC_windSensor"></a>
             <li><strong>ASC_windSensor - DEVICE[:READING]</strong> - Sensor f&uuml;r die Windgeschwindigkeit. Kombination aus Device und Reading.</li>
-            <li><strong>ASC_slatDriveCmdInverse</strong> - Vertauscht wie Reihnfolge der Fahrbefehle f&uuml;r Slat und Drive</li>
         </ul>
         <br />
         <br />
@@ -1030,7 +1028,7 @@ sub Initialize {
         <tr><td>ExternalTriggerPosActive</td><td>Rolloposition welche angefahren werden soll wenn der erste externe Trigger aktiv wird.</td></tr>
         <tr><td>ExternalTriggerPosActive2</td><td>Rolloposition welche angefahren werden soll wenn der zweite externe Trigger aktiv wird.</td></tr>
         <tr><td>ExternalTriggerPosInactive</td><td>Rolloposition welche angefahren werden soll wenn der externe Trigger inaktiv wird.</td></tr>
-        <tr><td>ExternalTriggerState</td><td>aktueller Status des externen Triggers, 0 oder 1</td></tr>
+        <tr><td>ExternalTriggerStatus</td><td>aktueller Status des externen Triggers, 0 oder 1</td></tr>
         <tr><td>Delay</td><td>konfigurierte Verz&ouml;gerungswert welcher f&uuml;r die Zufallsberechnung werwendet werden soll</td></tr>
         <tr><td>DelayStart</td><td>konfigurierter fester Verz&ouml;gerungswert</td></tr>
         <tr><td>BlockingTimeAfterManual</td><td>konfigurierte Blockzeit nach einer manuellen Fahrt</td></tr>
@@ -1140,7 +1138,7 @@ sub Initialize {
     </p>
     <u>&Uuml;bersicht f&uuml;r das Rollladen-Device Setter</u>
     <ul>
-        <code>{ ascAPIset('SETTER','ROLLODEVICENAME') }</code><br>
+        <code>{ ascAPIset('SETTER','ROLLODEVICENAME','VALUE') }</code><br>
     </ul>
     <table>
         <tr><th>Setter</th><th>Erl&auml;uterung</th></tr>
@@ -1232,23 +1230,6 @@ sub Initialize {
         <tr><td>RainWaitingTime</td><td>   </td></tr>
         <tr><td>BlockAscDrivesAfterManual</td><td>   </td></tr>
     </table>
-    </p>
-    <u>&Uuml;bersicht f&uuml;r das ASC Device Setter</u>
-    <ul>
-        <code>{ ascAPIget('SETTER') }</code><br>
-    </ul>
-    <table>
-        <tr><th>Setter</th><th>Erl&auml;uterung</th></tr>
-        <tr><td>AutoAstroModeEvening</td><td>   </td></tr>
-        <tr><td>AutoAstroModeEveningHorizon</td><td>   </td></tr>
-        <tr><td>AutoAstroModeMorning</td><td>   </td></tr>
-        <tr><td>AutoAstroModeMorningHorizon</td><td>   </td></tr>
-        <tr><td>AutoShuttersControlMorning</td><td>   </td></tr>
-        <tr><td>AutoShuttersControlEvening</td><td>   </td></tr>
-        <tr><td>AutoShuttersControlComfort</td><td>   </td></tr>
-        <tr><td>FreezeTemp</td><td>   </td></tr>
-        <tr><td>BlockAscDrivesAfterManual</td><td>   0,1</td></tr>
-    </table>
 </ul>
 
 =end html_DE
@@ -1272,7 +1253,7 @@ sub Initialize {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.10.1",
+  "version": "v0.10.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

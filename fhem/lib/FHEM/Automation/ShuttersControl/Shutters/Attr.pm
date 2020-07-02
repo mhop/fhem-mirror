@@ -110,9 +110,10 @@ sub _getPosition {
         );
 
         $posAssignment = (
-              $posAssignment =~ m{\A\d+(\.\d+)?\z}xms
-            ? $posAssignment
-            : 'none'
+                defined($posAssignment)
+            &&  $posAssignment =~ m{\A\d+(\.\d+)?\z}xms
+              ? $posAssignment
+              : 'none'
         );
     }
     else {
@@ -1196,20 +1197,6 @@ sub getExternalTriggerPosInactive {
 
     return $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}
       ->{posinactive};
-}
-
-sub getExternalTriggerState {
-    my $self = shift;
-
-    return (
-        (
-            defined(
-                $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
-              )
-              and
-              $self->{ $self->{shuttersDev} }->{ASC_ExternalTrigger}->{event}
-        ) ? 1 : 0
-    );
 }
 
 sub setDelay {
