@@ -2524,11 +2524,12 @@ sub HMinfo_configCheck ($){ ###################################################
     }
   }
   $ret .="\n\n idTp01\n    ".(join "\n    ",sort @tlr)  if(@tlr);
+  $ret .="\n";
 
   $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
 
   if(!$id){$ret = HMinfo_applTxt2Check($ret);}# add readable text
-  return "$id;$ret";#;$ret2";
+  return "$id;$ret";
 }
 sub HMinfo_register ($){ ######################################################
   my ($param) = shift;
