@@ -9904,9 +9904,11 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   my $devN = CUL_HM_getDeviceName($name);
   
   return if (AttrVal($devN,"subType","") eq "virtual");
-
   my ($hm) = devspec2array("TYPE=HMinfo");
-  HMinfo_SetFn($defs{$hm},$hm,"configCheck -f ",$devN) if(defined $hm && $q eq "qReqConf");
+  if(defined $hm && $q eq "qReqConf"){
+    my $chkCfg = "(".join("|",(map{$defs{$devN}{$_}}grep/channel_/,keys %{$defs{$devN}}),$devN).")";
+    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$chkCfg) ;
+  }
 
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
@@ -9932,12 +9934,8 @@ sub CUL_HM_unQEntity($$){# remove entity from q
 sub CUL_HM_qEntity($$){  # add to queue
   my ($name,$q) = @_;
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
-
   my $devN = CUL_HM_getDeviceName($name);
   return if (AttrVal($devN,"subType","") eq "virtual");
-
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  HMinfo_SetFn($defs{$hm},$hm,"configCheck -f ",$devN) if(defined $hm && $q eq "qReqConf");
 
   $name =  $devN if ($defs{$devN}{helper}{q}{$q} eq "00"); #already requesting all
   if ($devN eq $name){#config for all device
@@ -9949,11 +9947,18 @@ sub CUL_HM_qEntity($$){  # add to queue
                                       .",".substr(CUL_HM_name2Id($name),6,2));
   }
   $q .= "Wu" if (!(CUL_HM_getRxType($defs{$name}) & 0x03));#normal or wakeup q?
-  $q = $modules{CUL_HM}{helper}{$q};
-  @{$q} = CUL_HM_noDup(@{$q},$devN); #we only q device - channels are stored in the device
+  my $qa = $modules{CUL_HM}{helper}{$q};
+  @{$qa} = CUL_HM_noDup(@{$qa},$devN); #we only q device - channels are stored in the device
   my $wT = (@{$modules{CUL_HM}{helper}{qReqStat}})?
                               "1":
                               $modules{CUL_HM}{hmAutoReadScan};
+
+  my ($hm) = devspec2array("TYPE=HMinfo");
+   if(defined $hm && $q eq "qReqConf"){
+    my $chkCfg = "(".join("|",(map{$defs{$devN}{$_}}grep/channel_/,keys %{$defs{$devN}}),$devN).")";
+    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$chkCfg) ;
+  }
+
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
 }
