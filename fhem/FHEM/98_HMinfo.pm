@@ -1375,7 +1375,7 @@ sub HMinfo_GetFn($@) {#########################################################
     }
     else{
       (undef,undef,undef,$ret) = split(";",HMinfo_configCheck (join(",",("$name;;",$opt,$filter))),4);
-      $ret =~s/-ret-/\n/g;
+      $ret = HMinfo_bpPost("$name;;;$ret");
     }
   }
   elsif($cmd eq "configChkResult"){##check peers and register------------------
@@ -2528,7 +2528,6 @@ sub HMinfo_configCheck ($){ ###################################################
 
   $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
 
-  if(!$id){$ret = HMinfo_applTxt2Check($ret);}# add readable text
   return "$id;$ret";
 }
 sub HMinfo_register ($){ ######################################################
@@ -2636,13 +2635,17 @@ sub HMinfo_bpPost($) {#bp finished ############################################
   }
   
   $ret = HMinfo_applTxt2Check($ret);
+  delete $defs{$name}{nb}{$id};
+  $defs{$name}{helper}{cfgChkResult} = $ret;
   if ($ret && defined $defs{$cl}){
     $ret =~s/-ret-/\n/g; # re-insert new-line
     asyncOutput($defs{$cl},$ret);
+    return;
   }
-  delete $defs{$name}{nb}{$id};
-  $defs{$name}{helper}{cfgChkResult} = $ret;
-  return;
+  else{
+    return $ret;
+  }
+  
 }
 sub HMinfo_bpAbort($) {#bp timeout ############################################
   my ($rep) = @_;
