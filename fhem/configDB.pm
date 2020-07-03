@@ -149,6 +149,13 @@
 #
 # 2020-02-25 - added     support weekprofile in automatic migration
 #
+# 2020-06-37 - added     support for special strange readings (length check)
+#
+# 2020-06-29 - added     support for mysqldump parameter by attribute
+#
+# 2020-07-02 - changed   code cleanup after last changes (remove debug code)
+#                        add "configdb attr ?" to show known attributes
+#
 ##############################################################################
 =cut
 
@@ -207,6 +214,7 @@ sub _cfgDB_Search;
 sub _cfgDB_Uuid;
 sub _cfgDB_table_exists;
 sub _cfgDB_dump;
+sub _cfgDB_knownAttr;
 
 ##################################################
 # Read configuration file for DB connection
@@ -271,6 +279,8 @@ $configDB{type}              = $cfgDB_dbtype;
 $configDB{attr}{nostate}     = defined($dbconfig{nostate})     ? $dbconfig{nostate}     : 0;
 $configDB{attr}{rescue}      = defined($dbconfig{rescue})      ? $dbconfig{rescue}      : 0;
 $configDB{attr}{loadversion} = defined($dbconfig{loadversion}) ? $dbconfig{loadversion} : 0;
+
+_cfgDB_knownAttr();
 
 %dbconfig = ();
 @config   = ();
@@ -538,7 +548,6 @@ sub cfgDB_SaveState {
 				$val =~ s/\n/\\\n/g;
 				$out = "setstate $d $rd->{TIME} $c $val";
 				if (length($out) > 65530) {
-#                if ($out =~ m/externalTest/) {
                   my $uid = _cfgDB_Uuid();
 				  FileWrite($uid,$val);
 				  $out = "setstate $d $rd->{TIME} $c cfgDBkey:$uid";
@@ -1176,6 +1185,25 @@ sub _cfgDB_dump {
    $ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
    return $ret;
 
+}
+
+sub _cfgDB_knownAttr {
+  $configDB{knownAttr}{deleteimported} =
+    "(0|1) delete file from filesystem after import";
+  $configDB{knownAttr}{dumpPath} =
+    "(valid path) define path for database dump";
+  $configDB{knownAttr}{loadversion}=
+    "for internal use only";
+  $configDB{knownAttr}{maxversions}=
+    "(number) define maximum number of configurations stored in database";
+  $configDB{knownAttr}{mysqldump}=
+    "(valid parameter string) define additional parameters used for dump in mysql environment";
+  $configDB{knownAttr}{nostate}=
+    "for internal use only";
+  $configDB{knownAttr}{private}=
+    "(0|1) show or supress userdata in info output";
+  $configDB{knownAttr}{rescue}=
+    "for internal use only";
 }
 
 ##################################################

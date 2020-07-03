@@ -39,7 +39,7 @@ sub CommandConfigdb {
 
 		when ('attr') {
 			Log3('configdb', 4, "configdb: attr $param1 $param2 requested.");
-			if ($param1 eq "" && $param2 eq "") {
+			if ($param1 eq '' && $param2 eq '') {
 			# list attributes
 				foreach my $c (sort keys %{$configDB{attr}}) {
 					my $val = $configDB{attr}{$c};
@@ -47,7 +47,19 @@ sub CommandConfigdb {
 					$val =~ s/\n/\\\n/g;
 					$ret .= "configdb attr $c $val\n";
 				}
-			} elsif($param2 eq "") {
+			} elsif(lc($param1) eq '?' || lc($param1) eq 'help') {
+			# list all available attributes
+			    my $l = 0;
+				foreach my $c (sort keys %{$configDB{knownAttr}}) {
+    				$l = length($c) > $l ? length($c) : $l;
+    			}
+				foreach my $c (sort keys %{$configDB{knownAttr}}) {
+					my $val = $configDB{knownAttr}{$c};
+					$val =~ s/;/;;/g;
+					$val =~ s/\n/\\\n/g;
+					$ret .= sprintf("%-*s : ",$l,$c)."$val\n";
+				}
+			} elsif($param2 eq '') {
 			# delete attribute
 				delete $configDB{attr}{$param1};
 				$ret = " attribute $param1 deleted";
@@ -68,8 +80,6 @@ sub CommandConfigdb {
 
 		when ('diff') {
 			return "\n Syntax: configdb diff <device> <version>" if @a != 3;
-#			return "Invalid paramaeter '$param1' for diff. Must be a number."
-#				unless looks_like_number($param1);
 			return "Invalid paramaeter '$param2' for diff. Must be a number."
 				unless (looks_like_number($param2) || $param2 eq 'current');
 			Log3('configdb', 4, "configdb: diff requested for device: $param1 in version $param2.");
@@ -439,13 +449,7 @@ sub _cfgDB_readConfig() {
 			<br/>
 			<code> configdb attr</code> - show all defined attributes.<br/>
 			<br/>
-			<ul>Supported attributes:</ul>
-			<br/>
-			<ul><b>deleteimported</b> if set to 1 files will always be deleted from filesystem after import to database.<br/></ul><br/>
-			<ul><b>maxversions</b> set the maximum number of configurations stored in database. <br/>
-			    The oldest version will be dropped in a "save config" if it would exceed this number.</ul><br/>
-			<ul><b>private</b> if set to 0 the database user and password info will be shown in 'configdb info' output.</ul><br/>
-			<ul><b>dumpPath</b> define a path for database dumps<br/></ul><br/>
+			<code> configdb attr ?|help</code> - show a list of available attributes.<br/>
 			<br/>
 
 		<li><code>configdb diff &lt;device&gt; &lt;version&gt;</code></li><br/>
