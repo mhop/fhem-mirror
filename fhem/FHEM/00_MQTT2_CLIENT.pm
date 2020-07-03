@@ -86,6 +86,7 @@ MQTT2_CLIENT_connect($)
   my $disco = (ReadingsVal($hash->{NAME}, "state", "") eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
+  $hash->{BUF}="";
   return DevIo_OpenDev($hash, $disco, "MQTT2_CLIENT_doinit", sub(){})
                 if($hash->{connecting});
 }
@@ -206,6 +207,7 @@ MQTT2_CLIENT_Disco($;$)
         if($ond && $ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
   MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
+  delete($hash->{BUF});
 }
 
 
