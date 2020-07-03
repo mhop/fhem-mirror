@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
   "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
   "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
@@ -205,8 +206,8 @@ my %vNotesIntern = (
 # Voreinstellungen
 my $maxretries   = 8;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
 my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
-my $sleepretry   = 0.5;                    # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
-my $sleepexc     = 2;                      # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
+my $sleepretry   = 60;                     # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
+my $sleepexc     = 90;                     # Sleep vor neuem Datencall nach Überschreitung Threshold (neues Cookie wird angelegt)
 my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
 
 my %statkeys = (                           # Statistikdaten auszulesende Schlüssel
@@ -224,24 +225,24 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
-my %mandatory;                                                                                           # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
-my %subs;                                                                                                # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
-my %stpl = (                                                                                             # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
-    plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
-    liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
-    weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
-    forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
-    consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
-    consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
-    consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
-    consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
-    plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
-    balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
-    balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
-    balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
-    balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
-    balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
+my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
+my %subs;                                                                                              # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
+my %stpl = (                                                                                           # Ausgangstemplate Subfunktionen der Datenprovider
+  consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+  plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+  liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
+  weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
+  forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
+  consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
+  consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
+  consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
+  consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
+  plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
+  balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
+  balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
+  balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
+  balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
+  balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
@@ -752,8 +753,9 @@ sub CallInfo {
       }
       
       if ($hash->{HELPER}{RUNNING_PID}) {
-          BlockingKill($hash->{HELPER}{RUNNING_PID});
-          delete($hash->{HELPER}{RUNNING_PID});
+          Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
+          InternalTimer(gettimeofday()+5, "FHEM::SMAPortal::CallInfo", $hash, 0) if($interval);
+          return;
       } 
       
       my $getp = $hash->{HELPER}{GETTER};
@@ -984,7 +986,7 @@ sub GetSetData {                                                       ## no cri
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
               if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
-                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
+                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry in $sleepretry seconds ...}); 
                   sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
@@ -999,7 +1001,7 @@ sub GetSetData {                                                       ## no cri
           my $ac        = $hash->{HELPER}{ACTCYCLE};
           my $maxcycles = (controlParams $name)[1];
           if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
-              Log3 ($name, 3, qq{$name - Maximum retries reached, start new data get cycle ...}); 
+              Log3 ($name, 3, qq{$name - Maximum retries reached, start new data get cycle in $sleepexc seconds ...}); 
               $newcycle = 1;
               return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
           }    
@@ -2788,12 +2790,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22312 2020-06-30 21:37:17Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -3862,7 +3864,8 @@ return;
 
     After a successful login, only the asset master data are retrieved. 
     The attribute <a href="#providerLevel">providerLevel</a> is used to set the data suppliers its data 
-    the device should retrieve.   
+    the device should retrieve. If no Sunny Home Manager is installed, the attribute
+    <a href="#noHomeManager">noHomeManager</a> must be set. 
    </ul>
    <br><br>   
     
@@ -3946,12 +3949,17 @@ return;
        Time interval for continuous data retrieval from the aus dem SMA Sunny Portal (default: 300 seconds). <br>
        if the interval is set to "0", no continuous data retrieval is executed and has to be triggered manually by the 
        "get &lt;name&gt; data" command.  <br><br>
-       
+              
        <ul>
          <b>Note:</b> 
          The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
          120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
        </ul>
+       </li><br>
+       
+       <a name="noHomeManager"></a>
+       <li><b>noHomeManager</b><br>
+       Must be set if no Sunny Home Manager is installed. 
        </li><br>
        
        <a name="plantLogbookApprovalState"></a>
@@ -3986,7 +3994,7 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
-          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated (an SMA Home Manager must be available) </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
@@ -4104,7 +4112,8 @@ return;
     
     Nach einem erfolgreichen Login werden nur die Anlagenstammdaten abgerufen. 
     Mit dem Attribut <a href="#providerLevel">providerLevel</a> werden die Datenlieferanten eingestellt, die durch das 
-    Device abgerufen werden sollen.
+    Device abgerufen werden sollen. Ist kein Sunny Home Manager installiert, muss das Attribut 
+    <a href="#noHomeManager">noHomeManager</a> gesetzt werden.
    </ul>
    <br><br>   
     
@@ -4186,7 +4195,8 @@ return;
        
        <a name="disable"></a>
        <li><b>disable</b><br>
-       Deaktiviert das Device. </li><br>
+       Deaktiviert das Device. 
+       </li><br>
 
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
@@ -4199,6 +4209,11 @@ return;
          Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
          Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
        </ul>
+       </li><br>
+       
+       <a name="noHomeManager"></a>
+       <li><b>noHomeManager</b><br>
+       Muss gesetzt werden wenn kein Sunny Home Manager installiert ist. 
        </li><br>
        
        <a name="plantLogbookApprovalState"></a>
@@ -4233,7 +4248,7 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
-          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt (ein SMA Home Manager muss vorhanden sein) </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
