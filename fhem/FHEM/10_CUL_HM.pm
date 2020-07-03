@@ -1244,14 +1244,14 @@ sub CUL_HM_Parse($$) {#########################################################
     if( defined $mh{dstH}->{helper}{cSnd} && 
           $mh{dstH}->{helper}{cSnd} !~ m/$tm/){
       if (   !defined $mh{dstH}->{"prot"."ErrIoAttack"} 
-          && ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack cnt:",undef)){
+          && ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef)){
         $mh{dstH}->{"prot"."ErrIoAttack"} =
-          ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack cnt:",undef);
+          ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef);
       }
       Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:$mh{dstH}->{helper}{cSnd}:".$tm;
       CUL_HM_eventP($mh{dstH},"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoAttack"},2);
-      push @evtEt,[$mh{dstH},1,"sabotageAttack_ErrIoAttack cnt:$evntCnt"];
+      push @evtEt,[$mh{dstH},1,"sabotageAttack_ErrIoAttack_cnt:$evntCnt"];
     }
   }
   ###########
