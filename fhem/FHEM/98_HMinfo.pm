@@ -1364,6 +1364,7 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
+
     if ($hash->{CL}){
       $defs{$name}{helper}{cfgChkResult} = "";
       my $id = ++$hash->{nb}{cnt};
@@ -2931,9 +2932,14 @@ sub HMinfo_templateChk(@){#####################################################
     $repl = "  no peer:$pName - ".ReadingsVal($aName,"peerList" ,"")."\n";
   }
   else{
-    my $pRnm = $pName ? $pName."-" : "";
+    my $pRnm = "";
     if ($pName){
-      $pRnm = $pName.(($defs{$pName}{helper}{role}{dev})?"_chn-01-":"-");
+      if (defined $defs{$pName} && $defs{$pName}{helper}{role}{dev}){
+        $pRnm = $pName."_chn-01-";
+      }
+      else{
+        $pRnm = $pName."-";
+      }
     }
     my $pRnmLS = $pTyp eq "long"?"lg":($pTyp eq "short"?"sh":"");
     foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
