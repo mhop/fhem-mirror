@@ -1136,15 +1136,13 @@ AnalyzePerlCommand($$;$)
   my $we = IsWe(undef, $wday);
 
   if($evalSpecials) {
-    $cmd = join("", map { my $n = substr($_,1); # ignore the %
-                          my $v = $evalSpecials->{$_};
-                          $v =~ s/(['\\])/\\$1/g;
-                          "my \$$n='$v';";
-                        } keys %{$evalSpecials})
-           . $cmd;
-    # Normally this is deleted in AnalyzeCommandChain, but ECMDDevice calls us
-    # directly, and combining perl with something else isnt allowed anyway.
-    $evalSpecials = undef if(!$calledFromChain);
+    $cmd = join("", map {
+      my $n = substr($_,1); # ignore the legacy %
+      my $ref = ref($evalSpecials->{$_});
+      $ref eq "ARRAY" ? "my \@$n=\@{\$evalSpecials->{'$_'}};" :
+      $ref eq "HASH"  ? "my \%$n=\%{\$evalSpecials->{'$_'}};" :
+                        "my \$$n=   \$evalSpecials->{'$_'};";
+    } sort keys %{$evalSpecials}) . $cmd;
   }
 
   $cmdFromAnalyze = $cmd;
@@ -1153,6 +1151,10 @@ AnalyzePerlCommand($$;$)
     $ret = $@;
     Log 1, "ERROR evaluating $cmd: $ret";
   }
+
+  # Normally this is deleted in AnalyzeCommandChain, but ECMDDevice calls us
+  # directly, and combining perl with something else isnt allowed anyway.
+  $evalSpecials = undef if(!$calledFromChain);
   $cmdFromAnalyze = undef;
   return $ret;
 }
