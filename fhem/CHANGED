@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix   73_AutoShuttersControl: fix bug in
+                   ./lib/FHEM/Automation/ShuttersControl.pm
  - feature: 76_SMAPortal: new attribute noHomeManager
  - bugfix:  70_BRAVIA: check available service APIs if available only
  - change:  49_SSCam / 49_SSCamSTRM: switch to packages, changes according PBP
