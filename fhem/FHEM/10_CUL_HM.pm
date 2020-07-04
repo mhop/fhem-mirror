@@ -143,6 +143,7 @@ sub CUL_HM_autoReadReady($);
 sub CUL_HM_calcDisWm($$$);
 sub CUL_HM_statCnt(@);
 sub CUL_HM_trigLastEvent($$$$$);
+sub CUL_HM_rmOldRegs($$);
 
 # ----------------modul globals-----------------------
 my $respRemoved; # used to control trigger of stack processing
@@ -3377,6 +3378,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         if (grep /00000000/,@peers) {# last entry, peerList is complete
           # check for request to get List3 data
           my $reqPeer = $chnhash->{helper}{getCfgList};
+          my $readCont = 0;    # more to read?
           if ($reqPeer){
             my $flag = 'A0';
             my $ioId = CUL_HM_IoId($mhp->{devH});
@@ -3390,6 +3392,7 @@ sub CUL_HM_parseCommon(@){#####################################################
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
                   CUL_HM_PushCmdStack($mhp->{devH},sprintf("++%s01%s%s%s04%s%s",
                           $flag,$ioId,$mhp->{src},$chn,$peer,$listNo));# List3 or 4
+                  $readCont = 1;
                 }
               }
             }
@@ -3397,7 +3400,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_respPendRm($mhp->{devH});
           delete $chnhash->{helper}{getCfgList};
           delete $chnhash->{helper}{getCfgListNo};
-          CUL_HM_rmOldRegs($chnName);
+          CUL_HM_rmOldRegs($chnName,$readCont);
           $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
         }
         else{
@@ -4274,7 +4277,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   
   $cmd = $oCmd;# necessary for press/S/L - check better implementation
-
   my @hArr;
   @hArr = split(" ", $h) if($h);
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
@@ -6610,7 +6612,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $tTyp =   ($tPeer eq "0" ? "" 
             : ($tTyp  eq "0" ? ":both"
             :  ":".$tTyp)); 
-            
     my ($hm) = devspec2array("TYPE=HMinfo");
     return "no HMinfo defined" if (!defined $defs{$hm});
 
@@ -6641,7 +6642,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   else{
     return "$cmd not implemented - contact sysop";
   }
-
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
   my $rxType = CUL_HM_getRxType($devHash);
@@ -7109,7 +7109,7 @@ sub CUL_HM_ProcessCmdStack($) {
   my $hash = CUL_HM_getDeviceHash($chnhash);
   if (!defined $hash->{helper}{prt}{rspWait} or ! defined $hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
-     CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
+      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
     }
     elsif($hash->{helper}{prt}{sProc} != 0){
       CUL_HM_protState($hash,"CMDs_done");                                    
@@ -8574,10 +8574,13 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_SD_2($hash) if ($list == 0);
   }
   #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
+
+  my ($hm) = devspec2array("TYPE=HMinfo");
+  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$name) if(defined $hm);
 }
-sub CUL_HM_rmOldRegs($){ # remove register i outdated
+sub CUL_HM_rmOldRegs($$){ # remove register i outdated
   #will remove register for deleted peers
-  my $name = shift;
+  my ($name,$readCont) = @_;
   my $hash = $defs{$name};
   return if (!$hash->{peerList});# so far only peer-regs are removed
   my @rpList;
@@ -8591,6 +8594,10 @@ sub CUL_HM_rmOldRegs($){ # remove register i outdated
     next if($hash->{peerList} =~ m/\b$peer\b/);
     delete $hash->{READINGS}{$_} foreach (grep /^R-${peer}-/,keys %{$hash->{READINGS}});
     delete $hash->{READINGS}{$_} foreach (grep /^R-${peer}_chn-..-/,keys %{$hash->{READINGS}});
+  }
+  if($readCont){
+    my ($hm) = devspec2array("TYPE=HMinfo");
+    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$name) if(defined $hm);
   }
 }
 sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
@@ -9904,11 +9911,6 @@ sub CUL_HM_unQEntity($$){# remove entity from q
   my $devN = CUL_HM_getDeviceName($name);
   
   return if (AttrVal($devN,"subType","") eq "virtual");
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  if(defined $hm && $q eq "qReqConf"){
-    my $chkCfg = "(".join("|",(map{$defs{$devN}{$_}}grep/channel_/,keys %{$defs{$devN}}),$devN).")";
-    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$chkCfg) ;
-  }
 
   my $dq = $defs{$devN}{helper}{q};
   RemoveInternalTimer("sUpdt:$name") if ($q eq "qReqStat");#remove delayed
@@ -9954,7 +9956,7 @@ sub CUL_HM_qEntity($$){  # add to queue
                               $modules{CUL_HM}{hmAutoReadScan};
 
   my ($hm) = devspec2array("TYPE=HMinfo");
-   if(defined $hm && $q eq "qReqConf"){
+  if(defined $hm && $q eq "qReqConf"){
     my $chkCfg = "(".join("|",(map{$defs{$devN}{$_}}grep/channel_/,keys %{$defs{$devN}}),$devN).")";
     HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$chkCfg) ;
   }
