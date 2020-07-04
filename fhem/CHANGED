@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 51_MOBILEALERTS: Added Sensor MA 10238
  - bugfix   73_AutoShuttersControl: fix bug in
                    ./lib/FHEM/Automation/ShuttersControl.pm
  - feature: 76_SMAPortal: new attribute noHomeManager
