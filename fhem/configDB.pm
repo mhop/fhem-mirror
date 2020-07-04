@@ -1192,18 +1192,18 @@ sub _cfgDB_knownAttr {
     "(0|1) delete file from filesystem after import";
   $configDB{knownAttr}{dumpPath} =
     "(valid path) define path for database dump";
-  $configDB{knownAttr}{loadversion}=
-    "for internal use only";
+#  $configDB{knownAttr}{loadversion}=
+#    "for internal use only";
   $configDB{knownAttr}{maxversions}=
     "(number) define maximum number of configurations stored in database";
   $configDB{knownAttr}{mysqldump}=
     "(valid parameter string) define additional parameters used for dump in mysql environment";
-  $configDB{knownAttr}{nostate}=
-    "for internal use only";
+#  $configDB{knownAttr}{nostate}=
+#    "for internal use only";
   $configDB{knownAttr}{private}=
     "(0|1) show or supress userdata in info output";
-  $configDB{knownAttr}{rescue}=
-    "for internal use only";
+#  $configDB{knownAttr}{rescue}=
+#    "for internal use only";
 }
 
 ##################################################
