@@ -544,9 +544,16 @@ sub CUL_HM_updateConfig($){##########################
       }
     }
     CUL_HM_complConfig($name);
+    CUL_HM_setAssotiat($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
+  
+  my ($hm) = devspec2array("TYPE=HMinfo");
+  HMinfo_GetFn($defs{$hm},$hm,"configCheck") if(defined $hm && !$modules{CUL_HM}{helper}{hmManualOper});
+
 }
+
+
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -840,7 +847,7 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "modelForce"){
     if ($init_done){# while init allow anything. Correct with CUL_HM_updateConfig after init_done
       if ($cmd eq "set"){
-        return "invalid model name:$attrVal. Please check options" if (!CUL_HM_getmIdFromModel($attrVal));
+        return "invalid model name$cmd. Please check options" if (!CUL_HM_getmIdFromModel($attrVal));
         if (!defined $attr{$name}{".mId"} && defined $attr{$name}{model}){ # set .mId in case it is missing
           $attr{$name}{".mId"} = CUL_HM_getmIdFromModel($attr{$name}{model});
         }
@@ -1228,7 +1235,7 @@ sub CUL_HM_Parse($$) {#########################################################
   ####################  attack alarm detection#####################
   if (   $mh{dstH} && $mh{dst} ne "000000"
       && !CUL_HM_getAttrInt($mh{dstN},"ignore")
-      && ($mh{mTp} eq '01' || $mh{mTp} eq '11'
+      && ($mh{mTp} =~ m/^(01|11|3E)$/
       )){
     my $ioId = AttrVal($mh{dstH}->{IODev}{NAME},"hmId","-");
     if($ioId ne $mh{src}){
@@ -1242,7 +1249,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{dstH},1,"sabotageAttackId_ErrIoId_$mh{src}: cnt:$evntCnt"];
     }
     my $tm = substr($mh{msg},8);
-    if( defined $mh{dstH}->{helper}{cSnd} && 
+    if( !defined $mh{dstH}->{helper}{cSnd} || 
           $mh{dstH}->{helper}{cSnd} !~ m/$tm/){
       if (   !defined $mh{dstH}->{"prot"."ErrIoAttack"} 
           && ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef)){
@@ -7909,7 +7916,8 @@ sub CUL_HM_ID2PeerList ($$$) {
         CUL_HM_UpdtReadSingle($hash,"state","unpeered");
       }
     }
- }
+  }
+  CUL_HM_setAssotiat($name);
 }
 sub CUL_HM_peerChId($$) {  #in:<IDorName> <deviceID>, out:channelID
   my($pId,$dId)=@_;
@@ -8239,6 +8247,15 @@ sub CUL_HM_lstCh($$$){
     return $h->{helper}{shRegR}{$l};
   }
   return $c;
+}
+sub CUL_HM_setAssotiat($) {##########################
+  my $name = shift;
+  my @list = (CUL_HM_getAssChnNames(CUL_HM_getDeviceName($name))
+             ,CUL_HM_getDeviceName($name)
+             ,grep!/self/,split(",",InternalVal($name,"peerList","")));
+  CUL_HM_UpdtReadSingle($defs{$name},".associatedWith"
+                       ,join(",",@list)
+                       ,0);
 }
 
 #+++++++++++++++++ debug ++++++++++++++++++++++++++++++++++++++++++++++++++++++
