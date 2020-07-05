@@ -837,7 +837,7 @@ sub CUL_HM_Attr(@) {#################################
         CUL_HM_UpdtCentral($name);
     }
     else{
-      return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done && AttrVal($name,$attrName,"empty") != m/(empty|$attrVal)/);
+      return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done && AttrVal($name,$attrName,"empty") !~ m/(empty|$attrVal)/);
       delete $hash->{helper}{rxType}; # needs new calculation
       delete $hash->{helper}{mId};
       CUL_HM_hmInitMsg($hash);# will update mId, rxType and others
@@ -864,7 +864,7 @@ sub CUL_HM_Attr(@) {#################################
     return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done);
   }
   elsif($attrName eq "subType"){
-    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done && AttrVal($name,$attrName,"empty") != m/(empty|$attrVal)/);
+    return "$attrName must not be changed by User. \nUse modelForce instead" if ($init_done && AttrVal($name,$attrName,"empty") !~ m/(empty|$attrVal)/);
     $updtReq = 1;
   }
   elsif($attrName eq "aesCommReq" ){
