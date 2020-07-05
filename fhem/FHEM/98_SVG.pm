@@ -1517,7 +1517,7 @@ SVG_render($$$$$$$$$$)
   my $tmul; 
   $tmul = $w/($tosec-$fromsec) if($tosec && $fromsec && $tosec != $fromsec);
 
-  my ($min, $max, $idx) = (99999999, -99999999, 0);
+  my ($min, $max, $idx) = (9e+30, -9e+30, 0);
   my (%hmin, %hmax, @hdx, @hdy);
   my ($dxp, $dyp) = (\(), \());
 
@@ -1542,7 +1542,7 @@ SVG_render($$$$$$$$$$)
           $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
           $hmax{$a} = $max if(!defined($hmax{$a}) || $hmax{$a} < $max);
         }
-        ($min, $max) = (99999999, -99999999);
+        ($min, $max) = (9e+30, -9e+30);
         $hdx[$idx] = $dxp; $hdy[$idx] = $dyp;
         ($dxp, $dyp) = (\(), \());
         $lIdx++;
